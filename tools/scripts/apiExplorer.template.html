@@ -733,8 +733,8 @@ if (!set("cutof.value", 1)) {
       </p>
       <p>
         You can override it for a group of lines when you need to. A button that resets forty
-        controls to a starting patch should update all of them and only then tell the synth; a
-        reply confirming a setting does need to go out even though it came from an incoming
+        controls to a starting patch should update all of them and only then tell the synth. A
+        reply confirming a setting does need to go out, even though it came from an incoming
         message. Wrap the lines in <code>noTransmit</code> or <code>transmit</code> and normal
         behaviour returns as soon as the group ends, even if something goes wrong inside it.
       </p>
@@ -992,9 +992,9 @@ on(a, "onStep", (step) =&gt; {
         pick, and <code>font("Inter Tight")</code> tells you about one of them, or nothing if it is
         not there. Ask for a font nobody has and it says so, rather than storing the name and
         quietly showing you something else. Check <code>portable</code> before you settle on a
-        face: a built-in font works everywhere, but one from your own library lives on this
-        computer and is not part of the panel &mdash; so it looks right while you build and falls
-        back to something else for whoever you send it to.
+        face. A built-in font works everywhere. One from your own library lives on this computer
+        and is not part of the panel, so it looks right while you build and falls back to something
+        else for whoever you send it to.
       </p>
       <p>
         <b>It keeps related settings in step.</b> Boldness is stored in two places, and different
@@ -1078,8 +1078,8 @@ if (!fitted.fits) {
         <code>encode</code> and <code>decode</code> turn a value into text and back, which is how
         you fit something structured into a place that only takes text. They are here rather than
         borrowed from your language because not all five languages have one, and all five have to
-        produce exactly the same text &mdash; which also means you can compare two of them by
-        comparing the text.
+        produce exactly the same text. That also means you can compare two values by comparing
+        their text.
       </p>
     </div>
     <div class="lesson-code">
@@ -1183,31 +1183,37 @@ function onError(info) {
     <p class="lesson-n">01 &middot; A button, from nothing</p>
     <div data-shot="tutorial-walkthrough"></div>
     <div class="lesson-text prose">
-      <h3>The vocabulary, in one go</h3>
+      <h3>One button, using most of what you have just read</h3>
       <p>
-        Ten lessons of verbs, on one control. Every line below runs &mdash; the numbers in the
-        comments are what the calls returned, and the test suite re&#8209;runs the whole thing.
+        The whole of the manual so far, applied to a single control. Every line below really runs.
+        The numbers in the comments are what the calls actually returned, and the test suite runs
+        the whole thing again on every change.
       </p>
       <p>
-        It is a <b>panel</b> script on <code>onPanelBuild</code>: the phase that exists to build.
-        Controls a script creates are cleared before it fires, so running it twice cannot double
-        the layout.
+        This is a <b>panel</b> script, in the <code>onPanelBuild</code> section &mdash; the one
+        that exists for building things. Anything a script created last time is cleared before it
+        runs, so running it twice cannot give you two of everything.
       </p>
       <p>
-        Three of these steps look like a colour and are not. <code>create()</code> returns the name
-        it <i>settled on</i> &mdash; a clash gets a suffix, so keep what it hands back rather than
-        the name you asked for. The fill is a <b>composite</b>: solid, gradient, image and overlay
-        all stack and <code>layerOrder</code> decides who is on top, which is why the state patches
-        move <code>gradientOpacity</code> and not <code>colour</code> &mdash; a gradient at full
-        opacity covers the solid layer completely, and patching underneath it stores a colour
-        nobody ever sees. And the gradient's stops spell it <code>color</code> while the fill spells
-        it <code>colour</code>: the gradient editor is older than the section model and kept its
-        own spelling. Write <code>colour</code> in a stop and the browser is handed
-        <code>#undefined</code>.
+        Three steps here are easy to get wrong. First, <code>create()</code> hands back the name it
+        actually used, which may not be the one you asked for if something already had it &mdash;
+        so keep what it gives you.
+      </p>
+      <p>
+        Second, a control's fill is made of layers: a solid colour, a gradient, an image and an
+        overlay, stacked in an order you control. That is why the states below change the
+        gradient's opacity rather than the colour underneath it. A gradient at full opacity hides
+        the solid layer completely, so changing that colour would store something nobody ever sees.
+      </p>
+      <p>
+        Third, watch the spelling. A gradient stop takes <code>color</code> while the fill around
+        it takes <code>colour</code>. The gradient editor is older than the rest and kept its own
+        spelling.
       </p>
       <p class="note">
-        <code>bind()</code> answers <code>true</code> for a parameter nothing has declared yet, on
-        purpose &mdash; a script may declare it later. So the guard is yours to write.
+        <code>bind()</code> says yes for a parameter nothing has declared yet, deliberately &mdash;
+        a script is allowed to declare one later. So checking for that is up to you, which is what
+        the guard in the listing does.
       </p>
     </div>
     <div class="lesson-code">
@@ -1377,40 +1383,37 @@ on(NAME, "valueChanged", (v) =&gt; {
     <p class="lesson-n">02 &middot; Eight, from a table</p>
     <div data-shot="tutorial-from-data"></div>
     <div class="lesson-text prose">
-      <h3>A panel is data plus a rule</h3>
+      <h3>Describe the panel once, and let the script build it</h3>
       <p>
-        The same panel, built eight times from eight rows. The point is not that it is shorter
-        &mdash; it is that the <b>rule</b> is now the thing you keep. Change <code>COLS</code> to 2
-        and the grid reflows and the group resizes with it. Add a ninth row and there is a ninth
-        pad, coloured, labelled, wired and playing, with no other edit. A stored property can hold
-        the <i>result</i> of that; nothing can store the rule.
+        The same eight pads, built from a list of eight rows. The gain is not that it is shorter.
+        It is that what you keep is now the <i>rule</i>. Change the number of columns to 2 and the
+        grid reflows and the group resizes to match. Add a ninth row and you get a ninth pad
+        &mdash; coloured, labelled, wired up and playing &mdash; with no other change.
       </p>
       <p>
-        Each piece is the language doing a different job. A <b>table</b> is the drum kit, kept
-        apart from the panel. A <b>function</b> means eight pads that cannot drift apart the way
-        eight copy&#8209;pasted blocks would. <b>Arithmetic</b> places them and sizes the group to
-        fit, and <code>shade()</code> derives every gradient's dark stop instead of you typing
-        sixteen hex values &mdash; the API should not grow a verb for arithmetic, because every
-        language the player embeds already has it. The <b>label is computed</b> from the same row
-        that sets the rate, so the two cannot disagree.
+        Each part of it does a different job. The <b>list</b> is the drum kit, kept separate from
+        the panel. The <b>function</b> is why eight pads cannot drift apart the way eight
+        copy-pasted blocks would. Plain <b>arithmetic</b> places them and sizes the group to fit,
+        and <code>shade()</code> works out each gradient's darker end rather than you typing
+        sixteen colour codes. The <b>label is worked out</b> from the same row that sets the rate,
+        so the two cannot disagree.
       </p>
       <p>
-        <b>The roll is a property, not a script.</b> <code>momentary/repeating</code> is a button
-        behaviour with a Delay and an Interval, and a script that reimplemented it with a timer
-        would be writing a worse copy of something the control already does. What the script adds
-        is the part a stored number cannot: the interval is derived from
-        <code>ce.time.division()</code> and <code>beatsToMs()</code>, so the roll follows the host
-        tempo instead of being frozen at whatever the author typed.
+        <b>The drum roll is a setting, not a script.</b> A button can already repeat while it is
+        held, with its own delay and interval, and a script that rebuilt that with a timer would
+        be writing a worse copy of something the control does for you. What the script adds is the
+        part a stored number cannot do: it works the interval out from the tempo, so the roll
+        follows the music instead of being stuck at whatever was typed in.
       </p>
       <p>
-        And the <b>closure</b> is the one with no property equivalent at all. Eight handlers, each
-        holding its own row. A <code>Value</code> section can store <i>a</i> note; it cannot store
-        "this button, that note, that velocity" eight times over.
+        The <b>handler holding its own row</b> is the part with no equivalent setting at all.
+        Eight handlers, each remembering which pad it belongs to. A control can store one note; it
+        cannot store "this button, that note, that velocity" eight times over.
       </p>
       <p class="note">
-        A plain pad fires <code>onClick</code> once, on release. A repeating pad fires it at its
-        own rate for as long as it is held &mdash; and <i>not</i> again on the way up, because the
-        firing already happened. One handler covers both.
+        An ordinary pad fires <code>onClick</code> once, when you let go. A repeating pad fires it
+        over and over while it is held, and <i>not</i> again on release, because it has already
+        fired. The same handler covers both.
       </p>
     </div>
     <div class="lesson-code">
@@ -1625,48 +1628,43 @@ function onPanelBuild() {
     <p class="lesson-n">03 &middot; Asking the instrument</p>
     <div data-shot="tutorial-drumkit"></div>
     <div class="lesson-text prose">
-      <h3>The control knows more than your script does</h3>
+      <h3>Let the component do the work, and ask it what it did</h3>
       <p>
-        Lesson 12 built a drum kit out of eight buttons, and every line of it was honest work. This
-        is the same kit as <b>one control</b>, and the reason to reach for it is not that it is
-        shorter. It is that three of the things a drum grid does cannot be built from eight
-        independent buttons at all.
+        The last tutorial built a drum kit out of eight separate buttons, and there was nothing
+        wrong with it. This is the same kit as a <b>single Drum Pads control</b>. The reason to
+        prefer it is not that it is shorter: three of the things a drum grid does cannot be built
+        from eight independent buttons at all.
       </p>
       <p>
-        <b>Choke groups.</b> A closed hi&#8209;hat silences an open one. Eight buttons cannot do
-        that, because no button knows the others exist &mdash; you would have to write the
-        bookkeeping yourself and keep it right as the kit changed. <b>Strike position.</b> Where in
-        the pad you land decides how hard it sounds; a button has no inside.
-        <b>Corner zones.</b> The four corners of every pad carry a second vocabulary &mdash; a roll
-        under one thumb, a flam under the other &mdash; so sixteen triggers become something you can
-        phrase on.
+        <b>Choke groups.</b> A closed hi-hat has to silence an open one. Separate buttons cannot do
+        that, because none of them knows the others exist. <b>Strike position.</b> Where in the pad
+        you land decides how hard it sounds, and a button has no inside. <b>Corner zones.</b> The
+        four corners of every pad can do something different &mdash; a roll under one thumb, a flam
+        under the other &mdash; which turns sixteen triggers into something you can play.
       </p>
       <p>
-        <b>The overrides are sparse, and that is the interesting part.</b> You set what differs;
-        everything else follows the map. One <code>fill()</code> writes eight notes in a single
-        document change, and the choke groups <i>follow</i> &mdash; nothing sets them, because a
-        choke group is resolved from the note. Look at what the script actually stored: pad 1 holds
-        an empty entry, because 36 is the note it was already going to play, and pinning it there
-        would only stop it following <code>baseNote</code> later.
+        <b>Only set what differs.</b> Everything else follows the kit. One call to
+        <code>fill()</code> writes all eight notes at once, and the choke groups sort themselves
+        out, because which pads choke each other is worked out from the notes. Look at what the
+        script actually stored: pad 1 has nothing set, because 36 was the note it was going to play
+        anyway, and pinning it there would only stop it following the base note later.
       </p>
       <p>
-        <b>So ask, rather than tell.</b> <code>read()</code> answers what the component
-        <i>resolved</i>, not what you stored &mdash; so the setup can be derived. "Give a roll to
-        every pad in a choke group" finds the hi&#8209;hats without a single typed index, names them
-        in the log from the same read, and keeps being right when the map, the rows or the columns
-        change underneath it. A stored property can hold the <i>result</i> of that question. Nothing
-        can store the question.
+        <b>So ask, rather than tell.</b> <code>read()</code> answers with what the component
+        settled on, not with what you stored. That is what lets the rest be worked out: "give a
+        roll to every pad in a choke group" finds the hi-hats without you typing a single position,
+        names them in the log from the same answer, and keeps being right when the kit, the rows or
+        the columns change underneath it.
       </p>
       <p>
-        The roll is derived too: <code>rollRate</code> is a note value, not a number of
-        milliseconds, so a 1/32 roll is a 1/32 against the panel tempo and stays one when the tempo
-        moves. And <code>rollDelay</code> is what makes one pad do two jobs &mdash; tap it and it
-        strikes once, lean on it and it rolls.
+        The roll is worked out too. Its rate is a note value rather than a number of milliseconds,
+        so a 1/32 roll stays a 1/32 when the tempo moves. And the roll delay is what lets one pad
+        do two jobs: tap it and it strikes once, lean on it and it rolls.
       </p>
       <p class="note">
-        Corner zones are set for the <b>grid</b>, not per pad, on purpose: a corner is a gesture your
-        hand learns once. Four corners meaning different things on neighbouring pads is the opposite
-        of an instrument you can play without looking.
+        Corner zones are set for the <b>whole grid</b> rather than per pad, deliberately. A corner
+        is a gesture your hand learns once. Corners that meant different things on neighbouring
+        pads would be the opposite of an instrument you can play without looking.
       </p>
     </div>
     <div class="lesson-code">
@@ -1769,48 +1767,43 @@ end</code></pre>
     <p class="lesson-n">04 &middot; A panel is a graph</p>
     <div data-shot="tutorial-wiring"></div>
     <div class="lesson-text prose">
-      <h3>Controls that read each other</h3>
+      <h3>Wiring controls up to each other</h3>
       <p>
-        The last three lessons built controls. This one <b>connects</b> them. A Meter can follow a
-        knob, an LCD can take its value from one control and its backlight from another, an
-        Arpeggiator can take its notes from a Chord Pad &mdash; and once any of that is true, the
-        panel has stopped being a list of controls and become a graph.
+        The last three tutorials built controls. This one <b>connects</b> them. A meter can follow
+        a knob. An LCD can take its reading from one control and its backlight from another. An
+        arpeggiator can take its notes from a chord pad. Once any of that is true, the panel is no
+        longer a list of controls but a set of connections.
       </p>
       <p>
-        <b>You name the control, not its id.</b> The field underneath stores an id, because that is
-        what survives a rename; a script never sees one. It names the control the way it names
-        everything else, and <code>read()</code> hands the name back &mdash; an opaque
-        <code>ctl_&hellip;</code> is not something a script could have got hold of, and not
-        something it could do anything with.
+        <b>You name the control, the same as everywhere else.</b> Underneath, the connection is
+        stored against something that survives a rename, but your script never sees that and never
+        needs to &mdash; <code>read()</code> gives you the name back.
       </p>
       <p>
-        <b>Not every control can drive every field, and the refusal is the interesting part.</b>
-        Look at what happens to <code>Title</code>, a plain Label, in the listing: it is
-        <i>accepted</i> as the LCD's backlight source and <i>refused</i> as the Meter's level. One
-        control, two answers, because the two fields want different things &mdash; "is this on" can
-        be answered by anything, "how far up is this" cannot. The verb says which:
+        <b>Not every control can drive every field, and being told so is the useful part.</b> Watch
+        what happens to <code>Title</code>, an ordinary label, in the listing. It is accepted as
+        the LCD's backlight source and refused as the meter's level. One control, two answers,
+        because the two fields want different things: anything can answer "is this on", but not
+        everything can answer "how far up is this". The command says which, in words:
         <span class="q">refused &mdash; it is not a knob, slider or other range control</span>. A
-        wiring that failed silently would look exactly like a wiring that worked until the meter
-        sat still.
+        connection that failed quietly would look exactly like one that worked, right up until the
+        meter sat still.
       </p>
       <p>
-        That is what makes the return value worth reading. The loop below builds a chain from a
-        table of intended connections and <b>counts the ones that took</b>, so a panel assembling
-        itself against a kit somebody else laid out can adapt instead of half-working.
+        That is why the answer is worth reading. The loop below works through a list of intended
+        connections and <b>counts the ones that took</b>, so a panel building itself against
+        somebody else's layout can cope rather than half-work.
       </p>
       <p>
-        <b>And then it reads the graph back.</b> The last block walks the panel with
-        <code>ce.panel.each</code>, asks <code>ce.panel.info</code> what each control IS, and asks
-        each one what drives it. Nothing in that block knows what the first two blocks did &mdash;
-        it would report a panel a script never built, wired entirely by hand in the inspector.
-        Asking a stored property what it is connected to is not a thing you can do; the connection
-        is stored, the <i>question</i> is not.
+        <b>Then it reads the connections back.</b> The last block walks the panel, asks what each
+        control is, and asks each one what is driving it. Nothing in that block knows what the
+        earlier blocks did &mdash; it would report a panel that was wired entirely by hand, just as
+        well.
       </p>
       <p class="note">
-        Naming no control unlinks, which is the inspector's own
-        &ldquo;&mdash;&nbsp;Static&nbsp;/&nbsp;bound&nbsp;&mdash;&rdquo; and a real setting rather
-        than the absence of one. A link whose target has been deleted reads back as unlinked too:
-        the component is running on its static value either way, and that is the honest answer.
+        Naming no control disconnects it, which is a real setting rather than the absence of one.
+        A connection whose target has since been deleted reads back as disconnected too, which is
+        the honest answer: either way the control is running on its own value.
       </p>
     </div>
     <div class="lesson-code">
