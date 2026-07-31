@@ -182,12 +182,82 @@ function exampleFor(flat) {
   return pureExample(flat) ?? writtenExample(flat) ?? componentExample(flat);
 }
 
+/* ------------------------------------------------------- the options literal ------------------ */
+// A reader who has just been told a call takes `opts` still has to work out how to WRITE one, and
+// the two languages spell the same object differently: Lua uses `=` between key and value, JS uses
+// `:`. Customers asked for exactly this — "it is not clear what the markup is to construct those
+// opts" — so it is derived here from the same descriptors the table below it renders, rather than
+// left to a reader to assemble from a list of names.
+
+/** A representative value for one option field, in one language, and how concrete it is.
+ *
+ *  Concreteness ranks the fields: a literal reading `{ role = "…", query = "…" }` demonstrates
+ *  where the commas go and nothing else, so a field the contract gives a real value for is worth
+ *  more here than one whose only honest sample is a placeholder. */
+function fieldSample(field, lang) {
+  const type = String(field.type ?? '');
+  const quoted = /^".*"$/.test(String(field.default ?? ''));
+  const numeric = Number.isFinite(Number(field.default));
+  const lua = lang === 'lua';
+
+  if (field.sample) return { text: field.sample[lang] ?? field.sample, rank: 3 };
+  if (Array.isArray(field.values) && field.values.length) {
+    // Not values[0] when that IS the default: an example setting an option to what it already
+    // holds demonstrates the syntax and nothing else.
+    const first = field.values[0];
+    const pick = quoted && field.default === `"${first}"` ? (field.values[1] ?? first) : first;
+    return { text: JSON.stringify(pick), rank: 3 };
+  }
+  if (quoted) return { text: field.default, rank: 2 };
+  if (type.includes('number') && numeric) return { text: String(Number(field.default)), rank: 2 };
+  if (type.includes('true or false')) return { text: 'true', rank: 2 };
+  if (type.includes('colour')) return { text: '"#39D98A"', rank: 2 };
+  if (type.includes('list of text')) return { text: lua ? '{ "one", "two" }' : '["one", "two"]', rank: 1 };
+  if (type.includes('list')) return { text: lua ? '{ 3, 3 }' : '[3, 3]', rank: 1 };
+  if (type.includes('function')) return { text: lua ? 'function() end' : '() => {}', rank: 1 };
+  if (type.includes('number')) return { text: '1', rank: 0 };
+  return { text: '"…"', rank: 0 };
+}
+
+/** The literal you actually type, in one language. Capped at four fields: a twenty-field literal
+ *  is not an example of anything, and the table underneath carries the rest. */
+function optionLiteral(fields, lang) {
+  // A nested object gets its own shape rather than a `{ }` nobody can act on, and `<section>` is a
+  // stand-in for a name rather than a name — neither belongs in a one-line literal.
+  const usable = fields.filter((f) => /^[A-Za-z_]\w*$/.test(f.name) && !String(f.type).includes('object'));
+  if (!usable.length) return null;
+
+  const scored = usable.map((f, i) => ({ f, i, ...fieldSample(f, lang) }));
+  // Required first — a literal that omits one would not run — then the fields with a real value to
+  // show, then the contract's own order so the result is stable between the two languages.
+  scored.sort((a, b) =>
+    (b.f.required === true) - (a.f.required === true) || b.rank - a.rank || a.i - b.i);
+
+  const shown = scored.slice(0, 4);
+  const pairs = shown.map((s) => `${s.f.name}${lang === 'lua' ? ' = ' : ': '}${s.text}`);
+  const rest = usable.length - shown.length;
+  const trail = rest ? `   ${lang === 'lua' ? '--' : '//'} …and ${rest} more, in the table below` : '';
+  return `{ ${pairs.join(', ')} }${trail}`;
+}
+
 /** Structural validation. An example is documentation, and documentation that cites something that
  *  does not exist is worse than none — so the build refuses it rather than shipping it. */
 function validateExamples(examples) {
   const problems = [];
   const modulePaths = new Set(MODULES.map((m) => m.id));
   const memberPaths = new Set(ALL_MEMBERS.filter((m) => m.kind !== 'lifecycle').map((m) => memberPath(m.id)));
+  // Every option field must say what it holds and what it does. A field list is documentation, and
+  // a descriptor missing its summary would render as an empty table cell — the exact "the opts are
+  // not defined" complaint this replaced, in a nicer-looking box.
+  for (const member of ALL_MEMBERS) {
+    for (const param of member.params ?? []) {
+      for (const f of param.fields ?? []) {
+        if (!f?.name || !f?.type || !f?.summary) {
+          problems.push(`${member.id}: option field ${JSON.stringify(f?.name ?? f)} is not fully described`);
+        }
+      }
+    }
+  }
   const flatNames = new Set(ALL_MEMBERS.map((m) => m.id));
 
   for (const key of [...Object.keys(PURE), ...Object.keys(WRITTEN)]) {
@@ -208,6 +278,22 @@ function validateExamples(examples) {
   return problems;
 }
 
+/** One declared argument, with any object it carries written out.
+ *
+ *  `given` marks the objects a handler is HANDED rather than ones a caller builds — onError's
+ *  `info`, onDraw's. Those get the same field table (knowing that info.phase is "load" or
+ *  "dispatch" is worth as much as knowing what `scope` accepts) but no "written like this"
+ *  literal, because you never write one. */
+function describeArg(p, given = false) {
+  const fields = Array.isArray(p.fields) && p.fields.length ? p.fields : null;
+  return {
+    name: p.name, type: p.type, required: p.required === true, fields, given,
+    literal: fields && !given
+      ? { lua: optionLiteral(fields, 'lua'), js: optionLiteral(fields, 'javascript') }
+      : null,
+  };
+}
+
 /** The shape the page renders. Everything here comes from the contract; nothing is retyped. */
 function contract() {
   const modules = MODULES.map((mod) => {
@@ -222,13 +308,15 @@ function contract() {
         doc: member?.summary ?? '',
         value: isValueMember(member),          // `state` is a table, not a call
         rt: memberRuntime(member),
-        // The declared arguments. A signature says `opts` and stops; animateTo's opts has TEN fields
-        // and the only place they were written down was the prose. These come from the contract, so
-        // the page cannot fall behind them.
-        args: (member?.params ?? []).map((p) => ({
-          name: p.name, type: p.type, required: p.required === true,
-          fields: Array.isArray(p.fields) ? p.fields : null,
-        })),
+        // The declared arguments. A signature says `opts` and stops; animateTo's opts has TEN
+        // fields, and until the contract carried them as descriptors the only place any of it was
+        // written down was the summary prose. Each field now brings its type, what it does when
+        // you leave it out, and the values it accepts where that is a closed list — plus the
+        // literal you type, in both languages.
+        // NOT .map(describeArg): map passes the INDEX as the second argument, which would mark
+        // every argument after the first as one the handler is given — and silently drop its
+        // literal, which is the one thing this whole block exists to produce.
+        args: (member?.params ?? []).map((p) => describeArg(p)),
         eg: exampleFor(memberId),
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
@@ -261,6 +349,9 @@ function contract() {
     modules,
     hooks: LIFECYCLE_HOOKS.map((h) => ({
       id: h.id, sig: h.signature, doc: h.summary, rt: memberRuntime(h),
+      // What the hook is handed. onPanelReady(info) told a reader `info` existed and left
+      // `info.firstTime` — the whole reason to take the argument — to the summary prose.
+      args: (h.params ?? []).map((p) => describeArg(p, true)),
     })),
     events: ALL_EVENTS.map((e) => ({
       id: e.id, fn: e.fn, group: e.group, payload: e.payload ?? null,

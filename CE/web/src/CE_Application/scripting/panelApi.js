@@ -30,6 +30,13 @@ import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, moduleIdFor, verbSignature, verbSummary, verbArgs,
 } from './componentVerbs.js';
 import { HAND_WRITTEN_VALUES } from './componentTables.js';
+// The legal values an option accepts come from the table its own implementation reads, for the
+// reason the component enums do: a documented list somebody retyped is a list that drifts. These
+// two supply the image-layer and typography vocabularies.
+import {
+  BACKGROUND_FITS, BACKGROUND_ALIGNS, TEXT_FITS, IMAGE_BLENDS, IMAGE_CLIP_MODES, IMAGE_LAYER_IDS,
+} from '../utils/imageLayers.js';
+import { FEATURE_KEYS, CASE_MODES, SCRIPT_MODES, JUSTIFICATIONS } from './textStyle.js';
 
 /** `"a", "b" or "c"` from a table, for a summary that names the values a verb accepts.
  *
@@ -219,6 +226,157 @@ export const RUNTIME_PLAYER = 'player';   // the exported plugin only; the edito
 // instead of returning undefined and letting the author guess.
 export const REQUIRES_DEVICE_HOST = 'requiresDeviceHost';
 
+/* -------------------------------------------------------------- option fields */
+// A `params` entry whose type is 'object' used to declare its contents as bare names:
+//
+//     { name: 'opts', type: 'object', fields: ['duration', 'beats', 'sync', 'curve', …] }
+//
+// That says what an option is CALLED and nothing else. Not what it holds, not what happens when
+// you leave it out, not which of the eight spellings of `curve` are real ones. The detail existed,
+// but only as prose inside `summary` — ce.anim.to's ran to 955 characters, and a reader looking for
+// the default duration had to find it mid-sentence. Customers said so: "many opts to fill in, but
+// it is not clear what those opts are, or what the markup is to construct them."
+//
+// So a field is a DESCRIPTOR: what it holds, what it does if omitted, and the closed list of values
+// it accepts where there is one. The reference page renders that as a table, and derives the
+// literal you actually type from it, in each language.
+//
+// `optionFields` resolves a mix of shared names and inline descriptors. The nine timing options the
+// three animation verbs share are therefore written once and cannot drift apart, while a field that
+// only looks shared — `fit` means one thing on a background layer and another on text — stays
+// inline where it can say so.
+
+/**
+ * Resolve an option-field list into full descriptors.
+ *
+ * Entries may be a shared field's name, an inline `{ name, type, … }`, or `{ like: 'duration', … }`
+ * to take a shared one and override part of it. An unknown name throws at load: a field list is
+ * documentation, and documentation naming something that does not exist is worse than none.
+ */
+function optionFields(entries) {
+  return entries.map((entry) => {
+    const shared = typeof entry === 'string' ? entry : entry.like;
+    if (!shared) return entry;
+    const base = SHARED_OPTION_FIELDS[shared];
+    if (!base) throw new Error(`panelApi: no shared option field called "${shared}"`);
+    if (typeof entry === 'string') return base;
+    const { like, ...override } = entry;
+    return { ...base, ...override };
+  });
+}
+
+/** The option fields more than one member declares, defined once. */
+const SHARED_OPTION_FIELDS = {
+  /* --- persistence ------------------------------------------------------- */
+  scope: {
+    name: 'scope', type: 'text', default: '"panel"', values: ['panel', 'script', 'local'],
+    summary: 'Which store to use. "panel" is shared by every script on the panel and travels with '
+      + 'it; "script" is private to this one; "local" stays on this machine and is never written '
+      + 'into the panel document.',
+  },
+
+  /* --- animation timing (ce.anim.to / .spring / .envelope) ---------------- */
+  duration: {
+    name: 'duration', type: 'number', default: '300', unit: 'milliseconds',
+    summary: 'How long the move takes.',
+  },
+  beats: {
+    name: 'beats', type: 'number', sample: '2',
+    summary: 'A length in beats instead of milliseconds. Overrides `duration`, and follows the '
+      + 'tempo, so the same move is the same musical length at any speed.',
+  },
+  sync: {
+    name: 'sync', type: 'true or false', default: 'false',
+    summary: 'Follow the transport rather than the wall clock, so the move pauses when playback '
+      + 'does.',
+  },
+  delay: {
+    name: 'delay', type: 'number', default: '0', unit: 'milliseconds',
+    summary: 'Wait this long before starting.',
+  },
+  stagger: {
+    name: 'stagger', type: 'number', default: '0', unit: 'milliseconds',
+    summary: 'When `path` is a list, offset each one after the first by this much, so they set off '
+      + 'in turn rather than together.',
+  },
+  repeat: {
+    name: 'repeat', type: 'number', default: '1',
+    summary: 'How many times to run it. 0 or less repeats until you stop it.',
+  },
+  pingpong: {
+    name: 'pingpong', type: 'true or false', default: 'false',
+    summary: 'On a repeat, run the move backwards every other time instead of jumping back to the '
+      + 'start.',
+  },
+  done: {
+    name: 'done', type: 'function',
+    summary: 'Called when the move ends: done(completed). `completed` is false when something '
+      + 'stopped it early, so you can tell finishing from being cancelled.',
+  },
+  animFrom: {
+    name: 'from', type: 'number', sample: '0',
+    summary: 'Start from this value instead of wherever the control is now.',
+  },
+
+  /* --- dialogs and messages (ce.ui) -------------------------------------- */
+  uiKind: {
+    name: 'kind', type: 'text', default: '"info"', values: ['info', 'warn', 'error'],
+    summary: 'How serious it is, which sets the colour and the icon.',
+  },
+  uiTitle: { name: 'title', type: 'text', sample: '"Overwrite the patch?"', summary: 'The heading line.' },
+  uiMessage: { name: 'message', type: 'text', sample: '"This cannot be undone."', summary: 'The body text under the heading.' },
+  uiAccept: {
+    name: 'accept', type: 'text', default: '"OK"',
+    summary: 'The label on the confirm button.',
+  },
+  uiCancel: {
+    name: 'cancel', type: 'text', default: '"Cancel"',
+    summary: 'The label on the cancel button.',
+  },
+
+  /* --- devices ------------------------------------------------------------ */
+  role: {
+    name: 'role', type: 'text', default: 'the panel\'s current device',
+    sample: '"main"',
+    summary: 'Which configured device to use, when the panel is set up for more than one.',
+  },
+
+  /* --- image layers (ce.image) -------------------------------------------- */
+  tint: {
+    name: 'tint', type: 'colour',
+    summary: 'A colour to wash the image with, as "#RRGGBB". Omit it to leave the image as it is.',
+  },
+  opacity: {
+    name: 'opacity', type: 'number', default: '1', unit: '0 to 1',
+    summary: 'How solid the image is. 0 is invisible, 1 is fully opaque.',
+  },
+  imageRotation: {
+    name: 'rotation', type: 'number', default: '0', unit: 'degrees',
+    summary: 'Turn the image clockwise, with 0 upright.',
+  },
+};
+
+/** What each OpenType switch on ce.text.style does, in words rather than in four-letter tags.
+ *  Keyed by the app's own FEATURE_KEYS, and checked against them below so a feature cannot be
+ *  added to the editor and left undescribed here. */
+const TYPOGRAPHIC_FEATURES = {
+  ligatures: 'Join pairs like "fi" and "fl" into the single shapes the font draws for them.',
+  stylisticAlternates: 'Use the alternative letter shapes the designer drew, where there are any.',
+  oldstyleFigures: 'Draw numerals that sit on the baseline at differing heights, the way lower-case '
+    + 'letters do, so they read better inside a sentence.',
+  tabularFigures: 'Give every digit the same width so columns of numbers line up — what you want '
+    + 'for a readout that keeps changing.',
+  fractions: 'Draw things like 1/2 as a proper stacked fraction.',
+  slashedZero: 'Put a slash through zero so it cannot be mistaken for a capital O.',
+};
+
+{
+  const undescribed = FEATURE_KEYS.filter((key) => !TYPOGRAPHIC_FEATURES[key]);
+  if (undescribed.length) {
+    throw new Error(`panelApi: typographic feature(s) with no description: ${undescribed.join(', ')}`);
+  }
+}
+
 /* ------------------------------------------------------------- lifecycle hooks */
 // Named entry points the host calls (Q5). `onDaw*` = host-triggered.
 
@@ -244,7 +402,14 @@ export const LIFECYCLE_HOOKS = [
     id: 'onError', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onError(info)',
     summary: 'A script failed. `info` carries script, scriptId, event, phase ("load" | "dispatch") and message. Runs everywhere, which is the point — window-closed there is nobody watching a log, so this is how a panel reports its own failures. The error is ALWAYS logged as well; this is in addition to that, never instead of it. An error raised inside onError is logged and not re-dispatched, so a broken reporter cannot loop.',
-    params: [{ name: 'info', type: 'object', fields: ['script', 'scriptId', 'event', 'phase', 'message'] }],
+    params: [{ name: 'info', type: 'object', fields: optionFields([
+      { name: 'script', type: 'text', summary: 'The name of the script that failed.' },
+      { name: 'scriptId', type: 'text', summary: 'Its id, which stays the same when it is renamed.' },
+      { name: 'event', type: 'text', summary: 'The handler that was running, such as "onValueChanged".' },
+      { name: 'phase', type: 'text', values: ['load', 'dispatch'],
+        summary: 'Whether it failed while being loaded or while handling an event.' },
+      { name: 'message', type: 'text', summary: 'What went wrong.' },
+    ]) }],
     snippet: {
       lua: 'function onError(info)\n  set("status.text", info.script .. ": " .. info.message)\n  $0\nend',
       javascript: 'function onError(info) {\n  set("status.text", `${info.script}: ${info.message}`);\n  $0\n}',
@@ -254,7 +419,11 @@ export const LIFECYCLE_HOOKS = [
     id: 'onDraw', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
     signature: 'onDraw(info)',
     summary: 'Paint on top of the control this script is attached to. `info` carries target, width and height — the control\'s own size, so the drawing scales with it. Called when something asks for a repaint, NOT every frame: to animate, drive it from onTimer and call ce.draw.redraw(). Panel view only; there is no surface with the window shut.',
-    params: [{ name: 'info', type: 'object', fields: ['target', 'width', 'height'] }],
+    params: [{ name: 'info', type: 'object', fields: optionFields([
+      { name: 'target', type: 'text', summary: 'The name of the control being painted.' },
+      { name: 'width', type: 'number', unit: 'pixels', summary: 'How wide the control is right now.' },
+      { name: 'height', type: 'number', unit: 'pixels', summary: 'How tall it is right now.' },
+    ]) }],
     snippet: {
       lua: 'function onDraw(info)\n  ce.draw.clear()\n  ce.draw.stroke("#5B9BD5", 2)\n  ce.draw.line(0, info.height / 2, info.width, info.height / 2)\n  $0\nend',
       javascript: 'function onDraw(info) {\n  ce.draw.clear();\n  ce.draw.stroke("#5B9BD5", 2);\n  ce.draw.line(0, info.height / 2, info.width, info.height / 2);\n  $0\n}',
@@ -264,7 +433,11 @@ export const LIFECYCLE_HOOKS = [
     id: 'onPanelReady', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelReady(info)',
     summary: 'Phase 2 — GUI ready. Read the synth, fill controls. May re-fire on VST3 window reopen; guard one-time work with `if info.firstTime`.',
-    params: [{ name: 'info', type: 'object', fields: ['firstTime'] }],
+    params: [{ name: 'info', type: 'object', fields: optionFields([
+      { name: 'firstTime', type: 'true or false',
+        summary: 'True the first time the panel opens, false when a plugin window is reopened. '
+          + 'Guard one-time setup with it.' },
+    ]) }],
     snippet: {
       lua: 'function onPanelReady(info)\n  if info.firstTime then\n    $0\n  end\nend',
       javascript: 'function onPanelReady(info) {\n  if (info.firstTime) {\n    $0\n  }\n}',
@@ -434,7 +607,12 @@ export const COMMANDS = [
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'value', type: 'value', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['transmit'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'transmit', type: 'true or false', default: 'decided by where the write came from',
+          summary: 'Whether to send the change to the synth. Left out, a write made while handling '
+            + 'something the synth sent stays silent and any other write is sent. Set it only when '
+            + 'you need to override that.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: { lua: 'set("${1:path}", ${2:value})$0', javascript: 'set("${1:path}", ${2:value})$0' },
@@ -622,7 +800,11 @@ export const COMMANDS = [
     params: [
       { name: 'kind', type: 'dumpKind', required: true },
       { name: 'fn', type: 'function', required: false },
-      { name: 'opts', type: 'object', required: false, fields: ['timeout'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'timeout', type: 'number', default: '3000', unit: 'milliseconds',
+          summary: 'How long to wait for the reply before giving up and calling `fn` with '
+            + 'info.ok = false, so a callback is never left hanging.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: {
@@ -754,7 +936,15 @@ export const COMMANDS = [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
       { name: 'opts', type: 'object', required: false,
-        fields: ['duration', 'beats', 'sync', 'curve', 'from', 'delay', 'stagger', 'repeat', 'pingpong', 'done'] },
+        fields: optionFields([
+          'duration', 'beats', 'sync',
+          { name: 'curve', type: 'text', default: '"linear"',
+            values: ['linear', 'exp', 'log', 's', 'inQuad', 'outQuad', 'inOutQuad', 'outCubic'],
+            summary: 'The shape of the move. The first four are ce.math.curve\'s; the last four are '
+              + 'the Properties panel\'s, and are evaluated as the same curves the panel stores. An '
+              + 'unrecognised name is reported and the move runs linear.' },
+          'animFrom', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
+        ]) },
     ],
     scopes: 'any',
     snippet: {
@@ -769,7 +959,15 @@ export const COMMANDS = [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
       { name: 'opts', type: 'object', required: false,
-        fields: ['duration', 'damping', 'frequency', 'from', 'beats', 'sync', 'delay', 'stagger', 'repeat', 'pingpong', 'done'] },
+        fields: optionFields([
+          { like: 'duration', default: '600' },
+          { name: 'damping', type: 'number', default: '6',
+            summary: 'How quickly the wobble dies away. Higher settles sooner; lower keeps '
+              + 'bouncing.' },
+          { name: 'frequency', type: 'number', default: '12',
+            summary: 'How fast it wobbles. Higher is a tighter, faster bounce.' },
+          'animFrom', 'beats', 'sync', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
+        ]) },
     ],
     scopes: 'any',
     snippet: {
@@ -807,7 +1005,13 @@ export const COMMANDS = [
       { name: 'path', type: 'path', required: true },
       { name: 'points', type: 'list', required: true },
       { name: 'opts', type: 'object', required: false,
-        fields: ['from', 'to', 'duration', 'beats', 'sync', 'delay', 'repeat', 'pingpong', 'done'] },
+        fields: optionFields([
+          { name: 'from', type: 'number', default: '0',
+            summary: 'The value that y = 0 in the shape means.' },
+          { name: 'to', type: 'number', default: '1',
+            summary: 'The value that y = 1 in the shape means.' },
+          'duration', 'beats', 'sync', 'delay', 'repeat', 'pingpong', 'done',
+        ]) },
     ],
     scopes: 'any',
     snippet: {
@@ -861,7 +1065,12 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'message', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['kind', 'duration'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        'uiKind',
+        { name: 'duration', type: 'number', default: '3000', unit: 'milliseconds',
+          summary: 'How long the message stays up. 0 or less keeps it there until something '
+            + 'dismisses it, which is what you want while a job is still running.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.ui.notify("${1:Patch loaded}")$0', javascript: 'ce.ui.notify("${1:Patch loaded}");$0' },
@@ -872,7 +1081,7 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'message', type: 'string', required: false },
-      { name: 'opts', type: 'object', required: false, fields: ['kind'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['uiKind']) },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.ui.status("${1:Recording}")$0', javascript: 'ce.ui.status("${1:Recording}");$0' },
@@ -882,7 +1091,15 @@ export const COMMANDS = [
     summary: 'Ask a question. The ANSWER comes back through `onChoice`, not as a return value — an answer arrives later than the call. `opts` carries { title, message, buttons (labels, default one "OK"), kind ("info" | "warn" | "error"), default (the label focused first) }. `onChoice` gets the chosen label, or nothing if the dialog was dismissed. The RETURN says whether a dialog was actually put on screen: false means there was nobody to ask (window shut, or one is already open) and your callback has already been called with no answer. Only one dialog at a time — a second call is refused rather than queued, so a runaway script cannot stack modals in front of somebody.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'opts', type: 'object', required: true, fields: ['title', 'message', 'buttons', 'kind', 'default'] },
+      { name: 'opts', type: 'object', required: true, fields: optionFields([
+        'uiTitle', 'uiMessage',
+        { name: 'buttons', type: 'list of text', default: 'one button labelled "OK"',
+          summary: 'The button labels, left to right. Whichever is clicked is what `onChoice` is '
+            + 'given.' },
+        'uiKind',
+        { name: 'default', type: 'text', default: 'the first button', sample: '"Cancel"',
+          summary: 'The label of the button focused when the dialog opens.' },
+      ]) },
       { name: 'onChoice', type: 'function', required: false },
     ],
     scopes: 'any',
@@ -907,7 +1124,14 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'opts', type: 'object', required: true,
-        fields: ['title', 'message', 'value', 'placeholder', 'accept', 'cancel', 'kind'] },
+        fields: optionFields([
+          'uiTitle', 'uiMessage',
+          { name: 'value', type: 'text', default: 'empty', sample: 'get("patchName")',
+            summary: 'What the text field starts out holding.' },
+          { name: 'placeholder', type: 'text', sample: '"Patch name"',
+            summary: 'Grey hint text shown while the field is empty.' },
+          'uiAccept', 'uiCancel', 'uiKind',
+        ]) },
       { name: 'onAnswer', type: 'function', required: false },
     ],
     scopes: 'any',
@@ -922,7 +1146,17 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'opts', type: 'object', required: true,
-        fields: ['title', 'message', 'items', 'default', 'multiple', 'accept', 'cancel', 'kind'] },
+        fields: optionFields([
+          'uiTitle', 'uiMessage',
+          { name: 'items', type: 'list of text', required: true,
+            summary: 'The choices to offer. The list scrolls, so a long one cannot push the '
+              + 'buttons off screen.' },
+          { name: 'default', type: 'text', default: 'nothing selected', sample: '"Init"',
+            summary: 'The item selected when the dialog opens.' },
+          { name: 'multiple', type: 'true or false', default: 'false',
+            summary: 'Allow more than one to be picked, in which case the answer is a list.' },
+          'uiAccept', 'uiCancel', 'uiKind',
+        ]) },
       { name: 'onAnswer', type: 'function', required: false },
     ],
     scopes: 'any',
@@ -946,7 +1180,12 @@ export const COMMANDS = [
     params: [
       { name: 'id', type: 'number', required: true },
       { name: 'message', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['kind', 'duration'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        'uiKind',
+        { name: 'duration', type: 'number', default: 'unchanged', sample: '5000',
+          summary: 'A new lifetime for the message. Left out, a message that was staying put '
+            + 'stays put and a timed one gets its full time back.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: {
@@ -1004,7 +1243,18 @@ export const COMMANDS = [
     params: [
       { name: 'colour', type: 'value', required: false },
       { name: 'width', type: 'number', required: false },
-      { name: 'opts', type: 'object', required: false, fields: ['dash', 'dashOffset', 'cap', 'join'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'dash', type: 'list of numbers', default: 'a solid line',
+          summary: 'Alternating on and off lengths in pixels. The panel\'s own beat marks are '
+            + '{ 3, 3 } — three pixels drawn, three skipped.' },
+        { name: 'dashOffset', type: 'number', default: '0', unit: 'pixels',
+          summary: 'How far into the dash pattern to start. Advance it on a timer and the dashes '
+            + 'march along the line.' },
+        { name: 'cap', type: 'text', default: '"butt"', values: ['butt', 'round', 'square'],
+          summary: 'How a line ends.' },
+        { name: 'join', type: 'text', default: '"miter"', values: ['miter', 'round', 'bevel'],
+          summary: 'How two line segments meet at a corner.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.draw.stroke("${1:#5B9BD5}", ${2:2})$0', javascript: 'ce.draw.stroke("${1:#5B9BD5}", ${2:2});$0' },
@@ -1103,7 +1353,19 @@ export const COMMANDS = [
     id: 'drawTransform', category: 'Drawing', signature: 'drawTransform([opts])',
     summary: 'Rotate, move or scale everything drawn after this. `opts` carries { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it. Without this a knob pointer means computing every corner with sin and cos by hand, and getting the centre wrong is the classic way a pointer ends up orbiting the wrong point.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'opts', type: 'object', required: false, fields: ['rotate', 'cx', 'cy', 'x', 'y', 'scale'] }],
+    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'rotate', type: 'number', default: '0', unit: 'degrees',
+        summary: 'Turn everything drawn after this clockwise.' },
+      { name: 'cx', type: 'number', default: 'the middle of the control', unit: 'pixels', sample: '40',
+        summary: 'The horizontal point to rotate about. Getting this wrong is the usual reason a '
+          + 'knob pointer orbits somewhere it should not.' },
+      { name: 'cy', type: 'number', default: 'the middle of the control', unit: 'pixels', sample: '40',
+        summary: 'The vertical point to rotate about.' },
+      { name: 'x', type: 'number', default: '0', unit: 'pixels', summary: 'Shift sideways.' },
+      { name: 'y', type: 'number', default: '0', unit: 'pixels', summary: 'Shift up or down.' },
+      { name: 'scale', type: 'number', default: '1',
+        summary: 'Grow or shrink. 2 is double size, 0.5 is half.' },
+    ]) }],
     scopes: 'any',
     snippet: {
       lua: 'ce.draw.transform({ rotate = ${1:135}, cx = w / 2, cy = h / 2 })$0',
@@ -1137,7 +1399,15 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'text', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['size', 'family', 'pixel', 'scale'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'size', type: 'number', unit: 'pixels', sample: '14', summary: 'The text size to measure at.' },
+        { name: 'family', type: 'text', sample: '"Inter Tight"', summary: 'The font family to measure in.' },
+        { name: 'pixel', type: 'true or false', default: 'false',
+          summary: 'Measure in the panel\'s built-in LCD font instead of a normal one. That font '
+            + 'is a fixed grid, so the answer is exact arithmetic.' },
+        { name: 'scale', type: 'number', default: '1',
+          summary: 'How many screen pixels one LCD pixel is. Only used with `pixel`.' },
+      ]) },
     ],
     scopes: 'any',
   },
@@ -1153,7 +1423,25 @@ export const COMMANDS = [
     summary: 'A whole lattice as ONE command and one path. `opts` may carry { x, y, width, height } (defaulting to the control\'s box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. Both forms exist because both are how you actually know it: a step sequencer knows it has 16 columns, a ruler knows it wants a line every 10 pixels. The closing line is drawn, so a 4-column grid has five verticals rather than a missing right edge.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false,
-      fields: ['x', 'y', 'width', 'height', 'step', 'stepX', 'stepY', 'columns', 'rows'] }],
+      fields: optionFields([
+        { name: 'x', type: 'number', default: 'the control\'s left edge', unit: 'pixels', sample: '4',
+          summary: 'Where the grid starts horizontally.' },
+        { name: 'y', type: 'number', default: 'the control\'s top edge', unit: 'pixels', sample: '4',
+          summary: 'Where it starts vertically.' },
+        { name: 'width', type: 'number', default: 'the control\'s width', unit: 'pixels', sample: '120',
+          summary: 'How wide the grid is.' },
+        { name: 'height', type: 'number', default: 'the control\'s height', unit: 'pixels', sample: '60',
+          summary: 'How tall it is.' },
+        { name: 'step', type: 'number', unit: 'pixels', sample: '10',
+          summary: 'Spacing both ways — a line every this many pixels. Use this or `columns`, not '
+            + 'both: a ruler knows its spacing, a step sequencer knows its count.' },
+        { name: 'stepX', type: 'number', unit: 'pixels', sample: '10', summary: 'Horizontal spacing on its own.' },
+        { name: 'stepY', type: 'number', unit: 'pixels', sample: '20', summary: 'Vertical spacing on its own.' },
+        { name: 'columns', type: 'number', sample: '16',
+          summary: 'How many columns to divide the width into. The closing line is drawn, so four '
+            + 'columns give five vertical lines.' },
+        { name: 'rows', type: 'number', sample: '4', summary: 'How many rows to divide the height into.' },
+      ]) }],
     scopes: 'any',
   },
   {
@@ -1179,7 +1467,13 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'points', type: 'list', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['tension', 'closed'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'tension', type: 'number', default: '0.5', unit: '0 to 1',
+          summary: 'How round the curve is. 0 gives straight lines between the points, 1 is fully '
+            + 'rounded.' },
+        { name: 'closed', type: 'true or false', default: 'false',
+          summary: 'Join the last point back to the first to make a loop.' },
+      ]) },
     ],
     scopes: 'any',
   },
@@ -1192,7 +1486,11 @@ export const COMMANDS = [
       { name: 'cy', type: 'number', required: true },
       { name: 'radius', type: 'number', required: true },
       { name: 'sides', type: 'number', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['rotation'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'rotation', type: 'number', default: '0', unit: 'degrees',
+          summary: 'Turn the shape clockwise, with 0 putting a corner at twelve o\'clock — the '
+            + 'same convention drawArc uses, so a polygon and an arc at the same angle line up.' },
+      ]) },
     ],
     scopes: 'any',
   },
@@ -1206,7 +1504,11 @@ export const COMMANDS = [
       { name: 'y', type: 'number', required: true },
       { name: 'w', type: 'number', required: true },
       { name: 'h', type: 'number', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['fit'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'fit', type: 'text', default: '"fill"', values: ['fill', 'contain', 'cover'],
+          summary: 'How the image fills the box you gave. "fill" stretches it to fit exactly, '
+            + '"contain" keeps its shape and leaves gaps, "cover" keeps its shape and crops.' },
+      ]) },
     ],
     scopes: 'any',
   },
@@ -1249,7 +1551,13 @@ export const COMMANDS = [
     id: 'imageAssets', category: 'Images', signature: 'imageAssets([opts]) -> list',
     summary: 'The icon library, as { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `opts` narrows with { vector = true } or { embeddable = true }. `portable` is false for every entry, and that is the honest answer rather than a bug: the payload lives in app settings, not in the panel document, so a reference to it does not survive an export. `embeddable` says whether ce.image.embed() can fix that by copying the data URL into the layer.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'opts', type: 'object', required: false, fields: ['vector', 'embeddable'] }],
+    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'vector', type: 'true or false',
+        summary: 'Set true to list only vector icons, which stay sharp at any size.' },
+      { name: 'embeddable', type: 'true or false',
+        summary: 'Set true to list only icons ce.image.embed() can copy into the panel, so they '
+          + 'survive an export.' },
+    ]) }],
     scopes: 'any',
   },
   {
@@ -1267,9 +1575,55 @@ export const COMMANDS = [
       { name: 'target', type: 'string', required: true },
       { name: 'src', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false,
-        fields: ['layer', 'fit', 'align', 'opacity', 'tint', 'blend', 'blur', 'offsetX', 'offsetY',
-          'rotation', 'flipH', 'flipV', 'grayscale', 'saturation', 'brightness', 'contrast',
-          'tileScale', 'clipMode', 'muted'] },
+        fields: optionFields([
+          { name: 'layer', type: 'text', default: '"image"', values: IMAGE_LAYER_IDS,
+            summary: 'Which of the control\'s four image layers this is about. The first two are '
+              + 'background layers and stack; the last two fill the text and are exclusive. Every '
+              + 'option below applies only to the layers that actually have it — one that does '
+              + 'not is refused and reported rather than stored where nothing reads it.' },
+          { name: 'fit', type: 'text', default: '"fill" on a background, "cover" on text',
+            values: [...new Set([...BACKGROUND_FITS, ...TEXT_FITS])],
+            summary: 'How the image fills the layer. This is the one option whose words mean two '
+              + `different things: on a background it is one of ${BACKGROUND_FITS.join(', ')} and `
+              + `"fill" means COVER, while on text it is one of ${TEXT_FITS.join(', ')} and `
+              + '"fill" means STRETCH. The text texture layer always tiles and takes no fit.' },
+          { name: 'align', type: 'text', default: '"center"', values: BACKGROUND_ALIGNS,
+            summary: 'Where the image sits when it does not fill the layer. Background layers '
+              + 'only — on a text layer use offsetX and offsetY instead. Note the hyphens.' },
+          { like: 'opacity', unit: '0 to 100', default: '100',
+            summary: 'How solid the layer is, on the panel\'s own 0 to 100 scale — not 0 to 1.' },
+          'tint',
+          { name: 'blend', type: 'text', default: '"normal"', values: IMAGE_BLENDS,
+            summary: 'How the layer mixes with what is underneath it. Background layers only.' },
+          { name: 'blur', type: 'number', default: '0', unit: 'pixels',
+            summary: 'Soften the image. Background layers only.' },
+          { name: 'offsetX', type: 'number', default: '0', unit: 'pixels',
+            summary: 'Nudge the image sideways.' },
+          { name: 'offsetY', type: 'number', default: '0', unit: 'pixels',
+            summary: 'Nudge it up or down.' },
+          { like: 'imageRotation' },
+          { name: 'flipH', type: 'true or false', default: 'false',
+            summary: 'Mirror it left to right. Background layers only.' },
+          { name: 'flipV', type: 'true or false', default: 'false',
+            summary: 'Mirror it top to bottom. Background layers only.' },
+          { name: 'grayscale', type: 'true or false', default: 'false',
+            summary: 'Drain the colour out of it. Background layers only.' },
+          { name: 'saturation', type: 'number', default: '1',
+            summary: 'Colour intensity. 0 is grey, 1 is unchanged, above 1 is stronger. '
+              + 'Background layers only.' },
+          { name: 'brightness', type: 'number', default: '1',
+            summary: 'Lighten above 1, darken below. Background layers only.' },
+          { name: 'contrast', type: 'number', default: '1',
+            summary: 'Increase above 1, flatten below. Background layers only.' },
+          { name: 'tileScale', type: 'number', default: '1',
+            summary: 'How big each tile is when the image repeats. Never less than 0.1.' },
+          { name: 'clipMode', type: 'text', default: '"shape"', values: IMAGE_CLIP_MODES,
+            summary: 'Whether the image is clipped to the control\'s drawn shape or to its plain '
+              + 'rectangle. Background layers only.' },
+          { name: 'muted', type: 'true or false', default: 'false',
+            summary: 'Keep the layer configured but hide it, so you can switch it back on without '
+              + 'setting it up again. Background layers only.' },
+        ]) },
     ],
     scopes: 'any',
   },
@@ -1303,7 +1657,13 @@ export const COMMANDS = [
       { name: 'target', type: 'string', required: true },
       { name: 'idOrName', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false,
-        fields: ['size', 'fit', 'tint', 'opacity', 'rotation'] },
+        fields: optionFields([
+          { name: 'size', type: 'number', default: '16', unit: 'pixels',
+            summary: 'How big the icon is drawn.' },
+          { name: 'fit', type: 'text', default: '"contain"',
+            summary: 'How the icon fills its box, in the Icon section\'s own words.' },
+          'tint', 'opacity', 'imageRotation',
+        ]) },
     ],
     scopes: 'any',
   },
@@ -1329,7 +1689,15 @@ export const COMMANDS = [
     id: 'textFonts', category: 'Typography', signature: 'textFonts([opts]) -> list',
     summary: 'Every font this panel may use: { family, label, source, portable, variable, axes, features, featuresKnown }. `opts` may narrow it with { portable = true } or { variable = true }. `portable` is the one to read before styling anything: a builtin family is named in every runtime, while a font from the library is registered by the editor at edit time and is NOT part of the panel document — so it looks right while you build and falls back to a platform default once exported. `featuresKnown` separates "scanned, has none" from "nobody has scanned it", because [] otherwise reads as a fact it is not.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'opts', type: 'object', required: false, fields: ['portable', 'variable'] }],
+    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'portable', type: 'true or false',
+        summary: 'Set true to list only fonts that survive an export. A font from the icon library '
+          + 'is registered by the editor and is not part of the panel document, so it looks right '
+          + 'while you build and falls back to a system font once exported.' },
+      { name: 'variable', type: 'true or false',
+        summary: 'Set true to list only variable fonts, the ones with adjustable axes such as '
+          + 'weight and width.' },
+    ]) }],
     scopes: 'any',
   },
   {
@@ -1346,9 +1714,56 @@ export const COMMANDS = [
     params: [
       { name: 'target', type: 'string', required: true },
       { name: 'opts', type: 'object', required: true,
-        fields: ['family', 'size', 'weight', 'bold', 'italic', 'caseMode', 'scriptMode',
-          'justification', 'letterSpacing', 'wordSpacing', 'baselineShift', 'lineHeight',
-          'maxLines', 'underline', 'strikethrough', 'overline', 'ligatures'] },
+        // The declared list used to name 17 fields while the implementation accepted 27: the four
+        // paddings and five of the six OpenType switches were missing, so the only way to learn
+        // that `tabularFigures` was allowed was to read textStyle.js. The feature switches come
+        // from FEATURE_KEYS and the three word-lists from their own tables, so this cannot
+        // fall behind again.
+        fields: optionFields([
+          { name: 'family', type: 'text', sample: '"Inter Tight"',
+            summary: 'The font family. One nobody has is refused rather than stored, where a bare '
+              + 'set() would keep the typo and quietly fall back to a system font.' },
+          { name: 'size', type: 'number', unit: 'pixels', sample: '18', summary: 'Text size.' },
+          { name: 'weight', type: 'number or text', sample: '600',
+            summary: 'How heavy the text is, either as a number from 100 to 900 or as a name such '
+              + 'as "Bold". The panel stores this as a pair of fields that must agree, and this '
+              + 'always writes both.' },
+          { name: 'bold', type: 'true or false', summary: 'A shorthand for a heavy weight.' },
+          { name: 'italic', type: 'true or false', summary: 'Slant the text.' },
+          { name: 'caseMode', type: 'text', default: '"normal"', values: CASE_MODES,
+            summary: 'Re-case the text as it is drawn, without changing what it says.' },
+          { name: 'scriptMode', type: 'text', default: '"normal"', values: SCRIPT_MODES,
+            summary: 'Raise or lower the text, smaller, as a superscript or subscript.' },
+          { name: 'justification', type: 'text', values: JUSTIFICATIONS,
+            summary: 'Where the text sits inside the control.' },
+          { name: 'letterSpacing', type: 'number', default: '0', unit: 'pixels',
+            summary: 'Extra space between letters. Negative tightens them up.' },
+          { name: 'wordSpacing', type: 'number', default: '0', unit: 'pixels',
+            summary: 'Extra space between words.' },
+          { name: 'baselineShift', type: 'number', default: '0', unit: 'pixels',
+            summary: 'Move the text off its baseline, up for positive.' },
+          { name: 'lineHeight', type: 'number', sample: '1.4',
+            summary: 'The gap from one line of text to the next.' },
+          { name: 'maxLines', type: 'number', default: '0',
+            summary: 'Stop after this many lines. 0 means no limit.' },
+          { name: 'paddingLeft', type: 'number', default: '0', unit: 'pixels',
+            summary: 'Inset the text from the control\'s left edge.' },
+          { name: 'paddingRight', type: 'number', default: '0', unit: 'pixels',
+            summary: 'Inset it from the right edge.' },
+          { name: 'paddingTop', type: 'number', default: '0', unit: 'pixels',
+            summary: 'Inset it from the top edge.' },
+          { name: 'paddingBottom', type: 'number', default: '0', unit: 'pixels',
+            summary: 'Inset it from the bottom edge.' },
+          { name: 'underline', type: 'true or false', default: 'false', summary: 'Rule under it.' },
+          { name: 'strikethrough', type: 'true or false', default: 'false',
+            summary: 'Rule through it.' },
+          { name: 'overline', type: 'true or false', default: 'false', summary: 'Rule above it.' },
+          ...FEATURE_KEYS.map((key) => ({
+            name: key, type: 'true or false', default: 'false', group: 'typographic feature',
+            summary: `${TYPOGRAPHIC_FEATURES[key]} A font that does not offer it refuses the `
+              + 'option rather than ignoring it.',
+          })),
+        ]) },
     ],
     scopes: 'any',
   },
@@ -1389,7 +1804,16 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['min', 'max', 'text'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'min', type: 'number', default: '6', unit: 'pixels',
+          summary: 'The smallest size to shrink to. If the text still overflows at this size the '
+            + 'answer comes back with fits = false, which is a report rather than a failure.' },
+        { name: 'max', type: 'number', default: 'the control\'s current size', unit: 'pixels', sample: '24',
+          summary: 'The largest size to try.' },
+        { name: 'text', type: 'text', default: 'the control\'s own text', sample: '"PATCH NAME"',
+          summary: 'Measure this text instead, to size a control for something it does not hold '
+            + 'yet.' },
+      ]) },
     ],
     scopes: 'any',
   },
@@ -1400,7 +1824,12 @@ export const COMMANDS = [
     params: [
       { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
       { name: 'text', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['size', 'align', 'family'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'size', type: 'number', unit: 'pixels', sample: '12', summary: 'The text size.' },
+        { name: 'align', type: 'text', default: '"left"', values: ['left', 'middle', 'right'],
+          summary: 'Which part of the text sits at the x you gave.' },
+        { name: 'family', type: 'text', sample: '"Inter Tight"', summary: 'The font family to draw in.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.draw.text(${1:4}, ${2:12}, "${3:hello}")$0', javascript: 'ce.draw.text(${1:4}, ${2:12}, "${3:hello}");$0' },
@@ -1434,7 +1863,24 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'type', type: 'string', required: true },
-      { name: 'props', type: 'object', required: false, fields: ['name', 'x', 'y', 'width', 'height', 'parent'] },
+      { name: 'props', type: 'object', required: false, fields: optionFields([
+        { name: 'name', type: 'text', default: 'one derived from the type', sample: '"cutoff"',
+          summary: 'What to call the control. This is what every other verb addresses it by, so it '
+            + 'is worth choosing.' },
+        { name: 'x', type: 'number', default: '0', unit: 'pixels',
+          summary: 'Distance from the left edge of whatever contains it.' },
+        { name: 'y', type: 'number', default: '0', unit: 'pixels',
+          summary: 'Distance from the top edge.' },
+        { name: 'width', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
+          summary: 'How wide to make it.' },
+        { name: 'height', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
+          summary: 'How tall to make it.' },
+        { name: 'parent', type: 'text', default: 'the panel itself', sample: '"row1"',
+          summary: 'The name of a container to put it inside.' },
+        { name: '<section>', type: 'object', group: 'any section',
+          summary: 'Any section of the control, to set up as you create it — for example '
+            + '{ Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: {
@@ -1479,7 +1925,15 @@ export const COMMANDS = [
     id: 'panelFind', category: 'Panel structure', signature: 'panelFind([query])',
     summary: 'The names of matching controls, nested ones included. `query` is a substring of the name, or a table: { type = "Knob", generated = true, parent = "row1" }. No query means every control.',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'query', type: 'object', required: false, fields: ['name', 'type', 'generated', 'parent'] }],
+    params: [{ name: 'query', type: 'object', required: false, fields: optionFields([
+      { name: 'name', type: 'text', sample: '"osc"', summary: 'Match controls whose name contains this.' },
+      { name: 'type', type: 'text', sample: '"Knob"', summary: 'Match one kind of control, such as "Knob". '
+        + 'ce.panel.types() lists the spellings.' },
+      { name: 'generated', type: 'true or false',
+        summary: 'Match only controls a script created, or only ones you placed by hand.' },
+      { name: 'parent', type: 'text', sample: '"row1"',
+        summary: 'Match only what is inside the container of this name.' },
+    ]) }],
     scopes: 'any',
     snippet: {
       lua: 'for _, n in ipairs(ce.panel.find({ type = "${1:Knob}" })) do\n  $0\nend',
@@ -1531,7 +1985,11 @@ export const COMMANDS = [
     params: [
       { name: 'names', type: 'list', required: true },
       { name: 'edge', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['to'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'to', type: 'text', default: 'the box the whole group occupies', sample: '"cutoff"',
+          summary: 'Name one of the controls to line the others up on, instead of on the group as '
+            + 'a whole. This is what the canvas calls the key object.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: {
@@ -1546,7 +2004,15 @@ export const COMMANDS = [
     params: [
       { name: 'names', type: 'list', required: true },
       { name: 'what', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['gap', 'align'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'gap', type: 'number', default: 'worked out from the space available', sample: '12',
+          unit: 'pixels',
+          summary: 'Force a fixed gap between the controls rather than spreading them to fill '
+            + 'what is there.' },
+        { name: 'align', type: 'text', sample: '"top"',
+          summary: 'Also line them up on this edge across the other axis, so a row ends up level '
+            + 'as well as evenly spaced. Takes the same words as ce.panel.align.' },
+      ]) },
     ],
     scopes: 'any',
   },
@@ -1557,7 +2023,10 @@ export const COMMANDS = [
     params: [
       { name: 'names', type: 'list', required: true },
       { name: 'what', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['to'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'to', type: 'text', default: 'the first name you gave', sample: '"cutoff"',
+          summary: 'Name the control whose size the others should copy. It is not resized itself.' },
+      ]) },
     ],
     scopes: 'any',
   },
@@ -1567,7 +2036,14 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['columns', 'gapX', 'gapY'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'columns', type: 'number', default: '3',
+          summary: 'How many controls per row.' },
+        { name: 'gapX', type: 'number', default: '10', unit: 'pixels',
+          summary: 'The gap between columns.' },
+        { name: 'gapY', type: 'number', default: '10', unit: 'pixels',
+          summary: 'The gap between rows.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: {
@@ -1581,7 +2057,12 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['radius', 'startAngle'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'radius', type: 'number', default: '100', unit: 'pixels',
+          summary: 'How far from the centre to place each control.' },
+        { name: 'startAngle', type: 'number', default: '0', unit: 'degrees',
+          summary: 'Where the first control goes, clockwise from twelve o\'clock.' },
+      ]) },
     ],
     scopes: 'any',
   },
@@ -1908,7 +2389,20 @@ export const COMMANDS = [
     id: 'deviceParameters', category: 'Device / MIDI', signature: 'deviceParameters([opts])',
     summary: 'The profile\'s parameter descriptors: { id, name, group, type, min, max, access }. `opts` may carry { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report — while ce.device is enabled. A gated call returns nil like any other, because a module that is off has no answer to give.',
     requiresDeviceHost: true,
-    params: [{ name: 'opts', type: 'object', required: false, fields: ['role', 'query', 'group', 'type', 'access', 'limit'] }],
+    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+      'role',
+      { name: 'query', type: 'text', sample: '"cutoff"',
+        summary: 'Keep only parameters whose name or id contains this.' },
+      { name: 'group', type: 'text', sample: '"Filter"',
+        summary: 'Keep only one group, the way the synth itself files them — "Oscillator", '
+          + '"Filter" and so on.' },
+      { name: 'type', type: 'text', sample: '"number"',
+        summary: 'Keep only one kind of parameter, such as "number" or "choice".' },
+      { name: 'access', type: 'text', sample: '"readwrite"',
+        summary: 'Keep only parameters you can read, write, or both.' },
+      { name: 'limit', type: 'number', default: 'no limit', sample: '50',
+        summary: 'Return at most this many. Useful on a synth with hundreds.' },
+    ]) }],
     scopes: 'any',
     snippet: {
       lua: 'for _, p in ipairs(deviceParameters({ group = "${1:Filter}" })) do\n  log(p.id .. " " .. p.name)\nend$0',
@@ -1990,7 +2484,39 @@ export const COMMANDS = [
     summary: 'Teach the app a parameter at runtime, for a synth it has no profile for. `spec` says how it reaches the synth — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — plus name/group/type/min/max for what parameters() reports. The declaration is refused (and says why) when there is no wire format: a descriptor that enumerates and sends nothing is worse than an error, because the panel looks built. A declared id overrides a profile one, so a script can correct one wrong parameter without redeclaring the rest. Sysex template tokens: a hex literal, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.',
     params: [
       { name: 'id', type: 'string', required: true },
-      { name: 'spec', type: 'object', required: true, fields: ['name', 'group', 'type', 'min', 'max', 'access', 'cc', 'channel', 'nrpn', 'sysex', 'encoding', 'checksum', 'choices', 'variables'] },
+      { name: 'spec', type: 'object', required: true, fields: optionFields([
+        { name: 'name', type: 'text', default: 'the id', sample: '"Cutoff"',
+          summary: 'What to call it in the parameter list.' },
+        { name: 'group', type: 'text', sample: '"Filter"', summary: 'Which group to file it under, such as "Filter".' },
+        { name: 'type', type: 'text', default: '"number"',
+          summary: 'What kind of value it holds — a number, or a choice from `choices`.' },
+        { name: 'min', type: 'number', default: '0', summary: 'The lowest value it accepts.' },
+        { name: 'max', type: 'number', default: '127', summary: 'The highest.' },
+        { name: 'access', type: 'text', default: '"readwrite"',
+          summary: 'Whether the synth lets you read this parameter, write it, or both.' },
+        { name: 'choices', type: 'list of text',
+          summary: 'The names of the settings, in order, when the parameter is a choice rather '
+            + 'than a number.' },
+        { name: 'cc', type: 'number', sample: '74', group: 'how it reaches the synth — pick one',
+          summary: 'Send it as this CC number. The simplest of the three wire formats.' },
+        { name: 'nrpn', type: 'object', group: 'how it reaches the synth — pick one',
+          summary: 'Send it as an NRPN, as { msb, lsb }.' },
+        { name: 'sysex', type: 'list', group: 'how it reaches the synth — pick one',
+          summary: 'Send it as a SysEx message built from this template. Entries are hex literals '
+            + 'or one of the tokens $value, $deviceId, $checksumStart, $checksum, or any $name you '
+            + 'listed in `variables`.' },
+        { name: 'channel', type: 'number', default: 'the panel\'s channel', sample: '1',
+          summary: 'The MIDI channel to send on.' },
+        { name: 'encoding', type: 'text', sample: '"to14bit"',
+          summary: 'How the number is packed into bytes when one byte is not enough — the same '
+            + 'names ce.midi\'s encoders use.' },
+        { name: 'checksum', type: 'text', sample: '"roland-7bit"',
+          summary: 'Which checksum to compute for a SysEx template that asks for one. The names '
+            + 'are ce.midi.checksum\'s.' },
+        { name: 'variables', type: 'object',
+          summary: 'Extra named values your SysEx template can refer to as $name, such as an '
+            + 'address or a part number.' },
+      ]) },
       { name: 'role', type: 'string', required: false },
     ],
     scopes: 'any',
@@ -2005,7 +2531,25 @@ export const COMMANDS = [
     summary: 'Describe a SysEx dump layout at runtime: `request` (the bytes that ask for it), `match` ({ prefix, suffix }), `offset`/`size` for the payload, an optional `checksum`, and `fields` — one { parameter, offset } per value the dump carries. Every field must name a parameter defineParameter already declared; an unknown one is refused rather than decoded to nothing months later. A declared layout is matched against arriving SysEx, fills the bound controls and raises onDumpReceived, exactly as a profile-defined dump does.',
     params: [
       { name: 'kind', type: 'string', required: true },
-      { name: 'spec', type: 'object', required: true, fields: ['name', 'request', 'match', 'offset', 'size', 'checksum', 'fields'] },
+      { name: 'spec', type: 'object', required: true, fields: optionFields([
+        { name: 'name', type: 'text', default: 'the kind', sample: '"Patch"',
+          summary: 'What to call this dump where it is listed.' },
+        { name: 'request', type: 'text or list', summary: 'The bytes that ask the synth for it.' },
+        { name: 'match', type: 'object', required: true,
+          summary: 'How to recognise the reply, as { prefix, suffix } — the bytes a matching '
+            + 'message starts and ends with.' },
+        { name: 'offset', type: 'number', default: '0',
+          summary: 'How many bytes in from the start the payload begins.' },
+        { name: 'size', type: 'number', default: 'whatever is left', sample: '256',
+          summary: 'How many bytes of payload there are.' },
+        { name: 'checksum', type: 'text', sample: '"roland-7bit"',
+          summary: 'Which checksum the message carries, so it can be verified. The names are '
+            + 'ce.midi.checksum\'s.' },
+        { name: 'fields', type: 'list of objects', required: true,
+          summary: 'Where each value sits inside the payload, one { parameter, offset } per '
+            + 'value. Every parameter must be one defineParameter already declared; an unknown '
+            + 'name is refused now rather than decoding to nothing months later.' },
+      ]) },
       { name: 'role', type: 'string', required: false },
     ],
     scopes: 'any',
@@ -2024,7 +2568,12 @@ export const COMMANDS = [
     params: [
       { name: 'control', type: 'string', required: true },
       { name: 'parameterId', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['role', 'port'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        'role',
+        { name: 'port', type: 'text', default: '"value"',
+          summary: 'Which part of the control is wired up. Binding again on the same port '
+            + 'replaces the old binding rather than adding a second one.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: {
@@ -2051,7 +2600,10 @@ export const COMMANDS = [
     id: 'devicePorts', category: 'Device / MIDI', signature: 'devicePorts([opts]) -> list',
     summary: 'What is actually plugged in: [{ id, name, direction, type, hardware, role }]. connected(role) only answers yes/no for a role somebody configured in advance; this enumerates the real ports, so a panel can offer the user a choice or notice a device that showed up. `hardware` is false for the two placeholder rows the app always lists ("No MIDI Input", "Preview Only"), and `role` is the role currently using the port, or empty. `opts.direction` narrows to "in" or "out".',
     requiresDeviceHost: true,
-    params: [{ name: 'opts', type: 'object', required: false, fields: ['direction'] }],
+    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'direction', type: 'text', values: ['in', 'out'],
+        summary: 'List only the ports that receive, or only the ones that send.' },
+    ]) }],
     scopes: 'any',
     snippet: {
       lua: 'for _, p in ipairs(ce.device.ports({ direction = "out" })) do\n  if p.hardware then log(p.name) end\nend$0',
@@ -2344,7 +2896,11 @@ export const COMMANDS = [
         values: ['sum-7bit', 'roland-7bit', 'ones-complement-7bit', 'xor-7bit', 'offset-7bit',
           'sum-8bit', 'twos-complement-8bit', 'crc8', 'crc16-ccitt', 'crc16-modbus', 'crc32'] },
       { name: 'bytes', type: 'bytes', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['offset'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'offset', type: 'number', default: '0',
+          summary: 'The constant the "offset-7bit" algorithm subtracts from. Only that algorithm '
+            + 'reads it, and the constant is yours to supply because it varies by manufacturer.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: { lua: 'checksum("${1:roland}", ${2:bytes})$0', javascript: 'checksum("${1:roland}", ${2:bytes})$0' },
@@ -2352,7 +2908,13 @@ export const COMMANDS = [
   {
     id: 'panic', category: 'Device / MIDI', signature: 'panic([opts])',
     summary: 'Silence the rig: All Sound Off (120), then All Notes Off (123), then Reset All Controllers (121). Defaults to all 16 channels; pass { channel } for one, { resetControllers: false } to skip 121.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: ['channel', 'resetControllers'] }],
+    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'channel', type: 'number', default: 'all sixteen channels', sample: '1',
+        summary: 'Silence one channel instead of every one.' },
+      { name: 'resetControllers', type: 'true or false', default: 'true',
+        summary: 'Whether to send Reset All Controllers (121) as well as the two note-off '
+          + 'messages. Set false to leave pitch bend and modulation where they are.' },
+    ]) }],
     scopes: 'any',
     snippet: { lua: 'panic()$0', javascript: 'panic()$0' },
   },
@@ -2374,7 +2936,7 @@ export const COMMANDS = [
     params: [
       { name: 'key', type: 'string', required: true },
       { name: 'value', type: 'value', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['scope'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
     ],
     scopes: 'any',
     snippet: { lua: 'saveSetting("${1:key}", ${2:value})$0', javascript: 'saveSetting("${1:key}", ${2:value})$0' },
@@ -2385,7 +2947,7 @@ export const COMMANDS = [
     params: [
       { name: 'key', type: 'string', required: true },
       { name: 'fallback', type: 'value', required: false },
-      { name: 'opts', type: 'object', required: false, fields: ['scope'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
     ],
     scopes: 'any',
     snippet: { lua: 'local ${1:v} = loadSetting("${2:key}", ${3:default})$0', javascript: 'const ${1:v} = loadSetting("${2:key}", ${3:default});$0' },
@@ -2396,7 +2958,7 @@ export const COMMANDS = [
   {
     id: 'listSettings', category: 'Storage', signature: 'listSettings([opts]) -> list',
     summary: 'Every key saved in one scope, in no particular order. An empty list means nothing has been written — not that settings are unavailable, which is what ce.storage.info() is for. `opts.scope` as elsewhere; a panel listing hides other scripts\u2019 private keys.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: ['scope'] }], scopes: 'any',
+    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }], scopes: 'any',
     snippet: { lua: 'for _, k in ipairs(ce.storage.settings()) do $0 end', javascript: 'for (const k of ce.storage.settings()) { $0 }' },
   },
   {
@@ -2404,7 +2966,7 @@ export const COMMANDS = [
     summary: 'Delete a saved setting. Returns whether there was one to delete, so a script can tell "cleaned up" from "there was nothing there". `opts.scope` as elsewhere.',
     params: [
       { name: 'key', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['scope'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
     ], scopes: 'any',
     snippet: { lua: 'ce.storage.forget("${1:key}")$0', javascript: 'ce.storage.forget("${1:key}");$0' },
   },
@@ -2423,7 +2985,7 @@ export const COMMANDS = [
   {
     id: 'allSettings', category: 'Storage', signature: 'allSettings([opts]) -> table',
     summary: 'Every setting in one scope, as a table of key to value. The read every other module got — listing keys and looping to fetch each one was the only way before. `opts.scope` is "panel" (default), "script" or "local". A panel-scope listing hides other scripts’ private keys rather than showing an unusable spelling of them.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: ['scope'] }],
+    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
     scopes: 'any',
     snippet: {
       lua: 'for k, v in pairs(ce.storage.all()) do log(k, v) end$0',
@@ -2433,13 +2995,13 @@ export const COMMANDS = [
   {
     id: 'clearSettings', category: 'Storage', signature: 'clearSettings([opts]) -> number',
     summary: 'Forget everything in one scope, and say how many went. Panel scope leaves other scripts’ private keys alone: "clear my settings" must not mean "clear everybody’s".',
-    params: [{ name: 'opts', type: 'object', required: false, fields: ['scope'] }],
+    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
     scopes: 'any',
   },
   {
     id: 'storageInfo', category: 'Storage', signature: 'storageInfo([opts]) -> table',
     summary: 'Which store a scope is talking to and what is in it: { scope, backing, available, count, bytes }. The three scopes have genuinely different backing — the panel document, this machine, the DAW project state — and a script that has just failed to persist something deserves to know which one it was talking to. `available` is the honest field: false means writes in this scope will not stick, which is worth saying once rather than discovering per key.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: ['scope'] }],
+    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
     scopes: 'any',
   },
   {
@@ -2447,7 +3009,11 @@ export const COMMANDS = [
     summary: 'A value as JSON text. `opts.indent` pretty-prints with that many spaces. Nothing back for a value with no JSON form — a cycle, a function — rather than a string that is not the value. This is here because the Lua engine opens base, math, string and table and has NO json module, while JavaScript and Python each have their own with different names: "use the language’s own" was never available to a cross-runtime script, the same Q10 exception ce.time.now() is.',
     params: [
       { name: 'value', type: 'value', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['indent'] },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'indent', type: 'number', default: '0',
+          summary: 'Lay the JSON out over several lines, indented by this many spaces. 0 keeps it '
+            + 'on one line.' },
+      ]) },
     ],
     scopes: 'any',
     snippet: { lua: 'sendSysex(toAscii(ce.storage.encode(patch)))$0', javascript: 'sendSysex(toAscii(ce.storage.encode(patch)));$0' },
