@@ -1,4 +1,5 @@
 <script>
+  import { controlSources } from '../utils/controlSources.js';
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
@@ -39,17 +40,12 @@
 
   // Any control on the panel (for element linking).
   let allSources = $derived(
-    ($activePanel?.controls ?? [])
-      .filter((c) => String(c?._children?.Core?.id ?? '') !== String(core?.id ?? ''))
-      .map((c) => ({ id: String(c._children.Core.id), name: String(c._children.Core.name ?? c._children.Core.id) }))
+    controlSources($activePanel?.controls, 'any', core?.id)
   );
 
   // Range-valued controls (for the brightness source).
   let valueSources = $derived(
-    ($activePanel?.controls ?? [])
-      .filter((c) => String(c?._children?.Behavior?.family ?? '').trim().toLowerCase() === 'range'
-        && String(c?._children?.Core?.id ?? '') !== String(core?.id ?? ''))
-      .map((c) => ({ id: String(c._children.Core.id), name: String(c._children.Core.name ?? c._children.Core.id) }))
+    controlSources($activePanel?.controls, 'range', core?.id)
   );
 
   function set(prop, value) {

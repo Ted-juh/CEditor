@@ -1,4 +1,5 @@
 <script>
+  import { controlSources } from '../utils/controlSources.js';
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { ARP_PATTERNS, ARP_PATTERN_LABELS, ARP_SOURCES, ARP_SOURCE_LABELS, arpBaseNotes, arpSequence, midiNoteLabel, arpUseFlats, euclid } from '../utils/arpLayout.js';
@@ -15,9 +16,7 @@
 
   // The Chord Pads on this panel — the Arp can follow whichever one you pick.
   let chordPads = $derived(
-    ($activePanel?.controls ?? [])
-      .filter((c) => String(c?._children?.Core?.controlType ?? '') === 'ChordPad')
-      .map((c) => ({ id: String(c._children.Core.id), name: String(c._children.Core.name ?? c._children.Core.id) }))
+    controlSources($activePanel?.controls, 'chordPad', core?.id)
   );
 
   function set(prop, value) {

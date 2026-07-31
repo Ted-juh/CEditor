@@ -36,6 +36,7 @@
 
 import { VERB_VALUES } from './componentTables.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
+import { SOURCE_KINDS } from '../utils/controlSources.js';
 import {
   drumPadCount, resolveDrumPads, PAD_CORNERS, PAD_CORNER_LABELS, cornerField,
 } from '../utils/drumPadLayout.js';
@@ -47,6 +48,12 @@ const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
 const INDEXSET = 'indexset';
 // …and the five every family gets for free, appended below rather than declared per family.
 const READ = 'read', SIZE = 'size', FILL = 'fill', INSERT = 'insert', REMOVE = 'remove';
+// A field holding the ID of ANOTHER control that drives this one. Not a reducer kind: resolving a
+// name needs the panel, which the reducer deliberately never sees, so it dispatches in the runtime
+// beside read/size/fill. The verb takes a NAME and stores an id, because a script addresses controls
+// by name and an opaque `ctl_…` is not something it could have got hold of.
+const LINK = 'link';
+export const LINK_KIND = LINK;
 export const READ_KINDS = [READ, SIZE];
 export const ARRAY_KINDS = [FILL, INSERT, REMOVE];
 /** The kinds that address an array by a verb name — what `size`, `fill`, `insert` and `remove`
@@ -128,6 +135,8 @@ export const COMPONENT_FAMILIES = [
       v('inputChannel', 'inputChannel', INT, { min: 0, max: 16, doc: 'Which channel it takes notes from. 0 means omni.' }),
       v('baseOctave', 'baseOctave', INT, { min: -1, max: 8 }),
       v('source', 'source', ENUM, { doc: 'Where the notes come from: its own chord, a linked Chord Pad, or incoming MIDI.' }),
+      // The Chord Pad the arp takes its notes from, while `source` is "link".
+      v('link', 'linkId', LINK, { sourceKind: 'chordPad' }),
     ],
   },
   {
@@ -350,6 +359,10 @@ export const COMPONENT_FAMILIES = [
       v('curveY', 'curve', ITEM, { item: 'y', kind: NUM, ...UNIT }),
       v('curveShape', 'curve', ITEM, { item: 'curve', kind: ENUM,
         doc: 'How one segment of the transfer curve bends, 1-based.' }),
+      v('sourceControl', 'sourceControlId', LINK, { sourceKind: 'range',
+        doc: 'Name the control this Router follows, while `source` is "link" — a knob, slider or '
+          + 'other range control. No argument, or an empty name, unlinks it. Reads back as the '
+          + 'name, never as an id.' }),
     ],
   },
   {
@@ -405,6 +418,7 @@ export const COMPONENT_FAMILIES = [
       v('snapX', 'snapX', NUM, { min: 0, max: 1, doc: 'Snap step for time, 0..1. 0 is free.' }),
       v('snapY', 'snapY', NUM, { min: 0, max: 1, doc: 'Snap step for level. 0 is free.' }),
       v('fillUnder', 'fillUnder', BOOL, { toggle: true }),
+      v('phaseSource', 'phaseSourceId', LINK, { sourceKind: 'range' }),
     ],
   },
 
@@ -476,6 +490,7 @@ export const COMPONENT_FAMILIES = [
       v('valueSuffix', 'valueSuffix', STR, { doc: 'What follows the number — "dB", "%", "ms".' }),
       v('zoneAt', 'zones', ITEM, { item: 'from', kind: NUM, ...UNIT,
         doc: 'Where one colour zone starts, 0..1, 1-based.' }),
+      v('source', 'valueSourceId', LINK, { sourceKind: 'range' }),
     ],
   },
 
@@ -542,6 +557,9 @@ export const COMPONENT_FAMILIES = [
       v('valuePrecision', 'valuePrecision', INT, { min: 0, max: 6 }),
       v('valuePrefix', 'valuePrefix', STR),
       v('valueSuffix', 'valueSuffix', STR),
+      v('valueSource', 'valueSourceId', LINK, { sourceKind: 'range' }),
+      v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range' }),
+      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any' }),
     ],
   },
   {
@@ -560,6 +578,8 @@ export const COMPONENT_FAMILIES = [
       v('animFps', 'animFps', NUM, { min: 1, max: 120 }),
       v('layoutTransition', 'layoutTransition', ENUM, { doc: 'How one layout gives way to the next.' }),
       v('transitionMs', 'transitionMs', NUM, { min: 0, max: 5000 }),
+      v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range' }),
+      v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any' }),
     ],
   },
 ];
@@ -985,6 +1005,7 @@ export function verbArgs(verb) {
     case BOOL: return [verb.v];
     // The five every family gets. Their optional arguments are rendered in verbSignature, which is
     // why they read as a plain list here.
+    case LINK: return ['name'];
     case READ: return ['name', 'index'];
     case SIZE: return ['name'];
     case FILL: return ['name', 'values'];
@@ -996,6 +1017,7 @@ export function verbArgs(verb) {
 export function verbSignature(verb) {
   const args = verbArgs(verb);
   switch (verb.k) {
+    case LINK: return `${verb.id}(target [, name]) -> boolean`;
     case READ: return `${verb.id}(target [, name [, index]]) -> value`;
     case SIZE: return `${verb.id}(target [, name]) -> number|table`;
     case FILL: return `${verb.id}(target, name, values) -> boolean`;
@@ -1018,6 +1040,12 @@ export function verbSignature(verb) {
 
 export function verbSummary(verb) {
   if (verb.doc) return verb.doc;
+  if (verb.k === LINK) {
+    const what = verb.f.replace(/(SourceId|ControlId|Id)$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+    return `Name the control that drives this component's ${what || 'input'} — `
+      + `${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a control'}. No argument, or an empty name, `
+      + 'unlinks it. Reads back as the name, never as an id.';
+  }
   const label = verb.k === ITEM ? `${verb.item} of one ${verb.f.replace(/s$/, '')}` : verb.f;
   switch (verb.k) {
     case BOOL: return `Set \`${label}\`. Calling it with no argument toggles.`;

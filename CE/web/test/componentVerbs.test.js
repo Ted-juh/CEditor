@@ -241,7 +241,9 @@ test('a verb that needs a list finds none and yields nothing', () => {
 
 // The five kinds every family gets (§44) address the whole component rather than one field, so
 // they have no patch to make and are exercised in scriptComponents.test.js instead.
-const REDUCERLESS_KINDS = ['read', 'size', 'fill', 'insert', 'remove'];
+// …and `link`, which resolves a control NAME against the live panel — something the reducer is
+// deliberately blind to. Driven end to end in scriptControlSources.test.js instead.
+const REDUCERLESS_KINDS = ['read', 'size', 'fill', 'insert', 'remove', 'link'];
 
 test('every verb either changes something or explains why it cannot', () => {
   // The catch-all. For each verb, feed it a plausible argument and assert the reducer produced a

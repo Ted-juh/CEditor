@@ -79,17 +79,6 @@ const EXEMPT = {
   'lcd.cols': 'ditto',
   'pixel.pixelsW': 'ditto',
   'pixel.pixelsH': 'ditto',
-  // Wiring one control to another. A real gap, and a design rather than a verb: the field holds a
-  // control ID and scripts address controls by NAME, so it needs a resolver, not a setter.
-  'arp.linkId': 'wiring by control id — needs a name resolver, not a setter (open)',
-  'router.sourceControlId': 'ditto (open)',
-  'envelope.phaseSourceId': 'ditto (open)',
-  'meter.valueSourceId': 'ditto (open)',
-  'lcd.brightnessSourceId': 'ditto (open)',
-  'lcd.backlightSourceId': 'ditto (open)',
-  'lcd.valueSourceId': 'ditto (open)',
-  'pixel.brightnessSourceId': 'ditto (open)',
-  'pixel.backlightSourceId': 'ditto (open)',
   // Stored and read by NOTHING. Found by the same audit that produced this test: the Envelope
   // editor has no control for any of the three and no renderer mentions them. A verb for a field
   // nobody reads would be a lie in the reference, so they stay out until something consumes them.

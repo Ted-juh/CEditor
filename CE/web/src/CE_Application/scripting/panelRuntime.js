@@ -91,8 +91,11 @@ import {
 } from './midiFilters.js';
 import {
   COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, LIST_KINDS,
-  itemListLength,
+  itemListLength, LINK_KIND,
 } from './componentVerbs.js';
+import {
+  SOURCE_KINDS, sourceAccepts, sourceByName, sourceName,
+} from '../utils/controlSources.js';
 import {
   componentListWithElement, componentListWithoutElement,
 } from '../utils/componentElements.js';
@@ -2387,7 +2390,10 @@ function componentReadAction(verb, path, args) {
   if (name === undefined || name === null || name === '') {
     const out = {};
     for (const [verbName, spec] of Object.entries(specs)) {
-      if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') out[verbName] = componentScalarValue(cfg, spec);
+      // A link reads back as the NAME it was written by — '' when it points at nothing, which is
+      // the truthful answer for both "unlinked" and "linked to a control that has been deleted".
+      if (spec.k === LINK_KIND) out[verbName] = sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
+      else if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') out[verbName] = componentScalarValue(cfg, spec);
     }
     return out;
   }
@@ -2399,6 +2405,7 @@ function componentReadAction(verb, path, args) {
       + `${Object.keys(specs).filter((k) => k !== 'read').sort().join(', ')}.`);
     return undefined;
   }
+  if (spec.k === LINK_KIND) return sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
   if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') return componentScalarValue(cfg, spec);
 
   const list = componentListValue(cfg, spec);
@@ -2570,6 +2577,66 @@ function componentListSpec(verb, forWhat, name) {
   return null;
 }
 
+/**
+ * Point one component at another control, BY NAME.
+ *
+ * The field stores an id, and an id is not something a script could have got hold of — it addresses
+ * controls by name everywhere else, so it does here too, and read() gives the name back.
+ *
+ * Three outcomes, and they are deliberately distinguishable, because "the meter is not moving" has
+ * three very different causes and a silent one would leave all three looking alike:
+ *
+ *   no name        unlink. The component falls back to its static value, which is the editor's own
+ *                  "— Static / bound level —" and a legitimate thing to ask for.
+ *   unknown name   refused, and says the panel has no such control. A typo must not become a link
+ *                  to nothing that looks exactly like a link to something.
+ *   wrong kind     refused, and says WHAT would have been right — a Meter follows a knob, not a
+ *                  label. The rule is the same one the inspector's picker filters by; it lives in
+ *                  controlSources.js precisely so these two cannot disagree.
+ */
+function componentLinkAction(verb, path, args) {
+  const cfg = componentConfig(verb, path, verb.v);
+  if (!cfg) return false;
+  const controls = activePanel()?.controls ?? [];
+  const self = findControlByName(path);
+  const selfId = String(self?._children?.Core?.id ?? '');
+  const current = String(cfg[verb.f] ?? '');
+
+  const wanted = args[0] === undefined || args[0] === null ? '' : String(args[0]).trim();
+  if (!wanted) {
+    if (!current) {
+      addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}() — already unlinked`);
+      return true;
+    }
+    setValue(`${path}.${verb.section}.${verb.f}`, '');
+    addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}() → unlinked`);
+    return true;
+  }
+
+  const found = sourceByName(controls, wanted);
+  if (!found) {
+    addScriptTrace('error', '',
+      `${verb.family}.${verb.v}: no control named "${wanted}" on this panel.`);
+    return false;
+  }
+  if (!sourceAccepts(verb.sourceKind, found, selfId)) {
+    const why = String(found._children?.Core?.id ?? '') === selfId
+      ? 'a control cannot drive itself'
+      : `it is not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}`;
+    addScriptTrace('error', '', `${verb.family}.${verb.v}("${wanted}"): refused — ${why}.`);
+    return false;
+  }
+
+  const id = String(found._children.Core.id);
+  if (id === current) {
+    addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}("${wanted}") — already that way`);
+    return true;
+  }
+  setValue(`${path}.${verb.section}.${verb.f}`, id);
+  addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → "${wanted}"`);
+  return true;
+}
+
 /** The five kinds every family gets are not writes of a field, so they dispatch elsewhere. */
 const COMPONENT_KIND_ACTION = {
   read: componentReadAction,
@@ -2577,6 +2644,7 @@ const COMPONENT_KIND_ACTION = {
   fill: componentFillAction,
   insert: componentInsertAction,
   remove: componentRemoveAction,
+  [LINK_KIND]: componentLinkAction,
 };
 
 const componentVerbApi = Object.fromEntries(COMPONENT_VERBS.map((verb) => [
