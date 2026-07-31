@@ -1239,6 +1239,19 @@ export const SECTION_DEFAULTS = {
     echo: false,
     echoChannel: 0,
     echoColour: 'FF39D98A',
+    // CORNER ZONES — a strike inside a corner of a pad does something other than
+    // a plain hit, which is the hardware idiom where the rim carries a second
+    // vocabulary. Grid-level on purpose: a corner is a gesture the hand learns
+    // once, and per-pad corners would make the same movement mean different
+    // things on neighbouring pads. Screen corners, so `origin` does not turn them.
+    zones: false,
+    cornerSize: 0.28,             // fraction of the pad each corner claims
+    cornerTopLeft: 'none',
+    cornerTopRight: 'none',
+    cornerBottomLeft: 'none',
+    cornerBottomRight: 'none',
+    flamMs: 22,                   // how early a flam's grace note lands
+    ghostVelocity: 0.35,          // a ghost strike, as a fraction of the hit
     // ROLL — a pad restrikes for as long as it is on, which is the drag/buzz
     // roll a finger does on hardware. Per-pad rather than a grid mode: a kick
     // that rolled every time you leant on it would be unplayable. Rate is

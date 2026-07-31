@@ -61,8 +61,13 @@ export const PAD_MODE_LABELS = {
 // these are now that object and the two functions below read from them.
 export const PAD_ORIGINS = ['bottomLeft', 'topLeft'];
 export const PAD_ORIGIN_LABELS = { bottomLeft: 'Bottom-left (hardware)', topLeft: 'Top-left (reading order)' };
-export const PAD_VELOCITY_SOURCES = ['fixed', 'position'];
-export const PAD_VELOCITY_SOURCE_LABELS = { fixed: 'Fixed', position: 'From strike position' };
+// Three readings of the same strike, and you pick one. 'position' reads the vertical axis (higher
+// up the pad is harder, which is how a mouse is offered "hit it harder"); 'centre' reads distance
+// from the middle, which is how a real pad behaves — full in the middle, thinner toward the rim.
+export const PAD_VELOCITY_SOURCES = ['fixed', 'position', 'centre'];
+export const PAD_VELOCITY_SOURCE_LABELS = {
+  fixed: 'Fixed', position: 'From strike height', centre: 'From distance to centre',
+};
 
 export function drumOrigin(control) {
   const o = String(drumConfig(control).origin ?? 'bottomLeft');
@@ -198,15 +203,123 @@ export function padHit(geom, px, py, origin = 'bottomLeft') {
   }
   return -1;
 }
-// 0 at the bottom of the pad, 1 at the top — the axis velocity reads from.
+// 0 at the bottom of the pad, 1 at the top — the axis 'position' velocity reads from.
 export function padStrikeY(rect, py) {
   return clamp01(1 - (num(py, 0) - rect.y) / Math.max(1, rect.h));
 }
-// Velocity for a hit: fixed, or softer at the bottom of the pad and harder at
-// the top, which is how hardware pads present "hit it harder" to a mouse.
-export function strikeVelocity(control, strikeY) {
-  if (drumVelocityFrom(control) !== 'position') return drumVelocity(control);
-  return clampInt(10 + clamp01(num(strikeY, 0.5)) * 117, 1, 127);
+// 0 at the left edge, 1 at the right. Only 'centre' velocity and the corner zones need it, so it
+// is optional everywhere it is passed and defaults to the middle.
+export function padStrikeX(rect, px) {
+  return clamp01((num(px, 0) - rect.x) / Math.max(1, rect.w));
+}
+
+/**
+ * How hard a strike landed, in the pad's own terms.
+ *
+ * 'centre' measures the CHEBYSHEV distance to the middle — the larger of the two axis distances —
+ * rather than the euclidean one, because a pad is a square and a ring of equal response should
+ * follow its edges. With euclidean distance the corners are further from the middle than the edge
+ * midpoints are, so a corner strike would come out quieter than a rim strike beside it, which is
+ * backwards from how a square pad feels under a hand.
+ */
+export function strikeVelocity(control, strikeY, strikeX = 0.5) {
+  const from = drumVelocityFrom(control);
+  if (from === 'position') return clampInt(10 + clamp01(num(strikeY, 0.5)) * 117, 1, 127);
+  if (from === 'centre') {
+    const dx = Math.abs(clamp01(num(strikeX, 0.5)) - 0.5);
+    const dy = Math.abs(clamp01(num(strikeY, 0.5)) - 0.5);
+    // 0 in the middle, 1 at any edge.
+    const out = Math.min(1, Math.max(dx, dy) * 2);
+    return clampInt(drumVelocity(control) * (1 - out * 0.72), 1, 127);
+  }
+  return drumVelocity(control);
+}
+
+// --- Corner zones -------------------------------------------------------------
+//
+// A strike inside a corner of a pad does something other than a plain hit. This is the hardware
+// idiom where the rim and the corners of a pad carry a second vocabulary — a roll under one thumb,
+// a flam under the other — and it is what turns sixteen triggers into an instrument you can phrase
+// on rather than sixteen buttons.
+//
+// GRID-LEVEL, not per pad, and that is the point rather than a shortcut. A corner is a gesture your
+// hand learns once: "top-right rolls". Per-pad corners would make the same physical movement mean
+// different things on adjacent pads, which is the opposite of what a performance surface is for.
+//
+// SCREEN corners, so `origin` does not rotate them. Origin decides which pad sits where; it does
+// not decide which way your hand is pointing.
+
+export const PAD_ZONE_ACTIONS = ['none', 'roll', 'flam', 'choke', 'accent', 'ghost'];
+export const PAD_ZONE_ACTION_LABELS = {
+  none: 'Plain hit', roll: 'Roll while held', flam: 'Flam (grace note)',
+  choke: 'Choke the group', accent: 'Accent (full velocity)', ghost: 'Ghost (quiet)',
+};
+// In the order they are drawn and listed. The field each one is stored in is `corner` + the name,
+// flat rather than nested, so each is an ordinary enum the script verbs and the editor already know
+// how to write.
+export const PAD_CORNERS = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
+export const PAD_CORNER_LABELS = {
+  topLeft: 'Top left', topRight: 'Top right', bottomLeft: 'Bottom left', bottomRight: 'Bottom right',
+};
+export const cornerField = (corner) => `corner${corner.charAt(0).toUpperCase()}${corner.slice(1)}`;
+
+export function zonesEnabled(cfg) { return (cfg ?? {}).zones === true; }
+
+/** How much of the pad each corner claims, from both edges. Capped below a half so a face remains. */
+export function cornerSize(cfg) {
+  const n = num((cfg ?? {}).cornerSize, 0.28);
+  return n < 0.05 ? 0.05 : n > 0.45 ? 0.45 : n;
+}
+
+export function cornerAction(cfg, corner) {
+  const a = String((cfg ?? {})[cornerField(String(corner))] ?? 'none');
+  return PAD_ZONE_ACTIONS.includes(a) ? a : 'none';
+}
+
+/**
+ * Which corner a strike landed in, or nothing for the face.
+ *
+ * `x` and `y` are the pad-relative 0..1 pair padStrikeX/padStrikeY give — so y is 1 at the TOP,
+ * which is why the comparison below reads the way it does.
+ */
+export function cornerAt(cfg, strikeX, strikeY) {
+  if (!zonesEnabled(cfg)) return null;
+  const size = cornerSize(cfg);
+  const x = clamp01(num(strikeX, 0.5));
+  const y = clamp01(num(strikeY, 0.5));
+  const left = x <= size, right = x >= 1 - size;
+  const top = y >= 1 - size, bottom = y <= size;
+  if (!(left || right) || !(top || bottom)) return null;
+  return `${top ? 'top' : 'bottom'}${left ? 'Left' : 'Right'}`;
+}
+
+/** What a strike at this point does: an action name, and the corner it came from (null for a face
+ *  hit, which is always 'none'). */
+export function strikeAction(cfg, strikeX, strikeY) {
+  const corner = cornerAt(cfg, strikeX, strikeY);
+  return { corner, action: corner ? cornerAction(cfg, corner) : 'none' };
+}
+
+/** How long before the main hit a flam's grace note lands. */
+export function flamMs(cfg) {
+  return Math.max(1, Math.round(num((cfg ?? {}).flamMs, 22)));
+}
+
+/** A ghost strike's velocity, given what the hit would otherwise have been. */
+export function ghostVelocity(cfg, velocity) {
+  return clampInt(clampInt(velocity, 1, 127) * clamp01(num((cfg ?? {}).ghostVelocity, 0.35)), 1, 127);
+}
+
+/** The rectangle one corner occupies inside a pad, for drawing it. */
+export function cornerRect(rect, cfg, corner) {
+  const size = cornerSize(cfg);
+  const w = rect.w * size, h = rect.h * size;
+  const name = String(corner);
+  return {
+    x: name.endsWith('Left') ? rect.x : rect.x + rect.w - w,
+    y: name.startsWith('top') ? rect.y : rect.y + rect.h - h,
+    w, h,
+  };
 }
 
 // --- Roll ---------------------------------------------------------------------

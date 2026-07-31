@@ -110,9 +110,10 @@
     touchVelocity as nrVelocity, modValue as nrModValue, modCc as nrModCc,
   } from '../utils/noteRibbonLayout.js';
   import {
-    drumConfig, drumRows, drumCols, drumPads, drumChannel, drumMode, drumGateMs,
-    drumGeometry, padHit, padRect, padStrikeY, strikeVelocity, chokedBy, drumOrigin,
+    drumConfig, drumRows, drumCols, drumPads, drumChannel, drumMode, drumGateMs, drumVelocity,
+    drumGeometry, padHit, padRect, padStrikeY, padStrikeX, strikeVelocity, chokedBy, drumOrigin,
     padRolls, rollIntervalMs, rollDelayMs, rollVelocity,
+    strikeAction, flamMs, ghostVelocity,
   } from '../utils/drumPadLayout.js';
   import { createRepeatClock } from '../utils/repeatClock.js';
   import {
@@ -2870,7 +2871,7 @@
     delete drumHits[id][padId];
     raiseComponent(control, 'onRelease', { id: padId, note: held.note, notes: [held.note] });
   }
-  function drumHit(control, pad, strikeY) {
+  function drumHit(control, pad, strikeY, opts = null) {
     const id = getControlId(control);
     const ch = drumChannel(control);
     const mode = drumMode(control);
@@ -2886,11 +2887,15 @@
       if (map[other.id]) drumNoteOff(control, other.id);
     }
     if (map[pad.id]) drumNoteOff(control, pad.id);        // restrike cleanly
-    const strikeVel = strikeVelocity(control, strikeY);
+    // A corner action may have decided the velocity already (accent, ghost) or forced a roll on a
+    // pad that does not carry the flag.
+    const strikeVel = opts?.velocity != null
+      ? Math.max(1, Math.min(127, Math.round(opts.velocity)))
+      : strikeVelocity(control, strikeY);
     sendNoteBytes(noteOnBytes(ch, pad.note, strikeVel), `note_on_${pad.note}`);
     map[pad.id] = { note: pad.note, mode, velocity: strikeVel };
     raiseComponent(control, 'onHit', { id: pad.id, note: pad.note, notes: [pad.note], velocity: strikeVel });
-    startDrumRoll(control, pad, mode);
+    startDrumRoll(control, pad, mode, opts?.roll === true);
     if (mode === 'oneShot') {
       (drumTimers[id] ??= []).push(setTimeout(() => {
         drumNoteOff(control, pad.id);
@@ -2922,9 +2927,11 @@
       { id: pad.id, note: held.note, notes: [held.note], velocity: vel, roll: true });
   }
 
-  function startDrumRoll(control, pad, mode) {
+  function startDrumRoll(control, pad, mode, forced = false) {
     const cfg = drumConfig(control);
-    if (!padRolls(cfg, pad, mode)) return;
+    if (!forced && !padRolls(cfg, pad, mode)) return;
+    // A corner-forced roll still obeys the mode rule: there is no "while held" on a one-shot.
+    if (forced && !padRolls(cfg, { roll: true }, mode)) return;
     const key = drumRollKey(getControlId(control), pad.id);
     drumRolling[key] = { control, pad };
     // Synced to the panel transport when there is one to sync to, exactly as the Arpeggiator's
@@ -2941,6 +2948,62 @@
     delete drumRolling[key];
   }
 
+  /**
+   * One strike, with the corner vocabulary applied.
+   *
+   * Returns whether the pad is now SOUNDING — false for a strike that consumed itself, which is
+   * `choke`: grabbing a cymbal silences the group and makes no sound of its own, so there is no
+   * press to hold and no note to release.
+   *
+   * Everything else ends in the ordinary drumHit, which is what keeps one path for choke groups,
+   * toggling, restrikes, the one-shot gate and the roll clock. A corner that forked into its own
+   * note-sending code would be a second implementation of all of that.
+   */
+  function drumStrike(control, hit) {
+    const cfg = drumConfig(control);
+    const { action } = strikeAction(cfg, hit.strikeX, hit.strikeY);
+    const base = strikeVelocity(control, hit.strikeY, hit.strikeX);
+
+    switch (action) {
+      case 'choke': {
+        // Silence this pad's group — including the pad itself if it is ringing — and sound nothing.
+        for (const other of chokedBy(drumPads(control), hit.pad)) drumNoteOff(control, other.id);
+        drumNoteOff(control, hit.pad.id);
+        syncDrumSession(control, null);
+        raiseComponent(control, 'onRelease',
+          { id: hit.pad.id, note: hit.pad.note, notes: [hit.pad.note], choke: true });
+        return false;
+      }
+      case 'accent':
+        drumHit(control, hit.pad, hit.strikeY, { velocity: drumVelocity(control), roll: false });
+        return true;
+      case 'ghost':
+        drumHit(control, hit.pad, hit.strikeY, { velocity: ghostVelocity(cfg, base), roll: false });
+        return true;
+      case 'flam': {
+        // A grace note just before the main one. Quiet, and it does NOT choke — a flam is one
+        // gesture, and letting the grace note cut its own main hit would silence the thing it is
+        // decorating.
+        const ch = drumChannel(control);
+        const grace = ghostVelocity(cfg, base);
+        sendNoteBytes(noteOnBytes(ch, hit.pad.note, grace), `note_on_${hit.pad.note}`);
+        (drumTimers[getControlId(control)] ??= []).push(setTimeout(() => {
+          sendNoteBytes(noteOffBytes(ch, hit.pad.note), `note_off_${hit.pad.note}`);
+          drumHit(control, hit.pad, hit.strikeY, { velocity: base, roll: false });
+        }, flamMs(cfg)));
+        return true;
+      }
+      case 'roll':
+        // The corner rolls whether or not the pad's own flag does. Both are true unions of the
+        // same thing: "this strike should repeat".
+        drumHit(control, hit.pad, hit.strikeY, { velocity: base, roll: true });
+        return true;
+      default:
+        drumHit(control, hit.pad, hit.strikeY);
+        return true;
+    }
+  }
+
   // The pad under a point, plus how high up it you struck.
   function drumPadAtPoint(control, localPoint) {
     const geom = drumGeomFor(control);
@@ -2948,13 +3011,20 @@
     if (i < 0) return null;
     const pads = drumPads(control);
     if (!pads[i]) return null;
-    return { pad: pads[i], strikeY: padStrikeY(padRect(geom, i, drumOrigin(control)), localPoint.y) };
+    const rect = padRect(geom, i, drumOrigin(control));
+    return {
+      pad: pads[i],
+      strikeY: padStrikeY(rect, localPoint.y),
+      strikeX: padStrikeX(rect, localPoint.x),
+    };
   }
   function handleDrumPadsPointerDown(control, localPoint) {
     if (!isDrumPadsControl(control) || drumConfig(control).editable === false) return false;
     const hit = drumPadAtPoint(control, localPoint);
     if (!hit) return false;
-    drumHit(control, hit.pad, hit.strikeY);
+    // A corner action may consume the strike entirely — `choke` silences the group and sounds
+    // nothing, so there is no press to track afterwards.
+    if (!drumStrike(control, hit)) return true;
     if (drumMode(control) === 'momentary') drumPress = { id: getControlId(control), padId: hit.pad.id };
     return true;
   }
@@ -2963,8 +3033,7 @@
     const hit = drumPadAtPoint(control, localPoint);
     if (!hit || hit.pad.id === drumPress.padId) return;
     drumNoteOff(control, drumPress.padId);
-    drumHit(control, hit.pad, hit.strikeY);
-    drumPress.padId = hit.pad.id;
+    if (drumStrike(control, hit)) drumPress.padId = hit.pad.id;
   }
   function releaseDrumPress(control) {
     if (drumMode(control) !== 'momentary') return;   // one-shots and toggles ring on

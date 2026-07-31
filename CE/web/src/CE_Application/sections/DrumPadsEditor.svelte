@@ -2,7 +2,8 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import {
     PAD_MAPS, PAD_MAP_LABELS, PAD_MODES, PAD_MODE_LABELS, ROLL_MODES,
-    drumPads, drumCount, drumNoteLabel, rollIntervalMs,
+    PAD_CORNERS, PAD_CORNER_LABELS, PAD_ZONE_ACTIONS, PAD_ZONE_ACTION_LABELS, cornerField,
+    drumPads, drumCount, drumNoteLabel, rollIntervalMs, cornerAction,
   } from '../utils/drumPadLayout.js';
   import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -27,6 +28,9 @@
   let rolling = $derived(pads.filter((p) => p.roll).length);
   // A roll only happens while a pad is ON, so a one-shot — gone by its own gate — cannot have one.
   let rollUsable = $derived(ROLL_MODES.includes(String(d?.mode ?? 'momentary')));
+  // A corner set to roll needs the roll settings visible even when no pad carries the flag.
+  let cornerRolls = $derived(d?.zones === true
+    && PAD_CORNERS.some((c) => cornerAction(d, c) === 'roll'));
 
   // Overrides are sparse and index-aligned; writing one pads the array out to it.
   function setPad(i, key, value) {
@@ -117,6 +121,33 @@
     </PropertyCell>
   </PropertySection>
 
+  <PropertySection title="Corner zones">
+    <PropertyCell label="Corners" span={2} hint="Give the four corners of every pad their own action, so the same sixteen triggers carry a second vocabulary — a roll under one thumb, a flam under the other. The map is the same on every pad on purpose: a corner is a gesture your hand learns once.">
+      <PropertyToggle value={d.zones === true} onchange={() => set('zones', !(d.zones === true))} />
+    </PropertyCell>
+    {#if d.zones === true}
+      <PropertyCell label="Corner size" span={2} hint="How much of each pad a corner claims, measured in from both edges. The rest of the pad is the face and always plays a plain hit.">
+        <input class="val" type="number" min="0.05" max="0.45" step="0.01" value={num(d.cornerSize, 0.28)}
+               onchange={(e) => set('cornerSize', Math.min(0.45, Math.max(0.05, num(e.target.value, 0.28))))} />
+      </PropertyCell>
+      {#each PAD_CORNERS as corner (corner)}
+        <PropertyCell label={PAD_CORNER_LABELS[corner]} span={2} hint="What a strike in this corner of a pad does instead of a plain hit.">
+          <select class="val" value={cornerAction(d, corner)} onchange={(e) => set(cornerField(corner), e.target.value)}>
+            {#each PAD_ZONE_ACTIONS as a (a)}<option value={a}>{PAD_ZONE_ACTION_LABELS[a] ?? a}</option>{/each}
+          </select>
+        </PropertyCell>
+      {/each}
+      <PropertyCell label="Flam lead" span={1} hint="How far ahead of the main hit a flam's grace note lands, in milliseconds.">
+        <input class="val" type="number" min="1" max="500" step="1" value={num(d.flamMs, 22)}
+               onchange={(e) => set('flamMs', clampInt(e.target.value, 1, 500, 22))} />
+      </PropertyCell>
+      <PropertyCell label="Ghost level" span={1} hint="A ghost strike's velocity, as a fraction of the hit it replaces. Also the level a flam's grace note uses.">
+        <input class="val" type="number" min="0" max="1" step="0.05" value={num(d.ghostVelocity, 0.35)}
+               onchange={(e) => set('ghostVelocity', Math.min(1, Math.max(0, num(e.target.value, 0.35))))} />
+      </PropertyCell>
+    {/if}
+  </PropertySection>
+
   <PropertySection title="Pads">
     <PropertyCell label="" span={4} hint="Each row overrides one pad. Blank fields fall back to the generated map. Choke: pads sharing a non-zero number cut each other (the GM hi-hats are group 1).">
       <div class="table" role="table" aria-label="Pad overrides">
@@ -148,7 +179,7 @@
         {/each}
       </div>
     </PropertyCell>
-    {#if rolling}
+    {#if rolling || cornerRolls}
       <PropertyCell label="Roll rate" span={2} hint="How fast a rolling pad restrikes, as a note value against the panel transport — so a roll stays in time when the tempo moves.">
         <select class="val" value={d.rollRate ?? '1/16'} onchange={(e) => set('rollRate', e.target.value)}>
           {#each DIVISION_IDS as id (id)}<option value={id}>{DIVISION_LABELS[id] ?? id}</option>{/each}
@@ -174,7 +205,7 @@
       </PropertyCell>
       {#if !rollUsable}
         <PropertyCell label="" span={4} hint="A roll runs for as long as the pad is on. A one-shot releases itself after its gate, so there is no 'while held' for it to fill.">
-          <div class="note warn">{rolling} pad{rolling === 1 ? '' : 's'} set to roll, but the grid is a one-shot — rolls are ignored in this mode.</div>
+          <div class="note warn">The grid is a one-shot, so rolls are ignored — a one-shot releases itself and has no 'while held'.</div>
         </PropertyCell>
       {/if}
     {/if}

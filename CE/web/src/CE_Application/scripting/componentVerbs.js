@@ -35,7 +35,9 @@
 // that says "scene 3" should mean the third one whichever language it is written in.
 
 import { VERB_VALUES } from './componentTables.js';
-import { drumPadCount, resolveDrumPads } from '../utils/drumPadLayout.js';
+import {
+  drumPadCount, resolveDrumPads, PAD_CORNERS, PAD_CORNER_LABELS, cornerField,
+} from '../utils/drumPadLayout.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
@@ -210,6 +212,17 @@ export const COMPONENT_FAMILIES = [
         { min: 0, max: 4000, doc: 'How long a pad is held before its roll begins, in ms. 0 rolls from the first strike.' }),
       v('rollVelocity', 'rollVelocity', NUM,
         { ...UNIT, doc: 'Repeats strike at this fraction of the opening hit, so the first one is an accent.' }),
+      // CORNER ZONES — a second vocabulary under the same sixteen pads. Grid-level: a corner is a
+      // gesture the hand learns once, and per-pad corners would make one movement mean different
+      // things on adjacent pads.
+      v('zones', 'zones', BOOL, { toggle: true, doc: 'Let the corners of a pad carry their own actions.' }),
+      v('cornerSize', 'cornerSize', NUM,
+        { min: 0.05, max: 0.45, doc: 'How much of a pad each corner claims, from both edges.' }),
+      ...PAD_CORNERS.map((corner) => v(cornerField(corner), cornerField(corner), ENUM,
+        { doc: `What a strike in the ${PAD_CORNER_LABELS[corner].toLowerCase()} corner of a pad does.` })),
+      v('flamMs', 'flamMs', NUM, { min: 1, max: 500, doc: 'How early a flam\'s grace note lands, in ms.' }),
+      v('ghostVelocity', 'ghostVelocity', NUM,
+        { ...UNIT, doc: 'A ghost strike\'s velocity, as a fraction of the hit it replaces.' }),
     ],
   },
 

@@ -7,6 +7,7 @@
   import {
     drumConfig, drumRows, drumCols, drumPads, drumMap, drumChannel,
     drumGeometry, padRect, PAD_MAP_LABELS,
+    PAD_CORNERS, zonesEnabled, cornerAction, cornerRect,
   } from '../utils/drumPadLayout.js';
 
   let { control = null, width = 0, height = 0 } = $props();
@@ -25,6 +26,11 @@
   let cfg = $derived(drumConfig(control));
   let pads = $derived(drumPads(control));
   let origin = $derived(String(cfg.origin ?? 'bottomLeft'));
+  // The corners carrying an action, once. Sixteen pads x four corners is a lot of ink for a map
+  // that is the same on every pad, so it is computed here and drawn as a hint rather than a legend.
+  let zoneCorners = $derived(zonesEnabled(cfg)
+    ? PAD_CORNERS.map((c) => ({ corner: c, action: cornerAction(cfg, c) })).filter((z) => z.action !== 'none')
+    : []);
   let hits = $derived(new Set(Array.isArray(cfg.__hits) ? cfg.__hits : []));
   let last = $derived(cfg.__last ?? null);
   // Notes arriving on the MIDI input (note input echo) — an outline, so a pad
@@ -109,6 +115,22 @@
       <text x={c.r.x + c.r.w / 2} y={c.r.y + c.r.h - 7} font-size="8.5"
             fill={isHit ? hitCss : labelCss} text-anchor="middle" opacity={isHit ? 1 : 0.6}>{c.p.note}</text>
     {/if}
+    <!-- corner zones: a wedge in each corner that does something other than a plain hit. Drawn
+         faintly and only when the pad is big enough to aim at one. -->
+    {#each zoneCorners as z (z.corner)}
+      {@const zr = cornerRect(c.r, cfg, z.corner)}
+      {#if c.r.w >= 44 && c.r.h >= 34}
+        <!-- An L along the two INNER edges of the corner square: it draws the boundary you have
+             to land inside, which a filled wedge also does but with eight times the ink. Four
+             corners on every pad of a sixteen-pad grid is sixty-four marks, so this has to be
+             quiet or the labels lose. -->
+        <path d={z.corner === 'topLeft' ? `M${zr.x} ${zr.y + zr.h} L${zr.x + zr.w} ${zr.y + zr.h} L${zr.x + zr.w} ${zr.y}`
+               : z.corner === 'topRight' ? `M${zr.x} ${zr.y} L${zr.x} ${zr.y + zr.h} L${zr.x + zr.w} ${zr.y + zr.h}`
+               : z.corner === 'bottomLeft' ? `M${zr.x} ${zr.y} L${zr.x + zr.w} ${zr.y} L${zr.x + zr.w} ${zr.y + zr.h}`
+               : `M${zr.x + zr.w} ${zr.y} L${zr.x} ${zr.y} L${zr.x} ${zr.y + zr.h}`}
+              fill="none" stroke={accent} stroke-width="1" opacity="0.5" stroke-linecap="round" />
+      {/if}
+    {/each}
     <!-- roll marker: this pad restrikes for as long as it is held. Three descending ticks, on the
          LEFT so it never fights the choke digit — a hi-hat is commonly both. -->
     {#if c.p.roll && c.r.w >= 30}

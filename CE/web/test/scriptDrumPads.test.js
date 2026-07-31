@@ -30,6 +30,8 @@ import {
   drumPads, drumPadCount, resolveDrumPads, padCell, strikeVelocity,
   PAD_ORIGINS, PAD_VELOCITY_SOURCES, GM_CHOKE,
   ROLL_MODES, padRolls, rollIntervalMs, rollDelayMs, rollVelocity,
+  PAD_CORNERS, PAD_ZONE_ACTIONS, cornerField, cornerSize, cornerRect,
+  zonesEnabled, strikeAction, flamMs, ghostVelocity, padStrikeX, padStrikeY,
 } from '../src/CE_Application/utils/drumPadLayout.js';
 import { beatsPerStep, DIVISION_IDS } from '../src/CE_Application/utils/transportLayout.js';
 
@@ -295,5 +297,117 @@ test('fill can set which pads roll in one call', () => {
                    false, false, false, false, false, false, false, false];
     assert.equal(d.fill('Kit', 'roll', which), true);
     assert.deepEqual(d.read('Kit', 'roll'), which);
+  });
+});
+
+/* ------------------------------------------------------------------------ corner zones */
+
+test('velocity can come from the middle of the pad, not just its height', () => {
+  // The third reading of the same strike. Chebyshev rather than euclidean distance, because a pad
+  // is a square: with euclidean distance a corner is further from the middle than the edge midpoint
+  // beside it, so a corner strike would come out quieter than a rim strike, which is backwards.
+  const kit = createControl('DrumPads', { name: 'K' });
+  const cfg = kit._children.DrumPads;
+  cfg.velocityFrom = 'centre';
+  cfg.velocity = 100;
+
+  assert.equal(strikeVelocity(kit, 0.5, 0.5), 100, 'dead centre is the full velocity');
+  const edge = strikeVelocity(kit, 1, 0.5);
+  const corner = strikeVelocity(kit, 1, 1);
+  assert.ok(edge < 100, 'the rim is softer');
+  assert.equal(edge, corner, 'and a corner is a rim, not somewhere further out');
+  assert.ok(strikeVelocity(kit, 0.75, 0.5) > edge, 'halfway out is between the two');
+
+  // The other two sources must not read the new axis at all.
+  cfg.velocityFrom = 'fixed';
+  assert.equal(strikeVelocity(kit, 0.9, 0.1), strikeVelocity(kit, 0.1, 0.9));
+  cfg.velocityFrom = 'position';
+  assert.equal(strikeVelocity(kit, 0.7, 0.1), strikeVelocity(kit, 0.7, 0.9), 'x is ignored');
+});
+
+test('a corner is a corner of the screen, and the rest of the pad is the face', () => {
+  const cfg = { zones: true, cornerSize: 0.28, cornerTopRight: 'roll', cornerBottomLeft: 'flam' };
+  const at = (x, y) => strikeAction(cfg, x, y);
+
+  assert.deepEqual(at(0.5, 0.5), { corner: null, action: 'none' }, 'the middle');
+  assert.deepEqual(at(0.5, 0.99), { corner: null, action: 'none' }, 'the top EDGE is not a corner');
+  assert.deepEqual(at(0.95, 0.95), { corner: 'topRight', action: 'roll' });
+  assert.deepEqual(at(0.02, 0.02), { corner: 'bottomLeft', action: 'flam' });
+  // A corner with nothing assigned is still a corner, and still plays a plain hit.
+  assert.deepEqual(at(0.02, 0.98), { corner: 'topLeft', action: 'none' });
+
+  // Off by default, so a panel built before zones existed behaves as it always did.
+  assert.equal(SECTION_DEFAULTS.DrumPads.zones, false);
+  assert.deepEqual(strikeAction({ cornerTopRight: 'roll' }, 0.95, 0.95), { corner: null, action: 'none' });
+});
+
+test('corner size decides how much of the pad the corners claim', () => {
+  const wide = { zones: true, cornerSize: 0.45, cornerTopLeft: 'accent' };
+  const tight = { zones: true, cornerSize: 0.05, cornerTopLeft: 'accent' };
+  assert.equal(strikeAction(wide, 0.3, 0.7).action, 'accent');
+  assert.equal(strikeAction(tight, 0.3, 0.7).action, 'none', 'the same point is the face on a tight map');
+
+  // Clamped below a half, so there is always a face left between the four corners.
+  assert.equal(cornerSize({ cornerSize: 5 }), 0.45);
+  assert.equal(cornerSize({ cornerSize: -1 }), 0.05);
+  assert.equal(strikeAction({ zones: true, cornerSize: 5, cornerTopLeft: 'accent' }, 0.5, 0.5).action,
+    'none', 'the exact middle is never a corner');
+});
+
+test('the corner rectangle drawn is the region that was hit', () => {
+  // The renderer and the hit test must agree, or the wedge is a lie about where to aim.
+  const rect = { x: 100, y: 200, w: 80, h: 60 };
+  const cfg = { zones: true, cornerSize: 0.25 };
+  const r = cornerRect(rect, cfg, 'topLeft');
+  assert.deepEqual(r, { x: 100, y: 200, w: 20, h: 15 });
+
+  // A point inside that drawn rectangle, converted back the way the surface converts one.
+  const px = r.x + r.w / 2, py = r.y + r.h / 2;
+  assert.equal(strikeAction(cfg, padStrikeX(rect, px), padStrikeY(rect, py)).corner, 'topLeft');
+  // …and one just outside it is not.
+  assert.equal(strikeAction(cfg, padStrikeX(rect, r.x + r.w + 2), padStrikeY(rect, r.y + r.h + 2)).corner, null);
+});
+
+test('flam and ghost levels are derived from the hit they decorate', () => {
+  assert.equal(flamMs({}), 22);
+  assert.equal(flamMs({ flamMs: 0 }), 1, 'a flam with no lead is not a flam');
+  assert.equal(ghostVelocity({ ghostVelocity: 0.35 }, 100), 35);
+  assert.equal(ghostVelocity({}, 100), 35);
+  assert.equal(ghostVelocity({ ghostVelocity: 0 }, 100), 1, 'never silent');
+});
+
+test('a script can lay out the corner vocabulary', () => {
+  withKit((d, live) => {
+    assert.equal(d.zones('Kit'), true, 'a bare call turns them on');
+    assert.equal(d.cornerTopRight('Kit', 'roll'), true);
+    assert.equal(d.cornerTopLeft('Kit', 'choke'), true);
+    assert.equal(d.cornerBottomRight('Kit', 'flam'), true);
+    assert.equal(d.cornerBottomLeft('Kit', 'ghost'), true);
+    assert.equal(d.cornerSize('Kit', 0.3), true);
+    assert.equal(d.flamMs('Kit', 30), true);
+
+    const cfg = live()._children.DrumPads;
+    assert.equal(zonesEnabled(cfg), true);
+    assert.equal(strikeAction(cfg, 0.95, 0.95).action, 'roll');
+    assert.equal(strikeAction(cfg, 0.05, 0.95).action, 'choke');
+    assert.equal(strikeAction(cfg, 0.95, 0.05).action, 'flam');
+    assert.equal(strikeAction(cfg, 0.05, 0.05).action, 'ghost');
+    assert.equal(strikeAction(cfg, 0.5, 0.5).action, 'none');
+
+    const read = d.read('Kit');
+    assert.equal(read.cornerTopRight, 'roll');
+    assert.equal(read.cornerSize, 0.3);
+    assert.equal(read.flamMs, 30);
+  });
+});
+
+test('an action the component does not have is a no-op, and all four corners offer the same set', () => {
+  withKit((d, live) => {
+    assert.equal(d.cornerTopLeft('Kit', 'rimshot'), false);
+    assert.equal(live()._children.DrumPads.cornerTopLeft, 'none');
+    for (const corner of PAD_CORNERS) {
+      assert.equal(VERB_VALUES[`drumpads.${cornerField(corner)}`], PAD_ZONE_ACTIONS,
+        `${corner} must offer the same vocabulary as its neighbours`);
+    }
   });
 });
