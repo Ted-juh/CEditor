@@ -150,3 +150,52 @@ export function turingSyncedPhaseAt(beats, control) {
   const ph = (Math.max(0, num(beats, 0)) / turingBeatsPerStep(control)) / n;
   return ((ph % 1) + 1) % 1;
 }
+
+// --- Driving it from a script -------------------------------------------------------------
+// PURE reducer over the Turing config (patch-only, unknown args = no-op). `roll` is the
+// injected randomness source, like mutateStep's — so `seed` stays unit-testable.
+export const TURING_SCRIPT_ACTIONS = ['randomness', 'length', 'rate', 'sync', 'division', 'seed', 'clear', 'quantize'];
+
+export function turingScriptPatch(cfg, action, args = {}, roll = () => 0.5) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  const a = args && typeof args === 'object' ? args : {};
+  const len = Math.max(2, Math.min(64, Math.round(num(c.length, 8))));
+  switch (String(action)) {
+    case 'randomness': {
+      // The classic lock ↔ evolve knob: 0 never mutates, 1 always rewrites.
+      const r = Number(a.randomness ?? a.amount);
+      return Number.isFinite(r) ? { randomness: clamp01(r) } : {};
+    }
+    case 'length': {
+      const n = Number(a.length);
+      return Number.isFinite(n) ? { length: Math.max(2, Math.min(64, Math.round(n))) } : {};
+    }
+    case 'rate': {
+      const r = Number(a.rate);
+      return Number.isFinite(r) && r > 0 ? { rate: Math.max(0.1, r) } : {};
+    }
+    case 'sync':
+      return { syncToTransport: a.on !== false };
+    case 'division': {
+      const d = String(a.division ?? '');
+      return DIVISION_IDS.includes(d) ? { division: d } : {};
+    }
+    case 'seed': {
+      // A fresh random register — the "new melody please" move.
+      const steps = [];
+      for (let i = 0; i < len; i += 1) steps.push(clamp01(num(roll(), 0.5)));
+      return { steps };
+    }
+    case 'clear': {
+      const steps = [];
+      for (let i = 0; i < len; i += 1) steps.push(0);
+      return { steps };
+    }
+    case 'quantize': {
+      const q = Number(a.levels);
+      return Number.isFinite(q) ? { quantizeLevels: Math.max(0, Math.min(24, Math.round(q))) } : {};
+    }
+    default:
+      return {};
+  }
+}

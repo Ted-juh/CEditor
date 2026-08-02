@@ -121,6 +121,9 @@ export function generateManual() {
     'Phrase Recorder': `Drive the [Phrase Recorder](${COMPONENT_DOCS}/phrase-recorder.md) — the note looper. \`target\` is the component's control name.`,
     'Harmoniser': `Drive the [Harmoniser](${COMPONENT_DOCS}/harmoniser.md) — one finger in, a full chord out. \`target\` is the component's control name.`,
     'Setlist': `Drive the [Setlist](${COMPONENT_DOCS}/setlist.md) — scenes on a footswitch. \`target\` is the component's control name.`,
+    'Arpeggiator': `Drive the [Arpeggiator](${COMPONENT_DOCS}/arpeggiator.md) — held notes walked as a pattern. \`target\` is the component's control name.`,
+    'Turing Modulator': `Drive the [Turing Modulator](${COMPONENT_DOCS}/turing-modulator.md) — the locking random looper. \`target\` is the component's control name.`,
+    'Gesture Looper': `Drive the [Gesture Looper](${COMPONENT_DOCS}/gesture-looper.md) — recorded control motion on a loop. \`target\` is the component's control name.`,
   };
 
   const commandsByCategory = new Map();

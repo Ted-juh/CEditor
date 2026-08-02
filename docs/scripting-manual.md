@@ -722,6 +722,46 @@ Turn one grid cell on/off (step column, scale-degree row). Out-of-grid cells are
 phraseCell("target", step, row, true)
 ```
 
+#### `phraseStore(target, slot [, name])`
+
+Save the live pattern into a slot (1-based, up to 8), optionally named — the slots the song chain plays.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+phraseStore("target", slot)
+```
+
+#### `phraseLoad(target, slot)`
+
+Load a stored pattern from a slot (1-based) into the live grid.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+phraseLoad("target", slot)
+```
+
+#### `phraseChain(target [, on])`
+
+Turn song mode on (or off with false) — the sequencer follows its chain of pattern slots.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+phraseChain("target", true)
+```
+
+#### `phraseChainLoop(target [, loop])`
+
+Whether the song chain loops back to its start (false = play once and stop).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+phraseChainLoop("target", true)
+```
+
 ### Phrase Recorder
 
 Drive the [Phrase Recorder](../CE/web/src/CE_Application/docs/phrase-recorder.md) — the note looper. `target` is the component's control name.
@@ -1082,6 +1122,268 @@ Crossfade time between scenes, in milliseconds.
 
 ```lua
 setlistCrossfade("target", ms)
+```
+
+### Arpeggiator
+
+Drive the [Arpeggiator](../CE/web/src/CE_Application/docs/arpeggiator.md) — held notes walked as a pattern. `target` is the component's control name.
+
+#### `arpPattern(target, pattern)`
+
+"up", "down", "updown", "downup", "asPlayed", "random", or "chord".
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+arpPattern("target", "up")
+```
+
+#### `arpRate(target, stepsPerSecond)`
+
+Free-running speed in steps per second (when not synced to the transport).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+arpRate("target", 6)
+```
+
+#### `arpSync(target [, on])`
+
+Follow the transport (false = free-run at arpRate).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+arpSync("target", true)
+```
+
+#### `arpDivision(target, division)`
+
+Synced step length: "1/4", "1/8", "1/16", "1/32", dotted "1/8D", triplet "1/8T", …
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+arpDivision("target", "1/16")
+```
+
+#### `arpOctaves(target, octaves)`
+
+Spread the held notes across 1–4 octaves.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+arpOctaves("target", 2)
+```
+
+#### `arpGate(target, gate)`
+
+Note length as a fraction of the step (0–1; 1 = legato).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+arpGate("target", 0.6)
+```
+
+#### `arpSwing(target, swing)`
+
+Set the Arp's own swing (0–1) — this also switches it off the transport's shared swing.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+arpSwing("target", 0.2)
+```
+
+#### `arpVelocity(target, velocity)`
+
+Velocity of the generated notes (1–127).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+arpVelocity("target", 96)
+```
+
+#### `arpChannel(target, channel)`
+
+MIDI channel for the generated notes (1–16).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+arpChannel("target", channel)
+```
+
+#### `arpSource(target, source)`
+
+What it arpeggiates: "chord" (its own), "link" (a linked Chord Pad), or "input" (played notes).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+arpSource("target", "chord")
+```
+
+### Turing Modulator
+
+Drive the [Turing Modulator](../CE/web/src/CE_Application/docs/turing-modulator.md) — the locking random looper. `target` is the component's control name.
+
+#### `turingRandomness(target, amount)`
+
+The lock ↔ evolve knob (0–1): 0 = the loop never changes, 1 = every pass rewrites it.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+turingRandomness("target", 0.2)
+```
+
+#### `turingLength(target, steps)`
+
+Loop length in steps (2–64).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+turingLength("target", 8)
+```
+
+#### `turingRate(target, stepsPerSecond)`
+
+Free-running speed in steps per second (when not synced).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+turingRate("target", 2)
+```
+
+#### `turingSync(target [, on])`
+
+Follow the transport (false = free-run at turingRate).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+turingSync("target", true)
+```
+
+#### `turingDivision(target, division)`
+
+Synced step length: "1/4", "1/8", "1/16", dotted/triplet variants.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+turingDivision("target", "1/8")
+```
+
+#### `turingSeed(target)`
+
+Replace the register with a fresh random loop — "new melody, please".
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+turingSeed("target")
+```
+
+#### `turingClear(target)`
+
+Zero the register.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+turingClear("target")
+```
+
+#### `turingQuantize(target, levels)`
+
+Quantize the output to N discrete levels (0 = continuous, up to 24).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+turingQuantize("target", levels)
+```
+
+### Gesture Looper
+
+Drive the [Gesture Looper](../CE/web/src/CE_Application/docs/gesture-looper.md) — recorded control motion on a loop. `target` is the component's control name.
+
+#### `looperLaneEnable(target, lane [, enabled])`
+
+Unmute a lane (false mutes it). Lane by 1-based index, id, or label.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+looperLaneEnable("target", lane, true)
+```
+
+#### `looperLaneClear(target, lane)`
+
+Wipe one lane's recorded gesture.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+looperLaneClear("target", lane)
+```
+
+#### `looperClear(target)`
+
+Wipe every lane.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+looperClear("target")
+```
+
+#### `looperRest(target, lane, rest)`
+
+A lane's rest value (0–1) — what it outputs where nothing is recorded.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+looperRest("target", lane, 0.5)
+```
+
+#### `looperSync(target [, on])`
+
+Loop over bars of the transport instead of free seconds.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+looperSync("target", true)
+```
+
+#### `looperBars(target, bars)`
+
+Loop length in bars when synced (0.25–64).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+looperBars("target", 2)
+```
+
+#### `looperSeconds(target, seconds)`
+
+Loop length in seconds when free-running.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
+```lua
+looperSeconds("target", 4)
 ```
 
 ## Helpers

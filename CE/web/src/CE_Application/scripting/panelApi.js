@@ -615,6 +615,47 @@ export const COMMANDS = [
     scopes: 'any',
     snippet: { lua: 'phraseCell("${1:target}", ${2:step}, ${3:row}, ${4:true})$0', javascript: 'phraseCell("${1:target}", ${2:step}, ${3:row}, ${4:true})$0' },
   },
+  {
+    id: 'phraseStore', category: 'Phrase Sequencer', signature: 'phraseStore(target, slot [, name])',
+    summary: 'Save the live pattern into a slot (1-based, up to 8), optionally named — the slots the song chain plays.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'slot', type: 'number', required: true },
+      { name: 'name', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'phraseStore("${1:target}", ${2:slot})$0', javascript: 'phraseStore("${1:target}", ${2:slot})$0' },
+  },
+  {
+    id: 'phraseLoad', category: 'Phrase Sequencer', signature: 'phraseLoad(target, slot)',
+    summary: 'Load a stored pattern from a slot (1-based) into the live grid.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'slot', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'phraseLoad("${1:target}", ${2:slot})$0', javascript: 'phraseLoad("${1:target}", ${2:slot})$0' },
+  },
+  {
+    id: 'phraseChain', category: 'Phrase Sequencer', signature: 'phraseChain(target [, on])',
+    summary: 'Turn song mode on (or off with false) — the sequencer follows its chain of pattern slots.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'on', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'phraseChain("${1:target}", ${2:true})$0', javascript: 'phraseChain("${1:target}", ${2:true})$0' },
+  },
+  {
+    id: 'phraseChainLoop', category: 'Phrase Sequencer', signature: 'phraseChainLoop(target [, loop])',
+    summary: 'Whether the song chain loops back to its start (false = play once and stop).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'loop', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'phraseChainLoop("${1:target}", ${2:true})$0', javascript: 'phraseChainLoop("${1:target}", ${2:true})$0' },
+  },
 
   /* Phrase Recorder */
   {
@@ -952,11 +993,263 @@ export const COMMANDS = [
     scopes: 'any',
     snippet: { lua: 'setlistCrossfade("${1:target}", ${2:ms})$0', javascript: 'setlistCrossfade("${1:target}", ${2:ms})$0' },
   },
+
+  /* Arpeggiator */
+  {
+    id: 'arpPattern', category: 'Arpeggiator', signature: 'arpPattern(target, pattern)',
+    summary: '"up", "down", "updown", "downup", "asPlayed", "random", or "chord".',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'pattern', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'arpPattern("${1:target}", "${2:up}")$0', javascript: 'arpPattern("${1:target}", "${2:up}")$0' },
+  },
+  {
+    id: 'arpRate', category: 'Arpeggiator', signature: 'arpRate(target, stepsPerSecond)',
+    summary: 'Free-running speed in steps per second (when not synced to the transport).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'stepsPerSecond', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'arpRate("${1:target}", ${2:6})$0', javascript: 'arpRate("${1:target}", ${2:6})$0' },
+  },
+  {
+    id: 'arpSync', category: 'Arpeggiator', signature: 'arpSync(target [, on])',
+    summary: 'Follow the transport (false = free-run at arpRate).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'on', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'arpSync("${1:target}", ${2:true})$0', javascript: 'arpSync("${1:target}", ${2:true})$0' },
+  },
+  {
+    id: 'arpDivision', category: 'Arpeggiator', signature: 'arpDivision(target, division)',
+    summary: 'Synced step length: "1/4", "1/8", "1/16", "1/32", dotted "1/8D", triplet "1/8T", …',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'division', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'arpDivision("${1:target}", "${2:1/16}")$0', javascript: 'arpDivision("${1:target}", "${2:1/16}")$0' },
+  },
+  {
+    id: 'arpOctaves', category: 'Arpeggiator', signature: 'arpOctaves(target, octaves)',
+    summary: 'Spread the held notes across 1–4 octaves.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'octaves', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'arpOctaves("${1:target}", ${2:2})$0', javascript: 'arpOctaves("${1:target}", ${2:2})$0' },
+  },
+  {
+    id: 'arpGate', category: 'Arpeggiator', signature: 'arpGate(target, gate)',
+    summary: 'Note length as a fraction of the step (0–1; 1 = legato).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'gate', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'arpGate("${1:target}", ${2:0.6})$0', javascript: 'arpGate("${1:target}", ${2:0.6})$0' },
+  },
+  {
+    id: 'arpSwing', category: 'Arpeggiator', signature: 'arpSwing(target, swing)',
+    summary: "Set the Arp's own swing (0–1) — this also switches it off the transport's shared swing.",
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'swing', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'arpSwing("${1:target}", ${2:0.2})$0', javascript: 'arpSwing("${1:target}", ${2:0.2})$0' },
+  },
+  {
+    id: 'arpVelocity', category: 'Arpeggiator', signature: 'arpVelocity(target, velocity)',
+    summary: 'Velocity of the generated notes (1–127).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'velocity', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'arpVelocity("${1:target}", ${2:96})$0', javascript: 'arpVelocity("${1:target}", ${2:96})$0' },
+  },
+  {
+    id: 'arpChannel', category: 'Arpeggiator', signature: 'arpChannel(target, channel)',
+    summary: 'MIDI channel for the generated notes (1–16).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'channel', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'arpChannel("${1:target}", ${2:channel})$0', javascript: 'arpChannel("${1:target}", ${2:channel})$0' },
+  },
+  {
+    id: 'arpSource', category: 'Arpeggiator', signature: 'arpSource(target, source)',
+    summary: 'What it arpeggiates: "chord" (its own), "link" (a linked Chord Pad), or "input" (played notes).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'source', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'arpSource("${1:target}", "${2:chord}")$0', javascript: 'arpSource("${1:target}", "${2:chord}")$0' },
+  },
+
+  /* Turing Modulator */
+  {
+    id: 'turingRandomness', category: 'Turing Modulator', signature: 'turingRandomness(target, amount)',
+    summary: 'The lock ↔ evolve knob (0–1): 0 = the loop never changes, 1 = every pass rewrites it.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'amount', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'turingRandomness("${1:target}", ${2:0.2})$0', javascript: 'turingRandomness("${1:target}", ${2:0.2})$0' },
+  },
+  {
+    id: 'turingLength', category: 'Turing Modulator', signature: 'turingLength(target, steps)',
+    summary: 'Loop length in steps (2–64).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'steps', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'turingLength("${1:target}", ${2:8})$0', javascript: 'turingLength("${1:target}", ${2:8})$0' },
+  },
+  {
+    id: 'turingRate', category: 'Turing Modulator', signature: 'turingRate(target, stepsPerSecond)',
+    summary: 'Free-running speed in steps per second (when not synced).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'stepsPerSecond', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'turingRate("${1:target}", ${2:2})$0', javascript: 'turingRate("${1:target}", ${2:2})$0' },
+  },
+  {
+    id: 'turingSync', category: 'Turing Modulator', signature: 'turingSync(target [, on])',
+    summary: 'Follow the transport (false = free-run at turingRate).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'on', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'turingSync("${1:target}", ${2:true})$0', javascript: 'turingSync("${1:target}", ${2:true})$0' },
+  },
+  {
+    id: 'turingDivision', category: 'Turing Modulator', signature: 'turingDivision(target, division)',
+    summary: 'Synced step length: "1/4", "1/8", "1/16", dotted/triplet variants.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'division', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'turingDivision("${1:target}", "${2:1/8}")$0', javascript: 'turingDivision("${1:target}", "${2:1/8}")$0' },
+  },
+  {
+    id: 'turingSeed', category: 'Turing Modulator', signature: 'turingSeed(target)',
+    summary: 'Replace the register with a fresh random loop — "new melody, please".',
+    params: [{ name: 'target', type: 'targetRef', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'turingSeed("${1:target}")$0', javascript: 'turingSeed("${1:target}")$0' },
+  },
+  {
+    id: 'turingClear', category: 'Turing Modulator', signature: 'turingClear(target)',
+    summary: 'Zero the register.',
+    params: [{ name: 'target', type: 'targetRef', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'turingClear("${1:target}")$0', javascript: 'turingClear("${1:target}")$0' },
+  },
+  {
+    id: 'turingQuantize', category: 'Turing Modulator', signature: 'turingQuantize(target, levels)',
+    summary: 'Quantize the output to N discrete levels (0 = continuous, up to 24).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'levels', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'turingQuantize("${1:target}", ${2:levels})$0', javascript: 'turingQuantize("${1:target}", ${2:levels})$0' },
+  },
+
+  /* Gesture Looper */
+  {
+    id: 'looperLaneEnable', category: 'Gesture Looper', signature: 'looperLaneEnable(target, lane [, enabled])',
+    summary: 'Unmute a lane (false mutes it). Lane by 1-based index, id, or label.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'lane', type: 'value', required: true },
+      { name: 'enabled', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'looperLaneEnable("${1:target}", ${2:lane}, ${3:true})$0', javascript: 'looperLaneEnable("${1:target}", ${2:lane}, ${3:true})$0' },
+  },
+  {
+    id: 'looperLaneClear', category: 'Gesture Looper', signature: 'looperLaneClear(target, lane)',
+    summary: "Wipe one lane's recorded gesture.",
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'lane', type: 'value', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'looperLaneClear("${1:target}", ${2:lane})$0', javascript: 'looperLaneClear("${1:target}", ${2:lane})$0' },
+  },
+  {
+    id: 'looperClear', category: 'Gesture Looper', signature: 'looperClear(target)',
+    summary: 'Wipe every lane.',
+    params: [{ name: 'target', type: 'targetRef', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'looperClear("${1:target}")$0', javascript: 'looperClear("${1:target}")$0' },
+  },
+  {
+    id: 'looperRest', category: 'Gesture Looper', signature: 'looperRest(target, lane, rest)',
+    summary: "A lane's rest value (0–1) — what it outputs where nothing is recorded.",
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'lane', type: 'value', required: true },
+      { name: 'rest', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'looperRest("${1:target}", ${2:lane}, ${3:0.5})$0', javascript: 'looperRest("${1:target}", ${2:lane}, ${3:0.5})$0' },
+  },
+  {
+    id: 'looperSync', category: 'Gesture Looper', signature: 'looperSync(target [, on])',
+    summary: 'Loop over bars of the transport instead of free seconds.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'on', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'looperSync("${1:target}", ${2:true})$0', javascript: 'looperSync("${1:target}", ${2:true})$0' },
+  },
+  {
+    id: 'looperBars', category: 'Gesture Looper', signature: 'looperBars(target, bars)',
+    summary: 'Loop length in bars when synced (0.25–64).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'bars', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'looperBars("${1:target}", ${2:2})$0', javascript: 'looperBars("${1:target}", ${2:2})$0' },
+  },
+  {
+    id: 'looperSeconds', category: 'Gesture Looper', signature: 'looperSeconds(target, seconds)',
+    summary: 'Loop length in seconds when free-running.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'seconds', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'looperSeconds("${1:target}", ${2:4})$0', javascript: 'looperSeconds("${1:target}", ${2:4})$0' },
+  },
 ];
 
 // The component commands run in the shared JS panel runtime, everywhere it runs — tag the whole
 // block rather than repeating the note 47 times.
-const COMPONENT_CATEGORIES = new Set(['Zone Splitter', 'Phrase Sequencer', 'Phrase Recorder', 'Harmoniser', 'Setlist']);
+const COMPONENT_CATEGORIES = new Set([
+  'Zone Splitter', 'Phrase Sequencer', 'Phrase Recorder', 'Harmoniser', 'Setlist',
+  'Arpeggiator', 'Turing Modulator', 'Gesture Looper',
+]);
 for (const c of COMMANDS) {
   if (COMPONENT_CATEGORIES.has(c.category) && !c.availability) c.availability = PANEL_UI_RUNTIME;
 }
@@ -1017,6 +1310,7 @@ export function membersByCategory() {
   const order = [
     'Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Transport', 'Timers', 'Debug',
     'Zone Splitter', 'Phrase Sequencer', 'Phrase Recorder', 'Harmoniser', 'Setlist',
+    'Arpeggiator', 'Turing Modulator', 'Gesture Looper',
     'Value / range', 'Music', 'MIDI encoding',
   ];
   const map = new Map(order.map((c) => [c, []]));

@@ -37,6 +37,9 @@ import { phraseScriptPatch } from '../utils/phraseLayout.js';
 import { recorderScriptPatch } from '../utils/noteRecorderLayout.js';
 import { harmoniserScriptPatch } from '../utils/harmoniserLayout.js';
 import { setlistScriptPatch } from '../utils/setlistLayout.js';
+import { arpScriptPatch } from '../utils/arpLayout.js';
+import { turingScriptPatch } from '../utils/turingLayout.js';
+import { looperScriptPatch } from '../utils/looperLayout.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 /* --------------------------------------------------------------- path resolution */
@@ -368,6 +371,52 @@ const phraseApi = {
   phraseDirection: (target, direction) => phraseAction(target, 'direction', { direction }),
   phraseRun: (target, running) => phraseAction(target, 'run', { running: running !== false }),
   phraseCell: (target, step, row, on) => phraseAction(target, 'cell', { step, row, on }),
+  // Pattern slots + song mode (the chain of patterns).
+  phraseStore: (target, slot, name) => phraseAction(target, 'store', { slot, name }),
+  phraseLoad: (target, slot) => phraseAction(target, 'load', { slot }),
+  phraseChain: (target, on) => phraseAction(target, 'chain', on === undefined ? {} : { on: on !== false }),
+  phraseChainLoop: (target, loop) => phraseAction(target, 'chainLoop', loop === undefined ? {} : { loop: loop !== false }),
+};
+
+// --- Arpeggiator / Turing / Gesture Looper ----------------------------------
+// Same sectionAction shape as the Recorder family; the Turing's `seed` takes the
+// injected randomness the same way phraseSeed does.
+const arpCmd = (t, a, g) => sectionAction(t, 'Arp', arpScriptPatch, a, g);
+const arpApi = {
+  arpPattern: (target, pattern) => arpCmd(target, 'pattern', { pattern }),
+  arpRate: (target, rate) => arpCmd(target, 'rate', { rate }),
+  arpSync: (target, on) => arpCmd(target, 'sync', on === undefined ? {} : { on: on !== false }),
+  arpDivision: (target, division) => arpCmd(target, 'division', { division }),
+  arpOctaves: (target, octaves) => arpCmd(target, 'octaves', { octaves }),
+  arpGate: (target, gate) => arpCmd(target, 'gate', { gate }),
+  arpSwing: (target, swing) => arpCmd(target, 'swing', { swing }),
+  arpVelocity: (target, velocity) => arpCmd(target, 'velocity', { velocity }),
+  arpChannel: (target, channel) => arpCmd(target, 'channel', { channel }),
+  arpSource: (target, source) => arpCmd(target, 'source', { source }),
+};
+
+const turingCmd = (t, a, g) =>
+  sectionAction(t, 'Turing', (cfg, action, args) => turingScriptPatch(cfg, action, args, () => Math.random()), a, g);
+const turingApi = {
+  turingRandomness: (target, amount) => turingCmd(target, 'randomness', { randomness: amount }),
+  turingLength: (target, length) => turingCmd(target, 'length', { length }),
+  turingRate: (target, rate) => turingCmd(target, 'rate', { rate }),
+  turingSync: (target, on) => turingCmd(target, 'sync', on === undefined ? {} : { on: on !== false }),
+  turingDivision: (target, division) => turingCmd(target, 'division', { division }),
+  turingSeed: (target) => turingCmd(target, 'seed', {}),
+  turingClear: (target) => turingCmd(target, 'clear', {}),
+  turingQuantize: (target, levels) => turingCmd(target, 'quantize', { levels }),
+};
+
+const looperCmd = (t, a, g) => sectionAction(t, 'Looper', looperScriptPatch, a, g);
+const looperApi = {
+  looperLaneEnable: (target, lane, enabled) => looperCmd(target, 'laneEnable', { lane, enabled: enabled !== false }),
+  looperLaneClear: (target, lane) => looperCmd(target, 'laneClear', { lane }),
+  looperClear: (target) => looperCmd(target, 'clear', {}),
+  looperRest: (target, lane, rest) => looperCmd(target, 'rest', { lane, rest }),
+  looperSync: (target, on) => looperCmd(target, 'sync', on === undefined ? {} : { on: on !== false }),
+  looperBars: (target, bars) => looperCmd(target, 'bars', { bars }),
+  looperSeconds: (target, seconds) => looperCmd(target, 'seconds', { seconds }),
 };
 
 // --- Recorder / Harmoniser / Setlist -----------------------------------------
@@ -556,6 +605,12 @@ function buildApi(ownerName, collect) {
     ...harmoniserApi,
     // Setlist — next song, from a button or a script.
     ...setlistApi,
+    // Arpeggiator — re-pattern it, sync it, spread it.
+    ...arpApi,
+    // Turing Modulator — lock the loop, evolve it, ask for a new one.
+    ...turingApi,
+    // Gesture Looper — mute or wipe lanes, set the loop length.
+    ...looperApi,
     // flow (Q6) — emit re-enters dispatch; on() registrations are collected per load;
     // run() calls a named action in another script.
     emit: (name, data) => emitCustomEvent(name, data),

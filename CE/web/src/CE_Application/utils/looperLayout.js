@@ -174,3 +174,62 @@ export function looperLoopSecondsAt(control, bpm, beatsPerBar = 4) {
   if (!looperSynced(control) || !(b > 0)) return looperLoopSeconds(control);
   return looperLoopBars(control) * Math.max(1, num(beatsPerBar, 4)) * (60 / b);
 }
+
+// --- Driving it from a script -------------------------------------------------------------
+// PURE reducer over the Looper config (patch-only, unknown args = no-op). Recording itself is
+// an interaction (you move a control), so the script surface is playback and housekeeping:
+// mute/clear lanes, set the rest value, and the loop length / sync. A lane is addressed by
+// 1-based index, id, or label.
+export const LOOPER_SCRIPT_ACTIONS = ['laneEnable', 'laneClear', 'clear', 'rest', 'sync', 'bars', 'seconds'];
+
+function laneIndex(lanes, ref) {
+  if (ref == null) return -1;
+  const n = Number(ref);
+  if (Number.isFinite(n)) { const i = Math.round(n) - 1; return i >= 0 && i < lanes.length ? i : -1; }
+  const s = String(ref).toLowerCase();
+  return lanes.findIndex((l) => String(l?.id ?? '').toLowerCase() === s || String(l?.label ?? '').toLowerCase() === s);
+}
+
+export function looperScriptPatch(cfg, action, args = {}) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  const a = args && typeof args === 'object' ? args : {};
+  const lanes = Array.isArray(c.lanes) ? c.lanes : [];
+  switch (String(action)) {
+    case 'laneEnable': {
+      const i = laneIndex(lanes, a.lane);
+      if (i < 0) return {};
+      const next = lanes.slice();
+      next[i] = { ...next[i], enabled: a.enabled !== false };
+      return { lanes: next };
+    }
+    case 'laneClear': {
+      const i = laneIndex(lanes, a.lane);
+      if (i < 0) return {};
+      const next = lanes.slice();
+      next[i] = { ...next[i], points: [] };
+      return { lanes: next };
+    }
+    case 'clear':
+      return lanes.length ? { lanes: lanes.map((l) => ({ ...l, points: [] })) } : {};
+    case 'rest': {
+      const i = laneIndex(lanes, a.lane);
+      const r = Number(a.rest);
+      if (i < 0 || !Number.isFinite(r)) return {};
+      const next = lanes.slice();
+      next[i] = { ...next[i], rest: clamp01(r) };
+      return { lanes: next };
+    }
+    case 'sync':
+      return { syncToTransport: a.on !== false };
+    case 'bars': {
+      const b = Number(a.bars);
+      return Number.isFinite(b) && b > 0 ? { loopBars: clampBars(b) } : {};
+    }
+    case 'seconds': {
+      const s = Number(a.seconds);
+      return Number.isFinite(s) && s > 0 ? { loopSeconds: Math.max(0.05, s) } : {};
+    }
+    default:
+      return {};
+  }
+}

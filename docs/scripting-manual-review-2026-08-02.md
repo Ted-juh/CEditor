@@ -143,3 +143,9 @@ Player) and **musical time** (`transport()` snapshot everywhere; `onBeat`/`onBar
 panel Transport in the UI runtime and from the DAW playhead window-closed;
 `startTimer(id, { beats })`). The Player's inbound `midiIn`/`ccIn` channel fields were also
 corrected to the documented 1–16 convention (they were 0-based).
+
+Fifth follow-up (same branch): component-command coverage completed — new pure reducers and
+command families for the **Arpeggiator** (10), **Turing Modulator** (8), and **Gesture
+Looper** (7), plus **song mode** on the Phrase Sequencer (`phraseStore`/`phraseLoad`/
+`phraseChain`/`phraseChainLoop`). The picker, validation, and manual pick them up from
+`panelApi.js` automatically; reducers are unit-tested in `componentScriptPatches.test.js`.

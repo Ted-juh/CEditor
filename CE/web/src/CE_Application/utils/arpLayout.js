@@ -243,3 +243,54 @@ export function effectiveSwing(control, transportSwing = 0) {
   if (swingSource(control) === 'own') return ownSwing;
   return arpSynced(control) ? clamp01(num(transportSwing, 0)) : ownSwing;
 }
+
+// --- Driving it from a script -------------------------------------------------------------
+// Same shape as the Phrase Sequencer's script API: a PURE reducer over the Arp config
+// returning only the fields that change. Unknown arguments are a no-op, never an error.
+export const ARP_SCRIPT_ACTIONS = ['pattern', 'rate', 'sync', 'division', 'octaves', 'gate', 'swing', 'velocity', 'channel', 'source'];
+
+export function arpScriptPatch(cfg, action, args = {}) {
+  const a = args && typeof args === 'object' ? args : {};
+  switch (String(action)) {
+    case 'pattern': {
+      const p = String(a.pattern ?? '');
+      return ARP_PATTERNS.includes(p) ? { pattern: p } : {};
+    }
+    case 'rate': {
+      const r = Number(a.rate);
+      return Number.isFinite(r) && r > 0 ? { rate: Math.max(0.1, r) } : {};
+    }
+    case 'sync':
+      return { syncToTransport: a.on !== false };
+    case 'division': {
+      const d = String(a.division ?? '');
+      return DIVISION_IDS.includes(d) ? { division: d } : {};
+    }
+    case 'octaves': {
+      const o = Number(a.octaves);
+      return Number.isFinite(o) ? { octaves: clampInt(o, 1, 4) } : {};
+    }
+    case 'gate': {
+      const g = Number(a.gate);
+      return Number.isFinite(g) ? { gate: clamp01(g) } : {};
+    }
+    case 'swing': {
+      const s = Number(a.swing);
+      return Number.isFinite(s) ? { swing: clamp01(s), swingSource: 'own' } : {};
+    }
+    case 'velocity': {
+      const v = Number(a.velocity);
+      return Number.isFinite(v) ? { velocity: clampInt(v, 1, 127) } : {};
+    }
+    case 'channel': {
+      const c = Number(a.channel);
+      return Number.isFinite(c) ? { channel: clampInt(c, 1, 16) } : {};
+    }
+    case 'source': {
+      const s = String(a.source ?? '');
+      return ARP_SOURCES.includes(s) ? { source: s } : {};
+    }
+    default:
+      return {};
+  }
+}
