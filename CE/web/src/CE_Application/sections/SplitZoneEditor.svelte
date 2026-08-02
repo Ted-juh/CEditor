@@ -198,12 +198,12 @@
           <thead>
             <tr>
               <th>On</th><th>Name</th><th>From</th><th>To</th><th>Ch</th><th>Transp</th>
-              <th>Velocity</th><th>Range</th><th title="Only respond to notes played in this velocity window — the hit-it-hard layer">Plays at</th>
+              <th>Velocity</th><th>Range</th><th title="Only respond to notes in this velocity window">Plays at</th>
               <th title="Which controllers this zone forwards">CCs</th>
               <th title="Forward the sustain pedal (CC64) to this zone's channel">Ped</th>
-              <th title="A pitch bend carries no note, so who hears it is a rule rather than a fact">Bend</th>
-              <th title="Channel aftertouch — same attribution rule as bend, its own switch">Press</th>
-              <th title="Poly key pressure. It names its note, so it needs no rule — just on or off.">Poly</th>
+              <th title="Which zones receive pitch bend">Bend</th>
+              <th title="Which zones receive channel aftertouch">Press</th>
+              <th title="Forward poly key pressure to this zone">Poly</th>
               <th>Col</th><th></th>
             </tr>
           </thead>

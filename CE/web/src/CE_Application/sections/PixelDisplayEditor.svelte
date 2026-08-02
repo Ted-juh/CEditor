@@ -523,7 +523,7 @@
             <option value="date">YYYY-MM-DD</option>
           </select>
         {:else if el.kind === 'anim'}
-          <select class="val esel" title="Animation source: an uploaded file (GIF/sprite) or a built-in preset" value={el.animMode ?? 'preset'} onchange={(event) => setElement(i, 'animMode', event.target.value)}>
+          <select class="val esel" title="Animation source: an uploaded file or a built-in preset" value={el.animMode ?? 'preset'} onchange={(event) => setElement(i, 'animMode', event.target.value)}>
             <option value="preset">preset</option>
             <option value="file">file</option>
           </select>
@@ -577,7 +577,7 @@
               {#if (el.animMode ?? 'preset') === 'file'}
                 <input class="val ex-fill" type="file" accept="image/*" title="Animated GIF/APNG/WebP, or a sprite sheet" onchange={(event) => onPickElementAnim(i, event)} />
                 <input class="val en" type="number" min="0" max="180" title="Sprite frame count (0 = animated file)" placeholder="frames" value={el.animFrames ?? 0} onchange={(event) => setElement(i, 'animFrames', Math.max(0, Math.round(Number(event.target.value))))} />
-                <input class="val en" type="number" min="0" max="64" title="Sprite columns (0 = single horizontal strip; set for a grid/vertical sheet)" placeholder="cols" value={el.animSpriteCols ?? 0} onchange={(event) => setElement(i, 'animSpriteCols', Math.max(0, Math.round(Number(event.target.value))))} />
+                <input class="val en" type="number" min="0" max="64" title="Sprite columns (0 = single horizontal strip)" placeholder="cols" value={el.animSpriteCols ?? 0} onchange={(event) => setElement(i, 'animSpriteCols', Math.max(0, Math.round(Number(event.target.value))))} />
                 <input class="val en" type="number" min="1" max="60" title="Sprite FPS" value={el.animFps ?? 12} onchange={(event) => setElement(i, 'animFps', Math.max(1, Math.round(Number(event.target.value))))} />
                 <label class="ex-chk" title="Loop, or hold the last frame"><input type="checkbox" checked={el.animLoop !== false} onchange={(event) => setElement(i, 'animLoop', event.target.checked)} />Loop</label>
                 <label class="ex-chk" title="Keep the file's colours (posterized) instead of 1-bit dither"><input type="checkbox" checked={el.animColour === true} onchange={(event) => setElement(i, 'animColour', event.target.checked)} />Clr</label>
@@ -602,9 +602,9 @@
               <input class="val en" type="text" title="Prefix text" placeholder="pre" value={el.prefix ?? ''} oninput={(event) => setElement(i, 'prefix', event.target.value)} />
               <input class="val en" type="text" title="Suffix text" placeholder="suf" value={el.suffix ?? ''} oninput={(event) => setElement(i, 'suffix', event.target.value)} />
               <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
-              <input class="val ex-fill" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
-              <label class="ex-chk" title="Marquee-scroll the text when it overflows the W box (instead of clipping)"><input type="checkbox" checked={el.scroll === true} onchange={(event) => setElement(i, 'scroll', event.target.checked)} />Scrl</label>
-              <label class="ex-chk" title="Word-wrap into stacked lines within the W box (overrides scroll)"><input type="checkbox" checked={el.wrap === true} onchange={(event) => setElement(i, 'wrap', event.target.checked)} />Wrap</label>
+              <input class="val ex-fill" type="text" title="Caption under the widget, or the name override for name kind" placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
+              <label class="ex-chk" title="Marquee-scroll the text when it overflows the W box"><input type="checkbox" checked={el.scroll === true} onchange={(event) => setElement(i, 'scroll', event.target.checked)} />Scrl</label>
+              <label class="ex-chk" title="Word-wrap into stacked lines (overrides scroll)"><input type="checkbox" checked={el.wrap === true} onchange={(event) => setElement(i, 'wrap', event.target.checked)} />Wrap</label>
               {#if pixel.customFont?.src}
                 <select class="val en2" title="Font face" value={el.font ?? ''} onchange={(event) => setElement(i, 'font', event.target.value)}>
                   <option value="">5×7</option>
@@ -619,7 +619,7 @@
             <input class="val ecol" type="text" title="Element colour AARRGGBB or RRGGBB (empty = panel lit colour)" placeholder="colour" value={el.colour ?? ''} onchange={(event) => setElement(i, 'colour', event.target.value.trim())} />
             <label class="ex-chk" title="Element visible"><input type="checkbox" checked={el.visible !== false} onchange={(event) => setElement(i, 'visible', event.target.checked)} />Vis</label>
             <label class="ex-chk" title="Blink this element on/off (~530ms)"><input type="checkbox" checked={el.blink === true} onchange={(event) => setElement(i, 'blink', event.target.checked)} />Blk</label>
-            <input class="val en" type="text" title="Group name: elements sharing a group drag together and can be shown/hidden as one" placeholder="grp" value={el.group ?? ''} onchange={(event) => setElement(i, 'group', event.target.value.trim())} />
+            <input class="val en" type="text" title="Group name — elements in a group drag and hide together" placeholder="grp" value={el.group ?? ''} onchange={(event) => setElement(i, 'group', event.target.value.trim())} />
             {#if WIDGET_KINDS.includes(el.kind)}
               <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
               <label class="ex-chk" title="Tick marks"><input type="checkbox" checked={el.ticks === true} onchange={(event) => setElement(i, 'ticks', event.target.checked)} />Tck</label>
@@ -627,7 +627,7 @@
               <label class="ex-chk" title="Meter ballistics (smoothed movement)"><input type="checkbox" checked={el.smooth === true} onchange={(event) => setElement(i, 'smooth', event.target.checked)} />Sm</label>
               <label class="ex-chk" title="VU meter colours: green/yellow/red by level"><input type="checkbox" checked={el.meterColours === true} onchange={(event) => setElement(i, 'meterColours', event.target.checked)} />Clr</label>
               {#if el.kind === 'hbar' || el.kind === 'vbar'}
-                <label class="ex-chk" title="Brightness gradient along the bar (dim base → bright tip); ignored when VU colours are on"><input type="checkbox" checked={el.gradient === true} onchange={(event) => setElement(i, 'gradient', event.target.checked)} />Grd</label>
+                <label class="ex-chk" title="Brightness gradient along the bar; ignored with VU colours"><input type="checkbox" checked={el.gradient === true} onchange={(event) => setElement(i, 'gradient', event.target.checked)} />Grd</label>
               {/if}
             {/if}
             {#if el.kind === 'wave'}

@@ -3496,7 +3496,7 @@
 
     <div class="surface-options-strip" aria-label="Surface view + zoom options">
       <div class="surface-toolbar-left">
-      <div class="zone-mode-control creator-mode" role="radiogroup" aria-label="Creator mode" title="Simple hides the raw graph editors; Advanced shows the full component graph">
+      <div class="zone-mode-control creator-mode" role="radiogroup" aria-label="Creator mode" title="Simple hides the raw graph editors; Advanced shows them">
         <button type="button" class:active={$creatorMode === 'simple'} onclick={() => creatorMode.set('simple')}>Simple</button>
         <button type="button" class:active={$creatorMode === 'advanced'} onclick={() => creatorMode.set('advanced')}>Adv</button>
       </div>
@@ -3516,7 +3516,7 @@
           onchange={(event) => setSnapSize(event.currentTarget.value)}
         />
       </label>
-      <label class="toggle-option" title="Snap moves to other parts' edges/centers and the artboard (Alt bypasses)">
+      <label class="toggle-option" title="Snap to other parts' edges and the artboard (Alt bypasses)">
         <input type="checkbox" checked={smartSnapEnabled} onchange={(event) => { smartSnapEnabled = event.currentTarget.checked; }} />
         <span>Smart</span>
       </label>
@@ -3528,7 +3528,7 @@
         <input type="checkbox" checked={showBounds} onchange={(event) => setPreviewFlag('showBounds', event.currentTarget.checked)} />
         <span>Bounds</span>
       </label>
-      <label class="toggle-option" title="Show generated layer names, such as dial tick names, on the canvas">
+      <label class="toggle-option" title="Show generated layer names on the canvas">
         <input type="checkbox" checked={showGeneratedLabels} onchange={(event) => setPreviewFlag('showGeneratedLabels', event.currentTarget.checked)} />
         <span>Gen Names</span>
       </label>
@@ -4672,7 +4672,7 @@
                       {/if}
                     </div>
                     {#if activeSelectionKind === 'layer'}
-                      <label class="dock-field" title="Pin size: with the instance resize policy 'Scale internals', this part keeps its authored size and font (position still tracks the scale) — for labels and readouts.">
+                      <label class="dock-field" title="Keep this part's authored size and font when instances scale">
                         <span>Pin size</span>
                         <input
                           type="checkbox"
@@ -4972,7 +4972,7 @@
       <div class="tool-flyout-host">
         <button
           type="button"
-          title="Starters — load a complete editable archetype into this component"
+          title="Starters — load an editable archetype into this component"
           aria-haspopup="menu"
           aria-expanded={starterFlyoutOpen}
           onclick={toggleStarterFlyout}
@@ -4997,7 +4997,7 @@
       <div class="tool-flyout-host">
         <button
           type="button"
-          title="Assistant — apply a setup recipe (uses the selected layer/channel)"
+          title="Assistant — apply a setup recipe"
           aria-haspopup="menu"
           aria-expanded={assistantFlyoutOpen}
           onclick={toggleAssistantFlyout}

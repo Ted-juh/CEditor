@@ -594,13 +594,13 @@
               type="button"
               class:active={$creatorMode === 'simple'}
               onclick={() => creatorMode.set('simple')}
-              title="Hide the raw graph editors (Channels, Behaviors, Hit Zones, Bindings, Links, Variants). Nothing is removed — Advanced brings them back."
+              title="Hide the raw graph editors"
             >Simple</button>
             <button
               type="button"
               class:active={$creatorMode === 'advanced'}
               onclick={() => creatorMode.set('advanced')}
-              title="Expose the full component graph."
+              title="Show the full component graph"
             >Advanced</button>
           </div>
         </div>
