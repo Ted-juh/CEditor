@@ -115,7 +115,7 @@
             <button type="button" class="action-btn danger" disabled={rows.length <= 1} onclick={() => removeRow(i)}>✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addRow}>Add Source</button>
+        <button type="button" class="action-btn" onclick={addRow}>Add source</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -129,7 +129,7 @@
             <button type="button" class="action-btn danger" disabled={cols.length <= 1} onclick={() => removeCol(i)}>✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addCol}>Add Destination</button>
+        <button type="button" class="action-btn" onclick={addCol}>Add destination</button>
       </div>
     </PropertyCell>
   </PropertySection>

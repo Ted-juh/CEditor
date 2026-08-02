@@ -428,10 +428,10 @@
             <span class:warn={selectedRouteCandidate.compatibility.warning || selectedRouteExists}>
               {selectedRouteExists ? `Already routed by ${selectedRouteExists.name}.` : compatibilityLabel(selectedRouteCandidate)}
             </span>
-            <button class="action-btn" type="button" onclick={() => applyRouteCandidate(selectedRouteCandidate)} disabled={!!selectedRouteExists}>Create Route</button>
+            <button class="action-btn" type="button" onclick={() => applyRouteCandidate(selectedRouteCandidate)} disabled={!!selectedRouteExists}>Create route</button>
           {:else}
             <span>Add another custom component with published API endpoints.</span>
-            <button class="action-btn" type="button" disabled>Create Route</button>
+            <button class="action-btn" type="button" disabled>Create route</button>
           {/if}
         </div>
         {#if routeStatus}

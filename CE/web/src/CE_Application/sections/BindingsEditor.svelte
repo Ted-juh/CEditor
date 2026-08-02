@@ -214,7 +214,7 @@
     {:else}
       <PropertySection title="Direct Map">
         <PropertyCell label="Pass-Through" span={4} hint="Write the source value directly to the target property without remapping.">
-          <div class="placeholder-inline">This mode is useful for string targets such as `Parts.valueField.Text.content`.</div>
+          <div class="placeholder-inline">Useful for string targets, such as Parts.valueField.Text.content</div>
         </PropertyCell>
       </PropertySection>
     {/if}

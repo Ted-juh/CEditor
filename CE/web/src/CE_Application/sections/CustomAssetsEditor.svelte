@@ -391,10 +391,10 @@
         <div class="status">{imageAsset.source ? formatBytes(sourceByteEstimate(imageAsset.source)) : 'No source'}</div>
       </PropertyCell>
       <PropertyCell label="Apply" span={2} hint="Use this image as the selected custom layer fill.">
-        <button class="action-btn" type="button" onclick={() => applyImageToSelectedLayer('image')} disabled={!imageAsset.source || !selectedLayer}>Layer Image</button>
+        <button class="action-btn" type="button" onclick={() => applyImageToSelectedLayer('image')} disabled={!imageAsset.source || !selectedLayer}>Layer image</button>
       </PropertyCell>
       <PropertyCell label="Overlay" span={2} hint="Use this image as the selected custom layer overlay.">
-        <button class="action-btn" type="button" onclick={() => applyImageToSelectedLayer('overlay')} disabled={!imageAsset.source || !selectedLayer}>Layer Overlay</button>
+        <button class="action-btn" type="button" onclick={() => applyImageToSelectedLayer('overlay')} disabled={!imageAsset.source || !selectedLayer}>Layer overlay</button>
       </PropertyCell>
     {/if}
   </PropertySection>

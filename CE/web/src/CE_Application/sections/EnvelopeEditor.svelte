@@ -108,7 +108,7 @@
             <button type="button" class="action-btn danger" disabled={i === 0 || i === points.length - 1} onclick={() => removePoint(i)} title="Remove node">✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addPoint}>Add Node</button>
+        <button type="button" class="action-btn" onclick={addPoint}>Add node</button>
       </div>
     </PropertyCell>
   </PropertySection>

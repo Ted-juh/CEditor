@@ -137,7 +137,7 @@
           <button class="xbtn" title="remove" onclick={() => removeField(active, i)}>✕</button>
         </div>
       {/each}
-      <button class="addslot asbtn" onclick={() => addField(active)}>＋ Add parameter to this dump</button>
+      <button class="addslot asbtn" onclick={() => addField(active)}>+ Add parameter</button>
     </div>
   {:else if active}
     <!-- declared but unmapped (e.g. an imported stub whose byte layout is unknown) -->

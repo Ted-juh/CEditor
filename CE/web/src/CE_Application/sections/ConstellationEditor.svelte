@@ -131,7 +131,7 @@
       <PropertyToggle value={cn.showLabels !== false} onchange={() => set('showLabels', !(cn.showLabels !== false))} />
     </PropertyCell>
     <PropertyCell label="Arrange" span={2} hint="Lay the presets out by sonic similarity (a best-effort 2D projection of their patches). Similar sounds cluster together.">
-      <button type="button" class="action-btn" onclick={arrange} disabled={presets.length < 2}>Auto-arrange by similarity</button>
+      <button type="button" class="action-btn" onclick={arrange} disabled={presets.length < 2}>Auto-arrange</button>
     </PropertyCell>
   </PropertySection>
 
@@ -161,7 +161,7 @@
             <button type="button" class="action-btn danger" onclick={() => removeTarget(i)} title="Remove">✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addTarget}>Add Target</button>
+        <button type="button" class="action-btn" onclick={addTarget}>Add target</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -193,7 +193,7 @@
             {/if}
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addPreset}>Add Preset</button>
+        <button type="button" class="action-btn" onclick={addPreset}>Add preset</button>
       </div>
     </PropertyCell>
   </PropertySection>

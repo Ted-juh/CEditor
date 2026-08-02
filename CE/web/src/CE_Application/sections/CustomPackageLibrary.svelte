@@ -569,7 +569,7 @@
     </PropertyCell>
     {/if}
     <PropertyCell label="Save" span={2} hint="Save or replace this custom component definition in the local component library.">
-      <button class="library-btn" type="button" onclick={saveToLibrary}>Save Local Package</button>
+      <button class="library-btn" type="button" onclick={saveToLibrary}>Save local package</button>
     </PropertyCell>
     {#if $creatorMode === 'advanced'}
     <PropertyCell label="Export" span={1} hint="Create portable JSON for upload/download later.">
@@ -579,10 +579,10 @@
       <button class="library-btn" type="button" onclick={copyLibraryJson}>Library JSON</button>
     </PropertyCell>
     <PropertyCell label="Download" span={1} hint="Download this custom component package as a portable JSON file.">
-      <button class="library-btn" type="button" onclick={downloadPackageJson}>Package File</button>
+      <button class="library-btn" type="button" onclick={downloadPackageJson}>Package file</button>
     </PropertyCell>
     <PropertyCell label="Download All" span={1} hint="Download the complete local custom component library as one portable JSON file.">
-      <button class="library-btn" type="button" onclick={downloadLibraryJson} disabled={!libraryEntries.length}>Library File</button>
+      <button class="library-btn" type="button" onclick={downloadLibraryJson} disabled={!libraryEntries.length}>Library file</button>
     </PropertyCell>
     {/if}
     <PropertyCell label="Find" span={1} hint="Search saved package names, tags, authors, IDs, capabilities, and fingerprints.">

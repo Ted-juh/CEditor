@@ -357,7 +357,7 @@
         </PropertyCell>
         <PropertyCell label="Recommended" span={2} hint="Best defaults for an XY pad.">
           <button class="action-btn" type="button" onclick={() => setSelectedPatch({ type: 'xy-pad', role: 'xyPad', geometry: 'xy', dragMode: 'both', interaction: { ...(selected.interaction ?? {}), pointer: true, keyboard: false, wheel: false, snap: false } })}>
-            Apply XY Defaults
+            Apply XY defaults
           </button>
         </PropertyCell>
       </PropertySection>

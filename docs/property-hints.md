@@ -151,6 +151,58 @@ Two exceptions:
 
 ---
 
+## Buttons and empty states
+
+Unlike labels, **button text renders exactly as authored** — casing here is
+visible, so it has to be consistent.
+
+### Buttons
+
+**1. A verb and its object. Nothing else.**
+`Auto-arrange`, not `Auto-arrange by similarity`. `+ Add parameter`, not
+`+ Add parameter to this dump`. The section the button sits in already supplies
+the context; the hint supplies the detail.
+
+**2. Sentence case.**
+`Add zone`, `Clear part overrides`, `Reset channels`. The one exception is the
+**top-level chrome** — the canvas context menu, the workspace picker and the tab
+bar — which are Title Case menu commands: `Bring to Front`, `New Custom
+Component`, `Import Device Profile`.
+
+A proper name keeps its capitals wherever it appears: `Open Component Designer`,
+`Back to Notepad`, `Edit in Publish`, `Build VST3`, `Download PNG`.
+
+**3. One ellipsis, spelt one way.**
+`&hellip;` for a button that opens a dialog. Not `...`, not a bare `…`.
+
+**4. One plus sign.**
+ASCII `+`. A fullwidth `＋` had crept in.
+
+**5. Don't invent adjectives.**
+`probeable`, `semantic parts` — if a word only exists inside this codebase, it
+does not belong on a button.
+
+### Empty states
+
+The pattern the codebase already uses in a dozen places, and the one to copy:
+
+> **No <things> yet. <What to do>.**
+> `No members yet. Add one, then bind its port.`
+
+**1. Two short sentences. What is missing, then the one action that fixes it.**
+
+**2. Under 80 characters.**
+
+**3. Don't say it three times.**
+An eyebrow, a heading and a sentence that all mean "nothing here" is one
+message. A loading state needs no paragraph at all.
+
+**4. No markdown.**
+Backticks render as literal `` ` `` characters in the UI. Write the path or the
+extension plainly.
+
+---
+
 ## Before / after
 
 | Before | After |
@@ -163,6 +215,8 @@ Two exceptions:
 | *(section)* Performance Budget | Counts |
 | *(section)* Hit-Zone Probe | Hit Zones |
 | *(section)* Destinations (columns) | Destinations |
+| *(button)* Regenerate Semantic Parts | Regenerate parts |
+| *(empty)* Nothing is interactive yet. Use “+ Make Interactive” (or draw with the surface's Interactive tool) to scaffold a wired control — value, behavior, and grab area in one step. | Nothing is interactive yet. Use + Make interactive to wire one up. |
 
 ---
 

@@ -132,7 +132,7 @@
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addNode}>Add Satellite</button>
+        <button type="button" class="action-btn" onclick={addNode}>Add satellite</button>
       </div>
     </PropertyCell>
   </PropertySection>

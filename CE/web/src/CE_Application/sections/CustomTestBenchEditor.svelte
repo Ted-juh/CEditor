@@ -662,7 +662,7 @@
       </div>
     </PropertyCell>
     <PropertyCell label="Reset" span={4} hint="Clear all bench channel overrides and return to the component defaults.">
-      <button class="action-btn" type="button" onclick={resetAllChannelTestValues} disabled={!Object.keys(preview.channelValues ?? {}).length}>Reset Channel Rig</button>
+      <button class="action-btn" type="button" onclick={resetAllChannelTestValues} disabled={!Object.keys(preview.channelValues ?? {}).length}>Reset channels</button>
     </PropertyCell>
   </PropertySection>
 
@@ -695,7 +695,7 @@
             </div>
           </div>
         {/each}
-        {#if probeGroups.length === 0}<div class="empty-row">No probeable hit zones.</div>{/if}
+        {#if probeGroups.length === 0}<div class="empty-row">No hit zones.</div>{/if}
       </div>
       <div class="probe-list">
         {#each probeHitZoneEntries.slice(0, 12) as [name, zone] (name)}
@@ -706,7 +706,7 @@
             <small>{hitZoneRuntimeNote(zone) || payloadSummary(zone)}</small>
           </button>
         {/each}
-        {#if probeHitZoneEntries.length > 12}<div class="empty-row">+{probeHitZoneEntries.length - 12} more probeable zones available through the group samples</div>{/if}
+        {#if probeHitZoneEntries.length > 12}<div class="empty-row">+{probeHitZoneEntries.length - 12} more zones in the group samples</div>{/if}
       </div>
     </PropertyCell>
   </PropertySection>

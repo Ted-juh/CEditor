@@ -269,19 +269,19 @@
               {/each}
             </div>
             <div class="override-footnote">
-              Keep using `Background`, `Border`, `Text`, `Icon`, `Effects`, `Transform`, or `Segments` while `{selectedStateName}` is targeted to refine these overrides.
+              Refine them from the visual tabs while {selectedStateName} is targeted.
             </div>
           {:else}
             <div class="override-empty">
-              No overrides yet. Select `Edit {selectedStateName}` and adjust a visual tab to start capturing changes.
+              No overrides yet. Select Edit {selectedStateName}, then change something on a visual tab.
             </div>
           {/if}
         </div>
       </PropertyCell>
       <PropertyCell label="Reset" span={4} hint="Clear all captured component or part overrides for this state.">
         <div class="action-row">
-          <button class="action-btn compact" onclick={() => clearOverrides('component')}>Clear Component Overrides</button>
-          <button class="action-btn compact" onclick={() => clearOverrides('parts')}>Clear Part Overrides</button>
+          <button class="action-btn compact" onclick={() => clearOverrides('component')}>Clear component overrides</button>
+          <button class="action-btn compact" onclick={() => clearOverrides('parts')}>Clear part overrides</button>
         </div>
       </PropertyCell>
     </PropertySection>

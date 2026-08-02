@@ -93,7 +93,7 @@
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addSlot}>Add Assignment</button>
+        <button type="button" class="action-btn" onclick={addSlot}>Add assignment</button>
       </div>
     </PropertyCell>
   </PropertySection>

@@ -165,7 +165,7 @@
       <Download size={16} strokeWidth={1.6} />
       <div>
         <strong>Import Local Fonts</strong>
-        <span>Opens a file browser for `.ttf`, `.otf`, `.woff`, or `.woff2` files.</span>
+        <span>Opens a file browser for .ttf, .otf, .woff and .woff2 files.</span>
         <span class="local-help">You can also drag and drop font files anywhere onto this page.</span>
         {#if localStatusMessage}
           <span class="status-text">{localStatusMessage}</span>
@@ -212,7 +212,7 @@
     {#if $storedFonts.length === 0}
       <div class="empty-state">
         <span>No custom fonts yet.</span>
-        <small>Imported fonts will appear here and then show up in text font pickers.</small>
+        <small>Imported fonts appear here.</small>
       </div>
     {:else}
       <div class="font-list">

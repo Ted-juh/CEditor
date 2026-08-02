@@ -126,7 +126,7 @@
             <button type="button" class="action-btn danger" onclick={() => removeZone(i)}>✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addZone}>Add Zone</button>
+        <button type="button" class="action-btn" onclick={addZone}>Add zone</button>
       </div>
     </PropertyCell>
   </PropertySection>

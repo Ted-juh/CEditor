@@ -139,7 +139,7 @@
             <button type="button" class="action-btn danger" onclick={() => removeTarget(i)} title="Remove">✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addTarget}>Add Target</button>
+        <button type="button" class="action-btn" onclick={addTarget}>Add target</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -171,7 +171,7 @@
             {/if}
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addAnchor}>Add Anchor</button>
+        <button type="button" class="action-btn" onclick={addAnchor}>Add anchor</button>
       </div>
     </PropertyCell>
   </PropertySection>

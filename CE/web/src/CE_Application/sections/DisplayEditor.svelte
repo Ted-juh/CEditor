@@ -418,7 +418,7 @@
   <PropertySection title="Layouts">
     {#if layouts.length === 0}
       <PropertyCell label="Layouts" span={4} hint="Compose the display from bound regions instead of the lines above. Add a layout to switch modes.">
-        <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts (zones)</button>
+        <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts</button>
       </PropertyCell>
     {:else}
       <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Zones table edits and previews. Runtime switching is set by the Pages rules.">

@@ -508,7 +508,6 @@
         <div class="workspace-empty-state">
           <span class="workspace-empty-eyebrow">Component Designer</span>
           <strong>Preparing component document</strong>
-          <span>This workspace is independent from panels.</span>
         </div>
       {:else if splitVisibleForActiveTab && splitDeviceProfileId && canvasPanel}
         <div
@@ -676,7 +675,7 @@
         <div class="workspace-empty-state">
           <span class="workspace-empty-eyebrow">Choose a workspace</span>
           <strong>No document open</strong>
-          <span>Panels, custom components, and device profiles can all be opened independently.</span>
+          <span>Each opens in its own workspace.</span>
           <div class="workspace-empty-actions">
             <button type="button" onclick={() => addPanel()}>New Panel</button>
             <button type="button" onclick={openPanelFromFile}>Open Panel</button>

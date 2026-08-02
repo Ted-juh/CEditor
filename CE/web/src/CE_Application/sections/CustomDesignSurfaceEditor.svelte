@@ -3558,7 +3558,7 @@
           <button type="button" onclick={() => shiftArpOctave(-1)} title="Show lower octave">Oct -</button>
           <button type="button" onclick={() => shiftArpOctave(1)} title="Show higher octave">Oct +</button>
         </div>
-        <button type="button" class="surface-command danger" onclick={removeSelectedArpBlock} disabled={!arpSelectedBlock} title="Delete selected note block">Delete Note</button>
+        <button type="button" class="surface-command danger" onclick={removeSelectedArpBlock} disabled={!arpSelectedBlock} title="Delete selected note block">Delete note</button>
       {/if}
       <button type="button" class="surface-command" onclick={resetToBlankCanvas} title="Clear this component to a blank drawing canvas">Blank</button>
       <button type="button" class="surface-command accent" onclick={addDialKit} title="Add a circular value control">Dial</button>
@@ -4456,7 +4456,7 @@
                   <div class="dock-button-grid">
                     <button type="button" onclick={() => { setArtboardSize('width', 152); setArtboardSize('height', 92); }}>Button</button>
                     <button type="button" onclick={() => { setArtboardSize('width', 260); setArtboardSize('height', 120); }}>Default</button>
-                    <button type="button" onclick={fitArtboardToView}>Fit View</button>
+                    <button type="button" onclick={fitArtboardToView}>Fit view</button>
                   </div>
                 </div>
               {:else if !activeSelectionName && !multiSelectionActive}
@@ -4498,7 +4498,7 @@
                     </div>
                     <div class="dock-note">One smart value control — ticks, track, pointer, readout and hit area stay grouped.</div>
                     <div class="dock-button-grid">
-                      <button type="button" onclick={() => editKitParts(selectedKitEntry.id)}>Edit Internal Parts</button>
+                      <button type="button" onclick={() => editKitParts(selectedKitEntry.id)}>Edit internal parts</button>
                       <button type="button" class="danger" onclick={removeSelectedKit}>
                         <Trash2 size={13} aria-hidden="true" />
                         <span>Delete</span>
@@ -4691,7 +4691,7 @@
                           onclick={setSelectedPivotToArcCenter}
                           title={selectedArcPivotTarget ? `Set pivot to ${selectedArcPivotTarget.name} center` : 'No arc/value arc layer available'}
                         >
-                          Rotate around arc center
+                          Rotate around arc centre
                         </button>
                         <span>{selectedArcPivotTarget ? selectedArcPivotTarget.name : 'No arc found'}</span>
                       </div>
@@ -4820,7 +4820,7 @@
                   </label>
                 </div>
               {:else}
-                <div class="dock-empty">Select a layer to edit fill, stroke, text, opacity, and arc styling.</div>
+                <div class="dock-empty">Select a layer to edit its styling.</div>
               {/if}
             {:else if inspectorTab === 'behavior'}
               <div class="dock-section">

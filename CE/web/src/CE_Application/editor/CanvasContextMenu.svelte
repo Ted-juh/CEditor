@@ -133,7 +133,7 @@
         <button class="ctx-item" onclick={ungroup}>Ungroup<span class="ctx-shortcut">Ctrl+Shift+G</span></button>
       {/if}
       <div class="ctx-separator"></div>
-      <button class="ctx-item" onclick={align}>Align &amp; Layout...</button>
+      <button class="ctx-item" onclick={align}>Align &amp; Layout&hellip;</button>
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="ctx-sub-wrapper" onmouseenter={() => sub = 'order'} onmouseleave={() => sub = null}>
         <button class="ctx-item">Order<span class="ctx-arrow">&#9656;</span></button>

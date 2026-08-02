@@ -230,7 +230,7 @@
           </select>
         </PropertyCell>
         <PropertyCell label="Append" span={2} hint="Add this target to the selected animation target list.">
-          <button class="action-btn" onclick={appendTarget}>Append Target</button>
+          <button class="action-btn" onclick={appendTarget}>Append target</button>
         </PropertyCell>
         <PropertyCell label="State" span={1} hint="State used by quick animation presets.">
           <select class="val" bind:value={quickState}>
@@ -302,7 +302,7 @@
       <PropertyCell label="" span={4} hint="Send the selected animation payload to the Debug panel.">
         <div class="patch-footer">
           <span class="error">{parseError}</span>
-          <button class="action-btn" onclick={dumpAnimationDebug}>Debug Animation</button>
+          <button class="action-btn" onclick={dumpAnimationDebug}>Debug animation</button>
         </div>
       </PropertyCell>
     </PropertySection>

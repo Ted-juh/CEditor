@@ -117,7 +117,7 @@
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addLane}>Add Lane</button>
+        <button type="button" class="action-btn" onclick={addLane}>Add lane</button>
       </div>
     </PropertyCell>
   </PropertySection>

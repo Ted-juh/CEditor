@@ -147,7 +147,7 @@
       <div class="toolbar-spacer"></div>
       <button class="toolbar-btn" onclick={handleResetAll}>Reset All</button>
       <button class="toolbar-btn" class:active={debugEnabled} onclick={toggleDebugInspector}>
-        Debug Inspector
+        Debug inspector
       </button>
       {#if debugEnabled}
         <button class="toolbar-btn primary" onclick={dumpPreviewInspectionDebug} disabled={!control}>Dump</button>
@@ -162,7 +162,7 @@
         </div>
       {:else if !control}
         <div class="preview-empty inner">
-          Debug Inspector is active. Click a control on the canvas to inspect its runtime data.
+          Debug inspector is active. Click a control on the canvas to inspect its runtime data.
         </div>
       {:else}
         <PropertySection title="Target">

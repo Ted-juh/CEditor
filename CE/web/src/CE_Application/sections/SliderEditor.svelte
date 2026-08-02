@@ -171,7 +171,7 @@
       </div>
     </PropertyCell>
     <PropertyCell label="Refresh Parts" span={4} hint="Rebuild the semantic ready-made slider style parts if they were removed or drifted too far.">
-      <button class="preset-btn wide" type="button" onclick={regenerateSliderParts}>Regenerate Semantic Parts</button>
+      <button class="preset-btn wide" type="button" onclick={regenerateSliderParts}>Regenerate parts</button>
     </PropertyCell>
   </PropertySection>
 

@@ -181,7 +181,7 @@
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addDest}>Add Destination</button>
+        <button type="button" class="action-btn" onclick={addDest}>Add destination</button>
       </div>
     </PropertyCell>
   </PropertySection>
