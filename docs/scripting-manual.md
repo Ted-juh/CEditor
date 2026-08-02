@@ -307,7 +307,7 @@ Payloads are passed directly with a descriptive name — one obvious datum comes
 | Event | Handler | Payload | Fires when | Where |
 |---|---|---|---|---|
 | `"parameterReceived"` | `onParameterReceived(info)` | `info` (`.parameter` `.value`) | A value arrived, decoded via the DPD. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
-| `"dumpReceived"` | `onDumpReceived(dump)` | `dump` (`.bytes` `.kind`) | A bulk dump arrived. Use applyDump(dump.bytes) to fill the panel. | everywhere |
+| `"dumpReceived"` | `onDumpReceived(dump)` | `dump` (`.values` `.kind` `.role` `.bytes`) | A bulk dump arrived and was decoded via the DPD; the panel fills automatically. values = { parameterId: value }, bytes = the raw message. | everywhere |
 | `"midiIn"` | `onMidiIn(midi)` | `midi` (`.bytes` `.channel` `.status`) | Any MIDI arrived (raw). | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
 | `"ccIn"` | `onCcIn(cc)` | `cc` (`.channel` `.cc` `.value`) | A CC arrived. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
 | `"sysexIn"` | `onSysexIn(bytes)` | `bytes` | Raw SysEx arrived. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
@@ -378,9 +378,9 @@ transmit(() => {
 
 #### `on(target, event, fn)`
 
-React to an event on another control / the panel / the device, or to a custom emitted event.
+React to an event on another control / the panel / the device, or to a custom emitted event. Two-argument form on(name, fn) listens for a custom emit()ted event on any target.
 
-*Availability: preview ⬜ · export ⬜ — Designed (spec Q6) but not wired yet — stubbed in the preview and a no-op in the exported host.*
+*Availability: preview ✅ · export ✅ — Callback registration is for Lua/JS/TS/Python; C++/C#/Java handlers use named functions instead.*
 
 ```lua
 -- Lua
@@ -397,9 +397,7 @@ on("target", "event", (e) => {
 
 #### `emit(name [, data])`
 
-Announce a custom event; any script listening with on(name, …) reacts. Fire-and-forget, language-neutral.
-
-*Availability: preview ⬜ · export ⬜ — Designed (spec Q6) but not wired yet — stubbed in the preview and a no-op in the exported host.*
+Announce a custom event; any script listening with on(name, …) reacts. Fire-and-forget, language-neutral. Runaway emit chains are cut off and reported.
 
 ```lua
 emit("name", data)
@@ -407,9 +405,9 @@ emit("name", data)
 
 #### `run(target.action [, args])`
 
-Run a named action elsewhere ("target.action" = the owning control/panel, then the action name). Host-dispatched — works cross-language. Supports a return value. Only simple data crosses the boundary.
+Run a named action: "target.action" finds the script named `target` (or attached to it) that defines a function `action`, calls it with args, and returns its result. Plain "action" searches every script. Cross-language; only simple data crosses the boundary.
 
-*Availability: preview ⬜ · export ⬜ — Designed (spec Q6) but not wired yet — stubbed in the preview and a no-op in the exported host.*
+*Availability: preview ✅ · export ✅ — In the editor preview a Lua/Python target runs asynchronously — the return value is available from JS/TS/C++/C#/Java targets.*
 
 ```lua
 run("target.action")

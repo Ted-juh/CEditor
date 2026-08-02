@@ -29,12 +29,18 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
 `sendNRPN` / `sendSysex`, `requestDump` / `applyDump` / `sendDump` /
 `buildDump`, `runAction`, `emitEvent`, `log`.
 
-> ⚠️ **Interface ≠ implementation** (audit 2026-08-02): the Player's callbacks
-> for `runAction` and `emitEvent` are **no-op stubs** (`PluginProcessor.h`
-> ~583), and `buildDump` unconditionally returns an empty var — the interface
-> exists, but `run()`/`emit()`/`on(custom)` and `buildDump()` do nothing in the
-> exported plugin today (they are also stubbed in the editor preview). The
-> `availability` metadata in `panelApi.js` reflects this.
+> ✅ **FIXED** (2026-08-02, unverified by build on the C++ side): `run()` and
+> `emit()`/`on(custom)` are now wired in BOTH runtimes. Player:
+> `cb.runAction`/`cb.emitEvent` call the new `ScriptRuntime::runAction` and
+> `dispatchEvent` (depth-guarded); `dispatchEvent` also delivers the
+> `"valueChanged"` ↔ `"onValueChanged"` listener alias, and the Lua/JS engines
+> accept the 2-arg `on(name, fn)` custom form. Preview: `panelRuntime.js`
+> implements the same semantics (listener registry, emit-chain guard, sync
+> `run()` return for JS/TS/C++/C#/Java targets) — covered by
+> `test/scriptFlow.test.js`. Still open: **`buildDump`** returns an empty var
+> in the Player and null in preview (the panel→bytes codec is not yet exposed
+> to scripts); C++/C#/Java preview interpreters can't register `on()` callbacks
+> (named handlers only).
 
 ## Advertised in `panelApi.js` but NOT wired in C++
 
@@ -89,9 +95,9 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
 ## Add findings below
 <!-- New gaps go here as they surface. -->
 
-- **`onDumpReceived` payload diverges between runtimes** (audit 2026-08-02):
-  the API contract (and `panelApi.js`) says `dump.bytes` / `dump.kind`, but the
-  editor preview dispatches `{ values, kind, role }` (`panelRuntime.js`
-  `onDumpParsed`). A script reading `dump.bytes` works only in the exported
-  plugin; one reading `dump.values` works only in preview. Unify on the
-  contract shape (or add both fields in both runtimes).
+- ✅ **FIXED** — `onDumpReceived` payload unified (2026-08-02): both runtimes
+  now dispatch `{ values, kind, role, bytes }` — the Player adds `bytes` from
+  the message hex (`PluginProcessor.h`), the preview parses `payload.hex`
+  (`panelRuntime.js` `onDumpParsed`), and `panelApi.js`/the manual document
+  that shape. (The old contract text claimed `bytes`/`kind` only, which neither
+  runtime sent.)

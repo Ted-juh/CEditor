@@ -129,3 +129,10 @@ Java subset definition, and a freshness test; plus `docs/scripting-getting-start
 The audit also found `run`/`emit`/`on`(custom) and `buildDump` are no-op stubs in BOTH
 runtimes (logged in scripting-runtime-gaps.md), and the preview's `onDumpReceived` payload
 diverges from the contract (also logged).
+
+Third follow-up (same branch): the flagged runtime gaps were fixed — `emit`/`on`/`run`
+implemented in the preview runtime (listener registry, emit-chain guard, sync `run()` returns
+for JS/TS/C++/C#/Java targets; `test/scriptFlow.test.js`) and wired in the Player
+(`ScriptRuntime::runAction`, `emitEvent` → `dispatchEvent`, the `valueChanged`↔`onValueChanged`
+listener alias, 2-arg `on(name, fn)` in both engines); `onDumpReceived` now carries
+`{ values, kind, role, bytes }` in both runtimes. `buildDump` remains the one open flow gap.

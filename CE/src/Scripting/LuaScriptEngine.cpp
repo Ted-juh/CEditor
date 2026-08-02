@@ -211,9 +211,13 @@ public:
         g.set_function ("transmit", [this] (sol::protected_function fn)
             { host->beginTransmitOverride (true); auto r = fn(); host->endTransmitOverride(); if (! r.valid()) reportPF (r); });
 
-        // on(target, event, fn) — register a listener.
-        g.set_function ("on", [this] (std::string target, std::string event, sol::protected_function fn)
-            { listeners.push_back ({ juce::String (target), juce::String (event), std::move (fn) }); });
+        // on(target, event, fn) — register a listener. The 2-arg form on(name, fn) listens for a
+        // custom emit()ted event on any target (spec Q6).
+        g.set_function ("on", sol::overload (
+            [this] (std::string target, std::string event, sol::protected_function fn)
+                { listeners.push_back ({ juce::String (target), juce::String (event), std::move (fn) }); },
+            [this] (std::string name, sol::protected_function fn)
+                { listeners.push_back ({ "*", juce::String (name), std::move (fn) }); }));
 
         lua.script (kPrelude);
         return true;

@@ -23,7 +23,12 @@ namespace
 const char* kJsPrelude = R"JS(
 // Wrap the native bridge as globals + pure-math helpers + event registry + self.
 var __listeners = [];
-function on(target, event, fn) { __listeners.push({ t: target, e: event, fn: fn }); }
+// on(target, event, fn), or on(name, fn) — the 2-arg form listens for a custom emit()ted
+// event on any target (spec Q6).
+function on(target, event, fn) {
+  if (fn === undefined && typeof event === "function") { fn = event; event = target; target = "*"; }
+  __listeners.push({ t: target, e: event, fn: fn });
+}
 function __deliver(target, event, payload) {
   for (var i = 0; i < __listeners.length; i++) {
     var l = __listeners[i];

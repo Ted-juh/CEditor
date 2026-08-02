@@ -191,6 +191,12 @@ public:
         the nesting exceeds a fixed depth, instead of recursing until the stack dies. */
     void dispatchEvent (const juce::String& event, const juce::String& target, const juce::var& payload);
 
+    /** run("target.action") / run("action") — find the first loaded script that defines `action`
+        as a function (optionally filtered to scripts named `target` or attached to `target`),
+        call it with `args`, and return its result. Cross-language by construction: the lookup
+        goes through each script's engine. Shares the dispatch-depth backstop with dispatchEvent. */
+    juce::var runAction (const juce::String& targetAction, const juce::var& args);
+
     // --- Origin tracking for transmit-by-default (Q2) ---
     bool isInbound() const { return inboundDepth > 0; }
 

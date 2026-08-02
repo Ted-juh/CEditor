@@ -48,6 +48,7 @@ let host = null;
  */
 export function setRuntimeHost(h) {
   host = h ?? null;
+  live.listenersDirty = true;
   if (host) {
     live.activePanelId = host.panel?.id ?? 'player';
     snapshotValues();
@@ -404,7 +405,101 @@ const setlistApi = {
   setlistCrossfade: (target, ms) => setAction(target, 'crossfade', { ms }),
 };
 
-function buildApi(ownerName) {
+/* ------------------------------------------------------- flow: emit / on / run */
+// The composition layer (spec Q6), mirroring the C++ host (ScriptRuntime::dispatchEvent /
+// runAction): emit() re-enters the shared dispatch pipeline; on() registrations are collected
+// per script load into live.listeners and fired alongside named handlers; run() finds the
+// first script defining the action function and calls it.
+
+// A registration matches both the handler-style name a source dispatches ("onValueChanged")
+// and the catalog event id a script registers ("valueChanged"). Custom names have no alias.
+function eventAliases(event) {
+  const names = new Set([event]);
+  if (/^on[A-Z]/.test(event)) names.add(event.charAt(2).toLowerCase() + event.slice(3));
+  return names;
+}
+
+function listenerTargetMatches(target, controlName) {
+  if (target === '*' || target === 'self') return true;
+  if (controlName == null) return false;
+  return String(target).toLowerCase() === String(controlName).toLowerCase();
+}
+
+// emit-chain backstop: A emits → a handler emits → … is cut off (and reported) at a fixed
+// depth instead of looping forever (the async twin of the C++ maxDispatchDepth guard).
+const MAX_EMIT_CHAIN = 16;
+let emitChain = 0;
+
+function emitCustomEvent(name, data) {
+  const ev = String(name ?? '').trim();
+  if (!ev) { addScriptTrace('error', '', 'emit(): event name required'); return; }
+  if (emitChain >= MAX_EMIT_CHAIN) {
+    addScriptTrace('error', '', `emit("${ev}") dropped: emit chain exceeded ${MAX_EMIT_CHAIN} (feedback loop?)`);
+    return;
+  }
+  emitChain += 1;
+  addScriptTrace('trace', '', `emit("${ev}")`);
+  // Fire-and-forget by contract; errors are reported per handler inside the dispatch.
+  dispatchEvents([{ event: ev, controlName: null, payload: data }]).finally(() => { emitChain -= 1; });
+}
+
+const SYNC_RUN_LANGS = new Set(['javascript', 'js', 'cpp', 'c++', 'csharp', 'cs', 'c#', 'java']);
+const canRunSync = (s) =>
+  SYNC_RUN_LANGS.has(s.language)
+  || ((s.language === 'typescript' || s.language === 'ts') && typeof s.compiledJs === 'string' && s.compiledJs.length > 0);
+
+// Synchronously load a script's handlers, probing for `action` too (JS/TS-precompiled/C++/C#/Java).
+function loadHandlersSync(script, action) {
+  const lang = script.language;
+  if (lang === 'javascript' || lang === 'js') return runJsSource(script.source, script.id, buildApi(ownerOf(script)), action);
+  if (lang === 'typescript' || lang === 'ts') return runJsSource(script.compiledJs, script.id, buildApi(ownerOf(script)), action);
+  if (lang === 'cpp' || lang === 'c++') return loadHandlersCpp(script);
+  if (lang === 'csharp' || lang === 'cs' || lang === 'c#') return loadHandlersCsharp(script);
+  if (lang === 'java') return loadHandlersJava(script);
+  return null;
+}
+
+function runNamedAction(targetAction, args) {
+  const raw = String(targetAction ?? '').trim();
+  const dot = raw.indexOf('.');
+  const target = dot > 0 ? raw.slice(0, dot) : '';
+  const action = dot > 0 ? raw.slice(dot + 1) : raw;
+  if (!action) { addScriptTrace('error', '', 'run(): empty action name'); return undefined; }
+
+  const candidates = activeScripts().filter((s) => s.enabled !== false
+    && (!target
+      || String(s.name ?? '').toLowerCase() === target.toLowerCase()
+      || String(s.target ?? '').toLowerCase() === target.toLowerCase()));
+
+  // Sync-capable scripts first, so run() can hand back the action's return value
+  // (matching the C++ host). Lua/Python (and un-transpiled TS) load asynchronously —
+  // they still run, but the return value is unavailable.
+  for (const s of candidates.filter(canRunSync)) {
+    const fn = loadHandlersSync(s, action)?.[action];
+    if (typeof fn !== 'function') continue;
+    addScriptTrace('trace', s.id, `run("${raw}")`);
+    try { return fn(args); } catch (e) { reportScriptError(s.id, e); return undefined; }
+  }
+  const rest = candidates.filter((s) => !canRunSync(s));
+  if (rest.length) {
+    (async () => {
+      for (const s of rest) {
+        const fn = (await getHandlers(s, undefined, action))?.[action];
+        if (typeof fn !== 'function') continue;
+        addScriptTrace('trace', s.id, `run("${raw}") — async target, return value unavailable`);
+        try { const r = fn(args); if (r && typeof r.then === 'function') await r; }
+        catch (e) { reportScriptError(s.id, e); }
+        return;
+      }
+      addScriptTrace('error', '', `run("${raw}"): no script defines ${action}()`);
+    })();
+    return undefined;
+  }
+  addScriptTrace('error', '', `run("${raw}"): no script defines ${action}()`);
+  return undefined;
+}
+
+function buildApi(ownerName, collect) {
   const self = {
     set: (p, v) => setValue(ownerName ? `${ownerName}.${p}` : p, v),
     get: (p) => getValue(ownerName ? `${ownerName}.${p}` : p),
@@ -425,10 +520,22 @@ function buildApi(ownerName) {
     ...harmoniserApi,
     // Setlist — next song, from a button or a script.
     ...setlistApi,
-    // flow — minimal for M1
-    emit: () => {},
-    run: () => {},
-    on: () => {},
+    // flow (Q6) — emit re-enters dispatch; on() registrations are collected per load;
+    // run() calls a named action in another script.
+    emit: (name, data) => emitCustomEvent(name, data),
+    run: (targetAction, args) => runNamedAction(targetAction, args),
+    on: (a, b, c) => {
+      // on(target, event, fn), or on(name, fn) for a custom emit()ted event on any target.
+      const reg = typeof b === 'function'
+        ? { target: '*', event: String(a ?? ''), fn: b }
+        : { target: String(a ?? '*'), event: String(b ?? ''), fn: c };
+      if (!reg.event) { addScriptTrace('error', '', 'on(): event name required'); return; }
+      if (typeof reg.fn !== 'function') {
+        addScriptTrace('error', '', `on(…, "${reg.event}", …): the callback form isn't supported in the C++/C#/Java preview — use a named handler function instead`);
+        return;
+      }
+      collect?.(reg);
+    },
     noTransmit: (fn) => { try { fn?.(); } catch (e) { addScriptTrace('error', '', String(e?.message ?? e)); } },
     transmit: (fn) => { try { fn?.(); } catch (e) { addScriptTrace('error', '', String(e?.message ?? e)); } },
     self,
@@ -441,6 +548,10 @@ const HANDLER_NAMES = [
   'onValueChange', 'onValueChanged', 'onClick', 'onDoubleClick',
   'onPointerDown', 'onPointerMove', 'onPointerUp', 'onHoverStart', 'onHoverEnd', 'onWheel', 'onStateChanged',
   'onDumpReceived', 'onParameterReceived',
+  // Collected so named handlers are ready the moment their preview dispatch lands
+  // (today these fire in the exported plugin — see panelApi.js availability).
+  'onTimer', 'onMidiIn', 'onCcIn', 'onSysexIn',
+  'onControlChanged', 'onPanelStateChanged', 'onDeviceConnected', 'onDeviceDisconnected',
 ];
 
 /** A sensible sample payload for manually running a handler from the editor. */
@@ -458,9 +569,17 @@ function ownerOf(script) {
 
 /* -------------------------------------------------------------- JavaScript executor */
 
+// Handler names to probe for after evaluating a source: the catalog, plus an optional extra
+// (run()'s action function) when it's a valid identifier not already listed.
+function probeNames(extra) {
+  return extra && /^[A-Za-z_$][\w$]*$/.test(extra) && !HANDLER_NAMES.includes(extra)
+    ? [...HANDLER_NAMES, extra]
+    : HANDLER_NAMES;
+}
+
 /** Run JS source with the panel API bound and collect its declared handlers (sync). */
-function runJsSource(source, scriptId, api) {
-  const probe = HANDLER_NAMES.map((n) => `${JSON.stringify(n)}: (typeof ${n} !== 'undefined' ? ${n} : undefined)`).join(',');
+function runJsSource(source, scriptId, api, extraProbe) {
+  const probe = probeNames(extraProbe).map((n) => `${JSON.stringify(n)}: (typeof ${n} !== 'undefined' ? ${n} : undefined)`).join(',');
   const body = `${source}\n;return {${probe}};`;
   try {
     const factory = new Function(...Object.keys(api), body);
@@ -472,20 +591,20 @@ function runJsSource(source, scriptId, api) {
 }
 
 /** Execute a JS script's source and return its declared handlers (sync). */
-function loadHandlersJs(script) {
-  return runJsSource(script.source, script.id, buildApi(ownerOf(script)));
+function loadHandlersJs(script, collect, extraProbe) {
+  return runJsSource(script.source, script.id, buildApi(ownerOf(script), collect), extraProbe);
 }
 
 /** TypeScript: prefer the JS the editor already transpiled (what the C++ host ships), else
     transpile on the fly via the lazy compiler. Both run through the JS path. */
-async function loadHandlersTs(script) {
+async function loadHandlersTs(script, collect, extraProbe) {
   if (typeof script.compiledJs === 'string' && script.compiledJs.length)
-    return runJsSource(script.compiledJs, script.id, buildApi(ownerOf(script)));
+    return runJsSource(script.compiledJs, script.id, buildApi(ownerOf(script), collect), extraProbe);
   const ts = await ensureTs();
   if (!ts) { addScriptTrace('error', script.id, 'TypeScript compiler unavailable (offline?)'); return null; }
   const js = transpileTs(script.source);
   if (js == null) { addScriptTrace('error', script.id, 'TypeScript transpile failed'); return null; }
-  return runJsSource(js, script.id, buildApi(ownerOf(script)));
+  return runJsSource(js, script.id, buildApi(ownerOf(script), collect), extraProbe);
 }
 
 /* --------------------------------------------------------------------- Lua executor */
@@ -505,7 +624,7 @@ async function getLuaEngine() {
 }
 
 /** Execute a Lua script's source and return its declared handlers (async). */
-async function loadHandlersLua(script) {
+async function loadHandlersLua(script, collect, extraProbe) {
   let lua;
   try {
     lua = await getLuaEngine();
@@ -513,14 +632,15 @@ async function loadHandlersLua(script) {
     addScriptTrace('error', script.id, `Lua engine failed to start: ${e?.message ?? e}`);
     return null;
   }
-  const api = buildApi(ownerOf(script));
+  const api = buildApi(ownerOf(script), collect);
   try {
     for (const [k, v] of Object.entries(api)) lua.global.set(k, v);
     // Clear any handlers left in globals by a previous run, eval the source, then collect this
     // run's handlers into a table the JS side can call.
-    const clear = HANDLER_NAMES.map((n) => `${n}=nil`).join(';');
-    const collect = HANDLER_NAMES.map((n) => `${n}=${n}`).join(',');
-    const handlers = await lua.doString(`${clear}\n${script.source}\nreturn {${collect}}`);
+    const names = probeNames(extraProbe);
+    const clear = names.map((n) => `${n}=nil`).join(';');
+    const gather = names.map((n) => `${n}=${n}`).join(',');
+    const handlers = await lua.doString(`${clear}\n${script.source}\nreturn {${gather}}`);
     return handlers || {};
   } catch (e) {
     addScriptTrace('error', script.id, `load error: ${e?.message ?? e}`);
@@ -556,7 +676,7 @@ async function getPyodideEngine() {
 }
 
 /** Execute a Python script's source and return its declared handlers (async). */
-async function loadHandlersPython(script) {
+async function loadHandlersPython(script, collect, extraProbe) {
   let py;
   try {
     py = await getPyodideEngine();
@@ -564,7 +684,7 @@ async function loadHandlersPython(script) {
     addScriptTrace('error', script.id, `Pyodide failed to load: ${e?.message ?? e}`);
     return null;
   }
-  const api = buildApi(ownerOf(script));
+  const api = buildApi(ownerOf(script), collect);
   try {
     // Fresh namespace per run, seeded with the panel API + helpers as Python globals, so the source
     // can call set()/get()/sendCC()/log()/clamp()/scale()/… directly. Each defined handler is read
@@ -572,7 +692,7 @@ async function loadHandlersPython(script) {
     const ns = py.toPy(api);
     py.runPython(script.source, { globals: ns });
     const handlers = {};
-    for (const name of HANDLER_NAMES) {
+    for (const name of probeNames(extraProbe)) {
       const fn = ns.get(name);
       if (fn) handlers[name] = (payload) => fn(payload);
     }
@@ -587,8 +707,8 @@ async function loadHandlersPython(script) {
 // Interpreted preview of the C++ behavior-handler subset (cppPreview.js). The real C++ is
 // compiled into the exported plugin; this lets a C++ script move live controls in the editor.
 // `ctx.*` maps onto the same panel API as Lua/JS; `event` is the handler payload.
-function loadHandlersCpp(script) {
-  const api = buildApi(ownerOf(script));
+function loadHandlersCpp(script, collect) {
+  const api = buildApi(ownerOf(script), collect);
   const ctx = { ...api, setValue: api.set, getValue: api.get };
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileCpp(script.source);
@@ -608,8 +728,8 @@ function loadHandlersCpp(script) {
 // Interpreted preview of the C# behavior-handler subset (csharpPreview.js). `ctx` exposes the
 // panel API in both C# (PascalCase) and lower-case spellings; handler names match camelCase
 // (the skeleton) or PascalCase (idiomatic C#).
-function loadHandlersCsharp(script) {
-  const api = buildApi(ownerOf(script));
+function loadHandlersCsharp(script, collect) {
+  const api = buildApi(ownerOf(script), collect);
   const ctx = {
     ...api, setValue: api.set, getValue: api.get,
     SetValue: api.set, GetValue: api.get, Log: api.log,
@@ -637,8 +757,8 @@ function loadHandlersCsharp(script) {
 
 /* ----------------------------------------------------------------------- Java executor */
 // Interpreted preview of the Java behavior-handler subset (javaPreview.js).
-function loadHandlersJava(script) {
-  const api = buildApi(ownerOf(script));
+function loadHandlersJava(script, collect) {
+  const api = buildApi(ownerOf(script), collect);
   const ctx = { ...api, setValue: api.set, getValue: api.get };
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileJava(script.source);
@@ -656,16 +776,18 @@ function loadHandlersJava(script) {
 
 /* ---------------------------------------------------------------- unified run / load */
 
-/** Execute a script's source and return its declared handlers (JS/C++/C#/Java sync; Lua/Python async). */
-async function getHandlers(script) {
+/** Execute a script's source and return its declared handlers (JS/C++/C#/Java sync; Lua/Python async).
+    `collect` (optional) receives each on(...) registration made by the script's top-level code;
+    `extraProbe` (optional) additionally probes for that function name (run()'s action lookup). */
+async function getHandlers(script, collect, extraProbe) {
   const lang = script?.language ?? 'lua';
-  if (lang === 'javascript' || lang === 'js') return loadHandlersJs(script);
-  if (lang === 'typescript' || lang === 'ts') return loadHandlersTs(script);
-  if (lang === 'lua') return loadHandlersLua(script);
-  if (lang === 'python' || lang === 'py') return loadHandlersPython(script);
-  if (lang === 'cpp' || lang === 'c++') return loadHandlersCpp(script);
-  if (lang === 'csharp' || lang === 'cs' || lang === 'c#') return loadHandlersCsharp(script);
-  if (lang === 'java') return loadHandlersJava(script);
+  if (lang === 'javascript' || lang === 'js') return loadHandlersJs(script, collect, extraProbe);
+  if (lang === 'typescript' || lang === 'ts') return loadHandlersTs(script, collect, extraProbe);
+  if (lang === 'lua') return loadHandlersLua(script, collect, extraProbe);
+  if (lang === 'python' || lang === 'py') return loadHandlersPython(script, collect, extraProbe);
+  if (lang === 'cpp' || lang === 'c++') return loadHandlersCpp(script, collect);
+  if (lang === 'csharp' || lang === 'cs' || lang === 'c#') return loadHandlersCsharp(script, collect);
+  if (lang === 'java') return loadHandlersJava(script, collect);
   addScriptTrace('error', script?.id ?? '',
     `Language "${lang}" isn't supported in the web runtime (Lua, JavaScript, TypeScript, Python, C++, C#, and Java run here).`);
   return null;
@@ -687,7 +809,9 @@ function reportScriptError(scriptId, e) {
 
 /** Run a script now — execute it and call its declared handler (or a named hook). */
 export async function runScript(script, hook = null, payload = undefined) {
-  const handlers = await getHandlers(script);
+  const regs = [];
+  const handlers = await getHandlers(script, (r) => regs.push(r));
+  live.listeners.set(script.id, regs);   // refresh this script's on(...) registrations
   if (!handlers) return;
   const fnName = hook || script.event;
   const fn = handlers[fnName];
@@ -728,7 +852,9 @@ const live = {
   sessionLast: new Map(),  // preview overlay: controlId -> { value, pressed, hover }
   readyFired: new Set(),   // panelIds that already saw onPanelReady (firstTime tracking)
   prevPreviewOn: false,
-  dispatching: false,
+  dispatching: 0,          // dispatch nesting depth (emit() re-enters); truthy while any dispatch runs
+  listeners: new Map(),    // scriptId -> [{ target, event, fn }] from on(...) registrations
+  listenersDirty: true,    // scripts changed → rescan on the next dispatch
   unsubs: [],
 };
 
@@ -790,23 +916,68 @@ function scriptMatchesControl(script, controlName) {
   return t.toLowerCase() === String(controlName ?? '').toLowerCase();
 }
 
+// Rebuild the on(...) registration registry by loading every enabled script once (top-level
+// code runs — same as the C++ host, whose engines evaluate each script at loadScripts()).
+// Called lazily from dispatchEvents when the script set changed, so pure-listener scripts
+// (only on() calls, no bound event) register without their bound event ever firing.
+async function refreshListeners() {
+  const next = new Map();
+  for (const s of activeScripts()) {
+    if (s.enabled === false) continue;
+    const regs = [];
+    await getHandlers(s, (r) => regs.push(r));
+    next.set(s.id, regs);
+  }
+  live.listeners = next;
+}
+
 // Run a batch of { event, controlName, payload } against the matching live scripts. A null
-// controlName means panel-wide (lifecycle). Guarded so a script's own set() can't re-enter.
+// controlName means panel-wide (lifecycle / custom emit). Guarded so a script's own set()
+// can't re-enter the watchers; nested entries (a handler that emit()s) share the depth.
+const MAX_DISPATCH_DEPTH = 16;
 async function dispatchEvents(events) {
   if (!events.length) return;
+  if (live.dispatching >= MAX_DISPATCH_DEPTH) {
+    addScriptTrace('error', '', `event "${events[0]?.event}" dropped: dispatch depth exceeded ${MAX_DISPATCH_DEPTH} (emit feedback loop?)`);
+    return;
+  }
   const scripts = activeScripts();
-  live.dispatching = true;
+  live.dispatching += 1;
   try {
+    if (live.listenersDirty) {
+      live.listenersDirty = false;
+      await refreshListeners();
+    }
     for (const ev of events) {
+      // 1) Scripts bound to this event (named-function handlers).
       const matches = scripts.filter((s) =>
         s.enabled !== false && s.event === ev.event &&
         (ev.controlName == null || scriptMatchesControl(s, ev.controlName)));
       for (const s of matches) await runScript(s, s.event, ev.payload);
+
+      // 2) Explicit on(target, event, fn) / on(name, fn) registrations. Sources dispatch
+      //    handler-style names ("onValueChanged"); registrations may use the catalog id
+      //    ("valueChanged") — match either spelling.
+      const wanted = eventAliases(ev.event);
+      for (const [scriptId, regs] of live.listeners) {
+        for (const r of regs) {
+          if (!wanted.has(r.event)) continue;
+          if (!listenerTargetMatches(r.target, ev.controlName)) continue;
+          try {
+            const res = r.fn(ev.payload);
+            if (res && typeof res.then === 'function') await res;
+          } catch (e) {
+            reportScriptError(scriptId, e);
+          }
+        }
+      }
     }
   } finally {
-    snapshotValues();          // absorb panels writes our scripts just made
-    seedSessionSnapshot();     // and any preview-overlay writes
-    live.dispatching = false;
+    live.dispatching -= 1;
+    if (live.dispatching === 0) {
+      snapshotValues();          // absorb panels writes our scripts just made
+      seedSessionSnapshot();     // and any preview-overlay writes
+    }
   }
 }
 
@@ -915,8 +1086,12 @@ function onDumpParsed(payload) {
   const values = payload?.values ?? payload?.parsed?.values ?? null;
   const role = payload?.deviceRole ?? DEFAULT_ROLE;
   if (values && typeof values === 'object') syncDeviceRuntimeStateToPanelPreview({ [role]: values });
+  // Same payload shape as the C++ Player runtime: decoded values + kind + role + the raw bytes.
+  const hex = String(payload?.hex ?? '').replace(/\s+/g, '');
+  const bytes = [];
+  for (let i = 0; i + 1 < hex.length; i += 2) bytes.push(parseInt(hex.slice(i, i + 2), 16) & 0xFF);
   dispatchEvents([{ event: 'onDumpReceived', controlName: null,
-    payload: { values: values ?? {}, kind: payload?.dumpId ?? payload?.dumpName ?? '', role } }]);
+    payload: { values: values ?? {}, kind: payload?.dumpId ?? payload?.dumpName ?? '', role, bytes } }]);
 }
 
 /**
@@ -933,9 +1108,11 @@ export function initPanelRuntime() {
   seedSessionSnapshot();
   live.unsubs.push(resolvedActivePanelId.subscribe((id) => {
     live.activePanelId = id;
+    live.listenersDirty = true;
     snapshotValues();          // switching panels shouldn't fire spurious changes
     seedSessionSnapshot();
   }));
+  live.unsubs.push(scriptDocuments.subscribe(() => { live.listenersDirty = true; }));
   live.unsubs.push(panels.subscribe(() => onPanelsChanged()));
   live.unsubs.push(panelPreviewSessions.subscribe((s) => onPreviewSessionsChanged(s)));
   live.unsubs.push(previewModeEnabled.subscribe((on) => onPreviewModeChanged(on === true)));
@@ -954,6 +1131,7 @@ export function setLiveEnabled(on) {
  */
 export function setLiveScripts(scripts, panelId = null) {
   live.editOverride = scripts == null ? null : { panelId, scripts: Array.isArray(scripts) ? scripts : [] };
+  live.listenersDirty = true;   // rescan on(...) registrations against the new script set
 }
 
 /**

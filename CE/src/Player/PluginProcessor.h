@@ -462,11 +462,12 @@ private:
             // Inbound: set()s inside these handlers are silent by default.
             ceditor::scripting::InboundScope inbound (*scriptRuntime);
 
-            // onDumpReceived({ values, kind, role }).
+            // onDumpReceived({ values, kind, role, bytes }) — decoded values plus the raw message.
             auto* sp = new juce::DynamicObject();
             sp->setProperty ("values", values);
             sp->setProperty ("kind", kind);
             sp->setProperty ("role", role);
+            sp->setProperty ("bytes", juce::var (hexToByteVarArray (o->getProperty ("hex").toString())));
             scriptRuntime->dispatchEvent ("onDumpReceived", "", juce::var (sp));
 
             // onParameterReceived({ parameter, value }) — one per decoded parameter (the DPD payoff).
@@ -580,8 +581,13 @@ private:
         cb.sendDump   = [] (const juce::String&) {};
        #endif
         cb.buildDump  = [] (const juce::String&) { return juce::var(); };
-        cb.runAction  = [] (const juce::String&, const juce::var&) { return juce::var(); };
-        cb.emitEvent  = [] (const juce::String&, const juce::var&) {};
+        // Flow / composition (Q6): run() finds and calls a named action in another script;
+        // emit() dispatches a custom event to bound scripts + on(name, …) listeners. Both are
+        // depth-guarded inside ScriptRuntime against run/emit feedback loops.
+        cb.runAction  = [this] (const juce::String& target, const juce::var& args)
+        { return scriptRuntime != nullptr ? scriptRuntime->runAction (target, args) : juce::var(); };
+        cb.emitEvent  = [this] (const juce::String& name, const juce::var& data)
+        { if (scriptRuntime != nullptr) scriptRuntime->dispatchEvent (name, {}, data); };
         cb.log = [] (const juce::String& msg, const juce::var& value)
         {
             scriptLogLine ("[script] " + msg + (value.isVoid() ? juce::String() : " " + juce::JSON::toString (value)));

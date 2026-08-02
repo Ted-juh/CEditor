@@ -210,12 +210,62 @@ void ScriptRuntime::dispatchEvent (const juce::String& event, const juce::String
         if (s.event == event && matchesTarget (s, target))
             dispatchTo (s, event, payload);
 
-    // 2) Explicit on(target, event, fn) listeners registered inside scripts.
+    // 2) Explicit on(target, event, fn) listeners registered inside scripts. Hosts dispatch
+    //    handler-style names ("onValueChanged") while listeners register the event id from the
+    //    catalog ("valueChanged") — deliver under both spellings so either form fires. Custom
+    //    emit() names have no alias (they don't start with "on" + uppercase).
     const ScriptErrorSink onError = [this] (const juce::String& id, const juce::String& msg) { reportError (id, msg); };
-    if (lua)    lua->deliverEvent (target, event, payload, onError);
-    if (js)     js->deliverEvent (target, event, payload, onError);
-    if (python) python->deliverEvent (target, event, payload, onError);
-    if (native) native->deliverEvent (target, event, payload, onError);
+    juce::String alias;
+    if (event.startsWith ("on") && event.length() > 2 && juce::CharacterFunctions::isUpperCase (event[2]))
+        alias = event.substring (2, 3).toLowerCase() + event.substring (3);
+    for (auto* eng : { lua.get(), js.get(), python.get(), native.get() })
+    {
+        if (eng == nullptr) continue;
+        eng->deliverEvent (target, event, payload, onError);
+        if (alias.isNotEmpty()) eng->deliverEvent (target, alias, payload, onError);
+    }
+}
+
+juce::var ScriptRuntime::runAction (const juce::String& targetAction, const juce::var& args)
+{
+    assertMessageThread();
+
+    if (dispatchDepth >= maxDispatchDepth)
+    {
+        reportError ("runtime", "run(\"" + targetAction + "\") dropped: dispatch depth exceeded "
+                     + juce::String (maxDispatchDepth) + " (run/emit feedback loop?)");
+        return {};
+    }
+    ++dispatchDepth;
+    struct DepthScope { int& d; ~DepthScope() { --d; } } depthScope { dispatchDepth };
+
+    const auto raw    = targetAction.trim();
+    const bool dotted = raw.contains (".");
+    const auto target = dotted ? raw.upToFirstOccurrenceOf (".", false, false) : juce::String();
+    const auto action = dotted ? raw.fromFirstOccurrenceOf (".", false, false) : raw;
+    if (action.isEmpty())
+    {
+        reportError ("runtime", "run(): empty action name");
+        return {};
+    }
+
+    for (auto& s : scripts)
+    {
+        if (target.isNotEmpty()
+            && ! s.name.equalsIgnoreCase (target) && ! s.owner.equalsIgnoreCase (target))
+            continue;
+        auto* eng = engineFor (s.language);
+        if (eng == nullptr || ! eng->hasHandler (s.id, action)) continue;
+
+        const ScriptErrorSink onError = [this] (const juce::String& id, const juce::String& msg) { reportError (id, msg); };
+        host.enterScript (s.context());
+        auto out = eng->dispatch (s.id, action, args, onError);
+        host.exitScript();
+        return out;
+    }
+
+    reportError ("runtime", "run(\"" + raw + "\"): no loaded script defines " + action + "()");
+    return {};
 }
 
 } // namespace ceditor::scripting

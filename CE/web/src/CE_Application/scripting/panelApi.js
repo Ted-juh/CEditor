@@ -121,10 +121,6 @@ const NOT_WIRED_YET = {
   preview: false, export: false,
   note: 'Planned — not dispatched anywhere yet.',
 };
-const FLOW_NOT_WIRED = {
-  preview: false, export: false,
-  note: 'Designed (spec Q6) but not wired yet — stubbed in the preview and a no-op in the exported host.',
-};
 const TIMERS_EXPORT_ONLY = {
   preview: false, export: true,
   note: 'Runs in the exported plugin (TimerManager); editor-preview timers are pending.',
@@ -225,7 +221,7 @@ export const PANEL_EVENTS = [
 export const DEVICE_EVENTS = [
   // decoded (the DPD payoff — 90% of use)
   { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', fields: ['parameter', 'value'], decoded: true, summary: 'A value arrived, decoded via the DPD.', availability: EXPORT_ONLY_PENDING_PREVIEW },
-  { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', fields: ['bytes', 'kind'], decoded: true, summary: 'A bulk dump arrived. Use applyDump(dump.bytes) to fill the panel.' },
+  { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', fields: ['values', 'kind', 'role', 'bytes'], decoded: true, summary: 'A bulk dump arrived and was decoded via the DPD; the panel fills automatically. values = { parameterId: value }, bytes = the raw message.' },
   // raw (escape hatch)
   { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', fields: ['bytes', 'channel', 'status'], decoded: false, summary: 'Any MIDI arrived (raw).', availability: EXPORT_ONLY_PENDING_PREVIEW },
   { id: 'ccIn', fn: 'onCcIn', payload: 'cc', fields: ['channel', 'cc', 'value'], decoded: false, summary: 'A CC arrived.', availability: EXPORT_ONLY_PENDING_PREVIEW },
@@ -281,8 +277,8 @@ export const COMMANDS = [
   /* --- Events & Flow (Q3, Q6) --- */
   {
     id: 'on', category: 'Events & Flow', signature: 'on(target, event, fn)',
-    summary: 'React to an event on another control / the panel / the device, or to a custom emitted event.',
-    availability: FLOW_NOT_WIRED,
+    summary: 'React to an event on another control / the panel / the device, or to a custom emitted event. Two-argument form on(name, fn) listens for a custom emit()ted event on any target.',
+    availability: { preview: true, export: true, note: 'Callback registration is for Lua/JS/TS/Python; C++/C#/Java handlers use named functions instead.' },
     params: [
       { name: 'target', type: 'targetRef', required: true },
       { name: 'event', type: 'eventName', required: true },
@@ -296,8 +292,7 @@ export const COMMANDS = [
   },
   {
     id: 'emit', category: 'Events & Flow', signature: 'emit(name [, data])',
-    summary: 'Announce a custom event; any script listening with on(name, …) reacts. Fire-and-forget, language-neutral.',
-    availability: FLOW_NOT_WIRED,
+    summary: 'Announce a custom event; any script listening with on(name, …) reacts. Fire-and-forget, language-neutral. Runaway emit chains are cut off and reported.',
     params: [
       { name: 'name', type: 'string', required: true },
       { name: 'data', type: 'value', required: false },
@@ -307,8 +302,8 @@ export const COMMANDS = [
   },
   {
     id: 'run', category: 'Events & Flow', signature: 'run(target.action [, args])',
-    summary: 'Run a named action elsewhere ("target.action" = the owning control/panel, then the action name). Host-dispatched — works cross-language. Supports a return value. Only simple data crosses the boundary.',
-    availability: FLOW_NOT_WIRED,
+    summary: 'Run a named action: "target.action" finds the script named `target` (or attached to it) that defines a function `action`, calls it with args, and returns its result. Plain "action" searches every script. Cross-language; only simple data crosses the boundary.',
+    availability: { preview: true, export: true, note: 'In the editor preview a Lua/Python target runs asynchronously — the return value is available from JS/TS/C++/C#/Java targets.' },
     params: [
       { name: 'action', type: 'scriptRef', required: true },
       { name: 'args', type: 'value', required: false },
