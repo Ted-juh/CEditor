@@ -14,6 +14,9 @@ import {
   LIFECYCLE_HOOKS, CONTROL_EVENTS, PANEL_EVENTS, DEVICE_EVENTS,
   COMMANDS, HELPERS,
 } from '../src/CE_Application/scripting/panelApi.js';
+// The canonical handler in every language — REAL, toolchain-validated source (the fixture
+// behind `npm run test:script-exports`), so the cross-language section can never drift.
+import { SOURCES, CTX_LANGUAGES } from './script-export-corpus.mjs';
 
 const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../docs/scripting-manual.md');
 
@@ -36,6 +39,21 @@ function scopeLine(member) {
   return `\n*Valid in ${member.scopes.join(' / ')} scripts only.*\n`;
 }
 
+// Availability badge (see the legend in the intro). Absent = available everywhere, no line.
+function availabilityLine(member) {
+  const a = member.availability;
+  if (!a) return '';
+  const mark = (ok) => (ok ? '✅' : '⬜');
+  return `\n*Availability: preview ${mark(a.preview)} · export ${mark(a.export)}${a.note ? ` — ${a.note}` : ''}*\n`;
+}
+
+function availabilityCell(e) {
+  const a = e.availability;
+  if (!a) return 'everywhere';
+  const mark = (ok) => (ok ? '✅' : '⬜');
+  return `preview ${mark(a.preview)} · export ${mark(a.export)}${a.note ? ` — ${a.note}` : ''}`;
+}
+
 function codeBlocks(member) {
   const lua = displaySnippet(member.snippet?.lua);
   const js = displaySnippet(member.snippet?.javascript);
@@ -45,15 +63,20 @@ function codeBlocks(member) {
 }
 
 function memberSection(member) {
-  return `### \`${member.signature}\`\n\n${member.summary}\n${scopeLine(member)}${codeBlocks(member)}`;
+  return `### \`${member.signature}\`\n\n${member.summary}\n${scopeLine(member)}${availabilityLine(member)}${codeBlocks(member)}`;
 }
 
 function eventTable(events) {
+  const withWhere = events.some((e) => e.availability);
   const rows = events.map((e) => {
     const payload = e.payload ? `\`${e.payload}\`` : '—';
-    return `| \`"${e.id}"\` | \`${e.fn}(${e.payload ?? ''})\` | ${payload} | ${e.summary} |`;
+    const base = `| \`"${e.id}"\` | \`${e.fn}(${e.payload ?? ''})\` | ${payload} | ${e.summary} |`;
+    return withWhere ? `${base} ${availabilityCell(e)} |` : base;
   });
-  return ['| Event | Handler | Payload | Fires when |', '|---|---|---|---|', ...rows].join('\n');
+  const head = withWhere
+    ? ['| Event | Handler | Payload | Fires when | Where |', '|---|---|---|---|---|']
+    : ['| Event | Handler | Payload | Fires when |', '|---|---|---|---|'];
+  return [...head, ...rows].join('\n');
 }
 
 function helperTable(helpers) {
@@ -71,6 +94,16 @@ const languages = [
     return `| **${l.label}**${TIER1_LANGUAGES.includes(l.id) ? ' (Tier 1)' : ''} | ${l.version} | ${live} | ${l.host} |`;
   }),
 ].join('\n');
+
+// "The same script in every language" — straight from the validated corpus fixture.
+const FENCE_TAGS = { lua: 'lua', javascript: 'js', typescript: 'ts', python: 'python', cpp: 'cpp', csharp: 'csharp', java: 'java' };
+const crossLanguage = SCRIPT_LANGUAGES
+  .filter((l) => SOURCES[l.id])
+  .map((l) => {
+    const ctx = CTX_LANGUAGES.includes(l.id) ? ' *(ctx-based)*' : '';
+    return `**${l.label}**${ctx}\n\n\`\`\`${FENCE_TAGS[l.id] ?? ''}\n${SOURCES[l.id].trimEnd()}\n\`\`\``;
+  })
+  .join('\n\n');
 
 const accessors = [
   '| Accessor | What you get |',
@@ -116,6 +149,33 @@ script is stored and run in the language it was written in, never converted.
 ## Languages
 
 ${languages}
+
+## Where things run: preview vs export
+
+Some of the API is further along in one runtime than the other. Members below carry a badge
+when they deviate from "available everywhere":
+
+- **preview** — the editor's live preview (the JS panel runtime, also used by the exported
+  player's window).
+- **export** — the exported standalone/VST3 plugin (the C++ host engines, alive even with the
+  window closed).
+
+✅ = works today, ⬜ = not yet there (the note says why). No badge = works in both.
+
+## The same script in every language
+
+One handler, written as real source in every language — these exact snippets are validated
+against each language's real toolchain by \`npm run test:script-exports\`. Two API shapes:
+
+- **Lua / JavaScript / TypeScript / Python** — the API is injected as globals: \`set()\`,
+  \`sendCC()\`, …
+- **C++ / C# / Java** *(ctx-based)* — handlers take \`(ctx, event)\` and reach the same API
+  through \`ctx\` (C# uses .NET naming: \`ctx.SetValue\`, \`ctx.SendCC\`).
+
+${crossLanguage}
+
+The reference sections below show Lua and JavaScript. Python and TypeScript make the same
+global calls with their own function syntax; C++/C#/Java prefix them with \`ctx.\` as above.
 
 ## Addressing: paths and values
 
@@ -164,7 +224,7 @@ ${eventTable(DEVICE_EVENTS)}
 ## Commands
 
 ${[...commandsByCategory.entries()].map(([category, items]) =>
-  `### ${category}\n\n${CATEGORY_NOTES[category] ? `${CATEGORY_NOTES[category]}\n\n` : ''}${items.map((m) => `#### \`${m.signature}\`\n\n${m.summary}\n${scopeLine(m)}${codeBlocks(m)}`).join('\n')}`
+  `### ${category}\n\n${CATEGORY_NOTES[category] ? `${CATEGORY_NOTES[category]}\n\n` : ''}${items.map((m) => `#### \`${m.signature}\`\n\n${m.summary}\n${scopeLine(m)}${availabilityLine(m)}${codeBlocks(m)}`).join('\n')}`
 ).join('\n')}
 ## Helpers
 

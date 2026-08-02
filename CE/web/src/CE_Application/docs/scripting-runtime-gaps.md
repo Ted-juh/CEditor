@@ -74,6 +74,9 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
   (see [timer-system.md](./timer-system.md)).
 - [x] Confirm `checksum` / `to14bit` and the other encoding helpers are
   installed in every script engine (JS / Lua / Python — verified in source).
+- [x] Surface these gaps to users: `panelApi.js` now carries `availability`
+  metadata per member (rendered as badges in the generated
+  `docs/scripting-manual.md`). **Update it when closing a gap here.**
 - [ ] Keep `panelApi.js` and the C++ side in sync (the header already says so).
 
 ## Add findings below

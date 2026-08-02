@@ -4,6 +4,9 @@ Task-based recipes for panel scripting. Every call here is from the
 [scripting manual](scripting-manual.md) — look a name up there for the full signature.
 Recipes are shown in Lua and JavaScript; the API is identical in every language.
 
+Some of the API is further along in the exported plugin than in the editor preview (timers and
+`emit`/`on`/`run`, notably) — the manual's availability badges say exactly which is which.
+
 A quick orientation: a script attached to a control reacts to **its own** events just by
 defining the named function (`onValueChanged`, `onClick`, …). To reach anything else — another
 control, the panel, the device — use `on(target, event, handler)`. Values are read and written

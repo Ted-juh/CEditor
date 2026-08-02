@@ -22,6 +22,100 @@ script is stored and run in the language it was written in, never converted.
 | **C#** | 12 | ✅ (interpreted subset) | CeScript interpreter — preview only (compile-at-export planned) |
 | **Java** | 21 | ✅ (interpreted subset) | CeScript interpreter — preview only (compile-at-export planned) |
 
+## Where things run: preview vs export
+
+Some of the API is further along in one runtime than the other. Members below carry a badge
+when they deviate from "available everywhere":
+
+- **preview** — the editor's live preview (the JS panel runtime, also used by the exported
+  player's window).
+- **export** — the exported standalone/VST3 plugin (the C++ host engines, alive even with the
+  window closed).
+
+✅ = works today, ⬜ = not yet there (the note says why). No badge = works in both.
+
+## The same script in every language
+
+One handler, written as real source in every language — these exact snippets are validated
+against each language's real toolchain by `npm run test:script-exports`. Two API shapes:
+
+- **Lua / JavaScript / TypeScript / Python** — the API is injected as globals: `set()`,
+  `sendCC()`, …
+- **C++ / C# / Java** *(ctx-based)* — handlers take `(ctx, event)` and reach the same API
+  through `ctx` (C# uses .NET naming: `ctx.SetValue`, `ctx.SendCC`).
+
+**Lua**
+
+```lua
+function onValueChanged(value)
+  set("cutoff.value", scale(value, 0, 1, 80, 12000))
+  set("resonance.value", scale(value, 0, 1, 0.1, 0.85))
+  sendCC(1, 74, round(value * 127))
+end
+```
+
+**JavaScript**
+
+```js
+function onValueChanged(value) {
+  set('cutoff.value', scale(value, 0, 1, 80, 12000));
+  set('resonance.value', scale(value, 0, 1, 0.1, 0.85));
+  sendCC(1, 74, round(value * 127));
+}
+```
+
+**TypeScript**
+
+```ts
+function onValueChanged(value: number): void {
+  set('cutoff.value', scale(value, 0, 1, 80, 12000));
+  set('resonance.value', scale(value, 0, 1, 0.1, 0.85));
+  sendCC(1, 74, round(value * 127));
+}
+```
+
+**Python**
+
+```python
+def onValueChanged(value):
+    set("cutoff.value", scale(value, 0, 1, 80, 12000))
+    set("resonance.value", scale(value, 0, 1, 0.1, 0.85))
+    sendCC(1, 74, round(value * 127))
+```
+
+**C++** *(ctx-based)*
+
+```cpp
+void onValueChanged(CeContext& ctx, const CeEvent& event) {
+  ctx.set("cutoff.value", ctx.scale(event.value, 0.0, 1.0, 80.0, 12000.0));
+  ctx.set("resonance.value", ctx.scale(event.value, 0.0, 1.0, 0.1, 0.85));
+  ctx.sendCC(1, 74, ctx.round(event.value * 127.0));
+}
+```
+
+**C#** *(ctx-based)*
+
+```csharp
+void OnValueChanged(CeContext ctx, CeEvent e) {
+  ctx.SetValue("cutoff.value", ctx.Scale(e.Value, 0, 1, 80, 12000));
+  ctx.SetValue("resonance.value", ctx.Scale(e.Value, 0, 1, 0.1, 0.85));
+  ctx.SendCC(1, 74, (int)ctx.Round(e.Value * 127));
+}
+```
+
+**Java** *(ctx-based)*
+
+```java
+void onValueChanged(CeContext ctx, CeEvent e) {
+  ctx.set("cutoff.value", ctx.scale(e.value, 0.0, 1.0, 80.0, 12000.0));
+  ctx.set("resonance.value", ctx.scale(e.value, 0.0, 1.0, 0.1, 0.85));
+  ctx.sendCC(1, 74, (int) ctx.round(e.value * 127.0));
+}
+```
+
+The reference sections below show Lua and JavaScript. Python and TypeScript make the same
+global calls with their own function syntax; C++/C#/Java prefix them with `ctx.` as above.
+
 ## Addressing: paths and values
 
 Everything on the panel is reachable by a **dot-path** rooted on a control's name:
@@ -103,6 +197,8 @@ function onPanelClose() {
 
 The DAW is saving the project — write values into `store`.
 
+*Availability: preview ⬜ · export ✅ — Fires only when a DAW hosts the exported plugin.*
+
 ```lua
 -- Lua
 function onDawSaveState(store)
@@ -119,6 +215,8 @@ function onDawSaveState(store) {
 ### `onDawRestoreState(store)`
 
 The DAW reopened the project — read values back from `store`.
+
+*Availability: preview ⬜ · export ✅ — Fires only when a DAW hosts the exported plugin.*
 
 ```lua
 -- Lua
@@ -148,39 +246,39 @@ Payloads are passed directly with a descriptive name — one obvious datum comes
 
 ### Control events
 
-| Event | Handler | Payload | Fires when |
-|---|---|---|---|
-| `"valueChange"` | `onValueChange(value)` | `value` | Live — fires continuously while the value is moving (for GUI/preview). |
-| `"valueChanged"` | `onValueChanged(value)` | `value` | Settled — fires when the value reaches its final value (for transmit). |
-| `"click"` | `onClick(mouse)` | `mouse` | Clicked. mouse.x, mouse.y. |
-| `"doubleClick"` | `onDoubleClick(mouse)` | `mouse` | Double-clicked. |
-| `"pointerDown"` | `onPointerDown(mouse)` | `mouse` | Mouse pressed. mouse.x/.y/.button/.modifiers. |
-| `"pointerMove"` | `onPointerMove(mouse)` | `mouse` | Mouse moved while down. |
-| `"pointerUp"` | `onPointerUp(mouse)` | `mouse` | Mouse released. |
-| `"hoverStart"` | `onHoverStart()` | — | Mouse entered the control. |
-| `"hoverEnd"` | `onHoverEnd()` | — | Mouse left the control. |
-| `"wheel"` | `onWheel(wheel)` | `wheel` | Scrolled over the control. wheel.delta. |
-| `"stateChanged"` | `onStateChanged(state)` | `state` | State swapped (hover/pressed/disabled). |
+| Event | Handler | Payload | Fires when | Where |
+|---|---|---|---|---|
+| `"valueChange"` | `onValueChange(value)` | `value` | Live — fires continuously while the value is moving (for GUI/preview). | everywhere |
+| `"valueChanged"` | `onValueChanged(value)` | `value` | Settled — fires when the value reaches its final value (for transmit). | everywhere |
+| `"click"` | `onClick(mouse)` | `mouse` | Clicked. mouse.x, mouse.y. | everywhere |
+| `"doubleClick"` | `onDoubleClick(mouse)` | `mouse` | Double-clicked. | everywhere |
+| `"pointerDown"` | `onPointerDown(mouse)` | `mouse` | Mouse pressed. mouse.x/.y/.button/.modifiers. | everywhere |
+| `"pointerMove"` | `onPointerMove(mouse)` | `mouse` | Mouse moved while down. | everywhere |
+| `"pointerUp"` | `onPointerUp(mouse)` | `mouse` | Mouse released. | everywhere |
+| `"hoverStart"` | `onHoverStart()` | — | Mouse entered the control. | everywhere |
+| `"hoverEnd"` | `onHoverEnd()` | — | Mouse left the control. | everywhere |
+| `"wheel"` | `onWheel(wheel)` | `wheel` | Scrolled over the control. wheel.delta. | everywhere |
+| `"stateChanged"` | `onStateChanged(state)` | `state` | State swapped (hover/pressed/disabled). | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
 
 ### Panel events
 
-| Event | Handler | Payload | Fires when |
-|---|---|---|---|
-| `"controlChanged"` | `onControlChanged(info)` | `info` | Any control changed. info.target, info.value. |
-| `"panelStateChanged"` | `onPanelStateChanged(state)` | `state` | Panel state switched. |
-| `"timer"` | `onTimer(info)` | `info` | A started timer fired. info.id. |
+| Event | Handler | Payload | Fires when | Where |
+|---|---|---|---|---|
+| `"controlChanged"` | `onControlChanged(info)` | `info` | Any control changed. info.target, info.value. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
+| `"panelStateChanged"` | `onPanelStateChanged(state)` | `state` | Panel state switched. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
+| `"timer"` | `onTimer(info)` | `info` | A started timer fired. info.id. | preview ⬜ · export ✅ — Runs in the exported plugin (TimerManager); editor-preview timers are pending. |
 
 ### Device events
 
-| Event | Handler | Payload | Fires when |
-|---|---|---|---|
-| `"parameterReceived"` | `onParameterReceived(info)` | `info` | A value arrived, decoded via the DPD. info.parameter, info.value. |
-| `"dumpReceived"` | `onDumpReceived(dump)` | `dump` | A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel. |
-| `"midiIn"` | `onMidiIn(midi)` | `midi` | Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status. |
-| `"ccIn"` | `onCcIn(cc)` | `cc` | A CC arrived. cc.channel, cc.cc, cc.value. |
-| `"sysexIn"` | `onSysexIn(bytes)` | `bytes` | Raw SysEx arrived. |
-| `"deviceConnected"` | `onDeviceConnected(device)` | `device` | A device connected. |
-| `"deviceDisconnected"` | `onDeviceDisconnected(device)` | `device` | A device disconnected. |
+| Event | Handler | Payload | Fires when | Where |
+|---|---|---|---|---|
+| `"parameterReceived"` | `onParameterReceived(info)` | `info` | A value arrived, decoded via the DPD. info.parameter, info.value. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
+| `"dumpReceived"` | `onDumpReceived(dump)` | `dump` | A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel. | everywhere |
+| `"midiIn"` | `onMidiIn(midi)` | `midi` | Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
+| `"ccIn"` | `onCcIn(cc)` | `cc` | A CC arrived. cc.channel, cc.cc, cc.value. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
+| `"sysexIn"` | `onSysexIn(bytes)` | `bytes` | Raw SysEx arrived. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
+| `"deviceConnected"` | `onDeviceConnected(device)` | `device` | A device connected. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
+| `"deviceDisconnected"` | `onDeviceDisconnected(device)` | `device` | A device disconnected. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
 
 ## Commands
 
@@ -208,6 +306,8 @@ get("path")
 
 Run a block writing to the panel WITHOUT sending to the synth (e.g. an Init-Patch button). Auto-resets at block end.
 
+*Availability: preview ✅ · export ✅ — The block always runs; transmit gating is enforced by the exported (C++) runtime — the editor preview does not gate.*
+
 ```lua
 -- Lua
 noTransmit(function()
@@ -224,6 +324,8 @@ noTransmit(() => {
 #### `transmit(fn)`
 
 Force a block to send to the synth, even inside an inbound handler.
+
+*Availability: preview ✅ · export ✅ — The block always runs; transmit gating is enforced by the exported (C++) runtime — the editor preview does not gate.*
 
 ```lua
 -- Lua
@@ -244,6 +346,8 @@ transmit(() => {
 
 React to an event on another control / the panel / the device, or to a custom emitted event.
 
+*Availability: preview ⬜ · export ✅ — Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.*
+
 ```lua
 -- Lua
 on("target", "event", function(e)
@@ -261,6 +365,8 @@ on("target", "event", (e) => {
 
 Announce a custom event; any script listening with on(name, …) reacts. Fire-and-forget, language-neutral.
 
+*Availability: preview ⬜ · export ✅ — Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.*
+
 ```lua
 emit("name", data)
 ```
@@ -268,6 +374,8 @@ emit("name", data)
 #### `run(target.action [, args])`
 
 Run a named action elsewhere. Host-dispatched — works cross-language. Supports a return value. Only simple data crosses the boundary.
+
+*Availability: preview ⬜ · export ✅ — Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.*
 
 ```lua
 run("target.action")
@@ -310,6 +418,8 @@ sendDump("patch")
 Build the dump bytes from the panel values without sending.
 
 *Valid in device / panel / project scripts only.*
+
+*Availability: preview ⬜ · export ✅ — Returns null in the editor preview — the panel→bytes codec lives in the device host.*
 
 ```lua
 -- Lua
@@ -366,6 +476,8 @@ checksum("roland", bytes)
 
 Start (or restart) a named repeating timer; onTimer fires with info.id every ms until stopTimer(id).
 
+*Availability: preview ⬜ · export ✅ — Runs in the exported plugin (TimerManager); editor-preview timers are pending.*
+
 ```lua
 startTimer("id", ms)
 ```
@@ -373,6 +485,8 @@ startTimer("id", ms)
 #### `stopTimer(id)`
 
 Stop a named timer started with startTimer(id, ms).
+
+*Availability: preview ⬜ · export ✅ — Runs in the exported plugin (TimerManager); editor-preview timers are pending.*
 
 ```lua
 stopTimer("id")
@@ -396,6 +510,8 @@ Drive the [Zone Splitter](../CE/web/src/CE_Application/docs/zone-splitter.md) �
 
 Swap the whole split arrangement to a named preset (e.g. "threeWay"); optional boundary notes.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 splitPreset("target", "preset")
 ```
@@ -403,6 +519,8 @@ splitPreset("target", "preset")
 #### `splitMute(target, zone [, enabled])`
 
 Mute a zone (pass false to unmute). Zone by name or index.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 splitMute("target", "zone")
@@ -412,6 +530,8 @@ splitMute("target", "zone")
 
 Route a zone to a MIDI channel.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 splitChannel("target", "zone", channel)
 ```
@@ -420,6 +540,8 @@ splitChannel("target", "zone", channel)
 
 Transpose a zone in semitones.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 splitTranspose("target", "zone", semitones)
 ```
@@ -427,6 +549,8 @@ splitTranspose("target", "zone", semitones)
 #### `splitPoint(target, zone, note)`
 
 Move a zone boundary to a MIDI note.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 splitPoint("target", "zone", note)
@@ -440,6 +564,8 @@ Drive the [Phrase Sequencer](../CE/web/src/CE_Application/docs/phrase-sequencer.
 
 Swap the pattern to a named seed (e.g. "arpUp"). An unknown seed is a no-op.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 phraseSeed("target", "seed")
 ```
@@ -447,6 +573,8 @@ phraseSeed("target", "seed")
 #### `phraseClear(target)`
 
 Clear the pattern grid.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 phraseClear("target")
@@ -456,6 +584,8 @@ phraseClear("target")
 
 Move the phrase to a new key (0 = C … 11 = B) — the pattern itself is untouched.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 phraseKey("target", key)
 ```
@@ -463,6 +593,8 @@ phraseKey("target", key)
 #### `phraseScale(target, scale)`
 
 Re-harmonise to a named scale (e.g. "dorian").
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 phraseScale("target", "scale")
@@ -472,6 +604,8 @@ phraseScale("target", "scale")
 
 Transpose playback in semitones.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 phraseTranspose("target", semitones)
 ```
@@ -479,6 +613,8 @@ phraseTranspose("target", semitones)
 #### `phraseDirection(target, direction)`
 
 Set playback direction: "forward", "reverse", "pingpong", or "random".
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 phraseDirection("target", "forward")
@@ -488,6 +624,8 @@ phraseDirection("target", "forward")
 
 Start the sequencer (false stops it).
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 phraseRun("target", true)
 ```
@@ -495,6 +633,8 @@ phraseRun("target", true)
 #### `phraseCell(target, step, row, on)`
 
 Turn one grid cell on/off (step column, scale-degree row). Out-of-grid cells are a no-op.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 phraseCell("target", step, row, true)
@@ -508,6 +648,8 @@ Drive the [Phrase Recorder](../CE/web/src/CE_Application/docs/phrase-recorder.md
 
 Arm/stop recording. No argument toggles (what a footswitch wants); true/false is idempotent (safe for a MIDI-mapped switch that fires twice).
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 recorderRecord("target")
 ```
@@ -515,6 +657,8 @@ recorderRecord("target")
 #### `recorderStop(target)`
 
 Stop recording/arming (back to idle).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 recorderStop("target")
@@ -524,6 +668,8 @@ recorderStop("target")
 
 Toggle loop playback; false mutes the loop without losing it.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 recorderPlay("target", true)
 ```
@@ -531,6 +677,8 @@ recorderPlay("target", true)
 #### `recorderClear(target)`
 
 Throw the take away.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 recorderClear("target")
@@ -540,6 +688,8 @@ recorderClear("target")
 
 Drop the last overdub pass.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 recorderUndo("target")
 ```
@@ -547,6 +697,8 @@ recorderUndo("target")
 #### `recorderQuantize(target, grid [, strength, scale, key])`
 
 Quantize the take to a grid (1–64), by strength 0–1; give scale + key to also pull notes into key.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 recorderQuantize("target", 16, 1)
@@ -556,6 +708,8 @@ recorderQuantize("target", 16, 1)
 
 Transpose playback only (−48…+48) — the recorded take is untouched. To rewrite the take, use recorderShift.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 recorderTranspose("target", semitones)
 ```
@@ -563,6 +717,8 @@ recorderTranspose("target", semitones)
 #### `recorderBars(target, bars)`
 
 Set the loop length in bars.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 recorderBars("target", bars)
@@ -572,6 +728,8 @@ recorderBars("target", bars)
 
 What gets recorded: "input", "panel", or "both".
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 recorderSource("target", "panel")
 ```
@@ -579,6 +737,8 @@ recorderSource("target", "panel")
 #### `recorderNudge(target, by)`
 
 Shift the whole take in time by a fraction of the loop — the fix for a consistently-late take.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 recorderNudge("target", by)
@@ -588,6 +748,8 @@ recorderNudge("target", by)
 
 Rewrite the recorded take, transposed — unlike recorderTranspose, this changes the notes themselves.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 recorderShift("target", semitones)
 ```
@@ -595,6 +757,8 @@ recorderShift("target", semitones)
 #### `recorderStore(target, slot [, name])`
 
 Save the take into a slot (1-based), optionally named.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 recorderStore("target", slot)
@@ -604,6 +768,8 @@ recorderStore("target", slot)
 
 Load a stored take from a slot (1-based).
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 recorderLoad("target", slot)
 ```
@@ -611,6 +777,8 @@ recorderLoad("target", slot)
 #### `recorderCountIn(target, bars)`
 
 Set the count-in length (0–4 bars).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 recorderCountIn("target", bars)
@@ -624,6 +792,8 @@ Drive the [Harmoniser](../CE/web/src/CE_Application/docs/harmoniser.md) — one 
 
 "diatonic" (build chords in key) or "memory" (replay captured shapes).
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 harmonyMode("target", "diatonic")
 ```
@@ -631,6 +801,8 @@ harmonyMode("target", "diatonic")
 #### `harmonyKey(target, key)`
 
 Re-key it mid-song (0 = C … 11 = B; wraps around).
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 harmonyKey("target", key)
@@ -640,6 +812,8 @@ harmonyKey("target", key)
 
 Set the scale (e.g. "major", "minor", "dorian").
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 harmonyScale("target", "scale")
 ```
@@ -648,6 +822,8 @@ harmonyScale("target", "scale")
 
 Chord size — 2 to 6 voices.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 harmonySize("target", size)
 ```
@@ -655,6 +831,8 @@ harmonySize("target", size)
 #### `harmonyShape(target, shape)`
 
 A preset name or an explicit interval list. An unknown preset is a no-op, never a silent default.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 -- Lua
@@ -669,6 +847,8 @@ harmonyShape("target", [0, 4, 7])
 
 "close", "open", or "drop2".
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 harmonyVoicing("target", "close")
 ```
@@ -676,6 +856,8 @@ harmonyVoicing("target", "close")
 #### `harmonyInversion(target, inversion)`
 
 Chord inversion.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 harmonyInversion("target", inversion)
@@ -685,6 +867,8 @@ harmonyInversion("target", inversion)
 
 Octave offset for the generated chord.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 harmonyOctave("target", octave)
 ```
@@ -692,6 +876,8 @@ harmonyOctave("target", octave)
 #### `harmonyOutOfKey(target, mode)`
 
 Notes outside the key: "pass", "nearest", or "mute".
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 harmonyOutOfKey("target", "nearest")
@@ -701,6 +887,8 @@ harmonyOutOfKey("target", "nearest")
 
 Keep the played note in the chord (toggles without an argument).
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 harmonyKeepPlayed("target", true)
 ```
@@ -708,6 +896,8 @@ harmonyKeepPlayed("target", true)
 #### `harmonyChannel(target, channel)`
 
 MIDI channel for the generated notes.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 harmonyChannel("target", channel)
@@ -717,6 +907,8 @@ harmonyChannel("target", channel)
 
 How consecutive chords connect: "off", "closest", or "smooth".
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 harmonyVoiceLeading("target", "smooth")
 ```
@@ -725,6 +917,8 @@ harmonyVoiceLeading("target", "smooth")
 
 Strum spread in milliseconds (0–400).
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 harmonyStrum("target", ms)
 ```
@@ -732,6 +926,8 @@ harmonyStrum("target", ms)
 #### `harmonyDegree(target, degree, chord)`
 
 Override one scale degree's chord with an interval list; nil/null restores stacked thirds.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 -- Lua
@@ -750,6 +946,8 @@ Drive the [Setlist](../CE/web/src/CE_Application/docs/setlist.md) — scenes on 
 
 Step to the next enabled scene — same event downstream as a footswitch step.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 setlistNext("target")
 ```
@@ -757,6 +955,8 @@ setlistNext("target")
 #### `setlistPrev(target)`
 
 Step back to the previous enabled scene.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 setlistPrev("target")
@@ -766,6 +966,8 @@ setlistPrev("target")
 
 Jump to a scene — 1-based index or scene name (a name survives a reorder).
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 setlistGoto("target", scene)
 ```
@@ -773,6 +975,8 @@ setlistGoto("target", scene)
 #### `setlistEnable(target, scene [, enabled])`
 
 Include a scene, or skip it with false ("skip one tonight").
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 setlistEnable("target", scene, false)
@@ -782,6 +986,8 @@ setlistEnable("target", scene, false)
 
 Wrap from the last scene back to the first.
 
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
+
 ```lua
 setlistWrap("target", true)
 ```
@@ -789,6 +995,8 @@ setlistWrap("target", true)
 #### `setlistCrossfade(target, ms)`
 
 Crossfade time between scenes, in milliseconds.
+
+*Availability: preview ✅ · export ✅ — Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.*
 
 ```lua
 setlistCrossfade("target", ms)

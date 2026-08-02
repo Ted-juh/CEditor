@@ -107,6 +107,29 @@ export const RUNNABLE_LANGUAGES = ['lua', 'javascript', 'typescript', 'python', 
 
 export const SCRIPT_SCOPES = ['component', 'panel', 'device', 'project'];
 
+/* -------------------------------------------------------------- availability */
+// Where a member actually runs TODAY. Absent = available everywhere (editor preview and the
+// exported plugin). Shape: { preview, export, note } — preview = the editor's live preview
+// (JS runtime), export = the exported standalone/VST3. Keep in sync with
+// docs/scripting-runtime-gaps.md as gaps close.
+
+const EXPORT_ONLY_PENDING_PREVIEW = {
+  preview: false, export: true,
+  note: 'Wired in the exported plugin; editor-preview dispatch is pending.',
+};
+const NOT_WIRED_YET = {
+  preview: false, export: false,
+  note: 'Planned — not dispatched anywhere yet.',
+};
+const TIMERS_EXPORT_ONLY = {
+  preview: false, export: true,
+  note: 'Runs in the exported plugin (TimerManager); editor-preview timers are pending.',
+};
+const PANEL_UI_RUNTIME = {
+  preview: true, export: true,
+  note: 'Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.',
+};
+
 export const SELF = {
   id: 'self',
   label: 'self',
@@ -156,6 +179,7 @@ export const LIFECYCLE_HOOKS = [
     id: 'onDawSaveState', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onDawSaveState(store)',
     summary: 'The DAW is saving the project — write values into `store`.',
+    availability: { preview: false, export: true, note: 'Fires only when a DAW hosts the exported plugin.' },
     params: [{ name: 'store', type: 'object' }],
     snippet: { lua: 'function onDawSaveState(store)\n  $0\nend', javascript: 'function onDawSaveState(store) {\n  $0\n}' },
   },
@@ -163,6 +187,7 @@ export const LIFECYCLE_HOOKS = [
     id: 'onDawRestoreState', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onDawRestoreState(store)',
     summary: 'The DAW reopened the project — read values back from `store`.',
+    availability: { preview: false, export: true, note: 'Fires only when a DAW hosts the exported plugin.' },
     params: [{ name: 'store', type: 'object' }],
     snippet: { lua: 'function onDawRestoreState(store)\n  $0\nend', javascript: 'function onDawRestoreState(store) {\n  $0\n}' },
   },
@@ -184,25 +209,25 @@ export const CONTROL_EVENTS = [
   { id: 'hoverStart', fn: 'onHoverStart', payload: null, summary: 'Mouse entered the control.' },
   { id: 'hoverEnd', fn: 'onHoverEnd', payload: null, summary: 'Mouse left the control.' },
   { id: 'wheel', fn: 'onWheel', payload: 'wheel', summary: 'Scrolled over the control. wheel.delta.' },
-  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'State swapped (hover/pressed/disabled).' },
+  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'State swapped (hover/pressed/disabled).', availability: NOT_WIRED_YET },
 ];
 
 export const PANEL_EVENTS = [
-  { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', summary: 'Any control changed. info.target, info.value.' },
-  { id: 'panelStateChanged', fn: 'onPanelStateChanged', payload: 'state', summary: 'Panel state switched.' },
-  { id: 'timer', fn: 'onTimer', payload: 'info', summary: 'A started timer fired. info.id.' },
+  { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', summary: 'Any control changed. info.target, info.value.', availability: NOT_WIRED_YET },
+  { id: 'panelStateChanged', fn: 'onPanelStateChanged', payload: 'state', summary: 'Panel state switched.', availability: NOT_WIRED_YET },
+  { id: 'timer', fn: 'onTimer', payload: 'info', summary: 'A started timer fired. info.id.', availability: TIMERS_EXPORT_ONLY },
 ];
 
 export const DEVICE_EVENTS = [
   // decoded (the DPD payoff — 90% of use)
-  { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', decoded: true, summary: 'A value arrived, decoded via the DPD. info.parameter, info.value.' },
+  { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', decoded: true, summary: 'A value arrived, decoded via the DPD. info.parameter, info.value.', availability: EXPORT_ONLY_PENDING_PREVIEW },
   { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', decoded: true, summary: 'A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.' },
   // raw (escape hatch)
-  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.' },
-  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value.' },
-  { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'Raw SysEx arrived.' },
-  { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A device connected.' },
-  { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A device disconnected.' },
+  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.', availability: EXPORT_ONLY_PENDING_PREVIEW },
+  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value.', availability: EXPORT_ONLY_PENDING_PREVIEW },
+  { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'Raw SysEx arrived.', availability: EXPORT_ONLY_PENDING_PREVIEW },
+  { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A device connected.', availability: NOT_WIRED_YET },
+  { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A device disconnected.', availability: NOT_WIRED_YET },
 ];
 
 export const EVENTS = { control: CONTROL_EVENTS, panel: PANEL_EVENTS, device: DEVICE_EVENTS };
@@ -235,6 +260,7 @@ export const COMMANDS = [
   {
     id: 'noTransmit', category: 'Transmit', signature: 'noTransmit(fn)',
     summary: 'Run a block writing to the panel WITHOUT sending to the synth (e.g. an Init-Patch button). Auto-resets at block end.',
+    availability: { preview: true, export: true, note: 'The block always runs; transmit gating is enforced by the exported (C++) runtime — the editor preview does not gate.' },
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
     snippet: { lua: 'noTransmit(function()\n  $0\nend)', javascript: 'noTransmit(() => {\n  $0\n})' },
@@ -242,6 +268,7 @@ export const COMMANDS = [
   {
     id: 'transmit', category: 'Transmit', signature: 'transmit(fn)',
     summary: 'Force a block to send to the synth, even inside an inbound handler.',
+    availability: { preview: true, export: true, note: 'The block always runs; transmit gating is enforced by the exported (C++) runtime — the editor preview does not gate.' },
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
     snippet: { lua: 'transmit(function()\n  $0\nend)', javascript: 'transmit(() => {\n  $0\n})' },
@@ -251,6 +278,7 @@ export const COMMANDS = [
   {
     id: 'on', category: 'Events & Flow', signature: 'on(target, event, fn)',
     summary: 'React to an event on another control / the panel / the device, or to a custom emitted event.',
+    availability: { preview: false, export: true, note: 'Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.' },
     params: [
       { name: 'target', type: 'targetRef', required: true },
       { name: 'event', type: 'eventName', required: true },
@@ -265,6 +293,7 @@ export const COMMANDS = [
   {
     id: 'emit', category: 'Events & Flow', signature: 'emit(name [, data])',
     summary: 'Announce a custom event; any script listening with on(name, …) reacts. Fire-and-forget, language-neutral.',
+    availability: { preview: false, export: true, note: 'Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.' },
     params: [
       { name: 'name', type: 'string', required: true },
       { name: 'data', type: 'value', required: false },
@@ -275,6 +304,7 @@ export const COMMANDS = [
   {
     id: 'run', category: 'Events & Flow', signature: 'run(target.action [, args])',
     summary: 'Run a named action elsewhere. Host-dispatched — works cross-language. Supports a return value. Only simple data crosses the boundary.',
+    availability: { preview: false, export: true, note: 'Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.' },
     params: [
       { name: 'action', type: 'scriptRef', required: true },
       { name: 'args', type: 'value', required: false },
@@ -308,6 +338,7 @@ export const COMMANDS = [
   {
     id: 'buildDump', category: 'Device / MIDI', signature: 'buildDump(kind)',
     summary: 'Build the dump bytes from the panel values without sending.',
+    availability: { preview: false, export: true, note: 'Returns null in the editor preview — the panel→bytes codec lives in the device host.' },
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
     scopes: ['device', 'panel', 'project'],
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
@@ -359,6 +390,7 @@ export const COMMANDS = [
   {
     id: 'startTimer', category: 'Timers', signature: 'startTimer(id, ms)',
     summary: 'Start (or restart) a named repeating timer; onTimer fires with info.id every ms until stopTimer(id).',
+    availability: TIMERS_EXPORT_ONLY,
     params: [
       { name: 'id', type: 'string', required: true },
       { name: 'ms', type: 'number', required: true },
@@ -369,6 +401,7 @@ export const COMMANDS = [
   {
     id: 'stopTimer', category: 'Timers', signature: 'stopTimer(id)',
     summary: 'Stop a named timer started with startTimer(id, ms).',
+    availability: TIMERS_EXPORT_ONLY,
     params: [{ name: 'id', type: 'string', required: true }],
     scopes: 'any',
     snippet: { lua: 'stopTimer("${1:id}")$0', javascript: 'stopTimer("${1:id}")$0' },
@@ -870,6 +903,13 @@ export const COMMANDS = [
   },
 ];
 
+// The component commands run in the shared JS panel runtime, everywhere it runs — tag the whole
+// block rather than repeating the note 47 times.
+const COMPONENT_CATEGORIES = new Set(['Zone Splitter', 'Phrase Sequencer', 'Phrase Recorder', 'Harmoniser', 'Setlist']);
+for (const c of COMMANDS) {
+  if (COMPONENT_CATEGORIES.has(c.category) && !c.availability) c.availability = PANEL_UI_RUNTIME;
+}
+
 /* ------------------------------------------------------------------- helpers */
 // Host-provided, identical in every language (Q10). We do NOT duplicate the language's
 // own math (min/max/abs/sin). Extensible — grow as DPD profiles surface new needs.
@@ -948,7 +988,9 @@ export function language(id) {
   return SCRIPT_LANGUAGES.find((l) => l.id === id) ?? SCRIPT_LANGUAGES[0];
 }
 
-/** The snippet to insert for a member in a given language; falls back to the signature. */
+/** The snippet to insert for a member in a given language; falls back to the signature.
+ *  TypeScript call syntax is identical to JavaScript, so it shares the JS snippet. */
 export function insertSnippet(member, languageId) {
-  return member?.snippet?.[languageId] ?? member?.signature ?? member?.id ?? '';
+  const id = languageId === 'typescript' ? 'javascript' : languageId;
+  return member?.snippet?.[id] ?? member?.snippet?.[languageId] ?? member?.signature ?? member?.id ?? '';
 }
