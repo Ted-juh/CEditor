@@ -4,12 +4,13 @@
 
 | # | Document | What it is |
 |---|---|---|
-| 1 | [Scripting manual](scripting-manual.md) | **The user-facing API reference.** Generated from `panelApi.js` (`npm run docs:manual` in `CE/web`) — never edit it by hand. |
-| 2 | [Scripting cookbook](scripting-cookbook.md) | Task-based recipes: link controls, fill the panel from a dump, blink an LED on a timer… |
-| 3 | [Panel API spec](../tools/docs/panel-api-spec.md) | The design decisions (Q1–Q11) behind the API — the contract and its *why*. |
-| 4 | [Scripting redesign plan](../tools/docs/scripting-redesign-plan.md) | Why scripting works this way: lifecycle spine, scope layers, the many-real-languages model, Model 2 runtime. |
-| 5 | [Language options & shippable export](scripting-language-options-and-shippable-export.md) | Per-language toolchains, installer options, exporting from an installed app. |
-| — | [Scripting architecture plan](../tools/docs/scripting-architecture-plan.md) | ⚠️ **Historical.** The retired command-graph model; superseded by 3 and 4. |
+| 1 | [Getting started](scripting-getting-started.md) | Your first script: the Behavior Designer, the picker, live preview, Test / Trace. |
+| 2 | [Scripting manual](scripting-manual.md) | **The user-facing API reference.** Generated from `panelApi.js` (`npm run docs:manual` in `CE/web`) — never edit it by hand; a test fails when it's stale. |
+| 3 | [Scripting cookbook](scripting-cookbook.md) | Task-based recipes: link controls, fill the panel from a dump, blink an LED on a timer… |
+| 4 | [Panel API spec](../tools/docs/panel-api-spec.md) | The design decisions (Q1–Q11) behind the API — the contract and its *why*. |
+| 5 | [Scripting redesign plan](../tools/docs/scripting-redesign-plan.md) | Why scripting works this way: lifecycle spine, scope layers, the many-real-languages model, Model 2 runtime. |
+| 6 | [Language options & shippable export](scripting-language-options-and-shippable-export.md) | Per-language toolchains, installer options, exporting from an installed app. |
+| — | [Scripting architecture plan](../tools/docs/scripting-architecture-plan.md) | ⚠️ **Historical.** The retired command-graph model; superseded by 4 and 5. |
 
 Working notes: [runtime gaps](../CE/web/src/CE_Application/docs/scripting-runtime-gaps.md) (what the
 API advertises vs what the C++ runtime backs), [timer system](../CE/web/src/CE_Application/docs/timer-system.md),

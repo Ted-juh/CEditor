@@ -120,3 +120,12 @@ Follow-up (same branch): the three recommendations were then implemented too —
 `docs/scripting-manual.md` generated from `panelApi.js` by
 `CE/web/scripts/generate-scripting-manual.mjs` (`npm run docs:manual`),
 `docs/scripting-cookbook.md`, and the reading-order index in `docs/README.md`.
+
+Second follow-up (same branch): the component command families were registered in
+`panelApi.js` (47 commands the picker/validation/manual never showed); the manual gained
+all-language examples (from the validated export corpus), preview-vs-export availability
+badges, structured payload fields, a conventions table, a failure-modes section, the C++/C#/
+Java subset definition, and a freshness test; plus `docs/scripting-getting-started.md`.
+The audit also found `run`/`emit`/`on`(custom) and `buildDump` are no-op stubs in BOTH
+runtimes (logged in scripting-runtime-gaps.md), and the preview's `onDumpReceived` payload
+diverges from the contract (also logged).

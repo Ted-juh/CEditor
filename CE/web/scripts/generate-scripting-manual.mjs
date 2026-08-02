@@ -3,6 +3,7 @@
 // panelApi.js is the single source of truth for the panel API (it already drives the
 // picker, validation, and the host bindings); this script projects the same data into
 // one readable markdown page, so the manual can never drift from what the editor shows.
+// The freshness test (test/scriptingManual.test.js) fails when the committed page is stale.
 //
 // Output: docs/scripting-manual.md (repo root). Regenerate: `npm run docs:manual`.
 
@@ -18,7 +19,7 @@ import {
 // behind `npm run test:script-exports`), so the cross-language section can never drift.
 import { SOURCES, CTX_LANGUAGES } from './script-export-corpus.mjs';
 
-const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../docs/scripting-manual.md');
+export const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../docs/scripting-manual.md');
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -54,6 +55,12 @@ function availabilityCell(e) {
   return `preview ${mark(a.preview)} · export ${mark(a.export)}${a.note ? ` — ${a.note}` : ''}`;
 }
 
+function payloadCell(e) {
+  if (!e.payload) return '—';
+  const fields = e.fields?.length ? ` (${e.fields.map((f) => `\`.${f}\``).join(' ')})` : '';
+  return `\`${e.payload}\`${fields}`;
+}
+
 function codeBlocks(member) {
   const lua = displaySnippet(member.snippet?.lua);
   const js = displaySnippet(member.snippet?.javascript);
@@ -69,8 +76,7 @@ function memberSection(member) {
 function eventTable(events) {
   const withWhere = events.some((e) => e.availability);
   const rows = events.map((e) => {
-    const payload = e.payload ? `\`${e.payload}\`` : '—';
-    const base = `| \`"${e.id}"\` | \`${e.fn}(${e.payload ?? ''})\` | ${payload} | ${e.summary} |`;
+    const base = `| \`"${e.id}"\` | \`${e.fn}(${e.payload ?? ''})\` | ${payloadCell(e)} | ${e.summary} |`;
     return withWhere ? `${base} ${availabilityCell(e)} |` : base;
   });
   const head = withWhere
@@ -86,61 +92,62 @@ function helperTable(helpers) {
 
 /* ------------------------------------------------------------------ sections */
 
-const languages = [
-  '| Language | Version | Runs live in the editor | Runtime |',
-  '|---|---|---|---|',
-  ...SCRIPT_LANGUAGES.map((l) => {
-    const live = l.live ? (l.subset ? '✅ (interpreted subset)' : '✅') : '⬜ preview via WebView only';
-    return `| **${l.label}**${TIER1_LANGUAGES.includes(l.id) ? ' (Tier 1)' : ''} | ${l.version} | ${live} | ${l.host} |`;
-  }),
-].join('\n');
+export function generateManual() {
+  const languages = [
+    '| Language | Version | Runs live in the editor | Runtime |',
+    '|---|---|---|---|',
+    ...SCRIPT_LANGUAGES.map((l) => {
+      const live = l.live ? (l.subset ? '✅ (interpreted subset)' : '✅') : '⬜ preview via WebView only';
+      return `| **${l.label}**${TIER1_LANGUAGES.includes(l.id) ? ' (Tier 1)' : ''} | ${l.version} | ${live} | ${l.host} |`;
+    }),
+  ].join('\n');
 
-// "The same script in every language" — straight from the validated corpus fixture.
-const FENCE_TAGS = { lua: 'lua', javascript: 'js', typescript: 'ts', python: 'python', cpp: 'cpp', csharp: 'csharp', java: 'java' };
-const crossLanguage = SCRIPT_LANGUAGES
-  .filter((l) => SOURCES[l.id])
-  .map((l) => {
-    const ctx = CTX_LANGUAGES.includes(l.id) ? ' *(ctx-based)*' : '';
-    return `**${l.label}**${ctx}\n\n\`\`\`${FENCE_TAGS[l.id] ?? ''}\n${SOURCES[l.id].trimEnd()}\n\`\`\``;
-  })
-  .join('\n\n');
+  // "The same script in every language" — straight from the validated corpus fixture.
+  const FENCE_TAGS = { lua: 'lua', javascript: 'js', typescript: 'ts', python: 'python', cpp: 'cpp', csharp: 'csharp', java: 'java' };
+  const crossLanguage = SCRIPT_LANGUAGES
+    .filter((l) => SOURCES[l.id])
+    .map((l) => {
+      const ctx = CTX_LANGUAGES.includes(l.id) ? ' *(ctx-based)*' : '';
+      return `**${l.label}**${ctx}\n\n\`\`\`${FENCE_TAGS[l.id] ?? ''}\n${SOURCES[l.id].trimEnd()}\n\`\`\``;
+    })
+    .join('\n\n');
 
-const accessors = [
-  '| Accessor | What you get |',
-  '|---|---|',
-  ...VALUE_ACCESSORS.map((a) => `| \`${a.label}\` | ${a.summary} |`),
-].join('\n');
+  // One line of context for the component-command categories: what the component is,
+  // and where its full story lives. `target` semantics are shared by all of them.
+  const COMPONENT_DOCS = '../CE/web/src/CE_Application/docs';
+  const CATEGORY_NOTES = {
+    'Zone Splitter': `Drive the [Zone Splitter](${COMPONENT_DOCS}/zone-splitter.md) — keyboard zones with per-zone routing. \`target\` is the component's control name.`,
+    'Phrase Sequencer': `Drive the [Phrase Sequencer](${COMPONENT_DOCS}/phrase-sequencer.md) — a step grid whose rows are scale degrees. \`target\` is the component's control name.`,
+    'Phrase Recorder': `Drive the [Phrase Recorder](${COMPONENT_DOCS}/phrase-recorder.md) — the note looper. \`target\` is the component's control name.`,
+    'Harmoniser': `Drive the [Harmoniser](${COMPONENT_DOCS}/harmoniser.md) — one finger in, a full chord out. \`target\` is the component's control name.`,
+    'Setlist': `Drive the [Setlist](${COMPONENT_DOCS}/setlist.md) — scenes on a footswitch. \`target\` is the component's control name.`,
+  };
 
-// One line of context for the component-command categories: what the component is,
-// and where its full story lives. `target` semantics are shared by all of them.
-const COMPONENT_DOCS = '../CE/web/src/CE_Application/docs';
-const CATEGORY_NOTES = {
-  'Zone Splitter': `Drive the [Zone Splitter](${COMPONENT_DOCS}/zone-splitter.md) — keyboard zones with per-zone routing. \`target\` is the component's control name.`,
-  'Phrase Sequencer': `Drive the [Phrase Sequencer](${COMPONENT_DOCS}/phrase-sequencer.md) — a step grid whose rows are scale degrees. \`target\` is the component's control name.`,
-  'Phrase Recorder': `Drive the [Phrase Recorder](${COMPONENT_DOCS}/phrase-recorder.md) — the note looper. \`target\` is the component's control name.`,
-  'Harmoniser': `Drive the [Harmoniser](${COMPONENT_DOCS}/harmoniser.md) — one finger in, a full chord out. \`target\` is the component's control name.`,
-  'Setlist': `Drive the [Setlist](${COMPONENT_DOCS}/setlist.md) — scenes on a footswitch. \`target\` is the component's control name.`,
-};
+  const commandsByCategory = new Map();
+  for (const c of COMMANDS) {
+    if (!commandsByCategory.has(c.category)) commandsByCategory.set(c.category, []);
+    commandsByCategory.get(c.category).push(c);
+  }
 
-const commandsByCategory = new Map();
-for (const c of COMMANDS) {
-  if (!commandsByCategory.has(c.category)) commandsByCategory.set(c.category, []);
-  commandsByCategory.get(c.category).push(c);
-}
+  const helpersByCategory = new Map();
+  for (const h of HELPERS) {
+    if (!helpersByCategory.has(h.category)) helpersByCategory.set(h.category, []);
+    helpersByCategory.get(h.category).push(h);
+  }
 
-const helpersByCategory = new Map();
-for (const h of HELPERS) {
-  if (!helpersByCategory.has(h.category)) helpersByCategory.set(h.category, []);
-  helpersByCategory.get(h.category).push(h);
-}
+  const accessors = [
+    '| Accessor | What you get |',
+    '|---|---|',
+    ...VALUE_ACCESSORS.map((a) => `| \`${a.label}\` | ${a.summary} |`),
+  ].join('\n');
 
-const md = `# CEditor Scripting Manual
+  return `# CEditor Scripting Manual
 
 > **Generated file — do not edit by hand.**
 > Source of truth: \`CE/web/src/CE_Application/scripting/panelApi.js\` (the same data that drives
 > the editor's picker and validation). Regenerate with \`npm run docs:manual\` in \`CE/web\`.
-> New to scripting here? Start with the [cookbook](scripting-cookbook.md); design background and
-> reading order are in the [docs index](README.md).
+> First script? Start with [getting started](scripting-getting-started.md), then the
+> [cookbook](scripting-cookbook.md); reading order for everything is in the [docs index](README.md).
 
 A script is **an action plus the moment it runs** — a lifecycle hook, or an event handler that
 reacts while the panel is in use. Every language calls the same panel API described below; a
@@ -177,11 +184,45 @@ ${crossLanguage}
 The reference sections below show Lua and JavaScript. Python and TypeScript make the same
 global calls with their own function syntax; C++/C#/Java prefix them with \`ctx.\` as above.
 
+### What the C++ / C# / Java preview subset covers
+
+True C++/C#/Java is compiled into the plugin at export. In the editor these languages run
+through the CeScript interpreter — a large practical subset, so handlers move real controls
+live without a compiler. It covers functions and lambdas, structs with methods, enums,
+control flow (\`if\`/\`for\`/\`while\`/\`switch\`, range-for), the common \`std::\` containers
+(\`vector\`/\`array\`/\`map\`/\`string\`) with their everyday methods, \`<algorithm>\`/\`<numeric>\`
+over iterators, \`try\`/\`catch\`, casts, and \`printf\`/\`std::cout\` (to the script console).
+It does **not** run templates you define yourself, classes (use structs), pointer arithmetic,
+\`goto\`, or arbitrary third-party headers — those raise a clear error instead of mis-running,
+and all numbers are doubles (integer division is not truncated). The definitive list lives at
+the top of \`CE/web/src/CE_Application/scripting/cppPreview.js\` (C# and Java mirror it); the
+export-side design is \`CE/src/Scripting/native-handlers-design.md\`.
+
+## Conventions
+
+The numbers the API expects, everywhere:
+
+| What | Range / form |
+|---|---|
+| MIDI channel | **1–16** (the runtime converts to wire format) |
+| CC number / 7-bit value | 0–127 |
+| NRPN value | 0–16383 (14-bit) |
+| Note number | 0–127, middle C = **C4 = 60** |
+| \`normalizedValue\` | 0–1 |
+| Colours | \`"#rrggbb"\` strings |
+| Times | milliseconds |
+| Scale degrees / keys | key: 0 = C … 11 = B; degrees are 1-based |
+| Slots / scenes | 1-based (or by name where the signature says so) |
+
 ## Addressing: paths and values
 
 Everything on the panel is reachable by a **dot-path** rooted on a control's name:
 \`"cutoff.value"\`, \`"button2.background.fill.colour"\`. Read and write them with \`get\`/\`set\`
 (below). Renaming a control automatically updates its name in every script.
+
+*(The API spec also defines handle and dot-object conveniences — \`panel.get("cutoff")\`,
+\`panel.cutoff.value\` — as planned sugar over the same operation; today \`get\`/\`set\` are the
+surface.)*
 
 A control's value has three faces — suffix the path with the one you need. (**DPD** = the
 Device Profile Designer: the device map that knows each parameter's bytes, ranges, and enums,
@@ -207,7 +248,7 @@ Two ways to subscribe:
 
 Payloads are passed directly with a descriptive name — one obvious datum comes as itself
 (\`onValueChanged(value)\`), several fields come as one named object (\`onClick(mouse)\` →
-\`mouse.x\`).
+\`mouse.x\`). The Payload column lists each object's fields.
 
 ### Control events
 
@@ -233,19 +274,38 @@ domain-consistent — plain math (\`min\`/\`max\`/\`abs\`/\`sin\`) stays with th
 
 ${[...helpersByCategory.entries()].map(([category, items]) => `### ${category}\n\n${helperTable(items)}`).join('\n\n')}
 
-## Errors & safety
+## When things go wrong
 
-A broken script never crashes the panel: runtime errors stop that handler only, are reported in
-the editor's script console (and a log file in an exported plugin), and everything else keeps
-running. Loop, depth, and MIDI-flood guards plus an infinite-loop watchdog run invisibly in the
-background. Scripts see only this API — no filesystem, network, or OS access.
+The design rule (spec Q11): **a broken script never crashes the panel.** What that means in
+practice:
+
+- **A handler throws** → that handler stops; every other handler and the panel keep running.
+  The error is printed in the editor's script console (script name + message) and, in an
+  exported plugin, written to the log file. Never silent, never a dialog.
+- **\`set()\` on an unknown control** → an error line in the script console
+  (\`set: control "…" not found on the active panel\`); the script continues.
+- **\`get()\` on an unknown control or path** → returns nothing (\`nil\`/\`undefined\`/\`None\`) —
+  guard before doing math with it.
+- **A component command aimed at the wrong component** (e.g. \`phraseSeed\` on a knob) → an
+  error line naming what was expected; nothing changes.
+- **A valid command with an unknown argument** (an unknown seed name, an out-of-grid cell, an
+  unknown preset) → a deliberate no-op, with a console line so it never looks like a dead
+  footswitch.
+- **Runaway scripts** → loop, depth, and MIDI-flood guards plus an infinite-loop watchdog trip
+  invisibly and log when they do. Scripts see only this API — no filesystem, network, or OS.
 
 ## Further reading
 
+- [Getting started](scripting-getting-started.md) — your first script, step by step.
 - [Scripting cookbook](scripting-cookbook.md) — task-based recipes.
 - [Panel API spec](../tools/docs/panel-api-spec.md) — the design decisions behind this API.
 - [Docs index](README.md) — reading order for all scripting docs.
 `;
+}
 
-writeFileSync(OUT, md);
-console.log(`wrote ${OUT}`);
+/* --------------------------------------------------------------------- main */
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  writeFileSync(OUT, generateManual());
+  console.log(`wrote ${OUT}`);
+}

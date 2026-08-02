@@ -4,8 +4,10 @@ Task-based recipes for panel scripting. Every call here is from the
 [scripting manual](scripting-manual.md) — look a name up there for the full signature.
 Recipes are shown in Lua and JavaScript; the API is identical in every language.
 
-Some of the API is further along in the exported plugin than in the editor preview (timers and
-`emit`/`on`/`run`, notably) — the manual's availability badges say exactly which is which.
+Some of the API is further along in one runtime than the other — timers run only in the
+exported plugin for now, and the `emit`/`on`/`run` composition layer is designed but not wired
+anywhere yet. The manual's availability badges say exactly which is which, so treat recipes 6,
+7 and the timer recipe as "how it will look" until those badges turn green.
 
 A quick orientation: a script attached to a control reacts to **its own** events just by
 defining the named function (`onValueChanged`, `onClick`, …). To reach anything else — another

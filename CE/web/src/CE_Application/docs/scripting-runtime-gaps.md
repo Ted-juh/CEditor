@@ -29,6 +29,13 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
 `sendNRPN` / `sendSysex`, `requestDump` / `applyDump` / `sendDump` /
 `buildDump`, `runAction`, `emitEvent`, `log`.
 
+> ⚠️ **Interface ≠ implementation** (audit 2026-08-02): the Player's callbacks
+> for `runAction` and `emitEvent` are **no-op stubs** (`PluginProcessor.h`
+> ~583), and `buildDump` unconditionally returns an empty var — the interface
+> exists, but `run()`/`emit()`/`on(custom)` and `buildDump()` do nothing in the
+> exported plugin today (they are also stubbed in the editor preview). The
+> `availability` metadata in `panelApi.js` reflects this.
+
 ## Advertised in `panelApi.js` but NOT wired in C++
 
 ### Inbound events (no `dispatchEvent` for these)
@@ -81,3 +88,10 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
 
 ## Add findings below
 <!-- New gaps go here as they surface. -->
+
+- **`onDumpReceived` payload diverges between runtimes** (audit 2026-08-02):
+  the API contract (and `panelApi.js`) says `dump.bytes` / `dump.kind`, but the
+  editor preview dispatches `{ values, kind, role }` (`panelRuntime.js`
+  `onDumpParsed`). A script reading `dump.bytes` works only in the exported
+  plugin; one reading `dump.values` works only in preview. Unify on the
+  contract shape (or add both fields in both runtimes).

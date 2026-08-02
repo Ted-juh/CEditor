@@ -3,8 +3,8 @@
 > **Generated file — do not edit by hand.**
 > Source of truth: `CE/web/src/CE_Application/scripting/panelApi.js` (the same data that drives
 > the editor's picker and validation). Regenerate with `npm run docs:manual` in `CE/web`.
-> New to scripting here? Start with the [cookbook](scripting-cookbook.md); design background and
-> reading order are in the [docs index](README.md).
+> First script? Start with [getting started](scripting-getting-started.md), then the
+> [cookbook](scripting-cookbook.md); reading order for everything is in the [docs index](README.md).
 
 A script is **an action plus the moment it runs** — a lifecycle hook, or an event handler that
 reacts while the panel is in use. Every language calls the same panel API described below; a
@@ -116,11 +116,45 @@ void onValueChanged(CeContext ctx, CeEvent e) {
 The reference sections below show Lua and JavaScript. Python and TypeScript make the same
 global calls with their own function syntax; C++/C#/Java prefix them with `ctx.` as above.
 
+### What the C++ / C# / Java preview subset covers
+
+True C++/C#/Java is compiled into the plugin at export. In the editor these languages run
+through the CeScript interpreter — a large practical subset, so handlers move real controls
+live without a compiler. It covers functions and lambdas, structs with methods, enums,
+control flow (`if`/`for`/`while`/`switch`, range-for), the common `std::` containers
+(`vector`/`array`/`map`/`string`) with their everyday methods, `<algorithm>`/`<numeric>`
+over iterators, `try`/`catch`, casts, and `printf`/`std::cout` (to the script console).
+It does **not** run templates you define yourself, classes (use structs), pointer arithmetic,
+`goto`, or arbitrary third-party headers — those raise a clear error instead of mis-running,
+and all numbers are doubles (integer division is not truncated). The definitive list lives at
+the top of `CE/web/src/CE_Application/scripting/cppPreview.js` (C# and Java mirror it); the
+export-side design is `CE/src/Scripting/native-handlers-design.md`.
+
+## Conventions
+
+The numbers the API expects, everywhere:
+
+| What | Range / form |
+|---|---|
+| MIDI channel | **1–16** (the runtime converts to wire format) |
+| CC number / 7-bit value | 0–127 |
+| NRPN value | 0–16383 (14-bit) |
+| Note number | 0–127, middle C = **C4 = 60** |
+| `normalizedValue` | 0–1 |
+| Colours | `"#rrggbb"` strings |
+| Times | milliseconds |
+| Scale degrees / keys | key: 0 = C … 11 = B; degrees are 1-based |
+| Slots / scenes | 1-based (or by name where the signature says so) |
+
 ## Addressing: paths and values
 
 Everything on the panel is reachable by a **dot-path** rooted on a control's name:
 `"cutoff.value"`, `"button2.background.fill.colour"`. Read and write them with `get`/`set`
 (below). Renaming a control automatically updates its name in every script.
+
+*(The API spec also defines handle and dot-object conveniences — `panel.get("cutoff")`,
+`panel.cutoff.value` — as planned sugar over the same operation; today `get`/`set` are the
+surface.)*
 
 A control's value has three faces — suffix the path with the one you need. (**DPD** = the
 Device Profile Designer: the device map that knows each parameter's bytes, ranges, and enums,
@@ -242,7 +276,7 @@ Two ways to subscribe:
 
 Payloads are passed directly with a descriptive name — one obvious datum comes as itself
 (`onValueChanged(value)`), several fields come as one named object (`onClick(mouse)` →
-`mouse.x`).
+`mouse.x`). The Payload column lists each object's fields.
 
 ### Control events
 
@@ -250,32 +284,32 @@ Payloads are passed directly with a descriptive name — one obvious datum comes
 |---|---|---|---|---|
 | `"valueChange"` | `onValueChange(value)` | `value` | Live — fires continuously while the value is moving (for GUI/preview). | everywhere |
 | `"valueChanged"` | `onValueChanged(value)` | `value` | Settled — fires when the value reaches its final value (for transmit). | everywhere |
-| `"click"` | `onClick(mouse)` | `mouse` | Clicked. mouse.x, mouse.y. | everywhere |
-| `"doubleClick"` | `onDoubleClick(mouse)` | `mouse` | Double-clicked. | everywhere |
-| `"pointerDown"` | `onPointerDown(mouse)` | `mouse` | Mouse pressed. mouse.x/.y/.button/.modifiers. | everywhere |
-| `"pointerMove"` | `onPointerMove(mouse)` | `mouse` | Mouse moved while down. | everywhere |
-| `"pointerUp"` | `onPointerUp(mouse)` | `mouse` | Mouse released. | everywhere |
+| `"click"` | `onClick(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Clicked (fires on release). | everywhere |
+| `"doubleClick"` | `onDoubleClick(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Double-clicked. | everywhere |
+| `"pointerDown"` | `onPointerDown(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Mouse pressed. | everywhere |
+| `"pointerMove"` | `onPointerMove(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Mouse moved while down. | everywhere |
+| `"pointerUp"` | `onPointerUp(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Mouse released. | everywhere |
 | `"hoverStart"` | `onHoverStart()` | — | Mouse entered the control. | everywhere |
 | `"hoverEnd"` | `onHoverEnd()` | — | Mouse left the control. | everywhere |
-| `"wheel"` | `onWheel(wheel)` | `wheel` | Scrolled over the control. wheel.delta. | everywhere |
+| `"wheel"` | `onWheel(wheel)` | `wheel` (`.delta` `.deltaX` `.deltaY` `.x` `.y`) | Scrolled over the control. delta = +1 up / −1 down; deltaX/deltaY are the raw values. | everywhere |
 | `"stateChanged"` | `onStateChanged(state)` | `state` | State swapped (hover/pressed/disabled). | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
 
 ### Panel events
 
 | Event | Handler | Payload | Fires when | Where |
 |---|---|---|---|---|
-| `"controlChanged"` | `onControlChanged(info)` | `info` | Any control changed. info.target, info.value. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
+| `"controlChanged"` | `onControlChanged(info)` | `info` (`.target` `.value`) | Any control changed. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
 | `"panelStateChanged"` | `onPanelStateChanged(state)` | `state` | Panel state switched. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
-| `"timer"` | `onTimer(info)` | `info` | A started timer fired. info.id. | preview ⬜ · export ✅ — Runs in the exported plugin (TimerManager); editor-preview timers are pending. |
+| `"timer"` | `onTimer(info)` | `info` (`.id`) | A started timer fired. | preview ⬜ · export ✅ — Runs in the exported plugin (TimerManager); editor-preview timers are pending. |
 
 ### Device events
 
 | Event | Handler | Payload | Fires when | Where |
 |---|---|---|---|---|
-| `"parameterReceived"` | `onParameterReceived(info)` | `info` | A value arrived, decoded via the DPD. info.parameter, info.value. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
-| `"dumpReceived"` | `onDumpReceived(dump)` | `dump` | A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel. | everywhere |
-| `"midiIn"` | `onMidiIn(midi)` | `midi` | Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
-| `"ccIn"` | `onCcIn(cc)` | `cc` | A CC arrived. cc.channel, cc.cc, cc.value. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
+| `"parameterReceived"` | `onParameterReceived(info)` | `info` (`.parameter` `.value`) | A value arrived, decoded via the DPD. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
+| `"dumpReceived"` | `onDumpReceived(dump)` | `dump` (`.bytes` `.kind`) | A bulk dump arrived. Use applyDump(dump.bytes) to fill the panel. | everywhere |
+| `"midiIn"` | `onMidiIn(midi)` | `midi` (`.bytes` `.channel` `.status`) | Any MIDI arrived (raw). | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
+| `"ccIn"` | `onCcIn(cc)` | `cc` (`.channel` `.cc` `.value`) | A CC arrived. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
 | `"sysexIn"` | `onSysexIn(bytes)` | `bytes` | Raw SysEx arrived. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
 | `"deviceConnected"` | `onDeviceConnected(device)` | `device` | A device connected. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
 | `"deviceDisconnected"` | `onDeviceDisconnected(device)` | `device` | A device disconnected. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
@@ -346,7 +380,7 @@ transmit(() => {
 
 React to an event on another control / the panel / the device, or to a custom emitted event.
 
-*Availability: preview ⬜ · export ✅ — Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.*
+*Availability: preview ⬜ · export ⬜ — Designed (spec Q6) but not wired yet — stubbed in the preview and a no-op in the exported host.*
 
 ```lua
 -- Lua
@@ -365,7 +399,7 @@ on("target", "event", (e) => {
 
 Announce a custom event; any script listening with on(name, …) reacts. Fire-and-forget, language-neutral.
 
-*Availability: preview ⬜ · export ✅ — Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.*
+*Availability: preview ⬜ · export ⬜ — Designed (spec Q6) but not wired yet — stubbed in the preview and a no-op in the exported host.*
 
 ```lua
 emit("name", data)
@@ -373,9 +407,9 @@ emit("name", data)
 
 #### `run(target.action [, args])`
 
-Run a named action elsewhere. Host-dispatched — works cross-language. Supports a return value. Only simple data crosses the boundary.
+Run a named action elsewhere ("target.action" = the owning control/panel, then the action name). Host-dispatched — works cross-language. Supports a return value. Only simple data crosses the boundary.
 
-*Availability: preview ⬜ · export ✅ — Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.*
+*Availability: preview ⬜ · export ⬜ — Designed (spec Q6) but not wired yet — stubbed in the preview and a no-op in the exported host.*
 
 ```lua
 run("target.action")
@@ -419,7 +453,7 @@ Build the dump bytes from the panel values without sending.
 
 *Valid in device / panel / project scripts only.*
 
-*Availability: preview ⬜ · export ✅ — Returns null in the editor preview — the panel→bytes codec lives in the device host.*
+*Availability: preview ⬜ · export ⬜ — Planned — the panel→bytes codec is not yet exposed to scripts in either runtime; use sendDump to transmit.*
 
 ```lua
 -- Lua
@@ -1044,15 +1078,29 @@ domain-consistent — plain math (`min`/`max`/`abs`/`sin`) stays with the langua
 | `toSigned(v, bits)` | Value → two's-complement in N bits. |
 | `fromSigned(b, bits)` | Two's-complement in N bits → value. |
 
-## Errors & safety
+## When things go wrong
 
-A broken script never crashes the panel: runtime errors stop that handler only, are reported in
-the editor's script console (and a log file in an exported plugin), and everything else keeps
-running. Loop, depth, and MIDI-flood guards plus an infinite-loop watchdog run invisibly in the
-background. Scripts see only this API — no filesystem, network, or OS access.
+The design rule (spec Q11): **a broken script never crashes the panel.** What that means in
+practice:
+
+- **A handler throws** → that handler stops; every other handler and the panel keep running.
+  The error is printed in the editor's script console (script name + message) and, in an
+  exported plugin, written to the log file. Never silent, never a dialog.
+- **`set()` on an unknown control** → an error line in the script console
+  (`set: control "…" not found on the active panel`); the script continues.
+- **`get()` on an unknown control or path** → returns nothing (`nil`/`undefined`/`None`) —
+  guard before doing math with it.
+- **A component command aimed at the wrong component** (e.g. `phraseSeed` on a knob) → an
+  error line naming what was expected; nothing changes.
+- **A valid command with an unknown argument** (an unknown seed name, an out-of-grid cell, an
+  unknown preset) → a deliberate no-op, with a console line so it never looks like a dead
+  footswitch.
+- **Runaway scripts** → loop, depth, and MIDI-flood guards plus an infinite-loop watchdog trip
+  invisibly and log when they do. Scripts see only this API — no filesystem, network, or OS.
 
 ## Further reading
 
+- [Getting started](scripting-getting-started.md) — your first script, step by step.
 - [Scripting cookbook](scripting-cookbook.md) — task-based recipes.
 - [Panel API spec](../tools/docs/panel-api-spec.md) — the design decisions behind this API.
 - [Docs index](README.md) — reading order for all scripting docs.

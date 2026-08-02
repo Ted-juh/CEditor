@@ -121,6 +121,10 @@ const NOT_WIRED_YET = {
   preview: false, export: false,
   note: 'Planned — not dispatched anywhere yet.',
 };
+const FLOW_NOT_WIRED = {
+  preview: false, export: false,
+  note: 'Designed (spec Q6) but not wired yet — stubbed in the preview and a no-op in the exported host.',
+};
 const TIMERS_EXPORT_ONLY = {
   preview: false, export: true,
   note: 'Runs in the exported plugin (TimerManager); editor-preview timers are pending.',
@@ -201,30 +205,30 @@ export const LIFECYCLE_HOOKS = [
 export const CONTROL_EVENTS = [
   { id: 'valueChange', fn: 'onValueChange', payload: 'value', summary: 'Live — fires continuously while the value is moving (for GUI/preview).' },
   { id: 'valueChanged', fn: 'onValueChanged', payload: 'value', summary: 'Settled — fires when the value reaches its final value (for transmit).' },
-  { id: 'click', fn: 'onClick', payload: 'mouse', summary: 'Clicked. mouse.x, mouse.y.' },
-  { id: 'doubleClick', fn: 'onDoubleClick', payload: 'mouse', summary: 'Double-clicked.' },
-  { id: 'pointerDown', fn: 'onPointerDown', payload: 'mouse', summary: 'Mouse pressed. mouse.x/.y/.button/.modifiers.' },
-  { id: 'pointerMove', fn: 'onPointerMove', payload: 'mouse', summary: 'Mouse moved while down.' },
-  { id: 'pointerUp', fn: 'onPointerUp', payload: 'mouse', summary: 'Mouse released.' },
+  { id: 'click', fn: 'onClick', payload: 'mouse', fields: ['x', 'y', 'button', 'modifiers'], summary: 'Clicked (fires on release).' },
+  { id: 'doubleClick', fn: 'onDoubleClick', payload: 'mouse', fields: ['x', 'y', 'button', 'modifiers'], summary: 'Double-clicked.' },
+  { id: 'pointerDown', fn: 'onPointerDown', payload: 'mouse', fields: ['x', 'y', 'button', 'modifiers'], summary: 'Mouse pressed.' },
+  { id: 'pointerMove', fn: 'onPointerMove', payload: 'mouse', fields: ['x', 'y', 'button', 'modifiers'], summary: 'Mouse moved while down.' },
+  { id: 'pointerUp', fn: 'onPointerUp', payload: 'mouse', fields: ['x', 'y', 'button', 'modifiers'], summary: 'Mouse released.' },
   { id: 'hoverStart', fn: 'onHoverStart', payload: null, summary: 'Mouse entered the control.' },
   { id: 'hoverEnd', fn: 'onHoverEnd', payload: null, summary: 'Mouse left the control.' },
-  { id: 'wheel', fn: 'onWheel', payload: 'wheel', summary: 'Scrolled over the control. wheel.delta.' },
+  { id: 'wheel', fn: 'onWheel', payload: 'wheel', fields: ['delta', 'deltaX', 'deltaY', 'x', 'y'], summary: 'Scrolled over the control. delta = +1 up / −1 down; deltaX/deltaY are the raw values.' },
   { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'State swapped (hover/pressed/disabled).', availability: NOT_WIRED_YET },
 ];
 
 export const PANEL_EVENTS = [
-  { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', summary: 'Any control changed. info.target, info.value.', availability: NOT_WIRED_YET },
+  { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', fields: ['target', 'value'], summary: 'Any control changed.', availability: NOT_WIRED_YET },
   { id: 'panelStateChanged', fn: 'onPanelStateChanged', payload: 'state', summary: 'Panel state switched.', availability: NOT_WIRED_YET },
-  { id: 'timer', fn: 'onTimer', payload: 'info', summary: 'A started timer fired. info.id.', availability: TIMERS_EXPORT_ONLY },
+  { id: 'timer', fn: 'onTimer', payload: 'info', fields: ['id'], summary: 'A started timer fired.', availability: TIMERS_EXPORT_ONLY },
 ];
 
 export const DEVICE_EVENTS = [
   // decoded (the DPD payoff — 90% of use)
-  { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', decoded: true, summary: 'A value arrived, decoded via the DPD. info.parameter, info.value.', availability: EXPORT_ONLY_PENDING_PREVIEW },
-  { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', decoded: true, summary: 'A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.' },
+  { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', fields: ['parameter', 'value'], decoded: true, summary: 'A value arrived, decoded via the DPD.', availability: EXPORT_ONLY_PENDING_PREVIEW },
+  { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', fields: ['bytes', 'kind'], decoded: true, summary: 'A bulk dump arrived. Use applyDump(dump.bytes) to fill the panel.' },
   // raw (escape hatch)
-  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.', availability: EXPORT_ONLY_PENDING_PREVIEW },
-  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value.', availability: EXPORT_ONLY_PENDING_PREVIEW },
+  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', fields: ['bytes', 'channel', 'status'], decoded: false, summary: 'Any MIDI arrived (raw).', availability: EXPORT_ONLY_PENDING_PREVIEW },
+  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', fields: ['channel', 'cc', 'value'], decoded: false, summary: 'A CC arrived.', availability: EXPORT_ONLY_PENDING_PREVIEW },
   { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'Raw SysEx arrived.', availability: EXPORT_ONLY_PENDING_PREVIEW },
   { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A device connected.', availability: NOT_WIRED_YET },
   { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A device disconnected.', availability: NOT_WIRED_YET },
@@ -278,7 +282,7 @@ export const COMMANDS = [
   {
     id: 'on', category: 'Events & Flow', signature: 'on(target, event, fn)',
     summary: 'React to an event on another control / the panel / the device, or to a custom emitted event.',
-    availability: { preview: false, export: true, note: 'Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.' },
+    availability: FLOW_NOT_WIRED,
     params: [
       { name: 'target', type: 'targetRef', required: true },
       { name: 'event', type: 'eventName', required: true },
@@ -293,7 +297,7 @@ export const COMMANDS = [
   {
     id: 'emit', category: 'Events & Flow', signature: 'emit(name [, data])',
     summary: 'Announce a custom event; any script listening with on(name, …) reacts. Fire-and-forget, language-neutral.',
-    availability: { preview: false, export: true, note: 'Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.' },
+    availability: FLOW_NOT_WIRED,
     params: [
       { name: 'name', type: 'string', required: true },
       { name: 'data', type: 'value', required: false },
@@ -303,8 +307,8 @@ export const COMMANDS = [
   },
   {
     id: 'run', category: 'Events & Flow', signature: 'run(target.action [, args])',
-    summary: 'Run a named action elsewhere. Host-dispatched — works cross-language. Supports a return value. Only simple data crosses the boundary.',
-    availability: { preview: false, export: true, note: 'Stubbed in the editor preview for now; dispatched by the C++ host in the exported plugin.' },
+    summary: 'Run a named action elsewhere ("target.action" = the owning control/panel, then the action name). Host-dispatched — works cross-language. Supports a return value. Only simple data crosses the boundary.',
+    availability: FLOW_NOT_WIRED,
     params: [
       { name: 'action', type: 'scriptRef', required: true },
       { name: 'args', type: 'value', required: false },
@@ -338,7 +342,7 @@ export const COMMANDS = [
   {
     id: 'buildDump', category: 'Device / MIDI', signature: 'buildDump(kind)',
     summary: 'Build the dump bytes from the panel values without sending.',
-    availability: { preview: false, export: true, note: 'Returns null in the editor preview — the panel→bytes codec lives in the device host.' },
+    availability: { preview: false, export: false, note: 'Planned — the panel→bytes codec is not yet exposed to scripts in either runtime; use sendDump to transmit.' },
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
     scopes: ['device', 'panel', 'project'],
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
