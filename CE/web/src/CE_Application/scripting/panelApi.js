@@ -385,6 +385,489 @@ export const COMMANDS = [
     scopes: 'any',
     snippet: { lua: 'log("${1:message}", ${2:value})$0', javascript: 'log("${1:message}", ${2:value})$0' },
   },
+
+  /* --- Component commands ---
+     Musical components expose their moves as commands so a footswitch or script can drive them
+     without hand-editing config trees. Backed by the pure reducers in utils/*Layout.js
+     (…ScriptPatch), run by the shared JS panel runtime (editor preview + exported player).
+     `target` is the component's control name. Full stories: the component docs
+     (zone-splitter.md, phrase-sequencer.md, phrase-recorder.md, harmoniser.md, setlist.md). */
+
+  /* Zone Splitter */
+  {
+    id: 'splitPreset', category: 'Zone Splitter', signature: 'splitPreset(target, preset [, lowNote, highNote])',
+    summary: 'Swap the whole split arrangement to a named preset (e.g. "threeWay"); optional boundary notes.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'preset', type: 'string', required: true },
+      { name: 'lowNote', type: 'number', required: false },
+      { name: 'highNote', type: 'number', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'splitPreset("${1:target}", "${2:preset}")$0', javascript: 'splitPreset("${1:target}", "${2:preset}")$0' },
+  },
+  {
+    id: 'splitMute', category: 'Zone Splitter', signature: 'splitMute(target, zone [, enabled])',
+    summary: 'Mute a zone (pass false to unmute). Zone by name or index.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'zone', type: 'value', required: true },
+      { name: 'enabled', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'splitMute("${1:target}", "${2:zone}")$0', javascript: 'splitMute("${1:target}", "${2:zone}")$0' },
+  },
+  {
+    id: 'splitChannel', category: 'Zone Splitter', signature: 'splitChannel(target, zone, channel)',
+    summary: 'Route a zone to a MIDI channel.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'zone', type: 'value', required: true },
+      { name: 'channel', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'splitChannel("${1:target}", "${2:zone}", ${3:channel})$0', javascript: 'splitChannel("${1:target}", "${2:zone}", ${3:channel})$0' },
+  },
+  {
+    id: 'splitTranspose', category: 'Zone Splitter', signature: 'splitTranspose(target, zone, semitones)',
+    summary: 'Transpose a zone in semitones.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'zone', type: 'value', required: true },
+      { name: 'semitones', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'splitTranspose("${1:target}", "${2:zone}", ${3:semitones})$0', javascript: 'splitTranspose("${1:target}", "${2:zone}", ${3:semitones})$0' },
+  },
+  {
+    id: 'splitPoint', category: 'Zone Splitter', signature: 'splitPoint(target, zone, note)',
+    summary: 'Move a zone boundary to a MIDI note.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'zone', type: 'value', required: true },
+      { name: 'note', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'splitPoint("${1:target}", "${2:zone}", ${3:note})$0', javascript: 'splitPoint("${1:target}", "${2:zone}", ${3:note})$0' },
+  },
+
+  /* Phrase Sequencer */
+  {
+    id: 'phraseSeed', category: 'Phrase Sequencer', signature: 'phraseSeed(target, seed)',
+    summary: 'Swap the pattern to a named seed (e.g. "arpUp"). An unknown seed is a no-op.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'seed', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'phraseSeed("${1:target}", "${2:seed}")$0', javascript: 'phraseSeed("${1:target}", "${2:seed}")$0' },
+  },
+  {
+    id: 'phraseClear', category: 'Phrase Sequencer', signature: 'phraseClear(target)',
+    summary: 'Clear the pattern grid.',
+    params: [{ name: 'target', type: 'targetRef', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'phraseClear("${1:target}")$0', javascript: 'phraseClear("${1:target}")$0' },
+  },
+  {
+    id: 'phraseKey', category: 'Phrase Sequencer', signature: 'phraseKey(target, key)',
+    summary: 'Move the phrase to a new key (0 = C … 11 = B) — the pattern itself is untouched.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'key', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'phraseKey("${1:target}", ${2:key})$0', javascript: 'phraseKey("${1:target}", ${2:key})$0' },
+  },
+  {
+    id: 'phraseScale', category: 'Phrase Sequencer', signature: 'phraseScale(target, scale)',
+    summary: 'Re-harmonise to a named scale (e.g. "dorian").',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'scale', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'phraseScale("${1:target}", "${2:scale}")$0', javascript: 'phraseScale("${1:target}", "${2:scale}")$0' },
+  },
+  {
+    id: 'phraseTranspose', category: 'Phrase Sequencer', signature: 'phraseTranspose(target, semitones)',
+    summary: 'Transpose playback in semitones.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'semitones', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'phraseTranspose("${1:target}", ${2:semitones})$0', javascript: 'phraseTranspose("${1:target}", ${2:semitones})$0' },
+  },
+  {
+    id: 'phraseDirection', category: 'Phrase Sequencer', signature: 'phraseDirection(target, direction)',
+    summary: 'Set playback direction: "forward", "reverse", "pingpong", or "random".',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'direction', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'phraseDirection("${1:target}", "${2:forward}")$0', javascript: 'phraseDirection("${1:target}", "${2:forward}")$0' },
+  },
+  {
+    id: 'phraseRun', category: 'Phrase Sequencer', signature: 'phraseRun(target [, running])',
+    summary: 'Start the sequencer (false stops it).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'running', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'phraseRun("${1:target}", ${2:true})$0', javascript: 'phraseRun("${1:target}", ${2:true})$0' },
+  },
+  {
+    id: 'phraseCell', category: 'Phrase Sequencer', signature: 'phraseCell(target, step, row, on)',
+    summary: 'Turn one grid cell on/off (step column, scale-degree row). Out-of-grid cells are a no-op.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'step', type: 'number', required: true },
+      { name: 'row', type: 'number', required: true },
+      { name: 'on', type: 'value', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'phraseCell("${1:target}", ${2:step}, ${3:row}, ${4:true})$0', javascript: 'phraseCell("${1:target}", ${2:step}, ${3:row}, ${4:true})$0' },
+  },
+
+  /* Phrase Recorder */
+  {
+    id: 'recorderRecord', category: 'Phrase Recorder', signature: 'recorderRecord(target [, on])',
+    summary: 'Arm/stop recording. No argument toggles (what a footswitch wants); true/false is idempotent (safe for a MIDI-mapped switch that fires twice).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'on', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recorderRecord("${1:target}")$0', javascript: 'recorderRecord("${1:target}")$0' },
+  },
+  {
+    id: 'recorderStop', category: 'Phrase Recorder', signature: 'recorderStop(target)',
+    summary: 'Stop recording/arming (back to idle).',
+    params: [{ name: 'target', type: 'targetRef', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'recorderStop("${1:target}")$0', javascript: 'recorderStop("${1:target}")$0' },
+  },
+  {
+    id: 'recorderPlay', category: 'Phrase Recorder', signature: 'recorderPlay(target [, playing])',
+    summary: 'Toggle loop playback; false mutes the loop without losing it.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'playing', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recorderPlay("${1:target}", ${2:true})$0', javascript: 'recorderPlay("${1:target}", ${2:true})$0' },
+  },
+  {
+    id: 'recorderClear', category: 'Phrase Recorder', signature: 'recorderClear(target)',
+    summary: 'Throw the take away.',
+    params: [{ name: 'target', type: 'targetRef', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'recorderClear("${1:target}")$0', javascript: 'recorderClear("${1:target}")$0' },
+  },
+  {
+    id: 'recorderUndo', category: 'Phrase Recorder', signature: 'recorderUndo(target)',
+    summary: 'Drop the last overdub pass.',
+    params: [{ name: 'target', type: 'targetRef', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'recorderUndo("${1:target}")$0', javascript: 'recorderUndo("${1:target}")$0' },
+  },
+  {
+    id: 'recorderQuantize', category: 'Phrase Recorder', signature: 'recorderQuantize(target, grid [, strength, scale, key])',
+    summary: 'Quantize the take to a grid (1–64), by strength 0–1; give scale + key to also pull notes into key.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'grid', type: 'number', required: true },
+      { name: 'strength', type: 'number', required: false },
+      { name: 'scale', type: 'string', required: false },
+      { name: 'key', type: 'number', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recorderQuantize("${1:target}", ${2:16}, ${3:1})$0', javascript: 'recorderQuantize("${1:target}", ${2:16}, ${3:1})$0' },
+  },
+  {
+    id: 'recorderTranspose', category: 'Phrase Recorder', signature: 'recorderTranspose(target, semitones)',
+    summary: 'Transpose playback only (−48…+48) — the recorded take is untouched. To rewrite the take, use recorderShift.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'semitones', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recorderTranspose("${1:target}", ${2:semitones})$0', javascript: 'recorderTranspose("${1:target}", ${2:semitones})$0' },
+  },
+  {
+    id: 'recorderBars', category: 'Phrase Recorder', signature: 'recorderBars(target, bars)',
+    summary: 'Set the loop length in bars.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'bars', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recorderBars("${1:target}", ${2:bars})$0', javascript: 'recorderBars("${1:target}", ${2:bars})$0' },
+  },
+  {
+    id: 'recorderSource', category: 'Phrase Recorder', signature: 'recorderSource(target, source)',
+    summary: 'What gets recorded: "input", "panel", or "both".',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'source', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recorderSource("${1:target}", "${2:panel}")$0', javascript: 'recorderSource("${1:target}", "${2:panel}")$0' },
+  },
+  {
+    id: 'recorderNudge', category: 'Phrase Recorder', signature: 'recorderNudge(target, by)',
+    summary: 'Shift the whole take in time by a fraction of the loop — the fix for a consistently-late take.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'by', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recorderNudge("${1:target}", ${2:by})$0', javascript: 'recorderNudge("${1:target}", ${2:by})$0' },
+  },
+  {
+    id: 'recorderShift', category: 'Phrase Recorder', signature: 'recorderShift(target, semitones)',
+    summary: 'Rewrite the recorded take, transposed — unlike recorderTranspose, this changes the notes themselves.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'semitones', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recorderShift("${1:target}", ${2:semitones})$0', javascript: 'recorderShift("${1:target}", ${2:semitones})$0' },
+  },
+  {
+    id: 'recorderStore', category: 'Phrase Recorder', signature: 'recorderStore(target, slot [, name])',
+    summary: 'Save the take into a slot (1-based), optionally named.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'slot', type: 'number', required: true },
+      { name: 'name', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recorderStore("${1:target}", ${2:slot})$0', javascript: 'recorderStore("${1:target}", ${2:slot})$0' },
+  },
+  {
+    id: 'recorderLoad', category: 'Phrase Recorder', signature: 'recorderLoad(target, slot)',
+    summary: 'Load a stored take from a slot (1-based).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'slot', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recorderLoad("${1:target}", ${2:slot})$0', javascript: 'recorderLoad("${1:target}", ${2:slot})$0' },
+  },
+  {
+    id: 'recorderCountIn', category: 'Phrase Recorder', signature: 'recorderCountIn(target, bars)',
+    summary: 'Set the count-in length (0–4 bars).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'bars', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recorderCountIn("${1:target}", ${2:bars})$0', javascript: 'recorderCountIn("${1:target}", ${2:bars})$0' },
+  },
+
+  /* Harmoniser */
+  {
+    id: 'harmonyMode', category: 'Harmoniser', signature: 'harmonyMode(target, mode)',
+    summary: '"diatonic" (build chords in key) or "memory" (replay captured shapes).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'mode', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyMode("${1:target}", "${2:diatonic}")$0', javascript: 'harmonyMode("${1:target}", "${2:diatonic}")$0' },
+  },
+  {
+    id: 'harmonyKey', category: 'Harmoniser', signature: 'harmonyKey(target, key)',
+    summary: 'Re-key it mid-song (0 = C … 11 = B; wraps around).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'key', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyKey("${1:target}", ${2:key})$0', javascript: 'harmonyKey("${1:target}", ${2:key})$0' },
+  },
+  {
+    id: 'harmonyScale', category: 'Harmoniser', signature: 'harmonyScale(target, scale)',
+    summary: 'Set the scale (e.g. "major", "minor", "dorian").',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'scale', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyScale("${1:target}", "${2:scale}")$0', javascript: 'harmonyScale("${1:target}", "${2:scale}")$0' },
+  },
+  {
+    id: 'harmonySize', category: 'Harmoniser', signature: 'harmonySize(target, size)',
+    summary: 'Chord size — 2 to 6 voices.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'size', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonySize("${1:target}", ${2:size})$0', javascript: 'harmonySize("${1:target}", ${2:size})$0' },
+  },
+  {
+    id: 'harmonyShape', category: 'Harmoniser', signature: 'harmonyShape(target, shape)',
+    summary: 'A preset name or an explicit interval list. An unknown preset is a no-op, never a silent default.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'shape', type: 'value', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyShape("${1:target}", {0, 4, 7})$0', javascript: 'harmonyShape("${1:target}", [0, 4, 7])$0' },
+  },
+  {
+    id: 'harmonyVoicing', category: 'Harmoniser', signature: 'harmonyVoicing(target, voicing)',
+    summary: '"close", "open", or "drop2".',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'voicing', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyVoicing("${1:target}", "${2:close}")$0', javascript: 'harmonyVoicing("${1:target}", "${2:close}")$0' },
+  },
+  {
+    id: 'harmonyInversion', category: 'Harmoniser', signature: 'harmonyInversion(target, inversion)',
+    summary: 'Chord inversion.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'inversion', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyInversion("${1:target}", ${2:inversion})$0', javascript: 'harmonyInversion("${1:target}", ${2:inversion})$0' },
+  },
+  {
+    id: 'harmonyOctave', category: 'Harmoniser', signature: 'harmonyOctave(target, octave)',
+    summary: 'Octave offset for the generated chord.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'octave', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyOctave("${1:target}", ${2:octave})$0', javascript: 'harmonyOctave("${1:target}", ${2:octave})$0' },
+  },
+  {
+    id: 'harmonyOutOfKey', category: 'Harmoniser', signature: 'harmonyOutOfKey(target, mode)',
+    summary: 'Notes outside the key: "pass", "nearest", or "mute".',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'mode', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyOutOfKey("${1:target}", "${2:nearest}")$0', javascript: 'harmonyOutOfKey("${1:target}", "${2:nearest}")$0' },
+  },
+  {
+    id: 'harmonyKeepPlayed', category: 'Harmoniser', signature: 'harmonyKeepPlayed(target [, keep])',
+    summary: 'Keep the played note in the chord (toggles without an argument).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'keep', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyKeepPlayed("${1:target}", ${2:true})$0', javascript: 'harmonyKeepPlayed("${1:target}", ${2:true})$0' },
+  },
+  {
+    id: 'harmonyChannel', category: 'Harmoniser', signature: 'harmonyChannel(target, channel)',
+    summary: 'MIDI channel for the generated notes.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'channel', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyChannel("${1:target}", ${2:channel})$0', javascript: 'harmonyChannel("${1:target}", ${2:channel})$0' },
+  },
+  {
+    id: 'harmonyVoiceLeading', category: 'Harmoniser', signature: 'harmonyVoiceLeading(target, mode)',
+    summary: 'How consecutive chords connect: "off", "closest", or "smooth".',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'mode', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyVoiceLeading("${1:target}", "${2:smooth}")$0', javascript: 'harmonyVoiceLeading("${1:target}", "${2:smooth}")$0' },
+  },
+  {
+    id: 'harmonyStrum', category: 'Harmoniser', signature: 'harmonyStrum(target, ms)',
+    summary: 'Strum spread in milliseconds (0–400).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'ms', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyStrum("${1:target}", ${2:ms})$0', javascript: 'harmonyStrum("${1:target}", ${2:ms})$0' },
+  },
+  {
+    id: 'harmonyDegree', category: 'Harmoniser', signature: 'harmonyDegree(target, degree, chord)',
+    summary: "Override one scale degree's chord with an interval list; nil/null restores stacked thirds.",
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'degree', type: 'number', required: true },
+      { name: 'chord', type: 'value', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'harmonyDegree("${1:target}", ${2:degree}, {0, 5, 7})$0', javascript: 'harmonyDegree("${1:target}", ${2:degree}, [0, 5, 7])$0' },
+  },
+
+  /* Setlist */
+  {
+    id: 'setlistNext', category: 'Setlist', signature: 'setlistNext(target)',
+    summary: 'Step to the next enabled scene — same event downstream as a footswitch step.',
+    params: [{ name: 'target', type: 'targetRef', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'setlistNext("${1:target}")$0', javascript: 'setlistNext("${1:target}")$0' },
+  },
+  {
+    id: 'setlistPrev', category: 'Setlist', signature: 'setlistPrev(target)',
+    summary: 'Step back to the previous enabled scene.',
+    params: [{ name: 'target', type: 'targetRef', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'setlistPrev("${1:target}")$0', javascript: 'setlistPrev("${1:target}")$0' },
+  },
+  {
+    id: 'setlistGoto', category: 'Setlist', signature: 'setlistGoto(target, scene)',
+    summary: 'Jump to a scene — 1-based index or scene name (a name survives a reorder).',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'scene', type: 'value', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'setlistGoto("${1:target}", ${2:scene})$0', javascript: 'setlistGoto("${1:target}", ${2:scene})$0' },
+  },
+  {
+    id: 'setlistEnable', category: 'Setlist', signature: 'setlistEnable(target, scene [, enabled])',
+    summary: 'Include a scene, or skip it with false ("skip one tonight").',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'scene', type: 'value', required: true },
+      { name: 'enabled', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'setlistEnable("${1:target}", ${2:scene}, ${3:false})$0', javascript: 'setlistEnable("${1:target}", ${2:scene}, ${3:false})$0' },
+  },
+  {
+    id: 'setlistWrap', category: 'Setlist', signature: 'setlistWrap(target [, wrap])',
+    summary: 'Wrap from the last scene back to the first.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'wrap', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'setlistWrap("${1:target}", ${2:true})$0', javascript: 'setlistWrap("${1:target}", ${2:true})$0' },
+  },
+  {
+    id: 'setlistCrossfade', category: 'Setlist', signature: 'setlistCrossfade(target, ms)',
+    summary: 'Crossfade time between scenes, in milliseconds.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'ms', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'setlistCrossfade("${1:target}", ${2:ms})$0', javascript: 'setlistCrossfade("${1:target}", ${2:ms})$0' },
+  },
 ];
 
 /* ------------------------------------------------------------------- helpers */
@@ -440,7 +923,11 @@ export const EVENT_BY_ID = Object.fromEntries(ALL_EVENTS.map((e) => [e.id, e]));
 
 /** Group commands + helpers + lifecycle by their `category`, for the picker's "Commands" side. */
 export function membersByCategory() {
-  const order = ['Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Timers', 'Debug', 'Value / range', 'Music', 'MIDI encoding'];
+  const order = [
+    'Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Timers', 'Debug',
+    'Zone Splitter', 'Phrase Sequencer', 'Phrase Recorder', 'Harmoniser', 'Setlist',
+    'Value / range', 'Music', 'MIDI encoding',
+  ];
   const map = new Map(order.map((c) => [c, []]));
   for (const m of ALL_MEMBERS) {
     if (!map.has(m.category)) map.set(m.category, []);

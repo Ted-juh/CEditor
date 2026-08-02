@@ -388,6 +388,412 @@ Print to the script console without changing state.
 log("message", value)
 ```
 
+### Zone Splitter
+
+Drive the [Zone Splitter](../CE/web/src/CE_Application/docs/zone-splitter.md) — keyboard zones with per-zone routing. `target` is the component's control name.
+
+#### `splitPreset(target, preset [, lowNote, highNote])`
+
+Swap the whole split arrangement to a named preset (e.g. "threeWay"); optional boundary notes.
+
+```lua
+splitPreset("target", "preset")
+```
+
+#### `splitMute(target, zone [, enabled])`
+
+Mute a zone (pass false to unmute). Zone by name or index.
+
+```lua
+splitMute("target", "zone")
+```
+
+#### `splitChannel(target, zone, channel)`
+
+Route a zone to a MIDI channel.
+
+```lua
+splitChannel("target", "zone", channel)
+```
+
+#### `splitTranspose(target, zone, semitones)`
+
+Transpose a zone in semitones.
+
+```lua
+splitTranspose("target", "zone", semitones)
+```
+
+#### `splitPoint(target, zone, note)`
+
+Move a zone boundary to a MIDI note.
+
+```lua
+splitPoint("target", "zone", note)
+```
+
+### Phrase Sequencer
+
+Drive the [Phrase Sequencer](../CE/web/src/CE_Application/docs/phrase-sequencer.md) — a step grid whose rows are scale degrees. `target` is the component's control name.
+
+#### `phraseSeed(target, seed)`
+
+Swap the pattern to a named seed (e.g. "arpUp"). An unknown seed is a no-op.
+
+```lua
+phraseSeed("target", "seed")
+```
+
+#### `phraseClear(target)`
+
+Clear the pattern grid.
+
+```lua
+phraseClear("target")
+```
+
+#### `phraseKey(target, key)`
+
+Move the phrase to a new key (0 = C … 11 = B) — the pattern itself is untouched.
+
+```lua
+phraseKey("target", key)
+```
+
+#### `phraseScale(target, scale)`
+
+Re-harmonise to a named scale (e.g. "dorian").
+
+```lua
+phraseScale("target", "scale")
+```
+
+#### `phraseTranspose(target, semitones)`
+
+Transpose playback in semitones.
+
+```lua
+phraseTranspose("target", semitones)
+```
+
+#### `phraseDirection(target, direction)`
+
+Set playback direction: "forward", "reverse", "pingpong", or "random".
+
+```lua
+phraseDirection("target", "forward")
+```
+
+#### `phraseRun(target [, running])`
+
+Start the sequencer (false stops it).
+
+```lua
+phraseRun("target", true)
+```
+
+#### `phraseCell(target, step, row, on)`
+
+Turn one grid cell on/off (step column, scale-degree row). Out-of-grid cells are a no-op.
+
+```lua
+phraseCell("target", step, row, true)
+```
+
+### Phrase Recorder
+
+Drive the [Phrase Recorder](../CE/web/src/CE_Application/docs/phrase-recorder.md) — the note looper. `target` is the component's control name.
+
+#### `recorderRecord(target [, on])`
+
+Arm/stop recording. No argument toggles (what a footswitch wants); true/false is idempotent (safe for a MIDI-mapped switch that fires twice).
+
+```lua
+recorderRecord("target")
+```
+
+#### `recorderStop(target)`
+
+Stop recording/arming (back to idle).
+
+```lua
+recorderStop("target")
+```
+
+#### `recorderPlay(target [, playing])`
+
+Toggle loop playback; false mutes the loop without losing it.
+
+```lua
+recorderPlay("target", true)
+```
+
+#### `recorderClear(target)`
+
+Throw the take away.
+
+```lua
+recorderClear("target")
+```
+
+#### `recorderUndo(target)`
+
+Drop the last overdub pass.
+
+```lua
+recorderUndo("target")
+```
+
+#### `recorderQuantize(target, grid [, strength, scale, key])`
+
+Quantize the take to a grid (1–64), by strength 0–1; give scale + key to also pull notes into key.
+
+```lua
+recorderQuantize("target", 16, 1)
+```
+
+#### `recorderTranspose(target, semitones)`
+
+Transpose playback only (−48…+48) — the recorded take is untouched. To rewrite the take, use recorderShift.
+
+```lua
+recorderTranspose("target", semitones)
+```
+
+#### `recorderBars(target, bars)`
+
+Set the loop length in bars.
+
+```lua
+recorderBars("target", bars)
+```
+
+#### `recorderSource(target, source)`
+
+What gets recorded: "input", "panel", or "both".
+
+```lua
+recorderSource("target", "panel")
+```
+
+#### `recorderNudge(target, by)`
+
+Shift the whole take in time by a fraction of the loop — the fix for a consistently-late take.
+
+```lua
+recorderNudge("target", by)
+```
+
+#### `recorderShift(target, semitones)`
+
+Rewrite the recorded take, transposed — unlike recorderTranspose, this changes the notes themselves.
+
+```lua
+recorderShift("target", semitones)
+```
+
+#### `recorderStore(target, slot [, name])`
+
+Save the take into a slot (1-based), optionally named.
+
+```lua
+recorderStore("target", slot)
+```
+
+#### `recorderLoad(target, slot)`
+
+Load a stored take from a slot (1-based).
+
+```lua
+recorderLoad("target", slot)
+```
+
+#### `recorderCountIn(target, bars)`
+
+Set the count-in length (0–4 bars).
+
+```lua
+recorderCountIn("target", bars)
+```
+
+### Harmoniser
+
+Drive the [Harmoniser](../CE/web/src/CE_Application/docs/harmoniser.md) — one finger in, a full chord out. `target` is the component's control name.
+
+#### `harmonyMode(target, mode)`
+
+"diatonic" (build chords in key) or "memory" (replay captured shapes).
+
+```lua
+harmonyMode("target", "diatonic")
+```
+
+#### `harmonyKey(target, key)`
+
+Re-key it mid-song (0 = C … 11 = B; wraps around).
+
+```lua
+harmonyKey("target", key)
+```
+
+#### `harmonyScale(target, scale)`
+
+Set the scale (e.g. "major", "minor", "dorian").
+
+```lua
+harmonyScale("target", "scale")
+```
+
+#### `harmonySize(target, size)`
+
+Chord size — 2 to 6 voices.
+
+```lua
+harmonySize("target", size)
+```
+
+#### `harmonyShape(target, shape)`
+
+A preset name or an explicit interval list. An unknown preset is a no-op, never a silent default.
+
+```lua
+-- Lua
+harmonyShape("target", {0, 4, 7})
+```
+```js
+// JavaScript
+harmonyShape("target", [0, 4, 7])
+```
+
+#### `harmonyVoicing(target, voicing)`
+
+"close", "open", or "drop2".
+
+```lua
+harmonyVoicing("target", "close")
+```
+
+#### `harmonyInversion(target, inversion)`
+
+Chord inversion.
+
+```lua
+harmonyInversion("target", inversion)
+```
+
+#### `harmonyOctave(target, octave)`
+
+Octave offset for the generated chord.
+
+```lua
+harmonyOctave("target", octave)
+```
+
+#### `harmonyOutOfKey(target, mode)`
+
+Notes outside the key: "pass", "nearest", or "mute".
+
+```lua
+harmonyOutOfKey("target", "nearest")
+```
+
+#### `harmonyKeepPlayed(target [, keep])`
+
+Keep the played note in the chord (toggles without an argument).
+
+```lua
+harmonyKeepPlayed("target", true)
+```
+
+#### `harmonyChannel(target, channel)`
+
+MIDI channel for the generated notes.
+
+```lua
+harmonyChannel("target", channel)
+```
+
+#### `harmonyVoiceLeading(target, mode)`
+
+How consecutive chords connect: "off", "closest", or "smooth".
+
+```lua
+harmonyVoiceLeading("target", "smooth")
+```
+
+#### `harmonyStrum(target, ms)`
+
+Strum spread in milliseconds (0–400).
+
+```lua
+harmonyStrum("target", ms)
+```
+
+#### `harmonyDegree(target, degree, chord)`
+
+Override one scale degree's chord with an interval list; nil/null restores stacked thirds.
+
+```lua
+-- Lua
+harmonyDegree("target", degree, {0, 5, 7})
+```
+```js
+// JavaScript
+harmonyDegree("target", degree, [0, 5, 7])
+```
+
+### Setlist
+
+Drive the [Setlist](../CE/web/src/CE_Application/docs/setlist.md) — scenes on a footswitch. `target` is the component's control name.
+
+#### `setlistNext(target)`
+
+Step to the next enabled scene — same event downstream as a footswitch step.
+
+```lua
+setlistNext("target")
+```
+
+#### `setlistPrev(target)`
+
+Step back to the previous enabled scene.
+
+```lua
+setlistPrev("target")
+```
+
+#### `setlistGoto(target, scene)`
+
+Jump to a scene — 1-based index or scene name (a name survives a reorder).
+
+```lua
+setlistGoto("target", scene)
+```
+
+#### `setlistEnable(target, scene [, enabled])`
+
+Include a scene, or skip it with false ("skip one tonight").
+
+```lua
+setlistEnable("target", scene, false)
+```
+
+#### `setlistWrap(target [, wrap])`
+
+Wrap from the last scene back to the first.
+
+```lua
+setlistWrap("target", true)
+```
+
+#### `setlistCrossfade(target, ms)`
+
+Crossfade time between scenes, in milliseconds.
+
+```lua
+setlistCrossfade("target", ms)
+```
+
 ## Helpers
 
 Host-provided and identical in every language. Only what the language lacks or what must be

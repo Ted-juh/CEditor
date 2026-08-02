@@ -78,6 +78,17 @@ const accessors = [
   ...VALUE_ACCESSORS.map((a) => `| \`${a.label}\` | ${a.summary} |`),
 ].join('\n');
 
+// One line of context for the component-command categories: what the component is,
+// and where its full story lives. `target` semantics are shared by all of them.
+const COMPONENT_DOCS = '../CE/web/src/CE_Application/docs';
+const CATEGORY_NOTES = {
+  'Zone Splitter': `Drive the [Zone Splitter](${COMPONENT_DOCS}/zone-splitter.md) — keyboard zones with per-zone routing. \`target\` is the component's control name.`,
+  'Phrase Sequencer': `Drive the [Phrase Sequencer](${COMPONENT_DOCS}/phrase-sequencer.md) — a step grid whose rows are scale degrees. \`target\` is the component's control name.`,
+  'Phrase Recorder': `Drive the [Phrase Recorder](${COMPONENT_DOCS}/phrase-recorder.md) — the note looper. \`target\` is the component's control name.`,
+  'Harmoniser': `Drive the [Harmoniser](${COMPONENT_DOCS}/harmoniser.md) — one finger in, a full chord out. \`target\` is the component's control name.`,
+  'Setlist': `Drive the [Setlist](${COMPONENT_DOCS}/setlist.md) — scenes on a footswitch. \`target\` is the component's control name.`,
+};
+
 const commandsByCategory = new Map();
 for (const c of COMMANDS) {
   if (!commandsByCategory.has(c.category)) commandsByCategory.set(c.category, []);
@@ -153,7 +164,7 @@ ${eventTable(DEVICE_EVENTS)}
 ## Commands
 
 ${[...commandsByCategory.entries()].map(([category, items]) =>
-  `### ${category}\n\n${items.map((m) => `#### \`${m.signature}\`\n\n${m.summary}\n${scopeLine(m)}${codeBlocks(m)}`).join('\n')}`
+  `### ${category}\n\n${CATEGORY_NOTES[category] ? `${CATEGORY_NOTES[category]}\n\n` : ''}${items.map((m) => `#### \`${m.signature}\`\n\n${m.summary}\n${scopeLine(m)}${codeBlocks(m)}`).join('\n')}`
 ).join('\n')}
 ## Helpers
 
