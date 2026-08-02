@@ -192,7 +192,53 @@ end
 `to14bit`, `toNibbles`, `toAscii` and friends (see the manual's MIDI-encoding helpers) cover the
 usual byte-packing chores.
 
-## 9. See what's going on
+## 9. Play notes from a script
+
+`sendNote` plays and releases by itself; `noteOn`/`noteOff` are the held pair. A one-finger
+chord button:
+
+```lua
+-- Lua — attach to a button
+function onPointerDown(mouse)
+  noteOn(1, 60)          -- velocity defaults to 100
+  noteOn(1, 64)
+  noteOn(1, 67)
+end
+
+function onPointerUp(mouse)
+  noteOff(1, 60)
+  noteOff(1, 64)
+  noteOff(1, 67)
+end
+```
+```js
+// JavaScript — or fire-and-forget with an automatic note-off
+function onClick(mouse) {
+  sendNote(1, noteNumber("C4"), 100, 250)
+}
+```
+
+## 10. Follow the clock
+
+`transport()` reads the master clock; `onBeat`/`onBar` fire as it runs. A tempo-synced
+metronome light, panel scope:
+
+```lua
+-- Lua
+function onBeat(info)
+  set("beatLight.background.fill.colour", info.beat == 1 and "#ff4000" or "#804000")
+end
+
+function onBar(info)
+  set("barReadout.text.content", "bar " .. info.bar)
+end
+```
+
+In the exported plugin, `startTimer("pulse", { beats = 1 })` gives a tempo-derived timer —
+the interval is fixed when the timer starts, so restart it on tempo changes (or just use
+`onBeat`, which always follows the clock).
+
+## 11. See what's going on
 
 `log` prints to the script console without changing anything:
 
@@ -205,7 +251,7 @@ end
 Every event, `set`, and outgoing MIDI message also appears in the console's trace — usually the
 fastest way to find out why something fired (or didn't).
 
-## 10. Clean up when the panel closes
+## 12. Clean up when the panel closes
 
 ```lua
 -- Lua — panel scope

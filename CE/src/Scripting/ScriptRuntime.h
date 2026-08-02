@@ -93,6 +93,16 @@ public:
     // (loud, unless inbound or inside a noTransmit block) via ScriptRuntime::defaultTransmit().
     virtual void      setValue (const juce::String& path, const juce::var& value, const juce::var& options) = 0;
 
+    // Notes (device surface). sendNote plays and schedules its own note-off after durationMs;
+    // noteOn/noteOff are the held-note pair. Default no-op so alternative hosts need not implement.
+    virtual void sendNoteOn  (int channel, int note, int velocity) { juce::ignoreUnused (channel, note, velocity); }
+    virtual void sendNoteOff (int channel, int note) { juce::ignoreUnused (channel, note); }
+    virtual void sendNote (int channel, int note, int velocity, int durationMs) { juce::ignoreUnused (channel, note, velocity, durationMs); }
+
+    // Transport snapshot for scripts: { playing, bpm, beats, beat, bar, beatsPerBar } — empty
+    // object when no clock is available (e.g. window-closed standalone outside a DAW).
+    virtual juce::var getTransport() { return juce::var (new juce::DynamicObject()); }
+
     // Device / MIDI (Q9).
     virtual void sendCC   (int channel, int cc, const juce::var& value) = 0;
     virtual void sendNRPN (int channel, int msb, int lsb, const juce::var& value) = 0;

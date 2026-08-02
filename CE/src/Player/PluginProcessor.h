@@ -335,6 +335,37 @@ private:
                 scriptValues.setValue (desc.path, v);
                 scriptRuntime->dispatchEvent ("onValueChanged", desc.path.upToFirstOccurrenceOf (".", false, false), juce::var (v));
             }
+
+        // Window-closed beat clock: derive onBeat/onBar from the DAW playhead (the panel's own
+        // Transport lives in the web UI and covers this window-open). bar/beat are 1-based;
+        // beats is the absolute beat index crossed. Re-seeds on stop so a restart fires cleanly.
+        if (scriptRuntime != nullptr)
+        {
+            const auto pos = hostPosition();
+            if (pos.valid && pos.playing && pos.hasPpq)
+            {
+                const int perBar = pos.hasTimeSig && pos.timeSigNumerator > 0 ? pos.timeSigNumerator : 4;
+                const double beats = pos.ppqPosition;
+                const auto to = (long long) std::floor (beats);
+                const auto from = scriptLastBeats < -1.0e17 ? to - 1 : (long long) std::floor (scriptLastBeats);
+                for (auto b = from + 1; b <= to; ++b)
+                {
+                    auto* bo = new juce::DynamicObject();
+                    bo->setProperty ("beats", (double) b);
+                    bo->setProperty ("bar",  (int) (b / perBar) + 1);
+                    bo->setProperty ("beat", (int) (b % perBar) + 1);
+                    scriptRuntime->dispatchEvent ("onBeat", "", juce::var (bo));
+                    if (b % perBar == 0)
+                    {
+                        auto* ro = new juce::DynamicObject();
+                        ro->setProperty ("bar", (int) (b / perBar) + 1);
+                        scriptRuntime->dispatchEvent ("onBar", "", juce::var (ro));
+                    }
+                }
+                scriptLastBeats = beats;
+            }
+            else scriptLastBeats = -1.0e18;
+        }
        #endif
     }
 
@@ -417,19 +448,33 @@ private:
                 const juce::String messageType = o->getProperty ("messageType").toString();
                 const int status = bytes.size() > 0 ? (int) bytes.getReference (0) : 0;
 
+                // Channels are 1–16 everywhere in the script API (see the manual's conventions).
                 auto* mo = new juce::DynamicObject();
                 mo->setProperty ("bytes", juce::var (bytes));
                 mo->setProperty ("status", status);
-                mo->setProperty ("channel", status != 0 ? (status & 0x0F) : 0);
+                mo->setProperty ("channel", status != 0 ? (status & 0x0F) + 1 : 0);
                 scriptRuntime->dispatchEvent ("onMidiIn", "", juce::var (mo));
 
                 if (messageType == "cc" && bytes.size() >= 3)
                 {
                     auto* co = new juce::DynamicObject();
-                    co->setProperty ("channel", ((int) bytes.getReference (0)) & 0x0F);
+                    co->setProperty ("channel", (((int) bytes.getReference (0)) & 0x0F) + 1);
                     co->setProperty ("cc", (int) bytes.getReference (1));
                     co->setProperty ("value", (int) bytes.getReference (2));
                     scriptRuntime->dispatchEvent ("onCcIn", "", juce::var (co));
+                }
+
+                // onNoteIn({ channel, note, velocity, on }) — note-on with velocity 0 counts as off.
+                const int kind = status & 0xF0;
+                if ((kind == 0x90 || kind == 0x80) && bytes.size() >= 3)
+                {
+                    const int velocity = (int) bytes.getReference (2);
+                    auto* no = new juce::DynamicObject();
+                    no->setProperty ("channel", (status & 0x0F) + 1);
+                    no->setProperty ("note", (int) bytes.getReference (1));
+                    no->setProperty ("velocity", velocity);
+                    no->setProperty ("on", kind == 0x90 && velocity > 0);
+                    scriptRuntime->dispatchEvent ("onNoteIn", "", juce::var (no));
                 }
                 return;
             }
@@ -521,6 +566,16 @@ private:
             const int c = juce::jlimit (1, 16, ch) - 1, n = juce::jlimit (0, 127, cc);
             scriptSendRawMidi ("cc_" + juce::String (n), { 0xB0 | c, n, juce::jlimit (0, 127, (int) v) });
         };
+        cb.sendNoteOn = [this] (int ch, int note, int velocity)
+        {
+            const int c = juce::jlimit (1, 16, ch) - 1, n = juce::jlimit (0, 127, note);
+            scriptSendRawMidi ("note_on_" + juce::String (n), { 0x90 | c, n, juce::jlimit (1, 127, velocity) });
+        };
+        cb.sendNoteOff = [this] (int ch, int note)
+        {
+            const int c = juce::jlimit (1, 16, ch) - 1, n = juce::jlimit (0, 127, note);
+            scriptSendRawMidi ("note_off_" + juce::String (n), { 0x80 | c, n, 0 });
+        };
         cb.sendNRPN = [this] (int ch, int msb, int lsb, const juce::var& v)
         {
             const int s = 0xB0 | (juce::jlimit (1, 16, ch) - 1);
@@ -574,6 +629,8 @@ private:
         };
        #else
         cb.sendCC     = [] (int, int, const juce::var&) {};
+        cb.sendNoteOn  = [] (int, int, int) {};
+        cb.sendNoteOff = [] (int, int) {};
         cb.sendNRPN   = [] (int, int, int, const juce::var&) {};
         cb.sendSysex  = [] (const juce::var&) {};
         cb.requestDump = [] (const juce::String&) {};
@@ -581,6 +638,26 @@ private:
         cb.sendDump   = [] (const juce::String&) {};
        #endif
         cb.buildDump  = [] (const juce::String&) { return juce::var(); };
+        // Transport snapshot for scripts — the DAW playhead (captured on the audio thread into
+        // atomics). Window-open, the panel's own Transport (web) is the richer clock; this is
+        // what a window-closed script can see. Empty-ish when the host reports nothing.
+        cb.getTransport = [this]() -> juce::var
+        {
+            const auto pos = hostPosition();
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("playing", pos.valid && pos.playing);
+            if (pos.hasTempo) o->setProperty ("bpm", pos.bpm);
+            if (pos.hasPpq)
+            {
+                const int perBar = pos.hasTimeSig && pos.timeSigNumerator > 0 ? pos.timeSigNumerator : 4;
+                const double beats = pos.ppqPosition;
+                o->setProperty ("beats", beats);
+                o->setProperty ("beatsPerBar", perBar);
+                o->setProperty ("bar",  (int) std::floor (beats / perBar) + 1);
+                o->setProperty ("beat", (int) std::floor (std::fmod (beats, (double) perBar)) + 1);
+            }
+            return juce::var (o);
+        };
         // Flow / composition (Q6): run() finds and calls a named action in another script;
         // emit() dispatches a custom event to bound scripts + on(name, …) listeners. Both are
         // depth-guarded inside ScriptRuntime against run/emit feedback loops.
@@ -642,6 +719,7 @@ private:
     std::map<juce::String, juce::String> scriptBoundParamByPath;  // control path -> APVTS param id (bound)
     std::map<juce::String, juce::String> scriptDumpParamPaths;    // deviceParameterId -> control path (dump fill)
     std::map<juce::String, float> lastScriptValue;                // change-detect for window-closed onValueChanged
+    double scriptLastBeats = -1.0e18;                             // window-closed onBeat/onBar tracking (sentinel = re-seed)
     bool scriptWindowWasOpen = false;
     bool scriptReadyFired = false;
 #endif

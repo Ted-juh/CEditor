@@ -14,6 +14,8 @@
 
 #include "ScriptRuntime.h"
 
+#include <juce_events/juce_events.h>   // Timer::callAfterDelay for sendNote's scheduled note-off
+
 namespace ceditor::scripting
 {
 
@@ -25,6 +27,11 @@ public:
         // Values (path = "control.value" style; form = value|normalizedValue|midiValue).
         std::function<juce::var (const juce::String& path, const juce::String& form)> getValue;
         std::function<void (const juce::String& path, const juce::var& value, bool transmit)> setValue;
+        // Notes.
+        std::function<void (int ch, int note, int velocity)> sendNoteOn;
+        std::function<void (int ch, int note)> sendNoteOff;
+        // Transport snapshot ({ playing, bpm, beats, beat, bar, beatsPerBar }).
+        std::function<juce::var()> getTransport;
         // Device / MIDI.
         std::function<void (int ch, int cc, const juce::var& value)> sendCC;
         std::function<void (int ch, int msb, int lsb, const juce::var& value)> sendNRPN;
@@ -68,6 +75,24 @@ public:
             transmit = false;
         if (callbacks.setValue) callbacks.setValue (path, value, transmit);
     }
+
+    void sendNoteOn (int ch, int note, int velocity) override
+    { if (callbacks.sendNoteOn && midiSendAllowed()) callbacks.sendNoteOn (ch, note, velocity); }
+
+    void sendNoteOff (int ch, int note) override
+    { if (callbacks.sendNoteOff && midiSendAllowed()) callbacks.sendNoteOff (ch, note); }
+
+    void sendNote (int ch, int note, int velocity, int durationMs) override
+    {
+        sendNoteOn (ch, note, velocity);
+        // Capture a copy of the note-off function (not `this`) so a scheduled off outliving the
+        // host is harmless. The note-off bypasses the flood guard — hanging notes are worse.
+        const int ms = juce::jlimit (1, 60000, durationMs);
+        juce::Timer::callAfterDelay (ms, [off = callbacks.sendNoteOff, ch, note] { if (off) off (ch, note); });
+    }
+
+    juce::var getTransport() override
+    { return callbacks.getTransport ? callbacks.getTransport() : ScriptHostApi::getTransport(); }
 
     void sendCC (int ch, int cc, const juce::var& v) override        { if (callbacks.sendCC && midiSendAllowed()) callbacks.sendCC (ch, cc, v); }
     void sendNRPN (int ch, int msb, int lsb, const juce::var& v) override { if (callbacks.sendNRPN && midiSendAllowed()) callbacks.sendNRPN (ch, msb, lsb, v); }

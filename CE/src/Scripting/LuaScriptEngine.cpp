@@ -12,6 +12,8 @@
 #define SOL_ALL_SAFETIES_ON 1
 #include <sol/sol.hpp>
 
+#include <cmath>
+
 #include <map>
 #include <vector>
 
@@ -195,7 +197,36 @@ public:
         g.set_function ("sendDump",   [this] (std::string kind) { host->sendDump (juce::String (kind)); });
         g.set_function ("buildDump",  [this] (std::string kind) { return varToSol (lua, host->buildDump (juce::String (kind))); });
 
-        g.set_function ("startTimer", [this] (std::string id, sol::optional<int> ms) { host->startTimer (juce::String (id), ms ? *ms : 0); });
+        g.set_function ("noteOn",  [this] (int ch, int note, sol::optional<int> vel) { host->sendNoteOn (ch, note, vel ? *vel : 100); });
+        g.set_function ("noteOff", [this] (int ch, int note) { host->sendNoteOff (ch, note); });
+        g.set_function ("sendNote", [this] (int ch, int note, sol::optional<int> vel, sol::optional<int> ms)
+            { host->sendNote (ch, note, vel ? *vel : 100, ms ? *ms : 200); });
+        g.set_function ("transport", [this] () { return varToSol (lua, host->getTransport()); });
+
+        // startTimer(id, ms), or startTimer(id, { beats = n }) — beats convert via the current
+        // tempo (fixed at start; restart after a tempo change, or follow onBeat instead).
+        g.set_function ("startTimer", [this] (std::string id, sol::optional<sol::object> arg)
+        {
+            double ms = 0;
+            if (arg)
+            {
+                if (arg->is<double>()) ms = arg->as<double>();
+                else if (arg->is<sol::table>())
+                {
+                    auto t = arg->as<sol::table>();
+                    const double beats = t.get_or ("beats", 0.0);
+                    if (beats > 0)
+                    {
+                        double bpm = 120.0;
+                        if (auto* o = host->getTransport().getDynamicObject())
+                            if (const double b = (double) o->getProperty ("bpm"); b > 0) bpm = b;
+                        ms = beats * 60000.0 / bpm;
+                    }
+                    else ms = t.get_or ("ms", 0.0);
+                }
+            }
+            host->startTimer (juce::String (id), (int) std::llround (ms));
+        });
         g.set_function ("stopTimer",  [this] (std::string id) { host->stopTimer (juce::String (id)); });
 
         g.set_function ("run",  [this] (std::string target, sol::optional<sol::object> args)

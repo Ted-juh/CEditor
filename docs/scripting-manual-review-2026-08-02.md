@@ -136,3 +136,10 @@ for JS/TS/C++/C#/Java targets; `test/scriptFlow.test.js`) and wired in the Playe
 (`ScriptRuntime::runAction`, `emitEvent` → `dispatchEvent`, the `valueChanged`↔`onValueChanged`
 listener alias, 2-arg `on(name, fn)` in both engines); `onDumpReceived` now carries
 `{ values, kind, role, bytes }` in both runtimes. `buildDump` remains the one open flow gap.
+
+Fourth follow-up (same branch): the two top API extensions were built — the **note API**
+(`sendNote`/`noteOn`/`noteOff` in all engines + the preview, `noteIn` inbound event in the
+Player) and **musical time** (`transport()` snapshot everywhere; `onBeat`/`onBar` from the
+panel Transport in the UI runtime and from the DAW playhead window-closed;
+`startTimer(id, { beats })`). The Player's inbound `midiIn`/`ccIn` channel fields were also
+corrected to the documented 1–16 convention (they were 0-based).

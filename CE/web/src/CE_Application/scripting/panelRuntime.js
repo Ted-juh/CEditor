@@ -21,6 +21,10 @@ import { startDeviceSync, startBulkDumpSend } from '../stores/deviceProfiles.js'
 import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
+import {
+  transport as transportStore, transportBeatsNow, transportBpmNow,
+  transportBeatsPerBar, isTransportRunning,
+} from '../stores/transport.js';
 import { isSourceScript } from './scriptModel.js';
 import { compileCpp, invokeCpp } from './cppPreview.js';
 import { compileCsharp, invokeCsharp } from './csharpPreview.js';
@@ -209,9 +213,41 @@ function sendRawMidi(bytes, actionId) {
   }
 }
 
+// Notes: noteOn/noteOff are the held pair; sendNote schedules its own note-off after
+// durationMs (default 200). Channels 1–16, matching the whole script API.
+function noteOnApi(ch, note, vel) {
+  const n = midiInt(note, 0, 127);
+  sendRawMidi([0x90 | (midiInt(ch, 1, 16) - 1), n, midiInt(vel === undefined ? 100 : vel, 1, 127)], `note_on_${n}`);
+}
+function noteOffApi(ch, note) {
+  const n = midiInt(note, 0, 127);
+  sendRawMidi([0x80 | (midiInt(ch, 1, 16) - 1), n, 0], `note_off_${n}`);
+}
+
+/** Live master-clock snapshot for scripts: { playing, bpm, beats, beat, bar, beatsPerBar }. */
+function transportSnapshot() {
+  const beats = transportBeatsNow();
+  const perBar = transportBeatsPerBar() || 4;
+  return {
+    playing: isTransportRunning(),
+    bpm: transportBpmNow(),
+    beats,
+    beatsPerBar: perBar,
+    bar: Math.floor(beats / perBar) + 1,
+    beat: Math.floor(beats % perBar) + 1,
+  };
+}
+
 const midiApi = {
   sendCC: (ch, cc, v) =>
     sendRawMidi([0xB0 | (midiInt(ch, 1, 16) - 1), midiInt(cc, 0, 127), midiInt(v, 0, 127)], `cc_${midiInt(cc, 0, 127)}`),
+  noteOn: noteOnApi,
+  noteOff: noteOffApi,
+  sendNote: (ch, note, vel, durationMs) => {
+    noteOnApi(ch, note, vel);
+    setTimeout(() => noteOffApi(ch, note), midiInt(durationMs === undefined ? 200 : durationMs, 1, 60000));
+  },
+  transport: transportSnapshot,
   sendNRPN: (ch, msb, lsb, v) => {
     const s = 0xB0 | (midiInt(ch, 1, 16) - 1);
     const val = midiInt(v, 0, 16383);
@@ -550,8 +586,9 @@ const HANDLER_NAMES = [
   'onDumpReceived', 'onParameterReceived',
   // Collected so named handlers are ready the moment their preview dispatch lands
   // (today these fire in the exported plugin — see panelApi.js availability).
-  'onTimer', 'onMidiIn', 'onCcIn', 'onSysexIn',
+  'onTimer', 'onMidiIn', 'onCcIn', 'onSysexIn', 'onNoteIn',
   'onControlChanged', 'onPanelStateChanged', 'onDeviceConnected', 'onDeviceDisconnected',
+  'onBeat', 'onBar',
 ];
 
 /** A sensible sample payload for manually running a handler from the editor. */
@@ -734,6 +771,7 @@ function loadHandlersCsharp(script, collect) {
     ...api, setValue: api.set, getValue: api.get,
     SetValue: api.set, GetValue: api.get, Log: api.log,
     SendCC: api.sendCC, SendNRPN: api.sendNRPN, SendSysex: api.sendSysex,
+    SendNote: api.sendNote, NoteOn: api.noteOn, NoteOff: api.noteOff, Transport: api.transport,
     Clamp: api.clamp, Scale: api.scale, Round: api.round, Snap: api.snap, Lerp: api.lerp, Curve: api.curve,
   };
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
@@ -855,6 +893,7 @@ const live = {
   dispatching: 0,          // dispatch nesting depth (emit() re-enters); truthy while any dispatch runs
   listeners: new Map(),    // scriptId -> [{ target, event, fn }] from on(...) registrations
   listenersDirty: true,    // scripts changed → rescan on the next dispatch
+  transportPrevBeats: null, // last transport beat position seen (null = re-seed on next tick)
   unsubs: [],
 };
 
@@ -1078,7 +1117,42 @@ function onPreviewModeChanged(on) {
   live.prevPreviewOn = on;
 }
 
-/* --- source 4: incoming bulk dumps (device host) --- */
+/* --- source 4: the transport (onBeat / onBar) --- */
+
+/**
+ * The onBeat/onBar events between two clock readings (pure — exported for tests).
+ * bar/beat are 1-based; `beats` is the absolute beat index crossed. A backwards jump
+ * (rewind) produces no events — the caller just re-seeds from the new position.
+ */
+export function beatCrossings(prevBeats, nowBeats, beatsPerBar) {
+  const perBar = beatsPerBar > 0 ? beatsPerBar : 4;
+  const events = [];
+  const from = Math.floor(prevBeats);
+  const to = Math.floor(nowBeats);
+  for (let b = from + 1; b <= to; b += 1) {
+    events.push({ event: 'onBeat', controlName: null,
+      payload: { beats: b, bar: Math.floor(b / perBar) + 1, beat: (b % perBar) + 1 } });
+    if (b % perBar === 0) {
+      events.push({ event: 'onBar', controlName: null, payload: { bar: Math.floor(b / perBar) + 1 } });
+    }
+  }
+  return events;
+}
+
+// The transport store publishes on its own clock tick; derive beat crossings from the live
+// (never-accumulated) beat position. Re-seeds while stopped so a restart fires beat 1 cleanly.
+function onTransportChanged(t) {
+  if (!live.enabledGlobal) return;
+  if (t?.running !== true) { live.transportPrevBeats = null; return; }
+  const beats = transportBeatsNow();
+  const prev = live.transportPrevBeats ?? Math.floor(beats) - 1e-9; // first tick → fire the current beat once
+  live.transportPrevBeats = beats;
+  if (live.dispatching) return; // a dispatch is running; next tick picks up from here
+  const events = beatCrossings(prev, beats, transportBeatsPerBar());
+  if (events.length) dispatchEvents(events);
+}
+
+/* --- source 5: incoming bulk dumps (device host) --- */
 
 // A bulk dump arrived and the device host (C++ DPD codec) decoded it. Fill the bound controls and
 // fire onDumpReceived so scripts can run post-load logic. No-op in a plain browser (no host).
@@ -1113,6 +1187,7 @@ export function initPanelRuntime() {
     seedSessionSnapshot();
   }));
   live.unsubs.push(scriptDocuments.subscribe(() => { live.listenersDirty = true; }));
+  live.unsubs.push(transportStore.subscribe((t) => onTransportChanged(t)));
   live.unsubs.push(panels.subscribe(() => onPanelsChanged()));
   live.unsubs.push(panelPreviewSessions.subscribe((s) => onPreviewSessionsChanged(s)));
   live.unsubs.push(previewModeEnabled.subscribe((on) => onPreviewModeChanged(on === true)));

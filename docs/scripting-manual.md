@@ -301,6 +301,8 @@ Payloads are passed directly with a descriptive name — one obvious datum comes
 | `"controlChanged"` | `onControlChanged(info)` | `info` (`.target` `.value`) | Any control changed. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
 | `"panelStateChanged"` | `onPanelStateChanged(state)` | `state` | Panel state switched. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
 | `"timer"` | `onTimer(info)` | `info` (`.id`) | A started timer fired. | preview ⬜ · export ✅ — Runs in the exported plugin (TimerManager); editor-preview timers are pending. |
+| `"beat"` | `onBeat(info)` | `info` (`.beat` `.bar` `.beats`) | The clock crossed a beat (beat/bar 1-based, beats = absolute index). | preview ✅ · export ✅ — Fires from the panel Transport in the UI runtime; window-closed it follows the DAW playhead (nothing fires without a running clock). |
+| `"bar"` | `onBar(info)` | `info` (`.bar`) | The clock crossed a bar line. | preview ✅ · export ✅ — Fires from the panel Transport in the UI runtime; window-closed it follows the DAW playhead (nothing fires without a running clock). |
 
 ### Device events
 
@@ -310,6 +312,7 @@ Payloads are passed directly with a descriptive name — one obvious datum comes
 | `"dumpReceived"` | `onDumpReceived(dump)` | `dump` (`.values` `.kind` `.role` `.bytes`) | A bulk dump arrived and was decoded via the DPD; the panel fills automatically. values = { parameterId: value }, bytes = the raw message. | everywhere |
 | `"midiIn"` | `onMidiIn(midi)` | `midi` (`.bytes` `.channel` `.status`) | Any MIDI arrived (raw). | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
 | `"ccIn"` | `onCcIn(cc)` | `cc` (`.channel` `.cc` `.value`) | A CC arrived. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
+| `"noteIn"` | `onNoteIn(note)` | `note` (`.channel` `.note` `.velocity` `.on`) | A note arrived (on = false for note-off; a velocity-0 note-on counts as off). | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
 | `"sysexIn"` | `onSysexIn(bytes)` | `bytes` | Raw SysEx arrived. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
 | `"deviceConnected"` | `onDeviceConnected(device)` | `device` | A device connected. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
 | `"deviceDisconnected"` | `onDeviceDisconnected(device)` | `device` | A device disconnected. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
@@ -462,6 +465,36 @@ local bytes = buildDump("patch")
 const bytes = buildDump("patch")
 ```
 
+#### `sendNote(channel, note [, velocity, durationMs])`
+
+Play a note and automatically send its note-off after durationMs (default 200). velocity defaults to 100.
+
+*Valid in device / panel scripts only.*
+
+```lua
+sendNote(channel, note, 100, 200)
+```
+
+#### `noteOn(channel, note [, velocity])`
+
+Start holding a note (velocity defaults to 100). Pair with noteOff — for fire-and-forget use sendNote.
+
+*Valid in device / panel scripts only.*
+
+```lua
+noteOn(channel, note, 100)
+```
+
+#### `noteOff(channel, note)`
+
+Release a note started with noteOn.
+
+*Valid in device / panel scripts only.*
+
+```lua
+noteOff(channel, note)
+```
+
 #### `sendCC(channel, cc, value)`
 
 Send a raw MIDI CC.
@@ -502,11 +535,28 @@ Compute a device checksum (e.g. "roland", "yamaha").
 checksum("roland", bytes)
 ```
 
+### Transport
+
+#### `transport()`
+
+Snapshot of the master clock: { playing, bpm, beats, beat, bar, beatsPerBar } — beat/bar are 1-based, beats is the absolute position.
+
+*Availability: preview ✅ · export ✅ — Follows the panel Transport in the UI runtime; window-closed it reflects the DAW playhead (empty fields when the host reports nothing).*
+
+```lua
+-- Lua
+local t = transport()
+```
+```js
+// JavaScript
+const t = transport()
+```
+
 ### Timers
 
 #### `startTimer(id, ms)`
 
-Start (or restart) a named repeating timer; onTimer fires with info.id every ms until stopTimer(id).
+Start (or restart) a named repeating timer; onTimer fires with info.id every ms until stopTimer(id). Pass { beats: n } instead of ms to derive the interval from the current tempo (fixed at start — restart after a tempo change, or follow onBeat).
 
 *Availability: preview ⬜ · export ✅ — Runs in the exported plugin (TimerManager); editor-preview timers are pending.*
 

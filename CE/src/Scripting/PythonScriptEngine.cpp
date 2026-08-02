@@ -247,6 +247,25 @@ PyObject* api_buildDump (PyObject*, PyObject* args)
     const char* kind = nullptr; if (! PyArg_ParseTuple (args, "s", &kind)) return nullptr;
     return varToPy (g_host->buildDump (juce::String::fromUTF8 (kind)));
 }
+PyObject* api_sendNoteOn (PyObject*, PyObject* args)
+{
+    int ch = 0, note = 0, vel = 100;
+    if (! PyArg_ParseTuple (args, "ii|i", &ch, &note, &vel)) return nullptr;
+    g_host->sendNoteOn (ch, note, vel); Py_RETURN_NONE;
+}
+PyObject* api_sendNoteOff (PyObject*, PyObject* args)
+{
+    int ch = 0, note = 0;
+    if (! PyArg_ParseTuple (args, "ii", &ch, &note)) return nullptr;
+    g_host->sendNoteOff (ch, note); Py_RETURN_NONE;
+}
+PyObject* api_sendNote (PyObject*, PyObject* args)
+{
+    int ch = 0, note = 0, vel = 100, ms = 200;
+    if (! PyArg_ParseTuple (args, "ii|ii", &ch, &note, &vel, &ms)) return nullptr;
+    g_host->sendNote (ch, note, vel, ms); Py_RETURN_NONE;
+}
+PyObject* api_transport (PyObject*, PyObject*) { return varToPy (g_host->getTransport()); }
 PyObject* api_run (PyObject*, PyObject* args)
 {
     const char* target = nullptr; PyObject* a = nullptr;
@@ -288,6 +307,10 @@ PyMethodDef apiMethods[] = {
     { "applyDump",     api_applyDump,     METH_VARARGS, nullptr },
     { "sendDump",      api_sendDump,      METH_VARARGS, nullptr },
     { "buildDump",     api_buildDump,     METH_VARARGS, nullptr },
+    { "sendNoteOn",    api_sendNoteOn,    METH_VARARGS, nullptr },
+    { "sendNoteOff",   api_sendNoteOff,   METH_VARARGS, nullptr },
+    { "sendNote",      api_sendNote,      METH_VARARGS, nullptr },
+    { "transport",     api_transport,     METH_NOARGS,  nullptr },
     { "run",           api_run,           METH_VARARGS, nullptr },
     { "emit",          api_emit,          METH_VARARGS, nullptr },
     { "log",           api_log,           METH_VARARGS, nullptr },
@@ -311,6 +334,10 @@ import ceditor as __api
 def set(path, value, opts=None): return __api.set(path, value, opts)
 def get(path, form="value"):      return __api.get(path, form)
 def sendCC(ch, cc, v):            return __api.sendCC(ch, cc, v)
+def noteOn(ch, note, vel=100):    return __api.sendNoteOn(ch, note, vel)
+def noteOff(ch, note):            return __api.sendNoteOff(ch, note)
+def sendNote(ch, note, vel=100, ms=200): return __api.sendNote(ch, note, vel, ms)
+def transport():                  return __api.transport()
 def sendNRPN(ch, msb, lsb, v):    return __api.sendNRPN(ch, msb, lsb, v)
 def sendSysex(b):                 return __api.sendSysex(b)
 def requestDump(kind):            return __api.requestDump(kind)

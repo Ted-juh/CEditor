@@ -229,7 +229,15 @@ Host-provided, **identical in every language**. **Principle:** only provide what
 
 ## Timers ✅ (added post-Q11 — design in `CE/web/src/CE_Application/docs/timer-system.md`)
 
-`startTimer(id, ms)` starts (or restarts) a named repeating timer; the `onTimer` panel event fires with `info.id` every `ms` until `stopTimer(id)`. Backed by one host-side `TimerManager` (never a raw thread), bound in every engine. Picker category "Timers".
+`startTimer(id, ms)` starts (or restarts) a named repeating timer; the `onTimer` panel event fires with `info.id` every `ms` until `stopTimer(id)`. Backed by one host-side `TimerManager` (never a raw thread), bound in every engine. Picker category "Timers". `startTimer(id, { beats = n })` derives the interval from the current tempo (fixed at start — restart after a tempo change, or follow `onBeat`).
+
+---
+
+## Notes & Transport ✅ (added post-Q11)
+
+**Notes** (device surface, alongside Q9's raw sends): `sendNote(channel, note [, velocity, durationMs])` plays and schedules its own note-off (defaults 100 / 200 ms); `noteOn`/`noteOff` are the held pair. Inbound: the `noteIn` device event (`channel`, `note`, `velocity`, `on` — a velocity-0 note-on counts as off). Channels 1–16, notes 0–127 (C4 = 60), consistent with the rest of the API.
+
+**Transport**: `transport()` returns the master-clock snapshot `{ playing, bpm, beats, beat, bar, beatsPerBar }` (beat/bar 1-based). The `beat`/`bar` panel events fire as the clock runs — from the panel Transport in the UI runtime, from the DAW playhead window-closed. The clock is read, never accumulated (see `transport.md`), so beat events can't drift.
 
 ---
 

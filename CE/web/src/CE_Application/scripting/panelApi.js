@@ -125,6 +125,10 @@ const TIMERS_EXPORT_ONLY = {
   preview: false, export: true,
   note: 'Runs in the exported plugin (TimerManager); editor-preview timers are pending.',
 };
+const TRANSPORT_CLOCK = {
+  preview: true, export: true,
+  note: 'Fires from the panel Transport in the UI runtime; window-closed it follows the DAW playhead (nothing fires without a running clock).',
+};
 const PANEL_UI_RUNTIME = {
   preview: true, export: true,
   note: 'Panel-UI runtime (editor preview and the exported player window); not available to the window-closed C++ runtime.',
@@ -216,6 +220,8 @@ export const PANEL_EVENTS = [
   { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', fields: ['target', 'value'], summary: 'Any control changed.', availability: NOT_WIRED_YET },
   { id: 'panelStateChanged', fn: 'onPanelStateChanged', payload: 'state', summary: 'Panel state switched.', availability: NOT_WIRED_YET },
   { id: 'timer', fn: 'onTimer', payload: 'info', fields: ['id'], summary: 'A started timer fired.', availability: TIMERS_EXPORT_ONLY },
+  { id: 'beat', fn: 'onBeat', payload: 'info', fields: ['beat', 'bar', 'beats'], summary: 'The clock crossed a beat (beat/bar 1-based, beats = absolute index).', availability: TRANSPORT_CLOCK },
+  { id: 'bar', fn: 'onBar', payload: 'info', fields: ['bar'], summary: 'The clock crossed a bar line.', availability: TRANSPORT_CLOCK },
 ];
 
 export const DEVICE_EVENTS = [
@@ -225,6 +231,7 @@ export const DEVICE_EVENTS = [
   // raw (escape hatch)
   { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', fields: ['bytes', 'channel', 'status'], decoded: false, summary: 'Any MIDI arrived (raw).', availability: EXPORT_ONLY_PENDING_PREVIEW },
   { id: 'ccIn', fn: 'onCcIn', payload: 'cc', fields: ['channel', 'cc', 'value'], decoded: false, summary: 'A CC arrived.', availability: EXPORT_ONLY_PENDING_PREVIEW },
+  { id: 'noteIn', fn: 'onNoteIn', payload: 'note', fields: ['channel', 'note', 'velocity', 'on'], decoded: false, summary: 'A note arrived (on = false for note-off; a velocity-0 note-on counts as off).', availability: EXPORT_ONLY_PENDING_PREVIEW },
   { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'Raw SysEx arrived.', availability: EXPORT_ONLY_PENDING_PREVIEW },
   { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A device connected.', availability: NOT_WIRED_YET },
   { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A device disconnected.', availability: NOT_WIRED_YET },
@@ -343,6 +350,41 @@ export const COMMANDS = [
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
   },
 
+  /* --- Device / MIDI: notes --- */
+  {
+    id: 'sendNote', category: 'Device / MIDI', signature: 'sendNote(channel, note [, velocity, durationMs])',
+    summary: 'Play a note and automatically send its note-off after durationMs (default 200). velocity defaults to 100.',
+    params: [
+      { name: 'channel', type: 'number', required: true },
+      { name: 'note', type: 'number', required: true },
+      { name: 'velocity', type: 'number', required: false },
+      { name: 'durationMs', type: 'number', required: false },
+    ],
+    scopes: ['device', 'panel'],
+    snippet: { lua: 'sendNote(${1:channel}, ${2:note}, ${3:100}, ${4:200})$0', javascript: 'sendNote(${1:channel}, ${2:note}, ${3:100}, ${4:200})$0' },
+  },
+  {
+    id: 'noteOn', category: 'Device / MIDI', signature: 'noteOn(channel, note [, velocity])',
+    summary: 'Start holding a note (velocity defaults to 100). Pair with noteOff — for fire-and-forget use sendNote.',
+    params: [
+      { name: 'channel', type: 'number', required: true },
+      { name: 'note', type: 'number', required: true },
+      { name: 'velocity', type: 'number', required: false },
+    ],
+    scopes: ['device', 'panel'],
+    snippet: { lua: 'noteOn(${1:channel}, ${2:note}, ${3:100})$0', javascript: 'noteOn(${1:channel}, ${2:note}, ${3:100})$0' },
+  },
+  {
+    id: 'noteOff', category: 'Device / MIDI', signature: 'noteOff(channel, note)',
+    summary: 'Release a note started with noteOn.',
+    params: [
+      { name: 'channel', type: 'number', required: true },
+      { name: 'note', type: 'number', required: true },
+    ],
+    scopes: ['device', 'panel'],
+    snippet: { lua: 'noteOff(${1:channel}, ${2:note})$0', javascript: 'noteOff(${1:channel}, ${2:note})$0' },
+  },
+
   /* --- Device / MIDI: raw (Q9) --- */
   {
     id: 'sendCC', category: 'Device / MIDI', signature: 'sendCC(channel, cc, value)',
@@ -385,10 +427,20 @@ export const COMMANDS = [
     snippet: { lua: 'checksum("${1:roland}", ${2:bytes})$0', javascript: 'checksum("${1:roland}", ${2:bytes})$0' },
   },
 
+  /* --- Transport --- */
+  {
+    id: 'transport', category: 'Transport', signature: 'transport()',
+    summary: 'Snapshot of the master clock: { playing, bpm, beats, beat, bar, beatsPerBar } — beat/bar are 1-based, beats is the absolute position.',
+    params: [],
+    scopes: 'any',
+    availability: { preview: true, export: true, note: 'Follows the panel Transport in the UI runtime; window-closed it reflects the DAW playhead (empty fields when the host reports nothing).' },
+    snippet: { lua: 'local t = transport()$0', javascript: 'const t = transport()$0' },
+  },
+
   /* --- Timers (see docs/timer-system.md) --- */
   {
     id: 'startTimer', category: 'Timers', signature: 'startTimer(id, ms)',
-    summary: 'Start (or restart) a named repeating timer; onTimer fires with info.id every ms until stopTimer(id).',
+    summary: 'Start (or restart) a named repeating timer; onTimer fires with info.id every ms until stopTimer(id). Pass { beats: n } instead of ms to derive the interval from the current tempo (fixed at start — restart after a tempo change, or follow onBeat).',
     availability: TIMERS_EXPORT_ONLY,
     params: [
       { name: 'id', type: 'string', required: true },
@@ -963,7 +1015,7 @@ export const EVENT_BY_ID = Object.fromEntries(ALL_EVENTS.map((e) => [e.id, e]));
 /** Group commands + helpers + lifecycle by their `category`, for the picker's "Commands" side. */
 export function membersByCategory() {
   const order = [
-    'Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Timers', 'Debug',
+    'Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Transport', 'Timers', 'Debug',
     'Zone Splitter', 'Phrase Sequencer', 'Phrase Recorder', 'Harmoniser', 'Setlist',
     'Value / range', 'Music', 'MIDI encoding',
   ];
