@@ -129,7 +129,7 @@
     <PropertyCell label="Loop" span={1} hint="Next at the end goes back to the first scene.">
       <PropertyToggle value={p.wrap === true} onchange={() => set('wrap', !(p.wrap === true))} />
     </PropertyCell>
-    <PropertyCell label="Send program" span={1} hint="Bank select then program change, in that order — bank select selects the bank the NEXT program change lands in.">
+    <PropertyCell label="Send program" span={1} hint="Bank select then program change, in that order.">
       <PropertyToggle value={p.sendProgram !== false} onchange={() => set('sendProgram', !(p.sendProgram !== false))} />
     </PropertyCell>
     <PropertyCell label="Recall values" span={1} hint="Write each scene's captured panel values on recall.">
@@ -138,7 +138,7 @@
     <PropertyCell label="Recall tempo" span={1} hint="A scene's tempo drives the Transport. Songs have tempos; that is most of what a setlist is for.">
       <PropertyToggle value={p.recallTempo !== false} onchange={() => set('recallTempo', !(p.recallTempo !== false))} />
     </PropertyCell>
-    <PropertyCell label="Crossfade" span={1} hint="Milliseconds to slide the panel values across on a recall. 0 snaps, which is what a scene change usually means — a fade is for when a hard jump is worse than a slow one. Only numbers are interpolated; anything else switches at the halfway point, because there is no value between 'sine' and 'square'.">
+    <PropertyCell label="Crossfade" span={1} hint="Milliseconds to slide panel values on a recall; 0 snaps. Only numbers interpolate; the rest switch at halfway.">
       <input class="val" type="number" min="0" max="10000" step="50" value={crossfadeMs(control)} onchange={(e) => set('crossfadeMs', clampInt(e.target.value, 0, 10000, 0))} />
     </PropertyCell>
     <PropertyCell label="PC channel" span={1} hint="Where program change is sent.">
@@ -149,15 +149,13 @@
   <PropertySection title="Footswitch">
     <PropertyCell label="" span={4} hint="">
       <div class="note">
-        Steps on the <b>rising edge only</b>. A momentary pedal sends 127 when you press it and 0
-        when you let go — acting on both would step twice per press, which on stage looks like the
-        pedal skipping a song.
+        Steps on the <b>rising edge only</b>, so one press is one step.
       </div>
     </PropertyCell>
     <PropertyCell label="Enabled" span={1} hint="">
       <PropertyToggle value={p.footEnabled !== false} onchange={() => set('footEnabled', !(p.footEnabled !== false))} />
     </PropertyCell>
-    <PropertyCell label="CC" span={1} hint="64 is the sustain pedal, which is what most footswitches send out of the box.">
+    <PropertyCell label="CC" span={1} hint="Footswitch CC number. 64 is the sustain pedal, which most footswitches send.">
       <input class="val" type="number" min="0" max="127" step="1" value={num(p.footCc, 64)} onchange={(e) => set('footCc', clampInt(e.target.value, 0, 127, 64))} />
     </PropertyCell>
     <PropertyCell label="Channel" span={1} hint="0 listens on every channel.">
@@ -171,7 +169,7 @@
         {#each FOOT_ACTIONS as a (a)}<option value={a}>{FOOT_ACTION_LABELS[a] ?? a}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Back pedal" span={1} hint="A second CC for 'previous'. Blank means there is no back pedal — defaulting it to a number would silently let some other controller step the setlist backwards. Its held state is tracked separately, so one pedal's release can't cancel the other's press.">
+    <PropertyCell label="Back pedal" span={1} hint="A second CC for 'previous'. Blank means no back pedal.">
       <input class="val" type="number" min="0" max="127" step="1" placeholder="none" value={footswitchBackCc(control) ?? ''} onchange={(e) => set('footBackCc', e.target.value === '' ? null : clampInt(e.target.value, 0, 127, 65))} />
     </PropertyCell>
     {#if String(p.footAction ?? 'next') === 'goto'}
@@ -182,7 +180,7 @@
   </PropertySection>
 
   <PropertySection title="Scenes">
-    <PropertyCell label="" span={4} hint="Capture stores an explicit list of paths, never 'everything' — the setlist's own index is a panel value too, and a scene that stored it would move the setlist when recalled.">
+    <PropertyCell label="" span={4} hint="Capture stores an explicit list of paths, not 'everything'.">
       <div class="rowhead">
         <button type="button" class="btn" onclick={addScene} disabled={scenes.length >= MAX_SCENES}>Add scene</button>
         <button type="button" class="btn" onclick={captureAllPathsFromPanel}>Capture every control</button>

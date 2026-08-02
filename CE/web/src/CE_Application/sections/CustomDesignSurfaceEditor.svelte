@@ -4452,7 +4452,7 @@
                       />
                     </label>
                   </div>
-                  <div class="dock-note">This is the saved custom component workspace size. It does not require a panel.</div>
+                  <div class="dock-note">The saved custom component workspace size.</div>
                   <div class="dock-button-grid">
                     <button type="button" onclick={() => { setArtboardSize('width', 152); setArtboardSize('height', 92); }}>Button</button>
                     <button type="button" onclick={() => { setArtboardSize('width', 260); setArtboardSize('height', 120); }}>Default</button>
@@ -4496,7 +4496,7 @@
                         <span>{selectedKitEntry.zoneNames.length}</span>
                       </div>
                     </div>
-                    <div class="dock-note">This is one smart value control. The visible ticks, track, pointer, readout, and hidden interaction area stay grouped by default.</div>
+                    <div class="dock-note">One smart value control — ticks, track, pointer, readout and hit area stay grouped.</div>
                     <div class="dock-button-grid">
                       <button type="button" onclick={() => editKitParts(selectedKitEntry.id)}>Edit Internal Parts</button>
                       <button type="button" class="danger" onclick={removeSelectedKit}>
@@ -4843,7 +4843,7 @@
                     </select>
                   </label>
                 {:else}
-                  <div class="dock-note">Use hit zones to make artwork interactive. Selected artwork can still be animated by bindings and states.</div>
+                  <div class="dock-note">Use hit zones to make artwork interactive.</div>
                 {/if}
               </div>
             {:else if inspectorTab === 'states'}
@@ -4869,7 +4869,7 @@
               </div>
               <div class="dock-section">
                 <div class="dock-section-title">States</div>
-                <div class="dock-note">States are authored on the filmstrip below the canvas and in the panel's States tab (rules, patches, coverage).</div>
+                <div class="dock-note">States are authored on the filmstrip below the canvas and in the panel's States tab.</div>
               </div>
             {/if}
           </div>

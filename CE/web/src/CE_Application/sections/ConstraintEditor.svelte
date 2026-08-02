@@ -83,7 +83,7 @@
   </PropertySection>
 
   <PropertySection title="Members">
-    <PropertyCell label="" span={4} hint="The linked parameters. Each is a bindable 'Member' port — bind it in Device Bindings. Their values move together to satisfy the rule; drag the bars in preview.">
+    <PropertyCell label="" span={4} hint="The linked parameters, moving together to satisfy the rule. Bind each 'Member' port in Device Bindings.">
       <div class="rows">
         {#if members.length === 0}<div class="empty">No members yet. Add one, then bind its port.</div>{/if}
         {#each members as m, i (m.id ?? i)}

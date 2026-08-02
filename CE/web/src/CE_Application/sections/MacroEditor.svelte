@@ -60,7 +60,7 @@
   </PropertySection>
 
   <PropertySection title="Assignments">
-    <PropertyCell label="" span={4} hint="Each row maps the macro to one bound device parameter: depth (−100…+100%, sign = direction), response curve, and output range. Every row is a bindable 'Destination' port.">
+    <PropertyCell label="" span={4} hint="Each row maps the macro to one bound parameter: depth (−100…+100%), curve, and output range.">
       <div class="slots">
         {#if slots.length === 0}
           <div class="empty">No assignments yet. Add one, then bind its port in Device Bindings.</div>

@@ -52,7 +52,7 @@
     <PropertyCell label="Columns" span={1} hint="Grid width.">
       <input class="val" type="number" min="1" max="8" step="1" value={num(d.cols, 4)} onchange={(e) => set('cols', clampInt(e.target.value, 1, 8, 4))} />
     </PropertyCell>
-    <PropertyCell label="Map" span={2} hint="GM names the pads from the General MIDI drum kit and sets up the hi-hat choke group. Chromatic labels them by pitch. Custom is the same note run, named entirely by you.">
+    <PropertyCell label="Map" span={2} hint="GM = General MIDI kit names plus the hi-hat choke group. Chromatic = labelled by pitch. Custom = named by you.">
       <select class="val" value={d.map ?? 'gm'} onchange={(e) => set('map', e.target.value)}>
         {#each PAD_MAPS as m (m)}<option value={m}>{PAD_MAP_LABELS[m] ?? m}</option>{/each}
       </select>
@@ -75,7 +75,7 @@
   </PropertySection>
 
   <PropertySection title="Trigger">
-    <PropertyCell label="Mode" span={2} hint="Momentary holds the note while you press. One-shot sends a short fixed gate, which is what a sampler wants. Toggle keeps it sounding until you hit the pad again.">
+    <PropertyCell label="Mode" span={2} hint="Momentary = held while pressed. One-shot = a short fixed gate. Toggle = on until you hit the pad again.">
       <select class="val" value={d.mode ?? 'momentary'} onchange={(e) => set('mode', e.target.value)}>
         {#each PAD_MODES as m (m)}<option value={m}>{PAD_MODE_LABELS[m] ?? m}</option>{/each}
       </select>
@@ -97,7 +97,7 @@
     <PropertyCell label="Playable" span={1} hint="Allow striking the pads in preview / the player. Dragging across the grid rolls through them.">
       <PropertyToggle value={d.editable !== false} onchange={() => set('editable', !(d.editable !== false))} />
     </PropertyCell>
-    <PropertyCell label="Echo MIDI in" span={1} hint="Light the matching pads from notes arriving on the hardware MIDI input, drawn as an outline so external play never looks like your own. The grid becomes a monitor for whatever a sequencer or drum machine is playing.">
+    <PropertyCell label="Echo MIDI in" span={1} hint="Outline the matching pads from notes arriving on the hardware MIDI input.">
       <PropertyToggle value={d.echo === true} onchange={() => set('echo', !(d.echo === true))} />
     </PropertyCell>
     {#if d.echo === true}
@@ -114,7 +114,7 @@
   </PropertySection>
 
   <PropertySection title="Pads">
-    <PropertyCell label="" span={4} hint="Each row overrides one pad. Blank fields fall back to the generated map. Choke: pads sharing a non-zero number cut each other (the GM hi-hats are group 1).">
+    <PropertyCell label="" span={4} hint="Each row overrides one pad — blank fields use the generated map. Pads sharing a choke number cut each other.">
       <div class="table" role="table" aria-label="Pad overrides">
         <div class="thead" role="row">
           <span role="columnheader">#</span>

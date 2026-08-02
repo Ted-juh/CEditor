@@ -32,14 +32,14 @@
 
 {#if t}
   <PropertySection title="Transport">
-    <PropertyCell label="Source" span={2} hint="Internal makes this the master clock. MIDI clock in follows an incoming clock. Host / DAW follows the playhead of the DAW the exported plugin is running in — the best of the three, because a DAW reports a position rather than a stream of pulses. With either follower the tempo box shows what is being received and the tempo you set here is ignored.">
+    <PropertyCell label="Source" span={2} hint="Internal = this is the master clock. MIDI clock in = follow an incoming clock. Host/DAW = follow the DAW playhead. Followers ignore the tempo box.">
       <select class="val" value={t.source ?? 'internal'} onchange={(e) => set('source', e.target.value)}>
         {#each TRANSPORT_SOURCES as s (s)}<option value={s}>{TRANSPORT_SOURCE_LABELS[s] ?? s}</option>{/each}
       </select>
     </PropertyCell>
     {#if isHost}
       <PropertyCell label="" span={4} hint="">
-        <div class="note">Only live in an exported plugin — the editor preview and the standalone Player have no DAW to ask, so this Transport stays parked and the face reads &ldquo;HOST · no DAW&rdquo;.</div>
+        <div class="note">Only live in an exported plugin; elsewhere the face reads &ldquo;HOST · no DAW&rdquo;.</div>
       </PropertyCell>
     {/if}
 
@@ -56,13 +56,13 @@
     <PropertyCell label="Run on load" span={1} hint="Start the clock as soon as the panel opens, so an exported Player is already running.">
       <PropertyToggle value={t.runOnLoad === true} onchange={() => set('runOnLoad', !(t.runOnLoad === true))} />
     </PropertyCell>
-    <PropertyCell label="Count-in" span={1} hint="Bars of silence before the first step fires, when you press play. 0 = off. During the count-in the transport is deliberately not running, so every synced component holds and stays quiet — pressing play again aborts it.">
+    <PropertyCell label="Count-in" span={1} hint="Bars of silence before the first step fires when you press play; 0 = off. Synced components hold and stay quiet.">
       <input class="val" type="number" min="0" max={MAX_COUNT_IN_BARS} step="1" value={num(t.countInBars, 0)} onchange={(e) => set('countInBars', clampInt(e.target.value, 0, MAX_COUNT_IN_BARS, 0))} />
     </PropertyCell>
-    <PropertyCell label="Clock out" span={1} hint="Send MIDI clock so hardware follows this panel. That is 24 messages per quarter note — 48 a second at 120bpm — so leave it off unless something is actually listening.">
+    <PropertyCell label="Clock out" span={1} hint="Send MIDI clock so hardware follows this panel — 24 messages per quarter note.">
       <PropertyToggle value={t.clockOut === true} onchange={() => set('clockOut', !(t.clockOut === true))} />
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="Every synced component follows this one clock. Two Transports on a panel are two faces on the same clock, not two clocks.">
+    <PropertyCell label="" span={4} hint="Every synced component follows this one clock.">
       <div class="note">{isHost ? 'Following the DAW playhead' : external ? 'Following MIDI clock in' : 'Master clock'}{t.clockOut === true && !external ? ' · sending clock' : ''}</div>
     </PropertyCell>
   </PropertySection>
@@ -72,7 +72,7 @@
       <PropertyToggle value={t.loopEnabled === true} onchange={() => set('loopEnabled', !(t.loopEnabled === true))} />
     </PropertyCell>
     {#if t.loopEnabled === true}
-      <PropertyCell label="From bar" span={1} hint="The first bar of the loop, counting from 1. Running in from earlier in the song is allowed — the position is only folded once it reaches here.">
+      <PropertyCell label="From bar" span={1} hint="The first bar of the loop, counting from 1.">
         <input class="val" type="number" min="1" max={MAX_LOOP_BAR} step="1" value={num(t.loopStartBar, 1)} onchange={(e) => set('loopStartBar', clampInt(e.target.value, 1, MAX_LOOP_BAR, 1))} />
       </PropertyCell>
       <PropertyCell label="Length (bars)" span={1} hint="How long the loop is. 0.25 = one beat in 4/4.">
@@ -96,7 +96,7 @@
     <PropertyCell label="Position" span={1} hint="Show the bar.beat.tick readout and the beat pulse.">
       <PropertyToggle value={t.showPosition !== false} onchange={() => set('showPosition', !(t.showPosition !== false))} />
     </PropertyCell>
-    <PropertyCell label="Swing" span={1} hint="Shuffle for every follower synced to this clock — delays every odd step by up to half a step. It lives here rather than on each sequencer so two of them at the same setting really are the same shuffle; a follower can still opt out.">
+    <PropertyCell label="Swing" span={1} hint="Shuffle for every follower on this clock — delays every odd step by up to half a step.">
       <input class="val" type="number" min="0" max="1" step="0.05" value={num(t.swing, 0)} onchange={(e) => set('swing', clampNum(e.target.value, 0, 1, 0))} />
     </PropertyCell>
     <PropertyCell label="Tap tempo" span={1} hint="Tapping the face sets the tempo. Inactive while following an external clock or the DAW.">

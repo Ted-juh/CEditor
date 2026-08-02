@@ -326,7 +326,7 @@
     {/if}
 
     <PropertySection title="Public API">
-      <PropertyCell label="Published" span={2} hint="Publishing is edited in the Publish tab — the single source of truth. The channel flags follow the contract automatically.">
+      <PropertyCell label="Published" span={2} hint="Edited in the Publish tab. The channel flags follow it automatically.">
         <div class="published-chip" class:none={!publishedAsLabel}>
           <strong>{publishedAsLabel || 'not published'}</strong>
           <button type="button" onclick={jumpToPublish}>Edit in Publish</button>

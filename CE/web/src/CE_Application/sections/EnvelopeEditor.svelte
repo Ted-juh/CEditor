@@ -91,7 +91,7 @@
   </PropertySection>
 
   <PropertySection title="Nodes">
-    <PropertyCell label="" span={4} hint="Normalized position (0–1). Curve = the segment shape ending at that node. Drag in preview, or edit here.">
+    <PropertyCell label="" span={4} hint="Normalized position (0–1). Curve = the segment shape ending at that node.">
       <div class="nodes">
         {#each points as p, i (p.id ?? i)}
           <div class="nrow">

@@ -26,7 +26,7 @@
 <div class="shead"><h1>Detect devices</h1></div>
 <p class="sub">Discover a connected synth over MIDI-CI and start a profile from what it reports — controllers, presets and identity. Roland-style SysEx, bit-packing and dumps are added afterwards from the manual or a capture.</p>
 
-<div class="note"><span>ⓘ</span><div>Needs a <b>hardware MIDI output + input</b> mapped for this device and a <b>MIDI-CI-capable</b> synth — many recent instruments support it over an ordinary MIDI cable. Discovery is <b>partial</b> by design: it brings the controller map, presets and identity, not the SysEx address/dump structure.</div></div>
+<div class="note"><span>ⓘ</span><div>Needs a <b>hardware MIDI output + input</b> mapped for this device, and a <b>MIDI-CI-capable</b> synth. Discovery brings the controller map, presets and identity — not the SysEx address/dump structure.</div></div>
 
 <div class="rtbar">
   <button class="asbtn primary" onclick={scan} disabled={scanning || !isJuceAvailable()}>

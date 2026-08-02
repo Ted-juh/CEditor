@@ -39,7 +39,7 @@
 
 {#if r}
   <PropertySection title="Ribbon Keyboard">
-    <PropertyCell label="Mode" span={2} hint="Scale snap = only in-key notes, so you can't play a wrong one. Chromatic = every semitone. Glide = continuous pitch via MIDI pitch bend — the gesture a keyboard can't make.">
+    <PropertyCell label="Mode" span={2} hint="Scale snap = in-key notes only. Chromatic = every semitone. Glide = continuous pitch via pitch bend.">
       <select class="val" value={r.mode ?? 'snap'} onchange={(e) => set('mode', e.target.value)}>
         {#each RIBBON_MODES as m (m)}<option value={m}>{RIBBON_MODE_LABELS[m] ?? m}</option>{/each}
       </select>
@@ -73,7 +73,7 @@
 
   <PropertySection title="Performance">
     {#if isGlide}
-      <PropertyCell label="Bend range" span={2} hint="Semitones of pitch bend. This MUST match the synth's own bend range or the glide will be the wrong distance. 2 is the near-universal default; raise both if you want long slides without a retrigger.">
+      <PropertyCell label="Bend range" span={2} hint="Semitones of pitch bend. Must match the synth's own bend range; 2 is the common default.">
         <input class="val" type="number" min="1" max="48" step="1" value={num(r.bendRange, 2)} onchange={(e) => set('bendRange', clampInt(e.target.value, 1, 48, 2))} />
       </PropertyCell>
       <PropertyCell label="" span={2} hint="Bend only reaches ±the range, so past that the note retriggers on a new root.">
@@ -106,7 +106,7 @@
         <input class="val" type="number" min="0" max="127" step="1" value={num(r.modCc, 1)} onchange={(e) => set('modCc', clampInt(e.target.value, 0, 127, 1))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Echo MIDI in" span={1} hint="Light the matching zones from notes arriving on the hardware MIDI input, drawn as an outline so external play never looks like your own. Turns the strip into a pitch monitor for whatever is playing.">
+    <PropertyCell label="Echo MIDI in" span={1} hint="Outline the matching zones from notes arriving on the hardware MIDI input.">
       <PropertyToggle value={r.echo === true} onchange={() => set('echo', !(r.echo === true))} />
     </PropertyCell>
     {#if r.echo === true}

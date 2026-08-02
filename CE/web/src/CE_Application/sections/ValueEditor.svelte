@@ -79,7 +79,7 @@
       <button type="button" class="action-btn" onclick={addRow}>Add Row</button>
     </PropertyCell>
     {#if isSelector}
-      <PropertyCell label="Store by name" span={4} hint="Export/save this choice by its stable name instead of a row index, so the value round-trips even when the visible rows change (cascading lists).">
+      <PropertyCell label="Store by name" span={4} hint="Save this choice by its stable name instead of a row index, so it survives changing rows.">
         <PropertyToggle
           value={valueSection.storeByValue === true}
           onchange={() => set('Value.storeByValue', !(valueSection.storeByValue === true))}

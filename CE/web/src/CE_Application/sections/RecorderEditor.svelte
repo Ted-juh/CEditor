@@ -75,7 +75,7 @@
 
 {#if p}
   <PropertySection title="Recorder">
-    <PropertyCell label="" span={4} hint="Arming waits for the top of the loop, so the take's downbeat is the loop's downbeat rather than wherever your hand was when you pressed.">
+    <PropertyCell label="" span={4} hint="Arming waits for the top of the loop, so the take starts on the loop's downbeat.">
       <div class="transport">
         <button type="button" class="btn rec" class:on={isRecordingState(state) || state === 'armed'}
                 onclick={() => set('state', toggleRecordState(state, !takeIsEmpty(take)))}>
@@ -90,11 +90,11 @@
     <PropertyCell label="" span={4} hint="">
       <div class="note">
         <b>{RECORDER_STATE_LABELS[state]}</b> · {count} {count === 1 ? 'note' : 'notes'}{passes > 1 ? ` in ${passes} passes` : ''} · {span}
-        {#if count >= MAX_EVENTS}<br />Full — {MAX_EVENTS} notes is the cap, so a stuck input can't grow the take forever.{/if}
+        {#if count >= MAX_EVENTS}<br />Full — {MAX_EVENTS} notes is the cap.{/if}
       </div>
     </PropertyCell>
 
-    <PropertyCell label="Capture" span={2} hint="The panel source taps every note-emitting control here — Chord Pad, Arp, Ribbon, Drum Pads, Phrase, Splitter. A recorder never captures another recorder: two of them would feed each other forever.">
+    <PropertyCell label="Capture" span={2} hint="Which sources feed the take. The panel source taps every note-emitting control here.">
       <select class="val" value={p.source ?? 'both'} onchange={(e) => set('source', e.target.value)}>
         <option value="both">MIDI input + panel</option>
         <option value="input">MIDI input only</option>
@@ -104,13 +104,13 @@
     <PropertyCell label="One pass" span={1} hint="Stop at the end of the first lap instead of layering until you press stop.">
       <PropertyToggle value={p.once === true} onchange={() => set('once', !(p.once === true))} />
     </PropertyCell>
-    <PropertyCell label="Count-in" span={1} hint="Bars to wait after arming before it starts capturing. The Transport's count-in counts the whole panel in from a stop; this one counts THIS recorder in from wherever the music already is — what you want when the band is playing and you want the next four bars. It still starts on a loop boundary, just a later one.">
+    <PropertyCell label="Count-in" span={1} hint="Bars to wait after arming before capture starts. It still begins on a loop boundary.">
       <input class="val" type="number" min="0" max="4" step="1" value={countInBars(control)} onchange={(e) => set('countIn', clampInt(e.target.value, 0, 4, 0))} />
     </PropertyCell>
 
     <TransportSyncCells
       {control} section="Recorder"
-      hint="Synced, the loop is a number of BARS — so a tempo change keeps the phrase the same length in music, which is the whole reason to sync a recorded phrase rather than a recorded gesture."
+      hint="The loop is a number of bars, so it keeps its musical length when the tempo changes."
     >
       {#snippet children()}
         <PropertyCell label="Bars" span={1} hint="Loop length in bars.">
@@ -126,7 +126,7 @@
     <PropertyCell label="Channel" span={1} hint="The channel playback sends on. Captured notes keep their own channel in the take; this is where they go out.">
       <input class="val" type="number" min="1" max="16" step="1" value={num(p.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
     </PropertyCell>
-    <PropertyCell label="Transpose" span={1} hint="Semitones. A note that lands outside 0–127 is dropped, not clamped — clamping piles strays onto one pitch, which sounds like a stuck key.">
+    <PropertyCell label="Transpose" span={1} hint="Semitones. A note landing outside 0–127 is dropped, not clamped.">
       <input class="val" type="number" min="-48" max="48" step="1" value={num(p.transpose, 0)} onchange={(e) => set('transpose', clampInt(e.target.value, -48, 48, 0))} />
     </PropertyCell>
     <PropertyCell label="Velocity ×" span={1} hint="Scales every recorded velocity on the way out.">
@@ -137,9 +137,7 @@
   <PropertySection title="Quantise">
     <PropertyCell label="" span={4} hint="">
       <div class="note">
-        Strength is partial on purpose. Full snap makes a human take sound like a step sequencer —
-        and if that is what you want, the Phrase Sequencer is better at it. Half pulls the timing
-        toward the grid while keeping the feel.
+        Strength pulls the timing toward the grid; full snap removes the feel.
       </div>
     </PropertyCell>
     <PropertyCell label="Grid" span={1} hint="Divisions per loop. 16 over one bar is sixteenth notes.">
@@ -151,7 +149,7 @@
     <PropertyCell label="Lengths too" span={1} hint="Off by default: quantising lengths turns a legato line into blocks, which is a separate decision from fixing the timing.">
       <PropertyToggle value={p.quantizeLength === true} onchange={() => set('quantizeLength', !(p.quantizeLength === true))} />
     </PropertyCell>
-    <PropertyCell label="Into key" span={1} hint="Pitch-correct the take to the nearest note of the scale. Ties go down, deterministically — otherwise the same take quantises two different ways.">
+    <PropertyCell label="Into key" span={1} hint="Pitch-correct the take to the nearest note of the scale. Ties go down.">
       <PropertyToggle value={p.snapToScale === true} onchange={() => set('snapToScale', !(p.snapToScale === true))} />
     </PropertyCell>
     {#if p.snapToScale === true}
@@ -174,11 +172,10 @@
   <PropertySection title="Repair">
     <PropertyCell label="" span={4} hint="">
       <div class="note">
-        Not a piano roll — the Phrase Sequencer is that. These are the repairs you want on a take
-        you otherwise like: it is consistently a hair late, or one note landed wrong.
+        Nudge the whole take, or fix a single note.
       </div>
     </PropertyCell>
-    <PropertyCell label="Whole take" span={4} hint="Nudge moves everything; shift transposes the take itself rather than only its playback, so what you see is what is stored.">
+    <PropertyCell label="Whole take" span={4} hint="Nudge moves everything; shift transposes the stored take, not only its playback.">
       <div class="transport">
         <button type="button" class="btn" disabled={!count} onclick={() => set('take', nudgeTake(take, -0.01))}>◀ nudge</button>
         <button type="button" class="btn" disabled={!count} onclick={() => set('take', nudgeTake(take, 0.01))}>nudge ▶</button>
@@ -214,7 +211,7 @@
   </PropertySection>
 
   <PropertySection title="Takes">
-    <PropertyCell label="" span={4} hint="Storing and loading are copies in each direction — otherwise editing the live take would silently rewrite the stored one.">
+    <PropertyCell label="" span={4} hint="Storing and loading are copies in each direction.">
       <div class="note">
         {slots.length ? `${slots.length} stored${liveSlot >= 0 ? ` · slot ${liveSlot + 1} was loaded last` : ''}.` : 'No stored takes yet.'}
       </div>
@@ -243,7 +240,7 @@
       onloop={(v) => set('chainLoop', v)}
     />
     <PropertyCell label="" span={4} hint="">
-      <div class="note">A chain never advances while recording — swapping the take out from under a pass would lose it.</div>
+      <div class="note">A chain never advances while recording.</div>
     </PropertyCell>
   </PropertySection>
 
@@ -257,7 +254,7 @@
     <PropertyCell label="Pitch labels" span={1} hint="The note names down the left.">
       <PropertyToggle value={p.showGutter !== false} onchange={() => set('showGutter', !(p.showGutter !== false))} />
     </PropertyCell>
-    <PropertyCell label="Min rows" span={1} hint="The roll fits itself to the take, but never shows fewer rows than this — a two-note take drawn as two fat bars reads badly.">
+    <PropertyCell label="Min rows" span={1} hint="The roll fits itself to the take, but never shows fewer rows than this.">
       <input class="val" type="number" min="4" max="48" step="1" value={num(p.minSpan, 12)} onchange={(e) => set('minSpan', clampInt(e.target.value, 4, 48, 12))} />
     </PropertyCell>
   </PropertySection>

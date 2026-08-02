@@ -3,6 +3,9 @@
   import { setHint, clearHint } from '../stores/propertyHint.js';
   import { propertyFilter } from '../stores/propertyFilter.js';
 
+  // `hint` is rendered in the panel's Info bar — a fixed 80px box with no
+  // scrollbar. Keep it to one sentence saying what the control does, under 120
+  // characters. House rules: docs/property-hints.md.
   let { label = '', span = 1, disabled = false, hint = '', children } = $props();
 
   // A PropertyCell inside a PropertySection coordinates filtering through the

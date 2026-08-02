@@ -357,11 +357,11 @@
 
   <PropertySection title="Layouts">
     {#if layouts.length === 0}
-      <PropertyCell label="Layouts" span={4} hint="Multiple element scenes for the same screen, switched by the Pages rules. Enabling moves the current elements into Layout 1.">
+      <PropertyCell label="Layouts" span={4} hint="Multiple element scenes for one screen, switched by the Pages rules. Enabling moves current elements into Layout 1.">
         <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts</button>
       </PropertyCell>
     {:else}
-      <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Elements table edits AND previews on the canvas. Runtime switching follows the Pages rules.">
+      <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Elements table edits and previews. Runtime switching follows the Pages rules.">
         <div class="field-row">
           <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => selectEditLayout(event.target.value)}>
             {#each layouts as l}
@@ -722,7 +722,7 @@
         </div>
       {/if}
     {/each}
-    <PropertyCell label="Elements" span={4} hint="Add a pixel-addressed element: text kinds draw at X/Y with font height H; widget kinds (bars/sliders/needle) fill the X/Y/W/H rect.">
+    <PropertyCell label="Elements" span={4} hint="Add a pixel-addressed element. Text kinds draw at X/Y with font height H; widgets fill the X/Y/W/H rect.">
       <button class="val add-field" type="button" onclick={() => addElement()}>+ Add element</button>
     </PropertyCell>
 
@@ -892,7 +892,7 @@
   </PropertySection>
 
   <PropertySection title="On-screen text">
-    <PropertyCell label="Edit text" span={4} hint="The string shown/edited by an 'edit' element bound to ✎ This screen's text. Click it in preview to type; wheel/↑↓ cycle the character under the caret.">
+    <PropertyCell label="Edit text" span={4} hint="The string shown by an 'edit' element bound to ✎ This screen's text.">
       <input class="val" type="text" value={pixel.editText ?? 'INIT'} oninput={(event) => set('editText', event.target.value)} />
     </PropertyCell>
     <PropertyCell label="Charset" span={2} hint="Which characters new input is limited to.">
@@ -909,7 +909,7 @@
   </PropertySection>
 
   <PropertySection title="Custom font">
-    <PropertyCell label="Glyph sheet" span={4} hint="An image of glyph cells laid out in a grid (left-to-right, top-to-bottom). Text elements set Font → Custom to use it. Clear the file input to remove.">
+    <PropertyCell label="Glyph sheet" span={4} hint="An image of glyph cells in a grid, left-to-right then top-to-bottom. Text elements set Font → Custom to use it.">
       <input class="val" type="file" accept="image/*" onchange={onPickCustomFont} />
     </PropertyCell>
     {#if pixel.customFont?.src}

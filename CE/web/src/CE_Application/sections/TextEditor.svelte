@@ -738,7 +738,7 @@
         </div>
       </PropertyCell>
       {#if String(core?.controlType ?? '') === 'Label'}
-        <PropertyCell label="Editable" span={2} hint="Whether this label's text can be edited by the user at runtime. Must be On before an LCD 'edit' zone can rewrite it from the screen.">
+        <PropertyCell label="Editable" span={2} hint="Let the user edit this label's text at runtime. Required before an LCD 'edit' zone can rewrite it.">
           <PropertyToggle value={text?.editable === true} onchange={(next) => set('Text.editable', next)} />
         </PropertyCell>
       {/if}
@@ -1280,7 +1280,7 @@
         </div>
       </PropertyCell>
 
-      <PropertyCell label="Mode" span={4} hint="Choose how the text should flow: rotate as a block, run on a line, step like a staircase, or bend onto an arc or full circle.">
+      <PropertyCell label="Mode" span={4} hint="How the text flows: as a block, on a line, stepped, or bent onto an arc or circle.">
         <div class="flow-mode-grid">
           {#each FLOW_MODE_OPTIONS as option}
             <button

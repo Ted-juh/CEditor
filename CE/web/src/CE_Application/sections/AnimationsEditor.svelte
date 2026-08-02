@@ -262,7 +262,7 @@
       <PropertyCell label="Delay" span={1} hint="Transition delay in milliseconds.">
         <NumberInput value={selectedAnimation.delay ?? 0} step={1} min={0} onchange={(value) => setAnimationProp('delay', value)} />
       </PropertyCell>
-      <PropertyCell label="Easing" span={2} hint="Named easing curve. The current runtime maps a small stable set to CSS timing functions.">
+      <PropertyCell label="Easing" span={2} hint="Named easing curve, mapped to a CSS timing function.">
         <select class="val" value={selectedAnimation.easing ?? 'outQuad'} onchange={(e) => setAnimationProp('easing', e.target.value)}>
           {#each EASING_OPTIONS as option}
             <option value={option}>{option}</option>
