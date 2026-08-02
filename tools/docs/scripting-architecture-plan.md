@@ -1,5 +1,7 @@
 # CEditor Universal Scripting Architecture Plan
 
+> ⚠️ **SUPERSEDED (historical).** The engine model in this document — a language-neutral "command graph" translated to many languages — was **rejected and retired** (the command-graph script engine has been removed from the codebase). Scripts are now written, stored, and run in the language they were authored in; the only shared thing is the panel API. See [`scripting-redesign-plan.md`](scripting-redesign-plan.md) (the "why") and [`panel-api-spec.md`](panel-api-spec.md) (the contract). Only the non-translation pieces of this plan (sandbox, loop guards, scope model, validation-as-guidance) were kept.
+
 ## Purpose
 
 This document describes a scripting architecture for CEditor that works across custom components, panels, devices, and future exported runtimes. The goal is not to bolt JavaScript onto the editor, but to build a language-neutral scripting system that can be authored visually, displayed as readable script, executed in the editor, and translated to JavaScript, Lua, C++, or other targets later.

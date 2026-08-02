@@ -44,11 +44,13 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
   of the raw inbound events (this wired the C++ Player runtime only).
 
 ### Outbound host API
-- `startTimer` / `stopTimer` — needs a `juce::Timer`-backed `TimerManager`
-  (the only genuinely new thing to bring into the scripting layer).
-- `buildSysex` / `checksum` / `to14Bit` — pure computation; should be installed
-  as engine-side helpers (no JUCE needed). **Verify** they exist in each engine
-  (`JsScriptEngine` / `LuaScriptEngine` / `PythonScriptEngine`).
+- ✅ **DONE**: `startTimer` / `stopTimer` — backed by the `juce::Timer`-based
+  `TimerManager` (`CE/src/Scripting/TimerManager.h`), registered in the JS and
+  Lua engines (see [timer-system.md](./timer-system.md)).
+- ✅ `checksum` and the encoding helpers (`to7bit` / `to14bit` / `toNibbles` /
+  `nibblize` / …) are installed engine-side in `JsScriptEngine` /
+  `LuaScriptEngine` / `PythonScriptEngine`. (Earlier drafts named `buildSysex`
+  and `to14Bit` — the actual members are `sendSysex` and lowercase `to14bit`.)
 
 ## JUCE classes involved
 
@@ -68,10 +70,10 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
 - [ ] Dispatch `onDeviceConnected` / `onDeviceDisconnected` from device
   enumeration.
 - [ ] Dispatch `onControlChanged` / `onPanelStateChanged`.
-- [ ] Add `startTimer` / `stopTimer` + `onTimer` via the `TimerManager`
+- [x] Add `startTimer` / `stopTimer` + `onTimer` via the `TimerManager`
   (see [timer-system.md](./timer-system.md)).
-- [ ] Confirm `buildSysex` / `checksum` / `to14Bit` are installed in every
-  script engine.
+- [x] Confirm `checksum` / `to14bit` and the other encoding helpers are
+  installed in every script engine (JS / Lua / Python — verified in source).
 - [ ] Keep `panelApi.js` and the C++ side in sync (the header already says so).
 
 ## Add findings below

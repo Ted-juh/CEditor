@@ -355,6 +355,25 @@ export const COMMANDS = [
     snippet: { lua: 'checksum("${1:roland}", ${2:bytes})$0', javascript: 'checksum("${1:roland}", ${2:bytes})$0' },
   },
 
+  /* --- Timers (see docs/timer-system.md) --- */
+  {
+    id: 'startTimer', category: 'Timers', signature: 'startTimer(id, ms)',
+    summary: 'Start (or restart) a named repeating timer; onTimer fires with info.id every ms until stopTimer(id).',
+    params: [
+      { name: 'id', type: 'string', required: true },
+      { name: 'ms', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'startTimer("${1:id}", ${2:ms})$0', javascript: 'startTimer("${1:id}", ${2:ms})$0' },
+  },
+  {
+    id: 'stopTimer', category: 'Timers', signature: 'stopTimer(id)',
+    summary: 'Stop a named timer started with startTimer(id, ms).',
+    params: [{ name: 'id', type: 'string', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'stopTimer("${1:id}")$0', javascript: 'stopTimer("${1:id}")$0' },
+  },
+
   /* --- Debug --- */
   {
     id: 'log', category: 'Debug', signature: 'log(message [, value])',
@@ -381,8 +400,8 @@ export const HELPERS = [
   { id: 'curve', category: 'Value / range', signature: 'curve(v, shape)', summary: 'Apply a named response curve ("log","exp","s"…).' },
   { id: 'lerp', category: 'Value / range', signature: 'lerp(a, b, t)', summary: 'Blend between a and b by t (0–1).' },
   // music
-  { id: 'noteName', category: 'Music', signature: 'noteName(n)', summary: 'MIDI note number → name, e.g. 60 → "C3".' },
-  { id: 'noteNumber', category: 'Music', signature: 'noteNumber(name)', summary: 'Note name → MIDI number, e.g. "C3" → 60.' },
+  { id: 'noteName', category: 'Music', signature: 'noteName(n)', summary: 'MIDI note number → name, e.g. 60 → "C4" (middle C = C4).' },
+  { id: 'noteNumber', category: 'Music', signature: 'noteNumber(name)', summary: 'Note name → MIDI number, e.g. "C4" → 60.' },
   // MIDI data encoding (escape hatch — the DPD does this for modeled params)
   { id: 'to7bit', category: 'MIDI encoding', signature: 'to7bit(v, count, order)', summary: 'Pack v into `count` 7-bit bytes; order = "msb"/"lsb" first (14/21/28-bit).' },
   { id: 'from7bit', category: 'MIDI encoding', signature: 'from7bit(bytes, order)', summary: 'Unpack 7-bit bytes back to a value.' },
@@ -421,7 +440,7 @@ export const EVENT_BY_ID = Object.fromEntries(ALL_EVENTS.map((e) => [e.id, e]));
 
 /** Group commands + helpers + lifecycle by their `category`, for the picker's "Commands" side. */
 export function membersByCategory() {
-  const order = ['Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Debug', 'Value / range', 'Music', 'MIDI encoding'];
+  const order = ['Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Timers', 'Debug', 'Value / range', 'Music', 'MIDI encoding'];
   const map = new Map(order.map((c) => [c, []]));
   for (const m of ALL_MEMBERS) {
     if (!map.has(m.category)) map.set(m.category, []);

@@ -2,6 +2,7 @@
 
 > Result of a design discussion. It defines **what needs scripts and why**, and **how multi-language scripting actually works**, before deciding how the editor looks.
 > It **supersedes the engine model** in [`scripting-architecture-plan.md`](scripting-architecture-plan.md): that document assumed a neutral "command graph" that exports to many languages. We are **not** doing that (see §6). We keep only its non-translation pieces.
+> **Status (2026-08):** largely shipped. The 10-mode `ScriptWorkspace.svelte` described in §1 is gone — the DPD-style shell exists as `BehaviorDesigner.svelte`, and the API contract lives in [`panel-api-spec.md`](panel-api-spec.md). §1 is kept as the historical motivation.
 
 ---
 
@@ -40,7 +41,7 @@ Every script runs at some moment. The moments are the spine. **Four phases, all 
 - Phase 4 splits in VST3: **window hidden** vs **plugin unloading**.
 - State restore (phase 2) is non-negotiable for VST3.
 
-In each language, lifecycle hooks are just **named entry points** the host calls — e.g. `onStart()`, `onPanelReady()`, `onClose()` as a Lua function, a JS function, etc.
+In each language, lifecycle hooks are just **named entry points** the host calls — the final names (spec Q5) are `onPanelLoad()`, `onPanelReady()`, `onPanelClose()` as a Lua function, a JS function, etc.
 
 ---
 
@@ -123,6 +124,8 @@ The version is **gated by our two runtimes**, not by "newest." As of June 2026:
 - **Tier 3 — C++.** **Export-first** — fits the existing compile-per-panel export model (user C++ compiled into the VST3 at build time). Live C++ needs a JIT and is a stretch goal. Later.
 
 The work that pays off across *all* languages is the same one thing: **bind the shared panel API into each runtime.**
+
+*(Status note, 2026-08: **TypeScript** joined Tier 1 — it transpiles to JS and rides the same runtime — and **C# / Java** exist alongside C++ as interpreted preview-subset languages, compiled at export. See `panelApi.js` `SCRIPT_LANGUAGES` and `docs/scripting-language-options-and-shippable-export.md`.)*
 
 ---
 
