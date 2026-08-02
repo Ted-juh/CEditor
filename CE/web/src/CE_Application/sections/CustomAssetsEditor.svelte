@@ -152,7 +152,7 @@
   function downloadFilmstrip() {
     const source = String(filmstrip?.source ?? '');
     if (!source) {
-      bakeStatus = 'Selected filmstrip has no source to download';
+      bakeStatus = 'Selected filmstrip has no source to download.';
       return;
     }
     const link = document.createElement('a');
@@ -167,7 +167,7 @@
   function downloadImageAsset() {
     const source = String(imageAsset?.source ?? '');
     if (!source) {
-      bakeStatus = 'Selected image has no source to download';
+      bakeStatus = 'Selected image has no source to download.';
       return;
     }
     const link = document.createElement('a');
@@ -219,7 +219,7 @@
     try {
       const source = await fileToDataUrl(file);
       if (!source.startsWith('data:image/')) {
-        bakeStatus = 'Filmstrip import expects an image file';
+        bakeStatus = 'Filmstrip import expects an image file.';
         return;
       }
       const name = selectedFilmstrip || safeFileName(file.name.replace(/\.[^.]+$/, ''), 'importedFilmstrip');
@@ -263,7 +263,7 @@
     try {
       const source = await fileToDataUrl(file);
       if (!source.startsWith('data:image/')) {
-        bakeStatus = 'Image import expects an image file';
+        bakeStatus = 'Image import expects an image file.';
         return;
       }
       const name = selectedImage || safeFileName(file.name.replace(/\.[^.]+$/, ''), 'importedImage');

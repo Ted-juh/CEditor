@@ -203,6 +203,42 @@ extension plainly.
 
 ---
 
+## Console output and error messages
+
+**Every `console.log` / `.warn` / `.error` in this app is user-facing.**
+`stores/console.js` replaces the native console methods and pushes each call into
+the Console panel, alongside `debugLog` messages from the C++ side. There is no
+such thing as a devtools-only log here — write them for a panel author.
+
+**1. Say what went wrong, then what to do.**
+This is the one surface where telling the user what to do is the message's job.
+Two sentences at most.
+
+> `Google could not find that family. Use the font name as listed on Google Fonts.`
+
+**2. Errors and warnings are sentences. Confirmations are not.**
+An error starts with a capital and ends with a full stop: `Image import expects
+an image file.` A confirmation is a fragment and takes no stop: `Package JSON
+copied`, `Selected package downloaded`.
+
+**3. Console messages carry a `[module]` prefix.**
+Lowercase-first, matching the module: `[bridge]`, `[panels]`, `[appSettings]`,
+`[perf]`, `[fonts]`. Same prefix on every message from that module, including the
+"off"/"disabled" half of a pair.
+
+**4. No "please".**
+`Try again in a moment.` not `Please try again.`
+
+**5. Straight quotes, no markdown.**
+Curly quotes and backticks both render literally.
+
+**6. No internal vocabulary.**
+`stamping version 4 without changes` and `no migration step registered` describe
+the implementation. The user needs the outcome: `Marking it as version 4,
+unchanged.`
+
+---
+
 ## Before / after
 
 | Before | After |
@@ -216,6 +252,7 @@ extension plainly.
 | *(section)* Hit-Zone Probe | Hit Zones |
 | *(section)* Destinations (columns) | Destinations |
 | *(button)* Regenerate Semantic Parts | Regenerate parts |
+| *(warning)* No migration step registered for plan version 3; stamping version 4 without changes. | No migration step for plan version 3. Marking it as version 4, unchanged. |
 | *(empty)* Nothing is interactive yet. Use “+ Make Interactive” (or draw with the surface's Interactive tool) to scaffold a wired control — value, behavior, and grab area in one step. | Nothing is interactive yet. Use + Make interactive to wire one up. |
 
 ---

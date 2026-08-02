@@ -624,7 +624,7 @@
       await navigator.clipboard.writeText(text);
       monitorCopyStatus = 'Copied';
     } catch {
-      monitorCopyStatus = 'Copy failed';
+      monitorCopyStatus = 'Copy failed.';
     }
 
     setTimeout(() => {

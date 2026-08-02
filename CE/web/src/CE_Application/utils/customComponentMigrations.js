@@ -50,7 +50,7 @@ export function migrateCustomComponentPlan(control) {
 
   if (fromVersion > CUSTOM_COMPONENT_PLAN_VERSION) {
     result.warnings.push(
-      `Component plan version ${fromVersion} is newer than supported version ${CUSTOM_COMPONENT_PLAN_VERSION}; opening without migration.`
+      `Component plan version ${fromVersion} is newer than supported version ${CUSTOM_COMPONENT_PLAN_VERSION}. Opening it without migrating.`
     );
     return result;
   }
@@ -62,7 +62,7 @@ export function migrateCustomComponentPlan(control) {
     const step = MIGRATION_STEPS[version];
     if (!step) {
       result.warnings.push(
-        `No migration step registered for plan version ${version}; stamping version ${CUSTOM_COMPONENT_PLAN_VERSION} without changes.`
+        `No migration step for plan version ${version}. Marking it as version ${CUSTOM_COMPONENT_PLAN_VERSION}, unchanged.`
       );
       version = CUSTOM_COMPONENT_PLAN_VERSION;
       break;

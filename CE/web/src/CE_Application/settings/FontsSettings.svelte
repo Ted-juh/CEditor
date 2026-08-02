@@ -67,7 +67,7 @@
         ? `Imported ${result.importedCount} font(s). Skipped ${result.skippedCount} duplicate file(s).`
         : `Imported ${result.importedCount} font(s).`;
     } catch (error) {
-      console.error('[FontsSettings] Local import failed', error);
+      console.error('[fonts] Local import failed', error);
       localErrorMessage = 'The file browser opened, but the selected font files could not be read.';
     }
   }
@@ -124,7 +124,7 @@
       } else if (result.reason === 'download-failed') {
         errorMessage = 'Google found the font, but the font files could not be cached locally.';
       } else {
-        errorMessage = 'Google Fonts could not be verified right now. Please try again.';
+        errorMessage = 'Google Fonts could not be reached. Try again in a moment.';
       }
 
       isAddingGoogle = false;
