@@ -116,4 +116,7 @@ the picker summaries from `panelApi.js`. What it needs, in order of value:
 - `scripting-runtime-gaps.md` — timer entries marked done; `to14Bit`→`to14bit`; `buildSysex`
   reference corrected.
 
-Not done (recommendations only): the generated user manual, the cookbook, the docs index.
+Follow-up (same branch): the three recommendations were then implemented too —
+`docs/scripting-manual.md` generated from `panelApi.js` by
+`CE/web/scripts/generate-scripting-manual.mjs` (`npm run docs:manual`),
+`docs/scripting-cookbook.md`, and the reading-order index in `docs/README.md`.
