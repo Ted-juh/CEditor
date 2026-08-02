@@ -111,7 +111,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Color Effects">
+  <PropertySection title="Colour Effects">
     <PropertyCell label="Blend" span={1} hint="Blend mode for compositing">
       <BlendModeSelect value={get('Blend', 'normal')}
                        onchange={(v) => set('Blend', v)} />

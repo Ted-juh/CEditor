@@ -592,7 +592,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Channel Rig">
+  <PropertySection title="Channels">
     <PropertyCell label="Controls" span={4} hint="Drive each custom value channel directly while the bench evaluates links, generated output, and public surface.">
       <div class="channel-rig">
         {#each channelDiagnostics as channel (channel.name)}
@@ -666,7 +666,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Hit-Zone Probe">
+  <PropertySection title="Hit Zones">
     <PropertyCell label="Triggers" span={4} hint="Fire authored or generated hit zones directly into the channel rig.">
       <div class="probe-groups">
         {#each probeGroups as group (group.source)}
@@ -711,7 +711,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Preview Workbench">
+  <PropertySection title="States">
     <PropertyCell label="States" span={4} hint="Preview authored state rules and see which visual patches they apply.">
       <div class="state-list">
         {#each stateDiagnostics as state (state.name)}
@@ -738,7 +738,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Performance Budget">
+  <PropertySection title="Counts">
     <PropertyCell label="Layers" span={1} hint="Visible/internal parts."><div class="metric">{performance.layers}</div></PropertyCell>
     <PropertyCell label="Zones" span={1} hint="Hit zones."><div class="metric">{performance.hitZones}</div></PropertyCell>
     <PropertyCell label="Gen" span={1} hint="Generators."><div class="metric">{performance.generated}</div></PropertyCell>
@@ -753,7 +753,7 @@
     <PropertyCell label="Gen Zones" span={1} hint="Runtime hit zones created by enabled generators."><div class="metric">{performance.generatedZones}</div></PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Generated Output">
+  <PropertySection title="Generators">
     <PropertyCell label="Sources" span={4} hint="Enabled generators currently producing runtime parts or hit zones.">
       <div class="generated-source-list">
         {#each generatedSourceDiagnostics as source (source.source)}

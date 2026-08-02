@@ -106,7 +106,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Sources (rows)">
+  <PropertySection title="Sources">
     <PropertyCell label="" span={4} hint="Modulation sources — the grid's rows. Each cell is a bindable 'Source → Destination' port.">
       <div class="lst">
         {#each rows as label, i (i)}
@@ -120,7 +120,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Destinations (columns)">
+  <PropertySection title="Destinations">
     <PropertyCell label="" span={4} hint="Modulation destinations — the grid's columns.">
       <div class="lst">
         {#each cols as label, i (i)}

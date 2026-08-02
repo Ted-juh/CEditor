@@ -89,7 +89,7 @@
   </PropertySection>
 
   {#if isSelector}
-    <PropertySection title="Depends on (cascading)">
+    <PropertySection title="Depends on">
       <PropertyCell label="Parent list" span={dependsOn ? 3 : 4} hint="Show only the rows that match another selector's current choice (bank → preset).">
         <select class="val" value={dependsOn} onchange={(event) => set('Value.dependsOn', event.target.value)}>
           <option value="">— None (independent) —</option>

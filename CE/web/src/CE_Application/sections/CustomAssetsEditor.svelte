@@ -335,7 +335,7 @@
 </script>
 
 {#if assets}
-  <PropertySection title="Package Policy">
+  <PropertySection title="Packaging">
     <PropertyCell label="Embed" span={2} hint="Package images and filmstrips with saved components.">
       <PropertyToggle value={assets.packagePolicy?.embedAssets !== false} onchange={() => setAsset('packagePolicy.embedAssets', !(assets.packagePolicy?.embedAssets !== false))} />
     </PropertyCell>

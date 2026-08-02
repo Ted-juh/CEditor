@@ -246,7 +246,7 @@
     <PropertyCell label="Precision" span={1} hint="Readout precision for labels and preview text.">
       <NumberInput value={behavior.precision ?? 2} step={1} min={0} max={6} onchange={(value) => set('Behavior.precision', Math.max(0, Math.round(value)))} />
     </PropertyCell>
-    <PropertyCell label="Center" span={1} hint="Optional center reference value for bipolar sliders and center markers.">
+    <PropertyCell label="Centre" span={1} hint="Optional centre reference value for bipolar sliders and centre markers.">
       <NumberInput value={behavior.centerValue ?? ((numberOr(behavior.min, 0) + numberOr(behavior.max, 1)) / 2)} step={numberOr(behavior.step, 0.01)} onchange={(value) => set('Behavior.centerValue', value)} />
     </PropertyCell>
     <PropertyCell label="Fill Origin" span={1} hint="Choose where single-value fill starts.">
@@ -350,7 +350,7 @@
       </PropertyCell>
     {/if}
 
-    <PropertyCell label="Center Mark" span={1} hint="Show a generated center marker using the authored center value.">
+    <PropertyCell label="Centre Mark" span={1} hint="Show a generated centre marker using the authored centre value.">
       <PropertyToggle value={behavior.showCenterMarker === true} onchange={() => set('Behavior.showCenterMarker', !(behavior.showCenterMarker === true))} />
     </PropertyCell>
 

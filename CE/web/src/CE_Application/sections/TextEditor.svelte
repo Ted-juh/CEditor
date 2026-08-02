@@ -1198,7 +1198,7 @@
           </PropertyCell>
         </PropertySection>
 
-        <PropertySection title="Color Effects">
+        <PropertySection title="Colour Effects">
           <PropertyCell label="Opacity" span={1} hint="Opacity of the image fill.">
             <NumberInput value={Number(fillProp('imageOpacity', 100))} min={0} max={100} step={1} onchange={(value) => set('Text.Fill.imageOpacity', value)} />
           </PropertyCell>
@@ -1240,7 +1240,7 @@
           </PropertyCell>
         </PropertySection>
 
-        <PropertySection title="Color Effects">
+        <PropertySection title="Colour Effects">
           <PropertyCell label="Opacity" span={1} hint="Opacity of the texture fill.">
             <NumberInput value={Number(fillProp('textureOpacity', 100))} min={0} max={100} step={1} onchange={(value) => set('Text.Fill.textureOpacity', value)} />
           </PropertyCell>
@@ -1367,7 +1367,7 @@
           <NumberInput value={Number(position?.flowStepX ?? 8)} step={1} onchange={(value) => set('Text.Position.flowStepX', value)} />
         </PropertyCell>
       {:else if textFlowModeValue === 'arc'}
-        <PropertyCell label="Angle" span={2} hint="Center angle for the arc in degrees.">
+        <PropertyCell label="Angle" span={2} hint="Centre angle for the arc in degrees.">
           <NumberInput
             value={textFlowAngleValue}
             step={1}
@@ -1529,7 +1529,7 @@
             <option value="bevel">Bevel</option>
           </select>
         </PropertyCell>
-        <PropertyCell label="Outline Color" span={4} hint="AARRGGBB outline colour.">
+        <PropertyCell label="Outline Colour" span={4} hint="AARRGGBB outline colour.">
           <PropertyColor
             value={String(effectProp('outlineColour', 'FF000000'))}
             onchange={(value) => setEffectColor('outlineColour', value)}
@@ -1583,7 +1583,7 @@
         <PropertyCell label="Gap" span={1} disabled={effectProp('stroke2DashEnabled', false) !== true} hint="Gap between secondary stroke dashes.">
           <NumberInput value={Number(effectProp('stroke2DashGap', 3))} min={1} step={1} onchange={(value) => setEffectNumber('stroke2DashGap', value, 1)} disabled={effectProp('stroke2DashEnabled', false) !== true} />
         </PropertyCell>
-        <PropertyCell label="Stroke Color" span={2} hint="AARRGGBB colour for the secondary stroke.">
+        <PropertyCell label="Stroke Colour" span={2} hint="AARRGGBB colour for the secondary stroke.">
           <PropertyColor
             value={String(effectProp('stroke2Colour', 'FFFFFFFF'))}
             onchange={(value) => setEffectColor('stroke2Colour', value)}
@@ -1625,7 +1625,7 @@
             onchange={(value) => setEffectNumber('shadowBlur', value)}
           />
         </PropertyCell>
-        <PropertyCell label="Shadow Color" span={1} hint="AARRGGBB shadow colour.">
+        <PropertyCell label="Shadow Colour" span={1} hint="AARRGGBB shadow colour.">
           <PropertyColor
             value={String(effectProp('shadowColour', '80000000'))}
             onchange={(value) => setEffectColor('shadowColour', value)}
@@ -1660,7 +1660,7 @@
             onchange={(value) => setEffectNumber('glowIntensity', value, 0.25)}
           />
         </PropertyCell>
-        <PropertyCell label="Glow Color" span={2} hint="AARRGGBB glow colour.">
+        <PropertyCell label="Glow Colour" span={2} hint="AARRGGBB glow colour.">
           <PropertyColor
             value={String(effectProp('glowColour', '80FFFFFF'))}
             onchange={(value) => setEffectColor('glowColour', value)}
@@ -1681,7 +1681,7 @@
             onchange={(value) => setEffectNumber('innerGlowSize', value)}
           />
         </PropertyCell>
-        <PropertyCell label="Inner Glow Color" span={3} hint="AARRGGBB inner glow colour.">
+        <PropertyCell label="Inner Glow Colour" span={3} hint="AARRGGBB inner glow colour.">
           <PropertyColor
             value={String(effectProp('innerGlowColour', '80FFFFFF'))}
             onchange={(value) => setEffectColor('innerGlowColour', value)}
@@ -1703,7 +1703,7 @@
         <PropertyCell label="Inner Blur" span={1} hint="Blur radius for the inner shadow.">
           <NumberInput value={Number(effectProp('innerShadowBlur', 2))} min={0} step={0.5} onchange={(value) => setEffectNumber('innerShadowBlur', value)} />
         </PropertyCell>
-        <PropertyCell label="Inner Color" span={1} hint="AARRGGBB inner shadow colour.">
+        <PropertyCell label="Inner Colour" span={1} hint="AARRGGBB inner shadow colour.">
           <PropertyColor
             value={String(effectProp('innerShadowColour', '80000000'))}
             onchange={(value) => setEffectColor('innerShadowColour', value)}
@@ -1750,7 +1750,7 @@
             onchange={(value) => set('Text.Effects.motionSteps', Math.max(1, Math.round(Number(value) || 1)))}
           />
         </PropertyCell>
-        <PropertyCell label="Motion Color" span={1} hint="AARRGGBB motion smear colour.">
+        <PropertyCell label="Motion Colour" span={1} hint="AARRGGBB motion smear colour.">
           <PropertyColor
             value={String(effectProp('motionColour', '80FFFFFF'))}
             onchange={(value) => setEffectColor('motionColour', value)}
@@ -1849,7 +1849,7 @@
             onchange={(value) => setEffectNumber('reflectionFadeAmount', value, 1)}
           />
         </PropertyCell>
-        <PropertyCell label="Reflection Color" span={4} hint="AARRGGBB colour for the mirrored reflection layer.">
+        <PropertyCell label="Reflection Colour" span={4} hint="AARRGGBB colour for the mirrored reflection layer.">
           <PropertyColor
             value={reflectionColorValue()}
             onchange={(value) => setEffectColor('reflectionColour', value)}

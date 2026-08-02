@@ -214,7 +214,7 @@
 
   {#if selectedAnimation}
     {#if partNames.length}
-      <PropertySection title="Guided Targets">
+      <PropertySection title="Target">
         <PropertyCell label="Part" span={2} hint="Layer/part this animation target should affect.">
           <select class="val" bind:value={targetPart}>
             {#each partNames as name}

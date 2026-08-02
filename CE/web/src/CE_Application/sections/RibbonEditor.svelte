@@ -75,10 +75,10 @@
   </PropertySection>
 
   <PropertySection title="Return to rest">
-    <PropertyCell label="Mode" span={2} hint="What the value does on release. Center = pitch wheel; None = latch (mod wheel / ribbon).">
+    <PropertyCell label="Mode" span={2} hint="What the value does on release. Centre = pitch wheel; None = latch (mod wheel / ribbon).">
       <select class="val" value={r.returnMode ?? 'none'} onchange={(e) => set('returnMode', e.target.value)}>
         <option value="none">None (latch)</option>
-        <option value="center">Center</option>
+        <option value="center">Centre</option>
         <option value="min">Min</option>
         <option value="max">Max</option>
         <option value="rest">Rest value</option>

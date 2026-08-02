@@ -165,7 +165,7 @@
           </div>
         {/if}
         {#if showCenter}
-          <div class="section-sub-label offset">Center</div>
+          <div class="section-sub-label offset">Centre</div>
           <div class="input-row">
             <span class="input-prefix">X</span>
             <div class="num-input-wrap">
@@ -296,7 +296,7 @@
                 class="stop-color"
                 style="background: #{stop.color}"
                 onclick={() => { if (onSelectStop) onSelectStop(stop.origIdx); if (onEditStopColor) onEditStopColor(stop.origIdx); }}
-                title="Click to edit color"
+                title="Click to edit colour"
               ></button>
               <span class="stop-hex">#{stop.color}</span>
               <div class="stop-pos-wrap">

@@ -113,7 +113,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Zones (thresholds)">
+  <PropertySection title="Zones">
     <PropertyCell label="" span={4} hint="Each zone lights the fill from its position (0–1) upward; leave one at 0 for the base colour.">
       <div class="zones">
         {#if zones.length === 0}

@@ -103,6 +103,54 @@ consistent.
 
 ---
 
+## Section titles and labels
+
+`PropertySection title="…"` and `PropertyCell label="…"`. Both render in
+uppercase, so **source capitalisation is cosmetic** — match the file you are
+editing and do not churn it.
+
+Length is not the problem on this surface — the median label is 6 characters and
+the median section title is 9. These rules are about naming.
+
+**1. Name what the section holds, not what it is for.**
+`Channels`, not `Channel Rig`. `States`, not `State Studio` or `Preview
+Workbench`. `Counts`, not `Performance Budget`. A metaphor in a header makes the
+user learn a word before they can find anything.
+
+**2. One concept, one name.**
+The same thing was called `Public Surface`, `External Contract` and `Public API`
+in three sibling editors. When the in-app glossary
+(`sections/SurfaceHelpOverlay.svelte`) has a term for it, that term wins.
+
+**3. No parenthetical explanation in a title.**
+`Sources`, not `Sources (rows)`. `Zones`, not `Zones (thresholds)`. If the
+distinction matters, it goes in the first cell's hint. The exception is a
+parenthetical that *disambiguates two sections visible at once* —
+`Channels (flat list)` sits below the guided channel editor and has to.
+
+**4. Units in a label are good.**
+`Loop (bars)`, `Hold (ms)`, `Cycle (bars)`. That is naming, not explaining.
+
+**5. Don't say it four times.**
+A header, a label, a hint and an empty-state line that all state the same fact
+is one fact. Pick the one place it belongs.
+
+### Spelling
+
+**British.** The hints use `colour` 94 times and `color` zero times, so that is
+the house spelling; the labels that had drifted to `Color` were the outliers.
+Same for `centre`.
+
+Two exceptions:
+
+- **`Behavior`** is system vocabulary — it names a module, a file, an editor and
+  a glossary entry. It keeps its spelling.
+- **Alignment commands** keep `center`, matching the CSS values they map to and
+  the `Center X` / `Align center` command family: `Align center`, `Center
+  content horizontally`, `Align horizontal center`.
+
+---
+
 ## Before / after
 
 | Before | After |
@@ -112,6 +160,9 @@ consistent.
 | Clock the sequence off the panel's Transport. A shift register that lands its mutations on the beat sounds composed; the same register free-running sounds like a fault. | Clock the sequence off the panel's Transport. |
 | *(tooltip)* Hide the raw graph editors (Channels, Behaviors, Hit Zones, Bindings, Links, Variants). Nothing is removed — Advanced brings them back. | Hide the raw graph editors |
 | *(tooltip)* A pitch bend carries no note, so who hears it is a rule rather than a fact | Which zones receive pitch bend |
+| *(section)* Performance Budget | Counts |
+| *(section)* Hit-Zone Probe | Hit Zones |
+| *(section)* Destinations (columns) | Destinations |
 
 ---
 

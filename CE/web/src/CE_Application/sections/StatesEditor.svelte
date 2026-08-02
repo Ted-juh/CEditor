@@ -176,7 +176,7 @@
 {#if multiEdit}
   <div class="placeholder">State editing is single-selection only.</div>
 {:else if states}
-  <PropertySection title="State Studio">
+  <PropertySection title="States">
     <PropertyCell label="States" span={4} hint="Choose Base or a state you want to inspect and manage here.">
       <div class="state-strip">
         {#each stateTargetOptions as option}

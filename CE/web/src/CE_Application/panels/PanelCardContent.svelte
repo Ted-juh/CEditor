@@ -543,7 +543,7 @@
       </PropertyCell>
     </PropertySection>
     <PropertySection title="Origin" collapsed={$sectionCollapse['grid-origin'] ?? true} ontoggle={(v) => setCollapsed('grid-origin', v)}>
-      <PropertyCell label="Center" span={4} hint="Center the grid on the panel — lines radiate from the middle">
+      <PropertyCell label="Centre" span={4} hint="Centre the grid on the panel — lines radiate from the middle">
         <PropertyToggle value={panel.gridCentered ?? false}
                         onchange={() => updatePanel(panel.id, { gridCentered: !panel.gridCentered })} />
       </PropertyCell>
