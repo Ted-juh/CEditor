@@ -356,6 +356,16 @@ def stateSet(key, value):         return __api.stateSet(key, value)
 def stateGet(key, fallback=None):
     v = __api.stateGet(key)
     return fallback if v is None else v
+
+# panel.get("name") — a handle that remembers the path prefix (spec Q1's convenience form).
+class __Handle:
+    def __init__(self, name): self.__name = str(name or "")
+    def set(self, p, value, opts=None): return set(self.__name + "." + p, value, opts)
+    def get(self, p, form="value"):     return get(self.__name + "." + p, form)
+    def on(self, event, fn):            return on(self.__name, event, fn)
+class __Panel:
+    def get(self, name): return __Handle(name)
+panel = __Panel()
 def sendNRPN(ch, msb, lsb, v):    return __api.sendNRPN(ch, msb, lsb, v)
 def sendSysex(b):                 return __api.sendSysex(b)
 def requestDump(kind):            return __api.requestDump(kind)

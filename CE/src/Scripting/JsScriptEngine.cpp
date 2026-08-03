@@ -47,7 +47,19 @@ function __ownerPrefix(p) {
 }
 var self = {
   set: function (p, value, opts) { return __api.set(__ownerPrefix(p), value, opts || null); },
-  get: function (p, form) { return __api.get(__ownerPrefix(p), form || "value"); }
+  get: function (p, form) { return __api.get(__ownerPrefix(p), form || "value"); },
+  on: function (event, fn) { return on((typeof __owner !== 'undefined' && __owner) ? __owner : "*", event, fn); }
+};
+// panel.get("name") — a handle that remembers the path prefix (spec Q1's convenience form).
+var panel = {
+  get: function (name) {
+    var prefix = String(name || "");
+    return {
+      set: function (p, value, opts) { return set(prefix + "." + p, value, opts); },
+      get: function (p, form) { return get(prefix + "." + p, form); },
+      on: function (event, fn) { return on(prefix, event, fn); }
+    };
+  }
 };
 function sendCC(ch, cc, v) { return __api.sendCC(ch, cc, v); }
 function sendNRPN(ch, msb, lsb, v) { return __api.sendNRPN(ch, msb, lsb, v); }

@@ -502,6 +502,29 @@ private:
                 return;
             }
 
+            // onDeviceConnected / onDeviceDisconnected: a role's DPD session reaching "ready"
+            // is the panel's notion of connected; leaving it is disconnected.
+            if (name == "deviceSessionState")
+            {
+                if (o == nullptr) return;
+                for (const auto& prop : o->getProperties())
+                {
+                    const auto role = prop.name.toString();
+                    juce::String state;
+                    if (auto* ro = prop.value.getDynamicObject()) state = ro->getProperty ("state").toString();
+                    const bool ready = state == "ready";
+                    const auto it = scriptDeviceReady.find (role);
+                    const bool wasReady = it != scriptDeviceReady.end() && it->second;
+                    scriptDeviceReady[role] = ready;
+                    if (ready == wasReady) continue;
+                    auto* dv = new juce::DynamicObject();
+                    dv->setProperty ("role", role);
+                    dv->setProperty ("state", state);
+                    scriptRuntime->dispatchEvent (ready ? "onDeviceConnected" : "onDeviceDisconnected", "", juce::var (dv));
+                }
+                return;
+            }
+
             if (name != "dumpMessageParsed") return;
             if (o == nullptr) return;
 
@@ -748,6 +771,7 @@ private:
     std::map<juce::String, float> lastScriptValue;                // change-detect for window-closed onValueChanged
     double scriptLastBeats = -1.0e18;                             // window-closed onBeat/onBar tracking (sentinel = re-seed)
     juce::var scriptKvState;                                      // stateSet/stateGet store; persisted in ScriptState
+    std::map<juce::String, bool> scriptDeviceReady;               // per-role session-ready tracking for onDeviceConnected/Disconnected
     bool scriptWindowWasOpen = false;
     bool scriptReadyFired = false;
 #endif

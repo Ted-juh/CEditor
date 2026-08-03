@@ -80,6 +80,18 @@ sol::object varToSol (sol::state_view lua, const juce::var& v)
 }
 
 const char* kPrelude = R"LUA(
+-- panel.get("name") — a handle that remembers the path prefix (spec Q1's convenience form).
+-- Colon-call style: local h = panel.get("cutoff"); h:set("value", 8000); h:on("valueChanged", fn)
+panel = {
+  get = function(name)
+    local prefix = tostring(name or "")
+    local h = {}
+    function h:set(p, v, opts) return set(prefix .. "." .. p, v, opts) end
+    function h:get(p, form) return get(prefix .. "." .. p, form) end
+    function h:on(event, fn) return on(prefix, event, fn) end
+    return h
+  end,
+}
 -- Pure-math helpers (no host). Keep in sync with the JS prelude + panelApi.js.
 function clamp(v, lo, hi) if v < lo then return lo elseif v > hi then return hi else return v end end
 function round(v) return math.floor(v + 0.5) end

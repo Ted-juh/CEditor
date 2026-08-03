@@ -223,9 +223,11 @@ Everything on the panel is reachable by a **dot-path** rooted on a control's nam
 \`"cutoff.value"\`, \`"button2.background.fill.colour"\`. Read and write them with \`get\`/\`set\`
 (below). Renaming a control automatically updates its name in every script.
 
-*(The API spec also defines handle and dot-object conveniences — \`panel.get("cutoff")\`,
-\`panel.cutoff.value\` — as planned sugar over the same operation; today \`get\`/\`set\` are the
-surface.)*
+**Handles** are the convenience form of the same operation: \`panel.get("cutoff")\` returns a
+handle that remembers the prefix — \`h.set("value", 8000)\` (Lua: \`h:set("value", 8000)\`),
+\`h.get("value")\`, and \`h.on("valueChanged", fn)\`. \`self\` is the same kind of handle, bound
+to the control the script is attached to. *(The spec's dot-object form — \`panel.cutoff.value\` —
+remains optional planned sugar.)*
 
 A control's value has three faces — suffix the path with the one you need. (**DPD** = the
 Device Profile Designer: the device map that knows each parameter's bytes, ranges, and enums,

@@ -52,9 +52,13 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
   hex→bytes). No `DeviceProfileService` change was needed.
 - ✅ **WIRED**: `onTimer` — via the new `TimerManager` (see
   [timer-system.md](./timer-system.md)).
-- Still open: `onDeviceConnected` / `onDeviceDisconnected`,
-  `onControlChanged` / `onPanelStateChanged`; and the **editor-preview (JS)** side
-  of the raw inbound events (this wired the C++ Player runtime only).
+- ✅ **WIRED** (2026-08-03): `onDeviceConnected` / `onDeviceDisconnected` (both
+  runtimes, from the DPD session-state `ready` transitions), `onControlChanged`
+  (both runtimes), `onStateChanged` (preview session diff — a UI event), and the
+  **editor-preview (JS)** side of the raw inbound events (`onMidiIn` / `onCcIn` /
+  `onNoteIn` / `onSysexIn` via the bridge's midi/sysex input events, plus
+  per-parameter `onParameterReceived` from decoded dumps).
+- Still open: `onPanelStateChanged` (no panel-state feature to observe yet).
 
 ### Outbound host API
 - ✅ **DONE**: `startTimer` / `stopTimer` — backed by the `juce::Timer`-based

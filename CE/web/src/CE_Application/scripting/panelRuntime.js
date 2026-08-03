@@ -18,6 +18,8 @@ import { valueAtPath } from '../stores/controlTreeUtils.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { isJuceAvailable, triggerRawMidiAction, parseDumpMessage, onDumpMessageParsed } from '../bridge/bridge.js';
 import { startDeviceSync, startBulkDumpSend } from '../stores/deviceProfiles.js';
+import { deviceSessionState } from '../stores/deviceProfileStores.js';
+import { onMidiInputMessage, onSysexInputMessage } from '../bridge/bridge.js';
 import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
@@ -648,11 +650,26 @@ function runNamedAction(targetAction, args) {
 }
 
 function buildApi(ownerName, collect) {
+  // A handle remembers a path prefix (spec Q1's convenience form): h.set("value", 8000) ==
+  // set("cutoff.value", 8000); h.on("valueChanged", fn) registers a targeted listener.
+  const makeHandle = (name) => ({
+    set: (p, v) => setValue(`${name}.${p}`, v),
+    get: (p) => getValue(`${name}.${p}`),
+    on: (event, fn) => {
+      if (typeof fn !== 'function') { addScriptTrace('error', '', `handle.on("${event}"): callback must be a function`); return; }
+      collect?.({ target: String(name), event: String(event ?? ''), fn });
+    },
+  });
   const self = {
     set: (p, v) => setValue(ownerName ? `${ownerName}.${p}` : p, v),
     get: (p) => getValue(ownerName ? `${ownerName}.${p}` : p),
+    on: (event, fn) => {
+      if (typeof fn !== 'function') { addScriptTrace('error', '', `self.on("${event}"): callback must be a function`); return; }
+      collect?.({ target: ownerName || '*', event: String(event ?? ''), fn });
+    },
   };
   return {
+    panel: { get: (name) => makeHandle(String(name ?? '')) },
     set: (path, value) => setValue(path, value),
     get: (path) => getValue(path),
     log: (msg, val) => addScriptTrace('log', '', val !== undefined ? `${msg} ${JSON.stringify(val)}` : String(msg)),
@@ -1215,6 +1232,11 @@ function onPreviewSessionsChanged(sessions) {
     if (prev.hover !== cur.hover) {
       events.push({ event: cur.hover ? 'onHoverStart' : 'onHoverEnd', controlName: name, payload: undefined });
     }
+    // Composite interaction state, for onStateChanged: pressed wins over hover.
+    const stateOf = (x) => (x.pressed ? 'pressed' : x.hover ? 'hover' : 'normal');
+    if (stateOf(prev) !== stateOf(cur)) {
+      events.push({ event: 'onStateChanged', controlName: name, payload: stateOf(cur) });
+    }
   }
   live.sessionLast = next;
   if (events.length) dispatchEvents(events);
@@ -1279,16 +1301,76 @@ function onTransportChanged(t) {
 
 // A bulk dump arrived and the device host (C++ DPD codec) decoded it. Fill the bound controls and
 // fire onDumpReceived so scripts can run post-load logic. No-op in a plain browser (no host).
+function hexToByteList(hexIn) {
+  const hex = String(hexIn ?? '').replace(/\s+/g, '');
+  const bytes = [];
+  for (let i = 0; i + 1 < hex.length; i += 2) bytes.push(parseInt(hex.slice(i, i + 2), 16) & 0xFF);
+  return bytes;
+}
+
 function onDumpParsed(payload) {
   const values = payload?.values ?? payload?.parsed?.values ?? null;
   const role = payload?.deviceRole ?? DEFAULT_ROLE;
   if (values && typeof values === 'object') syncDeviceRuntimeStateToPanelPreview({ [role]: values });
   // Same payload shape as the C++ Player runtime: decoded values + kind + role + the raw bytes.
-  const hex = String(payload?.hex ?? '').replace(/\s+/g, '');
-  const bytes = [];
-  for (let i = 0; i + 1 < hex.length; i += 2) bytes.push(parseInt(hex.slice(i, i + 2), 16) & 0xFF);
-  dispatchEvents([{ event: 'onDumpReceived', controlName: null,
-    payload: { values: values ?? {}, kind: payload?.dumpId ?? payload?.dumpName ?? '', role, bytes } }]);
+  const events = [{ event: 'onDumpReceived', controlName: null,
+    payload: { values: values ?? {}, kind: payload?.dumpId ?? payload?.dumpName ?? '', role,
+      bytes: hexToByteList(payload?.hex) } }];
+  // …and one onParameterReceived per decoded parameter (the DPD payoff), like the Player.
+  if (values && typeof values === 'object') {
+    for (const [parameter, value] of Object.entries(values)) {
+      events.push({ event: 'onParameterReceived', controlName: null, payload: { parameter, value } });
+    }
+  }
+  dispatchEvents(events);
+}
+
+/* --- source 6: raw MIDI in (device bridge) --- */
+// Mirrors the Player's window-closed tap: onMidiIn for every message, refined into onCcIn /
+// onNoteIn; onSysexIn for sysex. Channels are 1-16, matching the whole script API.
+// Exported for tests — in the app these are fed by the bridge's midi/sysex input events.
+
+export function handleMidiInputMessage(payload) {
+  const bytes = hexToByteList(payload?.hex);
+  if (!bytes.length) return;
+  const status = bytes[0];
+  const channel = status >= 0x80 && status < 0xF0 ? (status & 0x0F) + 1 : 0;
+  const events = [{ event: 'onMidiIn', controlName: null, payload: { bytes, status, channel } }];
+  const kind = status & 0xF0;
+  if (kind === 0xB0 && bytes.length >= 3) {
+    events.push({ event: 'onCcIn', controlName: null, payload: { channel, cc: bytes[1], value: bytes[2] } });
+  }
+  if ((kind === 0x90 || kind === 0x80) && bytes.length >= 3) {
+    events.push({ event: 'onNoteIn', controlName: null,
+      payload: { channel, note: bytes[1], velocity: bytes[2], on: kind === 0x90 && bytes[2] > 0 } });
+  }
+  dispatchEvents(events);
+}
+
+export function handleSysexInputMessage(payload) {
+  const bytes = hexToByteList(payload?.hex);
+  if (!bytes.length) return;
+  dispatchEvents([{ event: 'onSysexIn', controlName: null, payload: bytes }]);
+}
+
+/* --- source 7: device session (connect / disconnect) --- */
+// The DPD session state is the panel's notion of "connected": a role's session reaching
+// "ready" is onDeviceConnected; leaving it is onDeviceDisconnected.
+
+const deviceReadyByRole = new Map();
+
+function onDeviceSessionChanged(sessions) {
+  const events = [];
+  for (const [role, s] of Object.entries(sessions ?? {})) {
+    const state = String(s?.state ?? '');
+    const ready = state === 'ready';
+    const wasReady = deviceReadyByRole.get(role) === true;
+    deviceReadyByRole.set(role, ready);
+    if (ready === wasReady) continue;
+    events.push({ event: ready ? 'onDeviceConnected' : 'onDeviceDisconnected', controlName: null,
+      payload: { role, state } });
+  }
+  if (events.length) dispatchEvents(events);
 }
 
 /**
@@ -1312,6 +1394,9 @@ export function initPanelRuntime() {
   }));
   live.unsubs.push(scriptDocuments.subscribe(() => { live.listenersDirty = true; }));
   live.unsubs.push(transportStore.subscribe((t) => onTransportChanged(t)));
+  live.unsubs.push(deviceSessionState.subscribe((s) => onDeviceSessionChanged(s)));
+  live.unsubs.push(onMidiInputMessage((payload) => handleMidiInputMessage(payload)));
+  live.unsubs.push(onSysexInputMessage((payload) => handleSysexInputMessage(payload)));
   live.unsubs.push(panels.subscribe(() => onPanelsChanged()));
   live.unsubs.push(panelPreviewSessions.subscribe((s) => onPreviewSessionsChanged(s)));
   live.unsubs.push(previewModeEnabled.subscribe((on) => onPreviewModeChanged(on === true)));

@@ -152,9 +152,11 @@ Everything on the panel is reachable by a **dot-path** rooted on a control's nam
 `"cutoff.value"`, `"button2.background.fill.colour"`. Read and write them with `get`/`set`
 (below). Renaming a control automatically updates its name in every script.
 
-*(The API spec also defines handle and dot-object conveniences — `panel.get("cutoff")`,
-`panel.cutoff.value` — as planned sugar over the same operation; today `get`/`set` are the
-surface.)*
+**Handles** are the convenience form of the same operation: `panel.get("cutoff")` returns a
+handle that remembers the prefix — `h.set("value", 8000)` (Lua: `h:set("value", 8000)`),
+`h.get("value")`, and `h.on("valueChanged", fn)`. `self` is the same kind of handle, bound
+to the control the script is attached to. *(The spec's dot-object form — `panel.cutoff.value` —
+remains optional planned sugar.)*
 
 A control's value has three faces — suffix the path with the one you need. (**DPD** = the
 Device Profile Designer: the device map that knows each parameter's bytes, ranges, and enums,
@@ -280,19 +282,19 @@ Payloads are passed directly with a descriptive name — one obvious datum comes
 
 ### Control events
 
-| Event | Handler | Payload | Fires when | Where |
-|---|---|---|---|---|
-| `"valueChange"` | `onValueChange(value)` | `value` | Live — fires continuously while the value is moving (for GUI/preview). | everywhere |
-| `"valueChanged"` | `onValueChanged(value)` | `value` | Settled — fires when the value reaches its final value (for transmit). | everywhere |
-| `"click"` | `onClick(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Clicked (fires on release). | everywhere |
-| `"doubleClick"` | `onDoubleClick(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Double-clicked. | everywhere |
-| `"pointerDown"` | `onPointerDown(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Mouse pressed. | everywhere |
-| `"pointerMove"` | `onPointerMove(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Mouse moved while down. | everywhere |
-| `"pointerUp"` | `onPointerUp(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Mouse released. | everywhere |
-| `"hoverStart"` | `onHoverStart()` | — | Mouse entered the control. | everywhere |
-| `"hoverEnd"` | `onHoverEnd()` | — | Mouse left the control. | everywhere |
-| `"wheel"` | `onWheel(wheel)` | `wheel` (`.delta` `.deltaX` `.deltaY` `.x` `.y`) | Scrolled over the control. delta = +1 up / −1 down; deltaX/deltaY are the raw values. | everywhere |
-| `"stateChanged"` | `onStateChanged(state)` | `state` | State swapped (hover/pressed/disabled). | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
+| Event | Handler | Payload | Fires when |
+|---|---|---|---|
+| `"valueChange"` | `onValueChange(value)` | `value` | Live — fires continuously while the value is moving (for GUI/preview). |
+| `"valueChanged"` | `onValueChanged(value)` | `value` | Settled — fires when the value reaches its final value (for transmit). |
+| `"click"` | `onClick(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Clicked (fires on release). |
+| `"doubleClick"` | `onDoubleClick(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Double-clicked. |
+| `"pointerDown"` | `onPointerDown(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Mouse pressed. |
+| `"pointerMove"` | `onPointerMove(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Mouse moved while down. |
+| `"pointerUp"` | `onPointerUp(mouse)` | `mouse` (`.x` `.y` `.button` `.modifiers`) | Mouse released. |
+| `"hoverStart"` | `onHoverStart()` | — | Mouse entered the control. |
+| `"hoverEnd"` | `onHoverEnd()` | — | Mouse left the control. |
+| `"wheel"` | `onWheel(wheel)` | `wheel` (`.delta` `.deltaX` `.deltaY` `.x` `.y`) | Scrolled over the control. delta = +1 up / −1 down; deltaX/deltaY are the raw values. |
+| `"stateChanged"` | `onStateChanged(state)` | `state` | The interaction state changed: "normal", "hover", or "pressed" (a UI event — needs a window, like clicks). |
 
 ### Panel events
 
@@ -306,16 +308,16 @@ Payloads are passed directly with a descriptive name — one obvious datum comes
 
 ### Device events
 
-| Event | Handler | Payload | Fires when | Where |
-|---|---|---|---|---|
-| `"parameterReceived"` | `onParameterReceived(info)` | `info` (`.parameter` `.value`) | A value arrived, decoded via the DPD. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
-| `"dumpReceived"` | `onDumpReceived(dump)` | `dump` (`.values` `.kind` `.role` `.bytes`) | A bulk dump arrived and was decoded via the DPD; the panel fills automatically. values = { parameterId: value }, bytes = the raw message. | everywhere |
-| `"midiIn"` | `onMidiIn(midi)` | `midi` (`.bytes` `.channel` `.status`) | Any MIDI arrived (raw). | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
-| `"ccIn"` | `onCcIn(cc)` | `cc` (`.channel` `.cc` `.value`) | A CC arrived. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
-| `"noteIn"` | `onNoteIn(note)` | `note` (`.channel` `.note` `.velocity` `.on`) | A note arrived (on = false for note-off; a velocity-0 note-on counts as off). | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
-| `"sysexIn"` | `onSysexIn(bytes)` | `bytes` | Raw SysEx arrived. | preview ⬜ · export ✅ — Wired in the exported plugin; editor-preview dispatch is pending. |
-| `"deviceConnected"` | `onDeviceConnected(device)` | `device` | A device connected. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
-| `"deviceDisconnected"` | `onDeviceDisconnected(device)` | `device` | A device disconnected. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
+| Event | Handler | Payload | Fires when |
+|---|---|---|---|
+| `"parameterReceived"` | `onParameterReceived(info)` | `info` (`.parameter` `.value`) | A value arrived, decoded via the DPD (one per parameter in a decoded dump). |
+| `"dumpReceived"` | `onDumpReceived(dump)` | `dump` (`.values` `.kind` `.role` `.bytes`) | A bulk dump arrived and was decoded via the DPD; the panel fills automatically. values = { parameterId: value }, bytes = the raw message. |
+| `"midiIn"` | `onMidiIn(midi)` | `midi` (`.bytes` `.channel` `.status`) | Any MIDI arrived (raw). |
+| `"ccIn"` | `onCcIn(cc)` | `cc` (`.channel` `.cc` `.value`) | A CC arrived. |
+| `"noteIn"` | `onNoteIn(note)` | `note` (`.channel` `.note` `.velocity` `.on`) | A note arrived (on = false for note-off; a velocity-0 note-on counts as off). |
+| `"sysexIn"` | `onSysexIn(bytes)` | `bytes` | Raw SysEx arrived. |
+| `"deviceConnected"` | `onDeviceConnected(device)` | `device` (`.role` `.state`) | A device role's session became ready. |
+| `"deviceDisconnected"` | `onDeviceDisconnected(device)` | `device` (`.role` `.state`) | A device role's session left ready (unplugged, mismatch, port lost). |
 
 ## Commands
 

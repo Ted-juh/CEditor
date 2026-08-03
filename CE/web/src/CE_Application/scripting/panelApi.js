@@ -113,10 +113,6 @@ export const SCRIPT_SCOPES = ['component', 'panel', 'device', 'project'];
 // (JS runtime), export = the exported standalone/VST3. Keep in sync with
 // docs/scripting-runtime-gaps.md as gaps close.
 
-const EXPORT_ONLY_PENDING_PREVIEW = {
-  preview: false, export: true,
-  note: 'Wired in the exported plugin; editor-preview dispatch is pending.',
-};
 const NOT_WIRED_YET = {
   preview: false, export: false,
   note: 'Planned — not dispatched anywhere yet.',
@@ -209,7 +205,7 @@ export const CONTROL_EVENTS = [
   { id: 'hoverStart', fn: 'onHoverStart', payload: null, summary: 'Mouse entered the control.' },
   { id: 'hoverEnd', fn: 'onHoverEnd', payload: null, summary: 'Mouse left the control.' },
   { id: 'wheel', fn: 'onWheel', payload: 'wheel', fields: ['delta', 'deltaX', 'deltaY', 'x', 'y'], summary: 'Scrolled over the control. delta = +1 up / −1 down; deltaX/deltaY are the raw values.' },
-  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'State swapped (hover/pressed/disabled).', availability: NOT_WIRED_YET },
+  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'The interaction state changed: "normal", "hover", or "pressed" (a UI event — needs a window, like clicks).' },
 ];
 
 export const PANEL_EVENTS = [
@@ -222,15 +218,15 @@ export const PANEL_EVENTS = [
 
 export const DEVICE_EVENTS = [
   // decoded (the DPD payoff — 90% of use)
-  { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', fields: ['parameter', 'value'], decoded: true, summary: 'A value arrived, decoded via the DPD.', availability: EXPORT_ONLY_PENDING_PREVIEW },
+  { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', fields: ['parameter', 'value'], decoded: true, summary: 'A value arrived, decoded via the DPD (one per parameter in a decoded dump).' },
   { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', fields: ['values', 'kind', 'role', 'bytes'], decoded: true, summary: 'A bulk dump arrived and was decoded via the DPD; the panel fills automatically. values = { parameterId: value }, bytes = the raw message.' },
   // raw (escape hatch)
-  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', fields: ['bytes', 'channel', 'status'], decoded: false, summary: 'Any MIDI arrived (raw).', availability: EXPORT_ONLY_PENDING_PREVIEW },
-  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', fields: ['channel', 'cc', 'value'], decoded: false, summary: 'A CC arrived.', availability: EXPORT_ONLY_PENDING_PREVIEW },
-  { id: 'noteIn', fn: 'onNoteIn', payload: 'note', fields: ['channel', 'note', 'velocity', 'on'], decoded: false, summary: 'A note arrived (on = false for note-off; a velocity-0 note-on counts as off).', availability: EXPORT_ONLY_PENDING_PREVIEW },
-  { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'Raw SysEx arrived.', availability: EXPORT_ONLY_PENDING_PREVIEW },
-  { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A device connected.', availability: NOT_WIRED_YET },
-  { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A device disconnected.', availability: NOT_WIRED_YET },
+  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', fields: ['bytes', 'channel', 'status'], decoded: false, summary: 'Any MIDI arrived (raw).' },
+  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', fields: ['channel', 'cc', 'value'], decoded: false, summary: 'A CC arrived.' },
+  { id: 'noteIn', fn: 'onNoteIn', payload: 'note', fields: ['channel', 'note', 'velocity', 'on'], decoded: false, summary: 'A note arrived (on = false for note-off; a velocity-0 note-on counts as off).' },
+  { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'Raw SysEx arrived.' },
+  { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', fields: ['role', 'state'], decoded: false, summary: "A device role's session became ready." },
+  { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', fields: ['role', 'state'], decoded: false, summary: "A device role's session left ready (unplugged, mismatch, port lost)." },
 ];
 
 export const EVENTS = { control: CONTROL_EVENTS, panel: PANEL_EVENTS, device: DEVICE_EVENTS };

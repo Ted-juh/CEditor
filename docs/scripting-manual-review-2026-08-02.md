@@ -156,3 +156,13 @@ runtimes, **script persistence** (`stateSet`/`stateGet`, panel-scoped; persisted
 project in the exported plugin via the ScriptState blob), and the **`controlChanged` event
 wired** in both runtimes (its "Planned" badge is gone). Tested in
 `scriptTimersState.test.js`.
+
+Seventh follow-up (same branch, closing out): **preview raw MIDI-in** (`onMidiIn`/`onCcIn`/
+`onNoteIn`/`onSysexIn` + per-parameter `onParameterReceived` — five badges gone),
+**`onDeviceConnected`/`onDeviceDisconnected`** in both runtimes (DPD session `ready`
+transitions), **`onStateChanged`** (preview interaction states), and the spec Q1 **handle
+form** (`panel.get("name")` → `{ set, get, on }`, plus `self.on`) in every engine and the
+preview. Tested in `scriptMidiInHandles.test.js`; the Lua prelude was verified in a real
+Lua 5.4 VM (wasmoon). Remaining open items: `buildDump` (needs a synchronous DPD bulk-encode
+API), `panelStateChanged` (no panel-state feature to observe), and the optional dot-object
+sugar.

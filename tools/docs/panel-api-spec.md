@@ -313,4 +313,6 @@ Runtime note (Model 2): all debugging runs against the **C++ host engines** (Sol
 
 **Next:** Milestone 1 build — bind the panel API into **Sol3 + juce_javascript** in the C++ host; lifecycle hooks wired to standalone + VST3 + state save/restore; the DPD-style editor shell with code editor, picker, live trace console.
 
+**Q1 status note (2026-08):** the handle form is implemented in every engine — `panel.get("name")` returns `{ set, get, on }` (colon-call in Lua), and `self` carries the same three. The dot-object form (`panel.cutoff.value`) remains unimplemented optional sugar.
+
 **Language status note (2026-08):** beyond the Tier 1 pair this spec was written for, the app now also ships **TypeScript** as Tier 1 (transpiled to JS, same runtime) and **Python / C++ / C# / Java** as additional languages (Python via Pyodide/embedded CPython; C++/C#/Java as an interpreted preview subset, compiled at export) — see `SCRIPT_LANGUAGES` in `panelApi.js` and `docs/scripting-language-options-and-shippable-export.md`. The API contract in this document is unchanged: every language calls the same surface.
