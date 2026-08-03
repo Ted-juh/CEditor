@@ -1,6 +1,7 @@
 <script>
   import { dragScrub } from '../scrub/dragScrubAction';
   import { presets } from '../scrub/dragScrub';
+  import { appScrubOverrides } from '../utils/scrubRuntime.js';
 
   let { value = 100, min = 0, max = 200, step = 1, label = '', defaultValue = undefined, onchange = null } = $props();
 
@@ -10,6 +11,7 @@
 
   const scrubParams = $derived({
     ...presets.linearHorizontal,
+    ...appScrubOverrides(),
     min,
     max,
     step,

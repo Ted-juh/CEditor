@@ -6,6 +6,7 @@ import {
 import { resolvePartPixelRect } from './customComponentLayout.js';
 import { numberOr, clamp } from './primitives.js';
 import { DragScrub, presets } from '../scrub/dragScrub';
+import { appScrubOverrides } from './scrubRuntime.js';
 
 function sectionChildren(control, sectionName) {
   return control?._children?.[sectionName]?._children ?? {};
@@ -770,16 +771,17 @@ function createCustomDragScrub(behaviorModule, rect, dragMode, startNormalized) 
     ...presets.knob,
     axis,
     combine,
-    invertX: reversed,
-    invertY: reversed,
+    invertX: reversed !== (behaviorModule?.invertX === true),
+    invertY: reversed !== (behaviorModule?.invertY === true),
     weightX: numberOr(behaviorModule?.weightX, 1) / Math.max(1, rect.width),
     weightY: numberOr(behaviorModule?.weightY, 1) / Math.max(1, rect.height),
     increaseAngle: (clamp(numberOr(behaviorModule?.increaseAngle, 45), 0, 90) * Math.PI) / 180,
     sensitivity: Math.max(0.01, numberOr(behaviorModule?.dragSensitivity, 1)),
     deadZone: 0,
-    fineFactor: 0.25,
+    fineFactor: 0.25, // the historical custom-component shift feel
     min: 0,
     max: 1,
+    ...appScrubOverrides(),
   }, clamp(startNormalized, 0, 1));
 }
 

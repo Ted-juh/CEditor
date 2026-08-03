@@ -19,6 +19,7 @@
   let selectedName = $state('');
   let newName = $state('');
   let showAdvancedGeometry = $state(false);
+  let showAdvancedDrag = $state(false);
   let selected = $derived(behaviors?._children?.[selectedName] ?? null);
   let behaviorEntries = $derived(Object.entries(behaviors?._children ?? {}));
   let enabledCount = $derived(behaviorEntries.filter(([, behavior]) => behavior?.enabled !== false).length);
@@ -32,7 +33,8 @@
 
   const TYPE_OPTIONS = ['button', 'toggle', 'radio', 'cycle', 'slider', 'multi-slider', 'three-value-slider', 'dial', 'ring', 'scroll', 'grid', 'piano-bar', 'filmstrip-control', 'xy-pad', 'drag-handle', 'visual-only'];
   const GEOMETRY_OPTIONS = ['none', 'linear', 'vertical', 'circular', 'ring', 'grid', 'xy', 'scroll', 'piano'];
-  const DRAG_MODE_OPTIONS = ['auto', 'vertical', 'horizontal', 'circular', 'both'];
+  const DRAG_MODE_OPTIONS = ['auto', 'vertical', 'horizontal', 'circular', 'both', 'free', 'relative'];
+  const COMBINE_OPTIONS = ['projected', 'sum', 'magnitude'];
   const TYPE_GEOMETRIES = {
     button: ['none'],
     toggle: ['none'],
@@ -329,6 +331,35 @@
       <PropertyCell label="Sensitivity" span={2} hint="Multiplier for vertical, horizontal, or both drag modes. 1 means one control height/width covers the full value range.">
         <input class="val" type="number" min="0.01" max="10" step="0.05" value={selected.dragSensitivity ?? 1} onchange={(event) => set('dragSensitivity', Math.max(0.01, Math.min(10, Number(event.target.value) || 1)))} />
       </PropertyCell>
+      <PropertyCell label="Invert X" span={1} hint="Flip the horizontal drag direction for this behavior only.">
+        <PropertyToggle value={selected.invertX === true} onchange={() => set('invertX', !(selected.invertX === true))} />
+      </PropertyCell>
+      <PropertyCell label="Invert Y" span={1} hint="Flip the vertical drag direction for this behavior only.">
+        <PropertyToggle value={selected.invertY === true} onchange={() => set('invertY', !(selected.invertY === true))} />
+      </PropertyCell>
+      {#if selected.dragMode === 'both' || selected.dragMode === 'free'}
+        <PropertyCell label="Advanced" span={2} hint="How the two drag axes merge into one value — combine mode, per-axis weights, and the increase direction.">
+          <PropertyToggle value={showAdvancedDrag} onchange={() => showAdvancedDrag = !showAdvancedDrag} />
+        </PropertyCell>
+        {#if showAdvancedDrag}
+          <PropertyCell label="Combine" span={2} hint="projected never exceeds the pixels travelled; sum runs faster diagonally and cancels on the opposing diagonal; magnitude moves at the same rate in every direction, only the sign flips.">
+            <select class="val" value={selected.combine ?? (selected.dragMode === 'free' ? 'magnitude' : 'projected')} onchange={(event) => set('combine', event.target.value)}>
+              {#each COMBINE_OPTIONS as option}
+                <option value={option}>{option}</option>
+              {/each}
+            </select>
+          </PropertyCell>
+          <PropertyCell label="Weight X" span={1} hint="Relative contribution of horizontal motion.">
+            <input class="val" type="number" min="0" max="4" step="0.1" value={selected.weightX ?? 1} onchange={(event) => set('weightX', Math.max(0, Math.min(4, Number(event.target.value) || 1)))} />
+          </PropertyCell>
+          <PropertyCell label="Weight Y" span={1} hint="Relative contribution of vertical motion.">
+            <input class="val" type="number" min="0" max="4" step="0.1" value={selected.weightY ?? 1} onchange={(event) => set('weightY', Math.max(0, Math.min(4, Number(event.target.value) || 1)))} />
+          </PropertyCell>
+          <PropertyCell label="Increase Angle" span={2} hint="Direction treated as increase, in degrees: 0 is right, 90 is up, 45 is the up-right default.">
+            <input class="val" type="number" min="0" max="90" step="5" value={selected.increaseAngle ?? 45} onchange={(event) => set('increaseAngle', Math.max(0, Math.min(90, Number(event.target.value) || 45)))} />
+          </PropertyCell>
+        {/if}
+      {/if}
     </PropertySection>
 
     {#if selected.type === 'xy-pad' || selected.role === 'xyPad' || selected.role === 'xy-pad' || selected.geometry === 'xy' || selected.geometry === 'grid'}

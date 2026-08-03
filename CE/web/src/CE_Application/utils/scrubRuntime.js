@@ -17,8 +17,25 @@ import {
   getSliderDirection,
 } from './sliderBehavior.js';
 
+import { readStoredJson } from './localStorageState.js';
+
 // The historical spinner feel: one step per 18 px of travel.
 const SCRUB_PIXELS_PER_STEP = 18;
+
+// App-level scrub defaults (deadZone, fineFactor, coarseFactor): deliberately
+// no per-widget UI. Stored under one key; only finite stored values override
+// the per-widget-type defaults, so an empty store changes nothing.
+const SCRUB_DEFAULTS_KEY = 'ce.ui.scrubDefaults';
+
+export function appScrubOverrides() {
+  const stored = readStoredJson(SCRUB_DEFAULTS_KEY, null);
+  if (!stored || typeof stored !== 'object') return {};
+  const overrides = {};
+  if (Number.isFinite(Number(stored.deadZone))) overrides.deadZone = Math.max(0, Number(stored.deadZone));
+  if (Number.isFinite(Number(stored.fineFactor))) overrides.fineFactor = Math.max(0.01, Number(stored.fineFactor));
+  if (Number.isFinite(Number(stored.coarseFactor))) overrides.coarseFactor = Math.max(1, Number(stored.coarseFactor));
+  return overrides;
+}
 
 export function scrubSample(event) {
   return {
@@ -75,9 +92,11 @@ export function createRangeScrub(behavior, startValue = 0) {
     invertX: !vertical && ((direction === 'rtl') !== reversed),
     invertY: vertical && ((direction === 'ttb') !== reversed),
     sensitivity: step / SCRUB_PIXELS_PER_STEP,
-    deadZone: 0,
     step,
     min: getRangeMin(behavior),
     max: getRangeMax(behavior),
+    ...appScrubOverrides(),
+    // The surface's own 5 px drag threshold gates engagement, never the core.
+    deadZone: 0,
   }, startValue);
 }

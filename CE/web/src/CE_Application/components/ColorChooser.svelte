@@ -15,6 +15,7 @@
   import { hueBand, saturationBand, lightnessBand, alphaBand } from '../utils/bandGradients.js';
   import { dragScrub } from '../scrub/dragScrubAction';
   import { presets } from '../scrub/dragScrub';
+  import { appScrubOverrides } from '../utils/scrubRuntime.js';
 
   let { color = '333333', alpha: propAlpha = 1, stepSize = 10, onchange } = $props();
 
@@ -96,6 +97,7 @@
   let bandParams = $derived({
     hue: {
       ...presets.linearHorizontal,
+      ...appScrubOverrides(),
       min: 0,
       max: 360,
       step: (stepSize / 100) * 360,
@@ -105,6 +107,7 @@
     },
     saturation: {
       ...presets.linearHorizontal,
+      ...appScrubOverrides(),
       invertX: true,
       min: 0,
       max: 100,
@@ -115,6 +118,7 @@
     },
     lightness: {
       ...presets.linearHorizontal,
+      ...appScrubOverrides(),
       min: 0,
       max: 100,
       step: stepSize,
@@ -124,6 +128,7 @@
     },
     alpha: {
       ...presets.linearHorizontal,
+      ...appScrubOverrides(),
       invertX: true,
       min: 0,
       max: 100,
