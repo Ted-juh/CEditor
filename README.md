@@ -127,6 +127,7 @@ CEditor/
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/my-feature`)
 3. Follow the folder structure conventions — UI code in `CE_Application/`, runtime components in `CE_Panel/`, etc.
+   Property-panel hints and tooltips follow [docs/property-hints.md](docs/property-hints.md).
 4. Test in both the browser (`localhost:5173`) and the JUCE app
 5. Submit a pull request
 

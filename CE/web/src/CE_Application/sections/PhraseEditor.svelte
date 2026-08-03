@@ -123,7 +123,7 @@
     <PropertyCell label="Run" span={1} hint="Advance the sequence in preview / player. Stopped, the grid still shows the pattern.">
       <PropertyToggle value={p.running !== false} onchange={() => set('running', !(p.running !== false))} />
     </PropertyCell>
-    <PropertyCell label="Rows are" span={3} hint="Scale degrees make the pattern a SHAPE: change the key and it transposes, change major to minor and it re-harmonises, and no row can produce a note outside the key. Chromatic turns it into a plain piano roll.">
+    <PropertyCell label="Rows are" span={3} hint="Scale degrees = the pattern transposes and re-harmonises with the key. Chromatic = a plain piano roll.">
       <select class="val" value={p.mode ?? 'degree'} onchange={(e) => set('mode', e.target.value)}>
         {#each PHRASE_MODES as m (m)}<option value={m}>{PHRASE_MODE_LABELS[m] ?? m}</option>{/each}
       </select>
@@ -154,7 +154,7 @@
     <PropertyCell label="Rows" span={1} hint="How many degrees the grid shows. 8 gives an octave of a seven-note scale plus the tonic above.">
       <input class="val" type="number" min={MIN_ROWS} max={MAX_ROWS} step="1" value={num(p.rows, 8)} onchange={(e) => set('rows', clampInt(e.target.value, MIN_ROWS, MAX_ROWS, 8))} />
     </PropertyCell>
-    <PropertyCell label="Direction" span={2} hint="Ping-pong turns round at the ends without repeating them. Random is deterministic from the step index, so it repeats identically each pass — change the seed for a different order.">
+    <PropertyCell label="Direction" span={2} hint="Ping-pong turns round at the ends without repeating them. Random repeats identically each pass — change the seed.">
       <select class="val" value={p.direction ?? 'forward'} onchange={(e) => set('direction', e.target.value)}>
         {#each PHRASE_DIRECTIONS as d (d)}<option value={d}>{PHRASE_DIRECTION_LABELS[d] ?? d}</option>{/each}
       </select>
@@ -188,16 +188,16 @@
       <div class="note">{selCell ? 'Editing that cell.' : 'Nothing there — place a note on the grid first.'}</div>
     </PropertyCell>
     {#if selCell}
-      <PropertyCell label="Chance" span={1} hint="How often it plays, 0–100%. Deterministic from the position and the seed, so the same lap always sounds the same and two sequencers on one clock agree — a maybe-note is drawn hollow so the grid doesn't claim a note that stays silent.">
+      <PropertyCell label="Chance" span={1} hint="How often the step plays, 0–100%. The same seed and position always give the same result.">
         <input class="val" type="number" min="0" max="100" step="5" value={Math.round(cellChance(selCell) * 100)} onchange={(e) => patchCell({ chance: clampInt(e.target.value, 0, 100, 100) / 100 })} />
       </PropertyCell>
-      <PropertyCell label="Ratchet" span={1} hint="How many times it retriggers inside its own step. A tied note is never ratcheted — holding it and retriggering it are opposite instructions.">
+      <PropertyCell label="Ratchet" span={1} hint="How many times the step retriggers inside itself. A tied note is never ratcheted.">
         <input class="val" type="number" min="1" max={MAX_RATCHET} step="1" value={cellRatchet(selCell)} onchange={(e) => patchCell({ ratchet: clampInt(e.target.value, 1, MAX_RATCHET, 1) })} />
       </PropertyCell>
-      <PropertyCell label="Length" span={1} hint="This note's own gate, as a multiple of the STEP — 2 holds it for two steps. Blank uses the pattern gate. This is how you write a long note without a chain of ties.">
+      <PropertyCell label="Length" span={1} hint="This note's gate as a multiple of the step — 2 holds it for two steps. Blank uses the pattern gate.">
         <input class="val" type="number" min="0.05" max="4" step="0.25" placeholder="—" value={cellLength(selCell) ?? ''} onchange={(e) => patchCell({ length: e.target.value === '' ? null : clampNum(e.target.value, 0.05, 4, 1) })} />
       </PropertyCell>
-      <PropertyCell label="Tie" span={1} hint="Hold this note through from the step before instead of retriggering. Needs a note on the same row in the previous step, or it is just a retrigger.">
+      <PropertyCell label="Tie" span={1} hint="Hold this note through from the step before. Needs a note on the same row in the previous step.">
         <PropertyToggle value={selCell.tie === true} onchange={() => patchCell({ tie: !(selCell.tie === true) })} />
       </PropertyCell>
       <PropertyCell label="Velocity" span={1} hint="This cell's own velocity. Blank follows the pattern's.">
@@ -235,16 +235,16 @@
         <input class="val" type="number" min="0.1" max="40" step="0.5" value={num(p.rate, 8)} onchange={(e) => set('rate', clampNum(e.target.value, 0.1, 40, 8))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Gate" span={1} hint="Note length as a fraction of the step. 1 = legato. A note the next step TIES is exempt — a tie would be pointless if the gate cut it.">
+    <PropertyCell label="Gate" span={1} hint="Note length as a fraction of the step; 1 = legato. A note that the next step ties is exempt.">
       <input class="val" type="number" min="0.05" max="1" step="0.05" value={num(p.gate, 0.8)} onchange={(e) => set('gate', clampNum(e.target.value, 0.05, 1, 0.8))} />
     </PropertyCell>
-    <PropertyCell label="Swing from" span={1} hint="Where the shuffle comes from. Synced to the transport it inherits the clock's swing by default, so everything on that clock shuffles together. Its own keeps this part separate. Free-running always uses its own — there is no clock to inherit from.">
+    <PropertyCell label="Swing from" span={1} hint="Transport = inherit the clock's swing. Own = this sequencer's own setting. Free-running always uses its own.">
       <select class="val" value={p.swingSource ?? 'transport'} onchange={(e) => set('swingSource', e.target.value)}>
         <option value="transport">The transport</option>
         <option value="own">Its own</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Swing" span={1} hint="Delays every odd step by up to half a step. Shares the Arpeggiator's swing function, so an Arp and a Phrase at the same swing land together.">
+    <PropertyCell label="Swing" span={1} hint="Delays every odd step by up to half a step. Shares the Arpeggiator's swing setting.">
       <input class="val" type="number" min="0" max="1" step="0.05" value={num(p.swing, 0)} onchange={(e) => set('swing', clampNum(e.target.value, 0, 1, 0))} />
     </PropertyCell>
     <PropertyCell label="Velocity" span={1} hint="The default a cell uses when it has none of its own.">
@@ -253,7 +253,7 @@
     <PropertyCell label="Channel" span={1} hint="MIDI channel 1–16.">
       <input class="val" type="number" min="1" max="16" step="1" value={num(p.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
     </PropertyCell>
-    <PropertyCell label="Bar line" span={1} hint="Shade every Nth step, so 16 steps read as four beats rather than sixteen identical boxes.">
+    <PropertyCell label="Bar line" span={1} hint="Shade every Nth step, so 16 steps read as four beats.">
       <input class="val" type="number" min="1" max="16" step="1" value={num(p.accentEvery, 4)} onchange={(e) => set('accentEvery', clampInt(e.target.value, 1, 16, 4))} />
     </PropertyCell>
   </PropertySection>

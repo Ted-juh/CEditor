@@ -230,8 +230,8 @@
   }
 </script>
 
-<PropertySection title="Public Surface">
-  <PropertyCell label="Contract" span={1} hint="Public name and package-facing surface for this reusable custom component.">
+<PropertySection title="Public API">
+  <PropertyCell label="Name" span={1} hint="The name this component is addressed by when a panel places it.">
     <div class="contract-card">
       <strong>{contractLabel}</strong>
       <span>{surfaceCount} public item{surfaceCount === 1 ? '' : 's'}</span>
@@ -428,9 +428,9 @@
 {/if}
 
 {#if !surfaceCount}
-  <PropertySection title="Public Surface">
-    <PropertyCell label="Private" span={4} hint="This package does not expose public inputs, outputs, or editable properties.">
-      <div class="empty-state">No public controls exposed by this component package.</div>
+  <PropertySection title="Nothing exposed">
+    <PropertyCell label="" span={4} hint="This component exposes no public inputs, outputs, or editable properties.">
+      <div class="empty-state">No public controls exposed.</div>
     </PropertyCell>
   </PropertySection>
 {/if}

@@ -152,7 +152,7 @@
     </div>
     <div class="add-host">
       <button type="button" class="add-btn" aria-haspopup="menu" aria-expanded={addMenuOpen} onclick={() => { addMenuOpen = !addMenuOpen; }}>
-        + Make Interactive ▾
+        + Make interactive ▾
       </button>
       {#if addMenuOpen}
         <div class="add-menu" role="menu" aria-label="Interactive archetypes">
@@ -244,7 +244,7 @@
   {:else}
     <div class="empty-card">
       <strong>Nothing is interactive yet.</strong>
-      <span>Use “+ Make Interactive” (or draw with the surface’s Interactive tool) to scaffold a wired control — value, behavior, and grab area in one step.</span>
+      <span>Use + Make interactive to wire one up.</span>
     </div>
   {/each}
 

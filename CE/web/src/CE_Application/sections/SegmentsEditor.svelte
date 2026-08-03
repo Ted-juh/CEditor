@@ -463,7 +463,7 @@
 {:else if rows.length === 0}
   <div class="placeholder">Add value rows first so the segment editor has segments to target.</div>
 {:else}
-  <PropertySection title="Segment Scope">
+  <PropertySection title="Scope">
     <PropertyCell label="Editing" span={4} hint="States and Segments in the top bar define which portion of the radio group these properties affect.">
       <div class="scope-stack">
         <div class="scope-banner">
@@ -567,7 +567,7 @@
   {#if activePartId === 'whole'}
     <PropertySection title="Shell Border">
       {#if wholeShellMixed}
-        <PropertyCell label="Scope" span={4} hint="The selected segments currently have different shell border or corner settings. Editing below writes the new values to all targeted segments.">
+        <PropertyCell label="Scope" span={4} hint="The selected segments have different border or corner settings. Editing below writes to all of them.">
           <div class="note-card mixed-note">
             The selected segments currently differ. Editing this shell border writes the new values to all targeted segments.
           </div>

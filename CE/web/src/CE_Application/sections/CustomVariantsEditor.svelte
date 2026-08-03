@@ -368,7 +368,7 @@
       <PropertyCell label="" span={4} hint="Remove this variant. Default cannot be removed.">
         <div class="footer-row">
           <span>{parseError}</span>
-          <button class="action-btn danger compact" type="button" onclick={removeVariant} disabled={selectedName === 'default'}>Remove Variant</button>
+          <button class="action-btn danger compact" type="button" onclick={removeVariant} disabled={selectedName === 'default'}>Remove variant</button>
         </div>
       </PropertyCell>
     </PropertySection>

@@ -375,7 +375,7 @@
         <PropertyToggle value={panel.resizable}
                         onchange={() => handleToggle('resizable')} />
       </PropertyCell>
-      <PropertyCell label="Panic key" span={2} hint="The panel-wide emergency stop: silences every note this panel is holding and sends all-sound-off to the synth. Click and press the keys you want; Backspace clears it (switching the shortcut off). A bare key like Escape is ignored while you are typing in a field; a combo with a modifier still works there.">
+      <PropertyCell label="Panic key" span={2} hint="Keyboard shortcut for panel panic — click, then press the keys. Backspace clears it.">
         <button class="shortcut" class:capturing={capturingShortcut} type="button"
                 onclick={() => { capturingShortcut = true; }}
                 onblur={() => { capturingShortcut = false; }}
@@ -384,7 +384,7 @@
         </button>
       </PropertyCell>
       {#if shortcutNotes.length}
-        <PropertyCell label="" span={4} hint="Nothing else on a panel binds a key, so this is not a clash with another control — it is about keys the host may take first, and keys that fire too easily.">
+        <PropertyCell label="" span={4} hint="Avoid keys the host may take first, and keys that fire too easily.">
           <ul class="shortcut-notes">
             {#each shortcutNotes as note, i (i)}
               <li class={note.level}>{note.message}</li>
@@ -598,7 +598,7 @@
       </PropertyCell>
     </PropertySection>
     <PropertySection title="Origin" collapsed={$sectionCollapse['grid-origin'] ?? true} ontoggle={(v) => setCollapsed('grid-origin', v)}>
-      <PropertyCell label="Center" span={4} hint="Center the grid on the panel — lines radiate from the middle">
+      <PropertyCell label="Centre" span={4} hint="Centre the grid on the panel — lines radiate from the middle">
         <PropertyToggle value={panel.gridCentered ?? false}
                         onchange={() => updatePanel(panel.id, { gridCentered: !panel.gridCentered })} />
       </PropertyCell>
@@ -643,7 +643,7 @@
     </PropertySection>
 
     <PropertySection title="Identity">
-      <PropertyCell label="Plugin GUID" span={4} hint="Stable per-panel id — the source of the unique plugin FUID. Changing it makes hosts treat a rebuild as a different plugin.">
+      <PropertyCell label="Plugin GUID" span={4} hint="Stable per-panel id behind the plugin FUID. Change it and hosts treat a rebuild as a different plugin.">
         <div class="export-row">
           <input class="val val-mono" type="text" readonly value={panel.panelGuid ?? '(none)'} />
           <button class="export-regen" onclick={regenerateGuid} title="Generate a new GUID (changes the plugin identity)">Regenerate</button>
@@ -766,7 +766,7 @@
 
     <PropertySection title="Scripting Runtime">
       <PropertyCell label="Python" span={4}
-                    hint="Embed the REAL CPython runtime (full standard library) so Python scripts run window-closed and offline. Lua + JavaScript are always built in and add almost nothing — only Python carries a meaningful size cost. Auto = include only when this panel has Python scripts.">
+                    hint="Embed the CPython runtime so Python scripts run window-closed and offline. Auto = only when this panel uses Python.">
         <div class="export-row">
           <div class="seg">
             {#each [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']] as [mode, label] (mode)}

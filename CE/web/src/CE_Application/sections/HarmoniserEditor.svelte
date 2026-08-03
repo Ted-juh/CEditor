@@ -89,7 +89,7 @@
 
 {#if p}
   <PropertySection title="Harmoniser">
-    <PropertyCell label="Mode" span={4} hint="Diatonic builds the chord that belongs to the played note's degree in the key, so it cannot produce a wrong note. Memory transposes a fixed shape to whatever you play, in key or out of it — which is what a hardware chord-memory button does, parallel fifths and all.">
+    <PropertyCell label="Mode" span={4} hint="Diatonic = the chord for the played note's degree in the key. Memory = a fixed shape transposed to whatever you play.">
       <select class="val" value={p.mode ?? 'diatonic'} onchange={(e) => set('mode', e.target.value)}>
         {#each HARMONY_MODES as m (m)}<option value={m}>{HARMONY_MODE_LABELS[m] ?? m}</option>{/each}
       </select>
@@ -109,13 +109,13 @@
       <PropertyCell label="Chord size" span={1} hint="Notes stacked in thirds up the scale. 3 is a triad, 4 a seventh, 5 a ninth.">
         <input class="val" type="number" min="2" max="6" step="1" value={num(p.size, 3)} onchange={(e) => set('size', clampInt(e.target.value, 2, 6, 3))} />
       </PropertyCell>
-      <PropertyCell label="Out of key" span={1} hint="A note that isn't in the scale has no degree, so there is no chord for it. None of the three answers is obviously right, so it is a setting rather than a guess — and the default keeps you audible.">
+      <PropertyCell label="Out of key" span={1} hint="What to do with a note that has no degree in the scale.">
         <select class="val" value={p.outOfKey ?? 'pass'} onchange={(e) => set('outOfKey', e.target.value)}>
           {#each OUT_OF_KEY as m (m)}<option value={m}>{OUT_OF_KEY_LABELS[m] ?? m}</option>{/each}
         </select>
       </PropertyCell>
     {:else}
-      <PropertyCell label="Shape" span={2} hint="Semitones from the note you played, comma separated. 0 is the played note itself — it is in the list rather than implied, so you can leave it out and send harmony only.">
+      <PropertyCell label="Shape" span={2} hint="Semitones from the played note, comma separated. 0 is the played note itself.">
         <input class="val" type="text" value={memoryShape(control).join(', ')} onchange={(e) => setShapeText(e.target.value)} />
       </PropertyCell>
       <PropertyCell label="Preset" span={2} hint="">
@@ -142,7 +142,7 @@
       <input class="val" type="number" min="1" max={MAX_VOICES} step="1" value={num(p.maxVoices, 6)} onchange={(e) => set('maxVoices', clampInt(e.target.value, 1, MAX_VOICES, 6))} />
     </PropertyCell>
 
-    <PropertyCell label="Keep played note" span={2} hint="Off sends only the harmony, so the note you played is heard from wherever else it is going — the classic 'harmony on another synth' setup.">
+    <PropertyCell label="Keep played note" span={2} hint="Send the played note along with the harmony. Off sends the harmony only.">
       <PropertyToggle value={p.keepPlayed !== false} onchange={() => set('keepPlayed', !(p.keepPlayed !== false))} />
     </PropertyCell>
     <PropertyCell label="In channel" span={1} hint="0 listens on every channel.">
@@ -155,7 +155,7 @@
       <input class="val" type="number" min="0" max="127" step="1" value={num(p.velocity, 0)} onchange={(e) => set('velocity', clampInt(e.target.value, 0, 127, 0))} />
     </PropertyCell>
 
-    <PropertyCell label="" span={4} hint={isMemory ? 'The shape applied to C.' : 'Every degree of the key, so you can see that it is right for all of them rather than for one example.'}>
+    <PropertyCell label="" span={4} hint={isMemory ? 'The shape applied to C.' : 'The chord built on every degree of the key.'}>
       <div class="preview">{table.length ? table.join('\n') : '—'}</div>
     </PropertyCell>
     <PropertyCell label="" span={4} hint="">
@@ -164,12 +164,12 @@
   </PropertySection>
 
   <PropertySection title="Voicing extras">
-    <PropertyCell label="Voice leading" span={4} hint="Pick the inversion that moves least from the chord before. OFF by default, because it makes the harmony depend on what you played PREVIOUSLY — a real behavioural change rather than a refinement. Closest minimises total movement (the textbook rule); Smooth minimises the TOP voice only, which holds a melody line still under a lead and lets the inner voices jump. The note you played never moves either way.">
+    <PropertyCell label="Voice leading" span={4} hint="Pick the inversion closest to the previous chord. Closest = least total movement; Smooth = holds the top voice.">
       <select class="val" value={voiceLeading(control)} onchange={(e) => set('voiceLeading', e.target.value)}>
         {#each VOICE_LEADING as v (v)}<option value={v}>{VOICE_LEADING_LABELS[v] ?? v}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Strum" span={1} hint="Spread the chord over this many milliseconds. Note-offs are never strummed: a chord that lets go raggedly sounds like a fault, where one that arrives raggedly sounds like a guitar.">
+    <PropertyCell label="Strum" span={1} hint="Spread the chord over this many milliseconds. Note-offs are never strummed.">
       <input class="val" type="number" min="0" max="400" step="5" value={harmoniserStrum(control)} onchange={(e) => set('strumMs', clampInt(e.target.value, 0, 400, 0))} />
     </PropertyCell>
     <PropertyCell label="Direction" span={1} hint="Which end of the chord arrives first.">
@@ -178,7 +178,7 @@
         <option value="down">Down</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Forward bend" span={1} hint="Pass incoming pitch bend to the chord's channel, all fourteen bits. The harmoniser needs no attribution rule — everything it plays is on one channel, so it is all of it or none.">
+    <PropertyCell label="Forward bend" span={1} hint="Pass incoming pitch bend to the chord's channel, all 14 bits.">
       <PropertyToggle value={p.forwardBend === true} onchange={() => set('forwardBend', !(p.forwardBend === true))} />
     </PropertyCell>
     <PropertyCell label="Forward pressure" span={1} hint="The same for channel aftertouch.">
@@ -190,9 +190,7 @@
     <PropertySection title="Per-degree chords">
       <PropertyCell label="" span={4} hint="">
         <div class="note">
-          Diatonic mode stacks thirds, which is right almost always and wrong when you wanted the
-          vi to be a sus4. An override replaces the stack for <b>one</b> degree and leaves the
-          others alone — the mode is still in-key by construction, with an exception you asked for.
+          An override replaces the stacked chord for <b>one</b> degree and leaves the others alone.
         </div>
       </PropertyCell>
       <PropertyCell label="Degree" span={1} hint="1 is the tonic.">

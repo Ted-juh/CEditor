@@ -374,7 +374,7 @@
         <PropertyToggle value={selected.detachable !== false} onchange={() => set('detachable', !(selected.detachable !== false))} />
       </PropertyCell>
       <PropertyCell label="Commit" span={2} hint="Convert generated output into normal editable layers and disable this generator.">
-        <button class="action-btn" type="button" onclick={detachGenerator} disabled={selected.detachable === false}>Detach Output</button>
+        <button class="action-btn" type="button" onclick={detachGenerator} disabled={selected.detachable === false}>Detach output</button>
       </PropertyCell>
     </PropertySection>
   {/if}

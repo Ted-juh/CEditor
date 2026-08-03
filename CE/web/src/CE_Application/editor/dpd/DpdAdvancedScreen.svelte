@@ -20,16 +20,16 @@
   });
   function validateSource() {
     try { const v = validateProfile(JSON.parse(sourceText)); sourceStatus = v.ok ? 'valid ✓' : ('invalid: ' + v.errors.join('; ')); }
-    catch (e) { sourceStatus = 'parse error: ' + e.message; }
+    catch (e) { sourceStatus = 'Parse error: ' + e.message; }
   }
   function applySource() {
     let parsed;
-    try { parsed = JSON.parse(sourceText); } catch (e) { sourceStatus = 'parse error: ' + e.message; return; }
+    try { parsed = JSON.parse(sourceText); } catch (e) { sourceStatus = 'Parse error: ' + e.message; return; }
     const v = validateProfile(parsed);
     if (!v.ok) { sourceStatus = 'invalid: ' + v.errors.join('; '); return; }
     onApplyModel?.(parsed);
     editing = false;
-    sourceStatus = 'applied ✓ — use “Save to engine” to persist';
+    sourceStatus = 'Applied — use Save to engine to persist.';
   }
 
   // ---- engine tests + dump parse (operate on the loaded engine profile via the bridge) ----

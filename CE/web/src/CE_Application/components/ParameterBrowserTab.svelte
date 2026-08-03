@@ -624,7 +624,7 @@
       await navigator.clipboard.writeText(text);
       monitorCopyStatus = 'Copied';
     } catch {
-      monitorCopyStatus = 'Copy failed';
+      monitorCopyStatus = 'Copy failed.';
     }
 
     setTimeout(() => {
@@ -989,11 +989,11 @@
     <input value={query} placeholder="Search parameters" oninput={(e) => query = e.target.value} />
     <button onclick={handleOpenDesigner}>Designer</button>
     <button onclick={handlePullFromSynth}>Sync</button>
-    <button onclick={handleScanPresets}>Scan Presets</button>
+    <button onclick={handleScanPresets}>Scan presets</button>
     {#if $latestPresetListScan?.running}
-      <button onclick={handleCancelPresetScan}>Cancel Scan</button>
+      <button onclick={handleCancelPresetScan}>Cancel scan</button>
     {/if}
-    <button onclick={handleRunTests}>Run Tests</button>
+    <button onclick={handleRunTests}>Run tests</button>
     <button onclick={() => refreshDeviceProfiles()}>Refresh</button>
     <button onclick={() => importDeviceProfile()}>Import</button>
   </div>
@@ -1018,7 +1018,7 @@
         <span class="profile-link-message">{identityMismatch.message}</span>
       </div>
       <div class="profile-link-meta">
-        <button onclick={handleAcceptIdentityMismatch}>Use Anyway</button>
+        <button onclick={handleAcceptIdentityMismatch}>Use anyway</button>
         <button onclick={handlePullFromSynth}>Retry</button>
       </div>
     </div>
@@ -1032,10 +1032,10 @@
     <div class="profile-link-meta">
       <span>{parameterSourceLabel}</span>
       {#if panelRequiredProfileId && panelRequiredProfileId !== selectedProfileId && panelRequiredProfileLoaded}
-        <button onclick={usePanelRequiredProfile}>Use Required</button>
+        <button onclick={usePanelRequiredProfile}>Use required</button>
       {/if}
       {#if selectedProfileId && panelRequiredProfileId !== selectedProfileId}
-        <button onclick={adoptCurrentProfileForPanel}>Adopt Current</button>
+        <button onclick={adoptCurrentProfileForPanel}>Adopt current</button>
       {/if}
       {#if panelRequiredProfileId && !panelRequiredProfileLoaded}
         <button onclick={() => importDeviceProfile()}>Import</button>
@@ -1145,7 +1145,7 @@
     <div class="diagnostic-panel">
       <div class="diagnostic-header">
         <div class="diagnostic-title">Tests</div>
-        <button class="diagnostic-action" onclick={handleRunTests}>Run Tests</button>
+        <button class="diagnostic-action" onclick={handleRunTests}>Run tests</button>
       </div>
       <div class="test-profile" title={selectedProfileName}>{selectedProfileName}</div>
       <div class="hex">

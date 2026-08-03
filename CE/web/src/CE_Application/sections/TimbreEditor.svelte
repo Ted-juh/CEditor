@@ -128,7 +128,7 @@
   </PropertySection>
 
   <PropertySection title="Targets">
-    <PropertyCell label="" span={4} hint="Each target is one parameter dimension the anchors morph. Every target is a bindable 'Target' port — bind it in Device Bindings.">
+    <PropertyCell label="" span={4} hint="Each target is one parameter the anchors morph. Bind its 'Target' port in Device Bindings.">
       <div class="rows">
         {#if targets.length === 0}<div class="empty">No targets yet. Add one, then bind its port.</div>{/if}
         {#each targets as t, i (t.id ?? i)}
@@ -138,13 +138,13 @@
             <button type="button" class="action-btn danger" onclick={() => removeTarget(i)} title="Remove">✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addTarget}>Add Target</button>
+        <button type="button" class="action-btn" onclick={addTarget}>Add target</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Anchors">
-    <PropertyCell label="" span={4} hint="Each anchor is a named patch placed on the pad (X/Y in 0–1), storing a value per target. The puck blends the anchors by distance — move it and the whole patch morphs toward the nearest anchors. 'Capture' stamps an anchor's values from the panel's current bound controls: dial in a sound with the panel's knobs, then capture it.">
+    <PropertyCell label="" span={4} hint="Each anchor is a named patch at X/Y (0–1) storing a value per target. Capture stamps the panel's current values.">
       <div class="rows">
         {#if anchors.length === 0}<div class="empty">No anchors yet. Add one and set its per-target values.</div>{/if}
         {#each anchors as a, i (a.id ?? i)}
@@ -170,7 +170,7 @@
             {/if}
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addAnchor}>Add Anchor</button>
+        <button type="button" class="action-btn" onclick={addAnchor}>Add anchor</button>
       </div>
     </PropertyCell>
   </PropertySection>

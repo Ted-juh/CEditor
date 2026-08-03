@@ -332,7 +332,7 @@
     </PropertySection>
 
     {#if selected.type === 'xy-pad' || selected.role === 'xyPad' || selected.role === 'xy-pad' || selected.geometry === 'xy' || selected.geometry === 'grid'}
-      <PropertySection title="XY Semantics">
+      <PropertySection title="XY Channels">
         <PropertyCell label="X Channel" span={2} hint="Horizontal value controlled by this XY behavior.">
           <select class="val" value={selectedValueChannels[0] ?? selected.valueChannel ?? ''} onchange={(event) => setValueChannelAt(0, event.target.value)}>
             <option value="">none</option>
@@ -357,7 +357,7 @@
         </PropertyCell>
         <PropertyCell label="Recommended" span={2} hint="Best defaults for an XY pad.">
           <button class="action-btn" type="button" onclick={() => setSelectedPatch({ type: 'xy-pad', role: 'xyPad', geometry: 'xy', dragMode: 'both', interaction: { ...(selected.interaction ?? {}), pointer: true, keyboard: false, wheel: false, snap: false } })}>
-            Apply XY Defaults
+            Apply XY defaults
           </button>
         </PropertyCell>
       </PropertySection>

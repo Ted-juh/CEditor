@@ -76,10 +76,10 @@
       />
     </PropertyCell>
     <PropertyCell label="Rows" span={2} hint="Add or remove rows for cyclic values, radio groups, toggles, and mapped payloads.">
-      <button type="button" class="action-btn" onclick={addRow}>Add Row</button>
+      <button type="button" class="action-btn" onclick={addRow}>Add row</button>
     </PropertyCell>
     {#if isSelector}
-      <PropertyCell label="Store by name" span={4} hint="Export/save this choice by its stable name instead of a row index, so the value round-trips even when the visible rows change (cascading lists).">
+      <PropertyCell label="Store by name" span={4} hint="Save this choice by its stable name instead of a row index, so it survives changing rows.">
         <PropertyToggle
           value={valueSection.storeByValue === true}
           onchange={() => set('Value.storeByValue', !(valueSection.storeByValue === true))}
@@ -89,7 +89,7 @@
   </PropertySection>
 
   {#if isSelector}
-    <PropertySection title="Depends on (cascading)">
+    <PropertySection title="Depends on">
       <PropertyCell label="Parent list" span={dependsOn ? 3 : 4} hint="Show only the rows that match another selector's current choice (bank → preset).">
         <select class="val" value={dependsOn} onchange={(event) => set('Value.dependsOn', event.target.value)}>
           <option value="">— None (independent) —</option>
@@ -107,7 +107,7 @@
         </PropertyCell>
         {#if parentControl && parentRows.length === 0}
           <PropertyCell label="" span={4}>
-            <div class="empty">The parent list has no rows yet — add rows there first, then tag each row below with the parent value it belongs to.</div>
+            <div class="empty">The parent list has no rows yet. Add rows there first.</div>
           </PropertyCell>
         {/if}
       {/if}

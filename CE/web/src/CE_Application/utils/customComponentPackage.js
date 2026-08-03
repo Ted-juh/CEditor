@@ -723,7 +723,7 @@ export function validateCustomComponentPackage(control) {
 
   const assetManifest = summarizeCustomComponentAssets(control);
   if (assetManifest.totalBytes > CUSTOM_COMPONENT_PACKAGE_ASSET_WARNING_BYTES) {
-    warnings.push(`Embedded assets total ${Math.round(assetManifest.totalBytes / 104857.6) / 10} MB; consider optimizing images or filmstrips before publishing.`);
+    warnings.push(`Embedded assets total ${Math.round(assetManifest.totalBytes / 104857.6) / 10} MB. Shrink the images or filmstrips to reduce it.`);
   }
 
   for (const [name, animation] of Object.entries(animations)) {

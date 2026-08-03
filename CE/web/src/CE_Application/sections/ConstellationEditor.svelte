@@ -100,7 +100,7 @@
         synced={cn.syncToTransport === true}
         onchange={(v) => set('syncToTransport', v)}
         span={2}
-        hint="Time the wander cycle in bars. The probe then reaches the same point of the map on the same bar every time round — an ambient drift an arrangement can be written against."
+        hint="How many bars one full wander cycle takes."
       >
         {#snippet children()}
           <PropertyCell label="Wander (bars)" span={2} hint="How many bars one full pass through the map takes.">
@@ -131,7 +131,7 @@
       <PropertyToggle value={cn.showLabels !== false} onchange={() => set('showLabels', !(cn.showLabels !== false))} />
     </PropertyCell>
     <PropertyCell label="Arrange" span={2} hint="Lay the presets out by sonic similarity (a best-effort 2D projection of their patches). Similar sounds cluster together.">
-      <button type="button" class="action-btn" onclick={arrange} disabled={presets.length < 2}>Auto-arrange by similarity</button>
+      <button type="button" class="action-btn" onclick={arrange} disabled={presets.length < 2}>Auto-arrange</button>
     </PropertyCell>
   </PropertySection>
 
@@ -151,7 +151,7 @@
   </PropertySection>
 
   <PropertySection title="Targets">
-    <PropertyCell label="" span={4} hint="Each target is one parameter dimension the presets morph. Every target is a bindable 'Target' port — bind it in Device Bindings.">
+    <PropertyCell label="" span={4} hint="Each target is one parameter the presets morph. Bind its 'Target' port in Device Bindings.">
       <div class="rows">
         {#if targets.length === 0}<div class="empty">No targets yet. Add one, then bind its port.</div>{/if}
         {#each targets as t, i (t.id ?? i)}
@@ -161,13 +161,13 @@
             <button type="button" class="action-btn danger" onclick={() => removeTarget(i)} title="Remove">✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addTarget}>Add Target</button>
+        <button type="button" class="action-btn" onclick={addTarget}>Add target</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Presets">
-    <PropertyCell label="" span={4} hint="Each preset is a star on the map (X/Y in 0–1) storing a value per target — its patch. 'Capture' stamps its values from the panel's current bound controls; 'Auto-arrange' positions all stars by similarity.">
+    <PropertyCell label="" span={4} hint="Each preset is a star at X/Y (0–1) storing a value per target. Capture stamps the panel's current values.">
       <div class="rows">
         {#if presets.length === 0}<div class="empty">No presets yet. Add one and set its per-target values.</div>{/if}
         {#each presets as p, i (p.id ?? i)}
@@ -193,7 +193,7 @@
             {/if}
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addPreset}>Add Preset</button>
+        <button type="button" class="action-btn" onclick={addPreset}>Add preset</button>
       </div>
     </PropertyCell>
   </PropertySection>

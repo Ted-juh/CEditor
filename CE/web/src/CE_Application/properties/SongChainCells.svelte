@@ -33,10 +33,10 @@
   }
 </script>
 
-<PropertyCell label="Song mode" span={1} hint="Play a chain of stored slots instead of one. A chain link's repeat count is in passes of whatever is in that slot, so a link of 2 means two passes however long that slot happens to be.">
+<PropertyCell label="Song mode" span={1} hint="Play a chain of stored slots instead of one. A link's repeat count is in passes of that slot.">
   <button type="button" class="btn" class:on={enabled} onclick={() => ontoggle(!enabled)}>{enabled ? 'On' : 'Off'}</button>
 </PropertyCell>
-<PropertyCell label="At the end" span={1} hint="Looping starts again from the first link. One-shot holds on the LAST link rather than wrapping or going silent — a song that ends should stay ended, on its final section.">
+<PropertyCell label="At the end" span={1} hint="Loop restarts from the first link. One-shot holds on the last link.">
   <button type="button" class="btn" onclick={() => onloop(!loop)}>{loop ? 'Loop' : 'Stop at the end'}</button>
 </PropertyCell>
 <PropertyCell label="" span={2} hint="">
@@ -62,7 +62,7 @@
   </PropertyCell>
 {/each}
 
-<PropertyCell label="" span={4} hint="A disabled link is skipped rather than played for zero passes — otherwise muting a section would silently change the length of everything after it.">
+<PropertyCell label="" span={4} hint="A disabled link is skipped, not played for zero passes.">
   <div class="row">
     <button type="button" class="btn" disabled={links.length >= MAX_CHAIN_STEPS} onclick={() => onchange(addLink(chain, 0, 1))}>Add link</button>
     {#if links.length !== live.length}<span class="hintline">{links.length - live.length} skipped</span>{/if}

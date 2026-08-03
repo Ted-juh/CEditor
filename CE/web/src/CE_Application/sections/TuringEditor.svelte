@@ -51,7 +51,7 @@
       synced={tr.syncToTransport === true}
       onchange={(v) => set('syncToTransport', v)}
       span={1}
-      hint="Clock the sequence off the panel's Transport. A shift register that lands its mutations on the beat sounds composed; the same register free-running sounds like a fault."
+      hint="Clock the sequence off the panel's Transport."
     >
       {#snippet children()}
         <PropertyCell label="Division" span={2} hint="Step length in musical time.">
@@ -69,7 +69,7 @@
     <PropertyCell label="Length" span={2} hint="Loop length in steps (2–64).">
       <input class="val" type="number" min="2" max="64" step="1" value={tr.length ?? 8} onchange={(e) => setLength(e.target.value)} />
     </PropertyCell>
-    <PropertyCell label="Randomness" span={4} hint="0% = a locked loop (never changes); 100% = a new value every step (pure chaos); in between, the sequence slowly evolves. This is the Turing Machine's signature knob.">
+    <PropertyCell label="Randomness" span={4} hint="0% = a locked loop; 100% = a new value every step; in between, the sequence slowly evolves.">
       <div class="rangewrap">
         <input class="range" type="range" min="0" max="100" step="1" value={rndPct} oninput={(e) => set('randomness', num(e.target.value, 0) / 100)} />
         <span class="pctlbl">{rndPct === 0 ? 'locked' : rndPct === 100 ? 'chaos' : `${rndPct}%`}</span>
@@ -122,7 +122,7 @@
   </PropertySection>
 
   <PropertySection title="Outputs">
-    <PropertyCell label="" span={4} hint="Three bindable ports (fan-out): Value = the current step's level; Gate = 1 when the step is above the threshold; Inverse = 1 − Value. Bind them in Device Bindings.">
+    <PropertyCell label="" span={4} hint="Ports: Value = the current step's level; Gate = 1 above the threshold; Inverse = 1 − Value.">
       <div class="ports">
         <span class="chip"><i style="background:#39D98A"></i>Value</span>
         <span class="chip"><i style="background:#F2C94C"></i>Gate</span>

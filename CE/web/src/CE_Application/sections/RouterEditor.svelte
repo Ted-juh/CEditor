@@ -68,7 +68,7 @@
 
 {#if r}
   <PropertySection title="Expression Router">
-    <PropertyCell label="Source" span={2} hint="The incoming signal to shape. Mod Wheel / Expression are near-universal; Aftertouch / Breath / Foot / Velocity only work if your synth (or controller) actually transmits them. 'Linked control' follows an on-panel control in preview.">
+    <PropertyCell label="Source" span={2} hint="The incoming signal to shape. Aftertouch, Breath, Foot and Velocity only work if your gear sends them.">
       <select class="val" value={r.source ?? 'modwheel'} onchange={(e) => set('source', e.target.value)}>
         {#each ROUTER_INPUT_SOURCES as s (s.id)}
           <option value={s.id}>{s.label}{EXTERNAL.has(s.id) ? ' — device-dependent' : ''}</option>
@@ -90,7 +90,7 @@
         </select>
       </PropertyCell>
     {:else}
-      <PropertyCell label="Learn" span={2} hint="Press, then move the controller you want. It adopts whichever one moves the most over the next few seconds — a stray note or a resting controller's jitter can't win — and pins the channel it actually arrived on. Times out on its own if nothing moves.">
+      <PropertyCell label="Learn" span={2} hint="Press, then move the controller you want. It takes the one that moves most and pins its channel.">
         <button class="btn" class:listening={learning} type="button" onclick={toggleLearn}>
           {learning ? (candidate ? `Got ${learnCandidateLabel(candidate)}` : 'Listening… move a control') : 'Learn from MIDI in'}
         </button>
@@ -101,7 +101,7 @@
         </PropertyCell>
       {/if}
       {#if String(r.source ?? '') === 'polyAftertouch'}
-        <PropertyCell label="Reduce by" span={2} hint="Per-note pressure is many values; a destination is one. Highest = the hardest-pressed key still down, so leaning on anything opens it. Last = the key you most recently leaned on. Released keys stop counting either way.">
+        <PropertyCell label="Reduce by" span={2} hint="How to turn per-note pressure into one value. Highest = hardest-pressed key still down; Last = most recent.">
           <select class="val" value={r.polyMode ?? 'highest'} onchange={(e) => set('polyMode', e.target.value)}>
             <option value="highest">Hardest key held</option>
             <option value="last">Most recent key</option>
@@ -111,10 +111,10 @@
       <PropertyCell label="In channel" span={1} hint="Which MIDI channel to take this controller from. 0 = omni (any channel).">
         <input class="val" type="number" min="0" max="16" step="1" value={num(r.inputChannel, 0)} onchange={(e) => set('inputChannel', Math.max(0, Math.min(16, Math.round(num(e.target.value, 0)))))} />
       </PropertyCell>
-      <PropertyCell label="Test in" span={1} hint="Stand-in value (0–1) used until that controller actually sends something. Once real hardware arrives it takes over, and the header reads LIVE instead of TEST — so a silent controller is never mistaken for a working one.">
+      <PropertyCell label="Test in" span={1} hint="Stand-in value (0–1) until that controller sends something. The header reads Live once real data arrives.">
         <input class="val" type="number" min="0" max="1" step="0.01" value={r.testInput ?? 0.5} onchange={(e) => set('testInput', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} />
       </PropertyCell>
-      <PropertyCell label="" span={4} hint="The controller is read from the hardware MIDI input on the device role. No input selected there means no live signal, and the router stays on its test value.">
+      <PropertyCell label="" span={4} hint="The controller is read from the hardware MIDI input on the device role.">
         <div class="note">Reads {String(r.source ?? '') === 'cc' ? `CC ${num(r.ccNumber, 1)}` : routerSourceLabel(r.source ?? 'modwheel')} from the MIDI input{num(r.inputChannel, 0) > 0 ? ` · ch ${num(r.inputChannel, 0)}` : ' · omni'}{String(r.source ?? '') === 'polyAftertouch' ? ` · ${String(r.polyMode ?? 'highest') === 'last' ? 'most recent key' : 'hardest key'}` : ''}</div>
       </PropertyCell>
     {/if}
@@ -153,7 +153,7 @@
   </PropertySection>
 
   <PropertySection title="Destinations">
-    <PropertyCell label="" span={4} hint="Each destination maps the shaped curve value to one bound device parameter: depth (−100…+100%, sign = direction) and output range. Every row is a bindable 'Destination' port. Draw the transfer curve by dragging its nodes in preview.">
+    <PropertyCell label="" span={4} hint="Each destination maps the curve to one bound parameter: depth (−100…+100%) and output range.">
       <div class="dests">
         {#if dests.length === 0}
           <div class="empty">No destinations yet. Add one, then bind its port in Device Bindings.</div>
@@ -179,7 +179,7 @@
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addDest}>Add Destination</button>
+        <button type="button" class="action-btn" onclick={addDest}>Add destination</button>
       </div>
     </PropertyCell>
   </PropertySection>

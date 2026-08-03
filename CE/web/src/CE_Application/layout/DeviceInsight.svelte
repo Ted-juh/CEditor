@@ -163,7 +163,7 @@
       <div class="dev-picker">
         <div class="dev-picker-head">{profileName || profileId || 'Device profile'}</div>
         {#if params.length === 0}
-          <div class="dev-picker-empty">No parameters loaded. Open this profile in the Device Profile Designer to load its parameter list.</div>
+          <div class="dev-picker-empty">No parameters loaded. Open this profile in the Device Profile Designer.</div>
         {:else}
           <div class="dev-picker-list">
             {#each params.slice(0, 200) as param (param.id)}

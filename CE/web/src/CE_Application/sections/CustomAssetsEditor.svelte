@@ -152,7 +152,7 @@
   function downloadFilmstrip() {
     const source = String(filmstrip?.source ?? '');
     if (!source) {
-      bakeStatus = 'Selected filmstrip has no source to download';
+      bakeStatus = 'Selected filmstrip has no source to download.';
       return;
     }
     const link = document.createElement('a');
@@ -167,7 +167,7 @@
   function downloadImageAsset() {
     const source = String(imageAsset?.source ?? '');
     if (!source) {
-      bakeStatus = 'Selected image has no source to download';
+      bakeStatus = 'Selected image has no source to download.';
       return;
     }
     const link = document.createElement('a');
@@ -219,7 +219,7 @@
     try {
       const source = await fileToDataUrl(file);
       if (!source.startsWith('data:image/')) {
-        bakeStatus = 'Filmstrip import expects an image file';
+        bakeStatus = 'Filmstrip import expects an image file.';
         return;
       }
       const name = selectedFilmstrip || safeFileName(file.name.replace(/\.[^.]+$/, ''), 'importedFilmstrip');
@@ -263,7 +263,7 @@
     try {
       const source = await fileToDataUrl(file);
       if (!source.startsWith('data:image/')) {
-        bakeStatus = 'Image import expects an image file';
+        bakeStatus = 'Image import expects an image file.';
         return;
       }
       const name = selectedImage || safeFileName(file.name.replace(/\.[^.]+$/, ''), 'importedImage');
@@ -335,7 +335,7 @@
 </script>
 
 {#if assets}
-  <PropertySection title="Package Policy">
+  <PropertySection title="Packaging">
     <PropertyCell label="Embed" span={2} hint="Package images and filmstrips with saved components.">
       <PropertyToggle value={assets.packagePolicy?.embedAssets !== false} onchange={() => setAsset('packagePolicy.embedAssets', !(assets.packagePolicy?.embedAssets !== false))} />
     </PropertyCell>
@@ -391,10 +391,10 @@
         <div class="status">{imageAsset.source ? formatBytes(sourceByteEstimate(imageAsset.source)) : 'No source'}</div>
       </PropertyCell>
       <PropertyCell label="Apply" span={2} hint="Use this image as the selected custom layer fill.">
-        <button class="action-btn" type="button" onclick={() => applyImageToSelectedLayer('image')} disabled={!imageAsset.source || !selectedLayer}>Layer Image</button>
+        <button class="action-btn" type="button" onclick={() => applyImageToSelectedLayer('image')} disabled={!imageAsset.source || !selectedLayer}>Layer image</button>
       </PropertyCell>
       <PropertyCell label="Overlay" span={2} hint="Use this image as the selected custom layer overlay.">
-        <button class="action-btn" type="button" onclick={() => applyImageToSelectedLayer('overlay')} disabled={!imageAsset.source || !selectedLayer}>Layer Overlay</button>
+        <button class="action-btn" type="button" onclick={() => applyImageToSelectedLayer('overlay')} disabled={!imageAsset.source || !selectedLayer}>Layer overlay</button>
       </PropertyCell>
     {/if}
   </PropertySection>

@@ -112,7 +112,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Zones (thresholds)">
+  <PropertySection title="Zones">
     <PropertyCell label="" span={4} hint="Each zone lights the fill from its position (0–1) upward; leave one at 0 for the base colour.">
       <div class="zones">
         {#if zones.length === 0}
@@ -125,7 +125,7 @@
             <button type="button" class="action-btn danger" onclick={() => removeZone(i)}>✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addZone}>Add Zone</button>
+        <button type="button" class="action-btn" onclick={addZone}>Add zone</button>
       </div>
     </PropertyCell>
   </PropertySection>

@@ -146,7 +146,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Data (preset browser)">
+  <PropertySection title="Data">
     <PropertyCell label="Source" span={2} hint="Rows from the Value editor, or the device's preset list.">
       <select class="val" value={lb.choiceSource ?? 'rows'} onchange={(e) => set('choiceSource', e.target.value)}>
         <option value="rows">Value rows</option>

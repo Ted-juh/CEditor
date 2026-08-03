@@ -73,7 +73,7 @@
         {#each ARP_PATTERNS as p (p)}<option value={p}>{ARP_PATTERN_LABELS[p] ?? p}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Notes from" span={2} hint="Chord = its own key/scale chord, always playing. Linked = whatever a Chord Pad on this panel is holding (that pad then goes silent — the arp does the playing). Incoming = hold keys on the hardware MIDI input and the arp runs them.">
+    <PropertyCell label="Notes from" span={2} hint="Chord = its own key/scale chord. Linked = a Chord Pad on this panel (that pad goes silent). Incoming = keys from the MIDI input.">
       <select class="val" value={a.source ?? 'chord'} onchange={(e) => set('source', e.target.value)}>
         {#each ARP_SOURCES as sc (sc)}<option value={sc}>{ARP_SOURCE_LABELS[sc] ?? sc}</option>{/each}
       </select>
@@ -129,7 +129,7 @@
   </PropertySection>
 
   <PropertySection title="Timing">
-    <PropertyCell label="Sync to transport" span={2} hint="Take the step length from the panel's Transport instead of a free-running rate. Synced arps lock to the bar and to each other.">
+    <PropertyCell label="Sync to transport" span={2} hint="Take the step length from the panel's Transport instead of a free rate.">
       <PropertyToggle value={synced} onchange={(v) => set('syncToTransport', v === true)} />
     </PropertyCell>
     {#if synced}
@@ -154,7 +154,7 @@
     <PropertyCell label="Gate" span={1} hint="Note length as a fraction of the step (1 = legato).">
       <input class="val" type="number" min="0.05" max="1" step="0.05" value={num(a.gate, 0.6)} onchange={(e) => set('gate', clampNum(e.target.value, 0.05, 1, 0.6))} />
     </PropertyCell>
-    <PropertyCell label="Swing from" span={1} hint="Where the shuffle comes from. Synced to the transport it inherits the clock's swing by default, so everything on that clock shuffles together. Its own keeps this part separate. Free-running always uses its own — there is no clock to inherit from.">
+    <PropertyCell label="Swing from" span={1} hint="Transport = inherit the clock's swing. Own = this arp's own setting. Free-running always uses its own.">
       <select class="val" value={a.swingSource ?? 'transport'} onchange={(e) => set('swingSource', e.target.value)}>
         <option value="transport">The transport</option>
         <option value="own">Its own</option>
@@ -178,7 +178,7 @@
   </PropertySection>
 
   <PropertySection title="Rests">
-    <PropertyCell label="Euclidean" span={1} hint="Spread N pulses evenly over M steps — the classic way to get a musical rest pattern instead of a straight run.">
+    <PropertyCell label="Euclidean" span={1} hint="Spread N pulses evenly over M steps.">
       <PropertyToggle value={a.euclidEnabled === true} onchange={() => set('euclidEnabled', !(a.euclidEnabled === true))} />
     </PropertyCell>
     {#if a.euclidEnabled === true}

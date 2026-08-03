@@ -52,7 +52,7 @@
   </div>
   <div class="sc-list" bind:this={listEl} onscroll={onScroll}>
     {#if visible.length === 0}
-      <div class="sc-empty">No output yet — press ▶ Run, or interact with the panel. Errors, <code>log()</code> output, and MIDI appear here.</div>
+      <div class="sc-empty">No output yet. Press ▶ Run, or interact with the panel.</div>
     {:else}
       {#each visible as e (e.id)}
         <div class={['sc-line', kindBucket(e.kind)]}>

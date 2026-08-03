@@ -106,7 +106,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Sources (rows)">
+  <PropertySection title="Sources">
     <PropertyCell label="" span={4} hint="Modulation sources — the grid's rows. Each cell is a bindable 'Source → Destination' port.">
       <div class="lst">
         {#each rows as label, i (i)}
@@ -115,12 +115,12 @@
             <button type="button" class="action-btn danger" disabled={rows.length <= 1} onclick={() => removeRow(i)}>✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addRow}>Add Source</button>
+        <button type="button" class="action-btn" onclick={addRow}>Add source</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Destinations (columns)">
+  <PropertySection title="Destinations">
     <PropertyCell label="" span={4} hint="Modulation destinations — the grid's columns.">
       <div class="lst">
         {#each cols as label, i (i)}
@@ -129,7 +129,7 @@
             <button type="button" class="action-btn danger" disabled={cols.length <= 1} onclick={() => removeCol(i)}>✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addCol}>Add Destination</button>
+        <button type="button" class="action-btn" onclick={addCol}>Add destination</button>
       </div>
     </PropertyCell>
   </PropertySection>

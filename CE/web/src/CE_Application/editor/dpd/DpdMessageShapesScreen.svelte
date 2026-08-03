@@ -8,7 +8,7 @@
 
 <div class="shead"><h1>Message shapes</h1></div>
 <p class="sub">Defined once per device. Inherited from the {merged?.inherits ?? 'family'} template — rarely needs editing.</p>
-<div class="note"><span>ⓘ</span><div>The parameter table and dumps both build on these shapes. Open one only if a row fails its round-trip check.</div></div>
+<div class="note"><span>ⓘ</span><div>The parameter table and dumps build on these shapes. Open one if a row fails its round-trip check.</div></div>
 
 {#each shapes as s (s.id)}
   <div class="layoutbox" style="margin-bottom:16px">

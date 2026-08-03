@@ -422,7 +422,7 @@
 </script>
 
 {#if published}
-  <PropertySection title="External Contract">
+  <PropertySection title="Public API">
     <PropertyCell label="Name" span={2} hint="Addressable name for external links and future scripts.">
       <input class="val" type="text" value={api?.addressableName ?? ''} onchange={(event) => set('ExternalAPI.addressableName', event.target.value)} />
     </PropertyCell>

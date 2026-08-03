@@ -36,7 +36,7 @@
       synced={k.syncToTransport === true}
       onchange={(v) => set('syncToTransport', v)}
       span={2}
-      hint="Advance the simulation in musical time: tempo scales the motion, and a stopped transport freezes the ball mid-flight. Unlike the other synced components this one is an integrator, not a phase — it can't be recomputed from the position, so it won't re-align itself after a stall. At 120bpm it behaves exactly as it does unsynced."
+      hint="Advance the simulation in musical time — tempo scales the motion, a stopped transport freezes the ball."
     />
     <PropertyCell label="Fling" span={1} hint="Drag the ball to throw it in preview.">
       <PropertyToggle value={k.editable !== false} onchange={() => set('editable', !(k.editable !== false))} />
@@ -44,7 +44,7 @@
     <PropertyCell label="Reset" span={2} hint="Drop the ball back to a fresh start.">
       <button type="button" class="action-btn" onclick={reset}>Reset ball</button>
     </PropertyCell>
-    <PropertyCell label="Gravity" span={4} hint="Downward pull. 0 = zero-g (the ball drifts and bounces like a billiard); higher = it falls and settles unless the bounce is high.">
+    <PropertyCell label="Gravity" span={4} hint="Downward pull. 0 = zero-g; higher makes the ball fall and settle.">
       <div class="rangewrap"><input class="range" type="range" min="0" max="4" step="0.05" value={num(k.gravity, 0)} oninput={(e) => set('gravity', num(e.target.value, 0))} /><span class="lbl">{num(k.gravity, 0).toFixed(2)}</span></div>
     </PropertyCell>
     <PropertyCell label="Bounce" span={4} hint="Wall restitution — energy kept on each bounce. 100% = perpetual motion; lower = the ball loses energy and slows.">
@@ -80,7 +80,7 @@
   </PropertySection>
 
   <PropertySection title="Outputs">
-    <PropertyCell label="" span={4} hint="Four bindable ports (fan-out): X / Y position, Speed (velocity magnitude), and a Bounce gate that pulses on each wall hit. Bind them in Device Bindings.">
+    <PropertyCell label="" span={4} hint="Ports: X, Y, Speed, and a Bounce gate that pulses on each wall hit. Bind them in Device Bindings.">
       <div class="ports">
         <span class="chip"><i style="background:#39D98A"></i>X</span>
         <span class="chip"><i style="background:#5B9BD5"></i>Y</span>

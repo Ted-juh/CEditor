@@ -121,10 +121,10 @@
 
 {#if s}
   <PropertySection title="Zone Splitter">
-    <PropertyCell label="In channel" span={1} hint="Which MIDI channel to take notes from. 0 = omni (any channel), which is almost always what you want — a keyboard's channel rarely matters, only which key was pressed.">
+    <PropertyCell label="In channel" span={1} hint="Which MIDI channel to take notes from. 0 = omni (any channel).">
       <input class="val" type="number" min="0" max="16" step="1" value={num(s.inputChannel, 0)} onchange={(e) => set('inputChannel', clampInt(e.target.value, 0, 16, 0))} />
     </PropertyCell>
-    <PropertyCell label="No zone" span={2} hint="What happens to a note no zone claims. Dropping is the point of a split — the top half must NOT play the bass patch — but passing through is handy while you set one up.">
+    <PropertyCell label="No zone" span={2} hint="What happens to a note no zone claims: drop it or pass it through.">
       <select class="val" value={String(s.unmatched ?? 'drop')} onchange={(e) => set('unmatched', e.target.value)}>
         <option value="drop">Drop (silent)</option>
         <option value="pass">Pass through</option>
@@ -151,7 +151,7 @@
         {/each}
       </div>
     </PropertyCell>
-    <PropertyCell label="Editable" span={1} hint="Drag a split point along the keyboard in preview, and click a key to audition it through the zones — useful when the hardware isn't plugged in.">
+    <PropertyCell label="Editable" span={1} hint="Drag split points on the keyboard in preview, and click a key to audition it.">
       <PropertyToggle value={s.editable !== false} onchange={() => set('editable', !(s.editable !== false))} />
     </PropertyCell>
     <PropertyCell label="Header" span={1} hint="Show the 'Zone → channel' summary strip.">
@@ -160,7 +160,7 @@
     <PropertyCell label="Zone names" span={1} hint="Draw each zone's name on its band.">
       <PropertyToggle value={s.showLabels !== false} onchange={() => set('showLabels', !(s.showLabels !== false))} />
     </PropertyCell>
-    <PropertyCell label="Mark gaps" span={1} hint="Shade keys no zone claims, so a silent octave is visible rather than a mystery.">
+    <PropertyCell label="Mark gaps" span={1} hint="Shade keys no zone claims.">
       <PropertyToggle value={s.showGaps !== false} onchange={() => set('showGaps', !(s.showGaps !== false))} />
     </PropertyCell>
 
@@ -192,18 +192,18 @@
   </PropertySection>
 
   <PropertySection title="Zones">
-    <PropertyCell label="" span={4} hint="Zones may overlap — a note inside two of them is sent twice, on two channels, which is how you layer. Drag the split points on the keyboard in preview.">
+    <PropertyCell label="" span={4} hint="Zones may overlap — a note inside two is sent twice, on two channels. Drag the split points in preview.">
       <div class="tablewrap">
         <table class="zt">
           <thead>
             <tr>
               <th>On</th><th>Name</th><th>From</th><th>To</th><th>Ch</th><th>Transp</th>
-              <th>Velocity</th><th>Range</th><th title="Only respond to notes played in this velocity window — the hit-it-hard layer">Plays at</th>
+              <th>Velocity</th><th>Range</th><th title="Only respond to notes in this velocity window">Plays at</th>
               <th title="Which controllers this zone forwards">CCs</th>
               <th title="Forward the sustain pedal (CC64) to this zone's channel">Ped</th>
-              <th title="A pitch bend carries no note, so who hears it is a rule rather than a fact">Bend</th>
-              <th title="Channel aftertouch — same attribution rule as bend, its own switch">Press</th>
-              <th title="Poly key pressure. It names its note, so it needs no rule — just on or off.">Poly</th>
+              <th title="Which zones receive pitch bend">Bend</th>
+              <th title="Which zones receive channel aftertouch">Press</th>
+              <th title="Forward poly key pressure to this zone">Poly</th>
               <th>Col</th><th></th>
             </tr>
           </thead>
@@ -286,12 +286,8 @@
     </PropertyCell>
     <PropertyCell label="" span={4} hint="">
       <div class="note">
-        <b>Bend</b> and <b>Press</b> answer a question the message itself can't: a pitch bend carries no note,
-        so which zone it belongs to has to be a rule. <b>Last played</b> (the default) sends it to whichever
-        zones claimed the most recent note-on — in a split that's the half you just played, and in a layer
-        it's both, because both claimed that note. <b>While sounding</b> differs when you hold a bass note
-        and play a lead over it. Before you've played anything there is nothing to attribute to, so
-        <b>Last played</b> goes everywhere until the first note.
+        <b>Bend</b> and <b>Press</b> carry no note, so a rule picks the zones: <b>Last played</b> = whichever
+        claimed the most recent note-on; <b>While sounding</b> = every zone currently holding a note.
       </div>
     </PropertyCell>
     <PropertyCell label="" span={4} hint="">

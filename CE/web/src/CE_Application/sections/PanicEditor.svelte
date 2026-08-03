@@ -28,7 +28,7 @@
     <PropertyCell label="Label" span={2} hint="Text on the button.">
       <input class="val" type="text" value={p.label ?? 'PANIC'} onchange={(e) => set('label', e.target.value)} />
     </PropertyCell>
-    <PropertyCell label="Scope" span={2} hint="All 16 channels is the right default: a stuck note is by definition one you have lost track of, so narrowing the search is the wrong instinct.">
+    <PropertyCell label="Scope" span={2} hint="Which MIDI channels the panic covers. All 16 is the default.">
       <select class="val" value={p.scope ?? 'all'} onchange={(e) => set('scope', e.target.value)}>
         {#each PANIC_SCOPES as sc (sc)}<option value={sc}>{PANIC_SCOPE_LABELS[sc] ?? sc}</option>{/each}
       </select>
@@ -50,7 +50,7 @@
     <PropertyCell label="Pressable" span={1} hint="Allow firing it in preview / the player.">
       <PropertyToggle value={p.editable !== false} onchange={() => set('editable', !(p.editable !== false))} />
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="Sound-off is sent before notes-off: all-notes-off only lifts the keys, so on a long release the tail would still be ringing.">
+    <PropertyCell label="" span={4} hint="Sound-off is sent before notes-off, so long release tails are cut too.">
       <div class="note">Sends {count} message{count === 1 ? '' : 's'} on the 'mainSynth' role</div>
     </PropertyCell>
   </PropertySection>
@@ -68,7 +68,7 @@
     <PropertyCell label="Label" span={1} hint="Label colour.">
       <input class="cswatch" type="color" value={colRgb(p.labelColour, 'FFF2C94C')} onchange={(e) => setCol('labelColour', p.labelColour, e.target.value)} />
     </PropertyCell>
-    <PropertyCell label="Flash" span={2} hint="The colour it flashes when fired. The result is silence, so without a flash there is no way to tell a working button from a dead one.">
+    <PropertyCell label="Flash" span={2} hint="The colour it flashes when fired.">
       <input class="cswatch" type="color" value={colRgb(p.flashColour, 'FFE05C5C')} onchange={(e) => setCol('flashColour', p.flashColour, e.target.value)} />
     </PropertyCell>
   </PropertySection>

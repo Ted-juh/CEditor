@@ -340,7 +340,7 @@
 
   <PropertySection title="Text">
     {#each Array.from({ length: rows }) as _, index}
-      <PropertyCell label={`Line ${index + 1}`} span={4} hint="Text shown on this row. Value tokens (in braces): value, pct, bar, bar:N. Truncated/padded to the column count.">
+      <PropertyCell label={`Line ${index + 1}`} span={4} hint="Text for this row, padded or truncated to the column count. Value tokens in braces: value, pct, bar, bar:N.">
         <input class="val" type="text" value={lines[index] ?? ''} oninput={(event) => setLine(index, event.target.value)} />
       </PropertyCell>
     {/each}
@@ -395,7 +395,7 @@
   </PropertySection>
 
   <PropertySection title="Edit Field">
-    <PropertyCell label="Text" span={4} hint="Editable text (e.g. a preset name). Bind a zone with Show=edit to '✎ This screen's text' to show/edit it. In preview, click the screen and type, or use the wheel/Up-Down to cycle characters.">
+    <PropertyCell label="Text" span={4} hint="Editable text such as a preset name. Bind a zone with Show = edit to '✎ This screen's text'.">
       <input class="val" type="text" value={display.editText ?? ''} oninput={(event) => set('editText', event.target.value)} />
     </PropertyCell>
     <PropertyCell label="Charset" span={2} hint="Allowed characters. 'upper' auto-uppercases typed letters (classic patch-name set).">
@@ -413,11 +413,11 @@
 
   <PropertySection title="Layouts">
     {#if layouts.length === 0}
-      <PropertyCell label="Layouts" span={4} hint="Zones/layouts compose the display from bound regions instead of the lines/tokens above. Add a layout to switch to region mode.">
-        <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts (zones)</button>
+      <PropertyCell label="Layouts" span={4} hint="Compose the display from bound regions instead of the lines above. Add a layout to switch modes.">
+        <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts</button>
       </PropertyCell>
     {:else}
-      <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Zones table edits AND previews on the canvas. Runtime switching is set by the Pages rules below.">
+      <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Zones table edits and previews. Runtime switching is set by the Pages rules.">
         <div class="field-row">
           <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => selectEditLayout(event.target.value)}>
             {#each layouts as l}

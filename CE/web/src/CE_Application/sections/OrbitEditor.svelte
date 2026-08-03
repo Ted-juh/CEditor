@@ -44,7 +44,7 @@
       synced={o.syncToTransport === true}
       onchange={(v) => set('syncToTransport', v)}
       span={2}
-      hint="Time the global cycle in bars off the panel's Transport. Each satellite's ratio is turns per cycle, so they all inherit the tempo from this one number — no per-satellite setting needed."
+      hint="How many bars one global cycle takes. Each satellite's ratio is turns per cycle."
     >
       {#snippet children()}
         <PropertyCell label="Cycle (bars)" span={2} hint="How many bars one global cycle takes. A satellite at ratio 2 then makes two turns per cycle, on the bar.">
@@ -90,7 +90,7 @@
   </PropertySection>
 
   <PropertySection title="Satellites">
-    <PropertyCell label="" span={4} hint="Each satellite orbits the centre and emits a live 0–1 value from its position via 'Output' (Y / X / Sine / Radius), scaled by depth, optionally inverted. Radius sets its distance, angle its starting position, and speed its orbits per global cycle (negative = reverse). Every satellite is a bindable 'Node' port.">
+    <PropertyCell label="" span={4} hint="Each satellite emits a live 0–1 value from its position. Bind its 'Node' port in Device Bindings.">
       <div class="nodes">
         {#if nodes.length === 0}
           <div class="empty">No satellites yet. Add one, then bind its port in Device Bindings.</div>
@@ -128,7 +128,7 @@
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addNode}>Add Satellite</button>
+        <button type="button" class="action-btn" onclick={addNode}>Add satellite</button>
       </div>
     </PropertyCell>
   </PropertySection>

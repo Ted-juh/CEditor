@@ -83,7 +83,7 @@
       filterText = 'perf';
       console.info('[perf] Logging enabled from Console panel. Load or reload a panel to capture timings.');
     } else {
-      console.info('Perf logging disabled from Console panel.');
+      console.info('[perf] Logging disabled from Console panel.');
     }
   }
 

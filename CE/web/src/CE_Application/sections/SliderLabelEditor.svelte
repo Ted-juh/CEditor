@@ -115,7 +115,7 @@
       <PropertyToggle value={labelVisible(selectedLabelTarget)} onchange={() => toggleVisible(selectedLabelTarget)} />
     </PropertyCell>
     <PropertyCell label="Reset Label" span={3} hint="Reset the selected label's text styling basics.">
-      <button class="label-action-btn" type="button" onclick={resetSelectedLabelText}>Reset Selected Label Text</button>
+      <button class="label-action-btn" type="button" onclick={resetSelectedLabelText}>Reset label text</button>
     </PropertyCell>
   </PropertySection>
 

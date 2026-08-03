@@ -305,7 +305,7 @@
     <PropertyCell label="Actions" span={4} hint="Apply, save, update, or delete presets for this card.">
       <div class="preset-action-row">
         <button class="preset-action-btn" disabled={!selectedPreset} onclick={applyPreset}>Apply</button>
-        <button class="preset-action-btn" disabled={!draftName.trim() || selectedScopeIds.length === 0} onclick={saveNewPreset}>Save New</button>
+        <button class="preset-action-btn" disabled={!draftName.trim() || selectedScopeIds.length === 0} onclick={saveNewPreset}>Save new</button>
         <button class="preset-action-btn" disabled={!selectedPreset || !draftName.trim() || selectedScopeIds.length === 0} onclick={updateExistingPreset}>Update</button>
         <button class="preset-action-btn" disabled={!selectedPreset} onclick={deleteSelectedPreset}>Delete</button>
         <button class="preset-action-btn" onclick={resetDraft}>New</button>

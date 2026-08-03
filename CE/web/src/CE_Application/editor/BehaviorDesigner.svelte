@@ -582,7 +582,7 @@
           <div class="field">
             <label for="bd-target">Attached control</label>
             <select id="bd-target" value={targetValue} onchange={(e) => updateField('target', e.target.value)}
-              title="Which control this script reacts to. 'self' inside the script resolves to it.">
+              title="Which control this script reacts to; 'self' resolves to it">
               <option value="*">Any control</option>
               {#each controlNames as name (name)}<option value={name}>{name}</option>{/each}
             </select>
@@ -605,9 +605,9 @@
         <span class="lang">
           {langLabel(selected.language)} source
           {#if selectedLangMeta && !selectedLangMeta.live}
-            <span class="previewtag" title="This language runs in the WebView preview and is not part of the always-on native core (Lua + JS). Python runs in the shipped plugin only when its native CPython runtime is embedded at export (window-closed + offline); otherwise it runs window-open only.">preview · not live</span>
+            <span class="previewtag" title="Runs in the editor preview, not in the shipped plugin">preview · not live</span>
           {:else if selectedLangMeta?.subset}
-            <span class="previewtag" title="This language runs live in the editor through an interpreted subset (the panel-API surface). It does NOT yet run in the shipped plugin — compile-at-export is planned (see native-handlers-design.md).">interpreted subset</span>
+            <span class="previewtag" title="Interpreted subset — editor only, not in the shipped plugin">interpreted subset</span>
           {/if}
         </span>
         <span style="display:flex;gap:6px">
@@ -985,7 +985,7 @@
     <span class={['savestate', saveState]} title={saveState === 'saved' ? 'All changes saved' : 'Saving…'}>
       {saveState === 'saved' ? '✓ Saved' : '● Unsaved'}
     </span>
-    <label class="livetoggle" title="When on, onValueChanged scripts fire automatically as control values change">
+    <label class="livetoggle" title="Fire onValueChanged scripts as control values change">
       <input type="checkbox" checked={liveOn} onchange={(e) => liveOn = e.target.checked} />
       <span class={['liveled', liveOn && 'on']}></span> Live
     </label>

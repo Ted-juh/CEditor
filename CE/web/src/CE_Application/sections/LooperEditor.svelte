@@ -44,7 +44,7 @@
       synced={lp.syncToTransport === true}
       onchange={(v) => set('syncToTransport', v)}
       span={2}
-      hint="Loop over a number of BARS instead of a number of seconds. The loop point becomes the bar line, so a take recorded over two bars comes back over two bars at any tempo."
+      hint="Loop over a number of bars instead of seconds, so the loop point is the bar line."
     >
       {#snippet children()}
         <PropertyCell label="Loop (bars)" span={2} hint="Loop length in bars. 0.25 = one beat in 4/4.">
@@ -95,7 +95,7 @@
   </PropertySection>
 
   <PropertySection title="Lanes">
-    <PropertyCell label="" span={4} hint="Each lane records a value-over-loop gesture: press and move inside it in preview, release to loop it. Every lane is a bindable 'Lane' port. Bind it in Device Bindings to drive a parameter.">
+    <PropertyCell label="" span={4} hint="Each lane records a value-over-loop gesture. Bind its 'Lane' port in Device Bindings.">
       <div class="lanes">
         {#if lanes.length === 0}
           <div class="empty">No lanes yet. Add one, then bind its port in Device Bindings.</div>
@@ -117,7 +117,7 @@
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addLane}>Add Lane</button>
+        <button type="button" class="action-btn" onclick={addLane}>Add lane</button>
       </div>
     </PropertyCell>
   </PropertySection>

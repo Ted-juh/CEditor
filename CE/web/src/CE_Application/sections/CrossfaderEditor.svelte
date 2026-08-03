@@ -29,7 +29,7 @@
 
 {#if x}
   <PropertySection title="Crossfader">
-    <PropertyCell label="Law" span={2} hint="How the two sides overlap. Equal-power holds constant loudness across the sweep; linear dips −6 dB at centre; sharp keeps both full through the middle.">
+    <PropertyCell label="Law" span={2} hint="Equal-power = constant loudness. Linear = −6 dB dip at centre. Sharp = both full through the middle.">
       <select class="val" value={x.law ?? 'equalPower'} onchange={(e) => set('law', e.target.value)}>
         <option value="equalPower">Equal power (−3 dB)</option>
         <option value="linear">Linear (−6 dB)</option>

@@ -31,7 +31,7 @@
 
 {#if cp}
   <PropertySection title="Chord Pad">
-    <PropertyCell label="Layout" span={2} hint="Wheel = circle of fifths: the V is one step clockwise, the IV one anti-clockwise, each relative minor sits inside its major, and stepping outside the lit wedge gives borrowed chords. Grid = compact, in-key only.">
+    <PropertyCell label="Layout" span={2} hint="Wheel = circle of fifths, with relative minors inside their majors. Grid = compact, in-key only.">
       <select class="val" value={cp.layout ?? 'wheel'} onchange={(e) => set('layout', e.target.value)}>
         <option value="wheel">Wheel (circle of fifths)</option>
         <option value="grid">Grid</option>
@@ -110,7 +110,7 @@
     <PropertyCell label="Numerals" span={1} hint="Show roman numerals (I, ii, ♭VII…) on the pads.">
       <PropertyToggle value={cp.showRomans !== false} onchange={() => set('showRomans', !(cp.showRomans !== false))} />
     </PropertyCell>
-    <PropertyCell label="Echo MIDI in" span={1} hint="Light the pads (and the piano strip) from notes arriving on the hardware MIDI input, drawn as an outline so external play never looks like your own. A pad lights when every one of its notes is sounding, so the wheel doubles as a chord analyser.">
+    <PropertyCell label="Echo MIDI in" span={1} hint="Outline the pads and piano strip from notes arriving on the hardware MIDI input.">
       <PropertyToggle value={cp.echo === true} onchange={() => set('echo', !(cp.echo === true))} />
     </PropertyCell>
     {#if cp.echo === true}
