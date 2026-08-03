@@ -207,7 +207,13 @@
     resolveMouseDirection,
     snapRangeValue,
   } from '../utils/rangeBehavior.js';
-  import { createRangeScrub, scrubSample } from '../utils/scrubRuntime.js';
+  import {
+    createRangeScrub,
+    createRangeTrackScrub,
+    createSliderTrackScrub,
+    isLinearSliderGeometry,
+    scrubSample,
+  } from '../utils/scrubRuntime.js';
   import {
     getSliderActiveHandle,
     getSliderLegalRangeForHandle,
@@ -276,6 +282,7 @@
   let lastPointerMoveDispatchAt = 0;
   let pointerStartValue = $state(0);
   let rangeScrub = null;
+  let sliderScrub = null;
   let pointerSliderHandle = $state('');
   let pointerCustomHitZone = $state(null);
   let pointerCustomStartValues = $state({});
@@ -4920,7 +4927,11 @@
     const behavior = getBehavior(control);
     const min = getRangeMin(behavior);
     const max = getRangeMax(behavior);
-    const normalized = resolveSliderNormalizedFromPoint(behavior, rect, event.clientX, event.clientY);
+    // A live scrub means a linear drag is in progress; circular tracks (and
+    // one-shot hit tests like handle picking) use the pure geometry mapping.
+    const normalized = sliderScrub
+      ? (sliderScrub.move(scrubSample(event)) ?? sliderScrub.value)
+      : resolveSliderNormalizedFromPoint(behavior, rect, event.clientX, event.clientY);
     return snapSliderValue(behavior, min + ((max - min) * normalized));
   }
 
@@ -5534,7 +5545,9 @@
     const behavior = getBehavior(control);
     const min = getRangeMin(behavior);
     const max = getRangeMax(behavior);
-    const normalized = normalizedRangePointerValue(behavior, rect, event.clientX, event.clientY);
+    const normalized = sliderScrub
+      ? (sliderScrub.move(scrubSample(event)) ?? sliderScrub.value)
+      : normalizedRangePointerValue(behavior, rect, event.clientX, event.clientY);
     setRangeValue(control, min + ((max - min) * normalized));
   }
 
@@ -5679,6 +5692,8 @@
     window.removeEventListener('pointerup', handleWindowPointerUp);
     rangeScrub?.end();
     rangeScrub = null;
+    sliderScrub?.end();
+    sliderScrub = null;
   }
 
   onDestroy(() => {
@@ -6037,6 +6052,7 @@
     pointerDownPoint = { x: event.clientX, y: event.clientY };
     pointerDownZone = '';
     pointerSliderHandle = '';
+    sliderScrub = null;
     pointerCustomHitZone = null;
     pointerCustomStartValues = {};
     pointerStartValue = isSliderControl(control)
@@ -6120,6 +6136,12 @@
     }
 
     if (draggingRange) {
+      const rect = pointerActiveElement?.getBoundingClientRect?.();
+      const dragBehavior = getBehavior(control);
+      if (rect && (!isSliderControl(control) || isLinearSliderGeometry(dragBehavior))) {
+        sliderScrub = isSliderControl(control) ? createSliderTrackScrub(dragBehavior) : createRangeTrackScrub(dragBehavior);
+        sliderScrub.begin(scrubSample(event), { bounds: rect, jumpToPointer: true });
+      }
       updateSliderRangeFromPointer(control, event, nextSliderHandle);
     }
 
