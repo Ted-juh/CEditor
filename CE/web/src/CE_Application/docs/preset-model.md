@@ -116,8 +116,12 @@ Preset Librarian** (managing/saving banks). Same model, two consumers.
   (`presetLibrarian.js` — lives in the Designer's Presets screen until the
   Workbench workspace exists).
 - [x] Add a **preset-recall action** to the model (PC / bank+PC / SysEx template).
-- [ ] Add `choiceSource: static | devicePresets | factoryCatalog` to Combobox /
+- [x] Add `choiceSource: static | devicePresets | factoryCatalog` to Combobox /
   Listbox so a selector can mirror live/factory presets instead of static rows.
+  Listbox: live rows (`_presetRows` fed by `stores/presetChoiceSync.js` in the
+  editor, `injectPresetRowsIntoPanel` in the Player) + `recallOnSelect` now
+  sends the real recall action. Combobox (and any selector): "Fill from device
+  presets / factory catalog" in the Value editor materializes the rows.
 - [ ] Wire inbound preset-change feedback so selectors reflect the device.
 
 ## Notes

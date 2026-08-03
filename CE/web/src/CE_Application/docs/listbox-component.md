@@ -91,12 +91,14 @@ and driven by `PanelPreviewSurface.svelte`):
   value set).
 - **Appearance (E):** selection styles (bar/stripe/outline/check/bold), zebra
   striping, card rows, density, empty-state text.
-- **Preset browser (F):** `choiceSource: devicePresets` swaps the authored
-  Value rows for `Listbox._presetRows` when a preset scan injects them (falls
-  back to the authored rows for authoring/preview — the scanner is a runtime
-  hook); `recallOnSelect` fires the recall on commit and stamps the
-  now-playing row; `nowPlaying` marks the live/recalled row (▶) distinct from
-  the current selection.
+- **Preset browser (F):** `choiceSource: devicePresets | factoryCatalog` swaps
+  the authored Value rows for `Listbox._presetRows` (falls back to the authored
+  rows for authoring/preview). The rows are now really injected —
+  `stores/presetChoiceSync.js` rebuilds them from the profile's preset model +
+  the latest scan (editor), `injectPresetRowsIntoPanel` does the same in the
+  Player; `recallOnSelect` sends the profile's real recall action (PC /
+  bank+PC / SysEx) on commit and stamps the now-playing row; `nowPlaying`
+  marks the live/recalled row (▶) distinct from the current selection.
 - **Accessibility (G):** `role="listbox"`/`role="option"`, `aria-selected`,
   `aria-disabled`, `aria-multiselectable`, per-option ids +
   `aria-activedescendant` following the keyboard browse cursor, and a focus

@@ -851,7 +851,7 @@ export const SECTION_DEFAULTS = {
     confirmMode: 'single',        // single | double | enter — when a pick "commits"
     multiSelect: false,           // checkbox / ctrl-click multi-selection
     // --- Data (preset browser) ---
-    choiceSource: 'rows',         // rows | devicePresets
+    choiceSource: 'rows',         // rows | devicePresets | factoryCatalog
     recallOnSelect: false,        // fire the bound recall action on select/confirm
     nowPlaying: false,            // mark the live/recalled row distinct from selection
   },
