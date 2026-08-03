@@ -11,6 +11,7 @@
   import DpdBulkDumpsScreen from './dpd/DpdBulkDumpsScreen.svelte';
   import DpdAdvancedScreen from './dpd/DpdAdvancedScreen.svelte';
   import DpdDiscoveryScreen from './dpd/DpdDiscoveryScreen.svelte';
+  import DpdPresetsScreen from './dpd/DpdPresetsScreen.svelte';
   import dpdLibrary from '../generated/dpd/dpdLibrary.json';
   import dpdProfileMap from '../generated/dpdProfileMap.json';
   import { resolveParams, resolveModel } from '../generated/dpd/resolve.mjs';
@@ -124,7 +125,7 @@
     ] },
   ]);
 
-  const realScreens = new Set(['detect', 'params', 'overview', 'device', 'messages', 'dumps', 'advanced']);
+  const realScreens = new Set(['detect', 'params', 'overview', 'device', 'messages', 'dumps', 'advanced', 'presets']);
 
   // Adopt a model discovered via MIDI-CI (or any source) into the editable working copy.
   function adoptModel(m) {
@@ -198,6 +199,9 @@
         </div>
         <div class={['screen', activeScreen === 'advanced' && 'active']}>
           <DpdAdvancedScreen {model} {profileId} onApplyModel={(m) => { model = m; appliedSavedFor = profileId; }} />
+        </div>
+        <div class={['screen', activeScreen === 'presets' && 'active']}>
+          <DpdPresetsScreen {model} {merged} {profileId} />
         </div>
 
         <!-- Placeholder screens (Detect / Share / Import / Presets / Packing — later) -->

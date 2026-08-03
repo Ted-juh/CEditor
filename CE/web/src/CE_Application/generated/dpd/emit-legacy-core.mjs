@@ -195,6 +195,33 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   if (dumpDefinitions) legacy.dumpDefinitions = dumpDefinitions;
   if (notes.length && log) for (const n of notes) log('[dump] ' + n);
 
+  // Preset model: carried through verbatim (the librarian/selector reads it), plus the legacy
+  // engine's scan plumbing derived from it — a `requests` entry synthesized from the referenced
+  // messageShape and a `presetBrowser` whose slots are the union of the bank ranges.
+  if (resolved.presets) {
+    legacy.presets = structuredClone(resolved.presets);
+    const nameRequestId = resolved.presets.nameRequest?.request;
+    const shape = (resolved.messageShapes ?? []).find((s) => s.id === nameRequestId);
+    if (shape) {
+      (legacy.requests ??= []).push({
+        id: shape.id,
+        name: 'Preset name request',
+        kind: shape.kind ?? 'sysex',
+        template: (shape.template ?? []).flatMap((tok) => (tok === '$modelId' ? toBytes(resolved.modelId) : [tok])),
+      });
+    } else if (nameRequestId && log) {
+      log(`[presets] nameRequest "${nameRequestId}" has no matching messageShape — scan needs a request with that id`);
+    }
+    const banks = resolved.presets.banks ?? [];
+    if (nameRequestId && banks.length) {
+      legacy.presetBrowser = {
+        request: nameRequestId,
+        slotVariable: resolved.presets.nameRequest?.slotVariable ?? 'slot',
+        slots: banks.flatMap((b) => Array.from({ length: b.slotCount ?? 0 }, (_, i) => (b.startSlot ?? 0) + i)),
+      };
+    }
+  }
+
   if (embedDpdModel) legacy.dpdModel = embedDpdModel;
   return legacy;
 }

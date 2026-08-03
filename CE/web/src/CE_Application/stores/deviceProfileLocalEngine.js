@@ -777,13 +777,17 @@ function presetScanSlots(presetBrowser = {}) {
 
 export function localBuildPresetListScan(profile, options = {}) {
   const presetBrowser = profile?.presetBrowser ?? {};
-  const request = String(options.request || presetBrowser.request || presetBrowser.nameRequest || '').trim();
-  const slotVariable = String(options.slotVariable || presetBrowser.slotVariable || 'slot');
+  // The informal presetBrowser field wins for compatibility; the structured preset model
+  // (presets.nameRequest + bank slot ranges) backs it up.
+  const nameRequest = profile?.presets?.nameRequest ?? {};
+  const request = String(options.request || presetBrowser.request || presetBrowser.nameRequest || nameRequest.request || '').trim();
+  const slotVariable = String(options.slotVariable || presetBrowser.slotVariable || nameRequest.slotVariable || 'slot');
   if (!request) return { ok: false, error: 'Preset browser needs a request id.' };
 
-  const scanSlots = Array.isArray(options.slots)
+  let scanSlots = Array.isArray(options.slots)
     ? options.slots.map((slot) => Number(slot)).filter(Number.isFinite)
     : presetScanSlots(presetBrowser);
+  if (scanSlots.length === 0) scanSlots = presetModelSlots(profile?.presets);
   if (scanSlots.length === 0) return { ok: false, error: 'Preset browser has no slots to scan.' };
 
   const entries = scanSlots.map((slot) => {
@@ -813,6 +817,156 @@ export function localBuildPresetListScan(profile, options = {}) {
     pending: 0,
     entries,
     local: true,
+  };
+}
+
+// ── Preset model (profile.presets: banks / recall / nameRequest / initPatch) ──
+
+export function presetBankForSlot(presets, slot) {
+  const banks = Array.isArray(presets?.banks) ? presets.banks : [];
+  const number = Number(slot);
+  return banks.find((bank) => {
+    const start = Number(bank?.startSlot);
+    const count = Number(bank?.slotCount);
+    return Number.isInteger(start) && Number.isInteger(count) && number >= start && number < start + count;
+  }) ?? null;
+}
+
+// What a slot IS: its bank, factory/user role, writability (drives ROM-write blocking) and, when the
+// profile ships a factory catalog, its name. The live scan says what's in the slot NOW; this is the model.
+export function presetSlotInfo(profile, slot) {
+  const presets = profile?.presets;
+  const bank = presetBankForSlot(presets, slot);
+  const number = Number(slot);
+  if (!bank) {
+    return { slot: number, bankId: '', bankLabel: '', role: 'user', writable: true, program: clampInt(number, 0, 127), catalogName: '', inBank: false };
+  }
+  const start = Number(bank.startSlot);
+  const role = String(bank.role ?? 'user');
+  const index = number - start;
+  return {
+    slot: number,
+    bankId: String(bank.id ?? ''),
+    bankLabel: String(bank.label ?? bank.id ?? ''),
+    role,
+    writable: bank.writable != null ? bank.writable === true : role === 'user',
+    program: clampInt(Number(bank.programBase ?? 0) + index, 0, 127),
+    catalogName: Array.isArray(bank.names) ? String(bank.names[index] ?? '') : '',
+    category: String(bank.category ?? ''),
+    inBank: true,
+  };
+}
+
+export function presetModelSlots(presets) {
+  const banks = Array.isArray(presets?.banks) ? presets.banks : [];
+  return banks.flatMap((bank) => {
+    const start = Number(bank?.startSlot);
+    const count = Number(bank?.slotCount);
+    if (!Number.isInteger(start) || !Number.isInteger(count)) return [];
+    return Array.from({ length: count }, (_, index) => start + index);
+  });
+}
+
+// "Recall slot S": the parameterized action from the preset model, compiled to concrete messages.
+// pc / bankPc share the panel's channel-voice conventions; sysex resolves a template like the other
+// local compiles. bankPc yields SEPARATE messages (CC0 [+CC32] then PC) — the raw-send door takes one
+// MIDI message per call, so the caller sends them in order.
+export function localCompilePresetRecall(profile, request = {}) {
+  const presets = profile?.presets;
+  if (!presets || typeof presets !== 'object') return { ok: false, error: 'Profile has no preset model (presets block).' };
+  const recall = presets.recall;
+  if (!recall || typeof recall !== 'object') return { ok: false, error: 'Preset model has no recall action.' };
+
+  const slot = Number(request.slot);
+  if (!Number.isInteger(slot) || slot < 0) return { ok: false, error: 'Preset recall needs an integer slot >= 0.' };
+  const info = presetSlotInfo(profile, slot);
+  const banks = Array.isArray(presets.banks) ? presets.banks : [];
+  if (banks.length > 0 && !info.inBank) return { ok: false, error: `Slot ${slot} is not inside any preset bank.` };
+
+  const variables = { channel: 1, deviceId: 16, ...(profile.variables ?? {}), ...(request.variables ?? {}) };
+  const channel = clampInt(recall.channel ?? variables.channel ?? 1, 1, 16);
+  const bank = presetBankForSlot(presets, slot);
+  const bankMsb = bank?.bankMsb;
+  const bankLsb = bank?.bankLsb;
+  const kind = String(recall.kind ?? '');
+  const messages = [];
+
+  if (kind === 'pc' || kind === 'bankPc') {
+    if (kind === 'bankPc') {
+      const cc = 0xb0 + channel - 1;
+      if (bankMsb != null) messages.push({ kind: 'raw', bytes: [cc, 0, clampInt(bankMsb, 0, 127)] });
+      if (bankLsb != null) messages.push({ kind: 'raw', bytes: [cc, 32, clampInt(bankLsb, 0, 127)] });
+    }
+    messages.push({ kind: 'raw', bytes: [0xc0 + channel - 1, info.program] });
+  } else if (kind === 'sysex') {
+    const template = Array.isArray(recall.template) ? recall.template : [];
+    if (template.length === 0) return { ok: false, error: 'SysEx preset recall has no template.' };
+    const recallVariables = {
+      ...variables,
+      slot,
+      program: info.program,
+      bankMsb: clampInt(bankMsb ?? 0, 0, 127),
+      bankLsb: clampInt(bankLsb ?? 0, 0, 127),
+    };
+    const bytes = [];
+    // Checksum span: from/to are template tokens ("$slot"); default = everything after $deviceId
+    // (else after F0) up to the $checksum token. Recorded per token so markers resolve to byte ranges.
+    const tokenRanges = [];
+    let checksumAt = -1;
+    for (const token of template) {
+      const text = String(token ?? '').trim();
+      const from = bytes.length;
+      if (text === '$checksum') {
+        checksumAt = bytes.length;
+        bytes.push(0); // patched below
+      } else if (text.startsWith('$')) {
+        const key = text.slice(1);
+        if (!(key in recallVariables)) return { ok: false, error: `Variable ${text} is not defined for preset recall` };
+        bytes.push(clampInt(recallVariables[key], 0, 127));
+      } else {
+        if (!/^[0-9a-f]{1,2}$/i.test(text)) return { ok: false, error: `Invalid hex byte in recall template: ${token}` };
+        bytes.push(parseInt(text, 16));
+      }
+      tokenRanges.push({ token: text, from, to: bytes.length - 1 });
+    }
+    const checksumType = String(recall.checksum?.type ?? 'none');
+    if (checksumAt >= 0 && checksumType !== 'none') {
+      const markerRange = (marker) => tokenRanges.find((range) => range.token === marker);
+      const fromRange = markerRange(String(recall.checksum?.from ?? ''));
+      const toRange = markerRange(String(recall.checksum?.to ?? ''));
+      const deviceIdRange = markerRange('$deviceId');
+      const start = fromRange ? fromRange.from : (deviceIdRange ? deviceIdRange.to + 1 : 1);
+      const end = toRange ? toRange.to : checksumAt - 1;
+      if (start > end) return { ok: false, error: 'Preset recall checksum range is empty.' };
+      const value = checksumBytes(checksumType, bytes.slice(start, end + 1));
+      if (value === undefined) return { ok: false, error: `Unsupported checksum type "${checksumType}".` };
+      bytes.splice(checksumAt, 1, ...value);
+    }
+    if (bytes.length === 0 || bytes[0] !== 0xf0 || bytes.at(-1) !== 0xf7) {
+      return { ok: false, error: 'SysEx preset recall must start with F0 and end with F7' };
+    }
+    for (let index = 1; index < bytes.length - 1; index += 1) {
+      if (bytes[index] < 0 || bytes[index] > 127) {
+        return { ok: false, error: `SysEx data byte outside 0-127: ${bytesToHex([bytes[index]])}` };
+      }
+    }
+    messages.push({ kind: 'sysex', bytes });
+  } else {
+    return { ok: false, error: `Unsupported preset recall kind "${kind}".` };
+  }
+
+  const withHex = messages.map((message) => ({ ...message, hex: bytesToHex(message.bytes) }));
+  return {
+    ok: true,
+    profileId: profile.id,
+    deviceRole: request.deviceRole ?? DEFAULT_DEVICE_ROLE,
+    slot,
+    bankId: info.bankId,
+    program: info.program,
+    channel,
+    kind,
+    hex: withHex.map((message) => message.hex).join(' '),
+    messages: withHex,
   };
 }
 
@@ -874,6 +1028,52 @@ export function validateLocalProfileSource(profileId, source = '') {
   const presetRequest = String(profile.presetBrowser?.request ?? profile.presetBrowser?.nameRequest ?? '');
   if (presetRequest && !requestIds.has(presetRequest)) {
     validation.push({ level: 'error', path: 'presetBrowser.request', message: `Unknown preset request "${presetRequest}".` });
+  }
+
+  // The structured preset model (banks / recall / nameRequest / initPatch) — same shape as the DPD
+  // schema's $defs.presets, carried into the legacy profile by emit-legacy-core.
+  const presets = profile.presets;
+  if (presets && typeof presets === 'object') {
+    const banks = Array.isArray(presets.banks) ? presets.banks : [];
+    const bankIds = new Set();
+    const ranges = [];
+    for (const [index, bank] of banks.entries()) {
+      const path = `presets.banks.${index}`;
+      const id = String(bank?.id ?? '').trim();
+      if (!id) validation.push({ level: 'error', path: `${path}.id`, message: 'Preset bank id is required.' });
+      else if (bankIds.has(id)) validation.push({ level: 'error', path: `${path}.id`, message: `Duplicate preset bank id "${id}".` });
+      bankIds.add(id);
+      if (!['factory', 'user'].includes(String(bank?.role ?? ''))) {
+        validation.push({ level: 'error', path: `${path}.role`, message: 'Preset bank role must be "factory" or "user".' });
+      }
+      const startSlot = Number(bank?.startSlot);
+      const slotCount = Number(bank?.slotCount);
+      if (!Number.isInteger(startSlot) || startSlot < 0) validation.push({ level: 'error', path: `${path}.startSlot`, message: 'Preset bank needs an integer startSlot >= 0.' });
+      if (!Number.isInteger(slotCount) || slotCount < 1) validation.push({ level: 'error', path: `${path}.slotCount`, message: 'Preset bank needs an integer slotCount >= 1.' });
+      if (Number.isInteger(startSlot) && Number.isInteger(slotCount)) ranges.push({ id: id || `#${index}`, from: startSlot, to: startSlot + slotCount - 1 });
+      if (Array.isArray(bank?.names) && Number.isInteger(slotCount) && bank.names.length > slotCount) {
+        validation.push({ level: 'error', path: `${path}.names`, message: `Names catalog (${bank.names.length}) exceeds slotCount (${slotCount}).` });
+      }
+    }
+    ranges.sort((a, b) => a.from - b.from);
+    for (let index = 1; index < ranges.length; index += 1) {
+      if (ranges[index].from <= ranges[index - 1].to) {
+        validation.push({ level: 'error', path: 'presets.banks', message: `Preset banks "${ranges[index - 1].id}" and "${ranges[index].id}" have overlapping slot ranges.` });
+      }
+    }
+    const recall = presets.recall;
+    if (recall && typeof recall === 'object') {
+      if (!['pc', 'bankPc', 'sysex'].includes(String(recall.kind ?? ''))) {
+        validation.push({ level: 'error', path: 'presets.recall.kind', message: 'Preset recall kind must be pc, bankPc or sysex.' });
+      }
+      if (String(recall.kind ?? '') === 'sysex' && (!Array.isArray(recall.template) || recall.template.length === 0)) {
+        validation.push({ level: 'error', path: 'presets.recall.template', message: 'SysEx preset recall requires a template.' });
+      }
+    }
+    const nameRequestId = String(presets.nameRequest?.request ?? '').trim();
+    if (nameRequestId && !requestIds.has(nameRequestId)) {
+      validation.push({ level: 'error', path: 'presets.nameRequest.request', message: `Unknown preset name request "${nameRequestId}".` });
+    }
   }
 
   for (const [index, parameter] of parameters.entries()) {

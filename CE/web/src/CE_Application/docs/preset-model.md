@@ -96,13 +96,26 @@ Preset Librarian** (managing/saving banks). Same model, two consumers.
 
 ## To-do
 
-- [ ] Formalize `presetBrowser` in `dpd.schema.json` (it's currently informal).
-- [ ] Add a **slot map** to the profile: factory vs user ranges + per-slot/bank
+> **Status update (2026-08-03): the core model + librarian shipped.** `presets` (banks slot map,
+> recall action, name request, init patch, factory catalog) is in `dpd.schema.json` +
+> `tools/validate.mjs` + the legacy validator; `emit-legacy-core.mjs` carries it into the engine
+> profile and synthesizes the scan plumbing; `stores/deviceProfileLocalEngine.js` gained
+> `presetSlotInfo` / `localCompilePresetRecall`; `stores/presetLibrarian.js` is the persisted
+> librarian (capture scans, rename, ROM-write blocking, recall, `.syx`/JSON export/import); the
+> Designer's **Presets screen** authors the model and hosts the operations. Tests:
+> `presetModel.test.js`, `presetLibrarian.test.js`.
+
+- [x] Formalize `presetBrowser` in `dpd.schema.json` — now `presets.nameRequest`
+  (the informal field is still honored and emitted for compatibility).
+- [x] Add a **slot map** to the profile: factory vs user ranges + per-slot/bank
   `writable`, bank/category structure.
-- [ ] Optional: a **factory preset catalog** (shipped names) per profile/family.
+- [x] Optional: a **factory preset catalog** (shipped names) per profile/family —
+  `presets.banks[].names`.
 - [ ] Wire `PATCH_NAME` through (Text Input binding + patch-name SysEx emit).
-- [ ] Workbench Preset Librarian reads the slot map; blocks writes to ROM slots.
-- [ ] Add a **preset-recall action** to the model (PC / bank+PC / SysEx template).
+- [x] Workbench Preset Librarian reads the slot map; blocks writes to ROM slots
+  (`presetLibrarian.js` — lives in the Designer's Presets screen until the
+  Workbench workspace exists).
+- [x] Add a **preset-recall action** to the model (PC / bank+PC / SysEx template).
 - [ ] Add `choiceSource: static | devicePresets | factoryCatalog` to Combobox /
   Listbox so a selector can mirror live/factory presets instead of static rows.
 - [ ] Wire inbound preset-change feedback so selectors reflect the device.

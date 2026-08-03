@@ -251,6 +251,35 @@
     "slotVariable": "slot",
     "slots": [1, 2, 3]
   },
+  "presets": {
+    "banks": [
+      {
+        "id": "factory",
+        "label": "Factory",
+        "role": "factory",
+        "startSlot": 1,
+        "slotCount": 2,
+        "programBase": 0,
+        "bankMsb": 0,
+        "bankLsb": 0,
+        "names": ["Init Pad", "Init Lead"]
+      },
+      {
+        "id": "user",
+        "label": "User",
+        "role": "user",
+        "writable": true,
+        "startSlot": 3,
+        "slotCount": 1,
+        "programBase": 2,
+        "bankMsb": 0,
+        "bankLsb": 1
+      }
+    ],
+    "recall": { "kind": "bankPc" },
+    "nameRequest": { "request": "requestPresetName", "slotVariable": "slot" },
+    "initPatch": { "bank": "factory", "slot": 1 }
+  },
   "dumpDefinitions": [
     {
       "id": "presetNameDump",
