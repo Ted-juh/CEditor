@@ -1,38 +1,25 @@
 <script>
-  let { value = 100, min = 0, max = 200, step = 1, label = '', onchange = null } = $props();
+  import { dragScrub } from '../scrub/dragScrubAction';
+  import { presets } from '../scrub/dragScrub';
 
-  let trackEl = $state(null);
-  let dragging = $state(false);
+  let { value = 100, min = 0, max = 200, step = 1, label = '', defaultValue = undefined, onchange = null } = $props();
 
   function pctFromValue(v) {
     return ((v - min) / (max - min)) * 100;
   }
 
-  function valueFromClientX(clientX) {
-    if (!trackEl) return value;
-    const rect = trackEl.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    let raw = min + pct * (max - min);
-    raw = Math.round(raw / step) * step;
-    return Math.max(min, Math.min(max, raw));
-  }
-
-  function handlePointerDown(e) {
-    dragging = true;
-    trackEl.setPointerCapture(e.pointerId);
-    const v = valueFromClientX(e.clientX);
-    if (v !== value) onchange?.(v);
-  }
-
-  function handlePointerMove(e) {
-    if (!dragging) return;
-    const v = valueFromClientX(e.clientX);
-    if (v !== value) onchange?.(v);
-  }
-
-  function handlePointerUp() {
-    dragging = false;
-  }
+  const scrubParams = $derived({
+    ...presets.linearHorizontal,
+    min,
+    max,
+    step,
+    value,
+    defaultValue,
+    manageCursor: false,
+    onChange: (v) => {
+      if (v !== value) onchange?.(v);
+    },
+  });
 
   function selectAll(e) {
     e.target.select();
@@ -48,13 +35,14 @@
 
 <div class="property-scrub">
   <span class="scrub-label">{label}</span>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="scrub-track"
-       bind:this={trackEl}
-       onpointerdown={handlePointerDown}
-       onpointermove={handlePointerMove}
-       onpointerup={handlePointerUp}
-       onlostpointercapture={handlePointerUp}>
+       role="slider"
+       tabindex="0"
+       aria-label={label || 'Value'}
+       aria-valuemin={min}
+       aria-valuemax={max}
+       aria-valuenow={value}
+       use:dragScrub={scrubParams}>
     <div class="scrub-fill" style="width:{pctFromValue(value)}%"></div>
     <div class="scrub-thumb" style="left:{pctFromValue(value)}%"></div>
   </div>
@@ -97,6 +85,11 @@
 
   .scrub-track:hover {
     border-color: #555;
+  }
+
+  .scrub-track:focus-visible {
+    outline: 2px solid #5B9BD5;
+    outline-offset: 1px;
   }
 
   .scrub-fill {
