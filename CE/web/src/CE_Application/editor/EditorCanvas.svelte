@@ -8,6 +8,8 @@
   import { handleEditorShortcut } from '../utils/editorShortcuts.js';
   import { findControlsInRect, findControlAtPoint } from '../utils/canvasSelection.js';
   import { createPanController, createMarqueeController } from '../utils/canvasInteractions.js';
+  import { DragScrub, presets } from '../scrub/dragScrub';
+  import { scrubSample } from '../utils/scrubRuntime.js';
   import { createZoomController } from '../utils/zoomController.js';
   import { trackViewportMetrics } from '../utils/viewportMetrics.js';
   import { fileCache, loadFile } from '../stores/fileCache.js';
@@ -395,22 +397,35 @@
   }
 
   function handleSplitResizeStart(event) {
-    if (!panelDesignerSplit || $activeEditorTab?.type !== 'panel') return;
+    if (!panelDesignerSplit || $activeEditorTab?.type !== 'panel' || !splitContainerEl) return;
     event.preventDefault();
     splitResizing = true;
 
+    // Absolute mapping over the split container, so the core is driven
+    // directly with the container rect as bounds (the handle itself is only
+    // 7px). Axis follows the split orientation; the second-pane-first layout
+    // flips the mapping, mirroring the old rect.bottom / rect.right maths.
+    const rect = splitContainerEl.getBoundingClientRect();
+    const horizontal = (panelDesignerSplit?.orientation === 'horizontal' ? 'horizontal' : 'vertical') === 'horizontal';
+    const deviceFirst = panelDesignerSplit?.deviceOnLeft !== false;
+    const scrub = new DragScrub({
+      ...presets.splitterHorizontal,
+      axis: horizontal ? 'y' : 'x',
+      invertY: horizontal && deviceFirst,
+      invertX: !horizontal && !deviceFirst,
+      min: 0,
+      max: 1,
+    }, 0);
+    const tabId = $activeEditorTab.id;
+    scrub.begin(scrubSample(event), { bounds: rect, jumpToPointer: false });
+
     const handleMove = (moveEvent) => {
-      if (!splitContainerEl) return;
-      const rect = splitContainerEl.getBoundingClientRect();
-      const orientation = panelDesignerSplit?.orientation === 'horizontal' ? 'horizontal' : 'vertical';
-      const deviceFirst = panelDesignerSplit?.deviceOnLeft !== false;
-      const raw = orientation === 'horizontal'
-        ? (deviceFirst ? (moveEvent.clientY - rect.top) / rect.height : (rect.bottom - moveEvent.clientY) / rect.height)
-        : (deviceFirst ? (moveEvent.clientX - rect.left) / rect.width : (rect.right - moveEvent.clientX) / rect.width);
-      setPanelDesignerSplitSize($activeEditorTab.id, raw);
+      const next = scrub.move(scrubSample(moveEvent));
+      if (next !== null) setPanelDesignerSplitSize(tabId, next);
     };
 
     const handleUp = () => {
+      scrub.end();
       splitResizing = false;
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
