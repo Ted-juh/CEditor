@@ -74,16 +74,19 @@ public:
     void endRouteOverride() override { routes.add ("<end>"); }
     void feedMidi (const juce::var& bytes) override { fed.add (juce::JSON::toString (bytes, true)); }
 
+    // One store: the `store` argument ("panel"/"local") is accepted and ignored, matching a
+    // host with a single settings home (see ScriptHostApi — settingsAvailable's default).
     std::map<juce::String, juce::var> settings;
-    void saveSetting (const juce::String& key, const juce::var& value) override { settings[key] = value; }
-    juce::var listSettings() override
+    void saveSetting (const juce::String& key, const juce::var& value, const juce::String&) override { settings[key] = value; }
+    juce::var listSettings (const juce::String&) override
     {
         juce::Array<juce::var> keys;
         for (const auto& [k, v] : settings) { juce::ignoreUnused (v); keys.add (k); }
         return juce::var (keys);
     }
-    bool forgetSetting (const juce::String& key) override { return settings.erase (key) > 0; }
-    juce::var loadSetting (const juce::String& key) override
+    bool forgetSetting (const juce::String& key, const juce::String&) override { return settings.erase (key) > 0; }
+    bool settingsAvailable (const juce::String&) override { return true; }   // the prelude refuses to save otherwise
+    juce::var loadSetting (const juce::String& key, const juce::String&) override
     { auto it = settings.find (key); return it != settings.end() ? it->second : juce::var(); }
     void sendSysex (const juce::var&) override {}
 
@@ -2188,14 +2191,17 @@ int main()
             payload->setProperty ("values", juce::var (values));
             payload->setProperty ("kind", "patch");
             payload->setProperty ("role", "mainSynth");
-            runtime.dispatchEvent ("onDumpReceived", "", juce::var (payload));
+            // ONE owning var, reused below. Wrapping the raw pointer twice would free the object
+            // when the first temporary died and hand the second dispatch a dangling pointer.
+            const juce::var dumpPayload (payload);
+            runtime.dispatchEvent ("onDumpReceived", "", dumpPayload);
             check (host.logs.contains ("back true 42"),
                    juce::String (lang) + ": requestDump's callback got the dump it asked for");
 
             // …once. A waiter that fired again on the next dump is the failure this ordering rule
             // exists to prevent, and it only shows up on the SECOND dump.
             host.logs.clear();
-            runtime.dispatchEvent ("onDumpReceived", "", juce::var (payload));
+            runtime.dispatchEvent ("onDumpReceived", "", dumpPayload);
             check (host.logs.isEmpty(), juce::String (lang) + ": …and is not armed for the next one");
         }
 

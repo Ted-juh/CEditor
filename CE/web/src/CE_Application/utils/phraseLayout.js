@@ -514,7 +514,7 @@ export function loadPattern(patterns, index) {
 // Returns a PATCH: only the fields that change. An empty patch is a no-op, which
 // is what every unrecognised argument produces. A script firing on a footswitch
 // must not take the panel down because someone typed "dorain".
-export const PHRASE_SCRIPT_ACTIONS = ['seed', 'clear', 'key', 'scale', 'transpose', 'direction', 'run', 'cell'];
+export const PHRASE_SCRIPT_ACTIONS = ['seed', 'clear', 'key', 'scale', 'transpose', 'direction', 'run', 'cell', 'store', 'load', 'chain', 'chainLoop'];
 
 export function phraseScriptPatch(cfg, action, args = {}, roll = () => 0.5) {
   const c = cfg && typeof cfg === 'object' ? cfg : {};
@@ -565,6 +565,22 @@ export function phraseScriptPatch(cfg, action, args = {}, roll = () => 0.5) {
       if (on === true) return already ? {} : { pattern: toggleCell(pattern, step, row) };
       return already ? { pattern: toggleCell(pattern, step, row) } : {};
     }
+    // Pattern slots + song mode (1-based slots, like the Recorder's take slots).
+    case 'store': {
+      const i = Math.round(num(a.slot, 0)) - 1;
+      if (i < 0 || i >= MAX_PATTERNS) return {};
+      return { patterns: storePattern(c.patterns, i, pattern, a.name ? String(a.name) : null) };
+    }
+    case 'load': {
+      const i = Math.round(num(a.slot, 0)) - 1;
+      const list = phrasePatterns({ _children: { Phrase: { patterns: c.patterns } } });
+      if (i < 0 || i >= list.length) return {};
+      return { pattern: loadPattern(c.patterns, i) };
+    }
+    case 'chain':
+      return { chainOn: a.on !== false };
+    case 'chainLoop':
+      return { chainLoop: a.loop !== false };
     default:
       return {};
   }

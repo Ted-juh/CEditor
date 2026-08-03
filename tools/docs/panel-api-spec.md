@@ -1,6 +1,6 @@
 # Panel API Spec (Milestone 1, Step 1)
 
-The shared API that every scripting language calls. It must behave **identically** in every runtime (Tier 1: Lua 5.4 via wasmoon/Sol3, JavaScript via WebView/juce_javascript). This is the one contract bound into all runtimes — see [`scripting-redesign-plan.md`](scripting-redesign-plan.md).
+The shared API that every scripting language calls. It must behave **identically** in every runtime (Tier 1: Lua 5.4 via Sol3, JavaScript via juce_javascript — one engine per language in the C++ host; see the Model 2 section below). This is the one contract bound into all runtimes — see [`scripting-redesign-plan.md`](scripting-redesign-plan.md).
 
 Decisions are recorded here as we settle them, question by question.
 
@@ -60,7 +60,7 @@ end)
 - Identical in Lua and JS (both have plain anonymous functions) → preserves cross-language parity.
 - Only needed for the **author-intent** case context can't infer — e.g. an on-screen "Init Patch" / "Randomize" button that sets many values but was not triggered by the synth.
 
-**Three levels of control:** (1) nothing — automatic origin rule, the 99% case; (2) `noTransmit(...)` / `transmit(...)` block — the normal manual override; (3) `set(path, value, { transmit = false })` — per-call, last-resort fine override.
+**Three levels of control:** (1) nothing — automatic origin rule, the 99% case; (2) `noTransmit(...)` / `transmit(...)` block — the normal manual override; (3) `set(path, value, { transmit = false })` (Lua; JS: `{ transmit: false }`) — per-call, last-resort fine override.
 
 **Rejected name:** `local`/`localOnly` — clashes with the real MIDI "Local Control On/Off" feature, which means something different; would mislead the synth-literate audience.
 
@@ -72,16 +72,16 @@ end)
 
 **Hybrid, matched to scope** — scripting is component-level, panel-level, panel→component, and multi-component:
 
-- **A script attached to a control** declares its *own* events as **named functions**, implicit target = itself. Zero boilerplate. This is the everyday case.
+- **A script attached to a control** declares its *own* events as **named functions**, implicit target = itself. Zero boilerplate. This is the everyday case. (Payload style per Q4 — the value is passed directly, with a descriptive name.)
   ```lua
-  function onValueChanged(e)
-    set("reso.value", e.value * 0.5)
+  function onValueChanged(value)
+    set("reso.value", value * 0.5)
   end
   ```
 - **To reach other controls / the panel / the device** (from any script), use **explicit registration** `on(target, event, handler)`, also available on a handle:
   ```lua
-  on("cutoff", "valueChanged", function(e) ... end)
-  panel.get("cutoff"):on("valueChanged", function(e) ... end)
+  on("cutoff", "valueChanged", function(value) ... end)
+  panel.get("cutoff"):on("valueChanged", function(value) ... end)
   ```
 - **Lifecycle hooks** (Q4) are the named-function form at panel scope (`onPanelReady()`, `onClose()`).
 
@@ -124,6 +124,7 @@ Consistent `onPanel*` / `onDaw*` prefixes (the `onDaw*` prefix signals "the host
 function onPanelLoad()             -- phase 1: before GUI. MIDI setup only — NO controls yet.
 function onPanelReady(info)        -- phase 2: GUI ready. Read synth, fill controls.
 function onPanelClose()            -- phase 4: really closing. Final cleanup / send dump / all-notes-off.
+                                   -- (phase 3 = "during use" — the event handlers; it has no hook of its own)
 
 function onDawSaveState(store)     -- DAW saves the project → write values into `store`.
 function onDawRestoreState(store)  -- DAW reopens → read values back from `store`.
@@ -214,7 +215,7 @@ Host-provided, **identical in every language**. **Principle:** only provide what
 
 **Value / range:** `scale(v, inLo, inHi, outLo, outHi)`, `clamp(v, lo, hi)`, `round(v)`, `snap(v, step)`, `curve(v, shape)`, `lerp(a, b, t)`.
 
-**Music:** `noteName(n)` → `"C3"`, `noteNumber(name)` → `60`.
+**Music:** `noteName(60)` → `"C4"` (middle C = C4), `noteNumber("C4")` → `60`.
 
 **MIDI data encoding** — *escape hatch only;* the DPD packs/unpacks modeled params automatically (it already has u14 / lsb-first / nibble codecs):
 - multi-byte 7-bit: `to7bit(v, count, order)` / `from7bit(bytes, order)` (covers 14/21/28-bit; `order` = "msb"/"lsb" first), plus `to14bit`/`from14bit` shorthand.
@@ -223,6 +224,20 @@ Host-provided, **identical in every language**. **Principle:** only provide what
 - signed/bipolar: `toOffset(v, center)` / `fromOffset(b, center)`, `toSigned(v, bits)` / `fromSigned(b, bits)`. *(DPD still does this automatically for modeled params; helpers are for hand-rolled data.)*
 
 *(`checksum` lives in the device surface, Q9.)*
+
+---
+
+## Timers ✅ (added post-Q11 — design in `CE/web/src/CE_Application/docs/timer-system.md`)
+
+`startTimer(id, ms)` starts (or restarts) a named repeating timer; the `onTimer` panel event fires with `info.id` every `ms` until `stopTimer(id)`. Backed by one host-side `TimerManager` (never a raw thread), bound in every engine. Picker category "Timers". `startTimer(id, { beats = n })` derives the interval from the current tempo (fixed at start — restart after a tempo change, or follow `onBeat`).
+
+---
+
+## Notes & Transport ✅ (added post-Q11)
+
+**Notes** (device surface, alongside Q9's raw sends): `sendNote(channel, note [, velocity, durationMs])` plays and schedules its own note-off (defaults 100 / 200 ms); `noteOn`/`noteOff` are the held pair. Inbound: the `noteIn` device event (`channel`, `note`, `velocity`, `on` — a velocity-0 note-on counts as off). Channels 1–16, notes 0–127 (C4 = 60), consistent with the rest of the API.
+
+**Transport**: `transport()` returns the master-clock snapshot `{ playing, bpm, beats, beat, bar, beatsPerBar }` (beat/bar 1-based). The `beat`/`bar` panel events fire as the clock runs — from the panel Transport in the UI runtime, from the DAW playhead window-closed. The clock is read, never accumulated (see `transport.md`), so beat events can't drift.
 
 ---
 
@@ -297,10 +312,7 @@ Runtime note (Model 2): all debugging runs against the **C++ host engines** (Sol
 **ALL CAVEATS CLOSED. Design phase complete.**
 
 **Next:** Milestone 1 build — bind the panel API into **Sol3 + juce_javascript** in the C++ host; lifecycle hooks wired to standalone + VST3 + state save/restore; the DPD-style editor shell with code editor, picker, live trace console.
-- **Q7 — `self` / scope:** what a component-attached script sees; custom-component isolation.
-- **Q8 — Value model:** normalized 0–1 vs raw vs display; units.
-- **Q9 — Device / MIDI surface:** sendCC / sendSysex / dump request / parse.
-- **Q10 — Helpers:** global utility functions.
-- **Q11 — Errors & safety:** script throws, loop/flood guards.
 
----
+**Q1 status note (2026-08):** the handle form is implemented in every engine — `panel.get("name")` returns `{ set, get, on }` (colon-call in Lua), and `self` carries the same three. The dot-object form (`panel.cutoff.value`) remains unimplemented optional sugar.
+
+**Language status note (2026-08):** beyond the Tier 1 pair this spec was written for, the app now also ships **TypeScript** as Tier 1 (transpiled to JS, same runtime) and **Python / C++ / C# / Java** as additional languages (Python via Pyodide/embedded CPython; C++/C#/Java as an interpreted preview subset, compiled at export) — see `SCRIPT_LANGUAGES` in `panelApi.js` and `docs/scripting-language-options-and-shippable-export.md`. The API contract in this document is unchanged: every language calls the same surface.

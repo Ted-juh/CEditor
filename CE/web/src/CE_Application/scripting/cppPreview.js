@@ -24,8 +24,8 @@
 //   • string literals + concatenation; (int)x and static_cast<int>(x) casts
 //   • std::cout << … << std::endl and printf(…) → the script console
 //
-// NOT SUPPORTED (raises a clear error instead of mis-running): templates you define, classes with
-// methods, pointer arithmetic, struct member functions, lambdas, goto, exceptions, iterators.
+// NOT SUPPORTED (raises a clear error instead of mis-running): templates you define, classes
+// (use structs — they support methods), pointer arithmetic, goto, third-party headers.
 // Integer division is not truncated (numbers are doubles) — a preview approximation.
 
 const TYPE_WORDS = new Set([

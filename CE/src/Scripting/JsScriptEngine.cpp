@@ -2398,7 +2398,9 @@ public:
                           + "var __scriptId = " + def.id.quoted() + ";\n";
         // …then gate the API down to the panel's declared modules. QuickJS gives every script its
         // own engine, so the gate is applied per script here rather than once for the language.
-        auto r1 = eng->execute (boot + juce::String (kJsPrelude) + "\n" + extensionBoot() + moduleGateCall());
+        // fromUTF8, NOT String(const char*): the prelude contains ♭/♯ literals, and the plain
+        // constructor reads bytes as single characters — every non-ASCII glyph arrives mangled.
+        auto r1 = eng->execute (boot + juce::String::fromUTF8 (kJsPrelude) + "\n" + extensionBoot() + moduleGateCall());
         if (r1.failed()) { onError (def.id, "prelude error: " + r1.getErrorMessage()); return false; }
 
         auto r2 = eng->execute (code);

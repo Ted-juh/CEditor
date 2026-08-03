@@ -186,11 +186,16 @@ and dispatch `onTimer({ id })`.
   globals in the JS (`JsScriptEngine`) and Lua (`LuaScriptEngine`) engines; wired
   in `PluginProcessor::setupScripting`, which dispatches `onTimer` on the message
   thread and stops all timers on teardown.
-- [ ] **Additive commands** (`pauseTimer` / `resumeTimer` / `restartTimer` /
-  `resetTimer` / `setTimerInterval`, queries, options form, `onTimerDone`) — not
-  yet; MVP is repeating start/stop + `onTimer`.
+- [x] **Editor-preview parity** — `panelRuntime.js` runs setInterval-backed named
+  timers with the same contract (repeat by default, restart-on-reuse, 5ms floor),
+  cleared on preview stop / panel switch. Covered by `test/scriptTimersState.test.js`.
+- [x] **Options form (partial)** — `startTimer(id, { ms | beats, once })` in both
+  runtimes: `beats` derives the interval from the current tempo (fixed at start),
+  `once` fires a single time and removes itself (TimerManager + preview).
+- [ ] **Remaining additive commands** (`pauseTimer` / `resumeTimer` / `restartTimer` /
+  `resetTimer` / `setTimerInterval`, queries, `onTimerDone`) — not yet.
 - [ ] **Serialize timer definitions** (declarative Timer section) — not yet.
-- [ ] **Python engine** registration + editor-preview parity — not yet.
+- [ ] **Python engine** registration — not yet.
 
 ## Add your ideas below
 <!-- New timer ideas go here; promote into the sections above once fleshed out. -->

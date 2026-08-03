@@ -140,10 +140,16 @@ local function __points(points)
       local x, y
       if type(p) == "table" then x = p.x or p[1] y = p.y or p[2] end
       x, y = tonumber(x), tonumber(y)
-      if x ~= nil and y ~= nil then out[#out + 1] = { x, y } end
+      -- The third element is the arrival index: table.sort is UNSTABLE (unlike JS sort), and a
+      -- step curve's two points at the same x must keep their written order or the "steps TO"
+      -- rule reads the wrong side. mapCurve only looks at [1] and [2].
+      if x ~= nil and y ~= nil then out[#out + 1] = { x, y, #out + 1 } end
     end
   end
-  table.sort(out, function(p, q) return p[1] < q[1] end)
+  table.sort(out, function(p, q)
+    if p[1] ~= q[1] then return p[1] < q[1] end
+    return p[3] < q[3]
+  end)
   return out
 end
 -- map(v, points) — straight lines through breakpoints: a response curve of the panel's own shape,

@@ -213,8 +213,8 @@ int main()
                 for (const auto& x : *arr) b.add (juce::jlimit (0, 255, (int) x));
             if (! b.isEmpty()) midiOut.add (hex (b));
         };
-        mcb.saveSetting = [&] (const juce::String& k, const juce::var& v) { settings.set (k, v); };
-        mcb.loadSetting = [&] (const juce::String& k) { return settings.getWithDefault (k, juce::var()); };
+        mcb.saveSetting = [&] (const juce::String& k, const juce::var& v, const juce::String&) { settings.set (k, v); };
+        mcb.loadSetting = [&] (const juce::String& k, const juce::String&) { return settings.getWithDefault (k, juce::var()); };
 
         BridgeScriptHost modHost (std::move (mcb));
         ScriptRuntime modRuntime (modHost);
