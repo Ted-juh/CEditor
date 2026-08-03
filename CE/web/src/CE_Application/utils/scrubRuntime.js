@@ -10,6 +10,7 @@ import {
   getRangeOrientation,
   getRangeDirection,
   isMouseDirectionReversed,
+  numberOr,
 } from './rangeBehavior.js';
 import {
   getSliderGeometry,
@@ -55,6 +56,38 @@ export function scrubSample(event) {
 // tracking is axis-aligned only, and its rotary axis is relative).
 export function isLinearSliderGeometry(behavior) {
   return getSliderGeometry(behavior) !== 'circular';
+}
+
+// Circular sliders can opt out of jump-to-angle into a relative drag:
+// 'knob' is the plugin-standard vertical drag, 'rotary' follows actual
+// rotation about the dial (unbounded turns, one full turn = the whole
+// range at sensitivity 1). 'absolute' keeps the classic angle mapping.
+export function getCircularSliderDragMode(behavior) {
+  const mode = String(behavior?.circularDragMode ?? 'absolute').trim().toLowerCase();
+  return mode === 'knob' || mode === 'rotary' ? mode : 'absolute';
+}
+
+export function createCircularSliderScrub(behavior, startNormalized = 0) {
+  const sensitivityScale = Math.max(0.01, numberOr(behavior?.circularDragSensitivity, 1));
+  const base = getCircularSliderDragMode(behavior) === 'rotary'
+    ? {
+        ...presets.rotary,
+        // The core's rotary axis is counter-clockwise-positive (mathematical
+        // angles); a cw dial needs the mirror so clockwise motion increases.
+        invertX: getSliderDirection(behavior) !== 'ccw',
+        sensitivity: (1 / 400) * sensitivityScale,
+      }
+    : {
+        ...presets.knob,
+        sensitivity: (1 / 250) * sensitivityScale,
+      };
+  return new DragScrub({
+    ...base,
+    deadZone: 0,
+    min: 0,
+    max: 1,
+    ...appScrubOverrides(),
+  }, Math.max(0, Math.min(1, numberOr(startNormalized, 0))));
 }
 
 function linearTrackScrub(vertical, inverted) {

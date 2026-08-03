@@ -208,9 +208,11 @@
     snapRangeValue,
   } from '../utils/rangeBehavior.js';
   import {
+    createCircularSliderScrub,
     createRangeScrub,
     createRangeTrackScrub,
     createSliderTrackScrub,
+    getCircularSliderDragMode,
     isLinearSliderGeometry,
     scrubSample,
   } from '../utils/scrubRuntime.js';
@@ -6143,6 +6145,13 @@
       if (rect && (!isSliderControl(control) || isLinearSliderGeometry(dragBehavior))) {
         sliderScrub = isSliderControl(control) ? createSliderTrackScrub(dragBehavior) : createRangeTrackScrub(dragBehavior);
         sliderScrub.begin(scrubSample(event), { bounds: rect, jumpToPointer: true });
+      } else if (rect && getCircularSliderDragMode(dragBehavior) !== 'absolute') {
+        // Relative dial drag: start from the picked handle's value, no jump.
+        const min = getRangeMin(dragBehavior);
+        const span = getRangeMax(dragBehavior) - min;
+        const role = nextSliderHandle || currentSliderActiveHandle(control);
+        sliderScrub = createCircularSliderScrub(dragBehavior, span > 0 ? (currentSliderRoleValue(control, role) - min) / span : 0);
+        sliderScrub.begin(scrubSample(event), { bounds: rect });
       }
       updateSliderRangeFromPointer(control, event, nextSliderHandle);
     }

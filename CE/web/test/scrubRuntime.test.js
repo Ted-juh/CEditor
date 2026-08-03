@@ -13,9 +13,11 @@ import assert from 'node:assert/strict';
 
 import { DragScrub, presets } from '../src/CE_Application/scrub/dragScrub';
 import {
+  createCircularSliderScrub,
   createRangeScrub,
   createRangeTrackScrub,
   createSliderTrackScrub,
+  getCircularSliderDragMode,
   isLinearSliderGeometry,
 } from '../src/CE_Application/utils/scrubRuntime.js';
 import { resolveSliderNormalizedFromPoint } from '../src/CE_Application/utils/sliderGeometry.js';
@@ -174,6 +176,42 @@ test('a DragScrub built from filtered options carries no widget params', () => {
 test('splitter preset: absolute track with no dead zone', () => {
   assert.equal(presets.splitterHorizontal.tracking, 'absolute');
   assert.equal(presets.splitterHorizontal.deadZone, 0);
+});
+
+// --- Circular sliders: opt-in relative modes --------------------------------
+
+test('circular drag mode defaults to absolute and only accepts knob/rotary', () => {
+  assert.equal(getCircularSliderDragMode({}), 'absolute');
+  assert.equal(getCircularSliderDragMode({ circularDragMode: 'knob' }), 'knob');
+  assert.equal(getCircularSliderDragMode({ circularDragMode: 'rotary' }), 'rotary');
+  assert.equal(getCircularSliderDragMode({ circularDragMode: 'nonsense' }), 'absolute');
+});
+
+test('knob mode: 250px vertical drag covers the range from the current value, no jump', () => {
+  const scrub = createCircularSliderScrub({ geometry: 'circular', circularDragMode: 'knob' }, 0.5);
+  scrub.begin({ x: 0, y: 0 }, { bounds: RECT });
+  // Up increases; 125px = half the range from 0.5 => 1.
+  assert.ok(Math.abs(scrub.move({ x: 0, y: -125 }) - 1) < 1e-9);
+  const down = createCircularSliderScrub({ geometry: 'circular', circularDragMode: 'knob' }, 0.5);
+  down.begin({ x: 0, y: 0 }, { bounds: RECT });
+  assert.ok(Math.abs(down.move({ x: 0, y: 62.5 }) - 0.25) < 1e-9);
+});
+
+test('rotary mode: a quarter turn about the dial center moves a quarter of the range', () => {
+  const scrub = createCircularSliderScrub({ geometry: 'circular', circularDragMode: 'rotary' }, 0);
+  const center = { x: RECT.left + RECT.width / 2, y: RECT.top + RECT.height / 2 };
+  // Start at 12 o'clock, rotate clockwise to 3 o'clock.
+  scrub.begin({ x: center.x, y: center.y - 40 }, { bounds: RECT });
+  const value = scrub.move({ x: center.x + 40, y: center.y });
+  assert.ok(Math.abs(value - 0.25) < 1e-9, `expected 0.25, got ${value}`);
+});
+
+test('rotary mode: ccw dials mirror the rotation direction', () => {
+  const scrub = createCircularSliderScrub({ geometry: 'circular', circularDragMode: 'rotary', direction: 'ccw' }, 0.5);
+  const center = { x: RECT.left + RECT.width / 2, y: RECT.top + RECT.height / 2 };
+  scrub.begin({ x: center.x, y: center.y - 40 }, { bounds: RECT });
+  const value = scrub.move({ x: center.x + 40, y: center.y });
+  assert.ok(Math.abs(value - 0.25) < 1e-9, `clockwise motion should decrease a ccw dial; got ${value}`);
 });
 
 test('a relative splitter scrub moves 1px per px and clamps at its bounds', () => {
