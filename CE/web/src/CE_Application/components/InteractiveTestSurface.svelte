@@ -486,6 +486,7 @@
       startClientY: pointerDownPoint?.y,
       startValues: pointerCustomStartValues,
       fine: event?.shiftKey === true,
+      coarse: event?.ctrlKey === true || event?.metaKey === true,
     });
     if (!Object.keys(patch).length) return;
     patchSession({
@@ -537,6 +538,7 @@
       startClientY: pointerDownPoint?.y,
       startNormalized: normalizeCustomChannelValue(channel, pointerCustomStartValues?.[channelName] ?? customSessionValues()?.[channelName] ?? channel?.defaultValue),
       fine: event.shiftKey === true,
+      coarse: event.ctrlKey === true || event.metaKey === true,
     });
     const nextValue = denormalizeCustomChannelValue(channel, normalized);
     patchSession({

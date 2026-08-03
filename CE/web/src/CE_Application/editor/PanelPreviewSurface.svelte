@@ -5168,6 +5168,7 @@
       startClientY: pointerDownPoint?.y,
       startValues: pointerCustomStartValues,
       fine: event?.shiftKey === true,
+      coarse: event?.ctrlKey === true || event?.metaKey === true,
     });
     if (!controlId || !Object.keys(patch).length) return;
     patchControlSession(controlId, {
@@ -5188,6 +5189,7 @@
       startClientY: pointerDownPoint?.y,
       startValues: pointerCustomStartValues,
       fine: event?.shiftKey === true,
+      coarse: event?.ctrlKey === true || event?.metaKey === true,
     });
     if (!Object.keys(patch).length) return;
     patchControlSession(getControlId(control), {
