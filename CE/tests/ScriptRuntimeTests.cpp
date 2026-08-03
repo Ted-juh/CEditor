@@ -39,7 +39,9 @@ public:
     void applyDump (const juce::var&) override {}
     void sendDump (const juce::String&) override {}
     juce::var buildDump (const juce::String&) override { return {}; }
-    juce::var runAction (const juce::String&, const juce::var&) override { return {}; }
+    // Forward to the runtime, mirroring how the Player wires cb.runAction.
+    juce::var runAction (const juce::String& target, const juce::var& args) override
+    { return runtime != nullptr ? runtime->runAction (target, args) : juce::var(); }
     void emitEvent (const juce::String& name, const juce::var& data) override
     { if (runtime != nullptr) runtime->dispatchEvent (name, "panel", data); }
     void log (const juce::String& message, const juce::var&) override { logs.add (message); }
@@ -143,6 +145,26 @@ int main()
     runtime.dispatchEvent ("onPing", "panel", juce::var (1));
     check (errors.joinIntoString ("\n").contains ("dispatch depth"),
            "Guard: emit/dispatch feedback loop cut off at max depth");
+
+    // 5) Composition layer: run() across languages, on() listeners (alias + 2-arg form) ------
+    juce::Array<juce::var> flowScripts;
+    flowScripts.add (makeScript ("actions", "lua", "panel", "onPanelReady", "*",
+        "function boost(v)\n  return v * 2\nend\n"
+        "on(\"knob\", \"valueChanged\", function(v) set(\"lua.watch\", v) end)\n"
+        "on(\"customPing\", function(d) set(\"lua.ping\", d) end)\n"));
+    flowScripts.add (makeScript ("caller", "javascript", "panel", "onGo", "*",
+        "function onGo(v) { set(\"js.boosted\", run(\"actions.boost\", v)); emit(\"customPing\", 7) }"));
+    runtime.loadScripts (juce::var (flowScripts));
+
+    runtime.dispatchEvent ("onGo", "panel", juce::var (21));
+    check ((int) host.values["js.boosted"] == 42,
+           "run(): JS calls a Lua action cross-language and gets its return value (42)");
+    check ((int) host.values["lua.ping"] == 7,
+           "on(name, fn): 2-arg custom listener fired via emit()");
+
+    runtime.dispatchEvent ("onValueChanged", "knob", juce::var (9));
+    check ((int) host.values["lua.watch"] == 9,
+           "on(target, \"valueChanged\"): listener fires when the host dispatches \"onValueChanged\" (alias)");
 
     std::cout << "------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
