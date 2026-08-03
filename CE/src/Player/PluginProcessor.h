@@ -226,6 +226,9 @@ public:
         {
             juce::var store (new juce::DynamicObject());   // scripts write their persisted state here
             scriptRuntime->onDawSaveState (store);
+            // The stateSet/stateGet key/value store rides in the same blob, under a reserved key.
+            if (scriptKvState.getDynamicObject() != nullptr)
+                store.getDynamicObject()->setProperty ("__scriptState", scriptKvState);
             root.createNewChildElement ("ScriptState")->addTextElement (juce::JSON::toString (store));
         }
        #endif
@@ -249,7 +252,13 @@ public:
            #if CEDITOR_SCRIPTING
             if (scriptRuntime != nullptr)
                 if (auto* sx = xml->getChildByName ("ScriptState"))
-                    scriptRuntime->onDawRestoreState (juce::JSON::parse (sx->getAllSubText()));
+                {
+                    auto store = juce::JSON::parse (sx->getAllSubText());
+                    if (auto* o = store.getDynamicObject())
+                        if (o->hasProperty ("__scriptState"))
+                            scriptKvState = o->getProperty ("__scriptState");
+                    scriptRuntime->onDawRestoreState (store);
+                }
            #endif
         }
         else if (xml->hasTagName (apvts.state.getType())) // backward-compat: APVTS-only state
@@ -333,7 +342,13 @@ private:
                 if (it != lastScriptValue.end() && it->second == v) continue;
                 lastScriptValue[desc.id] = v;
                 scriptValues.setValue (desc.path, v);
-                scriptRuntime->dispatchEvent ("onValueChanged", desc.path.upToFirstOccurrenceOf (".", false, false), juce::var (v));
+                const auto controlName = desc.path.upToFirstOccurrenceOf (".", false, false);
+                scriptRuntime->dispatchEvent ("onValueChanged", controlName, juce::var (v));
+                // Panel-wide companion: any control changed (info.target / info.value).
+                auto* co = new juce::DynamicObject();
+                co->setProperty ("target", controlName);
+                co->setProperty ("value", v);
+                scriptRuntime->dispatchEvent ("onControlChanged", "", juce::var (co));
             }
 
         // Window-closed beat clock: derive onBeat/onBar from the DAW playhead (the panel's own
@@ -669,8 +684,20 @@ private:
         {
             scriptLogLine ("[script] " + msg + (value.isVoid() ? juce::String() : " " + juce::JSON::toString (value)));
         };
-        cb.startTimer = [this] (const juce::String& id, int intervalMs) { scriptTimers.start (id, intervalMs); };
+        cb.startTimer = [this] (const juce::String& id, int intervalMs, bool once) { scriptTimers.start (id, intervalMs, once); };
         cb.stopTimer  = [this] (const juce::String& id) { scriptTimers.stop (id); };
+        // Panel-scoped script key/value state. Lives on the plugin instance and is persisted
+        // inside the ScriptState blob with the DAW project (get/setStateInformation).
+        cb.stateSet = [this] (const juce::String& key, const juce::var& value)
+        {
+            if (scriptKvState.getDynamicObject() == nullptr) scriptKvState = juce::var (new juce::DynamicObject());
+            scriptKvState.getDynamicObject()->setProperty (key, value);
+        };
+        cb.stateGet = [this] (const juce::String& key) -> juce::var
+        {
+            if (auto* o = scriptKvState.getDynamicObject()) return o->getProperty (key);
+            return {};
+        };
 
         scriptHost = std::make_unique<BridgeScriptHost> (std::move (cb));
         scriptRuntime = std::make_unique<ScriptRuntime> (*scriptHost);
@@ -720,6 +747,7 @@ private:
     std::map<juce::String, juce::String> scriptDumpParamPaths;    // deviceParameterId -> control path (dump fill)
     std::map<juce::String, float> lastScriptValue;                // change-detect for window-closed onValueChanged
     double scriptLastBeats = -1.0e18;                             // window-closed onBeat/onBar tracking (sentinel = re-seed)
+    juce::var scriptKvState;                                      // stateSet/stateGet store; persisted in ScriptState
     bool scriptWindowWasOpen = false;
     bool scriptReadyFired = false;
 #endif

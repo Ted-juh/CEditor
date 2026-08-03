@@ -60,16 +60,21 @@ function noteOn(ch, note, vel) { return __api.sendNoteOn(ch, note, vel === undef
 function noteOff(ch, note) { return __api.sendNoteOff(ch, note); }
 function sendNote(ch, note, vel, ms) { return __api.sendNote(ch, note, vel === undefined ? 100 : vel, ms === undefined ? 200 : ms); }
 function transport() { return __api.transport(); }
-// startTimer(id, ms), or startTimer(id, { beats: n }) — beats convert via the current tempo
-// (fixed at start; restart the timer after a tempo change, or follow onBeat instead).
+// startTimer(id, ms), or startTimer(id, { ms | beats, once }) — beats convert via the current
+// tempo (fixed at start; restart after a tempo change, or follow onBeat instead); once fires a
+// single time and removes itself.
 function startTimer(id, ms) {
+  var once = false;
   if (ms && typeof ms === "object") {
+    once = ms.once === true;
     if (ms.beats > 0) { var t = transport(); var bpm = t && t.bpm > 0 ? t.bpm : 120; ms = ms.beats * 60000 / bpm; }
     else ms = ms.ms || 0;
   }
-  return __api.startTimer(id, ms || 0);
+  return __api.startTimer(id, ms || 0, once);
 }
 function stopTimer(id) { return __api.stopTimer(id); }
+function stateSet(key, value) { return __api.stateSet(key, value === undefined ? null : value); }
+function stateGet(key, fallback) { var v = __api.stateGet(key); return (v === null || v === undefined) && fallback !== undefined ? fallback : v; }
 function run(target, args) { return __api.run(target, args || null); }
 function emit(name, data) { return __api.emit(name, data || null); }
 function log(msg, v) { return __api.log(String(msg), v === undefined ? null : v); }
@@ -127,7 +132,9 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("sendNoteOff", [host, arg] (const Args& a) -> juce::var { host->sendNoteOff ((int) arg (a, 0), (int) arg (a, 1)); return {}; });
     api->setMethod ("sendNote", [host, arg] (const Args& a) -> juce::var { host->sendNote ((int) arg (a, 0), (int) arg (a, 1), (int) arg (a, 2), (int) arg (a, 3)); return {}; });
     api->setMethod ("transport", [host] (const Args&) -> juce::var { return host->getTransport(); });
-    api->setMethod ("startTimer", [host, arg] (const Args& a) -> juce::var { host->startTimer (arg (a, 0).toString(), (int) arg (a, 1)); return {}; });
+    api->setMethod ("startTimer", [host, arg] (const Args& a) -> juce::var { host->startTimer (arg (a, 0).toString(), (int) arg (a, 1), (bool) arg (a, 2)); return {}; });
+    api->setMethod ("stateSet", [host, arg] (const Args& a) -> juce::var { host->stateSet (arg (a, 0).toString(), arg (a, 1)); return {}; });
+    api->setMethod ("stateGet", [host, arg] (const Args& a) -> juce::var { return host->stateGet (arg (a, 0).toString()); });
     api->setMethod ("stopTimer", [host, arg] (const Args& a) -> juce::var { host->stopTimer (arg (a, 0).toString()); return {}; });
     api->setMethod ("run", [host, arg] (const Args& a) -> juce::var { return host->runAction (arg (a, 0).toString(), arg (a, 1)); });
     api->setMethod ("emit", [host, arg] (const Args& a) -> juce::var { host->emitEvent (arg (a, 0).toString(), arg (a, 1)); return {}; });

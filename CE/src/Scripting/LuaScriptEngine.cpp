@@ -203,17 +203,20 @@ public:
             { host->sendNote (ch, note, vel ? *vel : 100, ms ? *ms : 200); });
         g.set_function ("transport", [this] () { return varToSol (lua, host->getTransport()); });
 
-        // startTimer(id, ms), or startTimer(id, { beats = n }) — beats convert via the current
-        // tempo (fixed at start; restart after a tempo change, or follow onBeat instead).
+        // startTimer(id, ms), or startTimer(id, { ms | beats, once }) — beats convert via the
+        // current tempo (fixed at start; restart after a tempo change, or follow onBeat
+        // instead); once fires a single time and removes itself.
         g.set_function ("startTimer", [this] (std::string id, sol::optional<sol::object> arg)
         {
             double ms = 0;
+            bool once = false;
             if (arg)
             {
                 if (arg->is<double>()) ms = arg->as<double>();
                 else if (arg->is<sol::table>())
                 {
                     auto t = arg->as<sol::table>();
+                    once = t.get_or ("once", false);
                     const double beats = t.get_or ("beats", 0.0);
                     if (beats > 0)
                     {
@@ -225,7 +228,14 @@ public:
                     else ms = t.get_or ("ms", 0.0);
                 }
             }
-            host->startTimer (juce::String (id), (int) std::llround (ms));
+            host->startTimer (juce::String (id), (int) std::llround (ms), once);
+        });
+        g.set_function ("stateSet", [this] (std::string key, sol::object v) { host->stateSet (juce::String (key), solToVar (v)); });
+        g.set_function ("stateGet", [this] (std::string key, sol::optional<sol::object> fallback) -> sol::object
+        {
+            auto v = host->stateGet (juce::String (key));
+            if (v.isVoid() && fallback) return *fallback;
+            return varToSol (lua, v);
         });
         g.set_function ("stopTimer",  [this] (std::string id) { host->stopTimer (juce::String (id)); });
 

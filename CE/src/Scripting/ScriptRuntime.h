@@ -120,9 +120,15 @@ public:
     virtual void log (const juce::String& message, const juce::var& value) = 0;
 
     // Timers. startTimer(id, ms) starts a repeating timer that fires `onTimer` ({ id }) every ms
-    // until stopTimer(id). Default no-op so alternative hosts need not implement them.
-    virtual void startTimer (const juce::String& id, int intervalMs) { juce::ignoreUnused (id, intervalMs); }
+    // until stopTimer(id); `once` fires a single time and removes itself. Default no-op so
+    // alternative hosts need not implement them.
+    virtual void startTimer (const juce::String& id, int intervalMs, bool once) { juce::ignoreUnused (id, intervalMs, once); }
     virtual void stopTimer  (const juce::String& id) { juce::ignoreUnused (id); }
+
+    // Panel-scoped key/value persistence for scripts (stateSet/stateGet). The exported plugin
+    // saves it with the DAW project; other hosts may keep it session-only. Default no-op/empty.
+    virtual void      stateSet (const juce::String& key, const juce::var& value) { juce::ignoreUnused (key, value); }
+    virtual juce::var stateGet (const juce::String& key) { juce::ignoreUnused (key); return {}; }
 };
 
 // ----------------------------------------------------------------------------------------------

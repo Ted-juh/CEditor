@@ -4,9 +4,8 @@ Task-based recipes for panel scripting. Every call here is from the
 [scripting manual](scripting-manual.md) — look a name up there for the full signature.
 Recipes are shown in Lua and JavaScript; the API is identical in every language.
 
-Some of the API is further along in one runtime than the other — timers, for example, run
-only in the exported plugin for now. The manual's availability badges say exactly which is
-which.
+A few corners of the API are further along in one runtime than the other — the manual's
+availability badges say exactly which is which.
 
 A quick orientation: a script attached to a control reacts to **its own** events just by
 defining the named function (`onValueChanged`, `onClick`, …). To reach anything else — another
@@ -234,9 +233,10 @@ function onBar(info)
 end
 ```
 
-In the exported plugin, `startTimer("pulse", { beats = 1 })` gives a tempo-derived timer —
-the interval is fixed when the timer starts, so restart it on tempo changes (or just use
-`onBeat`, which always follows the clock).
+`startTimer("pulse", { beats = 1 })` gives a tempo-derived timer — the interval is fixed when
+the timer starts, so restart it on tempo changes (or just use `onBeat`, which always follows
+the clock). `startTimer("flash", { ms = 150, once = true })` is the one-shot form — handy for
+"turn that light back off".
 
 ## 11. See what's going on
 

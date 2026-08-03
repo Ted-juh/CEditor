@@ -149,3 +149,10 @@ command families for the **Arpeggiator** (10), **Turing Modulator** (8), and **G
 Looper** (7), plus **song mode** on the Phrase Sequencer (`phraseStore`/`phraseLoad`/
 `phraseChain`/`phraseChainLoop`). The picker, validation, and manual pick them up from
 `panelApi.js` automatically; reducers are unit-tested in `componentScriptPatches.test.js`.
+
+Sixth follow-up (same branch): **preview timers** (setInterval-backed, same contract as
+TimerManager — the timer badges are gone), a **one-shot `{ once }` timer form** in both
+runtimes, **script persistence** (`stateSet`/`stateGet`, panel-scoped; persisted with the DAW
+project in the exported plugin via the ScriptState blob), and the **`controlChanged` event
+wired** in both runtimes (its "Planned" badge is gone). Tested in
+`scriptTimersState.test.js`.

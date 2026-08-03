@@ -121,10 +121,6 @@ const NOT_WIRED_YET = {
   preview: false, export: false,
   note: 'Planned — not dispatched anywhere yet.',
 };
-const TIMERS_EXPORT_ONLY = {
-  preview: false, export: true,
-  note: 'Runs in the exported plugin (TimerManager); editor-preview timers are pending.',
-};
 const TRANSPORT_CLOCK = {
   preview: true, export: true,
   note: 'Fires from the panel Transport in the UI runtime; window-closed it follows the DAW playhead (nothing fires without a running clock).',
@@ -217,9 +213,9 @@ export const CONTROL_EVENTS = [
 ];
 
 export const PANEL_EVENTS = [
-  { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', fields: ['target', 'value'], summary: 'Any control changed.', availability: NOT_WIRED_YET },
+  { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', fields: ['target', 'value'], summary: 'Any control settled on a new value — the panel-wide companion to a control\'s own valueChanged.' },
   { id: 'panelStateChanged', fn: 'onPanelStateChanged', payload: 'state', summary: 'Panel state switched.', availability: NOT_WIRED_YET },
-  { id: 'timer', fn: 'onTimer', payload: 'info', fields: ['id'], summary: 'A started timer fired.', availability: TIMERS_EXPORT_ONLY },
+  { id: 'timer', fn: 'onTimer', payload: 'info', fields: ['id'], summary: 'A started timer fired.' },
   { id: 'beat', fn: 'onBeat', payload: 'info', fields: ['beat', 'bar', 'beats'], summary: 'The clock crossed a beat (beat/bar 1-based, beats = absolute index).', availability: TRANSPORT_CLOCK },
   { id: 'bar', fn: 'onBar', payload: 'info', fields: ['bar'], summary: 'The clock crossed a bar line.', availability: TRANSPORT_CLOCK },
 ];
@@ -440,8 +436,7 @@ export const COMMANDS = [
   /* --- Timers (see docs/timer-system.md) --- */
   {
     id: 'startTimer', category: 'Timers', signature: 'startTimer(id, ms)',
-    summary: 'Start (or restart) a named repeating timer; onTimer fires with info.id every ms until stopTimer(id). Pass { beats: n } instead of ms to derive the interval from the current tempo (fixed at start — restart after a tempo change, or follow onBeat).',
-    availability: TIMERS_EXPORT_ONLY,
+    summary: 'Start (or restart) a named repeating timer; onTimer fires with info.id every ms until stopTimer(id). Options form: { ms | beats, once } — beats derives the interval from the current tempo (fixed at start), once fires a single time and removes itself.',
     params: [
       { name: 'id', type: 'string', required: true },
       { name: 'ms', type: 'number', required: true },
@@ -452,10 +447,33 @@ export const COMMANDS = [
   {
     id: 'stopTimer', category: 'Timers', signature: 'stopTimer(id)',
     summary: 'Stop a named timer started with startTimer(id, ms).',
-    availability: TIMERS_EXPORT_ONLY,
     params: [{ name: 'id', type: 'string', required: true }],
     scopes: 'any',
     snippet: { lua: 'stopTimer("${1:id}")$0', javascript: 'stopTimer("${1:id}")$0' },
+  },
+
+  /* --- State --- */
+  {
+    id: 'stateSet', category: 'State', signature: 'stateSet(key, value)',
+    summary: 'Remember a value under a key — panel-scoped, shared by all of the panel\'s scripts.',
+    params: [
+      { name: 'key', type: 'string', required: true },
+      { name: 'value', type: 'value', required: true },
+    ],
+    scopes: 'any',
+    availability: { preview: true, export: true, note: 'The exported plugin persists it with the DAW project; the editor preview keeps it for the session.' },
+    snippet: { lua: 'stateSet("${1:key}", ${2:value})$0', javascript: 'stateSet("${1:key}", ${2:value})$0' },
+  },
+  {
+    id: 'stateGet', category: 'State', signature: 'stateGet(key [, fallback])',
+    summary: 'Read a remembered value; fallback when the key was never set.',
+    params: [
+      { name: 'key', type: 'string', required: true },
+      { name: 'fallback', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    availability: { preview: true, export: true, note: 'The exported plugin persists it with the DAW project; the editor preview keeps it for the session.' },
+    snippet: { lua: 'stateGet("${1:key}", ${2:fallback})$0', javascript: 'stateGet("${1:key}", ${2:fallback})$0' },
   },
 
   /* --- Debug --- */
@@ -1308,7 +1326,7 @@ export const EVENT_BY_ID = Object.fromEntries(ALL_EVENTS.map((e) => [e.id, e]));
 /** Group commands + helpers + lifecycle by their `category`, for the picker's "Commands" side. */
 export function membersByCategory() {
   const order = [
-    'Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Transport', 'Timers', 'Debug',
+    'Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Transport', 'Timers', 'State', 'Debug',
     'Zone Splitter', 'Phrase Sequencer', 'Phrase Recorder', 'Harmoniser', 'Setlist',
     'Arpeggiator', 'Turing Modulator', 'Gesture Looper',
     'Value / range', 'Music', 'MIDI encoding',

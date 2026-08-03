@@ -298,9 +298,9 @@ Payloads are passed directly with a descriptive name — one obvious datum comes
 
 | Event | Handler | Payload | Fires when | Where |
 |---|---|---|---|---|
-| `"controlChanged"` | `onControlChanged(info)` | `info` (`.target` `.value`) | Any control changed. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
+| `"controlChanged"` | `onControlChanged(info)` | `info` (`.target` `.value`) | Any control settled on a new value — the panel-wide companion to a control's own valueChanged. | everywhere |
 | `"panelStateChanged"` | `onPanelStateChanged(state)` | `state` | Panel state switched. | preview ⬜ · export ⬜ — Planned — not dispatched anywhere yet. |
-| `"timer"` | `onTimer(info)` | `info` (`.id`) | A started timer fired. | preview ⬜ · export ✅ — Runs in the exported plugin (TimerManager); editor-preview timers are pending. |
+| `"timer"` | `onTimer(info)` | `info` (`.id`) | A started timer fired. | everywhere |
 | `"beat"` | `onBeat(info)` | `info` (`.beat` `.bar` `.beats`) | The clock crossed a beat (beat/bar 1-based, beats = absolute index). | preview ✅ · export ✅ — Fires from the panel Transport in the UI runtime; window-closed it follows the DAW playhead (nothing fires without a running clock). |
 | `"bar"` | `onBar(info)` | `info` (`.bar`) | The clock crossed a bar line. | preview ✅ · export ✅ — Fires from the panel Transport in the UI runtime; window-closed it follows the DAW playhead (nothing fires without a running clock). |
 
@@ -556,9 +556,7 @@ const t = transport()
 
 #### `startTimer(id, ms)`
 
-Start (or restart) a named repeating timer; onTimer fires with info.id every ms until stopTimer(id). Pass { beats: n } instead of ms to derive the interval from the current tempo (fixed at start — restart after a tempo change, or follow onBeat).
-
-*Availability: preview ⬜ · export ✅ — Runs in the exported plugin (TimerManager); editor-preview timers are pending.*
+Start (or restart) a named repeating timer; onTimer fires with info.id every ms until stopTimer(id). Options form: { ms | beats, once } — beats derives the interval from the current tempo (fixed at start), once fires a single time and removes itself.
 
 ```lua
 startTimer("id", ms)
@@ -568,10 +566,30 @@ startTimer("id", ms)
 
 Stop a named timer started with startTimer(id, ms).
 
-*Availability: preview ⬜ · export ✅ — Runs in the exported plugin (TimerManager); editor-preview timers are pending.*
-
 ```lua
 stopTimer("id")
+```
+
+### State
+
+#### `stateSet(key, value)`
+
+Remember a value under a key — panel-scoped, shared by all of the panel's scripts.
+
+*Availability: preview ✅ · export ✅ — The exported plugin persists it with the DAW project; the editor preview keeps it for the session.*
+
+```lua
+stateSet("key", value)
+```
+
+#### `stateGet(key [, fallback])`
+
+Read a remembered value; fallback when the key was never set.
+
+*Availability: preview ✅ · export ✅ — The exported plugin persists it with the DAW project; the editor preview keeps it for the session.*
+
+```lua
+stateGet("key", fallback)
 ```
 
 ### Debug

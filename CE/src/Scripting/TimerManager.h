@@ -30,8 +30,9 @@ public:
 
     void setFireCallback (FireCallback cb) { onFire = std::move (cb); }
 
-    /** Start, or reconfigure + restart, a repeating timer. intervalMs is clamped to a minimum. */
-    void start (const juce::String& id, int intervalMs)
+    /** Start, or reconfigure + restart, a timer. intervalMs is clamped to a minimum.
+        Repeats by default; `once` fires a single time and removes itself. */
+    void start (const juce::String& id, int intervalMs, bool once = false)
     {
         const auto interval = (juce::uint32) juce::jmax (kMinIntervalMs, intervalMs);
         const auto now = juce::Time::getMillisecondCounter();
@@ -42,12 +43,13 @@ public:
             {
                 t.intervalMs = interval;
                 t.nextDue = now + interval;
+                t.once = once;
                 ensureTicking();
                 return;
             }
         }
 
-        timers.push_back ({ id, interval, now + interval });
+        timers.push_back ({ id, interval, now + interval, once });
         ensureTicking();
     }
 
@@ -68,7 +70,7 @@ public:
     }
 
 private:
-    struct Entry { juce::String id; juce::uint32 intervalMs; juce::uint32 nextDue; };
+    struct Entry { juce::String id; juce::uint32 intervalMs; juce::uint32 nextDue; bool once = false; };
 
     static constexpr int kMinIntervalMs = 5;   // practical message-thread floor
     static constexpr int kTickMs        = 5;   // internal poll resolution
@@ -85,16 +87,26 @@ private:
 
         // Snapshot the ids that are due BEFORE firing, so callbacks may safely mutate `timers`.
         juce::StringArray due;
+        juce::StringArray finished;   // one-shots that just fired
         for (auto& t : timers)
         {
             if (now >= t.nextDue)
             {
                 due.add (t.id);
+                if (t.once)
+                {
+                    finished.add (t.id);
+                    continue;
+                }
                 t.nextDue += t.intervalMs;             // fixed-rate advance
                 if (now >= t.nextDue)                   // fell behind (missed fires) -> coalesce + realign
                     t.nextDue = now + t.intervalMs;
             }
         }
+
+        // Remove finished one-shots BEFORE firing, so a callback restarting the same id wins.
+        for (const auto& id : finished)
+            stop (id);
 
         for (const auto& id : due)
             if (onFire)

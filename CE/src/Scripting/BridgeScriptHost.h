@@ -45,8 +45,11 @@ public:
         std::function<void (const juce::String& name, const juce::var& data)> emitEvent;
         std::function<void (const juce::String& message, const juce::var& value)> log;
         // Timers.
-        std::function<void (const juce::String& id, int intervalMs)> startTimer;
+        std::function<void (const juce::String& id, int intervalMs, bool once)> startTimer;
         std::function<void (const juce::String& id)> stopTimer;
+        // Script key/value state (panel-scoped persistence).
+        std::function<void (const juce::String& key, const juce::var& value)> stateSet;
+        std::function<juce::var (const juce::String& key)> stateGet;
     };
 
     explicit BridgeScriptHost (Callbacks cb) : callbacks (std::move (cb)) {}
@@ -104,8 +107,10 @@ public:
     juce::var runAction (const juce::String& target, const juce::var& args) override { return callbacks.runAction ? callbacks.runAction (target, args) : juce::var(); }
     void emitEvent (const juce::String& name, const juce::var& data) override { if (callbacks.emitEvent) callbacks.emitEvent (name, data); }
     void log (const juce::String& message, const juce::var& value) override { if (callbacks.log) callbacks.log (message, value); }
-    void startTimer (const juce::String& id, int intervalMs) override { if (callbacks.startTimer) callbacks.startTimer (id, intervalMs); }
+    void startTimer (const juce::String& id, int intervalMs, bool once) override { if (callbacks.startTimer) callbacks.startTimer (id, intervalMs, once); }
     void stopTimer  (const juce::String& id) override { if (callbacks.stopTimer) callbacks.stopTimer (id); }
+    void stateSet (const juce::String& key, const juce::var& value) override { if (callbacks.stateSet) callbacks.stateSet (key, value); }
+    juce::var stateGet (const juce::String& key) override { return callbacks.stateGet ? callbacks.stateGet (key) : juce::var(); }
 
 private:
     // Anti-flood backstop (scripting-redesign §7 keep-list): scripts may not push

@@ -266,6 +266,18 @@ PyObject* api_sendNote (PyObject*, PyObject* args)
     g_host->sendNote (ch, note, vel, ms); Py_RETURN_NONE;
 }
 PyObject* api_transport (PyObject*, PyObject*) { return varToPy (g_host->getTransport()); }
+PyObject* api_stateSet (PyObject*, PyObject* args)
+{
+    const char* key = nullptr; PyObject* v = nullptr;
+    if (! PyArg_ParseTuple (args, "sO", &key, &v)) return nullptr;
+    g_host->stateSet (juce::String::fromUTF8 (key), pyToVar (v)); Py_RETURN_NONE;
+}
+PyObject* api_stateGet (PyObject*, PyObject* args)
+{
+    const char* key = nullptr;
+    if (! PyArg_ParseTuple (args, "s", &key)) return nullptr;
+    return varToPy (g_host->stateGet (juce::String::fromUTF8 (key)));
+}
 PyObject* api_run (PyObject*, PyObject* args)
 {
     const char* target = nullptr; PyObject* a = nullptr;
@@ -311,6 +323,8 @@ PyMethodDef apiMethods[] = {
     { "sendNoteOff",   api_sendNoteOff,   METH_VARARGS, nullptr },
     { "sendNote",      api_sendNote,      METH_VARARGS, nullptr },
     { "transport",     api_transport,     METH_NOARGS,  nullptr },
+    { "stateSet",      api_stateSet,      METH_VARARGS, nullptr },
+    { "stateGet",      api_stateGet,      METH_VARARGS, nullptr },
     { "run",           api_run,           METH_VARARGS, nullptr },
     { "emit",          api_emit,          METH_VARARGS, nullptr },
     { "log",           api_log,           METH_VARARGS, nullptr },
@@ -338,6 +352,10 @@ def noteOn(ch, note, vel=100):    return __api.sendNoteOn(ch, note, vel)
 def noteOff(ch, note):            return __api.sendNoteOff(ch, note)
 def sendNote(ch, note, vel=100, ms=200): return __api.sendNote(ch, note, vel, ms)
 def transport():                  return __api.transport()
+def stateSet(key, value):         return __api.stateSet(key, value)
+def stateGet(key, fallback=None):
+    v = __api.stateGet(key)
+    return fallback if v is None else v
 def sendNRPN(ch, msb, lsb, v):    return __api.sendNRPN(ch, msb, lsb, v)
 def sendSysex(b):                 return __api.sendSysex(b)
 def requestDump(kind):            return __api.requestDump(kind)

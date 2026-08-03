@@ -56,6 +56,7 @@ let host = null;
 export function setRuntimeHost(h) {
   host = h ?? null;
   live.listenersDirty = true;
+  stopAllPreviewTimers();
   if (host) {
     live.activePanelId = host.panel?.id ?? 'player';
     snapshotValues();
@@ -241,9 +242,71 @@ function transportSnapshot() {
   };
 }
 
+/* ------------------------------------------------------------------- timers (preview) */
+// setInterval-backed named timers, mirroring the C++ TimerManager's contract: repeat by
+// default, restart-on-reuse, { once } fires a single time, { beats } converts via the tempo
+// at start. All are cleared when the preview stops or the panel changes.
+
+const previewTimers = new Map(); // id -> interval/timeout handle (+ once flag)
+
+function startTimerApi(id, msOrOpts) {
+  const key = String(id ?? '');
+  if (!key) { addScriptTrace('error', '', 'startTimer(): a timer id is required'); return; }
+  let ms = msOrOpts;
+  let once = false;
+  if (ms && typeof ms === 'object') {
+    once = ms.once === true;
+    if (ms.beats > 0) {
+      const bpm = transportSnapshot().bpm;
+      ms = ms.beats * (60000 / (bpm > 0 ? bpm : 120));
+    } else ms = ms.ms;
+  }
+  ms = Math.max(5, Math.round(Number(ms) || 0)); // same floor as the C++ TimerManager
+  stopTimerApi(key); // restart-on-reuse (timer-system.md)
+  const fire = () => {
+    if (once) previewTimers.delete(key);
+    dispatchEvents([{ event: 'onTimer', controlName: null, payload: { id: key } }]);
+  };
+  previewTimers.set(key, once ? setTimeout(fire, ms) : setInterval(fire, ms));
+}
+
+function stopTimerApi(id) {
+  const key = String(id ?? '');
+  const h = previewTimers.get(key);
+  if (h !== undefined) { clearInterval(h); clearTimeout(h); previewTimers.delete(key); }
+}
+
+function stopAllPreviewTimers() {
+  for (const h of previewTimers.values()) { clearInterval(h); clearTimeout(h); }
+  previewTimers.clear();
+}
+
+/* ------------------------------------------------------- script key/value state */
+// Panel-scoped stateSet/stateGet. In the editor it lives for the session (per panel); the
+// exported plugin persists its own store with the DAW project (PluginProcessor).
+
+const scriptKvByPanel = new Map(); // panelId -> Map(key -> value)
+
+function kvStore() {
+  const pid = String(live.activePanelId ?? 'panel');
+  if (!scriptKvByPanel.has(pid)) scriptKvByPanel.set(pid, new Map());
+  return scriptKvByPanel.get(pid);
+}
+
+const stateApi = {
+  stateSet: (key, value) => { kvStore().set(String(key ?? ''), value); },
+  stateGet: (key, fallback) => {
+    const v = kvStore().get(String(key ?? ''));
+    return v === undefined ? fallback : v;
+  },
+};
+
 const midiApi = {
   sendCC: (ch, cc, v) =>
     sendRawMidi([0xB0 | (midiInt(ch, 1, 16) - 1), midiInt(cc, 0, 127), midiInt(v, 0, 127)], `cc_${midiInt(cc, 0, 127)}`),
+  startTimer: startTimerApi,
+  stopTimer: stopTimerApi,
+  ...stateApi,
   noteOn: noteOnApi,
   noteOff: noteOffApi,
   sendNote: (ch, note, vel, durationMs) => {
@@ -1093,6 +1156,7 @@ function onPanelsChanged() {
     if (live.last.has(id) && live.last.get(id) !== sig) {
       events.push({ event: 'onValueChange', controlName: name, payload: value });
       events.push({ event: 'onValueChanged', controlName: name, payload: value });
+      events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value } });
     }
   }
   live.last = next;
@@ -1138,7 +1202,10 @@ function onPreviewSessionsChanged(sessions) {
     const name = controlNameById(id);
     if (!Object.is(prev.value, cur.value) && cur.value !== undefined) {
       events.push({ event: 'onValueChange', controlName: name, payload: cur.value });
-      if (s.dragging !== true) events.push({ event: 'onValueChanged', controlName: name, payload: cur.value });
+      if (s.dragging !== true) {
+        events.push({ event: 'onValueChanged', controlName: name, payload: cur.value });
+        events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value: cur.value } });
+      }
     }
     if (prev.pressed !== cur.pressed) {
       const mouse = { x: s.pointerX ?? 0, y: s.pointerY ?? 0, button: s.pointerButton ?? 0, modifiers: s.pointerModifiers ?? 0 };
@@ -1168,6 +1235,7 @@ function onPreviewModeChanged(on) {
   } else if (live.enabledGlobal && !on && live.prevPreviewOn) {
     dispatchEvents([{ event: 'onPanelClose', controlName: null, payload: undefined }]);
     live.sessionLast.clear();
+    stopAllPreviewTimers();
   }
   live.prevPreviewOn = on;
 }
@@ -1238,6 +1306,7 @@ export function initPanelRuntime() {
   live.unsubs.push(resolvedActivePanelId.subscribe((id) => {
     live.activePanelId = id;
     live.listenersDirty = true;
+    stopAllPreviewTimers();    // another panel's timers must not keep firing
     snapshotValues();          // switching panels shouldn't fire spurious changes
     seedSessionSnapshot();
   }));
