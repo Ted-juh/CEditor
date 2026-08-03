@@ -16,10 +16,11 @@ The existing **Range** control is a spinbox, not a min–max slider:
 - Parts: **`decrement` · `valueField` · `increment`** (interactionDefaults.js).
 - `valueField` renders an editable `<input>` via
   `editor/InteractivePartRenderer.svelte` (type-in, commit on Enter).
-- Stepping/parse/scrub all live in `utils/rangeBehavior.js`
-  (`adjustRangeValue`, `parseRangeInputValue`, `snapRangeValue`,
-  `scrubRangeValue`) and are wired in `PanelPreviewSurface.svelte`
-  (arrow/page keys, wheel, +/- button zones).
+- Stepping/parse live in `utils/rangeBehavior.js`
+  (`adjustRangeValue`, `parseRangeInputValue`, `snapRangeValue`); drag-scrub
+  goes through the shared `scrub/dragScrub.ts` core via
+  `utils/scrubRuntime.js` (`createRangeScrub`). Wired in
+  `PanelPreviewSurface.svelte` (arrow/page keys, wheel, +/- button zones).
 - Same `value` port as Slider (numeric, continuous); exports as a numeric param.
 
 **So the functionality exists.** The real gaps are:

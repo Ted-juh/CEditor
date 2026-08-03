@@ -205,9 +205,9 @@
     resolveRangeDisplayValue,
     resolveRangeZone,
     resolveMouseDirection,
-    scrubRangeValue,
     snapRangeValue,
   } from '../utils/rangeBehavior.js';
+  import { createRangeScrub, scrubSample } from '../utils/scrubRuntime.js';
   import {
     getSliderActiveHandle,
     getSliderLegalRangeForHandle,
@@ -275,6 +275,7 @@
   let lastPointerDownId = '';
   let lastPointerMoveDispatchAt = 0;
   let pointerStartValue = $state(0);
+  let rangeScrub = null;
   let pointerSliderHandle = $state('');
   let pointerCustomHitZone = $state(null);
   let pointerCustomStartValues = $state({});
@@ -5538,17 +5539,10 @@
   }
 
   function updateScrubRangeFromPointer(control, event) {
-    if (!isRangeControl(control)) return;
-    setRangeValue(
-      control,
-      scrubRangeValue(
-        getBehavior(control),
-        pointerStartValue,
-        pointerDownPoint,
-        { x: event.clientX, y: event.clientY }
-      ),
-      { dragging: true }
-    );
+    if (!isRangeControl(control) || !rangeScrub) return;
+    const next = rangeScrub.move(scrubSample(event));
+    if (next === null) return;
+    setRangeValue(control, next, { dragging: true });
   }
 
   function maybeStartRangeDrag(control, event) {
@@ -5565,6 +5559,10 @@
     if (Math.max(dx, dy) < 5) return false;
 
     draggingRange = true;
+    // Anchor at the pointer-down point, not the threshold crossing, so the
+    // first fed move spans the whole distance travelled — same feel as before.
+    rangeScrub = createRangeScrub(behavior, pointerStartValue);
+    rangeScrub.begin({ x: pointerDownPoint.x, y: pointerDownPoint.y });
     patchControlSession(getControlId(control), { dragging: true });
     return true;
   }
@@ -5679,6 +5677,8 @@
   function removeWindowListeners() {
     window.removeEventListener('pointermove', handleWindowPointerMove);
     window.removeEventListener('pointerup', handleWindowPointerUp);
+    rangeScrub?.end();
+    rangeScrub = null;
   }
 
   onDestroy(() => {
