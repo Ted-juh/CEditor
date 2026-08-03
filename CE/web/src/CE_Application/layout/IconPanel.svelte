@@ -140,7 +140,6 @@
         { type: 'Listbox',         icon: List,                label: 'Insert Listbox' },
         { type: 'TimedButton',     icon: TimerReset,          label: 'Insert Timed Button' },
         { type: 'OneShotButton',   icon: BadgeCheck,          label: 'Insert One-Shot Button' },
-        { type: 'Panic',           icon: OctagonAlert,       label: 'Insert Panic button' },
       ],
     },
     {
@@ -191,6 +190,7 @@
         { type: 'SplitZone',       icon: SplitSquareHorizontal, label: 'Insert Zone Splitter (keyboard split)' },
         { type: 'Setlist',         icon: ListOrdered,        label: 'Insert Setlist (scenes on a footswitch)' },
         { type: 'Transport',       icon: Timer,              label: 'Insert Transport (master clock)' },
+        { type: 'Panic',           icon: OctagonAlert,       label: 'Insert Panic button' },
       ],
     },
   ];
