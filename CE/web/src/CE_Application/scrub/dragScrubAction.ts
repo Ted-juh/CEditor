@@ -7,7 +7,7 @@
  * and keyboard, so widgets stay declarative.
  */
 
-import { DragScrub, type DragScrubOptions, type PointerSample } from './dragScrub';
+import { DragScrub, defaultOptions, type DragScrubOptions, type PointerSample } from './dragScrub';
 
 export interface DragScrubParams extends Partial<DragScrubOptions> {
   value: number;
@@ -41,9 +41,22 @@ const cursorFor = (axis: DragScrubOptions['axis']): string => {
   }
 };
 
+// Only real DragScrubOptions keys may reach the core: the constructor spreads
+// its argument into `options`, so passing the whole params object would leak
+// `value`/`onChange`/etc. in — and a fresh onChange closure per render would
+// then read as a config change and reset the scrub mid-drag.
+const optionsFrom = (params: DragScrubParams): Partial<DragScrubOptions> => {
+  const out: Partial<DragScrubOptions> = {};
+  for (const key of Object.keys(defaultOptions) as (keyof DragScrubOptions)[]) {
+    const value = (params as Partial<DragScrubOptions>)[key];
+    if (value !== undefined) (out as Record<string, unknown>)[key] = value;
+  }
+  return out;
+};
+
 export function dragScrub(node: HTMLElement, params: DragScrubParams) {
   let current = params;
-  let scrub = new DragScrub(current, current.value);
+  let scrub = new DragScrub(optionsFrom(current), current.value);
   let activePointer: number | null = null;
   let locked = false;
   // Under pointer lock there is no meaningful clientX, so we integrate
@@ -184,12 +197,13 @@ export function dragScrub(node: HTMLElement, params: DragScrubParams) {
 
   return {
     update(next: DragScrubParams) {
-      const configChanged = Object.keys(next).some(
-        (k) => k in scrub.options && (next as never)[k] !== (scrub.options as never)[k]
+      const nextOptions = optionsFrom(next);
+      const configChanged = (Object.keys(defaultOptions) as (keyof DragScrubOptions)[]).some(
+        (k) => (nextOptions[k] ?? defaultOptions[k]) !== scrub.options[k]
       );
       current = next;
       if (configChanged) {
-        scrub = new DragScrub(next, next.value);
+        scrub = new DragScrub(nextOptions, next.value);
         applyCursor();
       } else if (!scrub.isDragging && next.value !== scrub.value) {
         // External change (host automation, undo, a second view of the same
