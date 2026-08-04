@@ -915,7 +915,7 @@ sendNRPN(channel, msb, lsb, value)
 
 #### `sendRPN(channel, msb, lsb, value)`
 
-Send a registered parameter number — the standard path for pitch-bend range (0,0), fine tuning (0,1) and coarse tuning (0,2), which is the kind of thing a panel sets once at load. Same shape as sendNRPN; the difference is CC 101/100 instead of 99/98.
+Send a registered parameter number (RPN): the standard path for pitch-bend range (0,0), fine tuning (0,1) and coarse tuning (0,2). Same shape as sendNRPN, but uses CC 101/100 instead of 99/98.
 
 ```lua
 -- Lua
@@ -928,7 +928,7 @@ sendRPN(1, 0, 0, 2);  // pitch-bend range
 
 #### `sendSongPosition(beats)`
 
-Song Position Pointer — where in the song the next start should resume from, in MIDI beats (one beat = six clocks = a sixteenth note). The piece of sendTransport that was missing for anything driving an external sequencer.
+Send a Song Position Pointer: where the next start or continue resumes from, in MIDI beats (one beat = six clocks = a sixteenth note).
 
 ```lua
 -- Lua
@@ -954,7 +954,7 @@ sendMidi([0x90, 60, 100])
 
 #### `sendNote(channel, note, velocity [, ms])`
 
-Note on. `note` is a MIDI number or a name ("C3"). Velocity 0 is a note off, as the MIDI spec has it. Give `ms` and the note off is scheduled for you — every script that plays a note was otherwise hand-rolling a timer for it, and a panel cannot play a note at all.
+Note on. `note` is a MIDI number or a name ("C3"). Velocity 0 is a note off. Give `ms` and the matching note off is scheduled automatically.
 
 ```lua
 sendNote(1, 60, 100)
@@ -962,7 +962,7 @@ sendNote(1, 60, 100)
 
 #### `interceptMidiIn(fn)`
 
-Sit in the inbound path. fn(bytes) returns replacement bytes to rewrite the message, false to swallow it, or nothing to pass it through — before the panel's bindings, the note input and the transport see it. onCcIn only lets you react after a binding has already moved the control; this is how a velocity curve, a channel remap or a MIDI-learn layer is built.
+Intercept inbound MIDI before the panel's bindings, note input and transport see it. fn(bytes) returns replacement bytes to rewrite the message, false to swallow it, or nothing to pass it through.
 
 ```lua
 -- Lua
@@ -981,7 +981,7 @@ interceptMidiIn((bytes) => {
 
 #### `interceptMidiOut(fn)`
 
-Sit in the outbound path — every message the panel sends, from a script or from a control's own binding. Rewrite, thin or block it. CC flooding on a fast drag has no answer from a panel, whose bindings are fixed and which has nothing between them and the port.
+Intercept outbound MIDI — every message the panel sends, from a script or from a control's own binding. fn(bytes) returns replacement bytes to rewrite the message, false to swallow it, or nothing to pass it through.
 
 ```lua
 -- Lua
@@ -1000,7 +1000,7 @@ interceptMidiOut((bytes) => {
 
 #### `feedMidi(bytes)`
 
-Inject a message as if it had arrived from the hardware, so the panel's own bindings, note input and transport all act on it. set() moves a control directly and bypasses every binding; this is how a script-built arpeggiator or sequencer drives the panel instead of around it. Inbound filters run on it, so a fed message obeys the same rules as a real one.
+Inject a message as if it had arrived from the hardware: the panel's own bindings, note input and transport all act on it. Inbound intercepts and filters run on it, so a fed message obeys the same rules as a real one.
 
 ```lua
 -- Lua
@@ -1013,7 +1013,7 @@ feedMidi([0x90, 60, 100])
 
 #### `routeMidi(role, fn)`
 
-Send everything in the block to a named device role instead of the default. Blocks rather than a per-call argument, the same shape noTransmit() uses — a panel binds one device at design time, so notes to one synth and CCs to another is otherwise impossible.
+Send everything inside `fn` to a named device role instead of the default device. Block-scoped, the same shape noTransmit() uses.
 
 ```lua
 -- Lua
@@ -1030,7 +1030,7 @@ routeMidi("aux", () => {
 
 #### `sendNoteOff(channel, note [, velocity])`
 
-Note off. Release velocity defaults to 0. Nothing schedules this for you — a note you start is a note you stop.
+Note off. Release velocity defaults to 0. Nothing schedules this for you: send it for every note you start.
 
 ```lua
 sendNoteOff(1, 60)
@@ -1038,7 +1038,7 @@ sendNoteOff(1, 60)
 
 #### `sendProgramChange(channel, program [, bankMsb, bankLsb])`
 
-Program change, with an optional bank select (CC 0 / CC 32) sent first, which is the order devices expect.
+Program change, with an optional bank select (CC 0 / CC 32) sent first.
 
 ```lua
 sendProgramChange(1, 0)
@@ -1046,7 +1046,7 @@ sendProgramChange(1, 0)
 
 #### `sendPitchBend(channel, value)`
 
-Pitch bend, 0–16383 with 8192 at centre — the raw 14-bit value, because how many semitones that is depends on the synth's bend range, not on us.
+Pitch bend as the raw 14-bit value: 0–16383, centre 8192. How many semitones that spans depends on the synth's bend range.
 
 ```lua
 sendPitchBend(1, 8192)
@@ -1078,7 +1078,7 @@ sendTransport("start")
 
 #### `sendSysex(bytes)`
 
-Send a raw SysEx message (device-scope, power use).
+Send a raw SysEx message.
 
 ```lua
 sendSysex(bytes)
@@ -1086,7 +1086,7 @@ sendSysex(bytes)
 
 #### `checksum(type, bytes [, opts]) -> number`
 
-Work out the checksum a synth expects at the end of a message. Eleven methods: "sum-7bit", "roland-7bit" (also spelled "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" and "crc32". Device profiles read the same list, so a script and a profile cannot disagree about what a name means. A name that is not on the list returns nothing and tells you what it would have accepted. Mind the size: the 7-bit ones fit in a single SysEx byte and the CRCs do not, so pass those through to7bit() before sending.
+Compute the checksum a synth expects at the end of a message. Eleven methods: "sum-7bit", "roland-7bit" (also spelled "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" and "crc32"; a name not on the list returns nothing and reports the accepted names. The 7-bit methods fit in a single SysEx byte, the CRCs do not — pass CRC results through to7bit() before sending.
 
 ```lua
 checksum("roland", bytes)
@@ -2078,7 +2078,7 @@ Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note), e.
 
 #### `state`
 
-A table of your own that survives between handler calls, private to this script. Cleared when the script reloads — for anything that must outlive the session use saveSetting.
+A table that persists between handler calls, private to this script. Cleared when the script reloads; use saveSetting for anything that must outlive the session.
 
 ```lua
 -- Lua
@@ -2091,7 +2091,7 @@ state.count = (state.count ?? 0) + 1;
 
 #### `saveSetting(key, value [, opts]) -> boolean`
 
-Save a value so it is still there next time. While you are building, a panel setting is kept with the panel and travels with it; in the finished plugin it goes into your music software's project. Returns false when there was nowhere to put it, so you can tell that apart from success.
+Save a value persistently. In the editor a panel-scope setting is stored with the panel and travels with it; in an exported plugin it is stored in the host's project. Returns false when storage is unavailable.
 
 ```lua
 saveSetting("key", value)
@@ -2099,7 +2099,7 @@ saveSetting("key", value)
 
 #### `loadSetting(key [, fallback [, opts]])`
 
-Read back a value saved with saveSetting. Returns `fallback` when the key has never been written — and `opts.scope` has to match the scope it was saved in, because a private setting and a shared one of the same name are two different values.
+Read back a value saved with saveSetting. Returns `fallback` when the key has never been written. `opts.scope` must match the scope the value was saved in — the same key in different scopes names different values.
 
 ```lua
 -- Lua
@@ -2112,7 +2112,7 @@ const v = loadSetting("key", default);
 
 #### `listSettings([opts]) -> list`
 
-Every key saved in one scope, in no particular order. An empty list means nothing has been written — not that settings are unavailable, which is what ce.storage.info() is for. `opts.scope` as elsewhere; a panel listing hides other scripts’ private keys.
+List every key saved in one scope, in no particular order. An empty list means nothing has been written; use storageInfo() to check whether storage is available. `opts.scope` as elsewhere; a panel-scope listing omits other scripts’ private keys.
 
 ```lua
 -- Lua
@@ -2125,7 +2125,7 @@ for (const k of ce.storage.settings()) {  }
 
 #### `forgetSetting(key [, opts]) -> boolean`
 
-Delete a saved setting. Returns whether there was one to delete, so a script can tell "cleaned up" from "there was nothing there". `opts.scope` as elsewhere.
+Delete a saved setting. Returns whether a value existed to delete. `opts.scope` as elsewhere.
 
 ```lua
 -- Lua
@@ -2138,7 +2138,7 @@ ce.storage.forget("key");
 
 #### `allSettings([opts]) -> table`
 
-Every setting in one scope, as a table of key to value. The read every other module got — listing keys and looping to fetch each one was the only way before. `opts.scope` is "panel" (default), "script" or "local". A panel-scope listing hides other scripts’ private keys rather than showing an unusable spelling of them.
+Every setting in one scope, as a table of key to value. `opts.scope` is "panel" (default), "script" or "local". A panel-scope listing omits other scripts’ private keys.
 
 ```lua
 -- Lua
@@ -2151,15 +2151,15 @@ for (const [k, v] of Object.entries(ce.storage.all())) log(k, v);
 
 #### `clearSettings([opts]) -> number`
 
-Forget everything in one scope, and say how many went. Panel scope leaves other scripts’ private keys alone: "clear my settings" must not mean "clear everybody’s".
+Delete every setting in one scope; returns how many were deleted. Panel scope leaves other scripts’ private keys untouched.
 
 #### `storageInfo([opts]) -> table`
 
-Which store a scope is talking to and what is in it: { scope, backing, available, count, bytes }. The three scopes have genuinely different backing — the panel document, this machine, the DAW project state — and a script that has just failed to persist something deserves to know which one it was talking to. `available` is the honest field: false means writes in this scope will not stick, which is worth saying once rather than discovering per key.
+Describe a scope's store: { scope, backing, available, count, bytes }. `backing` names where values live — the panel document, this machine, or the DAW project state. `available` false means writes in this scope will not persist.
 
 #### `encodeJson(value [, opts]) -> string`
 
-A value as JSON text. `opts.indent` pretty-prints with that many spaces. Nothing back for a value with no JSON form — a cycle, a function — rather than a string that is not the value. This is here because the Lua engine opens base, math, string and table and has no json module, while JavaScript and Python each have their own with different names: "use the language’s own" was never available to a cross-runtime script, the same Q10 exception ce.time.now() is.
+Encode a value as JSON text. `opts.indent` pretty-prints with that many spaces. Returns nothing for a value with no JSON form — a cycle, a function. Identical in every runtime, including Lua, which has no json module of its own.
 
 ```lua
 -- Lua
@@ -2172,7 +2172,7 @@ sendSysex(toAscii(ce.storage.encode(patch)));
 
 #### `decodeJson(text) -> value`
 
-Turn text back into a value. Text that is not valid JSON gives you nothing, which is how you tell a config somebody mistyped from one that is simply empty. Worth knowing: a JSON null comes back as nothing at all, so {"a":1,"b":null} arrives with one key and [1,null,2] with two entries. Not every language can hold a null, and all of them have to agree, so encoding and then decoding is not quite a round trip where nulls are involved.
+Decode JSON text into a value. Invalid JSON returns nothing. A JSON null also decodes to nothing: {"a":1,"b":null} arrives with one key and [1,null,2] with two entries, so encode-then-decode is not a full round trip where nulls are involved.
 
 ### Debug
 
@@ -2186,7 +2186,7 @@ log("message", value)
 
 #### `logWarn(message [, value])`
 
-Print at warning level: something is off but the panel carries on. Reads differently from log() in the console, which is the whole point.
+Print at warning level: something is off but the panel carries on. Rendered distinctly from log() in the console.
 
 ```lua
 ce.core.warn("message")
@@ -2194,7 +2194,7 @@ ce.core.warn("message")
 
 #### `logError(message [, value])`
 
-Print at error level: something the panel could not do. Reporting it does not stop the handler — this prints, it does not throw. To stop, use your language's own error()/throw, which is exactly why the flat name is logError and not error.
+Print at error level: something the panel could not do. Prints without throwing — the handler continues. To stop the handler, use your language's own error()/throw.
 
 ```lua
 ce.core.error("message")

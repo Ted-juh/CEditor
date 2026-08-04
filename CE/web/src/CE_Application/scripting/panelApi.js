@@ -2921,7 +2921,7 @@ export const COMMANDS = [
   },
   {
     id: 'saveSetting', category: 'Storage', signature: 'saveSetting(key, value [, opts]) -> boolean',
-    summary: 'Save a value so it is still there next time. While you are building, a panel setting is kept with the panel and travels with it; in the finished plugin it goes into your music software\'s project. Returns false when there was nowhere to put it, so you can tell that apart from success.',
+    summary: 'Save a value persistently. In the editor a panel-scope setting is stored with the panel and travels with it; in an exported plugin it is stored in the host\'s project. Returns false when storage is unavailable.',
     params: [
       { name: 'key', type: 'string', required: true },
       { name: 'value', type: 'value', required: true },
@@ -2932,7 +2932,7 @@ export const COMMANDS = [
   },
   {
     id: 'loadSetting', category: 'Storage', signature: 'loadSetting(key [, fallback [, opts]])',
-    summary: 'Read back a value saved with saveSetting. Returns `fallback` when the key has never been written — and `opts.scope` has to match the scope it was saved in, because a private setting and a shared one of the same name are two different values.',
+    summary: 'Read back a value saved with saveSetting. Returns `fallback` when the key has never been written. `opts.scope` must match the scope the value was saved in — the same key in different scopes names different values.',
     params: [
       { name: 'key', type: 'string', required: true },
       { name: 'fallback', type: 'value', required: false },
@@ -2946,13 +2946,13 @@ export const COMMANDS = [
   // after itself and could not show somebody what it had kept.
   {
     id: 'listSettings', category: 'Storage', signature: 'listSettings([opts]) -> list',
-    summary: 'Every key saved in one scope, in no particular order. An empty list means nothing has been written — not that settings are unavailable, which is what ce.storage.info() is for. `opts.scope` as elsewhere; a panel listing hides other scripts\u2019 private keys.',
+    summary: 'List every key saved in one scope, in no particular order. An empty list means nothing has been written; use storageInfo() to check whether storage is available. `opts.scope` as elsewhere; a panel-scope listing omits other scripts\u2019 private keys.',
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }], scopes: 'any',
     snippet: { lua: 'for _, k in ipairs(ce.storage.settings()) do $0 end', javascript: 'for (const k of ce.storage.settings()) { $0 }' },
   },
   {
     id: 'forgetSetting', category: 'Storage', signature: 'forgetSetting(key [, opts]) -> boolean',
-    summary: 'Delete a saved setting. Returns whether there was one to delete, so a script can tell "cleaned up" from "there was nothing there". `opts.scope` as elsewhere.',
+    summary: 'Delete a saved setting. Returns whether a value existed to delete. `opts.scope` as elsewhere.',
     params: [
       { name: 'key', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
@@ -2973,7 +2973,7 @@ export const COMMANDS = [
      value somewhere the caller did not ask for is how a private setting becomes a shared one. */
   {
     id: 'allSettings', category: 'Storage', signature: 'allSettings([opts]) -> table',
-    summary: 'Every setting in one scope, as a table of key to value. The read every other module got — listing keys and looping to fetch each one was the only way before. `opts.scope` is "panel" (default), "script" or "local". A panel-scope listing hides other scripts’ private keys rather than showing an unusable spelling of them.',
+    summary: 'Every setting in one scope, as a table of key to value. `opts.scope` is "panel" (default), "script" or "local". A panel-scope listing omits other scripts’ private keys.',
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
     scopes: 'any',
     snippet: {
@@ -2983,19 +2983,19 @@ export const COMMANDS = [
   },
   {
     id: 'clearSettings', category: 'Storage', signature: 'clearSettings([opts]) -> number',
-    summary: 'Forget everything in one scope, and say how many went. Panel scope leaves other scripts’ private keys alone: "clear my settings" must not mean "clear everybody’s".',
+    summary: 'Delete every setting in one scope; returns how many were deleted. Panel scope leaves other scripts’ private keys untouched.',
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
     scopes: 'any',
   },
   {
     id: 'storageInfo', category: 'Storage', signature: 'storageInfo([opts]) -> table',
-    summary: 'Which store a scope is talking to and what is in it: { scope, backing, available, count, bytes }. The three scopes have genuinely different backing — the panel document, this machine, the DAW project state — and a script that has just failed to persist something deserves to know which one it was talking to. `available` is the honest field: false means writes in this scope will not stick, which is worth saying once rather than discovering per key.',
+    summary: 'Describe a scope\'s store: { scope, backing, available, count, bytes }. `backing` names where values live — the panel document, this machine, or the DAW project state. `available` false means writes in this scope will not persist.',
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
     scopes: 'any',
   },
   {
     id: 'encodeJson', category: 'Storage', signature: 'encodeJson(value [, opts]) -> string',
-    summary: 'A value as JSON text. `opts.indent` pretty-prints with that many spaces. Nothing back for a value with no JSON form — a cycle, a function — rather than a string that is not the value. This is here because the Lua engine opens base, math, string and table and has no json module, while JavaScript and Python each have their own with different names: "use the language’s own" was never available to a cross-runtime script, the same Q10 exception ce.time.now() is.',
+    summary: 'Encode a value as JSON text. `opts.indent` pretty-prints with that many spaces. Returns nothing for a value with no JSON form — a cycle, a function. Identical in every runtime, including Lua, which has no json module of its own.',
     params: [
       { name: 'value', type: 'value', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
@@ -3009,7 +3009,7 @@ export const COMMANDS = [
   },
   {
     id: 'decodeJson', category: 'Storage', signature: 'decodeJson(text) -> value',
-    summary: 'Turn text back into a value. Text that is not valid JSON gives you nothing, which is how you tell a config somebody mistyped from one that is simply empty. Worth knowing: a JSON null comes back as nothing at all, so {"a":1,"b":null} arrives with one key and [1,null,2] with two entries. Not every language can hold a null, and all of them have to agree, so encoding and then decoding is not quite a round trip where nulls are involved.',
+    summary: 'Decode JSON text into a value. Invalid JSON returns nothing. A JSON null also decodes to nothing: {"a":1,"b":null} arrives with one key and [1,null,2] with two entries, so encode-then-decode is not a full round trip where nulls are involved.',
     params: [{ name: 'text', type: 'string', required: true }],
     scopes: 'any',
   },
@@ -3030,7 +3030,7 @@ export const COMMANDS = [
   // so a real failure read exactly like a debug print.
   {
     id: 'logWarn', category: 'Debug', signature: 'logWarn(message [, value])',
-    summary: 'Print at warning level: something is off but the panel carries on. Reads differently from log() in the console, which is the whole point.',
+    summary: 'Print at warning level: something is off but the panel carries on. Rendered distinctly from log() in the console.',
     params: [
       { name: 'message', type: 'string', required: true },
       { name: 'value', type: 'value', required: false },
@@ -3040,7 +3040,7 @@ export const COMMANDS = [
   },
   {
     id: 'logError', category: 'Debug', signature: 'logError(message [, value])',
-    summary: 'Print at error level: something the panel could not do. Reporting it does not stop the handler — this prints, it does not throw. To stop, use your language\'s own error()/throw, which is exactly why the flat name is logError and not error.',
+    summary: 'Print at error level: something the panel could not do. Prints without throwing — the handler continues. To stop the handler, use your language\'s own error()/throw.',
     params: [
       { name: 'message', type: 'string', required: true },
       { name: 'value', type: 'value', required: false },
@@ -3154,7 +3154,7 @@ export const PANEL_COMMANDS = [
   panelVerb('harmonyShape', 'harmonyShape(target, shape)', 'Apply a named chord shape / preset.',
     [T, { name: 'shape', type: 'string', required: true }]),
   panelVerb('harmonyVoicing', 'harmonyVoicing(target, voicing)',
-    `Voicing spread — ${oneOf(HAND_WRITTEN_VALUES['harmony.voicing'])}. There is no fourth.`,
+    `Voicing spread — ${oneOf(HAND_WRITTEN_VALUES['harmony.voicing'])}.`,
     [T, { name: 'voicing', type: 'string', required: true }]),
   panelVerb('harmonyInversion', 'harmonyInversion(target, inversion)', 'Chord inversion.',
     [T, { name: 'inversion', type: 'number', required: true }]),
@@ -3197,21 +3197,21 @@ export const PANEL_COMMANDS = [
      one shape a script is most likely to want is the same across all twenty-eight. */
   panelVerb('splitRead', 'splitRead(target [, field])',
     'Read the Zone Splitter\'s settings — the whole section, or one field by name (`zones`, `preset`). '
-    + 'By model field name rather than by verb name: this family predates the component spec.',
+    + 'Fields are addressed by model field name, not by verb name.',
     [T, { name: 'field', type: 'string', required: false }]),
   panelVerb('phraseRead', 'phraseRead(target [, field])',
     'Read the Phrase Sequencer\'s settings — the whole section, or one field by name.',
     [T, { name: 'field', type: 'string', required: false }]),
   panelVerb('recorderRead', 'recorderRead(target [, field])',
-    'Read the Phrase Recorder\'s state — the whole section, or one field by name. This is how a '
-    + 'script finds out whether it is recording, and what the take actually contains.',
+    'Read the Phrase Recorder\'s state — the whole section, or one field by name. Includes '
+    + 'recording status and the take contents.',
     [T, { name: 'field', type: 'string', required: false }]),
   panelVerb('harmonyRead', 'harmonyRead(target [, field])',
     'Read the Harmoniser\'s settings — the whole section, or one field by name.',
     [T, { name: 'field', type: 'string', required: false }]),
   panelVerb('setlistRead', 'setlistRead(target [, field])',
-    'Read the Setlist — the whole section, or one field by name. `scenes` is the list, and `index` '
-    + 'is where it is, which a script had no way to ask before.',
+    'Read the Setlist — the whole section, or one field by name. `scenes` is the scene list; '
+    + '`index` is the current position.',
     [T, { name: 'field', type: 'string', required: false }]),
 
   // --- Panel values: snapshot / restore ---
@@ -3267,7 +3267,7 @@ export const HELPERS = [
   { id: 'round', category: 'Value / range', signature: 'round(v)', summary: 'Nearest whole number.' },
   { id: 'snap', category: 'Value / range', signature: 'snap(v, step)', summary: 'Snap to the nearest step.' },
   { id: 'curve', category: 'Value / range', signature: 'curve(v, shape)',
-    summary: 'Apply a named response curve: "linear", "exp", "log" or "s". A name it does not know is reported and treated as linear, rather than silently doing nothing. For a shape this list does not have, use map().' },
+    summary: 'Apply a named response curve: "linear", "exp", "log" or "s". An unknown name is reported and treated as linear. For other shapes use map().' },
   { id: 'lerp', category: 'Value / range', signature: 'lerp(a, b, t)', summary: 'Blend between a and b by t (0–1).' },
   // wrap, and why it is not `%`. The five runtimes DISAGREE about the sign of a modulo: (-1) % 12
   // is 11 in Lua and Python and -1 in JavaScript, C++, C# and Java. So the ordinary way to write a
@@ -3275,7 +3275,7 @@ export const HELPERS = [
   // engine the panel is running in, and nothing said so. This is the one arithmetic a synth panel
   // does constantly, which is why it belongs to the module rather than to each panel.
   { id: 'wrap', category: 'Value / range', signature: 'wrap(v, lo, hi)',
-    summary: 'Bring a value round into a range, half-open: wrap(12, 0, 12) is 0, and wrap(-1, 0, 12) is 11. Use it for pitch classes, LFO phase and step indices instead of the language\'s %, whose sign differs between the runtimes — the same expression gives 11 in Lua and -1 in JavaScript.' },
+    summary: 'Wrap a value into a half-open range: wrap(12, 0, 12) is 0, wrap(-1, 0, 12) is 11. Use for pitch classes, LFO phase and step indices instead of the language\'s %, whose sign on negatives differs between runtimes — the same expression gives 11 in Lua and -1 in JavaScript.' },
   // map, and why `curve` was not enough. curve() is a CLOSED set of four names, so a taper it does
   // not have could not be expressed at all — and a properties panel cannot hold an arbitrary curve
   // either, since a property stores a constant. Breakpoints are the smallest thing that can.
