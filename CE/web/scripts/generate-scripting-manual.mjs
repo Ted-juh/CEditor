@@ -152,25 +152,31 @@ export function generateManual() {
 > First script? Start with [getting started](scripting-getting-started.md), then the
 > [cookbook](scripting-cookbook.md); reading order for everything is in the [docs index](README.md).
 
-A script is **an action plus the moment it runs** — a lifecycle hook, or an event handler that
-reacts while the panel is in use. Every language calls the same panel API described below; a
-script is stored and run in the language it was written in, never converted.
+A script is a piece of code plus the moment it runs. That moment is either a lifecycle hook
+(like "the panel just loaded") or an event (like "this knob moved"). Every language uses the
+same commands, described below. A script is stored and run in the language you wrote it in.
+It is never converted.
 
 ## Languages
 
 ${languages}
 
-## Where things run: preview vs export
+## Where scripts run
 
-Some of the API is further along in one runtime than the other. Members below carry a badge
-when they deviate from "available everywhere":
+Your scripts can run in two places:
 
-- **preview** — the editor's live preview (the JS panel runtime, also used by the exported
-  player's window).
-- **export** — the exported standalone/VST3 plugin (the C++ host engines, alive even with the
-  window closed).
+- **preview** — the panel window. This is the editor's live preview, and also the window of
+  the exported plugin. Scripts run here while the window is on screen.
+- **export** — the exported standalone or VST3 plugin itself. Its script engines keep running
+  even when the window is closed. Timers keep ticking. MIDI keeps arriving.
 
-✅ = works today, ⬜ = not yet there (the note says why). No badge = works in both.
+Most commands work the same in both places. Those carry no badge. A command carries a badge
+only when the two places differ: ✅ means it works there today, ⬜ means it does not yet, and
+the note says why. Commands that need the window (drawing, dialogs, the on-screen components)
+do nothing with the window closed, and a note goes to the log.
+
+If your script must keep working with the window closed, for example a timer that keeps
+sending MIDI, check the badges and use only commands that work in both places.
 
 ## The same script in every language
 
