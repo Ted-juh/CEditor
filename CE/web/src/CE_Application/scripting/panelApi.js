@@ -875,7 +875,7 @@ export const COMMANDS = [
   },
   {
     id: 'colourAlpha', category: 'Value / range', signature: 'colourAlpha(colour, a) -> string',
-    summary: 'Apply an alpha to a colour, returned in the panel\'s stored form: AARRGGBB, no leading #. The one colour verb that does not return #RRGGBB. Warning: CSS #rrggbbaa is the same bytes in the opposite order. To make a drawing translucent use ce.draw.opacity().',
+    summary: 'Apply an alpha to a colour, returned in the panel\'s stored form: AARRGGBB, no leading #. The one colour verb that does not return #RRGGBB. Warning: css\'s #rrggbbaa is the same bytes in the opposite order. To make a drawing translucent use ce.draw.opacity().',
     params: [
       { name: 'colour', type: 'string', required: true },
       { name: 'a', type: 'number', required: true },
@@ -3280,15 +3280,15 @@ export const HELPERS = [
   // not have could not be expressed at all — and a properties panel cannot hold an arbitrary curve
   // either, since a property stores a constant. Breakpoints are the smallest thing that can.
   { id: 'mapCurve', category: 'Value / range', signature: 'mapCurve(v, points)',
-    summary: 'A response curve of your own: straight lines through breakpoints, given as {{x, y}, …} — map(v, {{0,0},{0.5,0.9},{1,1}}) is a knob that opens fast and finishes slowly. Points are sorted by x, so the order you write them in does not matter; outside the outermost points the value is held rather than extrapolated. Two points with the same x is a step, and the later one wins.' },
+    summary: 'Piecewise-linear curve through breakpoints given as {{x, y}, …}: map(v, {{0,0},{0.5,0.9},{1,1}}). Points are sorted by x; outside the outermost points the value is held, not extrapolated. Two points with the same x form a step, and the later one wins.' },
   { id: 'quantizeTo', category: 'Value / range', signature: 'quantizeTo(v, values)',
-    summary: 'Snap to the nearest value in a list, rather than to a regular step: quantizeTo(9, {0, 8, 16}) is 8. snap() covers evenly spaced settings; this covers the ones a synth actually has. A tie goes to the lower value, so the result never depends on rounding.' },
+    summary: 'Snap to the nearest value in a list: quantizeTo(9, {0, 8, 16}) is 8. A tie goes to the lower value. For evenly spaced steps use snap().' },
   { id: 'randomChoice', category: 'Value / range', signature: 'randomChoice(values [, weights])',
-    summary: 'Pick one of a list, using the seeded generator — so a "random" patch replays. With `weights`, the chance of each is its weight over the total; a missing or negative weight counts as zero, and all-zero weights fall back to an even pick. Exactly one number is drawn from the generator either way, so adding weights does not change what everything after it picks.' },
+    summary: 'Pick one entry from a list, using the seeded generator. With `weights`, each entry\'s chance is its weight over the total; a missing or negative weight counts as zero, and all-zero weights fall back to an even pick. Exactly one number is drawn either way, so adding weights does not shift later draws.' },
   { id: 'dbToGain', category: 'Value / range', signature: 'dbToGain(db)',
-    summary: 'Decibels to a linear gain: 0 dB is 1, -6 dB is about 0.5. Neither Lua nor JavaScript has it, and a level control that reads in dB and sends a linear value needs it on every move.' },
+    summary: 'Convert decibels to linear gain: 0 dB is 1, -6 dB is about 0.5.' },
   { id: 'gainToDb', category: 'Value / range', signature: 'gainToDb(gain)',
-    summary: 'The inverse. A gain of zero or less returns -144 dB — the 24-bit noise floor — rather than negative infinity, which is a number half the runtimes cannot carry through a value and none can display.' },
+    summary: 'Convert linear gain to decibels. A gain of zero or less returns -144 dB (the 24-bit noise floor) rather than negative infinity.' },
 
   // --- the rest of the arithmetic a synth panel actually does (design doc §32) ---
   // Nothing here duplicates the language's own scalar maths — min/max/abs/floor/ceil/sin all exist
@@ -3296,52 +3296,52 @@ export const HELPERS = [
   // domain-specific, list-shaped (Lua's varargs make the language version unusable over a table),
   // or has to be identical in five runtimes to be worth anything.
   { id: 'norm', category: 'Value / range', signature: 'norm(v, lo, hi)',
-    summary: 'A value to its 0–1 position in a range, clamped. scale(v, lo, hi, 0, 1) is the hand-rolled version and it does not clamp, so a value past the end came out past 1 and stayed wrong all the way down the chain. The value model already has a .normalizedValue face; this is that conversion for numbers a script is holding itself.' },
+    summary: 'Convert a value to its 0–1 position in a range, clamped at both ends.' },
   { id: 'denorm', category: 'Value / range', signature: 'denorm(t, lo, hi)',
-    summary: 'The inverse: a 0–1 position back into a range, clamped at both ends.' },
+    summary: 'Convert a 0–1 position back into a range, clamped at both ends.' },
   { id: 'bipolar', category: 'Value / range', signature: 'bipolar(t)',
-    summary: '0–1 to -1..+1. The two shapes a modulation source is ever in, and the conversion sits in the middle of every modulation script.' },
+    summary: 'Convert 0–1 to -1..+1.' },
   { id: 'unipolar', category: 'Value / range', signature: 'unipolar(v)',
-    summary: '-1..+1 back to 0–1.' },
+    summary: 'Convert -1..+1 to 0–1.' },
   { id: 'fold', category: 'Value / range', signature: 'fold(v, lo, hi)',
-    summary: 'Come back off the end of a range instead of round it. wrap() jumps from the top to the bottom, which is right for a pitch class and wrong for a modulation depth — a fold reflects, so the movement stays continuous. Wave folding is the audible version of the same idea, and neither is expressible with the language\'s %.' },
+    summary: 'Reflect a value off the ends of a range: where wrap() jumps from top to bottom, fold keeps the movement continuous. Right for modulation depths where wrap() suits pitch classes.' },
   { id: 'indexOfRange', category: 'Value / range', signature: 'indexOfRange(t, count)',
-    summary: 'A 0–1 position to one of `count` slots, zero-based — which preset, which step, which pad. The hand-rolled floor(t * count) returns `count` itself at exactly 1.0, one past the end of the list it is addressing, and that off-by-one only appears when a knob is turned fully up.' },
+    summary: 'Convert a 0–1 position to a zero-based index over `count` slots. At exactly 1.0 it returns count - 1, not `count`.' },
   { id: 'crossfade', category: 'Value / range', signature: 'crossfade(a, b, t [, law])',
-    summary: 'Blend a to b with a fade law: "linear", "equalPower" or "sharp" — the same three the Crossfader component has, which a script could not compute. equalPower is the one that matters: a linear fade between two sounds dips in the middle, audibly, which is why the component defaults away from it.' },
+    summary: 'Blend a to b with a fade law: "linear", "equalPower" or "sharp" — the same three as the Crossfader component. A linear fade between two sounds dips audibly in the middle; equalPower does not.' },
   { id: 'approach', category: 'Value / range', signature: 'approach(current, target, maxStep)',
-    summary: 'Move toward a target, no further than maxStep in one call. A rate limit with no state of its own, so it works from any handler without the script keeping a timer — ce.anim owns motion the runtime drives, this is the one a script drives itself, per incoming message. How you smooth a jumpy expression pedal.' },
+    summary: 'Move current toward target, no further than maxStep in one call. Stateless — works from any handler without the script keeping a timer.' },
   { id: 'roundTo', category: 'Value / range', signature: 'roundTo(v, decimals)',
-    summary: 'Round to a number of decimal places, for a readout. JavaScript\'s toFixed returns a string and Lua has no equivalent at all, so every panel showing a tidy number wrote this itself.' },
+    summary: 'Round to a number of decimal places. Returns a number, not a string.' },
   { id: 'almost', category: 'Value / range', signature: 'almost(a, b [, epsilon])',
-    summary: 'Float comparison that means what == is assumed to mean. A panel compares values constantly — has this reached its target, is this at the detent — and every one of those values arrived through a scale() or a curve().' },
+    summary: 'Float equality within `epsilon`. Use instead of == on values that have passed through scale() or curve().' },
   { id: 'minOf', category: 'Value / range', signature: 'minOf(values)',
-    summary: 'The smallest in a list, or nil for an empty one. Lua\'s math.min takes varargs, so over a table it needs table.unpack and falls over on a long one; JavaScript needs a spread with the same limit. A panel deals in lists constantly — macro slots, matrix rows, envelope points, the values out of a dump.' },
+    summary: 'The smallest in a list, or nil for an empty one.' },
   { id: 'maxOf', category: 'Value / range', signature: 'maxOf(values)', summary: 'The largest in a list, or nil for an empty one.' },
-  { id: 'sumOf', category: 'Value / range', signature: 'sumOf(values)', summary: 'The total of a list. Zero for an empty one — a sum of nothing is nothing, not an absence.' },
-  { id: 'meanOf', category: 'Value / range', signature: 'meanOf(values)', summary: 'The average of a list, or nil for an empty one — unlike a sum, an average of nothing does not exist.' },
+  { id: 'sumOf', category: 'Value / range', signature: 'sumOf(values)', summary: 'The total of a list; 0 for an empty one.' },
+  { id: 'meanOf', category: 'Value / range', signature: 'meanOf(values)', summary: 'The average of a list, or nil for an empty one.' },
   // `a, b` said nothing about these being LISTS, and with no return annotation the signature read
   // like lerp's. Passing two numbers returns an empty list, which is correct and baffling.
   { id: 'blend', category: 'Value / range', signature: 'blend(fromList, toList, t) -> list',
-    summary: 'Morph one list of values into another, element by element — which is what a snapshot morph is, and a script could only do it one value at a time. Both arguments are lists: for two single numbers you want lerp. The shorter list decides the length: padding with zeros would drag the missing entries to nothing, and on a patch that is a set of parameters slammed to their minimum.' },
+    summary: 'Interpolate one list of values into another, element by element. Both arguments are lists — for two single numbers use lerp. The shorter list decides the result length; missing entries are dropped, not padded with zeros.' },
   { id: 'randomFloat', category: 'Value / range', signature: 'randomFloat(lo, hi)',
-    summary: 'A seeded random float in a range. random(lo, hi) returns whole numbers — the form a note or a step wants — so until now there was no seeded way to get a fractional one without doing the arithmetic by hand.' },
+    summary: 'A seeded random float in a range. random(lo, hi) returns whole numbers; this returns fractional ones.' },
   { id: 'randomGaussian', category: 'Value / range', signature: 'randomGaussian([mean, sd])',
-    summary: 'A bell rather than a slab: most values near the middle. Humanising velocity or timing with a uniform random is the thing that sounds mechanical. Box-Muller, always consuming exactly two draws — it deliberately does not cache the second value the way the textbook version does, because a varying draw count would break seed replay.' },
+    summary: 'A seeded normally distributed random value, most results near `mean`. Always consumes exactly two draws from the generator, so seed replay stays stable.' },
   { id: 'randomWalk', category: 'Value / range', signature: 'randomWalk(current, step, lo, hi)',
-    summary: 'Drift rather than jump — a generative line that stays musical. Folded at the ends rather than clamped, because a walk that clamps sticks to the end it hit and stops moving.' },
+    summary: 'One step of a seeded random walk: drift from `current` by up to `step`. Folded at lo and hi rather than clamped, so the walk does not stick at the ends.' },
   { id: 'randomBool', category: 'Value / range', signature: 'randomBool([chance])',
-    summary: 'A weighted coin — the probability gate every step sequencer wants. `chance` is the odds of true, 0.5 by default.' },
+    summary: 'A seeded weighted coin. `chance` is the probability of true, 0.5 by default.' },
   { id: 'shuffle', category: 'Value / range', signature: 'shuffle(values)',
-    summary: 'A new list in seeded random order (Fisher-Yates, exactly one draw per element after the first). The same seed shuffles the same way, which is what makes a shuffled pattern something you can get back.' },
+    summary: 'A new list in seeded random order (Fisher-Yates, exactly one draw per element after the first). The same seed shuffles the same way.' },
   { id: 'toDegrees', category: 'Value / range', signature: 'toDegrees(radians)', summary: 'Radians to degrees — the unit ce.draw\'s arcs are in.' },
   { id: 'toRadians', category: 'Value / range', signature: 'toRadians(degrees)', summary: 'Degrees to radians — the unit the language\'s trigonometry is in.' },
   { id: 'distance', category: 'Value / range', signature: 'distance(x1, y1, x2, y2)',
     summary: 'The distance between two points. For XY pads, joysticks, the Orbit and hit testing in ce.draw.' },
   { id: 'angleOf', category: 'Value / range', signature: 'angleOf(x1, y1, x2, y2)',
-    summary: 'The angle from one point to another in ce.draw\'s own convention: degrees, 0 at twelve o\'clock, increasing clockwise, 0–360. Rebuilding that from atan2 by hand is where a knob pointer ends up running backwards or a quadrant out.' },
+    summary: 'The angle from one point to another in ce.draw\'s convention: degrees, 0 at twelve o\'clock, increasing clockwise, 0–360.' },
   { id: 'polar', category: 'Value / range', signature: 'polar(angle, radius)',
-    summary: 'The inverse: an angle and a radius to { x, y } offsets from a centre, in the same convention. Together with angleOf, what a knob ring, a radial meter or a pan indicator is drawn from.' },
+    summary: 'Convert an angle and radius to { x, y } offsets from a centre, in the same convention as angleOf.' },
 
   // --- the transforms the Properties panel itself applies (design doc §33) ---
   // The panel does not only store constants; it CONFIGURES value transforms — a Macro slot's
@@ -3351,41 +3351,41 @@ export const HELPERS = [
   // anything it worked out alongside a bound control came out subtly different. These are the
   // app's own functions, matched exactly.
   { id: 'shapeCurve', category: 'Value / range', signature: 'shapeCurve(v, curve [, tension])',
-    summary: 'Bend a value the way the panel itself bends one — the curve an Envelope segment or a Router breakpoint uses. This is not the same as curve(), which is a simpler and older set of shapes, so a curve name read straight out of a control belongs here rather than there. Both spellings of the s-curve are accepted. `tension` defaults to 1.6 rather than 0, matching the app: leaving it unset does not give you a straight line. With `tension` set to 1 this is also the curve a Macro slot uses, so shape(v, curve, 1) reproduces the third of the app\'s three curve families — the one nothing else names.' },
+    summary: 'Bend a value with the panel\'s own curve family — the one Envelope segments and Router breakpoints use, distinct from curve(). Both spellings of the s-curve are accepted. `tension` defaults to 1.6, matching the app — unset does not mean linear. With `tension` set to 1 this is also the curve a Macro slot uses.' },
   { id: 'deadzone', category: 'Value / range', signature: 'deadzone(v, amount [, invert])',
-    summary: 'The Expression Router\'s input shaping: below the threshold the value is zero, and the remaining range rescales to fill 0–1 so response starts right at the edge of the dead zone. The rescale is the part a hand-rolled version leaves out, and leaving it out loses the top of the range.' },
+    summary: 'The Expression Router\'s input shaping: below the threshold the value is zero, and the remaining range rescales to fill 0–1 so response starts at the edge of the dead zone.' },
   { id: 'weightsFor', category: 'Value / range', signature: 'weightsFor(points, x, y [, power])',
-    summary: 'The inverse-distance blend weights a Timbre Space and a Preset Constellation use, normalised so they sum to 1. `power` is the blend sharpness — higher means the nearest anchor dominates sooner. Pair with blendBy() to morph a set of values the way the pad does.' },
+    summary: 'The inverse-distance blend weights a Timbre Space and a Preset Constellation use, normalised to sum to 1. `power` is the blend sharpness — higher makes the nearest anchor dominate sooner. Pair with blendBy() to morph values.' },
   { id: 'blendBy', category: 'Value / range', signature: 'blendBy(values, weights)',
-    summary: 'A weighted average — what weightsFor() is for, and what a morph pad is. blend() interpolates two lists; this collapses many values by weight.' },
+    summary: 'A weighted average: collapse `values` by `weights`, as a morph pad does. blend() interpolates two lists; this blends many values into one.' },
   { id: 'tickStops', category: 'Value / range', signature: 'tickStops(major [, minor])',
-    summary: 'The 0–1 stop positions a slider\'s scale is drawn from, as { major, minor }. Use these when you are drawing your own scale, so your minor ticks line up with the ones the app draws beside them rather than being visibly out of step.' },
+    summary: 'The 0–1 stop positions a slider\'s scale is drawn from, as { major, minor }. Use when drawing your own scale so its ticks line up with the app\'s.' },
   { id: 'dbPosition', category: 'Value / range', signature: 'dbPosition(fraction [, floorDb, ceilDb])',
-    summary: 'Where a level sits on a dB meter, 0–1. gainToDb answers "how many dB is this"; this answers "how far up the meter does it go", which is the question a script drawing a meter is asking. Defaults match the Meter component: floor -60, ceiling +6.' },
+    summary: 'The 0–1 position of a level on a dB meter. Defaults match the Meter component: floor -60, ceiling +6.' },
 
   // --- taming what arrives on the wire (design doc §34) ---
   // A controller does not send tidy numbers. It sends a value that jitters, crosses a threshold
   // repeatedly, spikes once, and has already been through a taper. These four are what a script
   // needs to make that usable, and none of them composes out of what was already here.
   { id: 'smooth', category: 'Value / range', signature: 'smooth(current, target, coefficient [, epsilon])',
-    summary: 'Smooth out a jumpy value — a twitchy expression pedal, a noisy CC. It moves quickly at first and then eases in, which is the response you want for that. Different from approach(), which moves a fixed amount each time and is really a speed limit. The important part is that it arrives: smoothing like this gets closer and closer forever, so a value smoothed by hand ends up sitting at 0.9999 and transmitting for ever. This one snaps to the target once it is close enough.' },
+    summary: 'Exponential smoothing toward a target — fast at first, easing as it closes. Snaps to the target once within `epsilon`, so the value arrives rather than approaching forever. approach() is the fixed-step alternative.' },
   { id: 'hysteresis', category: 'Value / range', signature: 'hysteresis(value, on, low, high)',
-    summary: 'A Schmitt trigger: turns on at `high`, off at `low`, and holds in between. `on` is the state it is in now, and the return is the state it should be. A plain threshold chatters — a CC hovering on the line flips a switch dozens of times a second, which on a bound control is dozens of MIDI messages a second. Two thresholds plus the current state is the fix, and nothing else in the module composes to it.' },
+    summary: 'A Schmitt trigger: turns on at `high`, off at `low`, and holds in between. `on` is the current state; the return is the new one. Two thresholds keep a value hovering on a line from flipping the state repeatedly.' },
   { id: 'median', category: 'Value / range', signature: 'median(values)',
-    summary: 'The middle value of a list, or the mean of the two middle ones; nil for an empty list. Distinct from mean() and the reason is the point: a mean smears a spike across the result, a median rejects it. On a noisy controller reading that is the difference between a glitch you can hear and one you cannot.' },
+    summary: 'The middle value of a list, or the mean of the two middle ones; nil for an empty list. Unlike a mean, a median rejects a single spike.' },
   { id: 'euclid', category: 'Value / range', signature: 'euclid(steps, pulses [, rotation])',
-    summary: 'A Euclidean rhythm: `pulses` hits spread as evenly as they will go across `steps`, handed back as a list of yes/no. This is the same working-out the Arpeggiator uses for its rest pattern, so a sequencer or gate you write yourself lands on the same rhythm rather than an approximation of it. `rotation` turns the whole pattern round without changing the spacing between hits.' },
+    summary: 'A Euclidean rhythm: `pulses` hits spread as evenly as possible across `steps`, returned as a list of yes/no — the same algorithm as the Arpeggiator\'s rest pattern. `rotation` rotates the pattern without changing the spacing between hits.' },
   { id: 'unshape', category: 'Value / range', signature: 'unshape(y, curve [, tension])',
-    summary: 'The inverse of shape(). Going device → panel through a taper needs it: a value shaped on the way out has to be un-shaped on the way back, or the control lands somewhere other than where it started. Only map() is invertible by hand — swap x and y — while a named curve is not. `hold` is a step, so many inputs give the same output and there is no true inverse; it returns the earliest input that produces the output, which is the only answer that is a function.' },
+    summary: 'The inverse of shape(): un-taper a value shaped on the way out. `hold` is a step with no true inverse; it returns the earliest input that produces the output.' },
   // Seeded, and seeded is the point: the language's own math.random cannot promise the same
   // sequence in five runtimes, so a randomised patch could not be reproduced and a generative
   // sequence would sound different in the editor and in the exported plugin.
   { id: 'random', category: 'Value / range', signature: 'random([lo, hi])',
-    summary: 'A random number. With no arguments, a float in [0, 1). With two, a whole number from lo to hi inclusive — the form a script actually wants for a note or a step. Seeded, so the same seed replays the same sequence in every runtime.' },
+    summary: 'A seeded random number. With no arguments, a float in [0, 1). With two, a whole number from lo to hi inclusive. The same seed replays the same sequence in every runtime.' },
   { id: 'randomSeed', category: 'Value / range', signature: 'randomSeed(n)',
-    summary: 'Set the seed of the generator this script is drawing from. The same seed replays the same sequence — which is what makes a "random" patch something you can get back. Reseeding with 0 is treated as the default seed rather than as a dead generator. Seeds one generator: every script has its own, and inside a script every named stream has its own, so this cannot reach into somebody else\'s sequence.' },
+    summary: 'Set the seed of this script\'s generator; the same seed replays the same sequence. Reseeding with 0 uses the default seed. Every script has its own generator, and every named stream its own, so this never reaches another script\'s sequence.' },
   { id: 'randomStream', category: 'Value / range', signature: 'randomStream(name, fn)',
-    summary: 'Give a run of random draws their own private sequence, so two generative parts of one script do not tread on each other — shuffling in one leaves what the other gets alone, and so does seeding it. Normal behaviour returns when the block ends, even if something goes wrong inside it. Each script\'s streams are its own, so two scripts using the same name still do not share one.' },
+    summary: 'Run `fn` with random draws taken from a private named sequence, so two generative parts of one script do not affect each other\'s draws or seeds. The normal generator returns when the block ends, even on error. Streams are per script — two scripts using the same name do not share one.' },
   // music
   // Middle C is C4 — scientific pitch notation, which is what every runtime has always computed.
   // These summaries said "C3" (the Yamaha convention) from the start, so the docs and the code
@@ -3393,7 +3393,7 @@ export const HELPERS = [
   // semitones. The code is right and stays; the wording is what was wrong.
   {
     id: 'noteName', category: 'Music', signature: 'noteName(n [, flats])',
-    summary: 'MIDI note number → name, e.g. 60 → "C4" (middle C). With `flats` omitted you get this module\'s plain-ASCII spelling ("C#4") — what noteNumber has always round-tripped. Pass `flats` and you get the panel\'s spelling instead, from the same table the Chord Pad, Harmoniser and Arpeggiator print from: true → "E♭4", false → "C♯4". `ce.music.spelling` answers which one a key wants.',
+    summary: 'MIDI note number → name: 60 → "C4" (middle C). With `flats` omitted, the plain-ASCII spelling ("C#4"), which noteNumber round-trips. With `flats` given, the panel\'s spelling: true → "E♭4", false → "C♯4". `ce.music.spelling` answers which a key wants.',
     params: [
       { name: 'n', type: 'number', required: true },
       { name: 'flats', type: 'boolean', required: false },
@@ -3401,7 +3401,7 @@ export const HELPERS = [
   },
   {
     id: 'noteNumber', category: 'Music', signature: 'noteNumber(name) -> number',
-    summary: 'Note name → MIDI number, e.g. "C4" → 60. Middle C is C4. Reads all four spellings — "C#4", "C♯4", "Db4", "D♭4" — so a name the panel printed can be read back. A name it cannot read returns nothing: 0 is a real note (C-1), so returning it for a misspelling meant a typo played a wrong note in silence.',
+    summary: 'Note name → MIDI number: "C4" → 60 (middle C is C4). Reads all four spellings — "C#4", "C♯4", "Db4", "D♭4". A name it cannot read returns nothing, not 0 — 0 is a real note (C-1).',
     params: [{ name: 'name', type: 'string', required: true }],
   },
   // Scales, chords and quantise-to-scale — what §2 defined ce.music as, finished. The interval
@@ -3410,7 +3410,7 @@ export const HELPERS = [
   // every prelude. `root` and `note` accept a MIDI number or a name ("C4"), like sendNote does.
   {
     id: 'scaleNotes', category: 'Music', signature: 'scaleNotes(root [, scale]) -> list',
-    summary: 'The notes of one octave of a scale, ascending from `root`. Seven notes for the modes, five for the pentatonics, six for blues — the root is not repeated at the top. `scale` defaults to "major"; an unknown name returns nothing rather than guessing.',
+    summary: 'One octave of a scale, ascending from `root` — seven notes for the modes, five for the pentatonics, six for blues; the root is not repeated at the top. `scale` defaults to "major"; an unknown name returns nothing.',
     params: [
       { name: 'root', type: 'value', required: true },
       { name: 'scale', type: 'string', required: false },
@@ -3426,7 +3426,7 @@ export const HELPERS = [
   },
   {
     id: 'quantizeNote', category: 'Music', signature: 'quantizeNote(note, root [, scale]) -> number',
-    summary: 'Snap a note to the nearest one in a scale, searching both directions. A tie goes up, always, so two runtimes cannot disagree about a note exactly between two scale tones. `scale` defaults to "major"; an unknown name returns nothing.',
+    summary: 'Snap a note to the nearest one in a scale, searching both directions; a tie goes up. `scale` defaults to "major"; an unknown name returns nothing.',
     params: [
       { name: 'note', type: 'value', required: true },
       { name: 'root', type: 'value', required: true },
@@ -3440,7 +3440,7 @@ export const HELPERS = [
   // Chord Pad labelling the same chord have to agree, or the panel contradicts itself on screen.
   {
     id: 'noteSpelling', category: 'Music', signature: 'noteSpelling(root [, scale]) -> boolean',
-    summary: 'Does this key write its accidentals as flats? F, B♭, E♭, A♭, D♭ and G♭ do — judged by the relative major, so C minor spells E♭/A♭ rather than D♯/G♯, exactly as the Chord Pad does. Pass the answer to noteName and a script\'s labels match the panel\'s without having to decide anything. An unknown scale returns nothing.',
+    summary: 'Whether a key writes its accidentals as flats — F, B♭, E♭, A♭, D♭ and G♭ do. Judged by the relative major, so C minor spells E♭/A♭ rather than D♯/G♯. Pass the result to noteName to match the panel\'s labels. An unknown scale returns nothing.',
     params: [
       { name: 'root', type: 'value', required: true },
       { name: 'scale', type: 'string', required: false },
@@ -3448,7 +3448,7 @@ export const HELPERS = [
   },
   {
     id: 'inScale', category: 'Music', signature: 'inScale(note, root [, scale]) -> boolean',
-    summary: 'Is this note in the key? Octave-blind, like every key question — C2 and C5 are both the tonic of C. `scale` defaults to "major"; an unknown name returns nothing.',
+    summary: 'Whether a note is in the key, octave-blind — C2 and C5 are both the tonic of C. `scale` defaults to "major"; an unknown name returns nothing.',
     params: [
       { name: 'note', type: 'value', required: true },
       { name: 'root', type: 'value', required: true },
@@ -3457,7 +3457,7 @@ export const HELPERS = [
   },
   {
     id: 'scaleDegree', category: 'Music', signature: 'scaleDegree(note, root [, scale]) -> number',
-    summary: 'Which degree of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key has no degree and returns nothing rather than the nearest one — rounding here is what turns a wrong note into a plausible chord, and quantizeNote is the verb that rounds on purpose.',
+    summary: 'The degree of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key returns nothing rather than the nearest degree; use quantizeNote to round to the key on purpose.',
     params: [
       { name: 'note', type: 'value', required: true },
       { name: 'root', type: 'value', required: true },
@@ -3466,7 +3466,7 @@ export const HELPERS = [
   },
   {
     id: 'degreeChord', category: 'Music', signature: 'degreeChord(root, scale, degree [, size]) -> table',
-    summary: 'Which chord a key builds on a given degree — the same working-out the Chord Pad does. Degrees start at 1, so degreeChord(60, "major", 5) is the chord on the fifth. `size` is how many notes: 3 for a triad, 4 for a seventh. You get back the notes, the chord spelled the way the key spells it ("E♭m7") and its roman numeral. Use this when you want the chord a key implies; use chordNotes when you already know which chord you want.',
+    summary: 'The chord a key builds on a degree. Degrees start at 1, so degreeChord(60, "major", 5) is the chord on the fifth; `size` is the note count — 3 for a triad, 4 for a seventh. Returns the notes, the chord name spelled as the key spells it ("E♭m7") and its roman numeral. For a chord you already know, use chordNotes.',
     params: [
       { name: 'root', type: 'value', required: true },
       { name: 'scale', type: 'string', required: true },
@@ -3476,12 +3476,12 @@ export const HELPERS = [
   },
   {
     id: 'chordQuality', category: 'Music', signature: 'chordQuality(notes) -> string',
-    summary: 'Name a chord from the notes in it: [60, 63, 70] → "min7". Reads intervals above the lowest note, so it takes a chord from chordNotes, from degreeChord, or one a script built by hand — the inverse of chordNotes. The vocabulary is the panel\'s (maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7, m7b5), so a chord this names and a chord the Chord Pad labels agree.',
+    summary: 'Name a chord from its notes: [60, 63, 70] → "min7". Reads intervals above the lowest note — the inverse of chordNotes. Vocabulary: maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7, m7b5 — the same names the Chord Pad uses.',
     params: [{ name: 'notes', type: 'list', required: true }],
   },
   {
     id: 'voiceLead', category: 'Music', signature: 'voiceLead(notes, previous [, mode]) -> list',
-    summary: 'Rearrange a chord so it moves as little as possible from the one before it — the Harmoniser\'s voice leading, available to any script that sends chords. "closest" keeps every note as close as it can; "smooth" holds the top note still, which keeps a melody in place while the notes underneath move; "off" gives you root position. With no previous chord there is nothing to move away from, so the first chord of a phrase comes back untouched.',
+    summary: 'Rearrange a chord to move as little as possible from the one before it — the Harmoniser\'s voice leading. "closest" keeps every note as close as it can; "smooth" holds the top note still; "off" gives root position. With no previous chord, the notes come back untouched.',
     params: [
       { name: 'notes', type: 'list', required: true },
       { name: 'previous', type: 'list', required: true },
@@ -3490,7 +3490,7 @@ export const HELPERS = [
   },
   {
     id: 'expandOctaves', category: 'Music', signature: 'expandOctaves(notes [, octaves]) -> list',
-    summary: 'The same note set repeated up over `octaves` octaves (1..4), ascending — the Arpeggiator\'s own expansion, the step before arpOrder. Anything that would land above 127 is dropped rather than clamped: clamping stacks strays on one pitch, which sounds like a stuck key rather than like nothing.',
+    summary: 'Repeat a note set upward over `octaves` octaves (1..4), ascending — the Arpeggiator\'s own expansion, the step before arpOrder. Notes that would land above 127 are dropped, not clamped.',
     params: [
       { name: 'notes', type: 'list', required: true },
       { name: 'octaves', type: 'number', required: false },
@@ -3498,7 +3498,7 @@ export const HELPERS = [
   },
   {
     id: 'arpOrder', category: 'Music', signature: 'arpOrder(notes, pattern) -> list',
-    summary: 'The order an arpeggiator pattern plays notes in, as a list of steps — each step being a list of notes, so "chord" (everything at once) comes back the same shape as the rest. The patterns are up, down, updown, downup, asPlayed, random and chord. Notes are used in the order you give them, which is what makes "asPlayed" meaningful; sort them first if you want a rising run. "updown" and "downup" do not play the turning points twice. "random" hands the notes back in the order given, exactly as the panel\'s arpeggiator does, because it picks its step as it plays; for a shuffled order use ce.math.shuffle.',
+    summary: 'The step order an arpeggiator pattern plays, as a list of steps — each step a list of notes, so "chord" comes back the same shape as the rest. Patterns: up, down, updown, downup, asPlayed, random, chord. Notes are used in the order given — sort them first for a rising run. "updown" and "downup" do not play the turning points twice. "random" returns the notes in the order given, as the panel\'s arpeggiator does — it picks its step as it plays; use ce.math.shuffle for a shuffled order.',
     params: [
       { name: 'notes', type: 'list', required: true },
       { name: 'pattern', type: 'string', required: true },
@@ -3567,20 +3567,19 @@ export const MODULE_GROUPS = [
     blurb: 'Always available, in every script.',
     modules: ['ce.core'] },
   { id: 'sound', label: 'Notes, MIDI and time',
-    blurb: 'Talking to the instrument, and doing it in time with the music.',
+    blurb: 'MIDI in and out, the connected device, music theory, and musical time.',
     modules: ['ce.midi', 'ce.device', 'ce.music', 'ce.time'] },
   { id: 'numbers', label: 'Working out values',
-    blurb: 'Arithmetic on values and ranges, and moving a value over time instead of jumping it.',
+    blurb: 'Value and range arithmetic, and moving a value over time.',
     modules: ['ce.math', 'ce.anim'] },
   { id: 'panel', label: 'The panel itself',
-    blurb: 'Building and arranging controls, and remembering things between sessions.',
+    blurb: 'Creating and arranging controls, and state that persists between sessions.',
     modules: ['ce.panel', 'ce.storage'] },
   { id: 'appearance', label: 'How it looks',
-    blurb: 'Drawing, images, type, and talking to whoever is using the panel.',
+    blurb: 'Drawing, images, typography, and dialogs with the user.',
     modules: ['ce.draw', 'ce.image', 'ce.text', 'ce.ui'] },
   { id: 'components', label: 'Components',
-    blurb: 'One module per interactive component. Each takes the control\'s name first, and every '
-      + 'verb reports whether the component now holds what you asked for.',
+    blurb: 'One module per interactive component. Each verb takes the control\'s name first and reports whether the component now holds what you asked for.',
     componentGroups: true },
 ];
 
@@ -3626,42 +3625,42 @@ export const MODULES = [
   // which is precisely the hanging this closed. The prelude-dependency test caught it the moment
   // the call appeared, which is the drift that rule exists to stop.
   { id: 'ce.device', version: '1.3', requires: ['ce.core', 'ce.time'], runtime: RUNTIME_ANY,
-    summary: 'The connected synth: what it is, what parameters it has, reading and setting one, and bulk dumps — plus declaring a parameter, a dump layout or a binding for a synth the app has no profile for, and enumerating the ports that are really there. Needs the device host.' },
+    summary: 'The connected synth: identity, parameters, reading and setting them, and bulk dumps — plus declaring parameters, dump layouts and bindings for a synth the app has no profile for, and enumerating available ports. Needs the device host.' },
   // requires ce.core because curve() now REPORTS a shape it does not know instead of silently
   // returning the input, and reporting is log(). ce.core is global and never gated, so the
   // dependency costs nothing at runtime — but it is a real call and the prelude-dependency test
   // is right to want it declared.
   { id: 'ce.math', version: '1.8', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels, colour — plus a seeded random you can pick from. Pure: no host involved.' },
+    summary: 'Value and range arithmetic: wrapping, curves, list snapping, decibels, colour, and seeded random. Pure — no host involved.' },
   { id: 'ce.music', version: '1.2', requires: [], runtime: RUNTIME_ANY,
-    summary: 'Note names and numbers, scales, chords, and snapping a note to a key — plus what a key implies: which degree a note is, the chord built on a degree and its numeral, how a key spells its accidentals, and the Harmoniser\'s and Arpeggiator\'s own voicing and walk.' },
+    summary: 'Note names and numbers, scales, chords, snapping a note to a key, key spelling, scale degrees and degree chords, chord naming, voice leading, and arpeggio expansion and ordering.' },
   { id: 'ce.time', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain, one-shot or beat-synced — plus the transport\'s own grid: note divisions, bar/beat at any position, the steps between two readings, swing, cycles, loop folding and tempo from taps or clock pulses. And a monotonic clock, because there was none.' },
+    summary: 'Musical time: tempo, transport position, beat/bar events, timers (plain, one-shot or beat-synced), note divisions, bar/beat at any position, steps between readings, swing, cycles, loop folding, tempo from taps or clock pulses, and a monotonic clock.' },
   // requires ce.math because envelope() drives the value through ce.math.map — one lookup, shared
   // with the Envelope component — and ce.time because `beats` and `sync` are the transport's.
   { id: 'ce.anim', version: '1.1', requires: ['ce.core', 'ce.math', 'ce.time'], runtime: RUNTIME_ANY,
-    summary: 'Move a value over time instead of jumping it: to a destination, with a spring, or through a shape you draw — delayed, staggered, repeating, tempo-synced, and telling you when it is done. Cross-runtime: a sweep has to work with the panel shut too.' },
+    summary: 'Move a value over time: to a destination, with a spring, or through a drawn shape — delayed, staggered, repeating, tempo-synced, with completion callbacks. Cross-runtime: works with the panel shut.' },
   { id: 'ce.ui', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Tell the person using the panel something, take it back, or replace it; ask them a question — a choice, a line of text, or a pick from a list; and put something on their clipboard. Panel view only — there is nobody to tell, ask or copy for with the window shut.' },
+    summary: 'Notifications (show, retract, replace), questions — a choice, a line of text, or a pick from a list — and the clipboard. Panel view only.' },
   { id: 'ce.draw', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Draw on top of any control: scope traces, envelope shapes, XY pads, readouts. Gradients, dashes, opacity and transforms as well as flat shapes, plus the panel\'s own LCD font and a way to measure text. Panel view only — there is no surface with the window shut.' },
+    summary: 'Draw on top of any control: shapes, gradients, dashes, opacity and transforms, plus the panel\'s own LCD font and text measurement. Panel view only.' },
   // The first MIXED module. Its structure verbs are panel-view only and say so individually, but
   // snapshot/restore are not — so declaring the whole module unavailable window-closed would make
   // ce.has("ce.panel") tell a script to skip two verbs that work perfectly there. The per-member
   // stubs are what state the boundary precisely; the module says "some of this reaches you".
   { id: 'ce.panel', version: '1.4', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Build the panel from a script and arrange what is there: create, clone, parent and find controls, then align, distribute, match, order, grid or circle them — panel view only, each verb says so. snapshot/restore work anywhere.' },
+    summary: 'Create, clone, parent and find controls, then align, distribute, match, order, grid or circle them — panel view only, each verb says so. snapshot/restore work anywhere.' },
   { id: 'ce.storage', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Per-script scratch state, and settings that outlive the session — shared with the panel, private to one script, or kept on this machine only. Plus JSON, because one of the four runtimes has none.' },
+    summary: 'Per-script scratch state, and settings that outlive the session — shared with the panel, private to one script, or kept on this machine only. Plus JSON encode/decode.' },
   // Panel view only, and for a reason worth stating: the font catalogue is the editor's, and the
   // measuring is done on a canvas. A player host has neither, and a typography verb that answered
   // from a guess would be worse than one that says it is not there.
   // Panel view only, for the same reason ce.text is: the icon library and the file cache are the
   // editor's, and a verb that answered from a guess would be worse than one that says it is absent.
   { id: 'ce.image', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'The image layers a control carries — background image and overlay, text image and texture, and the Icon section — plus the icon library they can draw from. A Label has 102 image-related fields and a Knob 864; all were writable by path and none was named anywhere in this API. What this adds is knowing which assets exist, keeping the two activation models straight (background layers composite, text layers are exclusive), and being honest about which sources survive an export.' },
+    summary: 'The image layers a control carries — background image and overlay, text image and texture, and the Icon section — plus the icon library they draw from. Background layers composite; text layers are exclusive. Reports which image sources survive an export.' },
   { id: 'ce.text', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Typography as something a script can reason about: what fonts exist and what they support, style writes that keep weight consistent instead of half-applying it, variable axes, and measuring a control\'s own text in its own font so it can be fitted to its box. The fields were always reachable with set() — the rules around them were not.' },
+    summary: 'Typography: which fonts exist and what they support, style writes that keep weight consistent, variable axes, and measuring a control\'s text in its own font to fit it to its box.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Zone Splitter. Panel view only — the component is modelled there.' },
   { id: 'ce.components.phrase', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
