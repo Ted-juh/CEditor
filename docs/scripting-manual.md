@@ -1229,7 +1229,7 @@ Jump to the target and complete: the value lands exactly where the animation was
 
 #### `uiNotify(message [, opts])`
 
-Show a brief message to whoever is using the panel, and return its ID. `opts` may carry { kind ("info" | "warn" | "error"), duration (ms, default 3000; 0 or less means until dismissed) }. For "the patch loaded", not for debugging — log() is for debugging. The id is what makes the message addressable: ce.ui.update(id, …) replaces it in place and ce.ui.dismiss(id) takes it back, which together are how you show progress instead of stacking ten toasts.
+Show a brief message to the panel user and return its ID. `opts` may carry { kind ("info" | "warn" | "error"), duration (ms, default 3000; 0 or less means until dismissed) }. For user-facing events, not debugging — use log() for that. Pass the ID to ce.ui.update(id, …) to replace the message in place, or to ce.ui.dismiss(id) to remove it.
 
 ```lua
 -- Lua
@@ -1242,7 +1242,7 @@ ce.ui.notify("Patch loaded");
 
 #### `uiStatus([message] [, opts])`
 
-Put a line in the status bar and leave it there. No message clears it. Unlike notify this persists, so it suits a state ("Recording", "Synced") rather than an event. `opts` may carry { kind ("info" | "warn" | "error") }, the same vocabulary notify uses and for the same reason: a state can be a warning, and "Device not responding" in the same colour as "Ready" is a warning nobody sees. Read it back with ce.ui.state().
+Put a line in the status bar; it persists until replaced. No message clears it. Use for a state ("Recording", "Synced") rather than an event — notify is for events. `opts` may carry { kind ("info" | "warn" | "error") }. Read it back with ce.ui.state().
 
 ```lua
 -- Lua
@@ -1255,7 +1255,7 @@ ce.ui.status("Recording");
 
 #### `uiDialog(opts [, onChoice]) -> boolean`
 
-Ask a question with buttons. The answer arrives later than the call, so it comes back through `onChoice` rather than as a return value — it is given the label that was clicked, or nothing if the dialog was dismissed. What the call itself returns is whether a dialog appeared at all: false means there was nobody to ask, and your callback has already run with no answer. Only one dialog can be open at a time.
+Ask a question with buttons. The answer arrives asynchronously through `onChoice`, which receives the clicked label, or nothing if the dialog was dismissed. The call itself returns whether a dialog appeared: false means there was nobody to ask and the callback has already run with no answer. Only one dialog can be open at a time.
 
 ```lua
 -- Lua
@@ -1276,7 +1276,7 @@ ce.ui.dialog({ title: "Overwrite?", buttons: ["Overwrite", "Cancel"] }, function
 
 #### `uiPrompt(opts [, onAnswer]) -> boolean`
 
-Ask somebody to type something — naming a patch, say. The answer comes back through `onAnswer` as text, or as nothing if they cancelled. Those two are deliberately different: an empty answer is something a person might mean, and no answer is not. Enter accepts. Returns whether a dialog appeared; false means the callback has already run with no answer.
+Ask the user to type text. The answer comes back through `onAnswer` as text, or as nothing if they cancelled — an empty answer and no answer are distinct. Enter accepts. Returns whether a dialog appeared; false means the callback has already run with no answer.
 
 ```lua
 -- Lua
@@ -1293,7 +1293,7 @@ ce.ui.prompt({ title: "Name this patch", value: get("patchName") }, (name) => {
 
 #### `uiChoose(opts [, onAnswer]) -> boolean`
 
-Ask somebody to pick from a list — which is what you want past about three choices, where buttons stop working. The answer is the item they chose, a list of items if you allowed more than one, or nothing if they cancelled. A long list scrolls rather than growing, so forty presets cannot push the buttons off the screen.
+Ask the user to pick from a list. The answer is the chosen item, a list of items if `multiple` is set, or nothing if they cancelled. A long list scrolls rather than growing.
 
 ```lua
 -- Lua
@@ -1310,7 +1310,7 @@ ce.ui.choose({ title: "Load which preset?", items: names }, (pick) => {
 
 #### `uiDismiss([id]) -> number`
 
-Take a message back — the thing whoever is looking at it can already do by clicking it. With no id it clears every one, because "stop saying things" is a real request and making a script remember six ids to make it would be busywork. Returns how many went.
+Remove a message; the user can also do this by clicking it. With no id, clears every message. Returns how many were removed.
 
 ```lua
 -- Lua
@@ -1323,7 +1323,7 @@ ce.ui.dismiss(id);
 
 #### `uiUpdate(id, message [, opts]) -> boolean`
 
-Change a message that is already on screen, leaving it where it is. This is how you show progress: dismissing and showing a new one makes it flicker and jump to the bottom each time. Give the original message a duration of 0 so it stays put, then update it as you go. Returns false once that message has gone, which is how you learn it was dismissed by hand and you can stop.
+Change a message that is already on screen, in place. To show progress, give the original message a duration of 0 so it stays put, then update it as you go. Returns false once the message has gone — for example dismissed by hand — so you can stop updating.
 
 ```lua
 -- Lua
@@ -1340,7 +1340,7 @@ ce.ui.update(id, "Working… done");
 
 #### `uiState() -> table`
 
-What is on screen: { status, statusKind, notifications ([{ id, message, kind, sticky }]), dialog }. One read rather than three. It is also how you tell apart the two reasons dialog() can answer false — nobody to ask, or a dialog already open — which need completely different handling and otherwise look the same.
+Return what is on screen: { status, statusKind, notifications ([{ id, message, kind, sticky }]), dialog }. Use `dialog` to tell apart the two reasons dialog() can return false — nobody to ask, or a dialog already open.
 
 ```lua
 -- Lua
@@ -1353,7 +1353,7 @@ if (!ce.ui.state().dialog) {  }
 
 #### `uiCopy(text) -> boolean`
 
-Put text on the clipboard — a SysEx string, a patch name, a parameter table. The app does this in six places of its own and a script could not do it at all. The write is asynchronous and a browser may refuse it outright without a click behind it, so the return says the copy was attempted rather than that it landed; a refusal is reported to the console. There is deliberately no matching read: a script silently helping itself to whatever somebody last copied is not a panel's business.
+Put text on the clipboard. The write is asynchronous and a browser may refuse it without a user gesture: the return means the copy was attempted, and a refusal is reported to the console. There is no clipboard read.
 
 ```lua
 -- Lua
@@ -1368,7 +1368,7 @@ ce.ui.copy(bytesToHex(buildDump("patch")));
 
 #### `drawClear([target])`
 
-Throw away what was drawn on this control. The usual first line of onDraw, because a draw adds to the list rather than replacing it.
+Discard everything drawn on this control. Drawing commands accumulate rather than replace, so this is the usual first line of onDraw.
 
 ```lua
 -- Lua
@@ -1394,7 +1394,7 @@ ce.draw.fill("#5B9BD5");
 
 #### `drawStroke([colour] [, width] [, opts])`
 
-The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` carries { dash (a list of on/off lengths, the way every drawing API since PostScript spells it — the panel’s own beat marks are { 3, 3 }), dashOffset (how far into that pattern to start — advance it on a timer and the dash marches), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }.
+The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` carries { dash (a list of on/off lengths, e.g. { 3, 3 }), dashOffset (how far into that pattern to start), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }.
 
 ```lua
 -- Lua
@@ -1433,7 +1433,7 @@ ce.draw.circle(20, 20, 8);
 
 #### `drawLine(x1, y1, x2, y2)`
 
-A straight line. Stroke only — a line has no inside.
+A straight line. Stroke only; fill does not apply.
 
 ```lua
 -- Lua
@@ -1446,7 +1446,7 @@ ce.draw.line(0, 0, 100, 0);
 
 #### `drawPath(points [, closed])`
 
-A polyline through a flat list of coordinates — { x1, y1, x2, y2, ... }. This is the scope trace and the envelope shape. `closed` joins the last point back to the first.
+A polyline through a flat list of coordinates — { x1, y1, x2, y2, ... }. `closed` joins the last point back to the first.
 
 ```lua
 -- Lua
@@ -1466,7 +1466,7 @@ ce.draw.path(pts);
 
 #### `drawArc(x, y, radius, from, to)`
 
-An arc centred on (x, y). Angles are degrees with 0 at twelve o'clock, increasing clockwise — the way a knob's arc is described, and the same convention the Meter's arcStart/arcSweep use. Stroked with the current stroke; filled as a pie slice if a fill is set. The shape a knob ring, a radial meter or a pan indicator is, and the one thing path() could not express.
+An arc centred on (x, y). Angles are degrees with 0 at twelve o'clock, increasing clockwise — the same convention the Meter's arcStart/arcSweep use. Stroked with the current stroke; filled as a pie slice if a fill is set.
 
 ```lua
 -- Lua
@@ -1479,7 +1479,7 @@ ce.draw.arc(30, 30, 24, 135, 135 + 270 * value);
 
 #### `drawGradient(stops [, angle]) -> value`
 
-A gradient to use instead of a flat colour with fill() or stroke(). Give it a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place them yourself; you can mix the two and let the unplaced ones fall where they may. The angle is the panel's own — 0 is up, 90 is to the right, the same as the gradients in the Background section. Fewer than two usable colours gives you nothing back, since a gradient from one colour to nothing is just a colour.
+Build a gradient to use in place of a flat colour with fill() or stroke(). Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place them yourself; the two forms can be mixed. `angle` is 0 for up and 90 for right, the same as the Background section's gradients. Fewer than two usable colours returns nothing.
 
 ```lua
 -- Lua
@@ -1492,11 +1492,11 @@ ce.draw.fill(ce.draw.gradient(["#2A6BD4", "#0A1830"], 180));
 
 #### `drawOpacity(a)`
 
-How opaque everything drawn after this is, 0..1. Applies like fill and stroke do — to what follows, not to one shape — because the whole style model here is "what was in force when the command was issued". A value that is not a number clears it. This makes a drawing translucent; ce.math.alpha() makes a stored colour translucent, and they are different questions with different answers.
+Set the opacity for everything drawn after this, 0..1. Like fill and stroke, it applies to what follows, not to one shape. A value that is not a number clears it. To make a stored colour translucent instead, use ce.math.alpha().
 
 #### `drawTransform([opts])`
 
-Rotate, move or scale everything drawn after this. `opts` carries { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it. Without this a knob pointer means computing every corner with sin and cos by hand, and getting the centre wrong is the classic way a pointer ends up orbiting the wrong point.
+Rotate, move or scale everything drawn after this. `opts` carries { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it.
 
 ```lua
 -- Lua
@@ -1509,47 +1509,47 @@ ce.draw.transform({ rotate: 135, cx: w / 2, cy: h / 2 });
 
 #### `drawEllipse(cx, cy, rx, ry)`
 
-An ellipse. circle() only does round, and a meter cap, an XY cursor or a squashed glow is not round.
+An ellipse centred on (cx, cy), with horizontal radius rx and vertical radius ry.
 
 #### `drawPixelText(text, x, y [, scale])`
 
-Text in the app’s own 5x7 LCD font — the one the LCD components print with — so a readout a script draws and a readout the panel draws are the same letters. `scale` is a whole-number pixel size, 1 by default. Drawn literally, one square per lit pixel: it is a bitmap font, and rendering it smoothly would stop it being that font. (x, y) is the top-left, unlike text() whose y is the baseline — a grid font has no baseline to speak of.
+Text in the app’s built-in 5x7 LCD font, the same one the LCD components use. `scale` is a whole-number pixel size, 1 by default. Drawn one square per lit pixel, with no smoothing. (x, y) is the top-left corner, unlike text() whose y is the baseline.
 
 #### `drawMeasure(text [, opts]) -> table`
 
-How wide a string will be: { width, height, exact }. Nothing could ask before, so a box behind a label, a column of right-aligned numbers or a truncation had no way to be worked out. `opts` carries { size, family } for ordinary text, or { pixel = true, scale } for the LCD font. `exact` is the honest part: the pixel font is a grid and its answer is arithmetic, while a proportional font has to be measured — and with no surface to measure on this falls back to an estimate and says so, rather than returning a guess as though it were a fact.
+Measure a string before drawing it: returns { width, height, exact }. `opts` carries { size, family } for ordinary text, or { pixel = true, scale } for the LCD font. The pixel font is a fixed grid, so its answer is exact; a proportional font must be measured, and when no surface is available the result is an estimate with `exact` false.
 
 #### `drawBatch(fn) -> boolean`
 
-Send a run of drawing commands as a single update instead of one each. Worth reaching for whenever you are drawing in a loop — a waveform, a set of tick marks — where it is several times faster. The commands that already do a whole set at once (grid, lines, points) do not need it.
+Send a run of drawing commands as a single update instead of one each. Use it when drawing in a loop — a waveform, a set of tick marks — where it is several times faster. grid, lines and points already send a whole set at once and do not need it.
 
 #### `drawGrid([opts]) -> boolean`
 
-A whole lattice as one command and one path. `opts` may carry { x, y, width, height } (defaulting to the control's box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. Both forms exist because both are how you actually know it: a step sequencer knows it has 16 columns, a ruler knows it wants a line every 10 pixels. The closing line is drawn, so a 4-column grid has five verticals rather than a missing right edge.
+Draw a whole grid as one command and one path. `opts` may carry { x, y, width, height } (defaulting to the control's box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. The closing line is drawn, so a 4-column grid has five verticals.
 
 #### `drawLines(segments) -> boolean`
 
-Many disjoint line segments in one command — a list of [x1, y1, x2, y2]. drawPath already draws a connected run cheaply; this is for geometry that is not connected: tick marks, a vu ladder, a scatter of whiskers, a grid you are computing yourself. One command and one path instead of one of each per segment.
+Draw many disjoint line segments as one command — a list of [x1, y1, x2, y2]. For unconnected geometry: tick marks, a vu ladder, a grid you compute yourself. drawPath draws a connected run.
 
 #### `drawPoints(points [, radius]) -> boolean`
 
-A scatter of dots as one command — a list of [x, y], with `radius` defaulting to 1.5. The radius is the dot's own rather than the stroke width's, so a thin outline and a fat dot are independent.
+A scatter of dots as one command — a list of [x, y], with `radius` defaulting to 1.5. The radius is independent of the stroke width.
 
 #### `drawCurve(points [, opts]) -> boolean`
 
-A smooth curve through the given points, not merely near them — a Catmull-Rom spline emitted as cubic Béziers. One command for the whole curve, rather than a loop approximating it with short straight segments.
+A smooth curve through the given points — a Catmull-Rom spline emitted as cubic Béziers, in one command.
 
 #### `drawPolygon(cx, cy, radius, sides [, opts]) -> boolean`
 
-A regular polygon — hexagonal pads, a radar plot's frame, a triangle indicator. `opts.rotation` is in degrees with 0 at twelve o'clock, clockwise, the same convention drawArc uses, so a polygon and an arc drawn at the same angle line up. Fewer than three sides is raised to three.
+A regular polygon centred on (cx, cy). `opts.rotation` is in degrees with 0 at twelve o'clock, clockwise — the same convention drawArc uses, so a polygon and an arc at the same angle line up. Fewer than three sides is raised to three.
 
 #### `drawImage(src, x, y, w, h [, opts]) -> boolean`
 
-Draw an image. `src` must be something the renderer can load — a data URL, or a library icon's dataUrl from ce.image.asset(). A bare asset name is refused rather than accepted and drawn as nothing, which is the failure this verb is most likely to be handed. `opts.fit` is "fill" (stretch, the default), "contain" or "cover".
+Draw an image. `src` must be a data URL or a library icon's dataUrl from ce.image.asset(); a bare asset name is refused rather than drawn as nothing. `opts.fit` is "fill" (stretch, the default), "contain" or "cover".
 
 #### `drawClip([x, y, w, h]) -> boolean`
 
-Restrict everything drawn after this to a rectangle. Style, not a shape: it applies until changed, and save()/restore() put it back. No arguments clears it. This cannot be emulated — a script could previously only avoid drawing outside a region, never clip what it drew. The control's own bounds still clip on top, so a clip can narrow the drawing area but never widen it.
+Restrict everything drawn after this to a rectangle. It is a style, not a shape: it applies until changed, and save()/restore() put it back. No arguments clears it. The control's own bounds still clip on top, so a clip can narrow the drawing area but never widen it.
 
 #### `drawBlend(mode) -> boolean`
 
@@ -1557,11 +1557,11 @@ How what follows composites with what is under it: "normal" (the default), "mult
 
 #### `drawSave() -> boolean`
 
-Push the current style — fill, stroke, width, dash, dash offset, cap, join, opacity, transform, clip and blend — so restore() can put it back. Use it when you want to change the style for one shape and put things back afterwards, without having to remember the old values yourself. What you save is cleared at the start of each drawing pass, so forgetting to restore cannot leak into the next one.
+Push the current style — fill, stroke, width, dash, dash offset, cap, join, opacity, transform, clip and blend — so restore() can put it back. The stack is cleared at the start of each drawing pass, so a forgotten restore cannot leak into the next one.
 
 #### `drawRestore() -> boolean`
 
-Pop the style that save() pushed. Reports and returns false when nothing was saved, rather than silently resetting to defaults — an unbalanced restore is a bug in the script and worth hearing about.
+Pop the style that save() pushed. Reports and returns false when nothing was saved, rather than silently resetting to defaults.
 
 #### `drawText(x, y, text [, opts])`
 
@@ -1578,7 +1578,7 @@ ce.draw.text(4, 12, "hello");
 
 #### `drawRedraw([target])`
 
-Ask for onDraw to run again. Nothing repaints on its own — that is deliberate, because a per-frame callback nobody asked for is a performance trap. Animate by calling this from onTimer.
+Ask for onDraw to run again. Nothing repaints on its own; to animate, call this from onTimer.
 
 ```lua
 -- Lua

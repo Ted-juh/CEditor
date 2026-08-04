@@ -1277,7 +1277,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawLine', category: 'Drawing', signature: 'drawLine(x1, y1, x2, y2)',
-    summary: 'A straight line. Stroke only — a line has no inside.',
+    summary: 'A straight line. Stroke only; fill does not apply.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'x1', type: 'number', required: true }, { name: 'y1', type: 'number', required: true },
@@ -1288,7 +1288,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawPath', category: 'Drawing', signature: 'drawPath(points [, closed])',
-    summary: 'A polyline through a flat list of coordinates — { x1, y1, x2, y2, ... }. This is the scope trace and the envelope shape. `closed` joins the last point back to the first.',
+    summary: 'A polyline through a flat list of coordinates — { x1, y1, x2, y2, ... }. `closed` joins the last point back to the first.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'points', type: 'array', required: true },
@@ -1302,7 +1302,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawArc', category: 'Drawing', signature: 'drawArc(x, y, radius, from, to)',
-    summary: 'An arc centred on (x, y). Angles are degrees with 0 at twelve o\'clock, increasing clockwise — the way a knob\'s arc is described, and the same convention the Meter\'s arcStart/arcSweep use. Stroked with the current stroke; filled as a pie slice if a fill is set. The shape a knob ring, a radial meter or a pan indicator is, and the one thing path() could not express.',
+    summary: 'An arc centred on (x, y). Angles are degrees with 0 at twelve o\'clock, increasing clockwise — the same convention the Meter\'s arcStart/arcSweep use. Stroked with the current stroke; filled as a pie slice if a fill is set.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
@@ -1323,7 +1323,7 @@ export const COMMANDS = [
      script could do none of it. */
   {
     id: 'drawGradient', category: 'Drawing', signature: 'drawGradient(stops [, angle]) -> value',
-    summary: 'A gradient to use instead of a flat colour with fill() or stroke(). Give it a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place them yourself; you can mix the two and let the unplaced ones fall where they may. The angle is the panel\'s own — 0 is up, 90 is to the right, the same as the gradients in the Background section. Fewer than two usable colours gives you nothing back, since a gradient from one colour to nothing is just a colour.',
+    summary: 'Build a gradient to use in place of a flat colour with fill() or stroke(). Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place them yourself; the two forms can be mixed. `angle` is 0 for up and 90 for right, the same as the Background section\'s gradients. Fewer than two usable colours returns nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'stops', type: 'list', required: true },
@@ -1337,21 +1337,21 @@ export const COMMANDS = [
   },
   {
     id: 'drawOpacity', category: 'Drawing', signature: 'drawOpacity(a)',
-    summary: 'How opaque everything drawn after this is, 0..1. Applies like fill and stroke do — to what follows, not to one shape — because the whole style model here is "what was in force when the command was issued". A value that is not a number clears it. This makes a drawing translucent; ce.math.alpha() makes a stored colour translucent, and they are different questions with different answers.',
+    summary: 'Set the opacity for everything drawn after this, 0..1. Like fill and stroke, it applies to what follows, not to one shape. A value that is not a number clears it. To make a stored colour translucent instead, use ce.math.alpha().',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'a', type: 'number', required: true }],
     scopes: 'any',
   },
   {
     id: 'drawTransform', category: 'Drawing', signature: 'drawTransform([opts])',
-    summary: 'Rotate, move or scale everything drawn after this. `opts` carries { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it. Without this a knob pointer means computing every corner with sin and cos by hand, and getting the centre wrong is the classic way a pointer ends up orbiting the wrong point.',
+    summary: 'Rotate, move or scale everything drawn after this. `opts` carries { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'rotate', type: 'number', default: '0', unit: 'degrees',
         summary: 'Turn everything drawn after this clockwise.' },
       { name: 'cx', type: 'number', default: 'the middle of the control', unit: 'pixels', sample: '40',
-        summary: 'The horizontal point to rotate about. Getting this wrong is the usual reason a '
-          + 'knob pointer orbits somewhere it should not.' },
+        summary: 'The horizontal point to rotate about. A wrong centre makes the shape orbit '
+          + 'the wrong point.' },
       { name: 'cy', type: 'number', default: 'the middle of the control', unit: 'pixels', sample: '40',
         summary: 'The vertical point to rotate about.' },
       { name: 'x', type: 'number', default: '0', unit: 'pixels', summary: 'Move everything sideways.' },
@@ -1367,7 +1367,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawEllipse', category: 'Drawing', signature: 'drawEllipse(cx, cy, rx, ry)',
-    summary: 'An ellipse. circle() only does round, and a meter cap, an XY cursor or a squashed glow is not round.',
+    summary: 'An ellipse centred on (cx, cy), with horizontal radius rx and vertical radius ry.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'cx', type: 'number', required: true }, { name: 'cy', type: 'number', required: true },
@@ -1377,7 +1377,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawPixelText', category: 'Drawing', signature: 'drawPixelText(text, x, y [, scale])',
-    summary: 'Text in the app’s own 5x7 LCD font — the one the LCD components print with — so a readout a script draws and a readout the panel draws are the same letters. `scale` is a whole-number pixel size, 1 by default. Drawn literally, one square per lit pixel: it is a bitmap font, and rendering it smoothly would stop it being that font. (x, y) is the top-left, unlike text() whose y is the baseline — a grid font has no baseline to speak of.',
+    summary: 'Text in the app’s built-in 5x7 LCD font, the same one the LCD components use. `scale` is a whole-number pixel size, 1 by default. Drawn one square per lit pixel, with no smoothing. (x, y) is the top-left corner, unlike text() whose y is the baseline.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'text', type: 'string', required: true },
@@ -1388,7 +1388,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawMeasure', category: 'Drawing', signature: 'drawMeasure(text [, opts]) -> table',
-    summary: 'How wide a string will be: { width, height, exact }. Nothing could ask before, so a box behind a label, a column of right-aligned numbers or a truncation had no way to be worked out. `opts` carries { size, family } for ordinary text, or { pixel = true, scale } for the LCD font. `exact` is the honest part: the pixel font is a grid and its answer is arithmetic, while a proportional font has to be measured — and with no surface to measure on this falls back to an estimate and says so, rather than returning a guess as though it were a fact.',
+    summary: 'Measure a string before drawing it: returns { width, height, exact }. `opts` carries { size, family } for ordinary text, or { pixel = true, scale } for the LCD font. The pixel font is a fixed grid, so its answer is exact; a proportional font must be measured, and when no surface is available the result is an estimate with `exact` false.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'text', type: 'string', required: true },
@@ -1406,14 +1406,14 @@ export const COMMANDS = [
   },
   {
     id: 'drawBatch', category: 'Drawing', signature: 'drawBatch(fn) -> boolean',
-    summary: 'Send a run of drawing commands as a single update instead of one each. Worth reaching for whenever you are drawing in a loop — a waveform, a set of tick marks — where it is several times faster. The commands that already do a whole set at once (grid, lines, points) do not need it.',
+    summary: 'Send a run of drawing commands as a single update instead of one each. Use it when drawing in a loop — a waveform, a set of tick marks — where it is several times faster. grid, lines and points already send a whole set at once and do not need it.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
   },
   {
     id: 'drawGrid', category: 'Drawing', signature: 'drawGrid([opts]) -> boolean',
-    summary: 'A whole lattice as one command and one path. `opts` may carry { x, y, width, height } (defaulting to the control\'s box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. Both forms exist because both are how you actually know it: a step sequencer knows it has 16 columns, a ruler knows it wants a line every 10 pixels. The closing line is drawn, so a 4-column grid has five verticals rather than a missing right edge.',
+    summary: 'Draw a whole grid as one command and one path. `opts` may carry { x, y, width, height } (defaulting to the control\'s box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. The closing line is drawn, so a 4-column grid has five verticals.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false,
       fields: optionFields([
@@ -1426,8 +1426,8 @@ export const COMMANDS = [
         { name: 'height', type: 'number', default: 'the control\'s height', unit: 'pixels', sample: '60',
           summary: 'How tall the grid is.' },
         { name: 'step', type: 'number', unit: 'pixels', sample: '10',
-          summary: 'Spacing both ways — a line every this many pixels. Use this or `columns`, not '
-            + 'both: a ruler knows its spacing, a step sequencer knows its count.' },
+          summary: 'Spacing both ways — a line every this many pixels. Use this or `columns`, '
+            + 'not both.' },
         { name: 'stepX', type: 'number', unit: 'pixels', sample: '10', summary: 'Horizontal spacing on its own.' },
         { name: 'stepY', type: 'number', unit: 'pixels', sample: '20', summary: 'Vertical spacing on its own.' },
         { name: 'columns', type: 'number', sample: '16',
@@ -1439,14 +1439,14 @@ export const COMMANDS = [
   },
   {
     id: 'drawLines', category: 'Drawing', signature: 'drawLines(segments) -> boolean',
-    summary: 'Many disjoint line segments in one command — a list of [x1, y1, x2, y2]. drawPath already draws a connected run cheaply; this is for geometry that is not connected: tick marks, a vu ladder, a scatter of whiskers, a grid you are computing yourself. One command and one path instead of one of each per segment.',
+    summary: 'Draw many disjoint line segments as one command — a list of [x1, y1, x2, y2]. For unconnected geometry: tick marks, a vu ladder, a grid you compute yourself. drawPath draws a connected run.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'segments', type: 'list', required: true }],
     scopes: 'any',
   },
   {
     id: 'drawPoints', category: 'Drawing', signature: 'drawPoints(points [, radius]) -> boolean',
-    summary: 'A scatter of dots as one command — a list of [x, y], with `radius` defaulting to 1.5. The radius is the dot\'s own rather than the stroke width\'s, so a thin outline and a fat dot are independent.',
+    summary: 'A scatter of dots as one command — a list of [x, y], with `radius` defaulting to 1.5. The radius is independent of the stroke width.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'points', type: 'list', required: true },
@@ -1456,7 +1456,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawCurve', category: 'Drawing', signature: 'drawCurve(points [, opts]) -> boolean',
-    summary: 'A smooth curve through the given points, not merely near them — a Catmull-Rom spline emitted as cubic Béziers. One command for the whole curve, rather than a loop approximating it with short straight segments.',
+    summary: 'A smooth curve through the given points — a Catmull-Rom spline emitted as cubic Béziers, in one command.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'points', type: 'list', required: true },
@@ -1472,7 +1472,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawPolygon', category: 'Drawing', signature: 'drawPolygon(cx, cy, radius, sides [, opts]) -> boolean',
-    summary: 'A regular polygon — hexagonal pads, a radar plot\'s frame, a triangle indicator. `opts.rotation` is in degrees with 0 at twelve o\'clock, clockwise, the same convention drawArc uses, so a polygon and an arc drawn at the same angle line up. Fewer than three sides is raised to three.',
+    summary: 'A regular polygon centred on (cx, cy). `opts.rotation` is in degrees with 0 at twelve o\'clock, clockwise — the same convention drawArc uses, so a polygon and an arc at the same angle line up. Fewer than three sides is raised to three.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'cx', type: 'number', required: true },
@@ -1489,7 +1489,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawImage', category: 'Drawing', signature: 'drawImage(src, x, y, w, h [, opts]) -> boolean',
-    summary: 'Draw an image. `src` must be something the renderer can load — a data URL, or a library icon\'s dataUrl from ce.image.asset(). A bare asset name is refused rather than accepted and drawn as nothing, which is the failure this verb is most likely to be handed. `opts.fit` is "fill" (stretch, the default), "contain" or "cover".',
+    summary: 'Draw an image. `src` must be a data URL or a library icon\'s dataUrl from ce.image.asset(); a bare asset name is refused rather than drawn as nothing. `opts.fit` is "fill" (stretch, the default), "contain" or "cover".',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'src', type: 'string', required: true },
@@ -1507,7 +1507,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawClip', category: 'Drawing', signature: 'drawClip([x, y, w, h]) -> boolean',
-    summary: 'Restrict everything drawn after this to a rectangle. Style, not a shape: it applies until changed, and save()/restore() put it back. No arguments clears it. This cannot be emulated — a script could previously only avoid drawing outside a region, never clip what it drew. The control\'s own bounds still clip on top, so a clip can narrow the drawing area but never widen it.',
+    summary: 'Restrict everything drawn after this to a rectangle. It is a style, not a shape: it applies until changed, and save()/restore() put it back. No arguments clears it. The control\'s own bounds still clip on top, so a clip can narrow the drawing area but never widen it.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'x', type: 'number', required: false },
@@ -1528,21 +1528,21 @@ export const COMMANDS = [
   },
   {
     id: 'drawSave', category: 'Drawing', signature: 'drawSave() -> boolean',
-    summary: 'Push the current style — fill, stroke, width, dash, dash offset, cap, join, opacity, transform, clip and blend — so restore() can put it back. Use it when you want to change the style for one shape and put things back afterwards, without having to remember the old values yourself. What you save is cleared at the start of each drawing pass, so forgetting to restore cannot leak into the next one.',
+    summary: 'Push the current style — fill, stroke, width, dash, dash offset, cap, join, opacity, transform, clip and blend — so restore() can put it back. The stack is cleared at the start of each drawing pass, so a forgotten restore cannot leak into the next one.',
     runtime: RUNTIME_WEBVIEW,
     params: [],
     scopes: 'any',
   },
   {
     id: 'drawRestore', category: 'Drawing', signature: 'drawRestore() -> boolean',
-    summary: 'Pop the style that save() pushed. Reports and returns false when nothing was saved, rather than silently resetting to defaults — an unbalanced restore is a bug in the script and worth hearing about.',
+    summary: 'Pop the style that save() pushed. Reports and returns false when nothing was saved, rather than silently resetting to defaults.',
     runtime: RUNTIME_WEBVIEW,
     params: [],
     scopes: 'any',
   },
   {
     id: 'imageAssets', category: 'Images', signature: 'imageAssets([opts]) -> list',
-    summary: 'The icon library, as { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `opts` narrows with { vector = true } or { embeddable = true }. `portable` is false for every entry, and that is the honest answer rather than a bug: the payload lives in app settings, not in the panel document, so a reference to it does not survive an export. `embeddable` says whether ce.image.embed() can fix that by copying the data URL into the layer.',
+    summary: 'List the icon library, as { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `opts` narrows with { vector = true } or { embeddable = true }. `portable` is false for every entry: the payload lives in app settings, not in the panel document, so a reference to it does not survive an export. `embeddable` says whether ce.image.embed() can copy the data URL into a layer.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'vector', type: 'true or false',
@@ -1555,14 +1555,14 @@ export const COMMANDS = [
   },
   {
     id: 'imageAsset', category: 'Images', signature: 'imageAsset(idOrName) -> table|nil',
-    summary: 'One library asset, by id first and then by name — the same order the renderer resolves in, so what you see is what will be picked. Nothing back when the library has no such asset, which is the guard to call before writing one. The name fallback is worth knowing about: a coincidental name match looks exactly like success.',
+    summary: 'Look up one library asset, by id first and then by name — the same resolution order the renderer uses. Returns nil when the library has no such asset; call it before writing an asset reference. Beware the name fallback: a coincidental name match is indistinguishable from an id hit.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'idOrName', type: 'string', required: true }],
     scopes: 'any',
   },
   {
     id: 'imageSet', category: 'Images', signature: 'imageSet(target, src [, opts]) -> boolean',
-    summary: 'Put a picture on one of a control\'s four image layers and switch that layer on. This does two things a plain set() does not: it always writes the picture and the switch together, so you cannot end up with a layer that is turned on and empty, and it turns the layer on the way that layer actually works — background layers stack, while a picture inside text replaces whatever was there. An option the chosen layer does not have is refused and reported, rather than stored where nothing will read it.',
+    summary: 'Set an image on one of a control\'s four image layers and switch that layer on, always writing the picture and the switch together so a layer cannot be on and empty. Background layers composite with each other; a picture inside text replaces whatever was there. An option the chosen layer does not have is refused and reported, not stored.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1570,16 +1570,16 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false,
         fields: optionFields([
           { name: 'layer', type: 'text', default: '"image"', values: IMAGE_LAYER_IDS,
-            summary: 'Which of the control\'s four image layers this is about. The first two are '
-              + 'background layers and stack; the last two fill the text and are exclusive. Every '
-              + 'option below applies only to the layers that actually have it — one that does '
-              + 'not is refused and reported rather than stored where nothing reads it.' },
+            summary: 'Which of the control\'s four image layers to write. The first two are '
+              + 'background layers and stack; the last two fill the text and are exclusive. Each '
+              + 'option below applies only to layers that have it; an unsupported option is '
+              + 'refused and reported.' },
           { name: 'fit', type: 'text', default: '"fill" on a background, "cover" on text',
             values: [...new Set([...BACKGROUND_FITS, ...TEXT_FITS])],
-            summary: 'How the image fills the layer. This is the one option whose words mean two '
-              + `different things: on a background it is one of ${BACKGROUND_FITS.join(', ')} and `
-              + `"fill" means COVER, while on text it is one of ${TEXT_FITS.join(', ')} and `
-              + '"fill" means stretch. The text texture layer always tiles and takes no fit.' },
+            summary: 'How the image fills the layer. The meaning differs by layer type: on a '
+              + `background it is one of ${BACKGROUND_FITS.join(', ')} and "fill" means COVER; `
+              + `on text it is one of ${TEXT_FITS.join(', ')} and "fill" means stretch. The `
+              + 'text texture layer always tiles and takes no fit.' },
           { name: 'align', type: 'text', default: '"center"', values: BACKGROUND_ALIGNS,
             summary: 'Where the image sits when it does not fill the layer. Background layers '
               + 'only — on a text layer use offsetX and offsetY instead. Note the hyphens.' },
@@ -1600,7 +1600,7 @@ export const COMMANDS = [
           { name: 'flipV', type: 'true or false', default: 'false',
             summary: 'Mirror it top to bottom. Background layers only.' },
           { name: 'grayscale', type: 'true or false', default: 'false',
-            summary: 'Drain the colour out of it. Background layers only.' },
+            summary: 'Remove all colour from the image. Background layers only.' },
           { name: 'saturation', type: 'number', default: '1',
             summary: 'Colour intensity. 0 is grey, 1 is unchanged, above 1 is stronger. '
               + 'Background layers only.' },
@@ -1622,7 +1622,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageClear', category: 'Images', signature: 'imageClear(target [, layer]) -> boolean',
-    summary: 'Turn a layer off and blank its source — two or three fields that have to agree, which is why it is a verb rather than a set(). An exclusive text layer also goes back to "solid", because a selected mode with no source paints nothing and looks broken.',
+    summary: 'Turn a layer off and blank its source in one step. An exclusive text layer also resets to "solid", because a selected mode with no source paints nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1633,7 +1633,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageRead', category: 'Images', signature: 'imageRead(target [, layer]) -> table',
-    summary: 'The layer\'s whole state, plus the three things the fields alone do not tell you: `active` is whether it will actually paint (which for a text layer depends on `mode` and not on `Enabled` at all), `source` is "data" | "file" | "none", and `portable` says whether it survives an export. Only an embedded data URL does.',
+    summary: 'Read the layer\'s full state, plus three derived fields: `active` is whether the layer will actually paint (for a text layer this depends on `mode`, not on `Enabled`), `source` is "data" | "file" | "none", and `portable` says whether it survives an export — only an embedded data URL does.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1644,7 +1644,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageIcon', category: 'Images', signature: 'imageIcon(target, idOrName [, opts]) -> boolean',
-    summary: 'Point a control\'s Icon section at a library asset. `opts` may carry { size, fit, tint, opacity, rotation }. Writes the id and the name, because the renderer resolves by id and falls back to the name — writing one leaves the fallback deciding. An asset the library does not have is refused rather than stored, which is the difference between an icon that is missing and an icon that is silently wrong.',
+    summary: 'Point a control\'s Icon section at a library asset. `opts` may carry { size, fit, tint, opacity, rotation }. Writes both the id and the name, because the renderer resolves by id and falls back to the name. An asset the library does not have is refused rather than stored.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1654,7 +1654,7 @@ export const COMMANDS = [
           { name: 'size', type: 'number', default: '16', unit: 'pixels',
             summary: 'How big the icon is drawn.' },
           { name: 'fit', type: 'text', default: '"contain"',
-            summary: 'How the icon fills its box, in the Icon section\'s own words.' },
+            summary: 'How the icon fills its box, using the Icon section\'s own values.' },
           'tint', 'opacity', 'imageRotation',
         ]) },
     ],
@@ -1662,7 +1662,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageEmbed', category: 'Images', signature: 'imageEmbed(target [, layer]) -> boolean',
-    summary: 'Turn a layer\'s source into one that travels: copy the resolved data URL into the layer, replacing a file path that only exists on this machine. This is the verb with no equivalent anywhere else in the app — the difference between a panel that looks right here and one that looks right after an export. Already-embedded sources return true unchanged. A file the host has not read yet returns false and says so rather than blocking: the read is asynchronous, it is requested, and calling again once it lands succeeds.',
+    summary: 'Copy the layer\'s resolved data URL into the layer, replacing a machine-local file path, so the image survives export. Already-embedded sources return true unchanged. A file the host has not read yet returns false; the read is requested, and calling again once it lands succeeds.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1680,7 +1680,7 @@ export const COMMANDS = [
   },
   {
     id: 'textFonts', category: 'Typography', signature: 'textFonts([opts]) -> list',
-    summary: 'Every font this panel can use, with what each one can do. Read `portable` before you settle on one: a built-in font works everywhere, while a font from your library lives on this computer and is not part of the panel — so it looks right while you build and falls back to something else for whoever you send it to. `featuresKnown` tells you whether a font has actually been checked for its typographic features, so an empty list is not mistaken for a fact.',
+    summary: 'List every font the panel can use, with per-font capabilities. `portable` says whether the font survives an export: built-in fonts work everywhere, while a library font lives on this machine, is not part of the panel document, and falls back to a system font for other users. `featuresKnown` says whether the font\'s typographic features have actually been checked; when it is false, an empty feature list means unchecked, not featureless.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'portable', type: 'true or false',
@@ -1695,14 +1695,14 @@ export const COMMANDS = [
   },
   {
     id: 'textFont', category: 'Typography', signature: 'textFont(family) -> table|nil',
-    summary: 'One font descriptor by family name, or nothing when no such font is available — the guard to call before writing a family, and the way to ask what variable axes a face actually has. Matched case-insensitively against the stored family and its label, the way the Properties panel matches it.',
+    summary: 'Get one font descriptor by family name, or nil when no such font is available. Matched case-insensitively against the stored family and its label, the same matching the Properties panel uses. Use it to check a family before writing it, or to ask what variable axes a face has.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'family', type: 'string', required: true }],
     scopes: 'any',
   },
   {
     id: 'textStyle', category: 'Typography', signature: 'textStyle(target, opts) -> boolean',
-    summary: 'Set a control\'s type: font, size, weight, spacing, alignment and the rest, in one call. Worth using instead of writing the settings directly, because boldness is stored in two places that must agree — set one alone and the editor and the finished panel disagree about how bold your text is. A font nobody has, a feature the font does not offer, and an option that is not a text option are all refused and reported. Says false if any part of what you asked for did not apply.',
+    summary: 'Set a control\'s type — font, size, weight, spacing, alignment and the rest — in one call. Boldness is stored as a pair of fields that must agree; this always writes both together, where setting one directly leaves them inconsistent. An unavailable font, a feature the font does not offer, or an option that is not a text option is refused and reported. Returns false if any part did not apply.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1714,8 +1714,8 @@ export const COMMANDS = [
         // fall behind again.
         fields: optionFields([
           { name: 'family', type: 'text', sample: '"Inter Tight"',
-            summary: 'The font family. One nobody has is refused rather than stored, where a bare '
-              + 'set() would keep the typo and quietly fall back to a system font.' },
+            summary: 'The font family. An unavailable family is refused rather than stored; a '
+              + 'bare set() would store it and quietly fall back to a system font.' },
           { name: 'size', type: 'number', unit: 'pixels', sample: '18',
             summary: 'How big the text is drawn.' },
           { name: 'weight', type: 'number or text', sample: '600',
@@ -1727,7 +1727,7 @@ export const COMMANDS = [
           { name: 'caseMode', type: 'text', default: '"normal"', values: CASE_MODES,
             summary: 'Re-case the text as it is drawn, without changing what it says.' },
           { name: 'scriptMode', type: 'text', default: '"normal"', values: SCRIPT_MODES,
-            summary: 'Raise or lower the text, smaller, as a superscript or subscript.' },
+            summary: 'Draw the text smaller and raised or lowered, as superscript or subscript.' },
           { name: 'justification', type: 'text', values: JUSTIFICATIONS,
             summary: 'Where the text sits inside the control.' },
           { name: 'letterSpacing', type: 'number', default: '0', unit: 'pixels',
@@ -1763,7 +1763,7 @@ export const COMMANDS = [
   },
   {
     id: 'textAxis', category: 'Typography', signature: 'textAxis(target, tag, value) -> boolean',
-    summary: 'Set one variable-font axis by its four-letter tag, clamped to the range the font declares. An axis the face does not have is refused rather than stored, because a stored axis nothing reads is indistinguishable from one that worked. Setting `wght` moves the weight pair with it, which is what the Properties panel\'s own axis control does — otherwise a variable face renders its old weight.',
+    summary: 'Set one variable-font axis by its four-letter tag, clamped to the range the font declares. An axis the face does not have is refused rather than stored. Setting `wght` also updates the weight pair, matching the Properties panel\'s own axis control — otherwise a variable face renders its old weight.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1774,7 +1774,7 @@ export const COMMANDS = [
   },
   {
     id: 'textRead', category: 'Typography', signature: 'textRead(target [, name]) -> value|table',
-    summary: 'Read one text field by name, from whichever of Font / Multiline / Position owns it — so `size` and `lineHeight` are both just names and a script need not know which node they live on. With no name, the whole state: { content, resolvedWeight, font, multiline, position }. That is what makes typography snapshot-and-restorable without naming ninety fields, and `resolvedWeight` is the weight the renderer will actually use rather than either half of the pair.',
+    summary: 'Read one text field by name, from whichever of Font / Multiline / Position owns it — `size` and `lineHeight` are both just names; the script need not know which node holds them. With no name, return the whole state: { content, resolvedWeight, font, multiline, position }. `resolvedWeight` is the weight the renderer will actually use, not either half of the stored pair.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1784,7 +1784,7 @@ export const COMMANDS = [
   },
   {
     id: 'textMeasure', category: 'Typography', signature: 'textMeasure(target [, text]) -> table',
-    summary: 'How much room a control\'s text takes up, in its own font: { width, height, lines, truncated, exact }. It measures through the same code that draws the text, so the answer is the layout you will actually get — spacing, wrapping and line limits included. Pass `text` to measure something the control does not hold yet, for a label about to be filled in. `exact` is false when there was no surface to measure on and the answer is an estimate.',
+    summary: 'Measure the room a control\'s text takes up, in its own font: { width, height, lines, truncated, exact }. Measures through the same code that draws the text, so the result matches the actual layout — spacing, wrapping and line limits included. Pass `text` to measure text the control does not hold yet. `exact` is false when there was no surface to measure on and the answer is an estimate.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1794,14 +1794,14 @@ export const COMMANDS = [
   },
   {
     id: 'textFit', category: 'Typography', signature: 'textFit(target [, opts]) -> table',
-    summary: 'Shrink Font.size until the text fits the control\'s box, and report what it settled on: { size, fits, changed, exact }. `opts` may carry { min = 6, max = the current size, text }. Text.Multiline.fitMode = "shrink" already scales text down at paint time, but that is a paint-time scale — the stored size never changes, so nothing can ask what it ended up at and nothing else can be aligned to it. This writes the size. `fits` is false when even `min` overflows, which is an answer rather than a failure.',
+    summary: 'Shrink Font.size until the text fits the control\'s box, write that size, and report { size, fits, changed, exact }. `opts` may carry { min = 6, max = the current size, text }. Unlike Text.Multiline.fitMode = "shrink", which scales only at paint time and never changes the stored size, this writes the size so other things can read and align to it. `fits` is false when even `min` overflows; the call still succeeds.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'min', type: 'number', default: '6', unit: 'pixels',
-          summary: 'The smallest size to shrink to. If the text still overflows at this size the '
-            + 'answer comes back with fits = false, which is a report rather than a failure.' },
+          summary: 'The smallest size to shrink to. If the text still overflows at this size, the '
+            + 'result has fits = false; the call still succeeds.' },
         { name: 'max', type: 'number', default: 'the control\'s current size', unit: 'pixels', sample: '24',
           summary: 'The largest size to try.' },
         { name: 'text', type: 'text', default: 'the control\'s own text', sample: '"PATCH NAME"',
@@ -1830,7 +1830,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawRedraw', category: 'Drawing', signature: 'drawRedraw([target])',
-    summary: 'Ask for onDraw to run again. Nothing repaints on its own — that is deliberate, because a per-frame callback nobody asked for is a performance trap. Animate by calling this from onTimer.',
+    summary: 'Ask for onDraw to run again. Nothing repaints on its own; to animate, call this from onTimer.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'target', type: 'string', required: false }],
     scopes: 'any',
