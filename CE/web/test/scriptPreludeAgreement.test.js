@@ -29,7 +29,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const scriptingDir = join(here, '..', '..', 'src', 'Scripting');
 
 function extractRawString(file, tag) {
-  const source = readFileSync(join(scriptingDir, file), 'utf8');
+  // Normalize CRLF from Windows checkouts (core.autocrlf): the preludes are authored LF, and the
+  // C++ compiler sees them LF, so the agreement tests must too.
+  const source = readFileSync(join(scriptingDir, file), 'utf8').replace(/\r\n/g, '\n');
   const open = `R"${tag}(`;
   const start = source.indexOf(open);
   assert.notEqual(start, -1, `could not find the ${tag} prelude in ${file}`);
@@ -432,6 +434,9 @@ test('the Python engine prelude computes what the WebView runtime computes', asy
     input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), cases: all }),
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
+    // Windows Python defaults stdio to the legacy code page (cp1252), which cannot carry the
+    // musical symbols and emoji in the cases; UTF-8 mode matches what the embedded engine does.
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
   });
   assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
 
@@ -646,6 +651,8 @@ test('the Python prelude encodes and decodes JSON byte-for-byte as the WebView d
     }),
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
+    // Same UTF-8 forcing as the compute-agreement test above: cp1252 stdio cannot carry the cases.
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
   });
   assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
 
