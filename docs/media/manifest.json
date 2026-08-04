@@ -179,6 +179,18 @@
     "width": 446,
     "height": 178
   },
+  "tutorial-ghost": {
+    "kind": "tutorial",
+    "id": "ghost",
+    "width": 324,
+    "height": 172
+  },
+  "tutorial-sequencer": {
+    "kind": "tutorial",
+    "id": "sequencer",
+    "width": 356,
+    "height": 142
+  },
   "tutorial-walkthrough": {
     "kind": "tutorial",
     "id": "walkthrough",

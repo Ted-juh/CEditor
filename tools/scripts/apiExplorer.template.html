@@ -1919,6 +1919,7 @@ end</code></pre>
 
   <div class="lesson wide" id="sequencer">
     <p class="lesson-n">05 &middot; A step sequencer</p>
+    <div data-shot="tutorial-sequencer"></div>
     <div class="lesson-text prose">
       <h3>Make the panel play notes, in time, on its own</h3>
       <p>
@@ -1974,6 +1975,7 @@ function onPanelBuild()
         name = "step" .. i, x = 16 + (i - 1) * 40, y = 40, width = 36, height = 36,
       })
       set("step" .. i .. ".Behavior.subtype", "toggle")
+      set("step" .. i .. ".Text.content", "")
     end
     ce.panel.create("Button", { name = "play", x = 16, y = 90, width = 76, height = 28 })
     set("play.Text.content", "PLAY")
@@ -1981,6 +1983,7 @@ function onPanelBuild()
     ce.panel.create("Button", { name = "gen", x = 100, y = 90, width = 76, height = 28 })
     set("gen.Text.content", "NEW")
     ce.panel.create("Label", { name = "pos", x = 184, y = 90, width = 100, height = 28 })
+    set("pos.Text.content", "ready")
   end)
   newPattern()
 end</code></pre>
@@ -1994,6 +1997,7 @@ function onPanelBuild() {
         name: "step" + i, x: 16 + (i - 1) * 40, y: 40, width: 36, height: 36,
       })
       set("step" + i + ".Behavior.subtype", "toggle")
+      set("step" + i + ".Text.content", "")
     }
     ce.panel.create("Button", { name: "play", x: 16, y: 90, width: 76, height: 28 })
     set("play.Text.content", "PLAY")
@@ -2001,6 +2005,7 @@ function onPanelBuild() {
     ce.panel.create("Button", { name: "gen", x: 100, y: 90, width: 76, height: 28 })
     set("gen.Text.content", "NEW")
     ce.panel.create("Label", { name: "pos", x: 184, y: 90, width: 100, height: 28 })
+    set("pos.Text.content", "ready")
   })
   newPattern()
 }</code></pre>
@@ -2077,6 +2082,7 @@ function onTimer(info) {
 
   <div class="lesson wide" id="ghost">
     <p class="lesson-n">06 &middot; A synth that does not exist</p>
+    <div data-shot="tutorial-ghost"></div>
     <div class="lesson-text prose">
       <h3>Teach the app a synth it has never met</h3>
       <p>
@@ -2154,6 +2160,7 @@ ce.device.defineParameter("resonance", {
   ce.panel.create("Button", { name = "recv", x = 24, y = 120, width = 100, height = 28 })
   set("recv.Text.content", "RECEIVE")
   ce.panel.create("Label", { name = "status", x = 140, y = 120, width = 160, height = 28 })
+  set("status.Text.content", "press RECEIVE")
   ce.device.bind("Cutoff", "cutoff")
   ce.device.bind("Reso", "resonance")
 end</code></pre>
@@ -2165,6 +2172,7 @@ end</code></pre>
   ce.panel.create("Button", { name: "recv", x: 24, y: 120, width: 100, height: 28 })
   set("recv.Text.content", "RECEIVE")
   ce.panel.create("Label", { name: "status", x: 140, y: 120, width: 160, height: 28 })
+  set("status.Text.content", "press RECEIVE")
   ce.device.bind("Cutoff", "cutoff")
   ce.device.bind("Reso", "resonance")
 }</code></pre>
