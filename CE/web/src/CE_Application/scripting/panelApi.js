@@ -1859,8 +1859,7 @@ export const COMMANDS = [
       { name: 'type', type: 'string', required: true },
       { name: 'props', type: 'object', required: false, fields: optionFields([
         { name: 'name', type: 'text', default: 'one derived from the type', sample: '"cutoff"',
-          summary: 'What to call the control. This is what every other verb addresses it by, so it '
-            + 'is worth choosing.' },
+          summary: 'The control\'s name. Every other verb addresses the control by this name.' },
         { name: 'x', type: 'number', default: '0', unit: 'pixels',
           summary: 'Distance from the left edge of whatever contains it.' },
         { name: 'y', type: 'number', default: '0', unit: 'pixels',
@@ -1884,7 +1883,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelClone', category: 'Panel structure', signature: 'panelClone(name, props)',
-    summary: 'Copy an existing control, including its sections, and return the copy\'s name. The usual way to make eight of something the author designed once.',
+    summary: 'Copy an existing control, including its sections, and return the copy\'s name. `props` overrides properties on the copy.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'name', type: 'string', required: true },
@@ -1944,7 +1943,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelTypes', category: 'Panel structure', signature: 'panelTypes()',
-    summary: 'Every component type panelCreate accepts, as a list of names. Ask rather than guess — the list grows.',
+    summary: 'Every component type panelCreate accepts, as a list of names.',
     runtime: RUNTIME_WEBVIEW,
     params: [],
     scopes: 'any',
@@ -1974,7 +1973,7 @@ export const COMMANDS = [
      back through it, exactly as the canvas does. */
   {
     id: 'panelAlign', category: 'Panel structure', signature: 'panelAlign(names, edge [, opts]) -> number',
-    summary: 'Line controls up on one edge: "left" | "hCenter" | "right" | "top" | "vCenter" | "bottom". By default they align to the bounding box of the lot; `opts.to` names one of them to align to instead — what the canvas calls a key object. Returns how many moved. Names that are not controls are reported and skipped rather than silently ignored.',
+    summary: 'Align controls on one edge: "left" | "hCenter" | "right" | "top" | "vCenter" | "bottom". Default reference is the group\'s bounding box; `opts.to` names one control to align to instead (the canvas\'s key object). Returns how many moved. Names that are not controls are reported and skipped.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -1993,7 +1992,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelDistribute', category: 'Panel structure', signature: 'panelDistribute(names, what [, opts]) -> number',
-    summary: 'Spread controls evenly. `what` is "leftEdges" | "hCenters" | "rightEdges" | "topEdges" | "vCenters" | "bottomEdges", which even out the positions, or "hSpacing" | "vSpacing", which even out the gaps — differently-sized controls end up evenly spaced rather than evenly placed, and those are different pictures. The first and last stay put, which is what makes this different from laying things out in a row. `opts.gap` forces a gap instead of computing one; `opts.align` also lines up the cross axis. Needs at least two.',
+    summary: 'Spread controls evenly. `what` is "leftEdges" | "hCenters" | "rightEdges" | "topEdges" | "vCenters" | "bottomEdges" (even out positions) or "hSpacing" | "vSpacing" (even out the gaps between differently-sized controls). The first and last controls stay put. `opts.gap` forces a fixed gap instead of computing one; `opts.align` also lines up the cross axis. Needs at least two controls.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },

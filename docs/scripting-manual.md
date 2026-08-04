@@ -1593,31 +1593,31 @@ ce.draw.redraw();
 
 #### `imageAssets([opts]) -> list`
 
-The icon library, as { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `opts` narrows with { vector = true } or { embeddable = true }. `portable` is false for every entry, and that is the honest answer rather than a bug: the payload lives in app settings, not in the panel document, so a reference to it does not survive an export. `embeddable` says whether ce.image.embed() can fix that by copying the data URL into the layer.
+List the icon library, as { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `opts` narrows with { vector = true } or { embeddable = true }. `portable` is false for every entry: the payload lives in app settings, not in the panel document, so a reference to it does not survive an export. `embeddable` says whether ce.image.embed() can copy the data URL into a layer.
 
 #### `imageAsset(idOrName) -> table|nil`
 
-One library asset, by id first and then by name — the same order the renderer resolves in, so what you see is what will be picked. Nothing back when the library has no such asset, which is the guard to call before writing one. The name fallback is worth knowing about: a coincidental name match looks exactly like success.
+Look up one library asset, by id first and then by name — the same resolution order the renderer uses. Returns nil when the library has no such asset; call it before writing an asset reference. Beware the name fallback: a coincidental name match is indistinguishable from an id hit.
 
 #### `imageSet(target, src [, opts]) -> boolean`
 
-Put a picture on one of a control's four image layers and switch that layer on. This does two things a plain set() does not: it always writes the picture and the switch together, so you cannot end up with a layer that is turned on and empty, and it turns the layer on the way that layer actually works — background layers stack, while a picture inside text replaces whatever was there. An option the chosen layer does not have is refused and reported, rather than stored where nothing will read it.
+Set an image on one of a control's four image layers and switch that layer on, always writing the picture and the switch together so a layer cannot be on and empty. Background layers composite with each other; a picture inside text replaces whatever was there. An option the chosen layer does not have is refused and reported, not stored.
 
 #### `imageClear(target [, layer]) -> boolean`
 
-Turn a layer off and blank its source — two or three fields that have to agree, which is why it is a verb rather than a set(). An exclusive text layer also goes back to "solid", because a selected mode with no source paints nothing and looks broken.
+Turn a layer off and blank its source in one step. An exclusive text layer also resets to "solid", because a selected mode with no source paints nothing.
 
 #### `imageRead(target [, layer]) -> table`
 
-The layer's whole state, plus the three things the fields alone do not tell you: `active` is whether it will actually paint (which for a text layer depends on `mode` and not on `Enabled` at all), `source` is "data" | "file" | "none", and `portable` says whether it survives an export. Only an embedded data URL does.
+Read the layer's full state, plus three derived fields: `active` is whether the layer will actually paint (for a text layer this depends on `mode`, not on `Enabled`), `source` is "data" | "file" | "none", and `portable` says whether it survives an export — only an embedded data URL does.
 
 #### `imageIcon(target, idOrName [, opts]) -> boolean`
 
-Point a control's Icon section at a library asset. `opts` may carry { size, fit, tint, opacity, rotation }. Writes the id and the name, because the renderer resolves by id and falls back to the name — writing one leaves the fallback deciding. An asset the library does not have is refused rather than stored, which is the difference between an icon that is missing and an icon that is silently wrong.
+Point a control's Icon section at a library asset. `opts` may carry { size, fit, tint, opacity, rotation }. Writes both the id and the name, because the renderer resolves by id and falls back to the name. An asset the library does not have is refused rather than stored.
 
 #### `imageEmbed(target [, layer]) -> boolean`
 
-Turn a layer's source into one that travels: copy the resolved data URL into the layer, replacing a file path that only exists on this machine. This is the verb with no equivalent anywhere else in the app — the difference between a panel that looks right here and one that looks right after an export. Already-embedded sources return true unchanged. A file the host has not read yet returns false and says so rather than blocking: the read is asynchronous, it is requested, and calling again once it lands succeeds.
+Copy the layer's resolved data URL into the layer, replacing a machine-local file path, so the image survives export. Already-embedded sources return true unchanged. A file the host has not read yet returns false; the read is requested, and calling again once it lands succeeds.
 
 #### `imageLoad(path) -> boolean`
 
@@ -1627,31 +1627,31 @@ Ask the host to read a file into the cache, and report whether it is there yet. 
 
 #### `textFonts([opts]) -> list`
 
-Every font this panel can use, with what each one can do. Read `portable` before you settle on one: a built-in font works everywhere, while a font from your library lives on this computer and is not part of the panel — so it looks right while you build and falls back to something else for whoever you send it to. `featuresKnown` tells you whether a font has actually been checked for its typographic features, so an empty list is not mistaken for a fact.
+List every font the panel can use, with per-font capabilities. `portable` says whether the font survives an export: built-in fonts work everywhere, while a library font lives on this machine, is not part of the panel document, and falls back to a system font for other users. `featuresKnown` says whether the font's typographic features have actually been checked; when it is false, an empty feature list means unchecked, not featureless.
 
 #### `textFont(family) -> table|nil`
 
-One font descriptor by family name, or nothing when no such font is available — the guard to call before writing a family, and the way to ask what variable axes a face actually has. Matched case-insensitively against the stored family and its label, the way the Properties panel matches it.
+Get one font descriptor by family name, or nil when no such font is available. Matched case-insensitively against the stored family and its label, the same matching the Properties panel uses. Use it to check a family before writing it, or to ask what variable axes a face has.
 
 #### `textStyle(target, opts) -> boolean`
 
-Set a control's type: font, size, weight, spacing, alignment and the rest, in one call. Worth using instead of writing the settings directly, because boldness is stored in two places that must agree — set one alone and the editor and the finished panel disagree about how bold your text is. A font nobody has, a feature the font does not offer, and an option that is not a text option are all refused and reported. Says false if any part of what you asked for did not apply.
+Set a control's type — font, size, weight, spacing, alignment and the rest — in one call. Boldness is stored as a pair of fields that must agree; this always writes both together, where setting one directly leaves them inconsistent. An unavailable font, a feature the font does not offer, or an option that is not a text option is refused and reported. Returns false if any part did not apply.
 
 #### `textAxis(target, tag, value) -> boolean`
 
-Set one variable-font axis by its four-letter tag, clamped to the range the font declares. An axis the face does not have is refused rather than stored, because a stored axis nothing reads is indistinguishable from one that worked. Setting `wght` moves the weight pair with it, which is what the Properties panel's own axis control does — otherwise a variable face renders its old weight.
+Set one variable-font axis by its four-letter tag, clamped to the range the font declares. An axis the face does not have is refused rather than stored. Setting `wght` also updates the weight pair, matching the Properties panel's own axis control — otherwise a variable face renders its old weight.
 
 #### `textRead(target [, name]) -> value|table`
 
-Read one text field by name, from whichever of Font / Multiline / Position owns it — so `size` and `lineHeight` are both just names and a script need not know which node they live on. With no name, the whole state: { content, resolvedWeight, font, multiline, position }. That is what makes typography snapshot-and-restorable without naming ninety fields, and `resolvedWeight` is the weight the renderer will actually use rather than either half of the pair.
+Read one text field by name, from whichever of Font / Multiline / Position owns it — `size` and `lineHeight` are both just names; the script need not know which node holds them. With no name, return the whole state: { content, resolvedWeight, font, multiline, position }. `resolvedWeight` is the weight the renderer will actually use, not either half of the stored pair.
 
 #### `textMeasure(target [, text]) -> table`
 
-How much room a control's text takes up, in its own font: { width, height, lines, truncated, exact }. It measures through the same code that draws the text, so the answer is the layout you will actually get — spacing, wrapping and line limits included. Pass `text` to measure something the control does not hold yet, for a label about to be filled in. `exact` is false when there was no surface to measure on and the answer is an estimate.
+Measure the room a control's text takes up, in its own font: { width, height, lines, truncated, exact }. Measures through the same code that draws the text, so the result matches the actual layout — spacing, wrapping and line limits included. Pass `text` to measure text the control does not hold yet. `exact` is false when there was no surface to measure on and the answer is an estimate.
 
 #### `textFit(target [, opts]) -> table`
 
-Shrink Font.size until the text fits the control's box, and report what it settled on: { size, fits, changed, exact }. `opts` may carry { min = 6, max = the current size, text }. Text.Multiline.fitMode = "shrink" already scales text down at paint time, but that is a paint-time scale — the stored size never changes, so nothing can ask what it ended up at and nothing else can be aligned to it. This writes the size. `fits` is false when even `min` overflows, which is an answer rather than a failure.
+Shrink Font.size until the text fits the control's box, write that size, and report { size, fits, changed, exact }. `opts` may carry { min = 6, max = the current size, text }. Unlike Text.Multiline.fitMode = "shrink", which scales only at paint time and never changes the stored size, this writes the size so other things can read and align to it. `fits` is false when even `min` overflows; the call still succeeds.
 
 ### Panel structure
 
