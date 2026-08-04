@@ -5,6 +5,8 @@ import {
 } from './customComponentArpeggiator.js';
 import { resolvePartPixelRect } from './customComponentLayout.js';
 import { numberOr, clamp } from './primitives.js';
+import { DragScrub, presets } from '../scrub/dragScrub';
+import { appScrubOverrides } from './scrubRuntime.js';
 
 function sectionChildren(control, sectionName) {
   return control?._children?.[sectionName]?._children ?? {};
@@ -751,6 +753,38 @@ export function resolveCustomHitZoneAtPoint(control, rect, clientX, clientY, val
   return null;
 }
 
+// Translates a behavior module's drag config into DragScrubOptions. Weights
+// fold the control's dimensions in, so motion keeps its historical unit of
+// "fraction of the control travelled" and dragSensitivity keeps its meaning.
+// Bidirectional modes expose the core's combine maths: 'both' defaults to the
+// safe 'projected', 'free' to 'magnitude' (every pixel counts), and a module
+// may pin one explicitly via `combine`; `weightX`/`weightY`/`increaseAngle`
+// (degrees) pass through for the advanced tuning surface.
+function createCustomDragScrub(behaviorModule, rect, dragMode, startNormalized) {
+  const axis = dragMode === 'horizontal' ? 'x' : (dragMode === 'both' || dragMode === 'free') ? 'both' : 'y';
+  const configuredCombine = String(behaviorModule?.combine ?? '').trim().toLowerCase();
+  const combine = ['sum', 'projected', 'magnitude'].includes(configuredCombine)
+    ? configuredCombine
+    : (dragMode === 'free' ? 'magnitude' : 'projected');
+  const reversed = isCustomMouseDirectionReversed(behaviorModule);
+  return new DragScrub({
+    ...presets.knob,
+    axis,
+    combine,
+    invertX: reversed !== (behaviorModule?.invertX === true),
+    invertY: reversed !== (behaviorModule?.invertY === true),
+    weightX: numberOr(behaviorModule?.weightX, 1) / Math.max(1, rect.width),
+    weightY: numberOr(behaviorModule?.weightY, 1) / Math.max(1, rect.height),
+    increaseAngle: (clamp(numberOr(behaviorModule?.increaseAngle, 45), 0, 90) * Math.PI) / 180,
+    sensitivity: Math.max(0.01, numberOr(behaviorModule?.dragSensitivity, 1)),
+    deadZone: 0,
+    fineFactor: 0.25, // the historical custom-component shift feel
+    min: 0,
+    max: 1,
+    ...appScrubOverrides(),
+  }, clamp(startNormalized, 0, 1));
+}
+
 export function resolveCustomNormalizedFromPoint(behaviorModule, rect, clientX, clientY, dragContext = null) {
   if (!rect) return 0;
   const localX = clamp(clientX - rect.left, 0, rect.width);
@@ -771,18 +805,18 @@ export function resolveCustomNormalizedFromPoint(behaviorModule, rect, clientX, 
     && Number.isFinite(Number(dragContext.startNormalized));
 
   if (hasDragStart && RELATIVE_MODES.includes(dragMode)) {
-    // Fine-drag modifier (Shift): slow the drag for precise adjustment.
-    const fineScale = dragContext?.fine ? 0.25 : 1;
-    const sensitivity = Math.max(0.01, numberOr(behaviorModule?.dragSensitivity, 1)) * fineScale;
-    const deltaX = (clientX - dragContext.startClientX) / Math.max(1, rect.width);
-    const deltaY = (dragContext.startClientY - clientY) / Math.max(1, rect.height);
-    const rawMovement = (dragMode === 'vertical' || dragMode === 'relative')
-      ? deltaY
-      : (dragMode === 'horizontal'
-        ? deltaX
-        : (Math.abs(deltaX) >= Math.abs(deltaY) ? deltaX : deltaY));
-    const movement = isCustomMouseDirectionReversed(behaviorModule) ? -rawMovement : rawMovement;
-    return clamp(numberOr(dragContext.startNormalized, 0) + (movement * sensitivity), 0, 1);
+    // Relative drag runs through the shared dragScrub core. dragContext is
+    // stateless (anchor + start value per call), so the scrub is rebuilt and
+    // fed the single start→current segment, which is the same accumulation.
+    const scrub = createCustomDragScrub(behaviorModule, rect, dragMode, numberOr(dragContext.startNormalized, 0));
+    scrub.begin({ x: Number(dragContext.startClientX), y: Number(dragContext.startClientY) });
+    const moved = scrub.move({
+      x: clientX,
+      y: clientY,
+      shiftKey: dragContext?.fine === true,
+      ctrlKey: dragContext?.coarse === true,
+    });
+    return moved ?? scrub.value;
   }
 
   if (['vertical', 'linear-vertical'].includes(geometry)) {
@@ -903,6 +937,7 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
         startClientY: point.startClientY,
         startNormalized: point.startNormalized ?? normalizeCustomChannelValue(channel, point.startValues?.[channelName] ?? currentValue),
         fine: point.fine === true,
+        coarse: point.coarse === true,
       });
     }
     nextValue = denormalizeCustomChannelValue(channel, normalized);

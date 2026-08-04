@@ -131,11 +131,11 @@
     </PropertyCell>
     <div class="bg-effects-layout">
       <div class="bg-scrub-group">
-        <PropertyScrub label="Sat" value={get('Saturation', 100)} min={0} max={200}
+        <PropertyScrub label="Sat" value={get('Saturation', 100)} min={0} max={200} defaultValue={100}
                        onchange={(v) => set('Saturation', v)} />
-        <PropertyScrub label="Bri" value={get('Brightness', 100)} min={0} max={200}
+        <PropertyScrub label="Bri" value={get('Brightness', 100)} min={0} max={200} defaultValue={100}
                        onchange={(v) => set('Brightness', v)} />
-        <PropertyScrub label="Con" value={get('Contrast', 100)} min={0} max={200}
+        <PropertyScrub label="Con" value={get('Contrast', 100)} min={0} max={200} defaultValue={100}
                        onchange={(v) => set('Contrast', v)} />
       </div>
       <div class="bg-grayscale-col">

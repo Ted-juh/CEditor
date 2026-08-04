@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { dragScrub } from './CE_Application/scrub/dragScrubAction';
   import MenuBar from './CE_Application/layout/MenuBar.svelte';
   import IconPanel from './CE_Application/layout/IconPanel.svelte';
   import EditorCanvas from './CE_Application/editor/EditorCanvas.svelte';
@@ -180,66 +181,52 @@
     if (target) displayPanelHeight = Math.min(target, maxDisplayPanelHeight());
   }
 
-  function startPropsResize(e) {
-    isResizingProps = true;
-    const startX = e.clientX;
-    const startWidth = propertiesPanelWidth;
+  // Pane splitters: relative dragScrub, one CSS pixel per pixel of travel.
+  // The panels sit right/below their handles, so leftward/upward drags widen
+  // them; the axis is fixed by orientation — no direction settings, by design.
+  const propsResizeScrub = $derived({
+    axis: 'x',
+    tracking: 'relative',
+    sensitivity: 1,
+    deadZone: 0,
+    invertX: true,
+    min: MIN_PROPERTIES_PANEL_WIDTH,
+    max: typeof window === 'undefined' ? 10000 : Math.max(MIN_PROPERTIES_PANEL_WIDTH, window.innerWidth - 120),
+    value: propertiesPanelWidth,
+    manageCursor: false,
+    onChange: (v) => { propertiesPanelWidth = Math.round(v); },
+    onDragStart: () => { isResizingProps = true; },
+    onDragEnd: () => { isResizingProps = false; },
+  });
 
-    function onMouseMove(e) {
-      const delta = startX - e.clientX;
-      const maxWidth = Math.max(MIN_PROPERTIES_PANEL_WIDTH, window.innerWidth - 120);
-      propertiesPanelWidth = Math.max(MIN_PROPERTIES_PANEL_WIDTH, Math.min(maxWidth, startWidth + delta));
-    }
+  const treeResizeScrub = $derived({
+    axis: 'x',
+    tracking: 'relative',
+    sensitivity: 1,
+    deadZone: 0,
+    invertX: true,
+    min: 120,
+    max: 400,
+    value: treePanelWidth,
+    manageCursor: false,
+    onChange: (v) => { treePanelWidth = Math.round(v); },
+    onDragStart: () => { isResizingTree = true; },
+    onDragEnd: () => { isResizingTree = false; },
+  });
 
-    function onMouseUp() {
-      isResizingProps = false;
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    }
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-  }
-
-  function startTreeResize(e) {
-    isResizingTree = true;
-    const startX = e.clientX;
-    const startWidth = treePanelWidth;
-
-    function onMouseMove(e) {
-      const delta = startX - e.clientX;
-      treePanelWidth = Math.max(120, Math.min(400, startWidth + delta));
-    }
-
-    function onMouseUp() {
-      isResizingTree = false;
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    }
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-  }
-
-  function startDisplayResize(e) {
-    isResizingDisplay = true;
-    const startY = e.clientY;
-    const startHeight = displayPanelHeight;
-
-    function onMouseMove(e) {
-      const delta = startY - e.clientY;
-      displayPanelHeight = Math.max(80, Math.min(maxDisplayPanelHeight(), startHeight + delta));
-    }
-
-    function onMouseUp() {
-      isResizingDisplay = false;
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    }
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-  }
+  const displayResizeScrub = $derived({
+    axis: 'y',
+    tracking: 'relative',
+    sensitivity: 1,
+    deadZone: 0,
+    min: 80,
+    max: maxDisplayPanelHeight(),
+    value: displayPanelHeight,
+    manageCursor: false,
+    onChange: (v) => { displayPanelHeight = Math.round(v); },
+    onDragStart: () => { isResizingDisplay = true; },
+    onDragEnd: () => { isResizingDisplay = false; },
+  });
 
   function handleBeforeUnload() {
     flushUnsavedSessionSnapshot();
@@ -337,14 +324,14 @@
         </div>
         {#if effectiveShowTreePanel}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="tree-resize-handle" class:active={isResizingTree} onmousedown={startTreeResize}></div>
+          <div class="tree-resize-handle" role="separator" aria-orientation="vertical" class:active={isResizingTree} use:dragScrub={treeResizeScrub}></div>
           <div class="tree-area" style="flex: 0 0 {treePanelWidth}px;">
             <ComponentTree />
           </div>
         {/if}
       </div>
       <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="display-resize-handle" class:active={isResizingDisplay} onmousedown={startDisplayResize} style="display: {effectiveShowDisplayPanel ? 'block' : 'none'}"></div>
+      <div class="display-resize-handle" role="separator" aria-orientation="horizontal" class:active={isResizingDisplay} use:dragScrub={displayResizeScrub} style="display: {effectiveShowDisplayPanel ? 'block' : 'none'}"></div>
       <div class="display-panel-area" style="flex: 0 0 {displayPanelBasis}; display: {effectiveShowDisplayPanel ? 'block' : 'none'}">
         <ErrorBoundary label="The display panel">
           <DisplayPanel onTabChange={handleDisplayTabChange} />
@@ -354,7 +341,7 @@
 
     {#if effectiveShowPropertiesPanel}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="resize-handle" class:active={isResizingProps} onmousedown={startPropsResize}></div>
+      <div class="resize-handle" role="separator" aria-orientation="vertical" class:active={isResizingProps} use:dragScrub={propsResizeScrub}></div>
 
       <div class="properties-area">
         <ErrorBoundary label="The properties panel">

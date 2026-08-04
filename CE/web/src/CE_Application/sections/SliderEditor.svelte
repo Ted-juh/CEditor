@@ -230,6 +230,18 @@
       <PropertyCell label="Diameter" span={2} hint="Circular track diameter in pixels. Set to 0 for automatic fitting.">
         <NumberInput value={behavior.circularDiameter ?? 0} step={1} min={0} onchange={(value) => set('Behavior.circularDiameter', Math.max(0, value))} />
       </PropertyCell>
+      <PropertyCell label="Drag" span={2} hint="absolute jumps to the clicked angle; knob is the plugin-standard vertical drag from the current value; rotary follows actual rotation about the dial.">
+        <select class="val" value={behavior.circularDragMode ?? 'absolute'} onchange={(event) => set('Behavior.circularDragMode', event.target.value)}>
+          <option value="absolute">absolute</option>
+          <option value="knob">knob</option>
+          <option value="rotary">rotary</option>
+        </select>
+      </PropertyCell>
+      {#if (behavior.circularDragMode === 'knob' || behavior.circularDragMode === 'rotary')}
+        <PropertyCell label="Drag Speed" span={2} hint="Sensitivity multiplier for the relative drag. 1 means 250px of travel (knob) or one full turn (rotary) covers the whole range.">
+          <NumberInput value={behavior.circularDragSensitivity ?? 1} step={0.1} min={0.1} max={10} onchange={(value) => set('Behavior.circularDragSensitivity', Math.max(0.1, Math.min(10, value)))} />
+        </PropertyCell>
+      {/if}
     {/if}
   </PropertySection>
 

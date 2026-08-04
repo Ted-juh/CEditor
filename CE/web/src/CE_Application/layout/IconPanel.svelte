@@ -108,67 +108,145 @@
       .slice(0, 3);
   });
 
-  const insertGroups = [
-    [
-      { type: 'Background',      icon: Square,             label: 'Insert Background' },
-      { type: 'Label',           icon: Type,               label: 'Insert Label' },
-      { type: 'TextInput',       icon: TextCursorInput,    label: 'Insert Text Input' },
-      { type: 'Container',       icon: Container,          label: 'Insert Container' },
-      { type: 'Group',           icon: Container,          label: 'Insert Group / Frame' },
-      { type: 'Image',           icon: Square,             label: 'Insert Image' },
-      { type: 'LcdDisplay',      icon: Monitor,            label: 'Insert LCD Display' },
-      { type: 'PixelDisplay',    icon: Grid3x3,            label: 'Insert Pixel Display' },
-      { type: 'Meter',           icon: Gauge,              label: 'Insert Meter' },
-      { type: 'Envelope',        icon: Spline,             label: 'Insert Envelope' },
-      { type: 'Matrix',          icon: Grid2x2,            label: 'Insert Mod Matrix' },
-      { type: 'VectorJoystick',  icon: Crosshair,          label: 'Insert Vector Joystick' },
-      { type: 'Crossfader',      icon: ArrowLeftRight,     label: 'Insert Crossfader' },
-      { type: 'Ribbon',          icon: SlidersVertical,    label: 'Insert Ribbon / Wheel' },
-      { type: 'Macro',           icon: CircleDashed,       label: 'Insert Macro' },
-      { type: 'Orbit',           icon: Orbit,              label: 'Insert Orbit Modulator' },
-      { type: 'Looper',          icon: AudioWaveform,      label: 'Insert Gesture Looper' },
-      { type: 'Router',          icon: Waypoints,          label: 'Insert Expression Router' },
-      { type: 'Timbre',          icon: Palette,            label: 'Insert Timbre Space' },
-      { type: 'Turing',          icon: BarChart3,          label: 'Insert Turing Modulator' },
-      { type: 'Kinetic',         icon: Circle,             label: 'Insert Kinetic Modulator' },
-      { type: 'Constellation',   icon: Sparkle,            label: 'Insert Preset Constellation' },
-      { type: 'Constraint',      icon: Link2,              label: 'Insert Constraint Cell' },
-      { type: 'ChordPad',        icon: Music,              label: 'Insert Chord Pad' },
-      { type: 'Arp',             icon: ListMusic,          label: 'Insert Arpeggiator' },
-      { type: 'NoteRibbon',      icon: Piano,              label: 'Insert Ribbon Keyboard' },
-      { type: 'DrumPads',        icon: LayoutGrid,         label: 'Insert Drum Pads' },
-      { type: 'Panic',           icon: OctagonAlert,       label: 'Insert Panic button' },
-      { type: 'Transport',       icon: Timer,              label: 'Insert Transport (master clock)' },
-      { type: 'SplitZone',       icon: SplitSquareHorizontal, label: 'Insert Zone Splitter (keyboard split)' },
-      { type: 'Phrase',          icon: Grid2x2Check,       label: 'Insert Phrase Sequencer (note grid)' },
-      { type: 'Recorder',        icon: Disc3,              label: 'Insert Phrase Recorder (record + loop notes)' },
-      { type: 'Harmoniser',      icon: Layers,             label: 'Insert Harmoniser (one finger, full chord)' },
-      { type: 'Setlist',         icon: ListOrdered,        label: 'Insert Setlist (scenes on a footswitch)' },
-    ],
-    [
-      { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },
-      { type: 'ToggleButton',    icon: ToggleLeft,          label: 'Insert Toggle Button' },
-      { type: 'RadioButtonGroup', icon: CircleDot,          label: 'Insert Radio Button Group' },
-      { type: 'CyclicButton',    icon: RefreshCw,           label: 'Insert Cyclic Button' },
-      { type: 'Combobox',        icon: ListCollapse,        label: 'Insert Combobox' },
-      { type: 'Listbox',         icon: List,                label: 'Insert Listbox' },
-      { type: 'TimedButton',     icon: TimerReset,          label: 'Insert Timed Button' },
-      { type: 'OneShotButton',   icon: BadgeCheck,          label: 'Insert One-Shot Button' },
-    ],
-    [
-      { type: 'Range',           icon: SlidersHorizontal,   label: 'Insert Range' },
-      { type: 'Number',          icon: RectangleHorizontal, label: 'Insert Number' },
-      { type: 'Slider',          icon: SlidersVertical,     label: 'Insert Slider' },
-      { type: 'Knob',            icon: CircleDot,           label: 'Insert Knob' },
-      { type: 'CustomComponent', icon: Container,           label: 'Insert Custom Component' },
-    ],
+  // One button per category; the components live in a flyout beside it, so
+  // the column stays short as the palette grows.
+  const insertCategories = [
+    {
+      id: 'layout',
+      label: 'Layout & Display',
+      icon: Monitor,
+      items: [
+        { type: 'Background',      icon: Square,             label: 'Insert Background' },
+        { type: 'Label',           icon: Type,               label: 'Insert Label' },
+        { type: 'TextInput',       icon: TextCursorInput,    label: 'Insert Text Input' },
+        { type: 'Container',       icon: Container,          label: 'Insert Container' },
+        { type: 'Group',           icon: Container,          label: 'Insert Group / Frame' },
+        { type: 'Image',           icon: Square,             label: 'Insert Image' },
+        { type: 'LcdDisplay',      icon: Monitor,            label: 'Insert LCD Display' },
+        { type: 'PixelDisplay',    icon: Grid3x3,            label: 'Insert Pixel Display' },
+        { type: 'Meter',           icon: Gauge,              label: 'Insert Meter' },
+      ],
+    },
+    {
+      id: 'buttons',
+      label: 'Buttons & Choices',
+      icon: ToggleLeft,
+      items: [
+        { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },
+        { type: 'ToggleButton',    icon: ToggleLeft,          label: 'Insert Toggle Button' },
+        { type: 'RadioButtonGroup', icon: CircleDot,          label: 'Insert Radio Button Group' },
+        { type: 'CyclicButton',    icon: RefreshCw,           label: 'Insert Cyclic Button' },
+        { type: 'Combobox',        icon: ListCollapse,        label: 'Insert Combobox' },
+        { type: 'Listbox',         icon: List,                label: 'Insert Listbox' },
+        { type: 'TimedButton',     icon: TimerReset,          label: 'Insert Timed Button' },
+        { type: 'OneShotButton',   icon: BadgeCheck,          label: 'Insert One-Shot Button' },
+      ],
+    },
+    {
+      id: 'values',
+      label: 'Values & Sliders',
+      icon: SlidersVertical,
+      items: [
+        { type: 'Slider',          icon: SlidersVertical,     label: 'Insert Slider' },
+        { type: 'Knob',            icon: CircleDot,           label: 'Insert Knob' },
+        { type: 'Range',           icon: SlidersHorizontal,   label: 'Insert Range' },
+        { type: 'Number',          icon: RectangleHorizontal, label: 'Insert Number' },
+        { type: 'Crossfader',      icon: ArrowLeftRight,     label: 'Insert Crossfader' },
+        { type: 'Ribbon',          icon: SlidersVertical,    label: 'Insert Ribbon / Wheel' },
+        { type: 'Macro',           icon: CircleDashed,       label: 'Insert Macro' },
+        { type: 'VectorJoystick',  icon: Crosshair,          label: 'Insert Vector Joystick' },
+        { type: 'CustomComponent', icon: Container,           label: 'Insert Custom Component' },
+      ],
+    },
+    {
+      id: 'modulation',
+      label: 'Modulation & Routing',
+      icon: Orbit,
+      items: [
+        { type: 'Envelope',        icon: Spline,             label: 'Insert Envelope' },
+        { type: 'Matrix',          icon: Grid2x2,            label: 'Insert Mod Matrix' },
+        { type: 'Orbit',           icon: Orbit,              label: 'Insert Orbit Modulator' },
+        { type: 'Looper',          icon: AudioWaveform,      label: 'Insert Gesture Looper' },
+        { type: 'Router',          icon: Waypoints,          label: 'Insert Expression Router' },
+        { type: 'Timbre',          icon: Palette,            label: 'Insert Timbre Space' },
+        { type: 'Turing',          icon: BarChart3,          label: 'Insert Turing Modulator' },
+        { type: 'Kinetic',         icon: Circle,             label: 'Insert Kinetic Modulator' },
+        { type: 'Constellation',   icon: Sparkle,            label: 'Insert Preset Constellation' },
+        { type: 'Constraint',      icon: Link2,              label: 'Insert Constraint Cell' },
+      ],
+    },
+    {
+      id: 'music',
+      label: 'Music & Performance',
+      icon: Music,
+      items: [
+        { type: 'ChordPad',        icon: Music,              label: 'Insert Chord Pad' },
+        { type: 'Arp',             icon: ListMusic,          label: 'Insert Arpeggiator' },
+        { type: 'NoteRibbon',      icon: Piano,              label: 'Insert Ribbon Keyboard' },
+        { type: 'DrumPads',        icon: LayoutGrid,         label: 'Insert Drum Pads' },
+        { type: 'Phrase',          icon: Grid2x2Check,       label: 'Insert Phrase Sequencer (note grid)' },
+        { type: 'Recorder',        icon: Disc3,              label: 'Insert Phrase Recorder (record + loop notes)' },
+        { type: 'Harmoniser',      icon: Layers,             label: 'Insert Harmoniser (one finger, full chord)' },
+        { type: 'SplitZone',       icon: SplitSquareHorizontal, label: 'Insert Zone Splitter (keyboard split)' },
+        { type: 'Setlist',         icon: ListOrdered,        label: 'Insert Setlist (scenes on a footswitch)' },
+        { type: 'Transport',       icon: Timer,              label: 'Insert Transport (master clock)' },
+        { type: 'Panic',           icon: OctagonAlert,       label: 'Insert Panic button' },
+      ],
+    },
   ];
 
+  function itemName(item) {
+    return item.label.replace(/^Insert /, '');
+  }
+
   const customLibraryKinds = ['all', 'button', 'slider', 'multi', 'grid', 'piano', 'filmstrip', 'linked'];
+
+  let openCategoryId = $state('');
+  let flyoutTop = $state(0);
+
+  function toggleCategory(category, event) {
+    if (openCategoryId === category.id) {
+      openCategoryId = '';
+      return;
+    }
+    openCategoryId = category.id;
+    positionFlyout(event);
+  }
+
+  function switchCategoryOnHover(category, event) {
+    // Menubar feel: once one flyout is open, hovering a sibling switches to it.
+    if (!openCategoryId || openCategoryId === category.id) return;
+    openCategoryId = category.id;
+    positionFlyout(event);
+  }
+
+  function positionFlyout(event) {
+    const rect = event?.currentTarget?.getBoundingClientRect?.();
+    const top = rect ? rect.top : 48;
+    // Keep the tallest flyout on screen; it scrolls internally past 60vh.
+    flyoutTop = Math.max(8, Math.min(top, window.innerHeight * 0.4));
+  }
+
+  function closeCategory() {
+    openCategoryId = '';
+  }
+
+  function handleWindowPointerDown(event) {
+    if (!openCategoryId) return;
+    if (event.target?.closest?.('.category-flyout, .category-btn')) return;
+    closeCategory();
+  }
+
+  function handleWindowKeydown(event) {
+    if (event.key === 'Escape' && openCategoryId) closeCategory();
+  }
+
+  let openCategory = $derived(insertCategories.find((category) => category.id === openCategoryId) ?? null);
 
   function handleInsert(type) {
     if (!hasActivePanel) return;
     addControl(type);
+    closeCategory();
   }
 
   function handleInsertPackage(entry) {
@@ -228,25 +306,25 @@
   }
 </script>
 
-<div class="icon-panel">
-  {#each insertGroups as group, groupIndex}
-    <div class="insert-section">
-      {#each group as component}
-        <button
-          class="icon-btn"
-          title={hasActivePanel ? component.label : `${component.label} (open a panel first)`}
-          onclick={() => handleInsert(component.type)}
-          disabled={!hasActivePanel}
-        >
-          <component.icon size={18} strokeWidth={1.5} />
-        </button>
-      {/each}
-    </div>
+<svelte:window onpointerdown={handleWindowPointerDown} onkeydown={handleWindowKeydown} />
 
-    {#if groupIndex < insertGroups.length - 1}
-      <div class="separator"></div>
-    {/if}
-  {/each}
+<div class="icon-panel">
+  <div class="insert-section">
+    {#each insertCategories as category (category.id)}
+      <button
+        class="icon-btn category-btn"
+        class:active={openCategoryId === category.id}
+        title={category.label}
+        aria-haspopup="menu"
+        aria-expanded={openCategoryId === category.id}
+        onclick={(event) => toggleCategory(category, event)}
+        onmouseenter={(event) => switchCategoryOnHover(category, event)}
+      >
+        <category.icon size={18} strokeWidth={1.5} />
+        <i class="flyout-marker" aria-hidden="true"></i>
+      </button>
+    {/each}
+  </div>
 
   {#if ($customComponentLibrary ?? []).length}
     <div class="separator"></div>
@@ -306,6 +384,24 @@
     </button>
   </div>
 </div>
+
+{#if openCategory}
+  <div class="category-flyout" role="menu" aria-label={openCategory.label} style={`top:${flyoutTop}px;`}>
+    <div class="flyout-title">{openCategory.label}</div>
+    {#each openCategory.items as item (item.type)}
+      <button
+        class="flyout-item"
+        role="menuitem"
+        title={hasActivePanel ? item.label : `${item.label} (open a panel first)`}
+        onclick={() => handleInsert(item.type)}
+        disabled={!hasActivePanel}
+      >
+        <item.icon size={16} strokeWidth={1.5} />
+        <span>{itemName(item)}</span>
+      </button>
+    {/each}
+  </div>
+{/if}
 
 {#if customLibraryOpen}
   <div class="custom-library-drawer">
@@ -515,6 +611,68 @@
 
   .package-btn.invalid span {
     color: #D9A58A;
+  }
+
+  .flyout-marker {
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-bottom: 4px solid currentColor;
+    opacity: 0.55;
+  }
+
+  .category-flyout {
+    position: fixed;
+    left: 46px;
+    z-index: 90;
+    min-width: 180px;
+    max-height: 60vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 6px;
+    background: #242424;
+    border: 1px solid #3A3A3A;
+    border-radius: 6px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  }
+
+  .flyout-title {
+    padding: 4px 8px 6px;
+    color: #9A9A9A;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .flyout-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: #CCC;
+    font-size: 11px;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .flyout-item:hover:not(:disabled) {
+    background: #094771;
+    color: #FFF;
+  }
+
+  .flyout-item:disabled {
+    color: #5A5A5A;
+    cursor: not-allowed;
   }
 
   .custom-library-drawer {

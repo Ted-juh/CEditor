@@ -7,6 +7,7 @@
   import { clampNumber } from '../utils/customDesignSurfaceGeometry.js';
   import { stopSelectionAction } from '../utils/customDesignSurfaceHelpers.js';
   import { noteNameFromMidi } from '../utils/customComponentArpeggiator.js';
+  import { DragScrub, presets } from '../scrub/dragScrub';
 
   let {
     arpeggiatorEnabled = false,
@@ -120,15 +121,35 @@
     window.addEventListener('mouseup', handleInteractionEnd);
   }
 
+  function scrubSampleFromEvent(event) {
+    return {
+      x: event.clientX,
+      y: event.clientY,
+      shiftKey: event.shiftKey,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      altKey: event.altKey,
+    };
+  }
+
   function beginArpVelocityDrag(block, event) {
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
     selectArpBlock(block.id);
-    interaction = { type: 'arpVelocity', id: block.id, block };
+    // The grab element is the small handle but the mapping runs over the whole
+    // block, so the core is driven directly with the block rect as bounds.
+    const blockEl = event.currentTarget?.closest?.('.arp-block') ?? document.querySelector(`.arp-block[data-block-id="${block.id}"]`);
+    const rect = blockEl?.getBoundingClientRect?.();
+    if (!rect) return;
+    const scrub = new DragScrub(
+      { ...presets.linearVertical, min: 1, max: 127, step: 1 },
+      clampNumber(numberOr(block.velocity, 96), 1, 127)
+    );
+    interaction = { type: 'arpVelocity', id: block.id, scrub };
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
-    updateArpVelocityFromEvent(block.id, event);
+    applyArpVelocity(block.id, scrub.begin(scrubSampleFromEvent(event), { bounds: rect, jumpToPointer: true }));
   }
 
   function handleArpBlockPointer(block, event) {
@@ -149,12 +170,9 @@
     beginArpBlockMove(block, event);
   }
 
-  function updateArpVelocityFromEvent(id, event) {
-    const blockEl = event.currentTarget?.closest?.('.arp-block') ?? document.querySelector(`.arp-block[data-block-id="${id}"]`);
-    const rect = blockEl?.getBoundingClientRect?.();
-    if (!rect) return;
-    const normalized = clampNumber(1 - ((event.clientY - rect.top) / Math.max(1, rect.height)), 0, 1);
-    const velocity = Math.max(1, Math.min(127, Math.round(normalized * 127)));
+  function applyArpVelocity(id, value) {
+    if (value === null || value === undefined) return;
+    const velocity = Math.round(value);
     setArpBlocks(arpBlocks.map((block) => block.id === id ? { ...block, velocity } : block), id);
   }
 
@@ -194,7 +212,7 @@
       return;
     }
     if (interaction.type === 'arpVelocity') {
-      updateArpVelocityFromEvent(interaction.id, event);
+      applyArpVelocity(interaction.id, interaction.scrub.move(scrubSampleFromEvent(event)));
       return;
     }
   }
@@ -203,6 +221,7 @@
     if (!interaction) return;
     window.removeEventListener('mousemove', handleInteractionMove);
     window.removeEventListener('mouseup', handleInteractionEnd);
+    interaction.scrub?.end();
 
     if (interaction.type === 'arpDraw') {
       const block = arpDraftBlock;

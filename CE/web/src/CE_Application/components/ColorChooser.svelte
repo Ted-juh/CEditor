@@ -13,6 +13,9 @@
 
   import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb, alphaToHex } from '../utils/colorMath.js';
   import { hueBand, saturationBand, lightnessBand, alphaBand } from '../utils/bandGradients.js';
+  import { dragScrub } from '../scrub/dragScrubAction';
+  import { presets } from '../scrub/dragScrub';
+  import { appScrubOverrides } from '../utils/scrubRuntime.js';
 
   let { color = '333333', alpha: propAlpha = 1, stepSize = 10, onchange } = $props();
 
@@ -21,7 +24,6 @@
   let saturation = $state(0);
   let lightness = $state(20);
   let alpha = $state(1);
-  let dragging = $state(null);
   let hexInput = $state('');
   let editingHex = $state(false);
 
@@ -90,40 +92,60 @@
   }
 
   // --- Drag handling ---
-  function getBandValue(e, bandEl) {
-    const rect = bandEl.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-    return x / rect.width;
-  }
+  // Each band is an absolute horizontal track. Saturation and alpha grow
+  // right-to-left (invertX), matching the gradients they float over.
+  let bandParams = $derived({
+    hue: {
+      ...presets.linearHorizontal,
+      ...appScrubOverrides(),
+      min: 0,
+      max: 360,
+      step: (stepSize / 100) * 360,
+      value: hue,
+      manageCursor: false,
+      onChange: (v) => { hue = v; fireChange(); },
+    },
+    saturation: {
+      ...presets.linearHorizontal,
+      ...appScrubOverrides(),
+      invertX: true,
+      min: 0,
+      max: 100,
+      step: stepSize,
+      value: saturation,
+      manageCursor: false,
+      onChange: (v) => { saturation = v; fireChange(); },
+    },
+    lightness: {
+      ...presets.linearHorizontal,
+      ...appScrubOverrides(),
+      min: 0,
+      max: 100,
+      step: stepSize,
+      value: lightness,
+      manageCursor: false,
+      onChange: (v) => { lightness = v; fireChange(); },
+    },
+    alpha: {
+      ...presets.linearHorizontal,
+      ...appScrubOverrides(),
+      invertX: true,
+      min: 0,
+      max: 100,
+      step: stepSize,
+      value: alpha * 100,
+      manageCursor: false,
+      onChange: (v) => { alpha = v / 100; fireChange(); },
+    },
+  });
 
-  function startDrag(band, e) {
-    dragging = band;
-    updateFromDrag(e);
-  }
-
-  function snap(value, max) {
-    const step = (stepSize / 100) * max;
-    return Math.round(value / step) * step;
-  }
-
-  function updateFromDrag(e) {
-    if (!dragging) return;
-    const bandEl = document.querySelector(`[data-band="${dragging}"]`);
-    if (!bandEl) return;
-    const ratio = getBandValue(e, bandEl);
-
-    switch (dragging) {
-      case 'hue':        hue = snap(ratio * 360, 360); break;
-      case 'saturation': saturation = snap((1 - ratio) * 100, 100); break;
-      case 'lightness':  lightness = snap(ratio * 100, 100); break;
-      case 'alpha':      alpha = snap((1 - ratio) * 100, 100) / 100; break;
+  function getBandNow(id) {
+    switch (id) {
+      case 'hue': return Math.round(hue);
+      case 'saturation': return Math.round(saturation);
+      case 'lightness': return Math.round(lightness);
+      case 'alpha': return Math.round(alpha * 100);
     }
-
-    fireChange();
-  }
-
-  function stopDrag() {
-    dragging = null;
   }
 
   // --- Hex input ---
@@ -191,11 +213,6 @@
   }
 </script>
 
-<svelte:window
-  onmousemove={dragging ? updateFromDrag : undefined}
-  onmouseup={dragging ? stopDrag : undefined}
-/>
-
 <div class="color-chooser">
   <!-- Checkerboard (visible through alpha) -->
   <div class="checkerboard"></div>
@@ -221,15 +238,17 @@
   <div class="bands-container">
     {#each bands as band}
       <div class="band-wrapper">
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           class="band"
           class:is-alpha={band.id === 'alpha'}
           data-band={band.id}
           role="slider"
-          tabindex="-1"
-          aria-valuenow={getThumbPos(band.id) * 100}
-          onmousedown={(e) => startDrag(band.id, e)}
+          tabindex="0"
+          aria-label={band.label}
+          aria-valuemin={0}
+          aria-valuemax={band.id === 'hue' ? 360 : 100}
+          aria-valuenow={getBandNow(band.id)}
+          use:dragScrub={bandParams[band.id]}
         >
           {#if band.id === 'alpha'}
             <div class="band-checkerboard"></div>
@@ -345,6 +364,11 @@
 
   .band:hover .band-label {
     opacity: 1;
+  }
+
+  .band:focus-visible {
+    outline: 2px solid #5B9BD5;
+    outline-offset: 1px;
   }
 
   .hex-corner {

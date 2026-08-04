@@ -25,9 +25,17 @@
     resolveRangeDisplayValue,
     resolveRangeZone,
     resolveMouseDirection,
-    scrubRangeValue,
     snapRangeValue,
   } from '../utils/rangeBehavior.js';
+  import {
+    createCircularSliderScrub,
+    createRangeScrub,
+    createRangeTrackScrub,
+    createSliderTrackScrub,
+    getCircularSliderDragMode,
+    isLinearSliderGeometry,
+    scrubSample,
+  } from '../utils/scrubRuntime.js';
   import {
     formatSliderNumericValue,
     getSliderActiveHandle,
@@ -84,6 +92,8 @@
   let pointerDownPoint = $state({ x: 0, y: 0 });
   let pointerDownZone = $state('');
   let pointerStartValue = $state(0);
+  let rangeScrub = null;
+  let sliderScrub = null;
   let pointerSliderHandle = $state('');
   let pointerCustomHitZone = $state(null);
   let pointerCustomStartValues = $state({});
@@ -263,6 +273,10 @@
   function removeWindowListeners() {
     window.removeEventListener('pointermove', handleWindowPointerMove);
     window.removeEventListener('pointerup', handleWindowPointerUp);
+    rangeScrub?.end();
+    rangeScrub = null;
+    sliderScrub?.end();
+    sliderScrub = null;
   }
 
   onDestroy(() => {
@@ -474,6 +488,7 @@
       startClientY: pointerDownPoint?.y,
       startValues: pointerCustomStartValues,
       fine: event?.shiftKey === true,
+      coarse: event?.ctrlKey === true || event?.metaKey === true,
     });
     if (!Object.keys(patch).length) return;
     patchSession({
@@ -525,6 +540,7 @@
       startClientY: pointerDownPoint?.y,
       startNormalized: normalizeCustomChannelValue(channel, pointerCustomStartValues?.[channelName] ?? customSessionValues()?.[channelName] ?? channel?.defaultValue),
       fine: event.shiftKey === true,
+      coarse: event.ctrlKey === true || event.metaKey === true,
     });
     const nextValue = denormalizeCustomChannelValue(channel, normalized);
     patchSession({
@@ -707,7 +723,11 @@
     if (!rect) return currentSliderRoleValue(currentSliderActiveHandle());
     const min = getRangeMin(behavior);
     const max = getRangeMax(behavior);
-    const normalized = resolveSliderNormalizedFromPoint(behavior, rect, event.clientX, event.clientY);
+    // A live scrub means a linear drag is in progress; circular tracks (and
+    // one-shot hit tests like handle picking) use the pure geometry mapping.
+    const normalized = sliderScrub
+      ? (sliderScrub.move(scrubSample(event)) ?? sliderScrub.value)
+      : resolveSliderNormalizedFromPoint(behavior, rect, event.clientX, event.clientY);
     return snapSliderValue(behavior, min + ((max - min) * normalized));
   }
 
@@ -1022,16 +1042,17 @@
 
     const min = getRangeMin(behavior);
     const max = getRangeMax(behavior);
-    const normalized = normalizedRangePointerValue(behavior, rect, event.clientX, event.clientY);
+    const normalized = sliderScrub
+      ? (sliderScrub.move(scrubSample(event)) ?? sliderScrub.value)
+      : normalizedRangePointerValue(behavior, rect, event.clientX, event.clientY);
     setRangeValue(min + ((max - min) * normalized));
   }
 
   function updateScrubRangeFromPointer(event) {
-    if (!isRangeControl()) return;
-    setRangeValue(
-      scrubRangeValue(behavior, pointerStartValue, pointerDownPoint, { x: event.clientX, y: event.clientY }),
-      { dragging: true }
-    );
+    if (!isRangeControl() || !rangeScrub) return;
+    const next = rangeScrub.move(scrubSample(event));
+    if (next === null) return;
+    setRangeValue(next, { dragging: true });
   }
 
   function maybeStartRangeDrag(event) {
@@ -1042,6 +1063,10 @@
     if (Math.max(dx, dy) < 5) return false;
 
     draggingRange = true;
+    // Anchor at the pointer-down point, not the threshold crossing, so the
+    // first fed move spans the whole distance travelled — same feel as before.
+    rangeScrub = createRangeScrub(behavior, pointerStartValue);
+    rangeScrub.begin({ x: pointerDownPoint.x, y: pointerDownPoint.y });
     patchSession({ dragging: true });
     return true;
   }
@@ -1325,6 +1350,7 @@
       ? resolveRangeZone(behavior, hitboxElement?.getBoundingClientRect?.(), event.clientX, event.clientY)
       : '';
     pointerSliderHandle = '';
+    sliderScrub = null;
 
     let nextSliderHandle = '';
     if (isSliderControl()) {
@@ -1351,6 +1377,18 @@
       timedButtonPreview.beginPress(control?._children?.Core?.id, behavior);
     }
     if (draggingRange) {
+      const rect = hitboxElement?.getBoundingClientRect?.();
+      if (rect && (!isSliderControl() || isLinearSliderGeometry(behavior))) {
+        sliderScrub = isSliderControl() ? createSliderTrackScrub(behavior) : createRangeTrackScrub(behavior);
+        sliderScrub.begin(scrubSample(event), { bounds: rect, jumpToPointer: true });
+      } else if (rect && getCircularSliderDragMode(behavior) !== 'absolute') {
+        // Relative dial drag: start from the picked handle's value, no jump.
+        const min = getRangeMin(behavior);
+        const span = getRangeMax(behavior) - min;
+        const role = nextSliderHandle || currentSliderActiveHandle();
+        sliderScrub = createCircularSliderScrub(behavior, span > 0 ? (currentSliderRoleValue(role) - min) / span : 0);
+        sliderScrub.begin(scrubSample(event), { bounds: rect });
+      }
       updateSliderRangeFromPointer(event, nextSliderHandle);
     }
     window.addEventListener('pointermove', handleWindowPointerMove);

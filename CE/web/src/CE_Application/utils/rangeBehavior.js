@@ -199,23 +199,3 @@ export function resolveRangeZone(behavior = null, rect = null, clientX = 0, clie
   return 'value';
 }
 
-export function scrubRangeValue(behavior = null, startValue = 0, startClient = { x: 0, y: 0 }, currentClient = { x: 0, y: 0 }) {
-  const orientation = getRangeOrientation(behavior);
-  const direction = getRangeDirection(behavior);
-  const pixelsPerStep = 18;
-
-  let primaryDelta = orientation === 'vertical'
-    ? numberOr(startClient?.y, 0) - numberOr(currentClient?.y, 0)
-    : numberOr(currentClient?.x, 0) - numberOr(startClient?.x, 0);
-
-  if ((orientation === 'horizontal' && direction === 'rtl') || (orientation === 'vertical' && direction === 'ttb')) {
-    primaryDelta *= -1;
-  }
-  if (isMouseDirectionReversed(behavior)) {
-    primaryDelta *= -1;
-  }
-
-  const stepDelta = Math.trunc(primaryDelta / pixelsPerStep);
-  if (stepDelta === 0) return snapRangeValue(behavior, startValue);
-  return adjustRangeValue(behavior, startValue, stepDelta < 0 ? -1 : 1, Math.abs(stepDelta));
-}
