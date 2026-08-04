@@ -566,6 +566,8 @@ pre code { font-size: inherit; }
       <a href="#from-data">Eight, from a table</a>
       <a href="#drumkit">Asking the instrument</a>
       <a href="#wiring">A panel is a graph</a>
+      <a href="#sequencer">A step sequencer</a>
+      <a href="#ghost">A synth that does not exist</a>
     </div>
     <div data-nav="reference">
       <h2>Reference</h2>
@@ -588,7 +590,7 @@ pre code { font-size: inherit; }
      you scrolled through the others to reach it. -->
 <nav class="views" id="views" aria-label="Sections of the manual">
   <a href="#/manual" data-view="manual">Manual<span>Ten lessons, in order</span></a>
-  <a href="#/tutorials" data-view="tutorials">Tutorials<span>Four panels, built step by step</span></a>
+  <a href="#/tutorials" data-view="tutorials">Tutorials<span>Six panels, built step by step</span></a>
   <a href="#/reference" data-view="reference">Reference<span>Every module and verb</span></a>
 </nav>
 
@@ -1175,7 +1177,7 @@ function onError(info) {
 <section id="tutorials">
   <div class="rule-head">
     <h2>Tutorials</h2>
-    <p>Four panels, built from nothing, one line at a time</p>
+    <p>Six panels, built from nothing, one line at a time</p>
     <span style="flex:1"></span>
     <div class="lang-pick" role="group" aria-label="Sample language">
       <button type="button" data-lang="lua" aria-pressed="true">Lua</button>
@@ -1912,6 +1914,296 @@ end</code></pre>
         <code>Reso &rarr; Screen.valueSource</code>,
         <code>Title &rarr; Screen.backlightSource</code>.
       </p>
+    </div>
+  </div>
+
+  <div class="lesson wide" id="sequencer">
+    <p class="lesson-n">05 &middot; A step sequencer</p>
+    <div class="lesson-text prose">
+      <h3>Make the panel play notes, in time, on its own</h3>
+      <p>
+        This tutorial builds a small instrument: eight step buttons, a PLAY button, and a NEW
+        button. Press PLAY and the panel plays a note pattern, in time with the clock. Press NEW
+        and you get a fresh pattern. You need no hardware for this. Everything runs in the
+        preview.
+      </p>
+      <p>
+        The first block builds the row. Each step is a toggle button. A toggle button holds a
+        value: 1 when it is on, 0 when it is off. That value <b>is</b> the pattern memory. A step
+        plays when its button is on. There is no separate list to keep in sync.
+      </p>
+      <p>
+        The second block makes a pattern. <code>ce.music.scale(48, "pentatonicMin")</code> gives
+        the five notes of a C minor pentatonic scale. Notes from one scale always sound good
+        together. That is why generated patterns here are never sour.
+        <code>ce.math.euclid(8, 5)</code> spreads 5 hits as evenly as possible over 8 steps. This
+        gives a musical rhythm instead of a random one.
+      </p>
+      <p>
+        Notice <code>ce.math.seed(state.seed)</code>. The random commands in this API are seeded.
+        The same seed number always gives the same "random" pattern, in every language. So a
+        pattern is saved as one small number. NEW just counts the seed up by one. Press NEW three
+        times, and pattern number 3 is always the same pattern number 3.
+      </p>
+      <p>
+        The third block is the clock. <code>ce.time.syncTimer("beat", 0.25)</code> fires the
+        timer every quarter of a beat. That is a sixteenth note. The timer follows the tempo: turn
+        the tempo up and the pattern speeds up with it. On each tick, <code>onTimer</code> moves
+        one step forward, wraps back to step 1 after step 8, and plays the step's note if its
+        button is on. The last number in <code>sendNote</code> releases the note after 120
+        milliseconds. You never send a note-off yourself.
+      </p>
+      <p class="note">
+        Every command in this tutorial is cross-runtime. So the sequencer keeps playing in a DAW
+        with the plugin window closed. This is the situation the "Where scripts run" note in
+        lesson 05 describes. One more idea to try: the pattern lives in <code>state</code>, so it
+        is gone when the panel reloads. Save <code>state.seed</code> with
+        <code>ce.storage.saveSetting</code> and restore it in <code>onPanelReady</code>, and your
+        pattern survives.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">The row of steps</p>
+      <pre data-lua><code>local STEPS = 8
+local CH = 1
+
+function onPanelBuild()
+  ce.panel.batch(function()
+    for i = 1, STEPS do
+      ce.panel.create("Button", {
+        name = "step" .. i, x = 16 + (i - 1) * 40, y = 40, width = 36, height = 36,
+      })
+      set("step" .. i .. ".Behavior.subtype", "toggle")
+    end
+    ce.panel.create("Button", { name = "play", x = 16, y = 90, width = 76, height = 28 })
+    set("play.Text.content", "PLAY")
+    set("play.Behavior.subtype", "toggle")
+    ce.panel.create("Button", { name = "gen", x = 100, y = 90, width = 76, height = 28 })
+    set("gen.Text.content", "NEW")
+    ce.panel.create("Label", { name = "pos", x = 184, y = 90, width = 100, height = 28 })
+  end)
+  newPattern()
+end</code></pre>
+      <pre data-js hidden><code>const STEPS = 8
+const CH = 1
+
+function onPanelBuild() {
+  ce.panel.batch(() => {
+    for (let i = 1; i <= STEPS; i += 1) {
+      ce.panel.create("Button", {
+        name: "step" + i, x: 16 + (i - 1) * 40, y: 40, width: 36, height: 36,
+      })
+      set("step" + i + ".Behavior.subtype", "toggle")
+    }
+    ce.panel.create("Button", { name: "play", x: 16, y: 90, width: 76, height: 28 })
+    set("play.Text.content", "PLAY")
+    set("play.Behavior.subtype", "toggle")
+    ce.panel.create("Button", { name: "gen", x: 100, y: 90, width: 76, height: 28 })
+    set("gen.Text.content", "NEW")
+    ce.panel.create("Label", { name: "pos", x: 184, y: 90, width: 100, height: 28 })
+  })
+  newPattern()
+}</code></pre>
+
+      <p class="cap">A pattern from a seed</p>
+      <pre data-lua><code>function newPattern()
+  state.seed = (state.seed or 0) + 1
+  ce.math.seed(state.seed)
+  local notes = ce.music.scale(48, "pentatonicMin")
+  local hits = ce.math.euclid(8, 5)
+  state.notes = {}
+  for i = 1, STEPS do
+    state.notes[i] = ce.math.choice(notes)
+    set("step" .. i .. ".value", hits[i] and 1 or 0)
+  end
+end</code></pre>
+      <pre data-js hidden><code>function newPattern() {
+  state.seed = (state.seed ?? 0) + 1
+  ce.math.seed(state.seed)
+  const notes = ce.music.scale(48, "pentatonicMin")
+  const hits = ce.math.euclid(8, 5)
+  state.notes = {}
+  for (let i = 1; i <= STEPS; i += 1) {
+    state.notes[i] = ce.math.choice(notes)
+    set("step" + i + ".value", hits[i - 1] ? 1 : 0)
+  }
+}</code></pre>
+
+      <p class="cap">The clock</p>
+      <pre data-lua><code>on("gen", "click", function()
+  newPattern()
+end)
+
+on("play", "valueChanged", function(value)
+  if value > 0 then
+    state.step = 0
+    ce.time.syncTimer("beat", 0.25)
+  else
+    ce.time.stopTimer("beat")
+  end
+end)
+
+function onTimer(info)
+  if info.id ~= "beat" then return end
+  state.step = state.step % STEPS + 1
+  set("pos.Text.content", "step " .. state.step)
+  if get("step" .. state.step .. ".value") > 0 then
+    sendNote(CH, state.notes[state.step], 100, 120)
+  end
+end</code></pre>
+      <pre data-js hidden><code>on("gen", "click", () => {
+  newPattern()
+})
+
+on("play", "valueChanged", (value) => {
+  if (value > 0) {
+    state.step = 0
+    ce.time.syncTimer("beat", 0.25)
+  } else {
+    ce.time.stopTimer("beat")
+  }
+})
+
+function onTimer(info) {
+  if (info.id !== "beat") return
+  state.step = state.step % STEPS + 1
+  set("pos.Text.content", "step " + state.step)
+  if (get("step" + state.step + ".value") > 0) {
+    sendNote(CH, state.notes[state.step], 100, 120)
+  }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson wide" id="ghost">
+    <p class="lesson-n">06 &middot; A synth that does not exist</p>
+    <div class="lesson-text prose">
+      <h3>Teach the app a synth it has never met</h3>
+      <p>
+        Normally a device profile tells the app what your synth understands. This tutorial shows
+        what to do when there is no profile: you teach the app from a script. To keep it
+        followable for everyone, we invent a synth. Call it the FS-1. Its MIDI maker number is
+        <code>7D</code>. That number is reserved for experiments, so no real synth will ever be
+        confused by it. Because the synth is invented, we will also play its part ourselves. The
+        panel cannot tell the difference. Yours at home will work exactly the same way.
+      </p>
+      <p>
+        The first block teaches the app two parameters. <code>defineParameter</code> needs one
+        thing above all: how the value reaches the synth. For <code>cutoff</code> that is a plain
+        CC number. That is the simplest form. For <code>resonance</code> it is a SysEx message,
+        written as a template. <code>$value</code> marks where the value goes.
+        <code>$checksum</code> marks where the checksum goes, and <code>$checksumStart</code>
+        marks where the checksum starts counting. The <code>F0</code> and <code>F7</code> frame
+        bytes are added for you. A parameter with no way to reach the synth is refused, and the
+        message says why.
+      </p>
+      <p>
+        The second block builds two knobs and connects them with <code>ce.device.bind</code>.
+        Tutorial 01 warned that <code>bind()</code> says yes even for a parameter nobody has
+        declared. Here is the other half of that story: now the parameters really exist, so the
+        binding really works. Turn the Cutoff knob and CC 74 goes out. Turn Reso and the SysEx
+        message goes out, checksum and all.
+      </p>
+      <p>
+        The third block teaches the app the FS-1's patch dump. <code>defineDump</code> describes
+        three things. The bytes that ask for the dump. How to recognise the reply: it starts with
+        <code>F0 7D 01 20</code> and ends with <code>F7</code>. And where each value sits: the
+        payload starts 4 bytes in, cutoff is payload byte 0, resonance is payload byte 1. Every
+        field must name a parameter you already defined. An unknown name is refused at once.
+      </p>
+      <p>
+        Then we play the synth's part. <code>ce.midi.feed</code> injects bytes as if the hardware
+        had sent them. The reply carries the values 96 and 40. Press RECEIVE and watch: the app
+        recognises the dump, both knobs move to the values from the message, and
+        <code>onDumpReceived</code> fires. With a real synth you would send
+        <code>ce.device.requestDump("patch")</code> and the real reply would arrive the same way.
+      </p>
+      <p class="note">
+        One rule is doing quiet work here. Values that arrive <b>from</b> the synth are not sent
+        back out to it. The knobs move, and nothing echoes. Without that rule, every dump would
+        answer the synth with a storm of messages carrying the values it just told you.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Teach the app two parameters</p>
+      <pre data-lua><code>ce.device.defineParameter("cutoff", {
+  name = "Cutoff", group = "Filter", min = 0, max = 127, cc = 74,
+})
+
+ce.device.defineParameter("resonance", {
+  name = "Resonance", group = "Filter", min = 0, max = 127,
+  sysex = { "7d", "01", "42", "$checksumStart", "$value", "$checksum" },
+  checksum = "sum-7bit",
+})</code></pre>
+      <pre data-js hidden><code>ce.device.defineParameter("cutoff", {
+  name: "Cutoff", group: "Filter", min: 0, max: 127, cc: 74,
+})
+
+ce.device.defineParameter("resonance", {
+  name: "Resonance", group: "Filter", min: 0, max: 127,
+  sysex: ["7d", "01", "42", "$checksumStart", "$value", "$checksum"],
+  checksum: "sum-7bit",
+})</code></pre>
+
+      <p class="cap">Two knobs, really connected</p>
+      <pre data-lua><code>function onPanelBuild()
+  ce.panel.create("Knob", { name = "Cutoff", x = 24, y = 40, width = 64, height = 64 })
+  ce.panel.create("Knob", { name = "Reso", x = 104, y = 40, width = 64, height = 64 })
+  set("Cutoff.Behavior.max", 127)
+  set("Reso.Behavior.max", 127)
+  ce.panel.create("Button", { name = "recv", x = 24, y = 120, width = 100, height = 28 })
+  set("recv.Text.content", "RECEIVE")
+  ce.panel.create("Label", { name = "status", x = 140, y = 120, width = 160, height = 28 })
+  ce.device.bind("Cutoff", "cutoff")
+  ce.device.bind("Reso", "resonance")
+end</code></pre>
+      <pre data-js hidden><code>function onPanelBuild() {
+  ce.panel.create("Knob", { name: "Cutoff", x: 24, y: 40, width: 64, height: 64 })
+  ce.panel.create("Knob", { name: "Reso", x: 104, y: 40, width: 64, height: 64 })
+  set("Cutoff.Behavior.max", 127)
+  set("Reso.Behavior.max", 127)
+  ce.panel.create("Button", { name: "recv", x: 24, y: 120, width: 100, height: 28 })
+  set("recv.Text.content", "RECEIVE")
+  ce.panel.create("Label", { name: "status", x: 140, y: 120, width: 160, height: 28 })
+  ce.device.bind("Cutoff", "cutoff")
+  ce.device.bind("Reso", "resonance")
+}</code></pre>
+
+      <p class="cap">The dump, and the synth's part</p>
+      <pre data-lua><code>ce.device.defineDump("patch", {
+  request = { "f0", "7d", "01", "10", "f7" },
+  match = { prefix = { "f0", "7d", "01", "20" }, suffix = { "f7" } },
+  offset = 4,
+  fields = {
+    { parameter = "cutoff", offset = 0 },
+    { parameter = "resonance", offset = 1 },
+  },
+})
+
+on("recv", "click", function()
+  ce.midi.feed({ 0xF0, 0x7D, 0x01, 0x20, 96, 40, 0xF7 })
+end)
+
+function onDumpReceived(dump)
+  set("status.Text.content", "got " .. dump.kind)
+end</code></pre>
+      <pre data-js hidden><code>ce.device.defineDump("patch", {
+  request: ["f0", "7d", "01", "10", "f7"],
+  match: { prefix: ["f0", "7d", "01", "20"], suffix: ["f7"] },
+  offset: 4,
+  fields: [
+    { parameter: "cutoff", offset: 0 },
+    { parameter: "resonance", offset: 1 },
+  ],
+})
+
+on("recv", "click", () => {
+  ce.midi.feed([0xF0, 0x7D, 0x01, 0x20, 96, 40, 0xF7])
+})
+
+function onDumpReceived(dump) {
+  set("status.Text.content", "got " + dump.kind)
+}</code></pre>
     </div>
   </div>
 </section>
