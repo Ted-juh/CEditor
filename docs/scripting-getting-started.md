@@ -70,11 +70,33 @@ If something does not happen, open **Test / Trace**:
   something fired, or why it did not.
 - **Live watch** shows control values changing while you interact.
 
-Note: a few parts of the API only run in the exported plugin for now
-(timers, and `emit`/`on`/`run`). The manual marks these with availability
-badges. So if a handler stays silent, check the badge before you look for a bug.
+Everything in this guide runs live in the preview. Some commands stop working
+once the plugin window is closed in a DAW. The next section explains this.
 
-## 5. Where scripts live
+## 5. Where scripts run
+
+Your scripts can run in two places:
+
+1. **The panel window.** While you build in the editor, and while someone has
+   the plugin window open in their DAW, the panel is on screen. Scripts run
+   right there.
+2. **The plugin itself, with the window closed.** In a DAW, people close the
+   plugin window all the time. The plugin keeps making sound, and your scripts
+   keep running. Timers keep ticking. MIDI keeps arriving. There is just no
+   window anymore.
+
+Most commands work the same in both places. The manual marks them
+**cross-runtime**. Some commands need the window: drawing, asking the user a
+question, and driving the on-screen components. The manual marks them
+**panel view only**. Calling one with the window closed does nothing, and a
+note goes to the log. A few commands are marked **player**: they only work in
+the exported plugin, because they involve the DAW. `onDawSaveState` is one.
+
+So: if your script must keep working with the window closed — for example a
+timer that keeps sending MIDI — use only cross-runtime commands. Check the
+badge in the manual when you are not sure.
+
+## 6. Where scripts live
 
 A script belongs to the control or panel it is attached to. It travels with it.
 It is saved in the panel and included at export. The exported plugin runs the

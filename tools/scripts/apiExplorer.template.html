@@ -843,13 +843,18 @@ watch("cutoff.background.fill.colour", (c) =&gt; {
         console tells you which module to tick. Your script keeps running.
       </p>
       <p class="note">
-        Some commands only work while the panel window is open. The reference marks them
+        Your scripts can run in two places. The first place is the panel window, while it is
+        open. The second place is the plugin itself, with the window closed. In a DAW, people
+        close the plugin window all the time, and the plugin keeps making sound. Your scripts
+        keep running there too. Timers keep ticking. MIDI keeps arriving. Some commands need
+        the window. Drawing, asking the user a question, and driving the components are like
+        this. With the window shut, there is nothing to draw on and no one to ask. The
+        reference marks these commands
         <b class="rt-webview" style="font-family:var(--mono);font-size:11px">panel view only</b>.
-        Drawing, asking the user a question, and driving the components are all in this group.
-        The reason is simple. With the window shut, there is nothing to draw on and no one to
-        ask. The other commands are marked
-        <b class="rt-any" style="font-family:var(--mono);font-size:11px">cross-runtime</b>. They
-        work either way.
+        Calling one with the window closed does nothing, and a note goes to the log. All other
+        commands are marked
+        <b class="rt-any" style="font-family:var(--mono);font-size:11px">cross-runtime</b>.
+        They work the same in both places.
       </p>
     </div>
     <div class="lesson-code">
