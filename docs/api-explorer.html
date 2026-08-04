@@ -1916,28 +1916,35 @@ end</code></pre>
 <section id="surface">
   <div class="rule-head">
     <h2>Reference</h2>
-    <p>Every command, sorted into groups you can open one at a time</p>
+    <p>Every command, sorted into groups. Open one group at a time.</p>
   </div>
 
   <p class="prose">
-    Every command here comes with a worked example. The <b id="i-derived">90</b> whose answer
-    depends only on what you pass in show that answer too, and those numbers were not typed by hand
-    &mdash; they are what the command actually returned when it was run, and the tests check every
-    one of them again on each change. Where a command takes a set of options, they are written out
-    underneath it: what each one holds, what happens if you leave it out, and the exact way to
-    write the whole thing in each language. The component examples pick their values from the same
-    lists the components themselves use, so an example cannot suggest a setting that does not
-    exist.
+    Every command on this page has a small code example. You can copy it into your
+    own script. Some examples also show the result of the command:
+  </p>
+  <pre data-lua style="max-width:48ch"><code>ce.midi.checksum("roland", { 64, 0, 127 })
+--> 65</code></pre>
+  <pre data-js hidden style="max-width:48ch"><code>ce.midi.checksum("roland", [64, 0, 127])
+//> 65</code></pre>
+  <p class="prose">
+    The result after the arrow is not made up. It is the real output of the command,
+    and tests check it after every change. Some commands have options. Below those
+    commands you will see a table. It lists each option, what it does, and its
+    default value. The default value is used when you do not set the option. The
+    table also shows how to type the options in each language. For component
+    commands, the example settings come from the component's own list of valid
+    settings. So an example can never show a setting that does not exist.
   </p>
   <p class="note">
-    Search looks inside the option names and their values too. That is the only way to find
-    something like <code>stagger</code> or <code>outCubic</code>, since neither of them appears in
-    any command's name.
+    Search also looks inside option names and option values. That is how you can find
+    words like <code>stagger</code> or <code>outCubic</code>. These words do not appear
+    in any command name.
   </p>
 
   <div class="finder">
     <label class="sr" for="q">Find a verb or module</label>
-    <input id="q" type="search" placeholder="Find a verb — sendNote, quantize, fill, probe…" autocomplete="off" spellcheck="false">
+    <input id="q" type="search" placeholder="Search commands: sendNote, quantize, fill…" autocomplete="off" spellcheck="false">
     <div class="seg" role="group" aria-label="Runtime">
       <button type="button" data-rt="all" aria-pressed="true">All</button>
       <button type="button" data-rt="any" aria-pressed="false">Cross-runtime</button>
@@ -1955,7 +1962,7 @@ end</code></pre>
 <section id="hooks">
   <div class="rule-head">
     <h2>Lifecycle hooks</h2>
-    <p>Write a section with one of these names and the panel runs it at the right moment</p>
+    <p>Give a script section one of these names. The panel runs it at the right time.</p>
   </div>
   <div class="members" id="hooktable"></div>
 </section>
@@ -1963,7 +1970,7 @@ end</code></pre>
 <section id="eventlist">
   <div class="rule-head">
     <h2>Events</h2>
-    <p>Things the panel tells you about, by name or through <code>on</code></p>
+    <p>Things the panel reports to your script, by name or through <code>on</code></p>
   </div>
   <div class="members" id="evtable"></div>
 </section>
@@ -1971,14 +1978,14 @@ end</code></pre>
 <section id="weight">
   <div class="rule-head">
     <h2>What it weighs</h2>
-    <p>How much each group of commands adds to your panel &mdash; measured, not guessed</p>
+    <p>How much each module adds to your exported panel</p>
   </div>
   <div class="weigh">
     <div>
       <p class="prose">
-        Tick the modules your panel uses and this tells you how much they add to it, in each
-        language. There is a small fixed amount every panel carries whatever you pick, which is
-        counted in as well.
+        Tick the modules your panel uses. The readout shows how much they add to your
+        panel, in each language. Every panel also carries a small fixed shared amount,
+        no matter what you pick. That amount is included in the numbers.
       </p>
       <div class="picks" id="picks"></div>
     </div>
@@ -1996,100 +2003,100 @@ end</code></pre>
     <p>Newest first</p>
   </div>
   <p class="prose">
-    The number of commands roughly tripled over these releases. Six of them added nothing new
-    at all: they were corrections, where something had been quietly doing the wrong thing.
+    The number of commands roughly tripled across these releases. Six of the releases
+    added nothing new. They fixed things that were quietly doing the wrong thing.
   </p>
   <ol class="ships">
     <li class="ship">
       <div class="ship-id"><b>Images</b>Pictures on a control</div>
       <div class="ship-body">
-        <p>Eight commands for the pictures a control can carry &mdash; a background image, an overlay, a picture or texture inside the text, and the icon it shows &mdash; plus a way to see what is in the icon library.</p>
-        <p class="note">Three things here are easy to get wrong, so the commands handle them for you. Background pictures stack on top of one another, while a picture inside text replaces whatever was there &mdash; so setting one up the wrong way leaves you with a layer that is fully configured and completely invisible. The word <code>fill</code> means "crop to fit" on a background and "stretch to fit" on text. And an icon from your library lives on this computer rather than in the panel, so it will not travel; <code>embed</code> copies it in so that it does.</p>
+        <p>Eight commands for the pictures a control can carry: a background image, an overlay, a picture or texture inside the text, and the icon it shows. There is also a command that lists what is in the icon library.</p>
+        <p class="note">Three things here are easy to get wrong. The commands handle them for you. First, background picture layers stack on top of each other. A picture inside text replaces the old one instead. Mix these up and you can build a layer that is set up correctly but never shows. Second, the word <code>fill</code> means two different things. On a background it means crop to fit. On text it means stretch to fit. Third, an icon from your library is stored on your computer, not in the panel. So the icon does not travel with the panel. The <code>embed</code> command copies the icon into the panel so it does.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Drawing</b>Drawing on a control</div>
       <div class="ship-body">
-        <p>Eleven more drawing commands: grids, sets of lines and points, smooth curves, polygons, images, clipping, blending, and a way to group a run of drawing together.</p>
-        <p class="note">The bigger change is speed. Anything worth drawing &mdash; a waveform, a set of tick marks, a grid of steps &mdash; means drawing the same thing many times over, and that used to get dramatically slower the more you drew. Drawing 256 line segments took longer than a single frame allows, before anything appeared on screen. Grids, lines and points are now one command for the whole set, and <code>batch</code> groups a run of drawing into one update &mdash; around fourteen times faster for those 256 segments.</p>
+        <p>Eleven more drawing commands: grids, sets of lines and points, smooth curves, polygons, images, clipping, blending, and a way to group drawing steps together.</p>
+        <p class="note">The bigger change is speed. Drawing many small things used to get much slower the more you drew. Drawing 256 line segments took longer than one screen frame allows. Grids, lines, and points are now one command for the whole set. The <code>batch</code> command groups many drawing steps into one screen update. For those 256 segments, this is about fourteen times faster.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Checksums</b>Checksums that agree with each other</div>
       <div class="ship-body">
-        <p>Many synths expect a checksum at the end of a message, and there are several ways of working one out. Scripts knew three of them and device profiles knew a different two, under different names &mdash; so a script could produce a checksum no profile could describe, and a synth using anything unusual could not have a working profile at all.</p>
-        <p class="note">Both now read the same list of eleven, so they cannot disagree. Ask for one that is not on the list and you get nothing back, with a message saying what is available, rather than a checksum for the wrong synth. Found along the way, and worse: while you were building a profile the editor and the finished export worked checksums out differently, so the preview was wrong and the export was right &mdash; the least helpful way round for that to be.</p>
+        <p>Many synths expect a checksum at the end of a message. There are several ways to work one out. Scripts knew three ways. Device profiles knew a different two, under different names. So a script could make a checksum that no profile could describe. And a synth with an unusual checksum could not have a working profile at all.</p>
+        <p class="note">Scripts and profiles now read the same list of eleven checksum types. They cannot disagree. If you ask for a type that is not on the list, you get nothing back, plus a message listing the valid types. You do not get a checksum for the wrong synth. This work also found a worse bug. While you built a profile, the editor and the finished export worked checksums out differently. The preview was wrong and the export was right.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>This page</b>This page</div>
       <div class="ship-body">
-        <p>A worked example for every command, the options written out as a table instead of described in passing, and the description moved under the name rather than into a column you had to scroll sideways to read.</p>
-        <p class="note">Generating the examples' answers instead of typing them turned up two commands whose descriptions were misleading: <code>blend</code> looked as though it took two numbers when it takes two lists, and passing numbers returned an empty list, which is correct and baffling.</p>
+        <p>Every command now has a worked example. Options are shown in a table instead of described in passing. Each description now sits under the command name, not in a wide column you had to scroll sideways to read.</p>
+        <p class="note">The example results are generated by running the commands, not typed by hand. Doing this exposed two misleading descriptions. <code>blend</code> looked like it took two numbers. It takes two lists. Passing numbers returned an empty list, which was correct but very confusing.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Text</b>Text and fonts</div>
       <div class="ship-body">
-        <p>Seven commands for typography: which fonts exist, what a font can do, setting a control's text style, measuring text, and shrinking it to fit.</p>
-        <p class="note">None of this is newly possible &mdash; every text setting could already be changed directly. What was missing was knowing which fonts are really available, keeping the two places boldness is stored in agreement, and being able to measure a control's own text in its own font.</p>
+        <p>Seven commands for text: list the fonts, ask what a font can do, set a control's text style, measure text, and shrink text to fit.</p>
+        <p class="note">None of this was newly possible. Every text setting could already be changed directly. Three things were missing. Knowing which fonts are really available. Keeping the two places where boldness is stored in agreement, because the editor and the export could disagree. And measuring a control's own text in its own font.</p>
       </div>
     </li>
     <li class="ship">
-      <div class="ship-id"><b>Components</b>Components can tell you what they are doing</div>
+      <div class="ship-id"><b>Components</b>Components report what they are doing</div>
       <div class="ship-body">
-        <p>Eleven things a component now reports: a step playing, a cycle completing, a pad hit or released, a scene or stage changing, a value settling, a bounce, a recall, a zone, a voicing.</p>
-        <p class="note">Before this a script could drive every setting of a component and never be told anything back.</p>
+        <p>Components now report eleven kinds of events: a step playing, a cycle finishing, a pad hit or released, a scene or stage changing, a value settling, a bounce, a recall, a zone, a voicing.</p>
+        <p class="note">Before this, a script could change every setting of a component but was never told anything back.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Components</b>Every component setting reachable</div>
       <div class="ship-body">
-        <p>The component commands went from 229 to 302. Every component gained <code>read</code>, so you can ask what it is set to; the ones holding lists gained ways to count, replace, add and remove items; and every command now tells you whether it worked.</p>
-        <p class="note">A real bug turned up here. Most of the settings offering a fixed choice of values were offering the wrong ones &mdash; the arpeggiator accepted a pattern it has never had, and refused "chord", which it does have. The choices now come from the same list each component itself reads.</p>
+        <p>The component commands went from 229 to 302. Every component gained <code>read</code>, so you can ask what it is set to. Components that hold lists gained commands to count, replace, add, and remove items. And every command now tells you whether it worked.</p>
+        <p class="note">A real bug turned up here. Many settings offer a fixed choice of values, and most of them listed the wrong values. The arpeggiator accepted a pattern it has never had. It refused "chord", which it does have. The choices now come from the same list each component itself reads.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Storage</b>Saved settings that do not collide</div>
       <div class="ship-body">
-        <p>Settings gained the three scopes described in the manual, so two scripts saving something under the same name no longer overwrite each other without saying so, plus a way to store structured values as text.</p>
+        <p>Saved settings gained the three scopes described in the manual. Two scripts can now save something under the same name without silently overwriting each other. There is also a way to store structured values as text.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Panel</b>Arranging controls from a script</div>
       <div class="ship-body">
-        <p>Twenty-seven ways of aligning and distributing controls existed on the canvas right-click menu and nowhere else. The menu and your script now call exactly the same ones.</p>
+        <p>The canvas right-click menu has twenty-seven ways to align and spread out controls. Before, only the menu could use them. Now the menu and your script call exactly the same commands.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Drawing</b>Gradients, dashes and colour</div>
       <div class="ship-body">
-        <p>Gradients, dashed lines, transparency and transforms as well as flat shapes, the panel's own LCD font, a way to measure text &mdash; and eight colour commands taken from the app's own, so a colour your script lightens matches the border next to it.</p>
+        <p>Drawing gained gradients, dashed lines, transparency, and transforms, as well as flat shapes. It also gained the panel's own LCD font and a way to measure text. Eight colour commands were taken from the app's own colour code. So a colour your script lightens matches the border next to it.</p>
       </div>
     </li>
     <li class="ship">
-      <div class="ship-id"><b>Dialogs</b>Asking a question, not just making a statement</div>
+      <div class="ship-id"><b>Dialogs</b>Scripts can ask questions</div>
       <div class="ship-body">
-        <p>A script could tell somebody something; now it can ask. A choice between buttons, a line of text, or a pick from a list.</p>
+        <p>A script could only show a message. Now it can also ask a question: a choice between buttons, a line of text, or a pick from a list.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Animation</b>Movement that matches the panel</div>
       <div class="ship-body">
-        <p>Seven more ways to move a value over time. The curves are now worked out from the very same shapes the Properties panel stores, rather than from formulas that merely looked similar.</p>
+        <p>Seven more ways to move a value over time. The curves now come from the same shapes the Properties panel stores. Before, they came from formulas that only looked similar.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Time</b>The transport's own grid</div>
       <div class="ship-body">
-        <p>Note divisions, bar and beat positions, swing, loops, and tempo worked out from taps or from an incoming clock. Lua had no clock of its own at all, so there was nothing to ask.</p>
+        <p>Note divisions, bar and beat positions, swing, loops, and tempo worked out from taps or from an incoming clock. Before this, Lua had no clock of its own at all.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Music</b>Scales, chords and voicing</div>
       <div class="ship-body">
-        <p>Scales, chords, voice leading and arpeggio ordering &mdash; the musical working-out the Chord Pad and Harmoniser already did internally, which a script could not reach.</p>
-        <p class="note">Reading a flat note name used to fail and quietly return note 0, which is a real note.</p>
+        <p>Scales, chords, voice leading, and arpeggio ordering. The Chord Pad and Harmoniser already did this musical work inside the app. Scripts could not reach it before.</p>
+        <p class="note">Reading a flat note name used to fail and quietly return note 0. Note 0 is a real note, so the mistake was easy to miss.</p>
       </div>
     </li>
   </ol>
@@ -2098,11 +2105,12 @@ end</code></pre>
 
 <footer class="foot">
   <p>
-    Generated by <code>tools/scripts/gen-api-explorer.mjs</code> from
-    <code>CE/web/src/CE_Application/scripting/panelApi.js</code> — the same module the five runtimes
-    are tested against, so the tables on this page cannot drift from the API. Weights are measured
-    from the language preludes by <code>tools/scripts/gen-script-modules.mjs</code>. The prose is
-    hand-written; the data is not.
+    This page is generated by <code>tools/scripts/gen-api-explorer.mjs</code> from
+    <code>CE/web/src/CE_Application/scripting/panelApi.js</code>. That is the same module
+    the five runtimes are tested against. So the tables on this page cannot drift from the
+    API. The weights are measured from the language preludes by
+    <code>tools/scripts/gen-script-modules.mjs</code>. The prose is hand-written. The data
+    is not.
   </p>
 </footer>
 
@@ -2224,7 +2232,7 @@ end</code></pre>
   $("#t-any").textContent = DATA.totals.crossRuntime;
   $("#i-mem").textContent = num(DATA.totals.members);
   $("#i-mod").textContent = DATA.totals.modules;
-  if (DATA.coverage) $("#i-derived").textContent = DATA.coverage.derived;
+  const derivedEl = $("#i-derived"); if (DATA.coverage && derivedEl) derivedEl.textContent = DATA.coverage.derived;
 
   /* ------------------------------------------------------- language toggle */
   // One preference for the whole page. A per-block toggle makes you re-pick your own language ten

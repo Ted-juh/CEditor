@@ -454,9 +454,12 @@ if (process.argv.includes('--json')) {
       'i-mod': String(data.totals.modules),
       'i-derived': String(data.coverage.derived),
     };
+    // 'i-derived' is optional: the reference intro no longer states that count out loud.
+    const optionalInline = new Set(['i-derived']);
     for (const [id, value] of Object.entries(inline)) {
       const re = new RegExp(`(<b id="${id}">)[^<]*(</b>)`);
       if (!re.test(page)) {
+        if (optionalInline.has(id)) continue;
         console.error(`apiExplorer.template.html has no <b id="${id}"> to fill`);
         process.exitCode = 2;
       }

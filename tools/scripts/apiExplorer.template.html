@@ -2038,65 +2038,65 @@ end</code></pre>
     <li class="ship">
       <div class="ship-id"><b>Text</b>Text and fonts</div>
       <div class="ship-body">
-        <p>Seven commands for typography: which fonts exist, what a font can do, setting a control's text style, measuring text, and shrinking it to fit.</p>
-        <p class="note">None of this is newly possible &mdash; every text setting could already be changed directly. What was missing was knowing which fonts are really available, keeping the two places boldness is stored in agreement, and being able to measure a control's own text in its own font.</p>
+        <p>Seven commands for text: list the fonts, ask what a font can do, set a control's text style, measure text, and shrink text to fit.</p>
+        <p class="note">None of this was newly possible. Every text setting could already be changed directly. Three things were missing. Knowing which fonts are really available. Keeping the two places where boldness is stored in agreement, because the editor and the export could disagree. And measuring a control's own text in its own font.</p>
       </div>
     </li>
     <li class="ship">
-      <div class="ship-id"><b>Components</b>Components can tell you what they are doing</div>
+      <div class="ship-id"><b>Components</b>Components report what they are doing</div>
       <div class="ship-body">
-        <p>Eleven things a component now reports: a step playing, a cycle completing, a pad hit or released, a scene or stage changing, a value settling, a bounce, a recall, a zone, a voicing.</p>
-        <p class="note">Before this a script could drive every setting of a component and never be told anything back.</p>
+        <p>Components now report eleven kinds of events: a step playing, a cycle finishing, a pad hit or released, a scene or stage changing, a value settling, a bounce, a recall, a zone, a voicing.</p>
+        <p class="note">Before this, a script could change every setting of a component but was never told anything back.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Components</b>Every component setting reachable</div>
       <div class="ship-body">
-        <p>The component commands went from 229 to 302. Every component gained <code>read</code>, so you can ask what it is set to; the ones holding lists gained ways to count, replace, add and remove items; and every command now tells you whether it worked.</p>
-        <p class="note">A real bug turned up here. Most of the settings offering a fixed choice of values were offering the wrong ones &mdash; the arpeggiator accepted a pattern it has never had, and refused "chord", which it does have. The choices now come from the same list each component itself reads.</p>
+        <p>The component commands went from 229 to 302. Every component gained <code>read</code>, so you can ask what it is set to. Components that hold lists gained commands to count, replace, add, and remove items. And every command now tells you whether it worked.</p>
+        <p class="note">A real bug turned up here. Many settings offer a fixed choice of values, and most of them listed the wrong values. The arpeggiator accepted a pattern it has never had. It refused "chord", which it does have. The choices now come from the same list each component itself reads.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Storage</b>Saved settings that do not collide</div>
       <div class="ship-body">
-        <p>Settings gained the three scopes described in the manual, so two scripts saving something under the same name no longer overwrite each other without saying so, plus a way to store structured values as text.</p>
+        <p>Saved settings gained the three scopes described in the manual. Two scripts can now save something under the same name without silently overwriting each other. There is also a way to store structured values as text.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Panel</b>Arranging controls from a script</div>
       <div class="ship-body">
-        <p>Twenty-seven ways of aligning and distributing controls existed on the canvas right-click menu and nowhere else. The menu and your script now call exactly the same ones.</p>
+        <p>The canvas right-click menu has twenty-seven ways to align and spread out controls. Before, only the menu could use them. Now the menu and your script call exactly the same commands.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Drawing</b>Gradients, dashes and colour</div>
       <div class="ship-body">
-        <p>Gradients, dashed lines, transparency and transforms as well as flat shapes, the panel's own LCD font, a way to measure text &mdash; and eight colour commands taken from the app's own, so a colour your script lightens matches the border next to it.</p>
+        <p>Drawing gained gradients, dashed lines, transparency, and transforms, as well as flat shapes. It also gained the panel's own LCD font and a way to measure text. Eight colour commands were taken from the app's own colour code. So a colour your script lightens matches the border next to it.</p>
       </div>
     </li>
     <li class="ship">
-      <div class="ship-id"><b>Dialogs</b>Asking a question, not just making a statement</div>
+      <div class="ship-id"><b>Dialogs</b>Scripts can ask questions</div>
       <div class="ship-body">
-        <p>A script could tell somebody something; now it can ask. A choice between buttons, a line of text, or a pick from a list.</p>
+        <p>A script could only show a message. Now it can also ask a question: a choice between buttons, a line of text, or a pick from a list.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Animation</b>Movement that matches the panel</div>
       <div class="ship-body">
-        <p>Seven more ways to move a value over time. The curves are now worked out from the very same shapes the Properties panel stores, rather than from formulas that merely looked similar.</p>
+        <p>Seven more ways to move a value over time. The curves now come from the same shapes the Properties panel stores. Before, they came from formulas that only looked similar.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Time</b>The transport's own grid</div>
       <div class="ship-body">
-        <p>Note divisions, bar and beat positions, swing, loops, and tempo worked out from taps or from an incoming clock. Lua had no clock of its own at all, so there was nothing to ask.</p>
+        <p>Note divisions, bar and beat positions, swing, loops, and tempo worked out from taps or from an incoming clock. Before this, Lua had no clock of its own at all.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Music</b>Scales, chords and voicing</div>
       <div class="ship-body">
-        <p>Scales, chords, voice leading and arpeggio ordering &mdash; the musical working-out the Chord Pad and Harmoniser already did internally, which a script could not reach.</p>
-        <p class="note">Reading a flat note name used to fail and quietly return note 0, which is a real note.</p>
+        <p>Scales, chords, voice leading, and arpeggio ordering. The Chord Pad and Harmoniser already did this musical work inside the app. Scripts could not reach it before.</p>
+        <p class="note">Reading a flat note name used to fail and quietly return note 0. Note 0 is a real note, so the mistake was easy to miss.</p>
       </div>
     </li>
   </ol>
@@ -2105,11 +2105,12 @@ end</code></pre>
 
 <footer class="foot">
   <p>
-    Generated by <code>tools/scripts/gen-api-explorer.mjs</code> from
-    <code>CE/web/src/CE_Application/scripting/panelApi.js</code> — the same module the five runtimes
-    are tested against, so the tables on this page cannot drift from the API. Weights are measured
-    from the language preludes by <code>tools/scripts/gen-script-modules.mjs</code>. The prose is
-    hand-written; the data is not.
+    This page is generated by <code>tools/scripts/gen-api-explorer.mjs</code> from
+    <code>CE/web/src/CE_Application/scripting/panelApi.js</code>. That is the same module
+    the five runtimes are tested against. So the tables on this page cannot drift from the
+    API. The weights are measured from the language preludes by
+    <code>tools/scripts/gen-script-modules.mjs</code>. The prose is hand-written. The data
+    is not.
   </p>
 </footer>
 
@@ -2231,7 +2232,7 @@ end</code></pre>
   $("#t-any").textContent = DATA.totals.crossRuntime;
   $("#i-mem").textContent = num(DATA.totals.members);
   $("#i-mod").textContent = DATA.totals.modules;
-  if (DATA.coverage) $("#i-derived").textContent = DATA.coverage.derived;
+  const derivedEl = $("#i-derived"); if (DATA.coverage && derivedEl) derivedEl.textContent = DATA.coverage.derived;
 
   /* ------------------------------------------------------- language toggle */
   // One preference for the whole page. A per-block toggle makes you re-pick your own language ten
