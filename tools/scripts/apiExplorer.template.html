@@ -595,14 +595,14 @@ pre code { font-size: inherit; }
 <div class="view" id="view-manual">
 <header class="top">
   <p class="eyebrow">Panel scripting</p>
-  <h1>Adding your own behaviour to a panel</h1>
+  <h1>Add your own behaviour to a panel</h1>
   <p class="lede">
-    A panel can carry scripts, so it can do things the controls alone cannot: send a particular
-    message when a button is pressed, work out one value from another, fill the whole panel from
-    what the synth reports. You can write them in Lua, JavaScript, TypeScript, Python or a
-    C&#8209;like language, and they all use the same set of commands. <b>A script behaves the same
-    way while you are building the panel as it does in the finished plugin</b> &mdash; if it works
-    while you are testing it, it works when you share it.
+    A panel can hold scripts. A script lets the panel do things the controls alone cannot do.
+    It can send a special message when a button is pressed. It can work out one value from
+    another. It can fill the whole panel from data the synth sends. You can write scripts in
+    Lua, JavaScript, TypeScript, Python or a C&#8209;like language. All of them use the same
+    set of commands. <b>A script works the same way while you build the panel and in the
+    finished plugin.</b> If it works while you test it, it works when you share it.
   </p>
   <dl class="tally">
     <div><dt>Modules</dt><dd id="t-mod">&ndash;</dd></div>
@@ -628,26 +628,27 @@ pre code { font-size: inherit; }
   <div class="lesson">
     <p class="lesson-n">01 &middot; What a script is</p>
     <div class="lesson-text prose">
-      <h3>You write the reactions; the panel decides when they run</h3>
+      <h3>You write what should happen. The panel decides when it runs.</h3>
       <p>
-        A script is a list of things to do when something happens. You do not start it yourself and
-        you do not tell it when to stop. Instead you write a section with a particular name, and the
-        panel runs that section at the moment the name describes. Attach a script to a knob and give
-        it a section called <code>onValueChanged</code>, and that section runs every time somebody
-        finishes turning the knob.
+        A script is a list of things to do when something happens. You do not start the script
+        yourself. You do not stop it either. Instead, you write a section with a special name.
+        The panel runs that section when the matching event happens. For example, attach a script
+        to a knob. Give it a section called <code>onValueChanged</code>. That section runs every
+        time someone finishes turning the knob.
       </p>
       <p>
-        Everything you can do is a command you simply call by name. Three of them &mdash;
-        <code>set</code>, <code>get</code> and <code>log</code> &mdash; are always available. The
-        rest are grouped into modules you switch on for the panel, which
-        <a href="#modules">Modules</a> explains. Commands in a module can be written either way:
-        <code>ce.midi.sendCC</code> says which group it came from, and plain <code>sendCC</code> is
-        shorter. They do exactly the same thing, so use whichever reads better to you.
+        Every action in a script is a command. You call a command by its name. Three commands are
+        always available: <code>set</code>, <code>get</code> and <code>log</code>. All other
+        commands live in groups called modules. You switch modules on for the panel. The
+        <a href="#modules">Modules</a> lesson explains this. You can write a module command in two
+        ways. <code>ce.midi.sendCC</code> shows which module it comes from. Plain
+        <code>sendCC</code> is shorter. Both do exactly the same thing. Use the one you like
+        better.
       </p>
       <p class="note">
-        There is nothing to set up first &mdash; no list of files to include, no step to run before
-        your script works. Tick the modules the panel should have, and every command in them is
-        ready by the time your first line runs.
+        You do not need to set anything up first. There are no files to include. There is no step
+        to run before your script works. Tick the modules the panel needs. Then every command in
+        them is ready when your first line runs.
       </p>
     </div>
     <div class="lesson-code">
@@ -666,28 +667,27 @@ end</code></pre>
   <div class="lesson" id="paths">
     <p class="lesson-n">02 &middot; Addressing</p>
     <div class="lesson-text prose">
-      <h3>Every control is reached by the name you gave it</h3>
+      <h3>You reach a control by the name you gave it</h3>
       <p>
-        To read or change a control, you name it. Not an internal number you never see &mdash; the
-        name in the editor. If you called a knob "cutoff", then that is what your script says. Add
-        a dot and you can reach further in: what it is set to, what colour it is, any setting it
-        has.
+        To read or change a control, use its name. Not a hidden number. Use the name you typed in
+        the editor. If you named a knob "cutoff", write "cutoff" in your script. Add a dot to
+        reach a detail of the control: its value, its colour, or any other setting.
       </p>
       <p>
-        The name on its own means the control's value, so <code>get("cutoff")</code> and
-        <code>get("cutoff.value")</code> ask the same question. If you later rename the control,
-        every script that mentions it is updated to match, so nothing breaks.
+        The name on its own means the control's value. So <code>get("cutoff")</code> and
+        <code>get("cutoff.value")</code> give the same answer. If you rename the control later,
+        every script that uses the name is updated too. Nothing breaks.
       </p>
       <p>
-        A value can be read in three ways. <code>.value</code> is the real one you would read off
-        the front panel, like 8000&nbsp;Hz. <code>.normalizedValue</code> is the same thing as a
-        position between 0 and 1, which is useful when you want two controls with different ranges
-        to move together. <code>.midiValue</code> is the number that actually goes to the synth.
+        You can read a value in three ways. <code>.value</code> is the real value you would read
+        on the front panel, like 8000&nbsp;Hz. <code>.normalizedValue</code> is the same value as
+        a position between 0 and 1. This is useful when two controls with different ranges must
+        move together. <code>.midiValue</code> is the number that is sent to the synth.
       </p>
       <p class="note warn">
-        <code>set</code> tells you whether it worked. If you mistype a name there is nothing to
-        change, so check the answer when it matters &mdash; otherwise a typo just quietly does
-        nothing.
+        <code>set</code> tells you if it worked. If you mistype a name, there is no control to
+        change. Then <code>set</code> does nothing and reports failure. Check the answer when it
+        matters. Otherwise a typo does nothing, and you will not notice.
       </p>
     </div>
     <div class="lesson-code">
@@ -718,29 +718,28 @@ if (!set("cutof.value", 1)) {
   <div class="lesson" id="transmit">
     <p class="lesson-n">03 &middot; Writing and the synth</p>
     <div class="lesson-text prose">
-      <h3>Changing a control normally tells the synth too</h3>
+      <h3>When your script changes a control, the synth is normally told too</h3>
       <p>
-        When your script changes a control, the panel treats it as though somebody had moved it by
-        hand: the control updates on screen <i>and</i> the synth is told. That is almost always what
-        you want.
+        When your script changes a control, the panel treats it like a change by hand. The control
+        updates on screen, <i>and</i> the synth is told. This is almost always what you want.
       </p>
       <p>
-        There is one case where it is not. If your script is responding to something the synth just
-        sent, sending it straight back would start the two of them talking in circles. So a change
-        made while you are handling an incoming message <b>is not sent back automatically</b>. You
-        do not have to remember this or set anything &mdash; the panel keeps track of why the change
-        happened.
+        There is one exception. Sometimes your script reacts to a message the synth just sent. If
+        your change went straight back, the panel and the synth would answer each other without
+        end. So a change made while you handle an incoming message <b>is not sent back
+        automatically</b>. You do not need to remember this or set anything. The panel keeps track
+        of why the change happened.
       </p>
       <p>
-        You can override it for a group of lines when you need to. A button that resets forty
-        controls to a starting patch should update all of them and only then tell the synth. A
-        reply confirming a setting does need to go out, even though it came from an incoming
-        message. Wrap the lines in <code>noTransmit</code> or <code>transmit</code> and normal
-        behaviour returns as soon as the group ends, even if something goes wrong inside it.
+        You can change this rule for a group of lines. Two examples. A button resets forty
+        controls to a starting patch. It should update them all first, and tell the synth only
+        after that. A reply that confirms a setting must go out, even during an incoming message.
+        Wrap the lines in <code>noTransmit</code> or <code>transmit</code>. Normal behaviour
+        returns when the group ends. This is true even if an error happens inside the group.
       </p>
     </div>
     <div class="lesson-code">
-      <p class="cap">Scoped, not per&#8209;line</p>
+      <p class="cap">One setting for a whole block</p>
       <pre data-lua><code>noTransmit(function()
   set("cutoff.value", 8000)
   set("reso.value", 40)
@@ -763,34 +762,35 @@ transmit(() =&gt; {
   <div class="lesson" id="events">
     <p class="lesson-n">04 &middot; Reacting</p>
     <div class="lesson-text prose">
-      <h3>Three ways to be told that something happened</h3>
+      <h3>Three ways to hear that something happened</h3>
       <p>
-        For things that happen to the control your script is attached to, write a section with the
-        matching name: <code>onValueChanged</code> when its value settles,
-        <code>onClick</code> when it is clicked, <code>onNoteIn</code> when a note arrives. Nothing
-        else to set up &mdash; the name is the whole connection.
+        Some events happen to the control your script is attached to. For those, write a section
+        with the matching name. <code>onValueChanged</code> runs when the value settles.
+        <code>onClick</code> runs when the control is clicked. <code>onNoteIn</code> runs when a
+        note arrives. There is nothing else to set up. The name alone makes the link.
       </p>
       <p>
-        To hear about something <i>else</i> &mdash; another control, the transport, one of the
-        components &mdash; use <code>on</code> and say what you are listening to:
-        <code>on("cutoff", "onValueChanged", …)</code>. Listen to <code>"*"</code> and you hear
-        about all of them, which is why what you are handed always says which one it came from.
+        You can also listen to something <i>else</i>: another control, the transport, or one of
+        the components. Use <code>on</code> and name what you are listening to:
+        <code>on("cutoff", "onValueChanged", …)</code>. Listen to <code>"*"</code> to hear about
+        all of them. The data your section receives always says which control the event came
+        from.
       </p>
       <p>
-        Two of these look almost the same and the difference is worth knowing.
-        <code>onValueChange</code> runs over and over while a knob is still being turned, which
-        suits anything on screen that should follow along. <code>onValueChanged</code> &mdash; note
-        the <b>d</b> &mdash; runs once, when the knob is let go, which is when you want to tell the
+        Two event names look almost the same. The difference matters.
+        <code>onValueChange</code> runs again and again while a knob is being turned. Use it for
+        things on screen that should follow the knob. <code>onValueChanged</code> has a <b>d</b>
+        at the end. It runs once, when the knob is released. That is the moment to tell the
         synth.
       </p>
       <p>
-        <code>watch</code> is the third way. It is not tied to any event: you give it something to
-        keep an eye on, and it runs whenever that changes. Use it for the settings no event covers,
-        like a colour or a size.
+        <code>watch</code> is the third way. It is not tied to any event. You give it something
+        to watch, and it runs whenever that thing changes. Use it for settings that no event
+        covers, like a colour or a size.
       </p>
       <p class="note">
-        With <code>on</code>, both spellings of an event work &mdash; <code>"step"</code> and
-        <code>"onStep"</code> mean the same thing, so you do not have to remember which one this
+        With <code>on</code>, both spellings of an event name work. <code>"step"</code> and
+        <code>"onStep"</code> mean the same thing. You do not have to remember which one this
         page used.
       </p>
     </div>
