@@ -1634,43 +1634,44 @@ function onPanelBuild() {
     <p class="lesson-n">03 &middot; Asking the instrument</p>
     <div data-shot="tutorial-drumkit"></div>
     <div class="lesson-text prose">
-      <h3>Let the component do the work, and ask it what it did</h3>
+      <h3>Let the component do the work, then ask it what it did</h3>
       <p>
-        The last tutorial built a drum kit out of eight separate buttons, and there was nothing
-        wrong with it. This is the same kit as a <b>single Drum Pads control</b>. The reason to
-        prefer it is not that it is shorter: three of the things a drum grid does cannot be built
-        from eight independent buttons at all.
+        Tutorial 02 built a drum kit from eight separate buttons. That worked. This tutorial
+        builds the same kit as a <b>single Drum Pads control</b>. The single control is not
+        just shorter. Three features of a drum grid cannot be built from separate buttons at
+        all.
       </p>
       <p>
-        <b>Choke groups.</b> A closed hi-hat has to silence an open one. Separate buttons cannot do
-        that, because none of them knows the others exist. <b>Strike position.</b> Where in the pad
-        you land decides how hard it sounds, and a button has no inside. <b>Corner zones.</b> The
-        four corners of every pad can do something different &mdash; a roll under one thumb, a flam
-        under the other &mdash; which turns sixteen triggers into something you can play.
+        <b>Choke groups.</b> A closed hi-hat has to silence an open hi-hat. Separate buttons
+        cannot do this, because no button knows the other buttons exist. <b>Strike
+        position.</b> The spot where your finger lands sets how hard the note sounds. A plain
+        button cannot tell where you hit it. <b>Corner zones.</b> Each corner of a pad can do
+        a different action, for example a roll or a flam. This gives you many more moves than
+        sixteen plain triggers.
       </p>
       <p>
-        <b>Only set what differs.</b> Everything else follows the kit. One call to
-        <code>fill()</code> writes all eight notes at once, and the choke groups sort themselves
-        out, because which pads choke each other is worked out from the notes. Look at what the
-        script actually stored: pad 1 has nothing set, because 36 was the note it was going to play
-        anyway, and pinning it there would only stop it following the base note later.
+        <b>Only set what differs from the defaults.</b> The kit handles the rest. One call to
+        <code>fill()</code> writes all eight notes in one step. You never set the choke groups.
+        The control works them out from the notes. Look at what the script actually stored.
+        Pad 1 stores nothing, because 36 was already its default note. Storing 36 anyway would
+        pin the pad, and it would stop following the base note later.
       </p>
       <p>
-        <b>So ask, rather than tell.</b> <code>read()</code> answers with what the component
-        settled on, not with what you stored. That is what lets the rest be worked out: "give a
-        roll to every pad in a choke group" finds the hi-hats without you typing a single position,
-        names them in the log from the same answer, and keeps being right when the kit, the rows or
-        the columns change underneath it.
+        <b>Ask the control instead of telling it.</b> <code>read()</code> returns what the
+        control settled on, not what you stored. This lets the script work things out. The
+        loop below gives a roll to every pad in a choke group. It finds the hi-hats without
+        any typed pad positions. It names them in the log from the same answer. It stays
+        correct when the kit, the rows, or the columns change.
       </p>
       <p>
-        The roll is worked out too. Its rate is a note value rather than a number of milliseconds,
-        so a 1/32 roll stays a 1/32 when the tempo moves. And the roll delay is what lets one pad
-        do two jobs: tap it and it strikes once, lean on it and it rolls.
+        The roll settings are computed too. The roll rate is a note value, not a number of
+        milliseconds. So a 1/32 roll stays a 1/32 when the tempo changes. The roll delay lets
+        one pad do two jobs. Tap the pad and it strikes once. Hold the pad and it rolls.
       </p>
       <p class="note">
-        Corner zones are set for the <b>whole grid</b> rather than per pad, deliberately. A corner
-        is a gesture your hand learns once. Corners that meant different things on neighbouring
-        pads would be the opposite of an instrument you can play without looking.
+        Corner zones are set for the <b>whole grid</b>, not per pad. This is on purpose. Your
+        hand learns each corner action once. If a corner meant different things on different
+        pads, the grid would be much harder to play.
       </p>
     </div>
     <div class="lesson-code">
@@ -1746,7 +1747,7 @@ function onPanelBuild() {
 
   log("rolling: " + rolled.join(", "));</code></pre>
 
-      <p class="cap">One gesture vocabulary, for every pad</p>
+      <p class="cap">The same corner actions on every pad</p>
       <pre data-lua><code>  D.zones(KIT, true)
   D.cornerSize(KIT, 0.3)              -- how much of a pad each corner claims
   D.cornerTopLeft(KIT, "accent")      -- full velocity, wherever it landed
@@ -1762,9 +1763,10 @@ end</code></pre>
   D.cornerBottomRight(KIT, "flam");   // a grace note ahead of the main one
 }</code></pre>
       <p class="note">
-        What it logs is <code>rolling: CH Hat, OP Hat</code> &mdash; two names the script never
-        wrote down, for two pads it never numbered. The remaining corner, <code>choke</code>, is the
-        cymbal grab: it silences the group and sounds nothing of its own.
+        The script logs <code>rolling: CH Hat, OP Hat</code>. The script never typed those two
+        names, and it never typed those pad numbers. One more corner action exists,
+        <code>choke</code>. It works like grabbing a cymbal. It silences the whole choke group
+        and plays no sound of its own.
       </p>
     </div>
   </div>
@@ -1773,47 +1775,46 @@ end</code></pre>
     <p class="lesson-n">04 &middot; A panel is a graph</p>
     <div data-shot="tutorial-wiring"></div>
     <div class="lesson-text prose">
-      <h3>Wiring controls up to each other</h3>
+      <h3>Connecting controls to each other</h3>
       <p>
-        The last three tutorials built controls. This one <b>connects</b> them. A meter can follow
-        a knob. An LCD can take its reading from one control and its backlight from another. An
-        arpeggiator can take its notes from a chord pad. Once any of that is true, the panel is no
-        longer a list of controls but a set of connections.
+        The last three tutorials built controls. This one <b>connects</b> them. A meter can
+        follow a knob. An LCD can take its reading from one control and its backlight from
+        another. An arpeggiator can take its notes from a chord pad. With connections like
+        these, the panel is more than a list of controls. It is a set of connections.
       </p>
       <p>
-        <b>You name the control, the same as everywhere else.</b> Underneath, the connection is
-        stored against something that survives a rename, but your script never sees that and never
-        needs to &mdash; <code>read()</code> gives you the name back.
+        <b>You name the control, the same as everywhere else.</b> Inside the editor, the
+        connection is stored in a way that survives a rename. Your script never sees that
+        stored form and never needs to. <code>read()</code> gives you the name back.
       </p>
       <p>
-        <b>Not every control can drive every field, and being told so is the useful part.</b> Watch
-        what happens to <code>Title</code>, an ordinary label, in the listing. It is accepted as
-        the LCD's backlight source and refused as the meter's level. One control, two answers,
-        because the two fields want different things: anything can answer "is this on", but not
-        everything can answer "how far up is this". The command says which, in words:
-        <span class="q">refused &mdash; it is not a knob, slider or other range control</span>. A
-        connection that failed quietly would look exactly like one that worked, right up until the
-        meter sat still.
+        <b>Not every control can drive every field.</b> The command tells you when a connection
+        is refused, and that answer is useful. Watch <code>Title</code> in the code below. It
+        is an ordinary label. The LCD accepts it as a backlight source. The meter refuses it as
+        a level source. The two fields need different things. Any control can answer "is this
+        on". Only some controls can answer "how far up is this". The command gives the reason
+        in words: <span class="q">refused &mdash; it is not a knob, slider or other range
+        control</span>. A connection that failed silently would look like a working one, until
+        you noticed the meter never moved.
       </p>
       <p>
-        That is why the answer is worth reading. The loop below works through a list of intended
-        connections and <b>counts the ones that took</b>, so a panel building itself against
-        somebody else's layout can cope rather than half-work.
+        So read the answer each call returns. The loop below tries a list of planned
+        connections. It <b>counts how many connections succeeded</b>. A script that builds on
+        someone else's layout can then handle missing controls instead of half-working.
       </p>
       <p>
-        <b>Then it reads the connections back.</b> The last block walks the panel, asks what each
-        control is, and asks each one what is driving it. Nothing in that block knows what the
-        earlier blocks did &mdash; it would report a panel that was wired entirely by hand, just as
-        well.
+        <b>The last block reads the connections back.</b> It walks the panel, asks what type
+        each control is, and asks each control what drives it. That block uses nothing from the
+        earlier blocks. It would report connections made by hand in the editor just as well.
       </p>
       <p class="note">
-        Naming no control disconnects it, which is a real setting rather than the absence of one.
-        A connection whose target has since been deleted reads back as disconnected too, which is
-        the honest answer: either way the control is running on its own value.
+        Naming no control disconnects the field. That is a real setting, not just a missing
+        one. A connection whose target was later deleted also reads back as disconnected. In
+        both cases the control runs on its own value.
       </p>
     </div>
     <div class="lesson-code">
-      <p class="cap">The rig</p>
+      <p class="cap">The controls</p>
       <pre data-lua><code>local M = ce.components.meter
 local L = ce.components.lcd
 
@@ -1833,7 +1834,7 @@ function onPanelBuild() {
   ce.panel.create("LcdDisplay", { name: "Screen", x: 270, y: 110, width: 240, height: 90 });
   ce.panel.create("Label",      { name: "Title",  x: 40,  y: 180, width: 200, height: 24 });</code></pre>
 
-      <p class="cap">Wire it, and count what took</p>
+      <p class="cap">Make the connections, and count the successes</p>
       <pre data-lua><code>  -- The last row is deliberately impossible: a Label has no value to give a Meter.
   -- The row above it is the same Label driving the LCD's backlight, which is fine.
   local WIRING = {
@@ -1868,7 +1869,7 @@ function onPanelBuild() {
   }
   log("wired " + made + " of " + WIRING.length);</code></pre>
 
-      <p class="cap">Read the graph back</p>
+      <p class="cap">Read the connections back</p>
       <pre data-lua><code>  -- Nothing below knows what the two blocks above did. It reports the wiring of
   -- whatever panel it is pointed at, including links made entirely by hand.
   local SOURCES = {
@@ -1899,8 +1900,9 @@ end</code></pre>
   });
 }</code></pre>
       <p class="note">
-        What it logs, in order: <code>could not wire Title &rarr; Level.source</code>,
-        <code>wired 3 of 4</code>, then the graph &mdash; <code>Cutoff &rarr; Level.source</code>,
+        The script logs these lines, in this order: <code>could not wire Title &rarr;
+        Level.source</code>, then <code>wired 3 of 4</code>, then the three connections:
+        <code>Cutoff &rarr; Level.source</code>,
         <code>Reso &rarr; Screen.valueSource</code>,
         <code>Title &rarr; Screen.backlightSource</code>.
       </p>
@@ -1914,28 +1916,35 @@ end</code></pre>
 <section id="surface">
   <div class="rule-head">
     <h2>Reference</h2>
-    <p>Every command, sorted into groups you can open one at a time</p>
+    <p>Every command, sorted into groups. Open one group at a time.</p>
   </div>
 
   <p class="prose">
-    Every command here comes with a worked example. The <b id="i-derived">90</b> whose answer
-    depends only on what you pass in show that answer too, and those numbers were not typed by hand
-    &mdash; they are what the command actually returned when it was run, and the tests check every
-    one of them again on each change. Where a command takes a set of options, they are written out
-    underneath it: what each one holds, what happens if you leave it out, and the exact way to
-    write the whole thing in each language. The component examples pick their values from the same
-    lists the components themselves use, so an example cannot suggest a setting that does not
-    exist.
+    Every command on this page has a small code example. You can copy it into your
+    own script. Some examples also show the result of the command:
+  </p>
+  <pre data-lua style="max-width:48ch"><code>ce.midi.checksum("roland", { 64, 0, 127 })
+--> 65</code></pre>
+  <pre data-js hidden style="max-width:48ch"><code>ce.midi.checksum("roland", [64, 0, 127])
+//> 65</code></pre>
+  <p class="prose">
+    The result after the arrow is not made up. It is the real output of the command,
+    and tests check it after every change. Some commands have options. Below those
+    commands you will see a table. It lists each option, what it does, and its
+    default value. The default value is used when you do not set the option. The
+    table also shows how to type the options in each language. For component
+    commands, the example settings come from the component's own list of valid
+    settings. So an example can never show a setting that does not exist.
   </p>
   <p class="note">
-    Search looks inside the option names and their values too. That is the only way to find
-    something like <code>stagger</code> or <code>outCubic</code>, since neither of them appears in
-    any command's name.
+    Search also looks inside option names and option values. That is how you can find
+    words like <code>stagger</code> or <code>outCubic</code>. These words do not appear
+    in any command name.
   </p>
 
   <div class="finder">
     <label class="sr" for="q">Find a verb or module</label>
-    <input id="q" type="search" placeholder="Find a verb — sendNote, quantize, fill, probe…" autocomplete="off" spellcheck="false">
+    <input id="q" type="search" placeholder="Search commands: sendNote, quantize, fill…" autocomplete="off" spellcheck="false">
     <div class="seg" role="group" aria-label="Runtime">
       <button type="button" data-rt="all" aria-pressed="true">All</button>
       <button type="button" data-rt="any" aria-pressed="false">Cross-runtime</button>
@@ -1953,7 +1962,7 @@ end</code></pre>
 <section id="hooks">
   <div class="rule-head">
     <h2>Lifecycle hooks</h2>
-    <p>Write a section with one of these names and the panel runs it at the right moment</p>
+    <p>Give a script section one of these names. The panel runs it at the right time.</p>
   </div>
   <div class="members" id="hooktable"></div>
 </section>
@@ -1961,7 +1970,7 @@ end</code></pre>
 <section id="eventlist">
   <div class="rule-head">
     <h2>Events</h2>
-    <p>Things the panel tells you about, by name or through <code>on</code></p>
+    <p>Things the panel reports to your script, by name or through <code>on</code></p>
   </div>
   <div class="members" id="evtable"></div>
 </section>
@@ -1969,14 +1978,14 @@ end</code></pre>
 <section id="weight">
   <div class="rule-head">
     <h2>What it weighs</h2>
-    <p>How much each group of commands adds to your panel &mdash; measured, not guessed</p>
+    <p>How much each module adds to your exported panel</p>
   </div>
   <div class="weigh">
     <div>
       <p class="prose">
-        Tick the modules your panel uses and this tells you how much they add to it, in each
-        language. There is a small fixed amount every panel carries whatever you pick, which is
-        counted in as well.
+        Tick the modules your panel uses. The readout shows how much they add to your
+        panel, in each language. Every panel also carries a small fixed shared amount,
+        no matter what you pick. That amount is included in the numbers.
       </p>
       <div class="picks" id="picks"></div>
     </div>
@@ -1994,36 +2003,36 @@ end</code></pre>
     <p>Newest first</p>
   </div>
   <p class="prose">
-    The number of commands roughly tripled over these releases. Six of them added nothing new
-    at all: they were corrections, where something had been quietly doing the wrong thing.
+    The number of commands roughly tripled across these releases. Six of the releases
+    added nothing new. They fixed things that were quietly doing the wrong thing.
   </p>
   <ol class="ships">
     <li class="ship">
       <div class="ship-id"><b>Images</b>Pictures on a control</div>
       <div class="ship-body">
-        <p>Eight commands for the pictures a control can carry &mdash; a background image, an overlay, a picture or texture inside the text, and the icon it shows &mdash; plus a way to see what is in the icon library.</p>
-        <p class="note">Three things here are easy to get wrong, so the commands handle them for you. Background pictures stack on top of one another, while a picture inside text replaces whatever was there &mdash; so setting one up the wrong way leaves you with a layer that is fully configured and completely invisible. The word <code>fill</code> means "crop to fit" on a background and "stretch to fit" on text. And an icon from your library lives on this computer rather than in the panel, so it will not travel; <code>embed</code> copies it in so that it does.</p>
+        <p>Eight commands for the pictures a control can carry: a background image, an overlay, a picture or texture inside the text, and the icon it shows. There is also a command that lists what is in the icon library.</p>
+        <p class="note">Three things here are easy to get wrong. The commands handle them for you. First, background picture layers stack on top of each other. A picture inside text replaces the old one instead. Mix these up and you can build a layer that is set up correctly but never shows. Second, the word <code>fill</code> means two different things. On a background it means crop to fit. On text it means stretch to fit. Third, an icon from your library is stored on your computer, not in the panel. So the icon does not travel with the panel. The <code>embed</code> command copies the icon into the panel so it does.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Drawing</b>Drawing on a control</div>
       <div class="ship-body">
-        <p>Eleven more drawing commands: grids, sets of lines and points, smooth curves, polygons, images, clipping, blending, and a way to group a run of drawing together.</p>
-        <p class="note">The bigger change is speed. Anything worth drawing &mdash; a waveform, a set of tick marks, a grid of steps &mdash; means drawing the same thing many times over, and that used to get dramatically slower the more you drew. Drawing 256 line segments took longer than a single frame allows, before anything appeared on screen. Grids, lines and points are now one command for the whole set, and <code>batch</code> groups a run of drawing into one update &mdash; around fourteen times faster for those 256 segments.</p>
+        <p>Eleven more drawing commands: grids, sets of lines and points, smooth curves, polygons, images, clipping, blending, and a way to group drawing steps together.</p>
+        <p class="note">The bigger change is speed. Drawing many small things used to get much slower the more you drew. Drawing 256 line segments took longer than one screen frame allows. Grids, lines, and points are now one command for the whole set. The <code>batch</code> command groups many drawing steps into one screen update. For those 256 segments, this is about fourteen times faster.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Checksums</b>Checksums that agree with each other</div>
       <div class="ship-body">
-        <p>Many synths expect a checksum at the end of a message, and there are several ways of working one out. Scripts knew three of them and device profiles knew a different two, under different names &mdash; so a script could produce a checksum no profile could describe, and a synth using anything unusual could not have a working profile at all.</p>
-        <p class="note">Both now read the same list of eleven, so they cannot disagree. Ask for one that is not on the list and you get nothing back, with a message saying what is available, rather than a checksum for the wrong synth. Found along the way, and worse: while you were building a profile the editor and the finished export worked checksums out differently, so the preview was wrong and the export was right &mdash; the least helpful way round for that to be.</p>
+        <p>Many synths expect a checksum at the end of a message. There are several ways to work one out. Scripts knew three ways. Device profiles knew a different two, under different names. So a script could make a checksum that no profile could describe. And a synth with an unusual checksum could not have a working profile at all.</p>
+        <p class="note">Scripts and profiles now read the same list of eleven checksum types. They cannot disagree. If you ask for a type that is not on the list, you get nothing back, plus a message listing the valid types. You do not get a checksum for the wrong synth. This work also found a worse bug. While you built a profile, the editor and the finished export worked checksums out differently. The preview was wrong and the export was right.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>This page</b>This page</div>
       <div class="ship-body">
-        <p>A worked example for every command, the options written out as a table instead of described in passing, and the description moved under the name rather than into a column you had to scroll sideways to read.</p>
-        <p class="note">Generating the examples' answers instead of typing them turned up two commands whose descriptions were misleading: <code>blend</code> looked as though it took two numbers when it takes two lists, and passing numbers returned an empty list, which is correct and baffling.</p>
+        <p>Every command now has a worked example. Options are shown in a table instead of described in passing. Each description now sits under the command name, not in a wide column you had to scroll sideways to read.</p>
+        <p class="note">The example results are generated by running the commands, not typed by hand. Doing this exposed two misleading descriptions. <code>blend</code> looked like it took two numbers. It takes two lists. Passing numbers returned an empty list, which was correct but very confusing.</p>
       </div>
     </li>
     <li class="ship">
