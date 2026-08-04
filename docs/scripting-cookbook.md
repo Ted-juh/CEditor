@@ -1,22 +1,25 @@
 # CEditor Scripting Cookbook
 
-Task-based recipes for panel scripting. Every call here is from the
-[scripting manual](scripting-manual.md) — look a name up there for the full signature.
-Recipes are shown in Lua and JavaScript; the API is identical in every language.
+This page holds ready-to-use recipes for panel scripting. Every call comes from
+the [scripting manual](scripting-manual.md). Look a name up there for the full
+signature. Recipes are shown in Lua and JavaScript. The API is the same in
+every language.
 
-A few corners of the API are further along in one runtime than the other — the manual's
-availability badges say exactly which is which.
+Some parts of the API work in one runtime but not yet in the other. The
+manual's availability badges show exactly which.
 
-A quick orientation: a script attached to a control reacts to **its own** events just by
-defining the named function (`onValueChanged`, `onClick`, …). To reach anything else — another
-control, the panel, the device — use `on(target, event, handler)`. Values are read and written
-by dot-path with `get`/`set`.
+Before you start, three basics. A script attached to a control reacts to that
+control's own events. You only need to define the named function, such as
+`onValueChanged` or `onClick`. To react to anything else — another control, the
+panel, the device — use `on(target, event, handler)`. To read and write values,
+use `get` and `set` with a dot-path.
 
 ---
 
 ## 1. Link two controls
 
-*"When the cutoff moves, drive the resonance at half strength."* Attach to the `cutoff` control:
+Goal: when the cutoff moves, drive the resonance at half strength.
+Attach this to the `cutoff` control:
 
 ```lua
 -- Lua
@@ -31,7 +34,8 @@ function onValueChanged(value) {
 }
 ```
 
-Different ranges? Go through the 0–1 face instead, so the shapes match no matter the units:
+Do the two controls have different ranges? Then use the 0–1 form instead.
+The movement will match, whatever units each control uses:
 
 ```lua
 function onValueChanged(value)
@@ -41,7 +45,8 @@ end
 
 ## 2. Rescale a value on the way through
 
-`scale` maps between ranges; `clamp` keeps the result legal; `curve` bends the response.
+`scale` maps a value from one range to another. `clamp` keeps the result inside
+its limits. `curve` bends the response.
 
 ```lua
 -- Lua — a 0–127 input driving a 0–100 target, with a log feel
@@ -52,8 +57,9 @@ end
 
 ## 3. An "Init Patch" button (set many values without spamming the synth)
 
-A plain `set` transmits to the synth (that's the right default). When one gesture sets *many*
-values, wrap them in `noTransmit(...)` so nothing is sent piecemeal:
+A plain `set` sends the change to the synth. That is the right default for one
+value. But when one click sets many values, you do not want many messages.
+Wrap the calls in `noTransmit(...)` and nothing is sent:
 
 ```lua
 -- Lua — attach to the button, runs on click
@@ -78,8 +84,9 @@ function onClick(mouse) {
 }
 ```
 
-To then push the whole result to the synth in one message, let a **panel** script react —
-`sendDump` is panel/device-scope, not available from a control script:
+Then send the whole result to the synth in one message. A **panel** script can
+react to the event and send a dump. Note: `sendDump` works in panel and device
+scope, not from a control script:
 
 ```lua
 -- Lua — panel scope
@@ -90,8 +97,9 @@ end)
 
 ## 4. Read the synth into the panel on startup
 
-Panel-scope script. `onPanelReady` is the first moment controls exist; guard one-time work with
-`info.firstTime` (the hook re-fires when a VST3 window reopens):
+Use a panel-scope script. `onPanelReady` is the first moment the controls
+exist. Guard one-time work with `info.firstTime`, because the hook fires again
+when a VST3 window reopens:
 
 ```lua
 -- Lua
@@ -108,7 +116,8 @@ end
 
 ## 5. Blink an LED on a timer
 
-`startTimer(id, ms)` fires the `timer` panel event every `ms` until `stopTimer(id)`:
+`startTimer(id, ms)` fires the `timer` panel event every `ms` milliseconds,
+until you call `stopTimer(id)`:
 
 ```lua
 -- Lua
@@ -143,7 +152,7 @@ function onTimer(info) {
 
 ## 6. React to a *different* control
 
-From any script, register on the other control by name:
+Any script can listen to another control. Register on it by name:
 
 ```lua
 -- Lua
@@ -154,7 +163,8 @@ end)
 
 ## 7. Let scripts talk to each other
 
-`emit` announces; any script that registered `on(name, …)` reacts — across languages:
+`emit` announces an event. Every script that registered `on(name, ...)` reacts.
+This works across languages:
 
 ```lua
 -- Lua — the announcing side
@@ -169,12 +179,13 @@ on("bassBoostChanged", (value) => {
 })
 ```
 
-For a direct call with a return value, use `run("target.action", args)` instead of an event.
+Do you need a direct call with a return value? Then use
+`run("target.action", args)` instead of an event.
 
 ## 8. Hand-built SysEx with a checksum (device script)
 
-Only needed when the device map doesn't already model the parameter — bulk and per-parameter
-sending are otherwise automatic:
+You only need this when the device map does not already model the parameter.
+Bulk sending and per-parameter sending are automatic otherwise:
 
 ```lua
 -- Lua
@@ -188,13 +199,13 @@ function sendCustom(value)
 end
 ```
 
-`to14bit`, `toNibbles`, `toAscii` and friends (see the manual's MIDI-encoding helpers) cover the
-usual byte-packing chores.
+For the usual byte-packing work, use `to14bit`, `toNibbles`, `toAscii` and the
+other MIDI-encoding helpers in the manual.
 
 ## 9. Play notes from a script
 
-`sendNote` plays and releases by itself; `noteOn`/`noteOff` are the held pair. A one-finger
-chord button:
+`sendNote` plays a note and releases it by itself. `noteOn` and `noteOff` are
+the held pair: you start the note, and you stop it. A one-finger chord button:
 
 ```lua
 -- Lua — attach to a button
@@ -219,8 +230,8 @@ function onClick(mouse) {
 
 ## 10. Follow the clock
 
-`transport()` reads the master clock; `onBeat`/`onBar` fire as it runs. A tempo-synced
-metronome light, panel scope:
+`transport()` reads the master clock. `onBeat` and `onBar` fire while it runs.
+A tempo-synced metronome light, panel scope:
 
 ```lua
 -- Lua
@@ -233,14 +244,15 @@ function onBar(info)
 end
 ```
 
-`startTimer("pulse", { beats = 1 })` gives a tempo-derived timer — the interval is fixed when
-the timer starts, so restart it on tempo changes (or just use `onBeat`, which always follows
-the clock). `startTimer("flash", { ms = 150, once = true })` is the one-shot form — handy for
-"turn that light back off".
+`startTimer("pulse", { beats = 1 })` gives a timer that follows the tempo.
+The interval is fixed when the timer starts. So restart the timer when the
+tempo changes, or simply use `onBeat`, which always follows the clock.
+`startTimer("flash", { ms = 150, once = true })` is the one-shot form.
+Use it for jobs like "turn that light back off".
 
 ## 11. See what's going on
 
-`log` prints to the script console without changing anything:
+`log` prints to the script console. It changes nothing:
 
 ```lua
 function onValueChanged(value)
@@ -248,8 +260,9 @@ function onValueChanged(value)
 end
 ```
 
-Every event, `set`, and outgoing MIDI message also appears in the console's trace — usually the
-fastest way to find out why something fired (or didn't).
+The console's trace also shows every event, every `set`, and every outgoing
+MIDI message. It is usually the fastest way to find out why something fired,
+or why it did not.
 
 ## 12. Clean up when the panel closes
 
