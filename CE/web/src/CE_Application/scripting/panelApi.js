@@ -202,7 +202,7 @@ export const PANEL_PROPERTIES = [
 export const VALUE_ACCESSORS = [
   { id: 'value', label: '.value', summary: 'The real, human value — e.g. 8000 (Hz) or "LP" (enum name). The default. Setting it lets the DPD convert to MIDI on send.' },
   { id: 'normalizedValue', label: '.normalizedValue', summary: 'The 0–1 position, from the control\'s own min/max. For uniform math, curves, and linking controls of different ranges.' },
-  { id: 'midiValue', label: '.midiValue', requiresDeviceHost: true, summary: 'The value as MIDI (e.g. 101), as the DPD would encode it. Device-bound controls only, and only with the device host attached — the encoding lives there, not in the panel.' },
+  { id: 'midiValue', label: '.midiValue', requiresDeviceHost: true, summary: 'The value as MIDI (e.g. 101), as the DPD would encode it. Device-bound controls only, and requires the device host attached.' },
 ];
 
 export const VALUE_ACCESSOR_IDS = VALUE_ACCESSORS.map((a) => a.id);
@@ -282,8 +282,7 @@ const SHARED_OPTION_FIELDS = {
   },
   beats: {
     name: 'beats', type: 'number', sample: '2',
-    summary: 'A length in beats instead of milliseconds. Overrides `duration`, and follows the '
-      + 'tempo, so the same move is the same musical length at any speed.',
+    summary: 'Length in beats instead of milliseconds. Overrides `duration` and follows the tempo.',
   },
   sync: {
     name: 'sync', type: 'true or false', default: 'false',
@@ -296,8 +295,8 @@ const SHARED_OPTION_FIELDS = {
   },
   stagger: {
     name: 'stagger', type: 'number', default: '0', unit: 'milliseconds',
-    summary: 'When `path` is a list, offset each one after the first by this much, so they set off '
-      + 'in turn rather than together.',
+    summary: 'When `path` is a list, offset each move after the first by this much, so they start '
+      + 'in turn.',
   },
   repeat: {
     name: 'repeat', type: 'number', default: '1',
@@ -310,8 +309,8 @@ const SHARED_OPTION_FIELDS = {
   },
   done: {
     name: 'done', type: 'function',
-    summary: 'Called when the move ends: done(completed). `completed` is false when something '
-      + 'stopped it early, so you can tell finishing from being cancelled.',
+    summary: 'Called when the move ends: done(completed). `completed` is false if the move was '
+      + 'stopped early.',
   },
   animFrom: {
     name: 'from', type: 'number', sample: '0',
@@ -321,7 +320,7 @@ const SHARED_OPTION_FIELDS = {
   /* --- dialogs and messages (ce.ui) -------------------------------------- */
   uiKind: {
     name: 'kind', type: 'text', default: '"info"', values: ['info', 'warn', 'error'],
-    summary: 'How serious it is, which sets the colour and the icon.',
+    summary: 'Severity of the message. Sets the colour and the icon.',
   },
   uiTitle: { name: 'title', type: 'text', sample: '"Overwrite the patch?"', summary: 'The bold line at the top.' },
   uiMessage: { name: 'message', type: 'text', sample: '"This cannot be undone."', summary: 'The body text under the heading.' },
@@ -344,11 +343,11 @@ const SHARED_OPTION_FIELDS = {
   /* --- image layers (ce.image) -------------------------------------------- */
   tint: {
     name: 'tint', type: 'colour',
-    summary: 'A colour to wash the image with, as "#RRGGBB". Omit it to leave the image as it is.',
+    summary: 'Tint colour, as "#RRGGBB". Omit to leave the image untinted.',
   },
   opacity: {
     name: 'opacity', type: 'number', default: '1', unit: '0 to 1',
-    summary: 'How solid the image is. 0 is invisible, 1 is fully opaque.',
+    summary: 'Image opacity. 0 is invisible, 1 is fully opaque.',
   },
   imageRotation: {
     name: 'rotation', type: 'number', default: '0', unit: 'degrees',
@@ -391,7 +390,7 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onPanelBuild', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
     signature: 'onPanelBuild()',
-    summary: 'Phase 1b — build the panel. The place to create, clone and parent controls, typically from what the device reports. Runs after onPanelLoad and before onPanelReady, in the panel view only: there is no renderer window-closed, so nothing here can run in a DAW with the window shut. Every control a script creates is cleared before this fires, so the handler always starts from the authored panel and running it twice cannot double the layout.',
+    summary: 'Phase 1b — build the panel: create, clone and parent controls. Runs after onPanelLoad and before onPanelReady, panel view only. Script-created controls are cleared before each run, so it always starts from the authored panel.',
     params: [],
     snippet: {
       lua: 'function onPanelBuild()\n  for i = 1, 4 do\n    ce.panel.create("Knob", { name = "osc" .. i, x = 20 + i * 90, y = 40 })\n  end\n  $0\nend',
@@ -401,14 +400,14 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onError', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onError(info)',
-    summary: 'A script failed. `info` carries script, scriptId, event, phase ("load" | "dispatch") and message. Runs everywhere, which is the point — window-closed there is nobody watching a log, so this is how a panel reports its own failures. The error is always logged as well; this is in addition to that, never instead of it. An error raised inside onError is logged and not re-dispatched, so a broken reporter cannot loop.',
+    summary: 'A script failed. `info` carries script, scriptId, event, phase ("load" | "dispatch") and message. Runs in every runtime, including window-closed; the error is always logged as well. An error raised inside onError is logged and not re-dispatched, so a broken reporter cannot loop.',
     params: [{ name: 'info', type: 'object', fields: optionFields([
       { name: 'script', type: 'text', summary: 'The name of the script that failed.' },
       { name: 'scriptId', type: 'text', summary: 'Its id, which stays the same when it is renamed.' },
       { name: 'event', type: 'text', summary: 'The handler that was running, such as "onValueChanged".' },
       { name: 'phase', type: 'text', values: ['load', 'dispatch'],
         summary: 'Whether it failed while being loaded or while handling an event.' },
-      { name: 'message', type: 'text', summary: 'What went wrong, in words.' },
+      { name: 'message', type: 'text', summary: 'The error message.' },
     ]) }],
     snippet: {
       lua: 'function onError(info)\n  set("status.text", info.script .. ": " .. info.message)\n  $0\nend',
@@ -418,7 +417,7 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onDraw', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
     signature: 'onDraw(info)',
-    summary: 'Paint on top of the control this script is attached to. `info` carries target, width and height — the control\'s own size, so the drawing scales with it. Called when something asks for a repaint, not every frame: to animate, drive it from onTimer and call ce.draw.redraw(). Panel view only; there is no surface with the window shut.',
+    summary: 'Paint on top of the control this script is attached to. `info` carries target, width and height (the control\'s current size). Called on repaint, not every frame: to animate, drive it from onTimer and call ce.draw.redraw(). Panel view only.',
     params: [{ name: 'info', type: 'object', fields: optionFields([
       { name: 'target', type: 'text', summary: 'The name of the control being painted.' },
       { name: 'width', type: 'number', unit: 'pixels', summary: 'How wide the control is right now.' },
@@ -446,14 +445,14 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onPanelClose', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelClose()',
-    summary: 'Phase 4 — the view is going away: preview stopped, or the plugin window was closed. Your scripts keep running (timers still tick, MIDI still arrives) — a plugin with its window shut is still playing. For "my scripts are being torn down", use onPanelDestroy.',
+    summary: 'Phase 4 — the view is closing: preview stopped, or the plugin window was closed. Scripts keep running (timers still tick, MIDI still arrives). For script teardown, use onPanelDestroy.',
     params: [],
     snippet: { lua: 'function onPanelClose()\n  $0\nend', javascript: 'function onPanelClose() {\n  $0\n}' },
   },
   {
     id: 'onPanelDestroy', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelDestroy()',
-    summary: 'Phase 5 — your scripts are going away: the panel was switched, the script set replaced, or the plugin unloaded. The last thing that runs. Everything still works here — timers, state, MIDI — so this is where you restore the synth, send a final dump, or release what you took. Fires exactly once per loaded script set, whether or not onPanelClose ever did; a window that was never opened never closed, but it is still destroyed.',
+    summary: 'Phase 5 — scripts are being torn down: panel switched, script set replaced, or plugin unloaded. The last hook to run; timers, state and MIDI still work, so restore the synth or send a final dump here. Fires exactly once per loaded script set, even if onPanelClose never fired.',
     params: [],
     snippet: { lua: 'function onPanelDestroy()\n  $0\nend', javascript: 'function onPanelDestroy() {\n  $0\n}' },
   },
@@ -530,13 +529,13 @@ export const DEVICE_EVENTS = [
   { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', decoded: true, summary: 'A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.' },
   // raw (escape hatch)
   { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.' },
-  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value. note: cc.channel is 0-based here, unlike sendCC and unlike onNoteIn — a long-standing quirk that cannot be changed without breaking panels that already compensate.' },
+  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value. Note: cc.channel is 0-based here, unlike sendCC and onNoteIn.' },
   // The most common message on the wire had no event of its own: a panel reacting to played notes
   // had to take onMidiIn and decode status nibbles by hand, in every language, including the
   // note-on-with-velocity-0 case that actually means note-off. Both are derived from the STATUS
   // BYTE rather than from the host's messageType, so the two runtimes cannot classify differently.
   { id: 'noteIn', fn: 'onNoteIn', payload: 'note', decoded: false,
-    summary: 'A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 is not one of these — it is a note-off, and arrives as onNoteOffIn.' },
+    summary: 'A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 counts as a note-off and arrives as onNoteOffIn instead.' },
   { id: 'noteOffIn', fn: 'onNoteOffIn', payload: 'note', decoded: false,
     summary: 'A note was released. note.channel (1-16), note.note, note.velocity (the release velocity, 0 when the device sent a note-on with velocity 0 instead of a note-off).' },
   { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'Raw SysEx arrived.' },
@@ -568,21 +567,21 @@ export const COMPONENT_EVENTS = [
   { id: 'hit', fn: 'onHit', payload: 'hit', runtime: RUNTIME_WEBVIEW,
     summary: 'A pad, key or ribbon was struck. hit.target, hit.id, hit.note, hit.velocity. Chord Pad, Drum Pads, Note Ribbon.' },
   { id: 'release', fn: 'onRelease', payload: 'release', runtime: RUNTIME_WEBVIEW,
-    summary: '…and let go. release.target, release.id, release.note.' },
+    summary: 'A pad, key or ribbon was released. release.target, release.id, release.note.' },
   { id: 'scene', fn: 'onScene', payload: 'scene', runtime: RUNTIME_WEBVIEW,
-    summary: 'The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on the recall, so a scripted jump and a footswitch are one event.' },
+    summary: 'The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on any recall, scripted or footswitch.' },
   { id: 'stage', fn: 'onStage', payload: 'stage', runtime: RUNTIME_WEBVIEW,
-    summary: 'A component entered a new stage of what it was doing. stage.target, stage.stage, stage.previous. The Recorder ("idle"/"armed"/"recording"/"overdub") and the Envelope ("sustain"/"release"/"end"). not onStateChanged, which is a control\'s hover/pressed state.' },
+    summary: 'A component entered a new stage. stage.target, stage.stage, stage.previous. Raised by the Recorder ("idle"/"armed"/"recording"/"overdub") and the Envelope ("sustain"/"release"/"end"). Not onStateChanged, which is a control\'s hover/pressed state.' },
   { id: 'settled', fn: 'onSettled', payload: 'settled', runtime: RUNTIME_WEBVIEW,
-    summary: 'A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick — the moment the return ends, which is not something a value stream tells you.' },
+    summary: 'A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick.' },
   { id: 'bounce', fn: 'onBounce', payload: 'bounce', runtime: RUNTIME_WEBVIEW,
     summary: 'The Kinetic ball hit a wall. bounce.target, bounce.x, bounce.y, bounce.vx, bounce.vy.' },
   { id: 'recall', fn: 'onRecall', payload: 'recall', runtime: RUNTIME_WEBVIEW,
-    summary: 'The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blending is continuous and has no moment to report.' },
+    summary: 'The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blend mode does not fire it.' },
   { id: 'zone', fn: 'onZone', payload: 'zone', runtime: RUNTIME_WEBVIEW,
-    summary: 'A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value. What you light an overload led from, without polling the level.' },
+    summary: 'A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value.' },
   { id: 'voiced', fn: 'onVoiced', payload: 'voiced', runtime: RUNTIME_WEBVIEW,
-    summary: 'A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). The Zone Splitter (which zone took it) and the Harmoniser (which voices it added).' },
+    summary: 'A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). Raised by the Zone Splitter and the Harmoniser.' },
 ];
 
 export const EVENTS = { control: CONTROL_EVENTS, panel: PANEL_EVENTS, time: TIME_EVENTS, device: DEVICE_EVENTS, component: COMPONENT_EVENTS };
@@ -603,7 +602,7 @@ export const COMMANDS = [
   /* --- Values (Q1) --- */
   {
     id: 'set', category: 'Values', signature: 'set(path, value [, opts])',
-    summary: 'Write a value at a path. Suffix the path with .normalizedValue to write a 0–1 position instead of the real value. Transmits to the synth by default (Q2); silence is auto-inferred when reacting to inbound MIDI.',
+    summary: 'Write a value at a path. Suffix the path with .normalizedValue to write a 0–1 position instead of the real value. Transmits to the synth by default; writes made while reacting to inbound MIDI stay silent.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'value', type: 'value', required: true },
@@ -680,8 +679,7 @@ export const COMMANDS = [
   {
     id: 'watch', category: 'Events & Flow', signature: 'watch(path, fn)',
     summary: 'Call fn(value, previous) whenever any model path changes — a nested section field, a '
-      + 'colour, a device binding — not just the eleven declared control events. Source-agnostic: it '
-      + 'fires whether a script, the user or inbound MIDI moved it.',
+      + 'colour, a device binding. Fires regardless of source: script, user, or inbound MIDI.',
     params: [
       { name: 'path', type: 'string', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -694,9 +692,8 @@ export const COMMANDS = [
   },
   {
     id: 'compute', category: 'Events & Flow', signature: 'compute(path, fn)',
-    summary: 'Make a property a formula instead of a constant: fn is re-evaluated whenever anything '
-      + 'moves, and its result is written to path. Unlike doing it in a handler, the runtime owns '
-      + 'the re-evaluation, so it cannot fall out of step with an event you forgot to hook.',
+    summary: 'Make a property a formula: fn is re-evaluated whenever anything moves, and its result '
+      + 'is written to path.',
     params: [
       { name: 'path', type: 'string', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -709,9 +706,8 @@ export const COMMANDS = [
   },
   {
     id: 'intercept', category: 'Events & Flow', signature: 'intercept(path, fn)',
-    summary: 'Sit in front of every write to path. fn(value, prev) returns a replacement value to '
-      + 'transform it (clamp, quantize, snap), false to reject it, or nothing to accept it unchanged. '
-      + 'The panel has no way to express what happens when a value changes; this does.',
+    summary: 'Intercept every write to path. fn(value, prev) returns a replacement value to '
+      + 'transform it (clamp, quantize, snap), false to reject it, or nothing to accept it unchanged.',
     params: [
       { name: 'path', type: 'string', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -724,9 +720,8 @@ export const COMMANDS = [
   },
   {
     id: 'defineAction', category: 'Events & Flow', signature: 'defineAction(name, fn)',
-    summary: 'Register a named action this panel can be built out of: run("name") calls it from any '
-      + 'script in any language, and it is offered wherever the panel binds actions. Scripts stop '
-      + 'being only things the panel triggers and become things the panel is made of.',
+    summary: 'Register a named action. run("name") calls it from any script in any language, and it '
+      + 'is offered wherever the panel binds actions.',
     params: [
       { name: 'name', type: 'string', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -774,7 +769,7 @@ export const COMMANDS = [
   },
   {
     id: 'after', category: 'Events & Flow', signature: 'after(ms, fn) -> id',
-    summary: 'Run `fn` once, `ms` from now. Every other timer here repeats, so a one-shot delay — send a program change, wait for the synth to settle, then send the dump — was written as a repeating timer that stops itself, which is easy to get wrong: a callback that throws before it cancels runs forever. Returns an id you can pass to stopTimer to cancel it before it fires.',
+    summary: 'Run `fn` once, `ms` from now. Returns an id; pass it to stopTimer to cancel before it fires.',
     params: [
       { name: 'ms', type: 'number', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -796,14 +791,14 @@ export const COMMANDS = [
   /* --- Device / MIDI: bulk (Q9) --- */
   {
     id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind [, fn [, opts]])',
-    summary: 'Ask the synth to send a dump. `kind` is defined by the DPD ("patch"/"tone"/"global"…) or declared by defineDump. With `fn`, the reply comes back to it — fn(values, info) — instead of only reaching onDumpReceived with nothing tying it to the request. `info.ok` is false when nothing arrived in time (`opts.timeout`, 3000ms by default), so a callback is never left hanging. fn runs after onDumpReceived, so both see the same panel.',
+    summary: 'Ask the synth to send a dump. `kind` is defined by the DPD ("patch"/"tone"/"global"…) or declared by defineDump. With `fn`, the reply is delivered to fn(values, info); `info.ok` is false when nothing arrived within `opts.timeout` (default 3000ms). fn runs after onDumpReceived, so both see the same panel.',
     params: [
       { name: 'kind', type: 'dumpKind', required: true },
       { name: 'fn', type: 'function', required: false },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'timeout', type: 'number', default: '3000', unit: 'milliseconds',
           summary: 'How long to wait for the reply before giving up and calling `fn` with '
-            + 'info.ok = false, so a callback is never left hanging.' },
+            + 'info.ok = false.' },
       ]) },
     ],
     scopes: 'any',
@@ -814,7 +809,7 @@ export const COMMANDS = [
   },
   {
     id: 'applyDump', category: 'Device / MIDI', signature: 'applyDump(bytes)',
-    summary: 'Fill the whole panel from a received dump (walks the DPD map). Silent automatically — inbound context. Also accepts an already-decoded { parameter: value } map, which is how a panel can be filled with no device host attached.',
+    summary: 'Fill the whole panel from a received dump (walks the DPD map). Silent automatically — inbound context. Also accepts an already-decoded { parameter: value } map, which works with no device host attached.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
     scopes: 'any',
     snippet: { lua: 'applyDump(${1:bytes})$0', javascript: 'applyDump(${1:bytes})$0' },
@@ -828,7 +823,7 @@ export const COMMANDS = [
   },
   {
     id: 'buildDump', category: 'Device / MIDI', signature: 'buildDump(kind)',
-    summary: 'Build the dump bytes from the panel values without sending. Needs the device host: the panel→bytes encoding is the DPD codec, which lives there, so this returns nothing in a plain browser tab and says so.',
+    summary: 'Build the dump bytes from the panel values without sending. Requires the device host (the DPD codec lives there); returns nothing in a plain browser tab and reports why.',
     requiresDeviceHost: true,
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
     scopes: 'any',
@@ -852,7 +847,7 @@ export const COMMANDS = [
      answer. Case is normalised to upper; hex is case-insensitive everywhere it is read. */
   {
     id: 'lighten', category: 'Value / range', signature: 'lighten(colour [, amount]) -> string',
-    summary: 'Scale each channel toward white. `amount` 0..1, default 0.4 — the border renderer\'s own highlight, so a script-drawn bevel matches the one the panel draws beside it. Nothing back for a colour it cannot read.',
+    summary: 'Scale each channel toward white. `amount` 0..1, default 0.4 (the border renderer\'s highlight amount). Returns nothing for a colour it cannot read.',
     params: [
       { name: 'colour', type: 'string', required: true },
       { name: 'amount', type: 'number', required: false },
@@ -861,7 +856,7 @@ export const COMMANDS = [
   },
   {
     id: 'darken', category: 'Value / range', signature: 'darken(colour [, amount]) -> string',
-    summary: 'Scale each channel toward black. `amount` 0..1, default 0.55 — the border groove shading, for the same reason lighten\'s default is what it is.',
+    summary: 'Scale each channel toward black. `amount` 0..1, default 0.55 (the border groove shading amount).',
     params: [
       { name: 'colour', type: 'string', required: true },
       { name: 'amount', type: 'number', required: false },
@@ -870,7 +865,7 @@ export const COMMANDS = [
   },
   {
     id: 'mixColour', category: 'Value / range', signature: 'mixColour(a, b, t) -> string',
-    summary: 'Blend two colours, `t` 0..1. not an app algorithm, and said so rather than implied: it is lerp() per channel in plain RGB, which is the blend a meter fading from green to red actually wants.',
+    summary: 'Blend two colours, `t` 0..1. Per-channel linear interpolation in plain RGB.',
     params: [
       { name: 'a', type: 'string', required: true },
       { name: 'b', type: 'string', required: true },
@@ -880,7 +875,7 @@ export const COMMANDS = [
   },
   {
     id: 'colourAlpha', category: 'Value / range', signature: 'colourAlpha(colour, a) -> string',
-    summary: 'A colour with an alpha, in the panel\'s form: AARRGGBB, no leading #, which is what a stored colour property holds. The one verb here that does not return #RRGGBB, because it is the only form a stored colour can carry an alpha in — css\'s #rrggbbaa is the same bytes the other way round, and mixing them up is silent. To make a drawing translucent use ce.draw.opacity().',
+    summary: 'Apply an alpha to a colour, returned in the panel\'s stored form: AARRGGBB, no leading #. The one colour verb that does not return #RRGGBB. Warning: CSS #rrggbbaa is the same bytes in the opposite order. To make a drawing translucent use ce.draw.opacity().',
     params: [
       { name: 'colour', type: 'string', required: true },
       { name: 'a', type: 'number', required: true },
@@ -889,13 +884,13 @@ export const COMMANDS = [
   },
   {
     id: 'hexToRgb', category: 'Value / range', signature: 'hexToRgb(colour) -> table',
-    summary: 'A colour as { r, g, b }, each 0..255. Nothing back for a colour it cannot read, which is what tells a typo from black.',
+    summary: 'A colour as { r, g, b }, each 0..255. Returns nothing for a colour it cannot read.',
     params: [{ name: 'colour', type: 'string', required: true }],
     scopes: 'any',
   },
   {
     id: 'rgbToHex', category: 'Value / range', signature: 'rgbToHex(r, g, b) -> string',
-    summary: 'Channels 0..255 back to "#RRGGBB". Out-of-range channels are clamped rather than wrapped — 300 is white, not 44.',
+    summary: 'Convert channels 0..255 to "#RRGGBB". Out-of-range channels are clamped, not wrapped.',
     params: [
       { name: 'r', type: 'number', required: true },
       { name: 'g', type: 'number', required: true },

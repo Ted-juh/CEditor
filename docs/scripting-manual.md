@@ -166,7 +166,7 @@ and converts between these representations for you.)
 |---|---|
 | `.value` | The real, human value — e.g. 8000 (Hz) or "LP" (enum name). The default. Setting it lets the DPD convert to MIDI on send. |
 | `.normalizedValue` | The 0–1 position, from the control's own min/max. For uniform math, curves, and linking controls of different ranges. |
-| `.midiValue` | The value as MIDI (e.g. 101), as the DPD would encode it. Device-bound controls only, and only with the device host attached — the encoding lives there, not in the panel. |
+| `.midiValue` | The value as MIDI (e.g. 101), as the DPD would encode it. Device-bound controls only, and requires the device host attached. |
 
 **`self`** — The element this script is attached to: the control for a component script, the panel for a panel script. Use instead of a fixed name so one script works on every copy of a reusable component.
 
@@ -193,7 +193,7 @@ function onPanelLoad() {
 
 ### `onPanelBuild()`
 
-Phase 1b — build the panel. The place to create, clone and parent controls, typically from what the device reports. Runs after onPanelLoad and before onPanelReady, in the panel view only: there is no renderer window-closed, so nothing here can run in a DAW with the window shut. Every control a script creates is cleared before this fires, so the handler always starts from the authored panel and running it twice cannot double the layout.
+Phase 1b — build the panel: create, clone and parent controls. Runs after onPanelLoad and before onPanelReady, panel view only. Script-created controls are cleared before each run, so it always starts from the authored panel.
 
 ```lua
 -- Lua
@@ -216,7 +216,7 @@ function onPanelBuild() {
 
 ### `onError(info)`
 
-A script failed. `info` carries script, scriptId, event, phase ("load" | "dispatch") and message. Runs everywhere, which is the point — window-closed there is nobody watching a log, so this is how a panel reports its own failures. The error is always logged as well; this is in addition to that, never instead of it. An error raised inside onError is logged and not re-dispatched, so a broken reporter cannot loop.
+A script failed. `info` carries script, scriptId, event, phase ("load" | "dispatch") and message. Runs in every runtime, including window-closed; the error is always logged as well. An error raised inside onError is logged and not re-dispatched, so a broken reporter cannot loop.
 
 ```lua
 -- Lua
@@ -235,7 +235,7 @@ function onError(info) {
 
 ### `onDraw(info)`
 
-Paint on top of the control this script is attached to. `info` carries target, width and height — the control's own size, so the drawing scales with it. Called when something asks for a repaint, not every frame: to animate, drive it from onTimer and call ce.draw.redraw(). Panel view only; there is no surface with the window shut.
+Paint on top of the control this script is attached to. `info` carries target, width and height (the control's current size). Called on repaint, not every frame: to animate, drive it from onTimer and call ce.draw.redraw(). Panel view only.
 
 ```lua
 -- Lua
@@ -279,7 +279,7 @@ function onPanelReady(info) {
 
 ### `onPanelClose()`
 
-Phase 4 — the view is going away: preview stopped, or the plugin window was closed. Your scripts keep running (timers still tick, MIDI still arrives) — a plugin with its window shut is still playing. For "my scripts are being torn down", use onPanelDestroy.
+Phase 4 — the view is closing: preview stopped, or the plugin window was closed. Scripts keep running (timers still tick, MIDI still arrives). For script teardown, use onPanelDestroy.
 
 ```lua
 -- Lua
@@ -296,7 +296,7 @@ function onPanelClose() {
 
 ### `onPanelDestroy()`
 
-Phase 5 — your scripts are going away: the panel was switched, the script set replaced, or the plugin unloaded. The last thing that runs. Everything still works here — timers, state, MIDI — so this is where you restore the synth, send a final dump, or release what you took. Fires exactly once per loaded script set, whether or not onPanelClose ever did; a window that was never opened never closed, but it is still destroyed.
+Phase 5 — scripts are being torn down: panel switched, script set replaced, or plugin unloaded. The last hook to run; timers, state and MIDI still work, so restore the synth or send a final dump here. Fires exactly once per loaded script set, even if onPanelClose never fired.
 
 ```lua
 -- Lua
