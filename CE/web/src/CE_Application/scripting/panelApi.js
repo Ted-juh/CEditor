@@ -2025,7 +2025,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelGrid', category: 'Panel structure', signature: 'panelGrid(names [, opts]) -> number',
-    summary: 'Tidy controls into a grid. `opts` carries { columns (3), gapX (10), gapY (10) }. Cells are uniform, sized by the biggest control, so a grid stays a grid — and the order is reading order, rows quantised to 20px then left to right, which makes "tidy" match what the eye already sees rather than document order. The first control in that order anchors the origin.',
+    summary: 'Arrange controls into a grid. `opts` carries { columns (3), gapX (10), gapY (10) }. Cells are uniform, sized by the biggest control. Order is reading order — rows quantised to 20px, then left to right — not document order. The first control in that order anchors the origin.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2046,7 +2046,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelCircle', category: 'Panel structure', signature: 'panelCircle(names [, opts]) -> number',
-    summary: 'Arrange controls around a circle centred on their own bounding box. `opts` carries { radius (100), startAngle (0, degrees) }. Order is the order you gave, so the ring reads the way the list does.',
+    summary: 'Arrange controls around a circle centred on their own bounding box. `opts` carries { radius (100), startAngle (0, degrees) }. Placement follows the order of `names`.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2061,7 +2061,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelFlip', category: 'Panel structure', signature: 'panelFlip(names, axis) -> number',
-    summary: 'Mirror where controls sit about the centre of their bounding box — "horizontal" or "vertical". It moves them; it does not rotate or mirror the controls themselves, because "flip the layout" and "flip the artwork" are different requests.',
+    summary: 'Mirror control positions about the centre of their bounding box — "horizontal" or "vertical". Moves the controls only; it does not rotate or mirror the controls themselves.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2071,14 +2071,14 @@ export const COMMANDS = [
   },
   {
     id: 'panelRect', category: 'Panel structure', signature: 'panelRect(name) -> table',
-    summary: 'Where a control is in panel coordinates: { x, y, width, height, right, bottom }. Transform.x is not that once anything is inside a container, so "draw a line between these two controls" or "is this one above that one" had no answer. Given a list of names it is the bounding box of the lot, which is what "how big is this group" means. Nothing back when no name resolves.',
+    summary: 'A control\'s position in panel coordinates: { x, y, width, height, right, bottom }. Unlike Transform.x, this accounts for container offsets. Given a list of names, returns the bounding box of the group. Returns nothing when no name resolves.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'name', type: 'value', required: true }],
     scopes: 'any',
   },
   {
     id: 'panelOrder', category: 'Panel structure', signature: 'panelOrder(names, where) -> number',
-    summary: 'Z-order: "front" | "forward" | "backward" | "back". Order is document order rather than a property, which is exactly why set() could never do it. Controls move within their own parent — bringing something to the front of a container it is not in is not a thing — and later in the list paints later, so "front" is the end.',
+    summary: 'Change z-order: "front" | "forward" | "backward" | "back". Controls move within their own parent only. Later in document order paints later, so "front" is the end of the list.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2088,7 +2088,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelBatch', category: 'Panel structure', signature: 'panelBatch(fn) -> boolean',
-    summary: 'Everything `fn` does is one undo step. The editor debounces its history snapshots, which groups a drag nicely and leaves a script that creates forty controls landing as an unpredictable number of steps; this brackets the work so it undoes as "build the page" rather than forty times. The flush happens whatever the callback does, including throwing — a half-built panel that cannot be undone is worse than a half-built panel. In the player there is no history to group and the callback simply runs.',
+    summary: 'Run `fn` so that everything it does is a single undo step. The history flush happens even if the callback throws. In the player there is no history and the callback simply runs.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
@@ -2113,7 +2113,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelEntry', category: 'Panel structure', signature: 'panelEntry(control, section, name)',
-    summary: 'One entry out of a collection section, or nil. Matched case-insensitively, the way a path is.',
+    summary: 'One entry out of a collection section, or nil. The name is matched case-insensitively, like a path.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
@@ -2128,7 +2128,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelDefine', category: 'Panel structure', signature: 'panelDefine(control, section, name, spec)',
-    summary: 'Create an entry in a collection section, or replace one that is there. The spec is merged over the section\'s own template, so declaring a state is one line rather than a hand-written node — hand-writing _type and both patch maps every time is how a verb like this ends up unused. Returns whether it landed.',
+    summary: 'Create an entry in a collection section, or replace an existing one. The spec is merged over the section\'s own template, so a partial spec is enough. Returns whether it landed.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
@@ -2144,7 +2144,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelUndefine', category: 'Panel structure', signature: 'panelUndefine(control, section, name)',
-    summary: 'Remove an entry from a collection section. Returns whether there was one, so "already gone" reads differently from "removed". Nothing script-facing could remove one of these before — set(path, nil) leaves the entry exactly where it was.',
+    summary: 'Remove an entry from a collection section. Returns whether an entry existed. Note that set(path, nil) does not remove entries; this is the verb that does.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
@@ -2159,7 +2159,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelPatch', category: 'Panel structure', signature: 'panelPatch(control, state, patch [, part])',
-    summary: 'Change how a control looks in one of its states — hovered, pressed, disabled. This needs its own command because the entries are themselves written as paths, which plain set() cannot address without losing its way. It merges what you give it into what is already there rather than replacing the lot, and returns how many entries were applied. Use `part` to patch one part of a custom component rather than the whole thing.',
+    summary: 'Change how a control looks in one of its states — hovered, pressed, disabled. The patch is merged into the existing state rather than replacing it. Returns how many entries were applied. Use `part` to patch one part of a custom component. State entries are themselves paths, which plain set() cannot address.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
@@ -2205,7 +2205,7 @@ export const COMMANDS = [
   },
   {
     id: 'beatsToMs', category: 'Time', signature: 'beatsToMs(beats [, bpm])',
-    summary: 'Musical time to milliseconds at the current tempo — the delay-time calculation a synth panel needs most. Pass `bpm` to override. Returns nil when there is no tempo to work from.',
+    summary: 'Convert beats to milliseconds at the current tempo. Pass `bpm` to override. Returns nil when there is no tempo to work from.',
     params: [
       { name: 'beats', type: 'number', required: true },
       { name: 'bpm', type: 'number', required: false },
@@ -2225,7 +2225,7 @@ export const COMMANDS = [
   },
   {
     id: 'syncTimer', category: 'Time', signature: 'syncTimer(id, beats [, opts])',
-    summary: 'startTimer with a musical interval: syncTimer("step", 0.25) fires every sixteenth at the current tempo, and follows the tempo — change it and the timer re-times itself. Re-arming resets the timer\'s phase, so a tempo change costs one hiccup; that beats a timer permanently at the wrong rate. Pass { follow = false } to freeze the interval at the tempo it was created with. Nothing is started when no tempo is being reported, and it says so.',
+    summary: 'startTimer with a musical interval: syncTimer("step", 0.25) fires every sixteenth at the current tempo. The interval follows tempo changes; each re-arm resets the timer\'s phase. Pass { follow = false } to freeze the interval at the creation tempo. When no tempo is being reported, nothing is started and the failure is reported.',
     params: [
       { name: 'id', type: 'string', required: true },
       { name: 'beats', type: 'number', required: true },
@@ -2236,7 +2236,7 @@ export const COMMANDS = [
   },
   {
     id: 'afterBeats', category: 'Time', signature: 'afterBeats(beats, fn) -> id',
-    summary: 'after() with a musical delay: afterBeats(2, fn) runs fn in two beats\' time. startTimer had syncTimer and the one-shot had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot fires once, so the delay is computed when you call it and does not follow a later tempo change. Returns the timer id, which stopTimer cancels. Nothing is scheduled when no tempo is being reported — it says so rather than firing immediately.',
+    summary: 'after() with a musical delay: afterBeats(2, fn) runs fn in two beats\' time. The delay is computed at call time and does not follow a later tempo change. Returns the timer id, which stopTimer cancels. When no tempo is being reported, nothing is scheduled (it does not fire immediately) and the failure is reported.',
     params: [
       { name: 'beats', type: 'number', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -2249,7 +2249,7 @@ export const COMMANDS = [
   },
   {
     id: 'runningTimers', category: 'Time', signature: 'runningTimers() -> list',
-    summary: 'The timer ids currently running, sorted — the ones started by name with startTimer or syncTimer. One-shots are not listed, any of them: after() hands you its id already, and the runtime\'s own (sendNote\'s note-off) is not a script\'s to cancel.',
+    summary: 'The ids of running named timers (startTimer or syncTimer), sorted. One-shot timers are not listed; after() already returns its id.',
     scopes: 'any',
     snippet: { lua: 'for _, id in ipairs(runningTimers()) do log(id) end$0', javascript: 'for (const id of runningTimers()) log(id);$0' },
   },
@@ -2266,26 +2266,26 @@ export const COMMANDS = [
      component's grid are the same grid. */
   {
     id: 'nowMs', category: 'Time', signature: 'nowMs() -> number',
-    summary: 'A monotonic millisecond reading. not a wall clock and not a date — the origin is arbitrary and only differences mean anything, which is deliberate: a wall clock jumps when the machine syncs its time and a script measuring across that jump measures the jump. This exists because there was no clock at all: the Lua engine opens base, math, string and table and not os, so a Lua script could not read one, and Date/time.time() disagree about epoch and unit anyway.',
+    summary: 'A monotonic millisecond reading. The origin is arbitrary; only differences are meaningful. Not a wall clock or date.',
     scopes: 'any',
     snippet: { lua: 'local t0 = nowMs()$0', javascript: 'const t0 = nowMs();$0' },
   },
   {
     id: 'beatsPerDivision', category: 'Time', signature: 'beatsPerDivision(name) -> number',
-    summary: 'A note division as a fraction of a beat: "1/16" → 0.25, "1/8T" → 0.333…, "1/4D" → 1.5. The vocabulary every sequencer property in the app speaks, and the one conversion a script could not do. Returns nothing for a name this build does not know — a component falls back to 1/16 because it has to keep running, a script that mistyped a division should find out.',
+    summary: 'A note division as a fraction of a beat: "1/16" → 0.25, "1/8T" → 0.333…, "1/4D" → 1.5. The same names every sequencer property uses. Returns nothing for a name this build does not know.',
     params: [{ name: 'name', type: 'string', required: true }],
     scopes: 'any',
     snippet: { lua: 'local beats = beatsPerDivision("1/16")$0', javascript: 'const beats = beatsPerDivision("1/16");$0' },
   },
   {
     id: 'divisionNames', category: 'Time', signature: 'divisionNames() -> list',
-    summary: 'Every division this build knows, in picker order: { id, label, beats }. What to build a menu from, rather than hard-coding fourteen strings that go stale the moment one is added.',
+    summary: 'Every division this build knows, in picker order: { id, label, beats }. Build menus from this list rather than hard-coding the names.',
     scopes: 'any',
     snippet: { lua: 'for _, d in ipairs(divisionNames()) do log(d.label) end$0', javascript: 'for (const d of divisionNames()) log(d.label);$0' },
   },
   {
     id: 'barBeatAt', category: 'Time', signature: 'barBeatAt(beats [, beatsPerBar]) -> table',
-    summary: 'Where a beat position falls musically — for any position, not only the one the transport is at. Returns { bar, beat, tick, text, beatsPerBar }, bars and beats counting from 1 as musicians do, ticks at 24 ppqn. `text` is the Transport component\'s own readout ("3.2.00"), so a script\'s label and the component\'s agree character for character.',
+    summary: 'Convert any beat position to a musical position: { bar, beat, tick, text, beatsPerBar }. Bars and beats are 1-based; ticks are at 24 ppqn. `text` is the Transport component\'s own readout format ("3.2.00").',
     params: [
       { name: 'beats', type: 'number', required: true },
       { name: 'beatsPerBar', type: 'number', required: false },
@@ -2304,7 +2304,7 @@ export const COMMANDS = [
   },
   {
     id: 'stepsBetween', category: 'Time', signature: 'stepsBetween(from, to, division [, max]) -> table',
-    summary: 'How many step boundaries went by between two readings: { steps, dropped }. Use it so a sequence you are driving yourself never loses a step — if a frame runs late, you still play the steps it slept through instead of leaving a hole in the bar. `max` limits the catching up (16 by default), so coming back to a window that was hidden for a minute does not fire hundreds of notes at once; anything skipped is reported rather than quietly dropped. When it does have to skip, it keeps the most recent steps, since catching up to now matters more than replaying where you were.',
+    summary: 'Count step boundaries crossed between two beat positions: { steps, dropped }. Use it to catch up steps a late frame slept through. `max` caps the catch-up (default 16); anything over the cap is counted in `dropped`, and the most recent steps are the ones kept.',
     params: [
       { name: 'from', type: 'number', required: true },
       { name: 'to', type: 'number', required: true },
@@ -2315,7 +2315,7 @@ export const COMMANDS = [
   },
   {
     id: 'swingOffset', category: 'Time', signature: 'swingOffset(step, amount, division) -> number',
-    summary: 'The panel\'s shuffle: every odd step pushed later by up to half a step, in beats, to add to that step\'s position. `amount` is 0..1, the same number the Transport\'s swing property holds. Two sequencers at "the same" swing really are the same swing only if they compute it the same way — which is why this is the transport\'s function and not a second one.',
+    summary: 'The swing offset for a step, in beats, to add to that step\'s position: every odd step is pushed later by up to half a step. `amount` is 0..1, the same number the Transport\'s swing property holds. Uses the transport\'s own swing calculation.',
     params: [
       { name: 'step', type: 'number', required: true },
       { name: 'amount', type: 'number', required: true },
@@ -2325,7 +2325,7 @@ export const COMMANDS = [
   },
   {
     id: 'cycleAt', category: 'Time', signature: 'cycleAt(beats, bars [, beatsPerBar]) -> table',
-    summary: 'For anything whose rate is a loop length in bars rather than a step — a take, a slow sweep. Returns { phase, count, length }: phase 0–1 through the cycle, how many have completed, and the cycle in beats. Derived from the position and never accumulated, so a cycle running for an hour is still exactly on the bar line.',
+    summary: 'Position within a repeating cycle of `bars` bars: { phase, count, length }. `phase` is 0–1 through the cycle, `count` how many have completed, `length` the cycle in beats. Derived from the position, never accumulated, so it stays exact over long runs.',
     params: [
       { name: 'beats', type: 'number', required: true },
       { name: 'bars', type: 'number', required: true },
@@ -2335,7 +2335,7 @@ export const COMMANDS = [
   },
   {
     id: 'loopedBeats', category: 'Time', signature: 'loopedBeats(beats, startBeats, lengthBeats) -> table',
-    summary: 'Fold a timeline position into a loop: { beats, pass }. Before the loop start the position is untouched — you can run in to a loop from earlier in the song, which is what every DAW does and what a count-in needs. `pass` is which time round you are, and -1 before the loop has been reached; watching it for changes tells you a wrap happened, without a wrap handler that can miss one. The looped position is a pure function of the un-looped one rather than a counter that gets reset, which is what makes it exact after an hour.',
+    summary: 'Fold a timeline position into a loop: { beats, pass }. Positions before the loop start are returned untouched, so a run-in or count-in works. `pass` is which time round the loop you are, and -1 before the loop is reached; watch it for changes to detect a wrap. The looped position is a pure function of the un-looped one, so it stays exact over long runs.',
     params: [
       { name: 'beats', type: 'number', required: true },
       { name: 'startBeats', type: 'number', required: true },
@@ -2345,7 +2345,7 @@ export const COMMANDS = [
   },
   {
     id: 'tapTempo', category: 'Time', signature: 'tapTempo(times [, resetMs]) -> number',
-    summary: 'Tempo from tap times, in the milliseconds now() reports. Taps more than `resetMs` apart (2000 by default) start a new measurement rather than averaging across the pause — otherwise the first tap after a break poisons it, which is exactly what a hand-rolled tap tempo gets wrong. Returns nothing from fewer than two usable taps, and the result is clamped to 20–300 bpm.',
+    summary: 'Tempo from a list of tap times, in the milliseconds now() reports. Taps more than `resetMs` apart (default 2000) start a new measurement rather than averaging across the pause. Returns nothing from fewer than two usable taps; the result is clamped to 20–300 bpm.',
     params: [
       { name: 'times', type: 'list', required: true },
       { name: 'resetMs', type: 'number', required: false },
@@ -2354,7 +2354,7 @@ export const COMMANDS = [
   },
   {
     id: 'clockTempo', category: 'Time', signature: 'clockTempo(intervalsMs) -> number',
-    summary: 'Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note) — what a script filtering 0xF8 with ce.midi.interceptIn is holding and could not turn into a bpm. The median, not the mean: one late pulse from a usb hiccup drags an average around, and a wobbling readout is worse than a slightly stale one. Nothing comes back from an empty list.',
+    summary: 'Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note), e.g. 0xF8 intervals collected with ce.midi.interceptIn. Uses the median interval, so one late pulse does not skew the result. Returns nothing from an empty list.',
     params: [{ name: 'intervalsMs', type: 'list', required: true }],
     scopes: 'any',
   },
@@ -2380,7 +2380,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceParameters', category: 'Device / MIDI', signature: 'deviceParameters([opts])',
-    summary: 'The profile\'s parameter descriptors: { id, name, group, type, min, max, access }. `opts` may carry { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report — while ce.device is enabled. A gated call returns nil like any other, because a module that is off has no answer to give.',
+    summary: 'The profile\'s parameter descriptors: { id, name, group, type, min, max, access }. `opts` may carry { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report; returns nil when ce.device is gated off.',
     requiresDeviceHost: true,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       'role',
@@ -2421,7 +2421,7 @@ export const COMMANDS = [
   // that discovered eight oscillators could enumerate them and not address them.
   {
     id: 'deviceRead', category: 'Device / MIDI', signature: 'deviceRead(id [, role]) -> value',
-    summary: 'The last known value of a device parameter — what the synth most recently told us, from a dump or a parameter message. Not a live query: asking the synth is asynchronous, and this verb is not. Nothing comes back if the device has never reported it, which is different from zero.',
+    summary: 'The last reported value of a device parameter, from a dump or a parameter message. Not a live query of the synth. Returns nothing if the device has never reported it — distinct from zero.',
     requiresDeviceHost: true,
     params: [
       { name: 'id', type: 'string', required: true },
@@ -2435,7 +2435,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceWrite', category: 'Device / MIDI', signature: 'deviceWrite(id, value [, role]) -> boolean',
-    summary: 'Set a device parameter on the synth, by parameter id, whether or not a control is bound to it. The device profile encodes it. Returns whether the message was dispatched — not whether the synth accepted it, which nothing can know synchronously. `value` is in the parameter\'s own units, the ones deviceParameter() reports min and max for.',
+    summary: 'Set a device parameter on the synth by parameter id; no control binding is required. The device profile encodes the message. Returns whether the message was dispatched, not whether the synth accepted it. `value` is in the parameter\'s own units, the ones deviceParameter() reports min and max for.',
     requiresDeviceHost: true,
     params: [
       { name: 'id', type: 'string', required: true },
@@ -2474,7 +2474,7 @@ export const COMMANDS = [
   {
     id: 'deviceDefineParameter', category: 'Device / MIDI',
     signature: 'deviceDefineParameter(id, spec [, role]) -> boolean',
-    summary: 'Teach the app a parameter at runtime, for a synth it has no profile for. `spec` says how it reaches the synth — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — plus name/group/type/min/max for what parameters() reports. The declaration is refused (and says why) when there is no wire format: a descriptor that enumerates and sends nothing is worse than an error, because the panel looks built. A declared id overrides a profile one, so a script can correct one wrong parameter without redeclaring the rest. Sysex template tokens: a hex literal, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.',
+    summary: 'Declare a device parameter at runtime, for a synth with no shipped profile. `spec` gives the wire format — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — plus name/group/type/min/max for what parameters() reports. A spec with no wire format is refused, and the refusal says why. A declared id overrides a profile one, so a script can correct one wrong parameter without redeclaring the rest. Sysex template tokens: a hex literal, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.',
     params: [
       { name: 'id', type: 'string', required: true },
       { name: 'spec', type: 'object', required: true, fields: optionFields([
@@ -2522,7 +2522,7 @@ export const COMMANDS = [
   {
     id: 'deviceDefineDump', category: 'Device / MIDI',
     signature: 'deviceDefineDump(kind, spec [, role]) -> boolean',
-    summary: 'Describe a SysEx dump layout at runtime: `request` (the bytes that ask for it), `match` ({ prefix, suffix }), `offset`/`size` for the payload, an optional `checksum`, and `fields` — one { parameter, offset } per value the dump carries. Every field must name a parameter defineParameter already declared; an unknown one is refused rather than decoded to nothing months later. A declared layout is matched against arriving SysEx, fills the bound controls and raises onDumpReceived, exactly as a profile-defined dump does.',
+    summary: 'Declare a SysEx dump layout at runtime: `request` (the bytes that ask for it), `match` ({ prefix, suffix }), `offset`/`size` for the payload, an optional `checksum`, and `fields` — one { parameter, offset } per value the dump carries. Every field must name a parameter already declared with defineParameter; an unknown one is refused. A declared layout is matched against arriving SysEx, fills the bound controls and raises onDumpReceived, exactly as a profile-defined dump does.',
     params: [
       { name: 'kind', type: 'string', required: true },
       { name: 'spec', type: 'object', required: true, fields: optionFields([
@@ -2541,8 +2541,8 @@ export const COMMANDS = [
             + 'ce.midi.checksum\'s.' },
         { name: 'fields', type: 'list of objects', required: true,
           summary: 'Where each value sits inside the payload, one { parameter, offset } per '
-            + 'value. Every parameter must be one defineParameter already declared; an unknown '
-            + 'name is refused now rather than decoding to nothing months later.' },
+            + 'value. Every parameter must already be declared with defineParameter; an unknown '
+            + 'name is refused.' },
       ]) },
       { name: 'role', type: 'string', required: false },
     ],
@@ -2558,7 +2558,7 @@ export const COMMANDS = [
     // Panel view only for the same reason ce.panel.create is: the binding lives on the control
     // model, and there is no control model with the window shut.
     runtime: RUNTIME_WEBVIEW,
-    summary: 'Wire a control to a device parameter at runtime. ce.panel.create could already make a control and nothing could connect it to anything, so a self-building panel built dead controls; this is the other half of that pair. Replaces whatever was bound to the same port rather than adding a second binding, and switches DeviceBindings back on if the control had it off. `opts` takes { role, port }; port defaults to "value".',
+    summary: 'Wire a control to a device parameter at runtime. Replaces whatever was bound to the same port rather than adding a second binding, and switches DeviceBindings back on if the control had it off. `opts` takes { role, port }; port defaults to "value".',
     params: [
       { name: 'control', type: 'string', required: true },
       { name: 'parameterId', type: 'string', required: true },
@@ -2579,7 +2579,7 @@ export const COMMANDS = [
     id: 'deviceUnbind', category: 'Device / MIDI',
     signature: 'deviceUnbind(control [, port]) -> boolean',
     runtime: RUNTIME_WEBVIEW,
-    summary: 'Remove a control\'s device binding. Returns whether there was one to remove, so "already clean" reads differently from "cleaned up".',
+    summary: 'Remove a control\'s device binding. Returns whether there was one to remove.',
     params: [
       { name: 'control', type: 'string', required: true },
       { name: 'port', type: 'string', required: false },
@@ -2592,7 +2592,7 @@ export const COMMANDS = [
   },
   {
     id: 'devicePorts', category: 'Device / MIDI', signature: 'devicePorts([opts]) -> list',
-    summary: 'What is actually plugged in: [{ id, name, direction, type, hardware, role }]. connected(role) only answers yes/no for a role somebody configured in advance; this enumerates the real ports, so a panel can offer the user a choice or notice a device that showed up. `hardware` is false for the two placeholder rows the app always lists ("No MIDI Input", "Preview Only"), and `role` is the role currently using the port, or empty. `opts.direction` narrows to "in" or "out".',
+    summary: 'Enumerate the MIDI ports: [{ id, name, direction, type, hardware, role }]. `hardware` is false for the two placeholder rows the app always lists ("No MIDI Input", "Preview Only"); `role` is the role currently using the port, or empty. `opts.direction` narrows to "in" or "out".',
     requiresDeviceHost: true,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'direction', type: 'text', values: ['in', 'out'],
@@ -2606,7 +2606,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceVariables', category: 'Device / MIDI', signature: 'deviceVariables([role]) -> table',
-    summary: 'The variables every message recipe interpolates — `channel`, `deviceId` and whatever else the profile declares — as their effective values: the profile\'s defaults with this project\'s overrides on top. Nothing back when no profile is mapped to the role.',
+    summary: 'The variables every message recipe interpolates — `channel`, `deviceId` and whatever else the profile declares — as their effective values: the profile\'s defaults with this project\'s overrides applied. Returns nothing when no profile is mapped to the role.',
     requiresDeviceHost: true,
     params: [{ name: 'role', type: 'string', required: false }],
     scopes: 'any',
@@ -2618,7 +2618,7 @@ export const COMMANDS = [
   {
     id: 'deviceSetVariable', category: 'Device / MIDI',
     signature: 'deviceSetVariable(name, value [, role]) -> boolean',
-    summary: 'Point this panel at a different unit: set one recipe variable, 0..127. The write lands on this project\'s override rather than on the profile, which is a shared document — two panels driving two units of the same synth sit on different device ids without editing it. Individual uses clamp further (a channel is 1..16).',
+    summary: 'Set one recipe variable, 0..127 — e.g. to point this panel at a different unit. The write lands on this project\'s override, not on the shared profile, so two panels can use different device ids for the same synth. Individual uses clamp further (a channel is 1..16).',
     requiresDeviceHost: true,
     params: [
       { name: 'name', type: 'string', required: true },
@@ -2645,7 +2645,7 @@ export const COMMANDS = [
   {
     id: 'deviceSetTiming', category: 'Device / MIDI',
     signature: 'deviceSetTiming(name, ms [, role]) -> boolean',
-    summary: 'Slow the panel down for a device that cannot keep up — an override on this project, in milliseconds, 0..60000. Same rule as setVariable: the profile is left alone.',
+    summary: 'Set one timing override for this project, in milliseconds, 0..60000 — e.g. to slow the panel down for a device that cannot keep up. As with setVariable, the profile itself is not modified.',
     requiresDeviceHost: true,
     params: [
       { name: 'name', type: 'string', required: true },
@@ -2661,7 +2661,7 @@ export const COMMANDS = [
   {
     id: 'deviceCoverage', category: 'Device / MIDI',
     signature: 'deviceCoverage([feature [, role]]) -> table|string',
-    summary: 'What the profile says it can do, in the profile\'s own words. No feature gives the whole map — `singleParameterWrite`, `realtimeEditing`, `editBufferDumpParse` and so on. Deliberately not a yes/no: real profiles answer "complete", "partial" and "notImplemented" but also "filter-block-rq1" and "broad-with-packed-text-and-requests", so a boolean would be a guess wearing the clothes of a fact. Test the words you care about.',
+    summary: 'The profile\'s self-reported feature coverage, as strings rather than booleans. With no feature, returns the whole map — `singleParameterWrite`, `realtimeEditing`, `editBufferDumpParse` and so on. Profiles answer "complete", "partial" and "notImplemented", but also free-form values such as "filter-block-rq1". Test the words you care about.',
     requiresDeviceHost: true,
     params: [
       { name: 'feature', type: 'string', required: false },
@@ -2722,7 +2722,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendRPN', category: 'Device / MIDI', signature: 'sendRPN(channel, msb, lsb, value)',
-    summary: 'Send a registered parameter number — the standard path for pitch-bend range (0,0), fine tuning (0,1) and coarse tuning (0,2), which is the kind of thing a panel sets once at load. Same shape as sendNRPN; the difference is CC 101/100 instead of 99/98.',
+    summary: 'Send a registered parameter number (RPN): the standard path for pitch-bend range (0,0), fine tuning (0,1) and coarse tuning (0,2). Same shape as sendNRPN, but uses CC 101/100 instead of 99/98.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'msb', type: 'number', required: true },
@@ -2734,7 +2734,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendSongPosition', category: 'Device / MIDI', signature: 'sendSongPosition(beats)',
-    summary: 'Song Position Pointer — where in the song the next start should resume from, in MIDI beats (one beat = six clocks = a sixteenth note). The piece of sendTransport that was missing for anything driving an external sequencer.',
+    summary: 'Send a Song Position Pointer: where the next start or continue resumes from, in MIDI beats (one beat = six clocks = a sixteenth note).',
     params: [{ name: 'beats', type: 'number', required: true }],
     scopes: 'any',
     snippet: { lua: 'sendSongPosition(${1:0})$0', javascript: 'sendSongPosition(${1:0});$0' },
@@ -2755,9 +2755,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendNote', category: 'Device / MIDI', signature: 'sendNote(channel, note, velocity [, ms])',
-    summary: 'Note on. `note` is a MIDI number or a name ("C3"). Velocity 0 is a note off, as the MIDI spec has it. '
-      + 'Give `ms` and the note off is scheduled for you — every script that plays a note was otherwise '
-      + 'hand-rolling a timer for it, and a panel cannot play a note at all.',
+    summary: 'Note on. `note` is a MIDI number or a name ("C3"). Velocity 0 is a note off. Give `ms` and the matching note off is scheduled automatically.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'note', type: 'value', required: true },
@@ -2769,10 +2767,9 @@ export const COMMANDS = [
   },
   {
     id: 'interceptMidiIn', category: 'Device / MIDI', signature: 'interceptMidiIn(fn)',
-    summary: 'Sit in the inbound path. fn(bytes) returns replacement bytes to rewrite the message, '
-      + 'false to swallow it, or nothing to pass it through — before the panel\'s bindings, the note '
-      + 'input and the transport see it. onCcIn only lets you react after a binding has already moved '
-      + 'the control; this is how a velocity curve, a channel remap or a MIDI-learn layer is built.',
+    summary: 'Intercept inbound MIDI before the panel\'s bindings, note input and transport see it. '
+      + 'fn(bytes) returns replacement bytes to rewrite the message, false to swallow it, or nothing '
+      + 'to pass it through.',
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
     snippet: {
@@ -2782,9 +2779,9 @@ export const COMMANDS = [
   },
   {
     id: 'interceptMidiOut', category: 'Device / MIDI', signature: 'interceptMidiOut(fn)',
-    summary: 'Sit in the outbound path — every message the panel sends, from a script or from a '
-      + 'control\'s own binding. Rewrite, thin or block it. CC flooding on a fast drag has no answer '
-      + 'from a panel, whose bindings are fixed and which has nothing between them and the port.',
+    summary: 'Intercept outbound MIDI — every message the panel sends, from a script or from a '
+      + 'control\'s own binding. fn(bytes) returns replacement bytes to rewrite the message, false '
+      + 'to swallow it, or nothing to pass it through.',
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
     snippet: {
@@ -2794,19 +2791,17 @@ export const COMMANDS = [
   },
   {
     id: 'feedMidi', category: 'Device / MIDI', signature: 'feedMidi(bytes)',
-    summary: 'Inject a message as if it had arrived from the hardware, so the panel\'s own bindings, '
-      + 'note input and transport all act on it. set() moves a control directly and bypasses every '
-      + 'binding; this is how a script-built arpeggiator or sequencer drives the panel instead of '
-      + 'around it. Inbound filters run on it, so a fed message obeys the same rules as a real one.',
+    summary: 'Inject a message as if it had arrived from the hardware: the panel\'s own bindings, '
+      + 'note input and transport all act on it. Inbound intercepts and filters run on it, so a fed '
+      + 'message obeys the same rules as a real one.',
     params: [{ name: 'bytes', type: 'value', required: true }],
     scopes: 'any',
     snippet: { lua: 'feedMidi(${1:{0x90, 60, 100\}})$0', javascript: 'feedMidi([${1:0x90, 60, 100}])$0' },
   },
   {
     id: 'routeMidi', category: 'Device / MIDI', signature: 'routeMidi(role, fn)',
-    summary: 'Send everything in the block to a named device role instead of the default. Blocks '
-      + 'rather than a per-call argument, the same shape noTransmit() uses — a panel binds one device '
-      + 'at design time, so notes to one synth and CCs to another is otherwise impossible.',
+    summary: 'Send everything inside `fn` to a named device role instead of the default device. '
+      + 'Block-scoped, the same shape noTransmit() uses.',
     params: [
       { name: 'role', type: 'string', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -2819,7 +2814,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendNoteOff', category: 'Device / MIDI', signature: 'sendNoteOff(channel, note [, velocity])',
-    summary: 'Note off. Release velocity defaults to 0. Nothing schedules this for you — a note you start is a note you stop.',
+    summary: 'Note off. Release velocity defaults to 0. Nothing schedules this for you: send it for every note you start.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'note', type: 'value', required: true },
@@ -2830,7 +2825,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendProgramChange', category: 'Device / MIDI', signature: 'sendProgramChange(channel, program [, bankMsb, bankLsb])',
-    summary: 'Program change, with an optional bank select (CC 0 / CC 32) sent first, which is the order devices expect.',
+    summary: 'Program change, with an optional bank select (CC 0 / CC 32) sent first.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'program', type: 'number', required: true },
@@ -2842,7 +2837,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendPitchBend', category: 'Device / MIDI', signature: 'sendPitchBend(channel, value)',
-    summary: 'Pitch bend, 0–16383 with 8192 at centre — the raw 14-bit value, because how many semitones that is depends on the synth\'s bend range, not on us.',
+    summary: 'Pitch bend as the raw 14-bit value: 0–16383, centre 8192. How many semitones that spans depends on the synth\'s bend range.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'value', type: 'number', required: true },
@@ -2877,14 +2872,14 @@ export const COMMANDS = [
   },
   {
     id: 'sendSysex', category: 'Device / MIDI', signature: 'sendSysex(bytes)',
-    summary: 'Send a raw SysEx message (device-scope, power use).',
+    summary: 'Send a raw SysEx message.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
     scopes: 'any',
     snippet: { lua: 'sendSysex(${1:bytes})$0', javascript: 'sendSysex(${1:bytes})$0' },
   },
   {
     id: 'checksum', category: 'Device / MIDI', signature: 'checksum(type, bytes [, opts]) -> number',
-    summary: 'Work out the checksum a synth expects at the end of a message. Eleven methods: "sum-7bit", "roland-7bit" (also spelled "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" and "crc32". Device profiles read the same list, so a script and a profile cannot disagree about what a name means. A name that is not on the list returns nothing and tells you what it would have accepted. Mind the size: the 7-bit ones fit in a single SysEx byte and the CRCs do not, so pass those through to7bit() before sending.',
+    summary: 'Compute the checksum a synth expects at the end of a message. Eleven methods: "sum-7bit", "roland-7bit" (also spelled "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" and "crc32"; a name not on the list returns nothing and reports the accepted names. The 7-bit methods fit in a single SysEx byte, the CRCs do not — pass CRC results through to7bit() before sending.',
     params: [
       { name: 'type', type: 'string', required: true,
         values: ['sum-7bit', 'roland-7bit', 'ones-complement-7bit', 'xor-7bit', 'offset-7bit',
@@ -2892,8 +2887,8 @@ export const COMMANDS = [
       { name: 'bytes', type: 'bytes', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'offset', type: 'number', default: '0',
-          summary: 'The constant the "offset-7bit" algorithm subtracts from. Only that algorithm '
-            + 'reads it, and the constant is yours to supply because it varies by manufacturer.' },
+          summary: 'The constant the "offset-7bit" method subtracts from. Only that method reads '
+            + 'it; the value varies by manufacturer.' },
       ]) },
     ],
     scopes: 'any',
@@ -2919,7 +2914,7 @@ export const COMMANDS = [
   // the first one already, but nothing said so, which made it undefined behaviour people relied on.
   {
     id: 'state', category: 'Storage', signature: 'state',
-    summary: 'A table of your own that survives between handler calls, private to this script. Cleared when the script reloads — for anything that must outlive the session use saveSetting.',
+    summary: 'A table that persists between handler calls, private to this script. Cleared when the script reloads; use saveSetting for anything that must outlive the session.',
     params: [],
     scopes: 'any',
     snippet: { lua: 'state.${1:count} = (state.${1:count} or 0) + 1$0', javascript: 'state.${1:count} = (state.${1:count} ?? 0) + 1;$0' },
@@ -3225,13 +3220,13 @@ export const PANEL_COMMANDS = [
   // footswitch action in a DAW with the window shut — which is exactly where it has to work.
   {
     id: 'panelSnapshot', category: 'Panel components', signature: 'panelSnapshot() -> object',
-    summary: 'Every control\'s current value, as an object keyed by control name. Pair it with saveSetting to keep one, or hold it in `state` for an A/B compare. Controls with no value of their own are left out rather than recorded as nothing.',
+    summary: 'Every control\'s current value, as an object keyed by control name. Controls with no value of their own are omitted. Pair it with saveSetting to persist one, or hold it in `state` for an A/B compare.',
     params: [], scopes: 'any',
     snippet: { lua: 'local before = ce.panel.snapshot()$0', javascript: 'const before = ce.panel.snapshot();$0' },
   },
   {
     id: 'panelEach', category: 'Panel components', signature: 'panelEach(fn) -> number',
-    summary: 'Call `fn(name)` once for every control in the panel, containers included, in document order. Returns how many there were. Cross-runtime, like snapshot and for the same reason: walking the panel does not need a renderer. To ask what a control is rather than what it is called, use ce.panel.info() — which does.',
+    summary: 'Call `fn(name)` once for every control in the panel, containers included, in document order. Returns how many there were. Works in any runtime. To inspect a control rather than list its name, use ce.panel.info() — which is panel view only.',
     params: [{ name: 'fn', type: 'function', required: true }], scopes: 'any',
     snippet: {
       lua: 'ce.panel.each(function(name)\n  $0\nend)',
@@ -3240,7 +3235,7 @@ export const PANEL_COMMANDS = [
   },
   {
     id: 'panelRestore', category: 'Panel components', signature: 'panelRestore(snapshot) -> number',
-    summary: 'Put the values back, and return how many landed. A name the panel no longer has is skipped rather than failing the whole restore — a snapshot taken before an edit is still worth most of what it holds.',
+    summary: 'Write snapshot values back to the panel; returns how many landed. A name the panel no longer has is skipped rather than failing the whole restore.',
     params: [{ name: 'snapshot', type: 'object', required: true }], scopes: 'any',
     snippet: { lua: 'ce.panel.restore(before)$0', javascript: 'ce.panel.restore(before);$0' },
   },

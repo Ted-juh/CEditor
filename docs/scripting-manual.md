@@ -660,7 +660,7 @@ if (p) log("device " + p.name);
 
 #### `deviceParameters([opts])`
 
-The profile's parameter descriptors: { id, name, group, type, min, max, access }. `opts` may carry { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report — while ce.device is enabled. A gated call returns nil like any other, because a module that is off has no answer to give.
+The profile's parameter descriptors: { id, name, group, type, min, max, access }. `opts` may carry { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report; returns nil when ce.device is gated off.
 
 ```lua
 -- Lua
@@ -690,7 +690,7 @@ if (p) log("max " + p.max);
 
 #### `deviceRead(id [, role]) -> value`
 
-The last known value of a device parameter — what the synth most recently told us, from a dump or a parameter message. Not a live query: asking the synth is asynchronous, and this verb is not. Nothing comes back if the device has never reported it, which is different from zero.
+The last reported value of a device parameter, from a dump or a parameter message. Not a live query of the synth. Returns nothing if the device has never reported it — distinct from zero.
 
 ```lua
 -- Lua
@@ -705,7 +705,7 @@ if (v !== undefined) {  }
 
 #### `deviceWrite(id, value [, role]) -> boolean`
 
-Set a device parameter on the synth, by parameter id, whether or not a control is bound to it. The device profile encodes it. Returns whether the message was dispatched — not whether the synth accepted it, which nothing can know synchronously. `value` is in the parameter's own units, the ones deviceParameter() reports min and max for.
+Set a device parameter on the synth by parameter id; no control binding is required. The device profile encodes the message. Returns whether the message was dispatched, not whether the synth accepted it. `value` is in the parameter's own units, the ones deviceParameter() reports min and max for.
 
 ```lua
 -- Lua
@@ -731,7 +731,7 @@ if (deviceConnected()) requestDump("patch");
 
 #### `deviceDefineParameter(id, spec [, role]) -> boolean`
 
-Teach the app a parameter at runtime, for a synth it has no profile for. `spec` says how it reaches the synth — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — plus name/group/type/min/max for what parameters() reports. The declaration is refused (and says why) when there is no wire format: a descriptor that enumerates and sends nothing is worse than an error, because the panel looks built. A declared id overrides a profile one, so a script can correct one wrong parameter without redeclaring the rest. Sysex template tokens: a hex literal, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.
+Declare a device parameter at runtime, for a synth with no shipped profile. `spec` gives the wire format — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — plus name/group/type/min/max for what parameters() reports. A spec with no wire format is refused, and the refusal says why. A declared id overrides a profile one, so a script can correct one wrong parameter without redeclaring the rest. Sysex template tokens: a hex literal, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.
 
 ```lua
 -- Lua
@@ -744,7 +744,7 @@ ce.device.defineParameter("cutoff", { name: "Cutoff", group: "Filter", min: 0, m
 
 #### `deviceDefineDump(kind, spec [, role]) -> boolean`
 
-Describe a SysEx dump layout at runtime: `request` (the bytes that ask for it), `match` ({ prefix, suffix }), `offset`/`size` for the payload, an optional `checksum`, and `fields` — one { parameter, offset } per value the dump carries. Every field must name a parameter defineParameter already declared; an unknown one is refused rather than decoded to nothing months later. A declared layout is matched against arriving SysEx, fills the bound controls and raises onDumpReceived, exactly as a profile-defined dump does.
+Declare a SysEx dump layout at runtime: `request` (the bytes that ask for it), `match` ({ prefix, suffix }), `offset`/`size` for the payload, an optional `checksum`, and `fields` — one { parameter, offset } per value the dump carries. Every field must name a parameter already declared with defineParameter; an unknown one is refused. A declared layout is matched against arriving SysEx, fills the bound controls and raises onDumpReceived, exactly as a profile-defined dump does.
 
 ```lua
 -- Lua
@@ -767,7 +767,7 @@ ce.device.defineDump("patch", {
 
 #### `deviceBind(control, parameterId [, opts]) -> boolean`
 
-Wire a control to a device parameter at runtime. ce.panel.create could already make a control and nothing could connect it to anything, so a self-building panel built dead controls; this is the other half of that pair. Replaces whatever was bound to the same port rather than adding a second binding, and switches DeviceBindings back on if the control had it off. `opts` takes { role, port }; port defaults to "value".
+Wire a control to a device parameter at runtime. Replaces whatever was bound to the same port rather than adding a second binding, and switches DeviceBindings back on if the control had it off. `opts` takes { role, port }; port defaults to "value".
 
 ```lua
 -- Lua
@@ -780,7 +780,7 @@ ce.device.bind("cutoffKnob", "cutoff");
 
 #### `deviceUnbind(control [, port]) -> boolean`
 
-Remove a control's device binding. Returns whether there was one to remove, so "already clean" reads differently from "cleaned up".
+Remove a control's device binding. Returns whether there was one to remove.
 
 ```lua
 -- Lua
@@ -793,7 +793,7 @@ ce.device.unbind("cutoffKnob");
 
 #### `devicePorts([opts]) -> list`
 
-What is actually plugged in: [{ id, name, direction, type, hardware, role }]. connected(role) only answers yes/no for a role somebody configured in advance; this enumerates the real ports, so a panel can offer the user a choice or notice a device that showed up. `hardware` is false for the two placeholder rows the app always lists ("No MIDI Input", "Preview Only"), and `role` is the role currently using the port, or empty. `opts.direction` narrows to "in" or "out".
+Enumerate the MIDI ports: [{ id, name, direction, type, hardware, role }]. `hardware` is false for the two placeholder rows the app always lists ("No MIDI Input", "Preview Only"); `role` is the role currently using the port, or empty. `opts.direction` narrows to "in" or "out".
 
 ```lua
 -- Lua
@@ -808,7 +808,7 @@ for (const p of ce.device.ports({ direction: "out" })) if (p.hardware) log(p.nam
 
 #### `deviceVariables([role]) -> table`
 
-The variables every message recipe interpolates — `channel`, `deviceId` and whatever else the profile declares — as their effective values: the profile's defaults with this project's overrides on top. Nothing back when no profile is mapped to the role.
+The variables every message recipe interpolates — `channel`, `deviceId` and whatever else the profile declares — as their effective values: the profile's defaults with this project's overrides applied. Returns nothing when no profile is mapped to the role.
 
 ```lua
 -- Lua
@@ -821,7 +821,7 @@ log(`device id ${ce.device.variables().deviceId}`);
 
 #### `deviceSetVariable(name, value [, role]) -> boolean`
 
-Point this panel at a different unit: set one recipe variable, 0..127. The write lands on this project's override rather than on the profile, which is a shared document — two panels driving two units of the same synth sit on different device ids without editing it. Individual uses clamp further (a channel is 1..16).
+Set one recipe variable, 0..127 — e.g. to point this panel at a different unit. The write lands on this project's override, not on the shared profile, so two panels can use different device ids for the same synth. Individual uses clamp further (a channel is 1..16).
 
 ```lua
 -- Lua
@@ -847,7 +847,7 @@ log(`gap ${ce.device.timing().minDelayBetweenMessagesMs} ms`);
 
 #### `deviceSetTiming(name, ms [, role]) -> boolean`
 
-Slow the panel down for a device that cannot keep up — an override on this project, in milliseconds, 0..60000. Same rule as setVariable: the profile is left alone.
+Set one timing override for this project, in milliseconds, 0..60000 — e.g. to slow the panel down for a device that cannot keep up. As with setVariable, the profile itself is not modified.
 
 ```lua
 -- Lua
@@ -860,7 +860,7 @@ ce.device.setTiming("minDelayBetweenMessagesMs", 40);
 
 #### `deviceCoverage([feature [, role]]) -> table|string`
 
-What the profile says it can do, in the profile's own words. No feature gives the whole map — `singleParameterWrite`, `realtimeEditing`, `editBufferDumpParse` and so on. Deliberately not a yes/no: real profiles answer "complete", "partial" and "notImplemented" but also "filter-block-rq1" and "broad-with-packed-text-and-requests", so a boolean would be a guess wearing the clothes of a fact. Test the words you care about.
+The profile's self-reported feature coverage, as strings rather than booleans. With no feature, returns the whole map — `singleParameterWrite`, `realtimeEditing`, `editBufferDumpParse` and so on. Profiles answer "complete", "partial" and "notImplemented", but also free-form values such as "filter-block-rq1". Test the words you care about.
 
 ```lua
 -- Lua
@@ -1670,7 +1670,7 @@ ce.panel.create("Knob", { name: "cutoff", x: 20, y: 40 });
 
 #### `panelClone(name, props)`
 
-Copy an existing control, including its sections, and return the copy's name. The usual way to make eight of something the author designed once.
+Copy an existing control, including its sections, and return the copy's name. `props` overrides properties on the copy.
 
 ```lua
 -- Lua
@@ -1739,7 +1739,7 @@ const c = ce.panel.info("name");
 
 #### `panelTypes()`
 
-Every component type panelCreate accepts, as a list of names. Ask rather than guess — the list grows.
+Every component type panelCreate accepts, as a list of names.
 
 ```lua
 -- Lua
@@ -1752,7 +1752,7 @@ log(ce.panel.types().join(", "));
 
 #### `panelAlign(names, edge [, opts]) -> number`
 
-Line controls up on one edge: "left" | "hCenter" | "right" | "top" | "vCenter" | "bottom". By default they align to the bounding box of the lot; `opts.to` names one of them to align to instead — what the canvas calls a key object. Returns how many moved. Names that are not controls are reported and skipped rather than silently ignored.
+Align controls on one edge: "left" | "hCenter" | "right" | "top" | "vCenter" | "bottom". Default reference is the group's bounding box; `opts.to` names one control to align to instead (the canvas's key object). Returns how many moved. Names that are not controls are reported and skipped.
 
 ```lua
 -- Lua
@@ -1765,7 +1765,7 @@ ce.panel.align(["knob1", "knob2"], "left");
 
 #### `panelDistribute(names, what [, opts]) -> number`
 
-Spread controls evenly. `what` is "leftEdges" | "hCenters" | "rightEdges" | "topEdges" | "vCenters" | "bottomEdges", which even out the positions, or "hSpacing" | "vSpacing", which even out the gaps — differently-sized controls end up evenly spaced rather than evenly placed, and those are different pictures. The first and last stay put, which is what makes this different from laying things out in a row. `opts.gap` forces a gap instead of computing one; `opts.align` also lines up the cross axis. Needs at least two.
+Spread controls evenly. `what` is "leftEdges" | "hCenters" | "rightEdges" | "topEdges" | "vCenters" | "bottomEdges" (even out positions) or "hSpacing" | "vSpacing" (even out the gaps between differently-sized controls). The first and last controls stay put. `opts.gap` forces a fixed gap instead of computing one; `opts.align` also lines up the cross axis. Needs at least two controls.
 
 #### `panelMatch(names, what [, opts]) -> number`
 
@@ -1773,7 +1773,7 @@ Give controls the same size: "width" | "height" | "both". The first name is the 
 
 #### `panelGrid(names [, opts]) -> number`
 
-Tidy controls into a grid. `opts` carries { columns (3), gapX (10), gapY (10) }. Cells are uniform, sized by the biggest control, so a grid stays a grid — and the order is reading order, rows quantised to 20px then left to right, which makes "tidy" match what the eye already sees rather than document order. The first control in that order anchors the origin.
+Arrange controls into a grid. `opts` carries { columns (3), gapX (10), gapY (10) }. Cells are uniform, sized by the biggest control. Order is reading order — rows quantised to 20px, then left to right — not document order. The first control in that order anchors the origin.
 
 ```lua
 -- Lua
@@ -1786,23 +1786,23 @@ ce.panel.grid(pads, { columns: 4, gapX: 8, gapY: 8 });
 
 #### `panelCircle(names [, opts]) -> number`
 
-Arrange controls around a circle centred on their own bounding box. `opts` carries { radius (100), startAngle (0, degrees) }. Order is the order you gave, so the ring reads the way the list does.
+Arrange controls around a circle centred on their own bounding box. `opts` carries { radius (100), startAngle (0, degrees) }. Placement follows the order of `names`.
 
 #### `panelFlip(names, axis) -> number`
 
-Mirror where controls sit about the centre of their bounding box — "horizontal" or "vertical". It moves them; it does not rotate or mirror the controls themselves, because "flip the layout" and "flip the artwork" are different requests.
+Mirror control positions about the centre of their bounding box — "horizontal" or "vertical". Moves the controls only; it does not rotate or mirror the controls themselves.
 
 #### `panelRect(name) -> table`
 
-Where a control is in panel coordinates: { x, y, width, height, right, bottom }. Transform.x is not that once anything is inside a container, so "draw a line between these two controls" or "is this one above that one" had no answer. Given a list of names it is the bounding box of the lot, which is what "how big is this group" means. Nothing back when no name resolves.
+A control's position in panel coordinates: { x, y, width, height, right, bottom }. Unlike Transform.x, this accounts for container offsets. Given a list of names, returns the bounding box of the group. Returns nothing when no name resolves.
 
 #### `panelOrder(names, where) -> number`
 
-Z-order: "front" | "forward" | "backward" | "back". Order is document order rather than a property, which is exactly why set() could never do it. Controls move within their own parent — bringing something to the front of a container it is not in is not a thing — and later in the list paints later, so "front" is the end.
+Change z-order: "front" | "forward" | "backward" | "back". Controls move within their own parent only. Later in document order paints later, so "front" is the end of the list.
 
 #### `panelBatch(fn) -> boolean`
 
-Everything `fn` does is one undo step. The editor debounces its history snapshots, which groups a drag nicely and leaves a script that creates forty controls landing as an unpredictable number of steps; this brackets the work so it undoes as "build the page" rather than forty times. The flush happens whatever the callback does, including throwing — a half-built panel that cannot be undone is worse than a half-built panel. In the player there is no history to group and the callback simply runs.
+Run `fn` so that everything it does is a single undo step. The history flush happens even if the callback throws. In the player there is no history and the callback simply runs.
 
 ```lua
 -- Lua
@@ -1832,7 +1832,7 @@ for (const s of ce.panel.entries("knob", "States")) log(s);
 
 #### `panelEntry(control, section, name)`
 
-One entry out of a collection section, or nil. Matched case-insensitively, the way a path is.
+One entry out of a collection section, or nil. The name is matched case-insensitively, like a path.
 
 ```lua
 -- Lua
@@ -1845,7 +1845,7 @@ const st = ce.panel.entry("knob", "States", "Hover");
 
 #### `panelDefine(control, section, name, spec)`
 
-Create an entry in a collection section, or replace one that is there. The spec is merged over the section's own template, so declaring a state is one line rather than a hand-written node — hand-writing _type and both patch maps every time is how a verb like this ends up unused. Returns whether it landed.
+Create an entry in a collection section, or replace an existing one. The spec is merged over the section's own template, so a partial spec is enough. Returns whether it landed.
 
 ```lua
 -- Lua
@@ -1858,7 +1858,7 @@ ce.panel.define("knob", "States", "Warn", { when: { valueGreaterThan: 0.9 } });
 
 #### `panelUndefine(control, section, name)`
 
-Remove an entry from a collection section. Returns whether there was one, so "already gone" reads differently from "removed". Nothing script-facing could remove one of these before — set(path, nil) leaves the entry exactly where it was.
+Remove an entry from a collection section. Returns whether an entry existed. Note that set(path, nil) does not remove entries; this is the verb that does.
 
 ```lua
 -- Lua
@@ -1871,7 +1871,7 @@ ce.panel.undefine("knob", "States", "Disabled");
 
 #### `panelPatch(control, state, patch [, part])`
 
-Change how a control looks in one of its states — hovered, pressed, disabled. This needs its own command because the entries are themselves written as paths, which plain set() cannot address without losing its way. It merges what you give it into what is already there rather than replacing the lot, and returns how many entries were applied. Use `part` to patch one part of a custom component rather than the whole thing.
+Change how a control looks in one of its states — hovered, pressed, disabled. The patch is merged into the existing state rather than replacing it. Returns how many entries were applied. Use `part` to patch one part of a custom component. State entries are themselves paths, which plain set() cannot address.
 
 ```lua
 -- Lua
@@ -1927,7 +1927,7 @@ if (t.valid) log("bar " + t.bar);
 
 #### `beatsToMs(beats [, bpm])`
 
-Musical time to milliseconds at the current tempo — the delay-time calculation a synth panel needs most. Pass `bpm` to override. Returns nil when there is no tempo to work from.
+Convert beats to milliseconds at the current tempo. Pass `bpm` to override. Returns nil when there is no tempo to work from.
 
 ```lua
 -- Lua
@@ -1953,7 +1953,7 @@ const beats = msToBeats(500);
 
 #### `syncTimer(id, beats [, opts])`
 
-startTimer with a musical interval: syncTimer("step", 0.25) fires every sixteenth at the current tempo, and follows the tempo — change it and the timer re-times itself. Re-arming resets the timer's phase, so a tempo change costs one hiccup; that beats a timer permanently at the wrong rate. Pass { follow = false } to freeze the interval at the tempo it was created with. Nothing is started when no tempo is being reported, and it says so.
+startTimer with a musical interval: syncTimer("step", 0.25) fires every sixteenth at the current tempo. The interval follows tempo changes; each re-arm resets the timer's phase. Pass { follow = false } to freeze the interval at the creation tempo. When no tempo is being reported, nothing is started and the failure is reported.
 
 ```lua
 -- Lua
@@ -1966,7 +1966,7 @@ syncTimer("step", 0.25);
 
 #### `afterBeats(beats, fn) -> id`
 
-after() with a musical delay: afterBeats(2, fn) runs fn in two beats' time. startTimer had syncTimer and the one-shot had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot fires once, so the delay is computed when you call it and does not follow a later tempo change. Returns the timer id, which stopTimer cancels. Nothing is scheduled when no tempo is being reported — it says so rather than firing immediately.
+after() with a musical delay: afterBeats(2, fn) runs fn in two beats' time. The delay is computed at call time and does not follow a later tempo change. Returns the timer id, which stopTimer cancels. When no tempo is being reported, nothing is scheduled (it does not fire immediately) and the failure is reported.
 
 ```lua
 -- Lua
@@ -1983,7 +1983,7 @@ afterBeats(2, () => {
 
 #### `runningTimers() -> list`
 
-The timer ids currently running, sorted — the ones started by name with startTimer or syncTimer. One-shots are not listed, any of them: after() hands you its id already, and the runtime's own (sendNote's note-off) is not a script's to cancel.
+The ids of running named timers (startTimer or syncTimer), sorted. One-shot timers are not listed; after() already returns its id.
 
 ```lua
 -- Lua
@@ -1996,7 +1996,7 @@ for (const id of runningTimers()) log(id);
 
 #### `nowMs() -> number`
 
-A monotonic millisecond reading. not a wall clock and not a date — the origin is arbitrary and only differences mean anything, which is deliberate: a wall clock jumps when the machine syncs its time and a script measuring across that jump measures the jump. This exists because there was no clock at all: the Lua engine opens base, math, string and table and not os, so a Lua script could not read one, and Date/time.time() disagree about epoch and unit anyway.
+A monotonic millisecond reading. The origin is arbitrary; only differences are meaningful. Not a wall clock or date.
 
 ```lua
 -- Lua
@@ -2009,7 +2009,7 @@ const t0 = nowMs();
 
 #### `beatsPerDivision(name) -> number`
 
-A note division as a fraction of a beat: "1/16" → 0.25, "1/8T" → 0.333…, "1/4D" → 1.5. The vocabulary every sequencer property in the app speaks, and the one conversion a script could not do. Returns nothing for a name this build does not know — a component falls back to 1/16 because it has to keep running, a script that mistyped a division should find out.
+A note division as a fraction of a beat: "1/16" → 0.25, "1/8T" → 0.333…, "1/4D" → 1.5. The same names every sequencer property uses. Returns nothing for a name this build does not know.
 
 ```lua
 -- Lua
@@ -2022,7 +2022,7 @@ const beats = beatsPerDivision("1/16");
 
 #### `divisionNames() -> list`
 
-Every division this build knows, in picker order: { id, label, beats }. What to build a menu from, rather than hard-coding fourteen strings that go stale the moment one is added.
+Every division this build knows, in picker order: { id, label, beats }. Build menus from this list rather than hard-coding the names.
 
 ```lua
 -- Lua
@@ -2035,7 +2035,7 @@ for (const d of divisionNames()) log(d.label);
 
 #### `barBeatAt(beats [, beatsPerBar]) -> table`
 
-Where a beat position falls musically — for any position, not only the one the transport is at. Returns { bar, beat, tick, text, beatsPerBar }, bars and beats counting from 1 as musicians do, ticks at 24 ppqn. `text` is the Transport component's own readout ("3.2.00"), so a script's label and the component's agree character for character.
+Convert any beat position to a musical position: { bar, beat, tick, text, beatsPerBar }. Bars and beats are 1-based; ticks are at 24 ppqn. `text` is the Transport component's own readout format ("3.2.00").
 
 ```lua
 -- Lua
@@ -2052,27 +2052,27 @@ Which step of the grid a position is on, counting from 0 at the transport origin
 
 #### `stepsBetween(from, to, division [, max]) -> table`
 
-How many step boundaries went by between two readings: { steps, dropped }. Use it so a sequence you are driving yourself never loses a step — if a frame runs late, you still play the steps it slept through instead of leaving a hole in the bar. `max` limits the catching up (16 by default), so coming back to a window that was hidden for a minute does not fire hundreds of notes at once; anything skipped is reported rather than quietly dropped. When it does have to skip, it keeps the most recent steps, since catching up to now matters more than replaying where you were.
+Count step boundaries crossed between two beat positions: { steps, dropped }. Use it to catch up steps a late frame slept through. `max` caps the catch-up (default 16); anything over the cap is counted in `dropped`, and the most recent steps are the ones kept.
 
 #### `swingOffset(step, amount, division) -> number`
 
-The panel's shuffle: every odd step pushed later by up to half a step, in beats, to add to that step's position. `amount` is 0..1, the same number the Transport's swing property holds. Two sequencers at "the same" swing really are the same swing only if they compute it the same way — which is why this is the transport's function and not a second one.
+The swing offset for a step, in beats, to add to that step's position: every odd step is pushed later by up to half a step. `amount` is 0..1, the same number the Transport's swing property holds. Uses the transport's own swing calculation.
 
 #### `cycleAt(beats, bars [, beatsPerBar]) -> table`
 
-For anything whose rate is a loop length in bars rather than a step — a take, a slow sweep. Returns { phase, count, length }: phase 0–1 through the cycle, how many have completed, and the cycle in beats. Derived from the position and never accumulated, so a cycle running for an hour is still exactly on the bar line.
+Position within a repeating cycle of `bars` bars: { phase, count, length }. `phase` is 0–1 through the cycle, `count` how many have completed, `length` the cycle in beats. Derived from the position, never accumulated, so it stays exact over long runs.
 
 #### `loopedBeats(beats, startBeats, lengthBeats) -> table`
 
-Fold a timeline position into a loop: { beats, pass }. Before the loop start the position is untouched — you can run in to a loop from earlier in the song, which is what every DAW does and what a count-in needs. `pass` is which time round you are, and -1 before the loop has been reached; watching it for changes tells you a wrap happened, without a wrap handler that can miss one. The looped position is a pure function of the un-looped one rather than a counter that gets reset, which is what makes it exact after an hour.
+Fold a timeline position into a loop: { beats, pass }. Positions before the loop start are returned untouched, so a run-in or count-in works. `pass` is which time round the loop you are, and -1 before the loop is reached; watch it for changes to detect a wrap. The looped position is a pure function of the un-looped one, so it stays exact over long runs.
 
 #### `tapTempo(times [, resetMs]) -> number`
 
-Tempo from tap times, in the milliseconds now() reports. Taps more than `resetMs` apart (2000 by default) start a new measurement rather than averaging across the pause — otherwise the first tap after a break poisons it, which is exactly what a hand-rolled tap tempo gets wrong. Returns nothing from fewer than two usable taps, and the result is clamped to 20–300 bpm.
+Tempo from a list of tap times, in the milliseconds now() reports. Taps more than `resetMs` apart (default 2000) start a new measurement rather than averaging across the pause. Returns nothing from fewer than two usable taps; the result is clamped to 20–300 bpm.
 
 #### `clockTempo(intervalsMs) -> number`
 
-Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note) — what a script filtering 0xF8 with ce.midi.interceptIn is holding and could not turn into a bpm. The median, not the mean: one late pulse from a usb hiccup drags an average around, and a wobbling readout is worse than a slightly stale one. Nothing comes back from an empty list.
+Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note), e.g. 0xF8 intervals collected with ce.midi.interceptIn. Uses the median interval, so one late pulse does not skew the result. Returns nothing from an empty list.
 
 ### Storage
 
