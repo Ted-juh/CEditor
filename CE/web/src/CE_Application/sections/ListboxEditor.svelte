@@ -5,10 +5,13 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberInput from './NumberInput.svelte';
   import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
+  import { syncPresetChoiceRows, initPresetChoiceSync } from '../stores/presetChoiceSync.js';
 
   let { control = null } = $props();
   let core = $derived(getSection(control, 'Core'));
   let lb = $derived(getSection(control, 'Listbox') ?? {});
+  let syncNote = $state('');
+  initPresetChoiceSync(); // scans + late profile sources keep preset-sourced rows fresh
 
   function set(prop, value) {
     if (core?.id) updateControlProperty(core.id, `Listbox.${prop}`, value);
@@ -147,12 +150,19 @@
   </PropertySection>
 
   <PropertySection title="Data">
-    <PropertyCell label="Source" span={2} hint="Rows from the Value editor, or the device's preset list.">
-      <select class="val" value={lb.choiceSource ?? 'rows'} onchange={(e) => set('choiceSource', e.target.value)}>
+    <PropertyCell label="Source" span={2} hint="Rows from the Value editor, the device's live preset list, or the profile's shipped factory catalog.">
+      <select class="val" value={lb.choiceSource ?? 'rows'} onchange={(e) => { set('choiceSource', e.target.value); if (e.target.value !== 'rows') syncPresetChoiceRows({}); }}>
         <option value="rows">Value rows</option>
         <option value="devicePresets">Device presets</option>
+        <option value="factoryCatalog">Factory catalog</option>
       </select>
     </PropertyCell>
+    {#if (lb.choiceSource ?? 'rows') !== 'rows'}
+      <PropertyCell label="Rows" span={2} hint="Rebuild the preset rows from the profile (and latest scan) now.">
+        <button class="val" type="button" onclick={() => { const r = syncPresetChoiceRows({}); syncNote = r.updated ? `Updated ${r.updated} selector(s).` : (r.targets ? 'Rows already up to date (or no preset model on the active profile).' : 'No preset-sourced selectors on this panel.'); }}>Sync from device profile</button>
+        {#if syncNote}<span class="hint-note">{syncNote}</span>{/if}
+      </PropertyCell>
+    {/if}
     <PropertyCell label="Recall" span={1} hint="Fire the bound recall action on select/confirm.">
       <PropertyToggle value={lb.recallOnSelect === true} onchange={() => toggle('recallOnSelect', false)} />
     </PropertyCell>
@@ -172,6 +182,13 @@
     border-radius: 4px;
     padding: 3px 6px;
     font-size: 12px;
+  }
+
+  .hint-note {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    opacity: 0.7;
   }
   .val:focus-visible {
     outline: 2px solid #5B9BD5;

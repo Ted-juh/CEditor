@@ -4,8 +4,11 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import { materializePresetRows } from '../stores/presetChoiceSync.js';
 
   let { control = null } = $props();
+  let fillNote = $state('');
+  const describeFill = (result) => (result.ok ? `Filled ${result.rows} row(s).` : result.error);
 
   let core = $derived(getSection(control, 'Core'));
   let text = $derived(getSection(control, 'Text'));
@@ -84,6 +87,11 @@
           value={valueSection.storeByValue === true}
           onchange={() => set('Value.storeByValue', !(valueSection.storeByValue === true))}
         />
+      </PropertyCell>
+      <PropertyCell label="Fill from" span={4} hint="Replace the rows with the device's presets (latest scan + slot map) or the profile's shipped factory catalog. Rows become a snapshot you can still edit.">
+        <button type="button" class="action-btn" onclick={() => { fillNote = describeFill(materializePresetRows(core?.id, 'devicePresets', {})); }}>Device presets</button>
+        <button type="button" class="action-btn" onclick={() => { fillNote = describeFill(materializePresetRows(core?.id, 'factoryCatalog', {})); }}>Factory catalog</button>
+        {#if fillNote}<span class="fill-note">{fillNote}</span>{/if}
       </PropertyCell>
     {/if}
   </PropertySection>
@@ -307,6 +315,12 @@
   }
   .show-for span { flex: 0 0 auto; }
   .show-for .val { flex: 1 1 auto; }
+
+  .fill-note {
+    font-size: 11px;
+    opacity: 0.7;
+    align-self: center;
+  }
 
   .empty {
     border: 1px dashed #3A3A3A;

@@ -69,7 +69,12 @@ Shipped, pure engine-reuse:
   musical context + Timer).
 - **LCD display** (canvas renderer + value-driven fields).
 - **MIDI Workbench** workspace (UI over existing plumbing + Phase 0 #1).
-- **Preset model + librarian**.
+- **Preset model + librarian** — ✅ core built: `presets` slot map/recall/catalog in the
+  DPD schema + validators + legacy emit, `stores/presetLibrarian.js` (persisted banks,
+  ROM-write blocking, recall, `.syx`/JSON export), Designer Presets screen, and
+  preset-sourced selectors (Listbox live rows + recall-on-select; Value-editor
+  "Fill from" for Combobox). Open: PATCH_NAME wiring, inbound preset-change
+  feedback.
 
 ### Phase 5 — groundbreaking
 - **Macro & Snapshot-Morph** ([macro-and-morph.md](./macro-and-morph.md)) — mostly

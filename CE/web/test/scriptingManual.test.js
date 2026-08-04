@@ -9,7 +9,8 @@ import { generateManual, OUT } from '../scripts/generate-scripting-manual.mjs';
 test('docs/scripting-manual.md matches what the generator produces', () => {
   let committed = '';
   try {
-    committed = readFileSync(OUT, 'utf8');
+    // Normalize CRLF from Windows checkouts (core.autocrlf) — the generator emits LF.
+    committed = readFileSync(OUT, 'utf8').replace(/\r\n/g, '\n');
   } catch {
     assert.fail(`docs/scripting-manual.md is missing — run \`npm run docs:manual\``);
   }

@@ -214,6 +214,7 @@ const EXEMPT = {
   startup: 'what to send on connect, performed by the session',
   ui: 'how the profile editor lays itself out',
   presetBrowser: 'the preset list, driven by ce.device dumps rather than described here',
+  presets: 'the preset model (slot map / recall / catalog) — consumed by the librarian and preset selectors; scripts recall via ce.midi programChange',
 };
 
 test('every key a shipped profile carries has a verb, or a reason', () => {

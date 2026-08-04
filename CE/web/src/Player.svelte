@@ -12,7 +12,9 @@
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
   import { choiceIndexOf, choiceValueAt } from './CE_Application/utils/exportParameters.js';
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
-  import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState } from './CE_Application/stores/deviceProfiles.js';
+  import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState, requestProfileSource } from './CE_Application/stores/deviceProfiles.js';
+  import { profileSources, latestPresetListScan } from './CE_Application/stores/deviceProfileStores.js';
+  import { injectPresetRowsIntoPanel } from './CE_Application/utils/presetChoiceRows.js';
   import { getDeviceSessionState } from './CE_Application/bridge/bridge.js';
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, listProfileParameters, onMidiInputMessage, onSysexInputMessage, triggerRawMidiAction } from './CE_Application/bridge/bridge.js';
   // Inbound decode maps are generated from the DPD device profile (CE/dpd), not hardcoded.
@@ -349,6 +351,22 @@
     if (hasBridge) { maybeAdoptMapping(currentSession); autoConnect(); }
     return panel;
   }
+
+  // Preset-sourced listboxes: rebuild their `_presetRows` whenever the profile source or a preset
+  // scan arrives. The panel is $state.raw, so the injector returns a NEW panel only when rows really
+  // changed (deep-equal rows are skipped) — replacing it wholesale is the Player's update model.
+  $effect(() => {
+    if (hasBridge && profileId) requestProfileSource(profileId);
+  });
+  $effect(() => {
+    const source = $profileSources?.[profileId]?.source;
+    const scan = $latestPresetListScan;
+    if (!panel || !source) return;
+    let profile = null;
+    try { profile = JSON.parse(source); } catch { return; }
+    const result = injectPresetRowsIntoPanel(panel, profile, scan);
+    if (result.updated && result.panel !== panel) panel = result.panel;
+  });
 
   // Fit the panel inside the viewport (whole panel visible), capped at 1x.
   let vw = $state(typeof window !== 'undefined' ? window.innerWidth : 800);

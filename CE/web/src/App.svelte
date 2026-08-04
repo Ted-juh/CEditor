@@ -24,6 +24,7 @@
   import ScriptDialog from './CE_Application/layout/ScriptDialog.svelte';
   import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
+  import { initPresetChoiceSync } from './CE_Application/stores/presetChoiceSync.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
   import { requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
   import { componentWorkspaceMode } from './CE_Application/stores/componentWorkspace.js';
@@ -68,6 +69,7 @@
     syncPerfDebugToNative();
     initAppSettingsBridge();
     initHistory();
+    initPresetChoiceSync(); // preset-sourced selector rows follow scans + profile sources
   }
 
   function handleGlobalKeyDown(e) {

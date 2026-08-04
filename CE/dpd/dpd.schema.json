@@ -86,6 +86,8 @@
       "description": "Bulk transfer definitions (patch/performance/bank). Reference scopes; tracked by verifiedFullDump separately from per-parameter round-trip."
     },
 
+    "presets": { "$ref": "#/$defs/presets" },
+
     "overrides": {
       "type": "array",
       "items": { "$ref": "#/$defs/overrideOp" },
@@ -302,6 +304,92 @@
           }
         }
       }
+    },
+
+    "presets": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The device's preset model: what a slot IS (factory/ROM vs writable user, banks, categories), how to RECALL one, and how to READ ITS NAME. This is the structured counterpart to live scanning — the scan tells you what's in a slot now; this tells you what the slot is. Consumed by the Workbench Preset Librarian (blocks writes to ROM slots) and by preset-selector components. Formalizes the previously informal 'presetBrowser' runtime field.",
+      "properties": {
+        "banks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/presetBank" },
+          "description": "The device's slot partition. Slots are device-global integers; each bank covers [startSlot, startSlot+slotCount). Banks must not overlap."
+        },
+        "recall": { "$ref": "#/$defs/presetRecall" },
+        "nameRequest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["request"],
+          "description": "How to read a slot's name (the formalized presetBrowser scan recipe): a messageShape/request id whose template takes the slot as a variable.",
+          "properties": {
+            "request": { "type": "string", "description": "messageShape (DPD) / request (legacy engine) id sent once per slot." },
+            "slotVariable": { "type": "string", "description": "Template variable that carries the slot number (default 'slot')." }
+          }
+        },
+        "initPatch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["slot"],
+          "description": "The device's init/neutral patch, when it has one (the 'init patch' concept).",
+          "properties": {
+            "bank": { "type": "string", "description": "Bank id containing the init patch." },
+            "slot": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+
+    "presetBank": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "role", "startSlot", "slotCount"],
+      "properties": {
+        "id": { "type": "string", "description": "Stable bank id, e.g. 'factory-a', 'user'." },
+        "label": { "type": "string", "description": "Device's own name for the bank (UI), e.g. 'Preset A', 'User'." },
+        "role": {
+          "enum": ["factory", "user"],
+          "description": "factory = ROM (read-only unless writable overrides); user = rewritable slots."
+        },
+        "writable": { "type": "boolean", "description": "Whether the librarian may overwrite slots in this bank. Defaults to role == 'user'. Drives ROM-write blocking." },
+        "startSlot": { "type": "integer", "minimum": 0, "description": "First device-global slot of this bank." },
+        "slotCount": { "type": "integer", "minimum": 1 },
+        "programBase": { "type": "integer", "minimum": 0, "maximum": 127, "description": "Program Change number of the bank's FIRST slot (PC = programBase + slot - startSlot). Default 0." },
+        "bankMsb": { "type": "integer", "minimum": 0, "maximum": 127, "description": "CC0 Bank Select MSB selecting this bank (recall kind 'bankPc')." },
+        "bankLsb": { "type": "integer", "minimum": 0, "maximum": 127, "description": "CC32 Bank Select LSB selecting this bank (recall kind 'bankPc')." },
+        "category": { "type": "string", "description": "Optional genre/category tag for the whole bank." },
+        "names": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional shipped factory-name catalog; index = slot - startSlot. Length must not exceed slotCount."
+        }
+      }
+    },
+
+    "presetRecall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "description": "Parameterized 'recall slot S' action. The selector/librarian says 'recall slot 12'; this emits the right bytes per device.",
+      "properties": {
+        "kind": {
+          "enum": ["pc", "bankPc", "sysex"],
+          "description": "pc = Program Change only. bankPc = CC0 (+CC32) Bank Select then Program Change, using the bank's bankMsb/bankLsb. sysex = a template message."
+        },
+        "channel": { "type": "integer", "minimum": 1, "maximum": 16, "description": "Fixed MIDI channel for pc/bankPc; defaults to the device/role channel." },
+        "template": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "For kind 'sysex': ordered tokens — literal hex bytes or placeholders ($deviceId, $slot, $program, $bankMsb, $bankLsb, $checksum)."
+        },
+        "checksum": { "$ref": "#/$defs/checksum" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "sysex" } } },
+          "then": { "required": ["template"] }
+        }
+      ]
     },
 
     "provenance": {

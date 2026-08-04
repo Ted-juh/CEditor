@@ -39,7 +39,12 @@ const { EASING_BEZIERS } = await import(`file://${easingPath}`);
 // The envelope sample count is the WebView runtime's own constant rather than a second copy: the
 // two sides sampling a different number of points is exactly the divergence sampling exists to
 // avoid. Read from the source text, because importing panelRuntime.js pulls in the whole editor.
-const runtimeSrc = readFileSync(join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'), 'utf8');
+// Windows checkouts can carry CRLF line endings (core.autocrlf). Everything here — byte
+// measuring, block splicing, freshness comparison — is defined over the LF form the repo is
+// authored in, so every read normalizes.
+const readText = (path) => readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+
+const runtimeSrc = readText(join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'));
 const ANIM_SAMPLES = Number(/export const ANIM_SAMPLES = (\d+);/.exec(runtimeSrc)?.[1]);
 if (!Number.isFinite(ANIM_SAMPLES)) throw new Error('could not read ANIM_SAMPLES from panelRuntime.js');
 
@@ -461,7 +466,7 @@ const MARKER_RE = /^\s*(?:--|\/\/|#)\s*@module\s+(\S+)\s*$/;
 
 /** Bytes per module id for one source, by walking its `@module` markers. */
 export function measureSource({ file, open, close }) {
-  let text = readFileSync(join(repo, file), 'utf8');
+  let text = readText(join(repo, file));
   if (open) {
     const from = text.indexOf(open);
     const to = text.indexOf(close, from);
@@ -831,7 +836,7 @@ function run() {
   // lands in compiled code instead of a string literal.
   {
     const path = join(repo, ANIM_TARGET.file);
-    const source = readFileSync(path, 'utf8');
+    const source = readText(path);
     const next = splice(source, ANIM_TARGET.block(), null, ANIM_BEGIN, ANIM_END);
     if (mode === '--write') {
       if (next !== source) { writeFileSync(path, next); console.log(`wrote ${ANIM_TARGET.file}`); }
@@ -846,7 +851,7 @@ function run() {
 
   for (const target of TARGETS) {
     const path = join(repo, target.file);
-    const source = readFileSync(path, 'utf8');
+    const source = readText(path);
     const stubs = STUB_TARGETS.find((t) => t.file === target.file);
     const music = MUSIC_TARGETS.find((t) => t.file === target.file);
     const next = splice(
@@ -871,7 +876,7 @@ function run() {
   {
     const path = join(repo, COST_FILE);
     const next = costFile();
-    const current = (() => { try { return readFileSync(path, 'utf8'); } catch { return null; } })();
+    const current = (() => { try { return readText(path); } catch { return null; } })();
     if (mode === '--write') {
       if (next !== current) { writeFileSync(path, next); console.log(`wrote ${COST_FILE}`); }
       else console.log(`unchanged ${COST_FILE}`);

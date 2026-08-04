@@ -29,6 +29,7 @@
     listboxFilterHeight,
   } from '../utils/listboxLayout.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
+  import { recallRowSlot } from '../stores/presetChoiceSync.js';
   import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
   import { meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
   import {
@@ -4548,11 +4549,13 @@
       focused: true, hover: true, pressed: false,
     });
   }
-  // Fire the "recall" side effect on commit when recallOnSelect is on: mark the
-  // row as now-playing (in a real device this also sends the recall message).
+  // Fire the "recall" side effect on commit when recallOnSelect is on: mark the row as now-playing
+  // and, when the row carries a preset slot, send the profile's recall action (Program Change /
+  // Bank+PC / SysEx per the DPD preset model — a no-op for authored non-preset rows).
   function recallListboxRow(control, row) {
     if (listboxConfig(control).recallOnSelect !== true || !isSelectableRow(row)) return;
     patchControlSession(getControlId(control), { listboxNowPlaying: String(rowValue(row)) });
+    recallRowSlot(row, {});
   }
   // A click's effect on a listbox row, honoring multiSelect + confirmMode.
   function activateListboxRow(control, row) {

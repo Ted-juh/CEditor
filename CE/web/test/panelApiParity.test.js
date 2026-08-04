@@ -38,7 +38,10 @@ import { apiSurfaceNames, scriptApiForTesting } from '../src/CE_Application/scri
 
 const here = dirname(fileURLToPath(import.meta.url));
 const scriptingDir = join(here, '..', '..', 'src', 'Scripting');
-const readEngine = (file) => readFileSync(join(scriptingDir, file), 'utf8');
+// Windows checkouts can carry CRLF line endings (core.autocrlf); every comparison and byte
+// count in this file is defined over the LF form the repo is authored in, so reads normalize.
+const readText = (path) => readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+const readEngine = (file) => readText(join(scriptingDir, file));
 
 // Names the runtimes bind for their own plumbing. They are not part of the script-facing contract,
 // so the "implemented but undeclared" direction ignores them rather than forcing panelApi.js to
@@ -67,7 +70,7 @@ test('the WebView runtime binds nothing the contract does not declare', () => {
 test('the WebView runtime probes for every handler name the contract declares', async () => {
   // The executors collect handlers by probing this list; a name missing from it is an event that
   // can never fire, which is how onTimer and the raw-MIDI events went dark.
-  const source = readFileSync(join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'), 'utf8');
+  const source = readText(join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'));
   assert.match(source, /const HANDLER_NAMES = handlerNamesForRuntime\(RUNTIME_WEBVIEW\);/,
     'HANDLER_NAMES must come from panelApi.js, never from a local copy');
   assert.equal(new Set(ALL_HANDLER_NAMES).size, ALL_HANDLER_NAMES.length, 'handler names must be unique');
@@ -185,7 +188,7 @@ test('the WebView runtime raises every event it is expected to raise', () => {
   const sources = [
     join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'),
     join(here, '..', 'src', 'CE_Application', 'editor', 'PanelPreviewSurface.svelte'),
-  ].map((f) => readFileSync(f, 'utf8')).join('\n');
+  ].map((f) => readText(f)).join('\n');
 
   const missing = handlerNamesForRuntime(RUNTIME_WEBVIEW)
     .filter((name) => !new RegExp(`['\`"]${name}['\`"]`).test(sources));
@@ -218,7 +221,7 @@ test('the only scope-limited members are the ones that genuinely need a componen
 /* ------------------------------------------------------------------------ the panel itself */
 
 test('both runtimes reserve the same word for the panel document', () => {
-  const runtime = readFileSync(join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'), 'utf8');
+  const runtime = readText(join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'));
   assert.match(runtime, /function isPanelTarget\(name\)/, 'the WebView runtime should reserve it');
   assert.match(readEngine('../Player/PanelValueModel.h'), /isPanelTarget \(const juce::String& name\)/,
     'the value model should reserve it too, or a script addresses the panel window-open only');
@@ -247,7 +250,7 @@ test('the read-only panel properties agree across the contract and both C++ copi
 test('`self` in a panel script resolves to the panel in every runtime', () => {
   // SELF has always been documented as "control, panel, or custom-component instance". The panel
   // half never resolved, in any runtime, because the panel was unaddressable.
-  const runtime = readFileSync(join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'), 'utf8');
+  const runtime = readText(join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'));
   assert.match(runtime, /script\?\.scope === 'panel' \? PANEL_TARGET : ''/);
   assert.match(readEngine('ScriptRuntime.h'), /resolveSelfOwner \(const ScriptDefinition& def\)/);
   for (const file of ['LuaScriptEngine.cpp', 'JsScriptEngine.cpp', 'PythonScriptEngine.cpp']) {
@@ -442,8 +445,8 @@ test('the measured cost table matches what the preludes actually weigh', async (
   // a number that used to be true — which is worse than showing none.
   const gen = await import('../../../tools/scripts/gen-script-modules.mjs');
   const fresh = gen.costFile();
-  const committed = readFileSync(
-    join(here, '..', 'src', 'CE_Application', 'scripting', 'moduleCost.generated.js'), 'utf8');
+  const committed = readText(
+    join(here, '..', 'src', 'CE_Application', 'scripting', 'moduleCost.generated.js'));
   assert.equal(committed, fresh,
     'moduleCost.generated.js is stale — run: node tools/scripts/gen-script-modules.mjs --write');
 

@@ -80,10 +80,61 @@ export function validateProfile(profile) {
     });
   }
 
+  if (profile.presets) validatePresets(profile.presets, E);
+
   if (profile.provenance && !['official', 'community', 'imported', 'learn'].includes(profile.provenance.source))
     E('bad provenance.source');
   if (profile.completeness && !['full', 'partial', 'structural-only'].includes(profile.completeness))
     E('bad completeness');
 
   return { ok: errs.length === 0, errors: errs };
+}
+
+// The preset model: slot map (banks), recall action, name request, init patch. Kept in step with
+// $defs.presets / presetBank / presetRecall in dpd.schema.json.
+const PRESET_BANK_ROLES = ['factory', 'user'];
+const PRESET_RECALL_KINDS = ['pc', 'bankPc', 'sysex'];
+
+export function validatePresets(presets, E) {
+  const banks = presets.banks ?? [];
+  const ids = new Set();
+  const ranges = [];
+  banks.forEach((b, i) => {
+    const id = b.id ?? `[${i}]`;
+    if (!b.id) E(`presets.banks[${i}]: needs id`);
+    else if (ids.has(b.id)) E(`presets.banks: duplicate id ${b.id}`);
+    ids.add(b.id);
+    if (!PRESET_BANK_ROLES.includes(b.role)) E(`presets bank ${id}: bad role ${b.role}`);
+    if (!Number.isInteger(b.startSlot) || b.startSlot < 0) E(`presets bank ${id}: needs integer startSlot >= 0`);
+    if (!Number.isInteger(b.slotCount) || b.slotCount < 1) E(`presets bank ${id}: needs integer slotCount >= 1`);
+    if (Number.isInteger(b.startSlot) && Number.isInteger(b.slotCount)) ranges.push({ id, from: b.startSlot, to: b.startSlot + b.slotCount - 1 });
+    if (Array.isArray(b.names) && Number.isInteger(b.slotCount) && b.names.length > b.slotCount)
+      E(`presets bank ${id}: names catalog (${b.names.length}) exceeds slotCount (${b.slotCount})`);
+    for (const f of ['programBase', 'bankMsb', 'bankLsb'])
+      if (b[f] != null && !(Number.isInteger(b[f]) && b[f] >= 0 && b[f] <= 127)) E(`presets bank ${id}: ${f} must be 0-127`);
+  });
+  ranges.sort((a, b) => a.from - b.from);
+  for (let i = 1; i < ranges.length; i += 1)
+    if (ranges[i].from <= ranges[i - 1].to) E(`presets banks ${ranges[i - 1].id} and ${ranges[i].id}: slot ranges overlap`);
+
+  const recall = presets.recall;
+  if (recall) {
+    if (!PRESET_RECALL_KINDS.includes(recall.kind)) E(`presets.recall: bad kind ${recall.kind}`);
+    if (recall.kind === 'sysex' && !(Array.isArray(recall.template) && recall.template.length)) E('presets.recall: sysex recall needs a template');
+    if (recall.channel != null && !(Number.isInteger(recall.channel) && recall.channel >= 1 && recall.channel <= 16)) E('presets.recall: channel must be 1-16');
+    if (recall.checksum?.type && !CHECKSUM_TYPES.includes(recall.checksum.type)) E(`presets.recall: bad checksum.type ${recall.checksum.type}`);
+  }
+
+  if (presets.nameRequest && !presets.nameRequest.request) E('presets.nameRequest: needs a request id');
+
+  const init = presets.initPatch;
+  if (init) {
+    if (!Number.isInteger(init.slot) || init.slot < 0) E('presets.initPatch: needs integer slot >= 0');
+    else if (banks.length) {
+      const bank = init.bank ? banks.find((b) => b.id === init.bank) : banks.find((b) => Number.isInteger(b.startSlot) && Number.isInteger(b.slotCount) && init.slot >= b.startSlot && init.slot < b.startSlot + b.slotCount);
+      if (init.bank && !bank) E(`presets.initPatch: unknown bank ${init.bank}`);
+      else if (bank && (init.slot < bank.startSlot || init.slot >= bank.startSlot + bank.slotCount)) E(`presets.initPatch: slot ${init.slot} is outside bank ${bank.id}`);
+      else if (!init.bank && !bank) E(`presets.initPatch: slot ${init.slot} is not inside any bank`);
+    }
+  }
 }

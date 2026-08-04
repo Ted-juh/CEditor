@@ -36,13 +36,15 @@ function rowMatches(row, filter, mode) {
 }
 
 // The row source for the list. Normally the authored Value rows; when the
-// listbox is sourced from device presets (choiceSource === 'devicePresets')
-// and a scan has injected `Listbox._presetRows`, those take over — a runtime
-// hook the preset scanner fills in, with the authored rows as the fallback so
-// the editor still shows something to lay out.
+// listbox is sourced from presets (choiceSource 'devicePresets' or
+// 'factoryCatalog') and the sync has injected `Listbox._presetRows`
+// (stores/presetChoiceSync.js in the editor, injectPresetRowsIntoPanel in the
+// Player), those take over — with the authored rows as the fallback so the
+// editor still shows something to lay out.
 export function listboxRowSource(control) {
   const cfg = listboxConfig(control);
-  if (String(cfg.choiceSource) === 'devicePresets' && Array.isArray(cfg._presetRows) && cfg._presetRows.length) {
+  const source = String(cfg.choiceSource);
+  if ((source === 'devicePresets' || source === 'factoryCatalog') && Array.isArray(cfg._presetRows) && cfg._presetRows.length) {
     return cfg._presetRows;
   }
   return control?._children?.Value?.rows;
