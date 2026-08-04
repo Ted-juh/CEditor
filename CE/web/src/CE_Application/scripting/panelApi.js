@@ -900,13 +900,13 @@ export const COMMANDS = [
   },
   {
     id: 'hexToHsl', category: 'Value / range', signature: 'hexToHsl(colour) -> table',
-    summary: 'A colour as { h, s, l } — hue 0..360, saturation and lightness 0..100, the colour editor\'s own ranges. Grey has hue and saturation 0, which is a fact about grey rather than a lost hue: guard on it if you meant to keep one.',
+    summary: 'A colour as { h, s, l } — hue 0..360, saturation and lightness 0..100 (the colour editor\'s ranges). Grey returns hue 0 and saturation 0.',
     params: [{ name: 'colour', type: 'string', required: true }],
     scopes: 'any',
   },
   {
     id: 'hslToHex', category: 'Value / range', signature: 'hslToHex(h, s, l) -> string',
-    summary: 'The inverse: hue 0..360, saturation and lightness 0..100, back to "#RRGGBB". Rotating a hue and going back is how a script builds a palette from one colour.',
+    summary: 'Convert hue 0..360, saturation and lightness 0..100 to "#RRGGBB". Inverse of hexToHsl.',
     params: [
       { name: 'h', type: 'number', required: true },
       { name: 's', type: 'number', required: true },
@@ -926,7 +926,7 @@ export const COMMANDS = [
      runtimes evaluating the same formula at the same elapsed time cannot. */
   {
     id: 'animateTo', category: 'Animation', signature: 'animateTo(path, target [, opts])',
-    summary: 'Slide a value to where you want it instead of jumping there. Give it a list of controls rather than one and a single call moves them all, with `stagger` setting them off one after another. Starting a second move on the same control replaces the first, since a value can only be heading one place; the replaced one is told it was cancelled rather than finished.',
+    summary: 'Animate a value to `target` instead of jumping there. Pass a list of controls to move them all in one call, with `stagger` offsetting their starts. Starting a second move on the same control replaces the first; the replaced one reports cancelled, not finished.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
@@ -936,8 +936,7 @@ export const COMMANDS = [
           { name: 'curve', type: 'text', default: '"linear"',
             values: ['linear', 'exp', 'log', 's', 'inQuad', 'outQuad', 'inOutQuad', 'outCubic'],
             summary: 'The shape of the move. The first four are ce.math.curve\'s; the last four are '
-              + 'the Properties panel\'s, and are evaluated as the same curves the panel stores. An '
-              + 'unrecognised name is reported and the move runs linear.' },
+              + 'the Properties panel\'s. An unrecognised name is reported and the move runs linear.' },
           'animFrom', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
     ],
@@ -972,14 +971,14 @@ export const COMMANDS = [
   },
   {
     id: 'animateStop', category: 'Animation', signature: 'animateStop([path])',
-    summary: 'Stop the animation on `path`, leaving the value where it got to. No path stops every animation this panel is running. `done` fires with completed = false, so a "then do X" can tell cancelling from finishing — use finish() to jump to the target instead.',
+    summary: 'Stop the animation on `path`, leaving the value where it got to. No path stops every animation this panel is running. `done` fires with completed = false; use finish() to jump to the target instead.',
     params: [{ name: 'path', type: 'path', required: false }],
     scopes: 'any',
     snippet: { lua: 'ce.anim.stop("${1:cutoff}")$0', javascript: 'ce.anim.stop("${1:cutoff}");$0' },
   },
   {
     id: 'animateRunning', category: 'Animation', signature: 'animateRunning([path])',
-    summary: 'Is `path` being animated right now? With no path, is anything? The guard before starting a gesture you do not want to interrupt.',
+    summary: 'Return whether `path` is being animated right now. With no path, return whether any animation is running.',
     params: [{ name: 'path', type: 'path', required: false }],
     scopes: 'any',
     snippet: { lua: 'if not ce.anim.running("${1:cutoff}") then $0 end', javascript: 'if (!ce.anim.running("${1:cutoff}")) { $0 }' },
@@ -995,7 +994,7 @@ export const COMMANDS = [
      now. These seven are the other direction: things a stored property structurally cannot be. */
   {
     id: 'animateEnvelope', category: 'Animation', signature: 'animateEnvelope(path, points [, opts])',
-    summary: 'Move a value through a whole shape rather than from one number to another — an attack and decay, a hold and fall, any curve you can draw. This is what `to` cannot do: `to` has a single destination, and an envelope goes up before it comes down. The shape is a list of { x, y } points between 0 and 1, the same ones the Envelope component uses, so a sweep from a script and an Envelope drawn beside it trace the same line.',
+    summary: 'Move a value through a multi-point shape — an attack and decay, a hold and fall. `points` is a list of { x, y } points between 0 and 1, the same format the Envelope component uses. Unlike `to`, the value can rise and fall within one animation.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'points', type: 'list', required: true },
@@ -1016,36 +1015,36 @@ export const COMMANDS = [
   },
   {
     id: 'animateValue', category: 'Animation', signature: 'animateValue(path) -> table',
-    summary: 'Where an animation is: { path, kind, value, progress, from, to, elapsed, remaining, paused, cycle, sync }, or nothing when the path is not animating. running() says whether; this says how far, which is what a progress ring, a guard on a gesture, or a decision about whether to interrupt actually needs. `elapsed` and `remaining` are nil for a transport-synced animation, because how long it has left depends on a tempo nobody has played yet.',
+    summary: 'Describe the animation on `path`: { path, kind, value, progress, from, to, elapsed, remaining, paused, cycle, sync }. Returns nothing when the path is not animating. `elapsed` and `remaining` are nil for a transport-synced animation.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
   {
     id: 'animateList', category: 'Animation', signature: 'animateList() -> list',
-    summary: 'Every animation running, in path order, each described as animateValue describes it. The read ce.time.timers() and ce.panel.entries() both got — and the one that makes `repeat = -1` safe to offer, because a script can always find what it started and stop it.',
+    summary: 'List every running animation, in path order, each described as animateValue describes it.',
     scopes: 'any',
   },
   {
     id: 'animatePause', category: 'Animation', signature: 'animatePause(path)',
-    summary: 'Hold an animation where it is, without ending it. stop() is destructive and there was no non-destructive hold, so "freeze the sweep while the user is dragging" meant stopping it and rebuilding the remainder by hand. Returns false when nothing is running on the path, or it is already paused.',
+    summary: 'Hold an animation where it is, without ending it. Returns false when nothing is running on the path, or it is already paused.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
   {
     id: 'animateResume', category: 'Animation', signature: 'animateResume(path)',
-    summary: 'Carry on from where pause() held it — the animation continues rather than restarting, which is the whole difference from stopping and starting again.',
+    summary: 'Resume an animation from where pause() held it; it continues rather than restarting.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
   {
     id: 'animateReverse', category: 'Animation', signature: 'animateReverse(path)',
-    summary: 'Turn a running animation around from where it is, travelling back at the same rate — a move that was 80% done takes 80% of its duration to get home. animateTo(path, from) would restart at the full duration, so an almost-finished move would take as long coming back as the whole journey took: a bounce rather than a snap back. An envelope reverses its shape as well as its direction.',
+    summary: 'Turn a running animation around from where it is, travelling back at the same rate — a move that was 80% done takes 80% of its duration to get home. An envelope reverses its shape as well as its direction.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
   {
     id: 'animateFinish', category: 'Animation', signature: 'animateFinish(path)',
-    summary: 'Jump to the target and complete: the value lands exactly where the animation was going and `done` fires with completed = true. stop() leaves it stranded halfway, which is right for a cancel and wrong for "skip the animation" — a footswitch that should apply a patch now rather than watch it glide.',
+    summary: 'Jump to the target and complete: the value lands exactly where the animation was going and `done` fires with completed = true. Use stop() to cancel instead, leaving the value where it is.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
@@ -1056,15 +1055,15 @@ export const COMMANDS = [
      than a return value, because an answer necessarily arrives later than the call. */
   {
     id: 'uiNotify', category: 'User feedback', signature: 'uiNotify(message [, opts])',
-    summary: 'Show a brief message to whoever is using the panel, and return its ID. `opts` may carry { kind ("info" | "warn" | "error"), duration (ms, default 3000; 0 or less means until dismissed) }. For "the patch loaded", not for debugging — log() is for debugging. The id is what makes the message addressable: ce.ui.update(id, …) replaces it in place and ce.ui.dismiss(id) takes it back, which together are how you show progress instead of stacking ten toasts.',
+    summary: 'Show a brief message to the panel user and return its ID. `opts` may carry { kind ("info" | "warn" | "error"), duration (ms, default 3000; 0 or less means until dismissed) }. For user-facing events, not debugging — use log() for that. Pass the ID to ce.ui.update(id, …) to replace the message in place, or to ce.ui.dismiss(id) to remove it.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'message', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         'uiKind',
         { name: 'duration', type: 'number', default: '3000', unit: 'milliseconds',
-          summary: 'How long the message stays up. 0 or less keeps it there until something '
-            + 'dismisses it, which is what you want while a job is still running.' },
+          summary: 'How long the message stays up. 0 or less keeps it visible until something '
+            + 'dismisses it.' },
       ]) },
     ],
     scopes: 'any',
@@ -1072,7 +1071,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiStatus', category: 'User feedback', signature: 'uiStatus([message] [, opts])',
-    summary: 'Put a line in the status bar and leave it there. No message clears it. Unlike notify this persists, so it suits a state ("Recording", "Synced") rather than an event. `opts` may carry { kind ("info" | "warn" | "error") }, the same vocabulary notify uses and for the same reason: a state can be a warning, and "Device not responding" in the same colour as "Ready" is a warning nobody sees. Read it back with ce.ui.state().',
+    summary: 'Put a line in the status bar; it persists until replaced. No message clears it. Use for a state ("Recording", "Synced") rather than an event — notify is for events. `opts` may carry { kind ("info" | "warn" | "error") }. Read it back with ce.ui.state().',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'message', type: 'string', required: false },
@@ -1083,7 +1082,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiDialog', category: 'User feedback', signature: 'uiDialog(opts [, onChoice]) -> boolean',
-    summary: 'Ask a question with buttons. The answer arrives later than the call, so it comes back through `onChoice` rather than as a return value — it is given the label that was clicked, or nothing if the dialog was dismissed. What the call itself returns is whether a dialog appeared at all: false means there was nobody to ask, and your callback has already run with no answer. Only one dialog can be open at a time.',
+    summary: 'Ask a question with buttons. The answer arrives asynchronously through `onChoice`, which receives the clicked label, or nothing if the dialog was dismissed. The call itself returns whether a dialog appeared: false means there was nobody to ask and the callback has already run with no answer. Only one dialog can be open at a time.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'opts', type: 'object', required: true, fields: optionFields([
@@ -1115,7 +1114,7 @@ export const COMMANDS = [
      them, and it copies to the clipboard in six places. A script could do none of those. */
   {
     id: 'uiPrompt', category: 'User feedback', signature: 'uiPrompt(opts [, onAnswer]) -> boolean',
-    summary: 'Ask somebody to type something — naming a patch, say. The answer comes back through `onAnswer` as text, or as nothing if they cancelled. Those two are deliberately different: an empty answer is something a person might mean, and no answer is not. Enter accepts. Returns whether a dialog appeared; false means the callback has already run with no answer.',
+    summary: 'Ask the user to type text. The answer comes back through `onAnswer` as text, or as nothing if they cancelled — an empty answer and no answer are distinct. Enter accepts. Returns whether a dialog appeared; false means the callback has already run with no answer.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'opts', type: 'object', required: true,
@@ -1137,15 +1136,14 @@ export const COMMANDS = [
   },
   {
     id: 'uiChoose', category: 'User feedback', signature: 'uiChoose(opts [, onAnswer]) -> boolean',
-    summary: 'Ask somebody to pick from a list — which is what you want past about three choices, where buttons stop working. The answer is the item they chose, a list of items if you allowed more than one, or nothing if they cancelled. A long list scrolls rather than growing, so forty presets cannot push the buttons off the screen.',
+    summary: 'Ask the user to pick from a list. The answer is the chosen item, a list of items if `multiple` is set, or nothing if they cancelled. A long list scrolls rather than growing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'opts', type: 'object', required: true,
         fields: optionFields([
           'uiTitle', 'uiMessage',
           { name: 'items', type: 'list of text', required: true,
-            summary: 'The choices to offer. The list scrolls, so a long one cannot push the '
-              + 'buttons off screen.' },
+            summary: 'The choices to offer. A long list scrolls.' },
           { name: 'default', type: 'text', default: 'nothing selected', sample: '"Init"',
             summary: 'The item selected when the dialog opens.' },
           { name: 'multiple', type: 'true or false', default: 'false',
@@ -1162,7 +1160,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiDismiss', category: 'User feedback', signature: 'uiDismiss([id]) -> number',
-    summary: 'Take a message back — the thing whoever is looking at it can already do by clicking it. With no id it clears every one, because "stop saying things" is a real request and making a script remember six ids to make it would be busywork. Returns how many went.',
+    summary: 'Remove a message; the user can also do this by clicking it. With no id, clears every message. Returns how many were removed.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'id', type: 'number', required: false }],
     scopes: 'any',
@@ -1170,7 +1168,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiUpdate', category: 'User feedback', signature: 'uiUpdate(id, message [, opts]) -> boolean',
-    summary: 'Change a message that is already on screen, leaving it where it is. This is how you show progress: dismissing and showing a new one makes it flicker and jump to the bottom each time. Give the original message a duration of 0 so it stays put, then update it as you go. Returns false once that message has gone, which is how you learn it was dismissed by hand and you can stop.',
+    summary: 'Change a message that is already on screen, in place. To show progress, give the original message a duration of 0 so it stays put, then update it as you go. Returns false once the message has gone — for example dismissed by hand — so you can stop updating.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'id', type: 'number', required: true },
@@ -1178,8 +1176,8 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         'uiKind',
         { name: 'duration', type: 'number', default: 'unchanged', sample: '5000',
-          summary: 'A new lifetime for the message. Left out, a message that was staying put '
-            + 'stays put and a timed one gets its full time back.' },
+          summary: 'A new lifetime for the message. If omitted, a sticky message stays sticky '
+            + 'and a timed one gets its full time back.' },
       ]) },
     ],
     scopes: 'any',
@@ -1190,14 +1188,14 @@ export const COMMANDS = [
   },
   {
     id: 'uiState', category: 'User feedback', signature: 'uiState() -> table',
-    summary: 'What is on screen: { status, statusKind, notifications ([{ id, message, kind, sticky }]), dialog }. One read rather than three. It is also how you tell apart the two reasons dialog() can answer false — nobody to ask, or a dialog already open — which need completely different handling and otherwise look the same.',
+    summary: 'Return what is on screen: { status, statusKind, notifications ([{ id, message, kind, sticky }]), dialog }. Use `dialog` to tell apart the two reasons dialog() can return false — nobody to ask, or a dialog already open.',
     runtime: RUNTIME_WEBVIEW,
     scopes: 'any',
     snippet: { lua: 'if not ce.ui.state().dialog then $0 end', javascript: 'if (!ce.ui.state().dialog) { $0 }' },
   },
   {
     id: 'uiCopy', category: 'User feedback', signature: 'uiCopy(text) -> boolean',
-    summary: 'Put text on the clipboard — a SysEx string, a patch name, a parameter table. The app does this in six places of its own and a script could not do it at all. The write is asynchronous and a browser may refuse it outright without a click behind it, so the return says the copy was attempted rather than that it landed; a refusal is reported to the console. There is deliberately no matching read: a script silently helping itself to whatever somebody last copied is not a panel\'s business.',
+    summary: 'Put text on the clipboard. The write is asynchronous and a browser may refuse it without a user gesture: the return means the copy was attempted, and a refusal is reported to the console. There is no clipboard read.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'text', type: 'string', required: true }],
     scopes: 'any',
@@ -1217,7 +1215,7 @@ export const COMMANDS = [
      a drawing is a product of the script, never part of the document. */
   {
     id: 'drawClear', category: 'Drawing', signature: 'drawClear([target])',
-    summary: 'Throw away what was drawn on this control. The usual first line of onDraw, because a draw adds to the list rather than replacing it.',
+    summary: 'Discard everything drawn on this control. Drawing commands accumulate rather than replace, so this is the usual first line of onDraw.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'target', type: 'string', required: false }],
     scopes: 'any',
@@ -1233,7 +1231,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawStroke', category: 'Drawing', signature: 'drawStroke([colour] [, width] [, opts])',
-    summary: 'The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` carries { dash (a list of on/off lengths, the way every drawing API since PostScript spells it \u2014 the panel\u2019s own beat marks are { 3, 3 }), dashOffset (how far into that pattern to start \u2014 advance it on a timer and the dash marches), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }.',
+    summary: 'The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` carries { dash (a list of on/off lengths, e.g. { 3, 3 }), dashOffset (how far into that pattern to start), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'colour', type: 'value', required: false },

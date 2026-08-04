@@ -388,8 +388,8 @@ Payloads are passed directly with a descriptive name — one obvious datum comes
 | `"parameterReceived"` | `onParameterReceived(info)` | `info` | A value arrived, decoded via the DPD. info.parameter, info.value. |
 | `"dumpReceived"` | `onDumpReceived(dump)` | `dump` | A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel. |
 | `"midiIn"` | `onMidiIn(midi)` | `midi` | Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status. |
-| `"ccIn"` | `onCcIn(cc)` | `cc` | A CC arrived. cc.channel, cc.cc, cc.value. note: cc.channel is 0-based here, unlike sendCC and unlike onNoteIn — a long-standing quirk that cannot be changed without breaking panels that already compensate. |
-| `"noteIn"` | `onNoteIn(note)` | `note` | A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 is not one of these — it is a note-off, and arrives as onNoteOffIn. |
+| `"ccIn"` | `onCcIn(cc)` | `cc` | A CC arrived. cc.channel, cc.cc, cc.value. Note: cc.channel is 0-based here, unlike sendCC and onNoteIn. |
+| `"noteIn"` | `onNoteIn(note)` | `note` | A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 counts as a note-off and arrives as onNoteOffIn instead. |
 | `"noteOffIn"` | `onNoteOffIn(note)` | `note` | A note was released. note.channel (1-16), note.note, note.velocity (the release velocity, 0 when the device sent a note-on with velocity 0 instead of a note-off). |
 | `"sysexIn"` | `onSysexIn(bytes)` | `bytes` | Raw SysEx arrived. |
 | `"deviceConnected"` | `onDeviceConnected(device)` | `device` | A device connected. |
@@ -401,7 +401,7 @@ Payloads are passed directly with a descriptive name — one obvious datum comes
 
 #### `set(path, value [, opts])`
 
-Write a value at a path. Suffix the path with .normalizedValue to write a 0–1 position instead of the real value. Transmits to the synth by default (Q2); silence is auto-inferred when reacting to inbound MIDI.
+Write a value at a path. Suffix the path with .normalizedValue to write a 0–1 position instead of the real value. Transmits to the synth by default; writes made while reacting to inbound MIDI stay silent.
 
 ```lua
 set("path", value)
@@ -480,7 +480,7 @@ off("target", "event")
 
 #### `watch(path, fn)`
 
-Call fn(value, previous) whenever any model path changes — a nested section field, a colour, a device binding — not just the eleven declared control events. Source-agnostic: it fires whether a script, the user or inbound MIDI moved it.
+Call fn(value, previous) whenever any model path changes — a nested section field, a colour, a device binding. Fires regardless of source: script, user, or inbound MIDI.
 
 ```lua
 -- Lua
@@ -497,7 +497,7 @@ watch("cutoff.value", (v, prev) => {
 
 #### `compute(path, fn)`
 
-Make a property a formula instead of a constant: fn is re-evaluated whenever anything moves, and its result is written to path. Unlike doing it in a handler, the runtime owns the re-evaluation, so it cannot fall out of step with an event you forgot to hook.
+Make a property a formula: fn is re-evaluated whenever anything moves, and its result is written to path.
 
 ```lua
 -- Lua
@@ -514,7 +514,7 @@ compute("label.text.text", () => {
 
 #### `intercept(path, fn)`
 
-Sit in front of every write to path. fn(value, prev) returns a replacement value to transform it (clamp, quantize, snap), false to reject it, or nothing to accept it unchanged. The panel has no way to express what happens when a value changes; this does.
+Intercept every write to path. fn(value, prev) returns a replacement value to transform it (clamp, quantize, snap), false to reject it, or nothing to accept it unchanged.
 
 ```lua
 -- Lua
@@ -531,7 +531,7 @@ intercept("cutoff.value", (v, prev) => {
 
 #### `defineAction(name, fn)`
 
-Register a named action this panel can be built out of: run("name") calls it from any script in any language, and it is offered wherever the panel binds actions. Scripts stop being only things the panel triggers and become things the panel is made of.
+Register a named action. run("name") calls it from any script in any language, and it is offered wherever the panel binds actions.
 
 ```lua
 -- Lua
@@ -572,7 +572,7 @@ startTimer("id", 250)
 
 #### `after(ms, fn) -> id`
 
-Run `fn` once, `ms` from now. Every other timer here repeats, so a one-shot delay — send a program change, wait for the synth to settle, then send the dump — was written as a repeating timer that stops itself, which is easy to get wrong: a callback that throws before it cancels runs forever. Returns an id you can pass to stopTimer to cancel it before it fires.
+Run `fn` once, `ms` from now. Returns an id; pass it to stopTimer to cancel before it fires.
 
 ```lua
 -- Lua
@@ -599,7 +599,7 @@ stopTimer("id")
 
 #### `requestDump(kind [, fn [, opts]])`
 
-Ask the synth to send a dump. `kind` is defined by the DPD ("patch"/"tone"/"global"…) or declared by defineDump. With `fn`, the reply comes back to it — fn(values, info) — instead of only reaching onDumpReceived with nothing tying it to the request. `info.ok` is false when nothing arrived in time (`opts.timeout`, 3000ms by default), so a callback is never left hanging. fn runs after onDumpReceived, so both see the same panel.
+Ask the synth to send a dump. `kind` is defined by the DPD ("patch"/"tone"/"global"…) or declared by defineDump. With `fn`, the reply is delivered to fn(values, info); `info.ok` is false when nothing arrived within `opts.timeout` (default 3000ms). fn runs after onDumpReceived, so both see the same panel.
 
 ```lua
 -- Lua
@@ -616,7 +616,7 @@ requestDump("patch", (values, info) => {
 
 #### `applyDump(bytes)`
 
-Fill the whole panel from a received dump (walks the DPD map). Silent automatically — inbound context. Also accepts an already-decoded { parameter: value } map, which is how a panel can be filled with no device host attached.
+Fill the whole panel from a received dump (walks the DPD map). Silent automatically — inbound context. Also accepts an already-decoded { parameter: value } map, which works with no device host attached.
 
 ```lua
 applyDump(bytes)
@@ -632,7 +632,7 @@ sendDump("patch")
 
 #### `buildDump(kind)`
 
-Build the dump bytes from the panel values without sending. Needs the device host: the panel→bytes encoding is the DPD codec, which lives there, so this returns nothing in a plain browser tab and says so.
+Build the dump bytes from the panel values without sending. Requires the device host (the DPD codec lives there); returns nothing in a plain browser tab and reports why.
 
 ```lua
 -- Lua
@@ -1104,41 +1104,41 @@ panic()
 
 #### `lighten(colour [, amount]) -> string`
 
-Scale each channel toward white. `amount` 0..1, default 0.4 — the border renderer's own highlight, so a script-drawn bevel matches the one the panel draws beside it. Nothing back for a colour it cannot read.
+Scale each channel toward white. `amount` 0..1, default 0.4 (the border renderer's highlight amount). Returns nothing for a colour it cannot read.
 
 #### `darken(colour [, amount]) -> string`
 
-Scale each channel toward black. `amount` 0..1, default 0.55 — the border groove shading, for the same reason lighten's default is what it is.
+Scale each channel toward black. `amount` 0..1, default 0.55 (the border groove shading amount).
 
 #### `mixColour(a, b, t) -> string`
 
-Blend two colours, `t` 0..1. not an app algorithm, and said so rather than implied: it is lerp() per channel in plain RGB, which is the blend a meter fading from green to red actually wants.
+Blend two colours, `t` 0..1. Per-channel linear interpolation in plain RGB.
 
 #### `colourAlpha(colour, a) -> string`
 
-A colour with an alpha, in the panel's form: AARRGGBB, no leading #, which is what a stored colour property holds. The one verb here that does not return #RRGGBB, because it is the only form a stored colour can carry an alpha in — css's #rrggbbaa is the same bytes the other way round, and mixing them up is silent. To make a drawing translucent use ce.draw.opacity().
+Apply an alpha to a colour, returned in the panel's stored form: AARRGGBB, no leading #. The one colour verb that does not return #RRGGBB. Warning: CSS #rrggbbaa is the same bytes in the opposite order. To make a drawing translucent use ce.draw.opacity().
 
 #### `hexToRgb(colour) -> table`
 
-A colour as { r, g, b }, each 0..255. Nothing back for a colour it cannot read, which is what tells a typo from black.
+A colour as { r, g, b }, each 0..255. Returns nothing for a colour it cannot read.
 
 #### `rgbToHex(r, g, b) -> string`
 
-Channels 0..255 back to "#RRGGBB". Out-of-range channels are clamped rather than wrapped — 300 is white, not 44.
+Convert channels 0..255 to "#RRGGBB". Out-of-range channels are clamped, not wrapped.
 
 #### `hexToHsl(colour) -> table`
 
-A colour as { h, s, l } — hue 0..360, saturation and lightness 0..100, the colour editor's own ranges. Grey has hue and saturation 0, which is a fact about grey rather than a lost hue: guard on it if you meant to keep one.
+A colour as { h, s, l } — hue 0..360, saturation and lightness 0..100 (the colour editor's ranges). Grey returns hue 0 and saturation 0.
 
 #### `hslToHex(h, s, l) -> string`
 
-The inverse: hue 0..360, saturation and lightness 0..100, back to "#RRGGBB". Rotating a hue and going back is how a script builds a palette from one colour.
+Convert hue 0..360, saturation and lightness 0..100 to "#RRGGBB". Inverse of hexToHsl.
 
 ### Animation
 
 #### `animateTo(path, target [, opts])`
 
-Slide a value to where you want it instead of jumping there. Give it a list of controls rather than one and a single call moves them all, with `stagger` setting them off one after another. Starting a second move on the same control replaces the first, since a value can only be heading one place; the replaced one is told it was cancelled rather than finished.
+Animate a value to `target` instead of jumping there. Pass a list of controls to move them all in one call, with `stagger` offsetting their starts. Starting a second move on the same control replaces the first; the replaced one reports cancelled, not finished.
 
 ```lua
 -- Lua
@@ -1164,7 +1164,7 @@ ce.anim.spring("cutoff", 127);
 
 #### `animateStop([path])`
 
-Stop the animation on `path`, leaving the value where it got to. No path stops every animation this panel is running. `done` fires with completed = false, so a "then do X" can tell cancelling from finishing — use finish() to jump to the target instead.
+Stop the animation on `path`, leaving the value where it got to. No path stops every animation this panel is running. `done` fires with completed = false; use finish() to jump to the target instead.
 
 ```lua
 -- Lua
@@ -1177,7 +1177,7 @@ ce.anim.stop("cutoff");
 
 #### `animateRunning([path])`
 
-Is `path` being animated right now? With no path, is anything? The guard before starting a gesture you do not want to interrupt.
+Return whether `path` is being animated right now. With no path, return whether any animation is running.
 
 ```lua
 -- Lua
@@ -1190,7 +1190,7 @@ if (!ce.anim.running("cutoff")) {  }
 
 #### `animateEnvelope(path, points [, opts])`
 
-Move a value through a whole shape rather than from one number to another — an attack and decay, a hold and fall, any curve you can draw. This is what `to` cannot do: `to` has a single destination, and an envelope goes up before it comes down. The shape is a list of { x, y } points between 0 and 1, the same ones the Envelope component uses, so a sweep from a script and an Envelope drawn beside it trace the same line.
+Move a value through a multi-point shape — an attack and decay, a hold and fall. `points` is a list of { x, y } points between 0 and 1, the same format the Envelope component uses. Unlike `to`, the value can rise and fall within one animation.
 
 ```lua
 -- Lua
@@ -1203,27 +1203,27 @@ ce.anim.envelope("cutoff", [{x:0,y:0},{x:0.1,y:1},{x:0.4,y:0.6},{x:1,y:0}], { du
 
 #### `animateValue(path) -> table`
 
-Where an animation is: { path, kind, value, progress, from, to, elapsed, remaining, paused, cycle, sync }, or nothing when the path is not animating. running() says whether; this says how far, which is what a progress ring, a guard on a gesture, or a decision about whether to interrupt actually needs. `elapsed` and `remaining` are nil for a transport-synced animation, because how long it has left depends on a tempo nobody has played yet.
+Describe the animation on `path`: { path, kind, value, progress, from, to, elapsed, remaining, paused, cycle, sync }. Returns nothing when the path is not animating. `elapsed` and `remaining` are nil for a transport-synced animation.
 
 #### `animateList() -> list`
 
-Every animation running, in path order, each described as animateValue describes it. The read ce.time.timers() and ce.panel.entries() both got — and the one that makes `repeat = -1` safe to offer, because a script can always find what it started and stop it.
+List every running animation, in path order, each described as animateValue describes it.
 
 #### `animatePause(path)`
 
-Hold an animation where it is, without ending it. stop() is destructive and there was no non-destructive hold, so "freeze the sweep while the user is dragging" meant stopping it and rebuilding the remainder by hand. Returns false when nothing is running on the path, or it is already paused.
+Hold an animation where it is, without ending it. Returns false when nothing is running on the path, or it is already paused.
 
 #### `animateResume(path)`
 
-Carry on from where pause() held it — the animation continues rather than restarting, which is the whole difference from stopping and starting again.
+Resume an animation from where pause() held it; it continues rather than restarting.
 
 #### `animateReverse(path)`
 
-Turn a running animation around from where it is, travelling back at the same rate — a move that was 80% done takes 80% of its duration to get home. animateTo(path, from) would restart at the full duration, so an almost-finished move would take as long coming back as the whole journey took: a bounce rather than a snap back. An envelope reverses its shape as well as its direction.
+Turn a running animation around from where it is, travelling back at the same rate — a move that was 80% done takes 80% of its duration to get home. An envelope reverses its shape as well as its direction.
 
 #### `animateFinish(path)`
 
-Jump to the target and complete: the value lands exactly where the animation was going and `done` fires with completed = true. stop() leaves it stranded halfway, which is right for a cancel and wrong for "skip the animation" — a footswitch that should apply a patch now rather than watch it glide.
+Jump to the target and complete: the value lands exactly where the animation was going and `done` fires with completed = true. Use stop() to cancel instead, leaving the value where it is.
 
 ### User feedback
 
