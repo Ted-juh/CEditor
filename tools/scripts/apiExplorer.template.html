@@ -558,6 +558,7 @@ pre code { font-size: inherit; }
       <a href="#start">What a script is</a>
       <a href="#paths">Addressing</a>
       <a href="#transmit">Writing &amp; the synth</a>
+      <a href="#rehearsal">Preview puts things back</a>
       <a href="#events">Reacting</a>
       <a href="#modules">Modules</a>
       <a href="#timing">Musical time</a>
@@ -591,7 +592,7 @@ pre code { font-size: inherit; }
 <main class="page">
 <div class="band">
 
-<!-- Three views, one at a time. The page used to be a single scroll: ten concept lessons, then
+<!-- Three views, one at a time. The page used to be a single scroll: eleven concept lessons, then
      four full tutorials, then 737 members of reference. Whichever of the three you had come for,
      you scrolled through the others to reach it. -->
 <nav class="views" id="views" aria-label="Sections of the manual">
@@ -767,8 +768,56 @@ transmit(() =&gt; {
     </div>
   </div>
 
+  <div class="lesson" id="rehearsal">
+    <p class="lesson-n">04 &middot; Preview puts things back</p>
+    <div class="lesson-text prose">
+      <h3>A preview is a rehearsal, not an edit</h3>
+      <p>
+        Turn the preview off and your panel is exactly as you left it. Everything the preview
+        changed is put back: a knob you dragged, a colour a script set, a control a script made.
+        This is on purpose. A script can run a hundred times while you work on it, and it never
+        slowly rewrites the panel underneath you.
+      </p>
+      <p>
+        Sometimes you mean it. You write a script that recolours forty controls, you run it once,
+        and you want to keep the result. Say so with <code>ce.panel.keep</code>. Give it a path to
+        keep one property, or call it with nothing to keep everything that run did. It answers
+        <code>true</code> if something was kept.
+      </p>
+      <p>
+        Two things are never put back, because they cannot be. MIDI you already sent is gone out
+        the wire. Anything you stored with <code>ce.storage.saveSetting</code> was stored because
+        you asked for it to last. Controls a script created are the other way round: they are
+        always cleared, even by <code>keep</code>, because the next run builds them again and a
+        kept one would sit next to its own copy forever.
+      </p>
+      <p>
+        None of this applies to the exported plugin. There is no preview there — the plugin owns
+        its panel, and nothing is put back. <code>ce.panel.keep</code> is marked
+        <b>panel view only</b> for that reason: in the plugin it has nothing to do.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Keeping one change, and keeping the lot</p>
+      <pre data-lua><code>set("Cutoff.Background.Fill.colour", "#5B9BD5")
+ce.panel.keep("Cutoff.Background.Fill.colour")
+
+for _, name in ipairs({ "Cutoff", "Reso", "Drive" }) do
+  set(name .. ".Background.Fill.colour", "#5B9BD5")
+end
+ce.panel.keep()</code></pre>
+      <pre data-js hidden><code>set("Cutoff.Background.Fill.colour", "#5B9BD5");
+ce.panel.keep("Cutoff.Background.Fill.colour");
+
+for (const name of ["Cutoff", "Reso", "Drive"]) {
+  set(name + ".Background.Fill.colour", "#5B9BD5");
+}
+ce.panel.keep();</code></pre>
+    </div>
+  </div>
+
   <div class="lesson" id="events">
-    <p class="lesson-n">04 &middot; Reacting</p>
+    <p class="lesson-n">05 &middot; Reacting</p>
     <div class="lesson-text prose">
       <h3>Three ways to hear that something happened</h3>
       <p>
@@ -830,7 +879,7 @@ watch("cutoff.background.fill.colour", (c) =&gt; {
   </div>
 
   <div class="lesson" id="modules">
-    <p class="lesson-n">05 &middot; Modules</p>
+    <p class="lesson-n">06 &middot; Modules</p>
     <div class="lesson-text prose">
       <h3>Switch on the command groups your panel needs</h3>
       <p>
@@ -888,7 +937,7 @@ const m = quantizeNote(63, 60, "minor");</code></pre>
   </div>
 
   <div class="lesson" id="timing">
-    <p class="lesson-n">06 &middot; Musical time</p>
+    <p class="lesson-n">07 &middot; Musical time</p>
     <div class="lesson-text prose">
       <h3>Work in beats and bars instead of milliseconds</h3>
       <p>
@@ -941,7 +990,7 @@ function onTimer(info) {
   </div>
 
   <div class="lesson" id="components">
-    <p class="lesson-n">07 &middot; Components</p>
+    <p class="lesson-n">08 &middot; Components</p>
     <div class="lesson-text prose">
       <h3>Set up a component, and hear back from it</h3>
       <p>
@@ -993,7 +1042,7 @@ on(a, "onStep", (step) =&gt; {
   </div>
 
   <div class="lesson" id="typography">
-    <p class="lesson-n">08 &middot; Typography</p>
+    <p class="lesson-n">09 &middot; Typography</p>
     <div class="lesson-text prose">
       <h3>Set text and fonts safely</h3>
       <p>
@@ -1075,7 +1124,7 @@ if (!fitted.fits) {
   </div>
 
   <div class="lesson" id="keeping">
-    <p class="lesson-n">09 &middot; Keeping things</p>
+    <p class="lesson-n">10 &middot; Keeping things</p>
     <div class="lesson-text prose">
       <h3>Keep data for a short time or for good</h3>
       <p>
@@ -1127,7 +1176,7 @@ if (back === undefined) logError("bad config");</code></pre>
   </div>
 
   <div class="lesson" id="debug">
-    <p class="lesson-n">10 &middot; When it breaks</p>
+    <p class="lesson-n">11 &middot; When it breaks</p>
     <div class="lesson-text prose">
       <h3>Find out what went wrong</h3>
       <p>

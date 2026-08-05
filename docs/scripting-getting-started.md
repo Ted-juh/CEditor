@@ -70,6 +70,25 @@ If something does not happen, open **Test / Trace**:
   something fired, or why it did not.
 - **Live watch** shows control values changing while you interact.
 
+Preview is a rehearsal. Everything the preview changed is put back when you turn
+preview off: a knob you dragged, a colour a script set, a control a script made.
+Your panel is exactly as you left it. That is on purpose — you can run a script a
+hundred times without it slowly rewriting the panel you are building.
+
+If you want to keep something a script did, say so in the script:
+
+```lua
+-- Lua
+set("Cutoff.Background.Fill.colour", "#5B9BD5")
+ce.panel.keep("Cutoff.Background.Fill.colour")  -- keep this one property
+ce.panel.keep()                                 -- or keep everything this run did
+```
+
+Two things are never put back, because they cannot be: MIDI you already sent, and
+anything you stored with `ce.storage.saveSetting`. Controls a script created are
+always cleared, even by `keep()` — the next run makes them again, so keeping one
+would leave a copy sitting next to it every time.
+
 Everything in this guide runs live in the preview. Some commands stop working
 once the plugin window is closed in a DAW. The next section explains this.
 

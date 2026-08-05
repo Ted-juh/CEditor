@@ -1823,6 +1823,14 @@ ce.panel.batch(() => {
 });
 ```
 
+#### `panelKeep([path]) -> boolean`
+
+Keep what a preview changed. Preview is a rehearsal: the panel goes back to how you authored it when preview stops, so a script's writes are undone with it. `panelKeep("Cutoff.Background.Fill.colour")` keeps one property; `panelKeep()` with no path keeps everything the run did. Returns whether anything was kept. A control the script itself created cannot be kept — it is built fresh by the next run, so keeping one would leave a copy beside it every time. Panel view only: the exported plugin owns its document and never puts it back.
+
+```lua
+ce.panel.keep("Cutoff.Background.Fill.colour")
+```
+
 #### `panelEntries(control, section)`
 
 The names in one of a control's collection sections — States, Bindings, Animations, Parts, ValueChannels, Behaviors, HitZones, Generators, Links or Variants — in document order. Any other section name is refused, and the message lists the ones that work.

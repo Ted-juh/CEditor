@@ -35,7 +35,12 @@ import { get } from 'svelte/store';
 import { panels, setAutosaveSuspended } from './panels.js';
 import { setHistoryRecordingSuppressed } from './history.js';
 
-/** The document as it was when preview started, or null when no rehearsal is running. */
+/**
+ * The document as it was when preview started, or null when no rehearsal is running.
+ *
+ * Held parsed rather than as text because ce.panel.keep() patches it: keeping a change means
+ * writing today's value into the photograph, so that putting the photograph back preserves it.
+ */
 let saved = null;
 
 /** The editor rehearses; the player does not. */
@@ -72,7 +77,7 @@ export function isRehearsing() {
 export function beginPreviewRehearsal() {
   if (!enabled || saved !== null) return false;
   try {
-    saved = JSON.stringify(get(panels));
+    saved = JSON.parse(JSON.stringify(get(panels)));
   } catch {
     saved = null;
     return false;
@@ -94,8 +99,8 @@ export function endPreviewRehearsal() {
   saved = null;
   let restored = false;
   try {
-    if (JSON.stringify(get(panels)) !== json) {
-      panels.set(JSON.parse(json));
+    if (JSON.stringify(get(panels)) !== JSON.stringify(json)) {
+      panels.set(json);
       restored = true;
     }
   } catch {
@@ -114,4 +119,80 @@ export function discardPreviewRehearsal() {
   saved = null;
   setHistoryRecordingSuppressed(false);
   setAutosaveSuspended(false);
+}
+
+/* ------------------------------------------------------------------------------ keeping */
+
+/** Walk `_children` case-insensitively, as every other path lookup in the runtime does. */
+function childAt(node, segments) {
+  let current = node;
+  for (const segment of segments) {
+    const children = current?._children;
+    if (!children) return null;
+    const key = Object.keys(children).find((k) => k.toLowerCase() === String(segment).toLowerCase());
+    if (key === undefined) return null;
+    current = children[key];
+  }
+  return current ?? null;
+}
+
+/**
+ * The control with this id inside a snapshot's control list, at any depth.
+ *
+ * A container holds its children at `_children.Children._children`, keyed by name — the same shape
+ * the runtime walks when it patches nested transforms.
+ */
+function findInSnapshot(list, controlId) {
+  for (const control of list ?? []) {
+    if (String(control?._children?.Core?.id ?? '') === controlId) return control;
+    const kids = control?._children?.Children?._children;
+    const nested = kids && typeof kids === 'object'
+      ? findInSnapshot(Object.values(kids), controlId)
+      : null;
+    if (nested) return nested;
+  }
+  return null;
+}
+
+/**
+ * Keep ONE property: copy its current value into the photograph, so the restore preserves it.
+ *
+ * `modelPath` is a resolved section path ("Background.Fill.colour"), the same form set() writes.
+ * Answers false when there is no rehearsal running, when the control is not in the photograph — a
+ * script-generated control never is, and keeping one would strip the mark that lets the next build
+ * clear it, so a twin would pile up beside it on every run — or when the path leads nowhere.
+ */
+export function keepPropertyInRehearsal(controlId, modelPath, value) {
+  if (saved === null) return false;
+  const id = String(controlId ?? '');
+  if (!id) return false;
+  const segments = String(modelPath ?? '').split('.').filter(Boolean);
+  if (!segments.length) return false;
+  for (const panel of saved) {
+    const control = findInSnapshot(panel?.controls, id);
+    if (!control) continue;
+    const leaf = segments[segments.length - 1];
+    const parent = childAt(control, segments.slice(0, -1));
+    if (!parent) return false;
+    const key = Object.keys(parent).find((k) => k.toLowerCase() === leaf.toLowerCase());
+    if (key === undefined) return false;   // only a leaf property is keepable
+    parent[key] = value;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Keep EVERYTHING this preview did: drop the photograph, so there is nothing to put back.
+ *
+ * The controls a script created are still cleared on stop by the runtime, deliberately — a
+ * generated control is minted fresh by the next build, and keeping one would leave a duplicate
+ * beside it forever.
+ */
+export function keepAllInRehearsal() {
+  if (saved === null) return false;
+  saved = null;
+  setHistoryRecordingSuppressed(false);
+  setAutosaveSuspended(false);
+  return true;
 }

@@ -2098,6 +2098,17 @@ export const COMMANDS = [
     },
   },
   {
+    id: 'panelKeep', category: 'Panel structure', signature: 'panelKeep([path]) -> boolean',
+    summary: 'Keep what a preview changed. Preview is a rehearsal: the panel goes back to how you authored it when preview stops, so a script\'s writes are undone with it. `panelKeep("Cutoff.Background.Fill.colour")` keeps one property; `panelKeep()` with no path keeps everything the run did. Returns whether anything was kept. A control the script itself created cannot be kept — it is built fresh by the next run, so keeping one would leave a copy beside it every time. Panel view only: the exported plugin owns its document and never puts it back.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'path', type: 'path', required: false }],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.panel.keep("${1:Cutoff.Background.Fill.colour}")$0',
+      javascript: 'ce.panel.keep("${1:Cutoff.Background.Fill.colour}")$0',
+    },
+  },
+  {
     id: 'panelEntries', category: 'Panel structure', signature: 'panelEntries(control, section)',
     summary: 'The names in one of a control\'s collection sections — States, Bindings, Animations, Parts, ValueChannels, Behaviors, HitZones, Generators, Links or Variants — in document order. Any other section name is refused, and the message lists the ones that work.',
     runtime: RUNTIME_WEBVIEW,
@@ -3857,7 +3868,7 @@ const MODULE_MEMBERS = {
     // `batch` are all §1 collisions as bare globals, so the flat spellings keep the panel prefix.
     align: 'panelAlign', distribute: 'panelDistribute', match: 'panelMatch',
     grid: 'panelGrid', circle: 'panelCircle', flip: 'panelFlip',
-    rect: 'panelRect', order: 'panelOrder', batch: 'panelBatch',
+    rect: 'panelRect', order: 'panelOrder', batch: 'panelBatch', keep: 'panelKeep',
   },
   'ce.storage': { state: 'state', saveSetting: 'saveSetting', loadSetting: 'loadSetting',
                   settings: 'listSettings', forget: 'forgetSetting',

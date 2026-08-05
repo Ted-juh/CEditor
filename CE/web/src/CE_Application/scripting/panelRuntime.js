@@ -66,7 +66,9 @@ import {
 import { extensionSource } from './extensionModules.js';
 import { panelPreviewSessions, previewModeEnabled, updatePanelPreviewSession } from '../stores/interactionPreview.js';
 import { isLiveValuePath, hasLiveValue, liveValuePatch, readLiveValue } from './liveValue.js';
-import { setPreviewRehearsalEnabled } from '../stores/previewRehearsal.js';
+import {
+  setPreviewRehearsalEnabled, isRehearsing, keepAllInRehearsal, keepPropertyInRehearsal,
+} from '../stores/previewRehearsal.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
 import { isSourceScript } from './scriptModel.js';
@@ -4909,6 +4911,59 @@ function panelOrderImpl(names, where) {
  * The flush happens whatever the callback does, including throwing: a half-built panel that cannot
  * be undone is worse than a half-built panel.
  */
+/**
+ * ce.panel.keep — promote what this preview did into the authored document.
+ *
+ * Preview is a rehearsal (stores/previewRehearsal.js): the panel is photographed when preview
+ * starts and put back when it stops, so a script's writes are undone with everything else. This is
+ * the one way to say "no, that one was real" — it writes today\'s value into the photograph, so
+ * putting the photograph back preserves it.
+ *
+ * With no path it keeps the whole run, which is the batch-edit shape: run a recolouring script,
+ * call keep(), stop preview, save. A control the script CREATED is still cleared on stop either
+ * way — the next build mints it again, and a kept copy would sit beside the new one for ever.
+ */
+function panelKeepImpl(path) {
+  if (!isRehearsing()) {
+    addScriptTrace('log', '',
+      'ce.panel.keep(): nothing to keep — the panel is not being previewed, so it is not being '
+      + 'rehearsed either. In the exported plugin there is no rehearsal at all.');
+    return false;
+  }
+
+  if (path === undefined || path === null || String(path).trim() === '') {
+    keepAllInRehearsal();
+    addScriptTrace('log', '', 'ce.panel.keep(): keeping everything this preview changed.');
+    return true;
+  }
+
+  const { name, segs } = splitScriptPath(String(path));
+  const control = findControlByName(name);
+  if (!control) {
+    addScriptTrace('error', '', `ce.panel.keep("${path}"): control "${name}" not found on the active panel`);
+    return false;
+  }
+  const generatedBy = control?._children?.Core?.generatedBy;
+  if (generatedBy) {
+    addScriptTrace('error', '',
+      `ce.panel.keep("${path}"): "${name}" was created by a script, and a created control cannot be `
+      + 'kept — the next run builds it again, so the kept copy would sit beside the new one every '
+      + 'time. Create it in onPanelBuild and let it be rebuilt, or add it in the editor.');
+    return false;
+  }
+
+  const modelPath = resolveModelPath(control, segs);
+  const value = valueAtPath(control, modelPath);
+  const kept = keepPropertyInRehearsal(control?._children?.Core?.id, modelPath, value);
+  if (!kept) {
+    addScriptTrace('error', '',
+      `ce.panel.keep("${path}"): "${modelPath}" does not lead to a property on "${name}" that can be `
+      + 'kept. Only a single stored property can be — a live value is not one, since it is session '
+      + 'state rather than part of the document.');
+  }
+  return kept;
+}
+
 function panelBatchImpl(scriptId, fn) {
   if (typeof fn !== 'function') {
     addScriptTrace('error', scriptId ?? '', 'ce.panel.batch(fn) needs a function to run — nothing was done.');
@@ -6468,6 +6523,7 @@ function buildApi(ownerName, scriptId = '') {
     panelRect: (names) => panelRectImpl(names),
     panelOrder: (names, where) => panelOrderImpl(names, where),
     panelBatch: (fn) => panelBatchImpl(scriptId, fn),
+    panelKeep: (path) => panelKeepImpl(path),
     panelEach: (fn) => panelEachImpl(scriptId, fn),
     panelSnapshot: () => panelSnapshotImpl(),
     panelRestore: (snap) => panelRestoreImpl(snap),

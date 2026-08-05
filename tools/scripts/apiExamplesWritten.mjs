@@ -398,6 +398,10 @@ export const WRITTEN = {
     js: `for (let i = 1; i <= 8; i += 1) {\n  ce.panel.clone("StepTemplate", { name: \`Step\${i}\`, x: 8 + i * 30, y: 60 });\n}`,
   },
   panelDestroy: { code: 'ce.panel.destroy("Step8")' },
+  panelKeep: {
+    lua: `set("Cutoff.Background.Fill.colour", "#5B9BD5")\nce.panel.keep("Cutoff.Background.Fill.colour")   -- keep just this one\nce.panel.keep()                                 -- or keep everything this run did`,
+    js: `set("Cutoff.Background.Fill.colour", "#5B9BD5");\nce.panel.keep("Cutoff.Background.Fill.colour");   // keep just this one\nce.panel.keep();                                 // or keep everything this run did`,
+  },
   panelParent: { code: 'ce.panel.parent("Cutoff", "FilterBox")   -- no container name unparents it' },
   panelFind: {
     lua: `local knobs = ce.panel.find({ type = "Knob" })\nlocal one = ce.panel.find("Cutoff")`,
