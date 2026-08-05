@@ -2296,8 +2296,11 @@ function onDumpReceived(dump) {
   <p class="prose">
     The result after the arrow is not made up. It is the real output of the command,
     and tests check it after every change. Some commands have options. Below those
-    commands you will see a table. It lists each option, what it does, and its
-    default value. The default value is used when you do not set the option. The
+    commands you will see a table. It lists each option, what it does, and what
+    happens if you leave it out. Most options have a default value, and the table
+    shows it. Some have none. Those say <code>not set</code>: leaving the option out
+    does not substitute a value, it means the command skips that part of its work
+    altogether. A dash means the option is required and cannot be left out. The
     table also shows how to type the options in each language. For component
     commands, the example settings come from the component's own list of valid
     settings. So an example can never show a setting that does not exist.
