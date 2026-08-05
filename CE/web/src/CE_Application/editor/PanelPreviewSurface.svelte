@@ -378,6 +378,12 @@
     return control?._children?.Behavior ?? null;
   }
 
+  // The Mouse section rides alongside Behavior into every scrub built here, so
+  // a drag-mode or sensitivity set in the Mouse tab reaches the core.
+  function getMouse(control) {
+    return control?._children?.Mouse ?? null;
+  }
+
   function sessionFor(control) {
     const controlId = getControlId(control);
     return $panelPreviewSessions?.[controlId] ?? createInteractionPreviewSession(control);
@@ -5581,7 +5587,7 @@
     draggingRange = true;
     // Anchor at the pointer-down point, not the threshold crossing, so the
     // first fed move spans the whole distance travelled — same feel as before.
-    rangeScrub = createRangeScrub(behavior, pointerStartValue);
+    rangeScrub = createRangeScrub(behavior, pointerStartValue, getMouse(control));
     rangeScrub.begin({ x: pointerDownPoint.x, y: pointerDownPoint.y });
     patchControlSession(getControlId(control), { dragging: true });
     return true;
@@ -6145,15 +6151,18 @@
     if (draggingRange) {
       const rect = pointerActiveElement?.getBoundingClientRect?.();
       const dragBehavior = getBehavior(control);
+      const dragMouse = getMouse(control);
       if (rect && (!isSliderControl(control) || isLinearSliderGeometry(dragBehavior))) {
-        sliderScrub = isSliderControl(control) ? createSliderTrackScrub(dragBehavior) : createRangeTrackScrub(dragBehavior);
+        sliderScrub = isSliderControl(control)
+          ? createSliderTrackScrub(dragBehavior, dragMouse)
+          : createRangeTrackScrub(dragBehavior, dragMouse);
         sliderScrub.begin(scrubSample(event), { bounds: rect, jumpToPointer: true });
       } else if (rect && getCircularSliderDragMode(dragBehavior) !== 'absolute') {
         // Relative dial drag: start from the picked handle's value, no jump.
         const min = getRangeMin(dragBehavior);
         const span = getRangeMax(dragBehavior) - min;
         const role = nextSliderHandle || currentSliderActiveHandle(control);
-        sliderScrub = createCircularSliderScrub(dragBehavior, span > 0 ? (currentSliderRoleValue(control, role) - min) / span : 0);
+        sliderScrub = createCircularSliderScrub(dragBehavior, span > 0 ? (currentSliderRoleValue(control, role) - min) / span : 0, dragMouse);
         sliderScrub.begin(scrubSample(event), { bounds: rect });
       }
       updateSliderRangeFromPointer(control, event, nextSliderHandle);

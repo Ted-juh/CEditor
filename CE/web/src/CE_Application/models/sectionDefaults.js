@@ -427,6 +427,13 @@ export const SECTION_DEFAULTS = {
     focusable: false,
     focusOutline: false,
     tabIndex: -1,
+    // Drag feel, layered over whatever the control's own geometry resolves to.
+    // 'auto' + sensitivity 1 + no inversion is the behavior every panel had
+    // before these existed, so an untouched control is unaffected.
+    dragMode: 'auto',
+    dragSensitivity: 1,
+    invertX: false,
+    invertY: false,
   },
 
   /** Icon — icon/image display. */

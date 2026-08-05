@@ -51,6 +51,17 @@
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
+  import {
+    getMouseSection,
+    resolveCursorCss,
+    resolveHitTestClipPath,
+    resolveTabIndex,
+    acceptsPointer,
+    childrenAcceptPointer,
+    showsFocusOutline,
+    isFocusable,
+    raisesOnClick,
+  } from '../utils/mouseBehavior.js';
   import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
   import { measurePerfDebug } from '../utils/perfDebug.js';
   import { resolveRadioGroupLayout } from '../utils/radioGroupLayout.js';
@@ -374,11 +385,55 @@
 
     return segments.join(' | ');
   });
+  // --- Mouse section (cursor, click interception, hit shape, focus) ---
+  // Applied on the preview/runtime surface only. In the editor the same
+  // properties would fight the tools you edit with: `interceptClicks: false`
+  // would make a control unselectable, an ellipse hit shape would clip its own
+  // resize handles, and a custom cursor would mask the move/resize affordances.
+  // The author sets what the finished panel does; the editor stays editable.
+  // renderControl, not the raw control: a state that changes the cursor or
+  // makes something focusable should take effect while that state is active.
+  let mouseSection = $derived(getMouseSection(renderControl ?? control));
+  let mouseAppliesToSurface = $derived(editorInteractionEnabled === false);
+  let mouseFocusable = $derived(mouseAppliesToSurface && isFocusable(mouseSection));
+  let mouseCursorCSS = $derived(mouseAppliesToSurface ? resolveCursorCss(mouseSection) : '');
+  let mouseClipCSS = $derived(mouseAppliesToSurface ? resolveHitTestClipPath(mouseSection) : '');
+  let mouseBlocksPointer = $derived(mouseAppliesToSurface && !acceptsPointer(mouseSection));
+  let mouseChildrenTakePointer = $derived(mouseAppliesToSurface && childrenAcceptPointer(mouseSection));
+  let mouseFocusOutline = $derived(mouseAppliesToSurface && showsFocusOutline(mouseSection));
+  let mouseRaisesOnClick = $derived(mouseAppliesToSurface && raisesOnClick(mouseSection));
+
+  // bringToFrontOnClick. Component-local state, so it lasts exactly as long as
+  // the preview does and leaves nothing behind in the document — overlapping
+  // controls come back in their authored order when preview stops, the same
+  // promise the rest of preview makes.
+  let raisedInPreview = $state(false);
+  let mouseRaiseCSS = $derived(raisedInPreview ? 'z-index:2147483000;' : '');
+
+  function handleMouseSectionPointerDown(event) {
+    if (mouseRaisesOnClick) raisedInPreview = true;
+    onpreviewpointerdown?.(event);
+  }
+
+  // Dropping out of preview clears the raise, so re-entering starts level.
+  $effect(() => {
+    if (!mouseAppliesToSurface && raisedInPreview) raisedInPreview = false;
+  });
+
   let previewInteractive = $derived(
     editorInteractionEnabled === false
     && (
       !!previewRole
       || previewTabIndex !== undefined
+      // A control the author marked focusable is interactive by that fact
+      // alone, even with no role and no handlers — otherwise ticking Focusable
+      // on a plain label would silently do nothing.
+      || mouseFocusable
+      || mouseRaisesOnClick
+      // The child-clicks rule is scoped to .preview-interactive so it cannot
+      // reach the editor's selection path; a container that turns it on has
+      // to carry that class or the setting would quietly do nothing.
+      || mouseChildrenTakePointer
       || onpreviewpointerenter != null
       || onpreviewpointerleave != null
       || onpreviewpointermove != null
@@ -389,6 +444,12 @@
       || onpreviewkeydown != null
       || onpreviewkeyup != null
     )
+  );
+
+  // The surface's own tab index wins when it set one — it knows about roles and
+  // handle counts. The Mouse section fills in for everything else.
+  let effectiveTabIndex = $derived(
+    previewTabIndex !== undefined ? previewTabIndex : resolveTabIndex(mouseSection)
   );
 
   // --- Drag state (internal $state per feedback) ---
@@ -2634,14 +2695,16 @@
   class:device-drop-compatible={deviceDropStatus === 'compatible'}
   class:device-drop-warning={deviceDropStatus === 'warning'}
   class:device-drop-incompatible={deviceDropStatus === 'incompatible'}
-  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS}"
+  class:mouse-transparent={mouseBlocksPointer}
+  class:mouse-focus-outline={mouseFocusOutline}
+  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
   ondragover={editorInteractionEnabled ? handleDeviceParameterDragOver : undefined}
   ondrop={editorInteractionEnabled ? handleDeviceParameterDrop : undefined}
   onpointerenter={previewInteractive ? onpreviewpointerenter : undefined}
   onpointerleave={previewInteractive ? onpreviewpointerleave : undefined}
   onpointermove={previewInteractive ? onpreviewpointermove : undefined}
-  onpointerdown={previewInteractive ? onpreviewpointerdown : undefined}
+  onpointerdown={previewInteractive ? handleMouseSectionPointerDown : undefined}
   onwheel={previewInteractive ? onpreviewwheel : undefined}
   onfocus={previewInteractive ? onpreviewfocus : undefined}
   onblur={previewInteractive ? onpreviewblur : undefined}
@@ -2649,7 +2712,7 @@
   onkeyup={previewInteractive ? onpreviewkeyup : undefined}
   role={previewInteractive && previewRole ? previewRole : undefined}
   data-preview-role={previewInteractive ? (previewRole || '') : undefined}
-  tabindex={previewInteractive ? previewTabIndex : undefined}
+  tabindex={previewInteractive ? effectiveTabIndex : undefined}
   aria-label={previewInteractive ? previewAriaLabel : undefined}
   aria-disabled={previewInteractive ? previewAriaDisabled : undefined}
   aria-checked={previewInteractive ? previewAriaChecked : undefined}
@@ -3365,7 +3428,7 @@
     <!-- Nested children: DOM nesting makes their Transform.x/y parent-relative
          for free. The clip/origin layers carry no pointer events; children
          re-enable their own. -->
-    <div class="children-clip" class:clipped={childrenClip}>
+    <div class="children-clip" class:clipped={childrenClip} class:children-interactive={mouseChildrenTakePointer}>
       <div class="children-origin" style="left:{childrenPadding}px; top:{childrenPadding}px;">
         {#each childControls as child (child._children?.Core?.id)}
           <CanvasControlNested
@@ -3415,6 +3478,34 @@
     position: absolute;
     box-sizing: border-box;
     cursor: default;
+  }
+
+  /* --- Mouse section, preview/runtime only (see mouseAppliesToSurface) --- */
+
+  /* interceptClicks off: the pointer passes straight through to whatever sits
+     behind. Nested controls inside it are unaffected — the existing
+     `.children-origin :global(.canvas-control.preview-interactive)` rule
+     already hands them their own pointer events back, so a decorative frame
+     can stop taking clicks without disabling the controls it contains. */
+  .canvas-control.mouse-transparent {
+    pointer-events: none;
+  }
+
+  /* interceptChildClicks on: parts inside the control become targets in their
+     own right, rather than the control being one opaque hit area.
+     Qualified by .preview-interactive, like every other re-enable in this
+     file: outside preview a click on a child must still select the container,
+     which is how a group gets dragged as a unit. */
+  .canvas-control.preview-interactive .children-clip.children-interactive {
+    pointer-events: auto;
+  }
+
+  /* focusOutline on: a visible ring when focus arrives by keyboard. Pointer
+     focus stays unmarked — :focus-visible, not :focus — which is the behavior
+     a plugin UI wants. */
+  .canvas-control.mouse-focus-outline:focus-visible {
+    outline: 2px solid #5B9BD5;
+    outline-offset: 1px;
   }
 
   /* Nested-children layers. Transparent to pointer events so the container's
