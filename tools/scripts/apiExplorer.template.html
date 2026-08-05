@@ -389,7 +389,7 @@ pre code { font-size: inherit; }
 }
 .m-doc { color: var(--ink-2); margin: 0 0 10px; max-width: 82ch; overflow-wrap: break-word; }
 
-/* The declared arguments. `opts` in a signature says nothing about the ten fields it may carry;
+/* The declared arguments. `opts` in a signature says nothing about the ten fields you can set in it;
    these come straight from the contract's params. */
 .m-args { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 10px; }
 .m-arg {
@@ -2511,7 +2511,7 @@ function onDumpReceived(dump) {
       </tr>`;
   }
 
-  /** An options object, in full: the literal you type, then every field it may carry.
+  /** An options object, in full: the literal you type, then every field you can set in it.
    *
    *  Open by default when there are few enough to read at a glance. `opts` is the argument people
    *  get stuck on, and a reader who has to click to find out what `curve` accepts is one click
@@ -2520,7 +2520,7 @@ function onDumpReceived(dump) {
     const lit = a.literal ?? {};
     const literal = lit.lua ? `
       <div class="m-lit">
-        <p class="cap">Written like this &mdash; the two languages differ only in = versus :</p>
+        <p class="cap">What you type</p>
         <pre data-lua><code>${esc(lit.lua)}</code></pre>
         <pre data-js hidden><code>${esc(lit.js ?? lit.lua)}</code></pre>
       </div>` : "";
@@ -2535,10 +2535,12 @@ function onDumpReceived(dump) {
       return head + fieldRow(f);
     }).join("");
 
+    // What the reader does with the object, not a description of it: a handed-to-you payload is
+    // something you read fields off, an options object is something you fill in.
     const n = a.fields.length;
     const what = a.given
-      ? `${n} field${n === 1 ? "" : "s"} it carries`
-      : `${n} field${n === 1 ? "" : "s"} it may carry`;
+      ? `${n} field${n === 1 ? "" : "s"} you can read`
+      : `${n} field${n === 1 ? "" : "s"} you can set`;
     return `
       <details class="m-fields"${n <= 12 ? " open" : ""}>
         <summary><b>${esc(a.name)}</b> &mdash; ${what}</summary>

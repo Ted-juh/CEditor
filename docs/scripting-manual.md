@@ -666,7 +666,7 @@ if (p) log("device " + p.name);
 
 #### `deviceParameters([opts])`
 
-The profile's parameter descriptors: { id, name, group, type, min, max, access }. `opts` may carry { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report; returns nil when ce.device is gated off.
+The profile's parameter descriptors: { id, name, group, type, min, max, access }. `opts` takes { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report; returns nil when ce.device is gated off.
 
 ```lua
 -- Lua
@@ -1235,7 +1235,7 @@ Jump to the target and complete: the value lands exactly where the animation was
 
 #### `uiNotify(message [, opts])`
 
-Show a brief message to the panel user and return its ID. `opts` may carry { kind ("info" | "warn" | "error"), duration (ms, default 3000; 0 or less means until dismissed) }. For user-facing events, not debugging — use log() for that. Pass the ID to ce.ui.update(id, …) to replace the message in place, or to ce.ui.dismiss(id) to remove it.
+Show a brief message to the panel user and return its ID. `opts` takes { kind ("info" | "warn" | "error"), duration (ms, default 3000; 0 or less means until dismissed) }. For user-facing events, not debugging — use log() for that. Pass the ID to ce.ui.update(id, …) to replace the message in place, or to ce.ui.dismiss(id) to remove it.
 
 ```lua
 -- Lua
@@ -1248,7 +1248,7 @@ ce.ui.notify("Patch loaded");
 
 #### `uiStatus([message] [, opts])`
 
-Put a line in the status bar; it persists until replaced. No message clears it. Use for a state ("Recording", "Synced") rather than an event — notify is for events. `opts` may carry { kind ("info" | "warn" | "error") }. Read it back with ce.ui.state().
+Put a line in the status bar; it persists until replaced. No message clears it. Use for a state ("Recording", "Synced") rather than an event — notify is for events. `opts` takes { kind ("info" | "warn" | "error") }. Read it back with ce.ui.state().
 
 ```lua
 -- Lua
@@ -1531,7 +1531,7 @@ Send a run of drawing commands as a single update instead of one each. Use it wh
 
 #### `drawGrid([opts]) -> boolean`
 
-Draw a whole grid as one command and one path. `opts` may carry { x, y, width, height } (defaulting to the control's box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. The closing line is drawn, so a 4-column grid has five verticals.
+Draw a whole grid as one command and one path. `opts` takes { x, y, width, height } (defaulting to the control's box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. The closing line is drawn, so a 4-column grid has five verticals.
 
 #### `drawLines(segments) -> boolean`
 
@@ -1571,7 +1571,7 @@ Pop the style that save() pushed. Reports and returns false when nothing was sav
 
 #### `drawText(x, y, text [, opts])`
 
-Text at (x, y), which is its left baseline. `opts` may carry { size, align, family }; align is "left" | "middle" | "right".
+Text at (x, y), which is its left baseline. `opts` takes { size, align, family }; align is "left" | "middle" | "right".
 
 ```lua
 -- Lua
@@ -1619,7 +1619,7 @@ Read the layer's full state, plus three derived fields: `active` is whether the 
 
 #### `imageIcon(target, idOrName [, opts]) -> boolean`
 
-Point a control's Icon section at a library asset. `opts` may carry { size, fit, tint, opacity, rotation }. Writes both the id and the name, because the renderer resolves by id and falls back to the name. An asset the library does not have is refused rather than stored.
+Point a control's Icon section at a library asset. `opts` takes { size, fit, tint, opacity, rotation }. Writes both the id and the name, because the renderer resolves by id and falls back to the name. An asset the library does not have is refused rather than stored.
 
 #### `imageEmbed(target [, layer]) -> boolean`
 
@@ -1657,13 +1657,13 @@ Measure the room a control's text takes up, in its own font: { width, height, li
 
 #### `textFit(target [, opts]) -> table`
 
-Shrink Font.size until the text fits the control's box, write that size, and report { size, fits, changed, exact }. `opts` may carry { min = 6, max = the current size, text }. Unlike Text.Multiline.fitMode = "shrink", which scales only at paint time and never changes the stored size, this writes the size so other things can read and align to it. `fits` is false when even `min` overflows; the call still succeeds.
+Shrink Font.size until the text fits the control's box, write that size, and report { size, fits, changed, exact }. `opts` takes { min = 6, max = the current size, text }. Unlike Text.Multiline.fitMode = "shrink", which scales only at paint time and never changes the stored size, this writes the size so other things can read and align to it. `fits` is false when even `min` overflows; the call still succeeds.
 
 ### Panel structure
 
 #### `panelCreate(type, props)`
 
-Create a control and return its name (nil if the type is unknown — panelTypes() lists them). `props` may carry name, x, y, width, height, and any section override such as { Behavior = { min = 0, max = 127 } }.
+Create a control and return its name (nil if the type is unknown — panelTypes() lists them). `props` takes name, x, y, width, height, and any section override such as { Behavior = { min = 0, max = 127 } }.
 
 ```lua
 -- Lua

@@ -1055,7 +1055,7 @@ export const COMMANDS = [
      than a return value, because an answer necessarily arrives later than the call. */
   {
     id: 'uiNotify', category: 'User feedback', signature: 'uiNotify(message [, opts])',
-    summary: 'Show a brief message to the panel user and return its ID. `opts` may carry { kind ("info" | "warn" | "error"), duration (ms, default 3000; 0 or less means until dismissed) }. For user-facing events, not debugging — use log() for that. Pass the ID to ce.ui.update(id, …) to replace the message in place, or to ce.ui.dismiss(id) to remove it.',
+    summary: 'Show a brief message to the panel user and return its ID. `opts` takes { kind ("info" | "warn" | "error"), duration (ms, default 3000; 0 or less means until dismissed) }. For user-facing events, not debugging — use log() for that. Pass the ID to ce.ui.update(id, …) to replace the message in place, or to ce.ui.dismiss(id) to remove it.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'message', type: 'string', required: true },
@@ -1071,7 +1071,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiStatus', category: 'User feedback', signature: 'uiStatus([message] [, opts])',
-    summary: 'Put a line in the status bar; it persists until replaced. No message clears it. Use for a state ("Recording", "Synced") rather than an event — notify is for events. `opts` may carry { kind ("info" | "warn" | "error") }. Read it back with ce.ui.state().',
+    summary: 'Put a line in the status bar; it persists until replaced. No message clears it. Use for a state ("Recording", "Synced") rather than an event — notify is for events. `opts` takes { kind ("info" | "warn" | "error") }. Read it back with ce.ui.state().',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'message', type: 'string', required: false },
@@ -1413,7 +1413,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawGrid', category: 'Drawing', signature: 'drawGrid([opts]) -> boolean',
-    summary: 'Draw a whole grid as one command and one path. `opts` may carry { x, y, width, height } (defaulting to the control\'s box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. The closing line is drawn, so a 4-column grid has five verticals.',
+    summary: 'Draw a whole grid as one command and one path. `opts` takes { x, y, width, height } (defaulting to the control\'s box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. The closing line is drawn, so a 4-column grid has five verticals.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false,
       fields: optionFields([
@@ -1644,7 +1644,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageIcon', category: 'Images', signature: 'imageIcon(target, idOrName [, opts]) -> boolean',
-    summary: 'Point a control\'s Icon section at a library asset. `opts` may carry { size, fit, tint, opacity, rotation }. Writes both the id and the name, because the renderer resolves by id and falls back to the name. An asset the library does not have is refused rather than stored.',
+    summary: 'Point a control\'s Icon section at a library asset. `opts` takes { size, fit, tint, opacity, rotation }. Writes both the id and the name, because the renderer resolves by id and falls back to the name. An asset the library does not have is refused rather than stored.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1794,7 +1794,7 @@ export const COMMANDS = [
   },
   {
     id: 'textFit', category: 'Typography', signature: 'textFit(target [, opts]) -> table',
-    summary: 'Shrink Font.size until the text fits the control\'s box, write that size, and report { size, fits, changed, exact }. `opts` may carry { min = 6, max = the current size, text }. Unlike Text.Multiline.fitMode = "shrink", which scales only at paint time and never changes the stored size, this writes the size so other things can read and align to it. `fits` is false when even `min` overflows; the call still succeeds.',
+    summary: 'Shrink Font.size until the text fits the control\'s box, write that size, and report { size, fits, changed, exact }. `opts` takes { min = 6, max = the current size, text }. Unlike Text.Multiline.fitMode = "shrink", which scales only at paint time and never changes the stored size, this writes the size so other things can read and align to it. `fits` is false when even `min` overflows; the call still succeeds.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1813,7 +1813,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawText', category: 'Drawing', signature: 'drawText(x, y, text [, opts])',
-    summary: 'Text at (x, y), which is its left baseline. `opts` may carry { size, align, family }; align is "left" | "middle" | "right".',
+    summary: 'Text at (x, y), which is its left baseline. `opts` takes { size, align, family }; align is "left" | "middle" | "right".',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
@@ -1853,7 +1853,7 @@ export const COMMANDS = [
      from a script. */
   {
     id: 'panelCreate', category: 'Panel structure', signature: 'panelCreate(type, props)',
-    summary: 'Create a control and return its name (nil if the type is unknown — panelTypes() lists them). `props` may carry name, x, y, width, height, and any section override such as { Behavior = { min = 0, max = 127 } }.',
+    summary: 'Create a control and return its name (nil if the type is unknown — panelTypes() lists them). `props` takes name, x, y, width, height, and any section override such as { Behavior = { min = 0, max = 127 } }.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'type', type: 'string', required: true },
@@ -2391,7 +2391,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceParameters', category: 'Device / MIDI', signature: 'deviceParameters([opts])',
-    summary: 'The profile\'s parameter descriptors: { id, name, group, type, min, max, access }. `opts` may carry { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report; returns nil when ce.device is gated off.',
+    summary: 'The profile\'s parameter descriptors: { id, name, group, type, min, max, access }. `opts` takes { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report; returns nil when ce.device is gated off.',
     requiresDeviceHost: true,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       'role',
