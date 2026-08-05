@@ -2,7 +2,10 @@
 
 The shared API that every scripting language calls. It must behave **identically** in every runtime (Tier 1: Lua 5.4 via Sol3, JavaScript via juce_javascript — one engine per language in the C++ host; see the Model 2 section below). This is the one contract bound into all runtimes — see [`scripting-redesign-plan.md`](scripting-redesign-plan.md).
 
-Decisions are recorded here as we settle them, question by question.
+Decisions are recorded here as we settle them, question by question. A question marked LOCKED
+records what was decided then, not necessarily the whole surface now — hooks and commands added by
+later design rounds are not backfilled here. For the API as it currently stands, read the
+[scripting manual](../../docs/scripting-manual.md) or open `docs/api-explorer.html`.
 
 ---
 
@@ -83,7 +86,7 @@ end)
   on("cutoff", "valueChanged", function(value) ... end)
   panel.get("cutoff"):on("valueChanged", function(value) ... end)
   ```
-- **Lifecycle hooks** (Q4) are the named-function form at panel scope (`onPanelReady()`, `onClose()`).
+- **Lifecycle hooks** (Q4) are the named-function form at panel scope (`onPanelReady()`, `onPanelClose()`).
 
 Rule: **named functions for "me reacting to me"; explicit `on(...)` for "me reacting to something else."**
 

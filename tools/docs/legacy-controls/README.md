@@ -15,7 +15,7 @@ It exists for two reasons:
 
 ## Snapshot Layout
 
-- Reference root: [reference](C:/dev/Projects/CEditor/docs/legacy-controls/reference)
+- Reference root: [reference](reference)
 - Source paths are preserved under `reference/` so diffs and lookups stay obvious.
 
 Included areas:
@@ -55,17 +55,17 @@ Recommended mindset:
 
 ## Reference Files
 
-- [BehaviorEditor.svelte](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/sections/BehaviorEditor.svelte)
-- [BindingsEditor.svelte](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/sections/BindingsEditor.svelte)
-- [componentTypes.js](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/models/componentTypes.js)
-- [interactionDefaults.js](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/models/interactionDefaults.js)
-- [interactionRuntime.js](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/utils/interactionRuntime.js)
-- [interactionPreview.js](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/stores/interactionPreview.js)
-- [rangeBehavior.js](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/utils/rangeBehavior.js)
-- [enumBehavior.js](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/utils/enumBehavior.js)
-- [CanvasControl.svelte](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/editor/CanvasControl.svelte)
-- [InteractivePartRenderer.svelte](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/editor/InteractivePartRenderer.svelte)
-- [PanelPreviewSurface.svelte](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/editor/PanelPreviewSurface.svelte)
-- [InteractiveTestSurface.svelte](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/components/InteractiveTestSurface.svelte)
-- [InteractionPreviewTab.svelte](C:/dev/Projects/CEditor/docs/legacy-controls/reference/CE/web/src/CE_Application/components/InteractionPreviewTab.svelte)
-- [interactive-components-implementation-spec.md](C:/dev/Projects/CEditor/docs/legacy-controls/reference/docs/interactive-components-implementation-spec.md)
+- [BehaviorEditor.svelte](reference/CE/web/src/CE_Application/sections/BehaviorEditor.svelte)
+- [BindingsEditor.svelte](reference/CE/web/src/CE_Application/sections/BindingsEditor.svelte)
+- [componentTypes.js](reference/CE/web/src/CE_Application/models/componentTypes.js)
+- [interactionDefaults.js](reference/CE/web/src/CE_Application/models/interactionDefaults.js)
+- [interactionRuntime.js](reference/CE/web/src/CE_Application/utils/interactionRuntime.js)
+- [interactionPreview.js](reference/CE/web/src/CE_Application/stores/interactionPreview.js)
+- [rangeBehavior.js](reference/CE/web/src/CE_Application/utils/rangeBehavior.js)
+- [enumBehavior.js](reference/CE/web/src/CE_Application/utils/enumBehavior.js)
+- [CanvasControl.svelte](reference/CE/web/src/CE_Application/editor/CanvasControl.svelte)
+- [InteractivePartRenderer.svelte](reference/CE/web/src/CE_Application/editor/InteractivePartRenderer.svelte)
+- [PanelPreviewSurface.svelte](reference/CE/web/src/CE_Application/editor/PanelPreviewSurface.svelte)
+- [InteractiveTestSurface.svelte](reference/CE/web/src/CE_Application/components/InteractiveTestSurface.svelte)
+- [InteractionPreviewTab.svelte](reference/CE/web/src/CE_Application/components/InteractionPreviewTab.svelte)
+- [interactive-components-implementation-spec.md](reference/docs/interactive-components-implementation-spec.md)
