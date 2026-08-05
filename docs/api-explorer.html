@@ -30,13 +30,13 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --ground:    #0E0F14;
-    --raised:    #15171F;
-    --sunken:    #11131A;
+    --raised:    #1A1D27;
+    --sunken:    #131620;
     --ink:       #E6E8F0;
     --ink-2:     #A8ACBB;
     --ink-3:     #747989;
-    --rule:      #282B38;
-    --rule-soft: #1E212C;
+    --rule:      #3A3F52;
+    --rule-soft: #272B3A;
     --accent:    #5B9BD5;
     --accent-2:  #162634;
     --signal:    #39D98A;
@@ -47,9 +47,9 @@
   }
 }
 :root[data-theme="dark"] {
-  --ground:#0E0F14; --raised:#15171F; --sunken:#11131A;
+  --ground:#0E0F14; --raised:#1A1D27; --sunken:#131620;
   --ink:#E6E8F0; --ink-2:#A8ACBB; --ink-3:#747989;
-  --rule:#282B38; --rule-soft:#1E212C;
+  --rule:#3A3F52; --rule-soft:#272B3A;
   --accent:#5B9BD5; --accent-2:#162634;
   --signal:#39D98A; --amber:#F2C94C; --alert:#E05C5C;
   --code-bg:#0A0B0F; --shadow:none;
@@ -140,7 +140,7 @@ a { color: var(--accent); }
 .views {
   display: flex; flex-wrap: wrap; gap: 0;
   border-bottom: 1px solid var(--rule); margin-top: 26px;
-  position: sticky; top: 0; z-index: 5; background: var(--bg);
+  position: sticky; top: 0; z-index: 5; background: var(--ground);
 }
 .views a {
   padding: 15px 22px 13px 0; margin-right: 26px;
@@ -282,8 +282,10 @@ pre code { font-size: inherit; }
 .grp[hidden] { display: none; }
 .grp > summary {
   display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
-  padding: 17px 0; cursor: pointer; list-style: none;
+  padding: 15px 14px; cursor: pointer; list-style: none;
+  background: var(--sunken); border-left: 3px solid var(--accent);
 }
+.grp { margin-bottom: 6px; }
 .grp > summary::-webkit-details-marker { display: none; }
 .grp > summary::before {
   content: "▸"; color: var(--ink-3); font-size: 11px; width: 10px; flex: none;
@@ -299,7 +301,7 @@ pre code { font-size: inherit; }
 .grp-body { padding-left: 17px; border-left: 1px solid var(--rule); margin-left: 4px; }
 /* A subgroup is the same shape one size down — it is a level of the same tree, not a new idea. */
 .grp.sub { border-bottom: 0; }
-.grp.sub > summary { padding: 11px 0; }
+.grp.sub > summary { padding: 10px 12px; background: var(--sunken); border-left: 2px solid var(--rule); }
 .grp.sub .grp-name { font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
 .grp.sub .grp-blurb { font-size: 12.5px; color: var(--ink-3); }
 .grp.sub + .grp.sub { border-top: 1px solid var(--rule-soft); }
@@ -331,8 +333,11 @@ pre code { font-size: inherit; }
 .mod > summary {
   display: grid; grid-template-columns: minmax(190px, 260px) minmax(0, 1fr) auto;
   gap: 4px 26px; align-items: start;
-  padding: 15px 0; cursor: pointer; list-style: none;
+  padding: 15px 12px; cursor: pointer; list-style: none;
+  background: var(--raised); border: 1px solid var(--rule-soft);
 }
+.mod { margin: 8px 0; }
+.mod .members { padding-left: 12px; padding-right: 12px; }
 .mod > summary::-webkit-details-marker { display: none; }
 .mod > summary:hover .mod-id { text-decoration: underline; text-underline-offset: 3px; }
 .mod-id { font-family: var(--mono); font-size: 13.5px; font-weight: 600; color: var(--accent); word-break: break-word; }
