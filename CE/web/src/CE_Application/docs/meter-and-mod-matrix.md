@@ -1,6 +1,10 @@
 # Meter & Mod Matrix — Investigation (+ the two cross-cutting gaps)
 
-> Status: **investigation / findings.** Both resolve to configs/presets over
+> Status: **shipped 🟢** — both landed as `ce.components.meter` (25 members) and
+> `ce.components.matrix` (11). Original investigation follows; its two cross-cutting
+> findings are what made them buildable.
+>
+> Original status: **investigation / findings.** Both resolve to configs/presets over
 > existing engines; together they reveal the two foundational capabilities the
 > whole synth tier actually needs. Part of the
 > [panel parts backlog](./README.md); see [component-gaps.md](./component-gaps.md).
