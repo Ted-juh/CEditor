@@ -3351,7 +3351,7 @@ export const HELPERS = [
   // anything it worked out alongside a bound control came out subtly different. These are the
   // app's own functions, matched exactly.
   { id: 'shapeCurve', category: 'Value / range', signature: 'shapeCurve(v, curve [, tension])',
-    summary: 'Bend a value with the panel\'s own curve family — the one Envelope segments and Router breakpoints use, distinct from curve(). Both spellings of the s-curve are accepted. `tension` defaults to 1.6, matching the app — unset does not mean linear. With `tension` set to 1 this is also the curve a Macro slot uses.' },
+    summary: 'Bend a value with the panel\'s own curve family — the one Envelope segments and Router breakpoints use, distinct from curve(). Both spellings of the s-curve are accepted. `tension` defaults to 1.6, matching the app — unset does not mean linear. With `tension` set to 1 this is also the curve a Macro slot uses, so shape(v, curve, 1) reproduces it.' },
   { id: 'deadzone', category: 'Value / range', signature: 'deadzone(v, amount [, invert])',
     summary: 'The Expression Router\'s input shaping: below the threshold the value is zero, and the remaining range rescales to fill 0–1 so response starts at the edge of the dead zone.' },
   { id: 'weightsFor', category: 'Value / range', signature: 'weightsFor(points, x, y [, power])',

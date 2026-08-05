@@ -233,11 +233,32 @@ export function flushUnsavedSessionSnapshot() {
   persistUnsavedSessionSnapshot();
 }
 
+// Autosave is suspended for the length of a preview run. A preview mutates the document — scripts
+// write to it, and several component gesture handlers write to it — and all of that is put back
+// when preview stops. Persisting a half-way state would mean a crash mid-preview restores a panel
+// the author never authored; the last snapshot taken before preview started is the right one to
+// keep. See stores/previewRehearsal.js.
+let autosaveSuspended = false;
+
+export function setAutosaveSuspended(on) {
+  autosaveSuspended = on === true;
+  if (!autosaveSuspended) {
+    scheduleUnsavedSessionAutosave();   // resume from whatever the document looks like now
+    return;
+  }
+  if (autosaveTimer != null) {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+  }
+}
+
 function scheduleUnsavedSessionAutosave() {
   if (autosaveTimer != null) {
     clearTimeout(autosaveTimer);
     autosaveTimer = null;
   }
+
+  if (autosaveSuspended) return;
 
   if (!sessionRestoreInitialized || !get(autosaveEnabled) || !get(restoreUnsavedWork)) {
     if (!get(restoreUnsavedWork)) clearUnsavedSessionSnapshot();

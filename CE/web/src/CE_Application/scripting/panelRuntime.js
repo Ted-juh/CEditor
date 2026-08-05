@@ -65,6 +65,7 @@ import {
 } from './panelApi.js';
 import { extensionSource } from './extensionModules.js';
 import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
+import { setPreviewRehearsalEnabled } from '../stores/previewRehearsal.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
 import { isSourceScript } from './scriptModel.js';
@@ -146,6 +147,10 @@ let host = null;
  */
 export function setRuntimeHost(h) {
   host = h ?? null;
+  // A host means the player, which owns its document: its panel is loaded from the .cepanel and
+  // reloaded when it changes, so there is nothing to put back and nothing to rehearse. The editor
+  // installs no host, which is exactly the case the rehearsal exists for.
+  setPreviewRehearsalEnabled(host == null);
   if (host) {
     live.activePanelId = host.panel?.id ?? 'player';
     snapshotValues();
@@ -7537,6 +7542,11 @@ function onPreviewModeChanged(on) {
     clearAllDrawings();         // …and a drawing outliving its panel is painted onto nothing
     stopAllAnimations();        // …and an animation writing into a panel that is gone is noise
     clearScriptUi();            // …and a message about a panel nobody is looking at is worse
+    // …and a reactive rule outliving its preview rewrites the document forever after. compute()
+    // re-runs on every store change, so a rule registered during a preview kept firing while the
+    // author typed into the Properties panel afterwards — overwriting the field they were editing.
+    // Last, because it drops the handlers onPanelClose was dispatched into just above.
+    resetScriptState();
   }
   live.prevPreviewOn = on;
 }
