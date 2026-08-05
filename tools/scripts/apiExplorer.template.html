@@ -593,7 +593,7 @@ pre code { font-size: inherit; }
 <div class="band">
 
 <!-- Three views, one at a time. The page used to be a single scroll: eleven concept lessons, then
-     four full tutorials, then 737 members of reference. Whichever of the three you had come for,
+     six full tutorials, then every member of the reference. Whichever of the three you had come for,
      you scrolled through the others to reach it. -->
 <nav class="views" id="views" aria-label="Sections of the manual">
   <a href="#/manual" data-view="manual">Manual</a>
@@ -883,7 +883,7 @@ watch("cutoff.background.fill.colour", (c) =&gt; {
     <div class="lesson-text prose">
       <h3>Switch on the command groups your panel needs</h3>
       <p>
-        There are <b id="i-mem">555</b> commands in total. They are sorted into
+        There are <b id="i-mem">738</b> commands in total. They are sorted into
         <b id="i-mod">41</b> groups called modules. A panel that carried every command would be
         too large. So you tick only the modules your panel uses. Only those are included when you
         share the panel. The section <a href="#weight">What it weighs</a> shows the real sizes.
@@ -1224,7 +1224,7 @@ function onError(info) {
 </div><!-- /view-manual -->
 
 <!-- ============================================================== TUTORIALS -->
-<!-- Its own view. These four are complete working scripts of 150 lines and up, and they used to
+<!-- Its own view. These six are complete working scripts of 150 lines and up, and they used to
      sit in the same run as the forty-line concept lessons — so the manual took a very long scroll
      to get past, whichever of the two you had come for. -->
 <div class="view" id="view-tutorials" hidden>
@@ -2009,8 +2009,8 @@ end</code></pre>
       </p>
       <p class="note">
         Every command in this tutorial is cross-runtime. So the sequencer keeps playing in a DAW
-        with the plugin window closed. This is the situation the "Where scripts run" note in
-        lesson 05 describes. One more idea to try: the pattern lives in <code>state</code>, so it
+        with the plugin window closed. That is the second place scripts run, described in
+        <a href="#modules">lesson 06</a>. One more idea to try: the pattern lives in <code>state</code>, so it
         is gone when the panel reloads. Save <code>state.seed</code> with
         <code>ce.storage.saveSetting</code> and restore it in <code>onPanelReady</code>, and your
         pattern survives.
@@ -2345,7 +2345,7 @@ function onDumpReceived(dump) {
       <div class="picks" id="picks"></div>
     </div>
     <div class="readout">
-      <h3>Prelude size</h3>
+      <h3>What your panel carries</h3>
       <table id="costtable"></table>
     </div>
   </div>
@@ -2570,8 +2570,8 @@ function onDumpReceived(dump) {
   function egBlock(v) {
     if (!v.eg) return "";
     const label = v.eg.derived
-      ? 'Example <b>&mdash; result verified against the implementation</b>'
-      : (v.eg.fromTable ? 'Example <b>&mdash; values from the component’s own table</b>' : "Example");
+      ? 'Example <b>&mdash; the result is what the call really returned</b>'
+      : (v.eg.fromTable ? 'Example <b>&mdash; the settings come from the component itself</b>' : "Example");
     return `<div class="m-eg">
       <p class="cap">${label}</p>
       <pre data-lua><code>${esc(v.eg.lua ?? "")}</code></pre>
@@ -2662,7 +2662,7 @@ function onDumpReceived(dump) {
       </summary>
       <div class="members">
         ${shot(`component-${m.id.replace("ce.components.", "")}`,
-    `${m.id.replace("ce.components.", "")} — what this module drives`)}
+    `${m.id.replace("ce.components.", "")} — the control these commands drive`)}
         ${m.members.map((v) => `
           <article class="mem" data-hay="${esc((v.path + " " + v.flat + " " + v.sig + " " + v.doc
             + " " + argHay(v)).toLowerCase())}">

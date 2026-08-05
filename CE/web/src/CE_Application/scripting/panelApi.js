@@ -875,7 +875,7 @@ export const COMMANDS = [
   },
   {
     id: 'colourAlpha', category: 'Value / range', signature: 'colourAlpha(colour, a) -> string',
-    summary: 'Apply an alpha to a colour, returned in the panel\'s stored form: AARRGGBB, no leading #. The one colour verb that does not return #RRGGBB. Warning: css\'s #rrggbbaa is the same bytes in the opposite order. To make a drawing translucent use ce.draw.opacity().',
+    summary: 'Apply an alpha to a colour, returned in the panel\'s stored form: AARRGGBB, no leading #. The one colour command that does not return #RRGGBB. Warning: css\'s #rrggbbaa is the same bytes in the opposite order. To make a drawing translucent use ce.draw.opacity().',
     params: [
       { name: 'colour', type: 'string', required: true },
       { name: 'a', type: 'number', required: true },
@@ -1231,7 +1231,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawStroke', category: 'Drawing', signature: 'drawStroke([colour] [, width] [, opts])',
-    summary: 'The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` carries { dash (a list of on/off lengths, e.g. { 3, 3 }), dashOffset (how far into that pattern to start), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }.',
+    summary: 'The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` takes { dash (a list of on/off lengths, e.g. { 3, 3 }), dashOffset (how far into that pattern to start), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'colour', type: 'value', required: false },
@@ -1344,7 +1344,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawTransform', category: 'Drawing', signature: 'drawTransform([opts])',
-    summary: 'Rotate, move or scale everything drawn after this. `opts` carries { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it.',
+    summary: 'Rotate, move or scale everything drawn after this. `opts` takes { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'rotate', type: 'number', default: '0', unit: 'degrees',
@@ -1388,7 +1388,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawMeasure', category: 'Drawing', signature: 'drawMeasure(text [, opts]) -> table',
-    summary: 'Measure a string before drawing it: returns { width, height, exact }. `opts` carries { size, family } for ordinary text, or { pixel = true, scale } for the LCD font. The pixel font is a fixed grid, so its answer is exact; a proportional font must be measured, and when no surface is available the result is an estimate with `exact` false.',
+    summary: 'Measure a string before drawing it: returns { width, height, exact }. `opts` takes { size, family } for ordinary text, or { pixel = true, scale } for the LCD font. The pixel font is a fixed grid, so its answer is exact; a proportional font must be measured, and when no surface is available the result is an estimate with `exact` false.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'text', type: 'string', required: true },
@@ -1859,7 +1859,7 @@ export const COMMANDS = [
       { name: 'type', type: 'string', required: true },
       { name: 'props', type: 'object', required: false, fields: optionFields([
         { name: 'name', type: 'text', default: 'one derived from the type', sample: '"cutoff"',
-          summary: 'The control\'s name. Every other verb addresses the control by this name.' },
+          summary: 'The control\'s name. Every other command addresses the control by this name.' },
         { name: 'x', type: 'number', default: '0', unit: 'pixels',
           summary: 'Distance from the left edge of whatever contains it.' },
         { name: 'y', type: 'number', default: '0', unit: 'pixels',
@@ -2025,7 +2025,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelGrid', category: 'Panel structure', signature: 'panelGrid(names [, opts]) -> number',
-    summary: 'Arrange controls into a grid. `opts` carries { columns (3), gapX (10), gapY (10) }. Cells are uniform, sized by the biggest control. Order is reading order — rows quantised to 20px, then left to right — not document order. The first control in that order anchors the origin.',
+    summary: 'Arrange controls into a grid. `opts` takes { columns (3), gapX (10), gapY (10) }. Cells are uniform, sized by the biggest control. Order is reading order — rows quantised to 20px, then left to right — not document order. The first control in that order anchors the origin.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2046,7 +2046,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelCircle', category: 'Panel structure', signature: 'panelCircle(names [, opts]) -> number',
-    summary: 'Arrange controls around a circle centred on their own bounding box. `opts` carries { radius (100), startAngle (0, degrees) }. Placement follows the order of `names`.',
+    summary: 'Arrange controls around a circle centred on their own bounding box. `opts` takes { radius (100), startAngle (0, degrees) }. Placement follows the order of `names`.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2155,7 +2155,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelUndefine', category: 'Panel structure', signature: 'panelUndefine(control, section, name)',
-    summary: 'Remove an entry from a collection section. Returns whether an entry existed. Note that set(path, nil) does not remove entries; this is the verb that does.',
+    summary: 'Remove an entry from a collection section. Returns whether an entry existed. set(path, nil) does not remove entries; this is the command that does.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
@@ -2759,7 +2759,7 @@ export const COMMANDS = [
   // sendCC. That is what makes them portable to every runtime and every exported language.
   {
     id: 'sendMidi', category: 'Device / MIDI', signature: 'sendMidi(bytes)',
-    summary: 'Send raw MIDI bytes exactly as given — no wrapping, no channel maths. The primitive the other message verbs are built on; reach for one of those first.',
+    summary: 'Send raw MIDI bytes exactly as given — no wrapping, no channel maths. Every other message command is built on this one; reach for one of those first.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
     scopes: 'any',
     snippet: { lua: 'sendMidi({0x90, 60, 100})$0', javascript: 'sendMidi([0x90, 60, 100])$0' },
@@ -3584,13 +3584,13 @@ export const MODULE_GROUPS = [
     blurb: 'Value and range arithmetic, and moving a value over time.',
     modules: ['ce.math', 'ce.anim'] },
   { id: 'panel', label: 'The panel itself',
-    blurb: 'Creating and arranging controls, and state that persists between sessions.',
+    blurb: 'Creating and arranging controls, and saving things that outlive the session.',
     modules: ['ce.panel', 'ce.storage'] },
   { id: 'appearance', label: 'How it looks',
     blurb: 'Drawing, images, typography, and dialogs with the user.',
     modules: ['ce.draw', 'ce.image', 'ce.text', 'ce.ui'] },
   { id: 'components', label: 'Components',
-    blurb: 'One module per interactive component. Each verb takes the control\'s name first and reports whether the component now holds what you asked for.',
+    blurb: 'One module per component. Every command names the control first, and tells you whether the setting took.',
     componentGroups: true },
 ];
 
@@ -3617,7 +3617,7 @@ export const COMPONENT_GROUPS = [
 
 export const MODULES = [
   { id: 'ce.core', version: '1.1', requires: [], runtime: RUNTIME_ANY, global: true,
-    summary: 'Values, flow and logging — the verbs every script uses. Never namespaced.' },
+    summary: 'Values, flow and logging — the commands every script uses. Never namespaced.' },
   // requires ce.music because sendNote/sendAftertouch accept a note NAME, and resolving it is
   // noteNumber() — a ce.music member. Gating ce.music away would leave sendNote(1, "C4", …)
   // reading a stub and sending note 0. panelApiParity.test.js walks the preludes and fails on any
@@ -3660,7 +3660,7 @@ export const MODULES = [
   // ce.has("ce.panel") tell a script to skip two verbs that work perfectly there. The per-member
   // stubs are what state the boundary precisely; the module says "some of this reaches you".
   { id: 'ce.panel', version: '1.4', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Create, clone, parent and find controls, then align, distribute, match, order, grid or circle them — panel view only, each verb says so. snapshot/restore work anywhere.' },
+    summary: 'Create, clone, parent and find controls, then align, distribute, match, order, grid or circle them — panel view only, each command says so. snapshot/restore work anywhere.' },
   { id: 'ce.storage', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Per-script scratch state, and settings that outlive the session — shared with the panel, private to one script, or kept on this machine only. Plus JSON encode/decode.' },
   // Panel view only, and for a reason worth stating: the font catalogue is the editor's, and the

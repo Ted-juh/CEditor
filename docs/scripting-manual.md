@@ -947,7 +947,7 @@ sendSongPosition(0);
 
 #### `sendMidi(bytes)`
 
-Send raw MIDI bytes exactly as given — no wrapping, no channel maths. The primitive the other message verbs are built on; reach for one of those first.
+Send raw MIDI bytes exactly as given — no wrapping, no channel maths. Every other message command is built on this one; reach for one of those first.
 
 ```lua
 -- Lua
@@ -1122,7 +1122,7 @@ Blend two colours, `t` 0..1. Per-channel linear interpolation in plain RGB.
 
 #### `colourAlpha(colour, a) -> string`
 
-Apply an alpha to a colour, returned in the panel's stored form: AARRGGBB, no leading #. The one colour verb that does not return #RRGGBB. Warning: css's #rrggbbaa is the same bytes in the opposite order. To make a drawing translucent use ce.draw.opacity().
+Apply an alpha to a colour, returned in the panel's stored form: AARRGGBB, no leading #. The one colour command that does not return #RRGGBB. Warning: css's #rrggbbaa is the same bytes in the opposite order. To make a drawing translucent use ce.draw.opacity().
 
 #### `hexToRgb(colour) -> table`
 
@@ -1400,7 +1400,7 @@ ce.draw.fill("#5B9BD5");
 
 #### `drawStroke([colour] [, width] [, opts])`
 
-The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` carries { dash (a list of on/off lengths, e.g. { 3, 3 }), dashOffset (how far into that pattern to start), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }.
+The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` takes { dash (a list of on/off lengths, e.g. { 3, 3 }), dashOffset (how far into that pattern to start), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }.
 
 ```lua
 -- Lua
@@ -1502,7 +1502,7 @@ Set the opacity for everything drawn after this, 0..1. Like fill and stroke, it 
 
 #### `drawTransform([opts])`
 
-Rotate, move or scale everything drawn after this. `opts` carries { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it.
+Rotate, move or scale everything drawn after this. `opts` takes { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it.
 
 ```lua
 -- Lua
@@ -1523,7 +1523,7 @@ Text in the app’s built-in 5x7 LCD font, the same one the LCD components use. 
 
 #### `drawMeasure(text [, opts]) -> table`
 
-Measure a string before drawing it: returns { width, height, exact }. `opts` carries { size, family } for ordinary text, or { pixel = true, scale } for the LCD font. The pixel font is a fixed grid, so its answer is exact; a proportional font must be measured, and when no surface is available the result is an estimate with `exact` false.
+Measure a string before drawing it: returns { width, height, exact }. `opts` takes { size, family } for ordinary text, or { pixel = true, scale } for the LCD font. The pixel font is a fixed grid, so its answer is exact; a proportional font must be measured, and when no surface is available the result is an estimate with `exact` false.
 
 #### `drawBatch(fn) -> boolean`
 
@@ -1779,7 +1779,7 @@ Give controls the same size: "width" | "height" | "both". The first name is the 
 
 #### `panelGrid(names [, opts]) -> number`
 
-Arrange controls into a grid. `opts` carries { columns (3), gapX (10), gapY (10) }. Cells are uniform, sized by the biggest control. Order is reading order — rows quantised to 20px, then left to right — not document order. The first control in that order anchors the origin.
+Arrange controls into a grid. `opts` takes { columns (3), gapX (10), gapY (10) }. Cells are uniform, sized by the biggest control. Order is reading order — rows quantised to 20px, then left to right — not document order. The first control in that order anchors the origin.
 
 ```lua
 -- Lua
@@ -1792,7 +1792,7 @@ ce.panel.grid(pads, { columns: 4, gapX: 8, gapY: 8 });
 
 #### `panelCircle(names [, opts]) -> number`
 
-Arrange controls around a circle centred on their own bounding box. `opts` carries { radius (100), startAngle (0, degrees) }. Placement follows the order of `names`.
+Arrange controls around a circle centred on their own bounding box. `opts` takes { radius (100), startAngle (0, degrees) }. Placement follows the order of `names`.
 
 #### `panelFlip(names, axis) -> number`
 
@@ -1872,7 +1872,7 @@ ce.panel.define("knob", "States", "Warn", { when: { valueGreaterThan: 0.9 } });
 
 #### `panelUndefine(control, section, name)`
 
-Remove an entry from a collection section. Returns whether an entry existed. Note that set(path, nil) does not remove entries; this is the verb that does.
+Remove an entry from a collection section. Returns whether an entry existed. set(path, nil) does not remove entries; this is the command that does.
 
 ```lua
 -- Lua
