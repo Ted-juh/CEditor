@@ -7,7 +7,8 @@ More examples are in the [cookbook](scripting-cookbook.md).
 ## 1. Open the script editor
 
 Select a control on the canvas. Look at the **Scripts / Logic** zone in the top bar.
-It shows whether the control has scripts. Interactive controls do.
+The zone appears for any control that can hold scripts — every interactive control
+can, a static label cannot — and it tells you how many that control has.
 Press the **Script Editor** button there. This opens the **Behavior Designer**.
 The Behavior Designer is the script editor for this panel.
 
@@ -109,7 +110,7 @@ Most commands work the same in both places. The manual marks them
 question, and driving the on-screen components. The manual marks them
 **panel view only**. Calling one with the window closed does nothing, and a
 note goes to the log. A few commands are marked **player**: they only work in
-the exported plugin, because they involve the DAW. `onDawSaveState` is one.
+the exported plugin, because they need the DAW itself. `onDawSaveState` is one.
 
 So: if your script must keep working with the window closed — for example a
 timer that keeps sending MIDI — use only cross-runtime commands. Check the
@@ -119,8 +120,8 @@ badge in the manual when you are not sure.
 
 A script belongs to the control or panel it is attached to. It travels with it.
 It is saved in the panel and included at export. The exported plugin runs the
-same scripts in its C++ host engines. Errors there go to a log file instead
-of the console.
+same scripts in its own engines. Errors there go to a log file instead of the
+console.
 
 ## Next
 

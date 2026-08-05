@@ -5,8 +5,8 @@ the [scripting manual](scripting-manual.md). Look a name up there for the full
 signature. Recipes are shown in Lua and JavaScript. The API is the same in
 every language.
 
-Some parts of the API work in one runtime but not yet in the other. The
-manual's availability badges show exactly which.
+A few commands work in one of the two places a script can run but not the
+other. The manual's badges say which.
 
 Before you start, three basics. A script attached to a control reacts to that
 control's own events. You only need to define the named function, such as
@@ -85,8 +85,8 @@ function onClick(mouse) {
 ```
 
 Then send the whole result to the synth in one message. A **panel** script can
-react to the event and send a dump. Note: `sendDump` works in panel and device
-scope, not from a control script:
+react to the event and send a dump. `sendDump` works in panel and device scope,
+not from a control script:
 
 ```lua
 -- Lua — panel scope
@@ -184,8 +184,8 @@ Do you need a direct call with a return value? Then use
 
 ## 8. Hand-built SysEx with a checksum (device script)
 
-You only need this when the device map does not already model the parameter.
-Bulk sending and per-parameter sending are automatic otherwise:
+You only need this when the device map does not already know the parameter.
+When it does, sending one value or a whole dump is handled for you:
 
 ```lua
 -- Lua
@@ -204,21 +204,23 @@ other MIDI-encoding helpers in the manual.
 
 ## 9. Play notes from a script
 
-`sendNote` plays a note and releases it by itself. `noteOn` and `noteOff` are
-the held pair: you start the note, and you stop it. A one-finger chord button:
+`sendNote(channel, note, velocity)` starts a note and leaves it sounding. Give
+it a fourth argument and it releases the note for you after that many
+milliseconds. Without one, the note is yours to stop: send `sendNoteOff` for
+every note you started. A one-finger chord button:
 
 ```lua
 -- Lua — attach to a button
 function onPointerDown(mouse)
-  noteOn(1, 60)          -- velocity defaults to 100
-  noteOn(1, 64)
-  noteOn(1, 67)
+  sendNote(1, 60, 100)   -- held: no duration given
+  sendNote(1, 64, 100)
+  sendNote(1, 67, 100)
 end
 
 function onPointerUp(mouse)
-  noteOff(1, 60)
-  noteOff(1, 64)
-  noteOff(1, 67)
+  sendNoteOff(1, 60)
+  sendNoteOff(1, 64)
+  sendNoteOff(1, 67)
 end
 ```
 ```js
@@ -230,25 +232,31 @@ function onClick(mouse) {
 
 ## 10. Follow the clock
 
-`transport()` reads the master clock. `onBeat` and `onBar` fire while it runs.
-A tempo-synced metronome light, panel scope:
+`transportInfo()` reads the master clock in one go — playing, bpm, bar, beat
+and the rest. (`ce.time.transport()` is the same call written with its module
+name; `tempo()` and `isPlaying()` fetch just those two.) `onBeat` and `onBar`
+fire while the clock runs. A tempo-synced metronome light, panel scope:
 
 ```lua
 -- Lua
-function onBeat(info)
-  set("beatLight.background.fill.colour", info.beat == 1 and "#ff4000" or "#804000")
+function onBeat(time)
+  set("beatLight.background.fill.colour", time.beat == 1 and "#ff4000" or "#804000")
 end
 
-function onBar(info)
-  set("barReadout.text.content", "bar " .. info.bar)
+function onBar(time)
+  set("barReadout.text.content", "bar " .. time.bar)
 end
 ```
 
-`startTimer("pulse", { beats = 1 })` gives a timer that follows the tempo.
-The interval is fixed when the timer starts. So restart the timer when the
-tempo changes, or simply use `onBeat`, which always follows the clock.
-`startTimer("flash", { ms = 150, once = true })` is the one-shot form.
-Use it for jobs like "turn that light back off".
+For a timer on a musical interval, use `syncTimer(id, beats)` rather than
+`startTimer`, which counts in milliseconds. `syncTimer("pulse", 1)` fires once
+a beat, and the interval follows the tempo as it changes — pass
+`{ follow = false }` to freeze it at the tempo it started with. Nothing starts
+if no tempo is being reported, and the call tells you so.
+
+For a one-shot, `after(150, fn)` runs `fn` once, 150 ms from now. It returns an
+id, so `stopTimer(id)` cancels it before it fires. Use it for jobs like "turn
+that light back off". `afterBeats(2, fn)` is the same thing in musical time.
 
 ## 11. See what's going on
 
