@@ -14,18 +14,16 @@ import { panelPreviewSessions, updatePanelPreviewSession } from '../stores/inter
 import { valueAtPath } from '../stores/controlTreeUtils.js';
 import { collectPanelExportScripts } from './scriptPanelExport.js';
 import { isSourceScript } from './scriptModel.js';
+import { isLiveValuePath, hasLiveValue, liveValuePatch, readLiveValue } from './liveValue.js';
 
 function controlId(control) {
   return String(control?._children?.Core?.id ?? '');
 }
 
-// True when the resolved model path addresses a control's LIVE value (the main value or a custom
-// component's value channel) — those are mirrored through the preview-session overlay so the plugin
-// UI moves and host-parameter sync fires. Everything else is a plain model property.
-function isLiveValuePath(modelPath) {
-  const p = String(modelPath ?? '').toLowerCase();
-  return p === 'value' || p === 'value.value' || p.endsWith('.currentvalue');
-}
+// A control's LIVE value (the main value or a custom component's value channel) is mirrored through
+// the preview-session overlay, so the plugin UI moves and host-parameter sync fires. Everything else
+// is a plain model property. The predicate itself lives in ./liveValue.js because the editor asks
+// the same question and the two answers used to differ — see that module's header.
 
 // Best-effort write of a non-value model path straight into the (reactive) panel control object,
 // so property mutations (colour, visible, …) reflect. Mirrors valueAtPath's _children/plain walk.
@@ -58,10 +56,9 @@ export function createPlayerHost(panel) {
     scripts: collectPanelExportScripts(panel).filter(isSourceScript),
 
     readValue(control, modelPath) {
-      if (isLiveValuePath(modelPath)) {
-        const sess = get(panelPreviewSessions)?.[controlId(control)];
-        if (sess?.valueOverrideEnabled) return sess.valueOverride;
-        if (sess && 'currentValueOverride' in sess) return sess.currentValueOverride;
+      if (isLiveValuePath(modelPath) && hasLiveValue(control)) {
+        const live = readLiveValue(get(panelPreviewSessions), control);
+        if (live !== undefined) return live;
       }
       return valueAtPath(control, modelPath);
     },
@@ -71,15 +68,10 @@ export function createPlayerHost(panel) {
     writeValue(control, modelPath, value) {
       const id = controlId(control);
       if (!id) return false;
-      if (isLiveValuePath(modelPath)) {
+      if (isLiveValuePath(modelPath) && hasLiveValue(control)) {
         // Same path the player uses for incoming MIDI: move the on-screen control AND let the
         // host-parameter sync pick it up (panelPreviewSessions subscriber in Player.svelte).
-        updatePanelPreviewSession(id, {
-          valueOverrideEnabled: true,
-          valueOverride: value,
-          currentValueOverrideEnabled: true,
-          currentValueOverride: value,
-        });
+        updatePanelPreviewSession(id, liveValuePatch(value));
         return true;
       }
       return setValueAtPath(control, modelPath, value) !== false;

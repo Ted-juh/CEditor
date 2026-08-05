@@ -64,7 +64,8 @@ import {
   allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID,
 } from './panelApi.js';
 import { extensionSource } from './extensionModules.js';
-import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
+import { panelPreviewSessions, previewModeEnabled, updatePanelPreviewSession } from '../stores/interactionPreview.js';
+import { isLiveValuePath, hasLiveValue, liveValuePatch, readLiveValue } from './liveValue.js';
 import { setPreviewRehearsalEnabled } from '../stores/previewRehearsal.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
@@ -470,15 +471,27 @@ function setValue(path, value, formOrOpts = '') {
   //    the player too. `wrote` still comes from the host, which is the part only the host knows.
   const shape = probeNestedWrite(control, modelPath, value);
 
+  // A control's live value is session state in BOTH runtimes (scripting/liveValue.js). The player
+  // has always done this through its host; the editor used to fall through to a document write at
+  // `Value.value`, a path Knob and Slider do not have — so the headline call of the whole API moved
+  // the knob in the shipped plugin and did nothing in the preview the author was testing in.
+  const live = isLiveValuePath(modelPath) && hasLiveValue(control);
+  const liveId = live ? String(control?._children?.Core?.id ?? '') : '';
+
   let wrote = true;
   if (host) {
     wrote = host.writeValue(control, modelPath, value) !== false;
+  } else if (live && liveId) {
+    updatePanelPreviewSession(liveId, liveValuePatch(value));
+    wrote = true;
   } else {
     wrote = shape.writes;
     if (wrote) updateControlProperty(control?._children?.Core?.id, modelPath, value);
   }
 
-  if (wrote && shape.fresh && shape.typed) {
+  // A live value needs no `Value` section to move, so the fresh-key warning does not apply to it —
+  // Button has that section without the field, and would otherwise warn on every write.
+  if (wrote && !live && shape.fresh && shape.typed) {
     addScriptTrace('warn', '',
       `set("${path}"): "${modelPath}" is a new property on a section with a fixed shape. `
       + 'It was written, but nothing reads it — check the spelling.');
@@ -536,7 +549,16 @@ function getValue(path, form = '') {
   if (addressed.form === 'midiValue') { reportNeedsDeviceHost('get(.midiValue)', addressed.path); return undefined; }
 
   const modelPath = resolveModelPath(control, segs);
-  const raw = host ? host.readValue(control, modelPath) : valueAtPath(control, modelPath);
+  let raw;
+  if (host) {
+    raw = host.readValue(control, modelPath);
+  } else {
+    // Same order the player's host reads in: the session first, the document behind it.
+    raw = isLiveValuePath(modelPath) && hasLiveValue(control)
+      ? readLiveValue(get(panelPreviewSessions), control)
+      : undefined;
+    if (raw === undefined) raw = valueAtPath(control, modelPath);
+  }
   if (addressed.form !== 'normalizedValue') return raw;
 
   const range = rangeOf(control);
