@@ -1,6 +1,6 @@
 # CEditor
 
-**CEditor** (originally *Ctrlr Editor*) is a visual editor for designing and building audio plugin UIs. Create panels with interactive components, style them with rich property editors, and export as VST3, AU, or standalone applications.
+**CEditor** (originally *Ctrlr Editor*) is a visual editor for designing and building audio plugin UIs. Create panels with interactive components, style them with rich property editors, add behaviour with scripts in any of seven languages, and export as a VST3 plugin or a standalone application.
 
 ## Architecture
 
@@ -8,6 +8,9 @@
 - **JUCE 8** — backend engine (audio, MIDI, ValueTree data model, plugin formats)
 - **WebView2** — bridges the Svelte UI to the JUCE backend
 - **Vite** — development server with hot reload
+- **Panel scripting** — Lua, JavaScript, TypeScript, Python, C++, C# and Java, each stored
+  and run in the language it was written in. One shared API across all of them; see the
+  [scripting manual](docs/scripting-manual.md) and the [docs index](docs/README.md).
 
 The editor UI runs entirely in Svelte. JUCE handles the non-visual backend: MIDI, file I/O, undo management, and plugin compilation. Communication between the two happens via a native bridge over JUCE's `WebBrowserComponent`.
 
@@ -18,13 +21,20 @@ CE/src/                      C++ backend (JUCE)
   Main.cpp                   Application entry point
   MainWindow.h               Window hosting the WebView
   WebViewHost.h/.cpp         WebBrowserComponent wrapper
-  ValueTreeBridge.h/.cpp     C++ <-> JS bridge over ValueTree
+  ValueTreeBridge*.h/.cpp    C++ <-> JS bridge over ValueTree
+  Scripting/                 Script engines (Lua, JS, Python) + the native-handler ABI
+  DeviceProfile/             The device profile engine: parameters, dumps, MIDI-CI
+  Player/                    Runtime that plays an exported panel, and the value layer
+  Export/                    Export identity shared with the exporter scripts
 
 CE/web/src/                  Svelte frontend
-  CE_Application/            Editor application (layout, panels, menus, tools)
-  CE_ComponentDesigner/      Custom component builder (future)
-  CE_Panel/                  Runtime components (Button, Slider, Label, etc.)
+  CE_Application/            Editor application (layout, panels, menus, tools, scripting)
+  CE_Panel/                  Panel-side renderers
+  Player.svelte, player.js   The exported panel's own entry point
 ```
+
+The Custom Component designer lives in `CE_Application/sections/` (the `Custom*` editors),
+not in a folder of its own.
 
 ## Getting Started
 
@@ -94,22 +104,26 @@ CEditor/
   CE/
     thirdparty/
       webview2/              WebView2 SDK (pre-installed)
-    src/                     C++ backend source
+    src/                     C++ backend source (see the tree above)
+    dpd/                     Device profile schema, codecs and profile tooling
     include/                 Native app assets
     web/                     Svelte frontend
       src/
-        CE_Application/      Editor app (layout, menus, panels, tools, bridge)
-        CE_ComponentDesigner/ Custom component builder (future)
-        CE_Panel/            Runtime components (Button, Slider, Label, etc.)
+        CE_Application/      Editor app (layout, menus, panels, tools, scripting, bridge)
+        CE_Panel/            Panel-side renderers
+      test/                  Node test suite (npm test)
       package.json           Node dependencies
       vite.config.js         Vite configuration
+  docs/                      User-facing docs: scripting manual, cookbook, API explorer
+                             — start at docs/README.md
   CMakeLists.txt             CMake build configuration
   build/                     Build output (gitignored)
   tools/
-    docs/                    Project docs and packaging notes
+    docs/                    Design records for the editor and its tooling (tools/docs/README.md)
     installer/               Inno Setup script and installer assets
-    scripts/                 Windows build/packaging helpers
+    scripts/                 Build, packaging, export and doc-generation helpers
       build-native.ps1       Windows-native build helper (loads vcvars + builds preset)
+      gen-api-explorer.mjs   Builds docs/api-explorer.html from the scripting contract
 ```
 
 ### Troubleshooting

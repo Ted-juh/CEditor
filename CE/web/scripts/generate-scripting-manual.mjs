@@ -178,6 +178,12 @@ do nothing with the window closed, and a note goes to the log.
 If your script must keep working with the window closed, for example a timer that keeps
 sending MIDI, check the badges and use only commands that work in both places.
 
+A script can also ask at run time. \`ce.has("ce.draw")\` is true only when that module is both
+switched on and reachable from where the script is running, so a panel-view module answers false
+with the window closed. \`ce.modules\` lists what this script has, \`ce.runtime\` says which of
+the two places it is in, and \`ce.language\` names the language it is written in. All four are on
+the \`ce\` namespace itself rather than inside a module, so they have no reference entry below.
+
 ## The same script in every language
 
 The same handler, written out in every language. These are real files: each one is put through

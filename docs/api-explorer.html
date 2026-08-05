@@ -898,6 +898,14 @@ watch("cutoff.background.fill.colour", (c) =&gt; {
         You may call a command from a module you have not switched on. Then nothing happens. The
         console tells you which module to tick. Your script keeps running.
       </p>
+      <p>
+        A script can ask what it has. <code>ce.has("ce.midi")</code> answers whether that module is
+        both switched on and reachable from where the script is running right now, so a panel-view
+        module answers <code>false</code> with the window closed. <code>ce.modules</code> is the
+        whole list, <code>ce.runtime</code> says which of the two places you are in, and
+        <code>ce.language</code> names the language the script is written in. Use them to write one
+        script that adapts, instead of two that nearly match.
+      </p>
       <p class="note">
         Your scripts can run in two places. The first place is the panel window, while it is
         open. The second place is the plugin itself, with the window closed. In a DAW, people
