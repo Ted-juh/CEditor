@@ -27,5 +27,5 @@ and the [manual review of 2026-08-02](scripting-manual-review-2026-08-02.md) tha
 - [License decision](license-decision.md)
 - [Verify end-to-end](verify-end-to-end.md)
 
-Component and panel-part design docs live in `CE/web/src/CE_Application/docs/`; editor/tooling
-design docs in `tools/docs/`.
+Component and panel-part design docs live in `CE/web/src/CE_Application/docs/`; editor and tooling
+design records have their own index at [tools/docs](../tools/docs/README.md).
