@@ -200,9 +200,9 @@ export const PANEL_PROPERTIES = [
 // host can answer — it is marked accordingly and reports rather than returning a quiet nothing.
 
 export const VALUE_ACCESSORS = [
-  { id: 'value', label: '.value', summary: 'The real, human value — e.g. 8000 (Hz) or "LP" (enum name). The default. Setting it lets the DPD convert to MIDI on send.' },
-  { id: 'normalizedValue', label: '.normalizedValue', summary: 'The 0–1 position, from the control\'s own min/max. For uniform math, curves, and linking controls of different ranges.' },
-  { id: 'midiValue', label: '.midiValue', requiresDeviceHost: true, summary: 'The value as MIDI (e.g. 101), as the DPD would encode it. Device-bound controls only, and requires the device host attached.' },
+  { id: 'value', label: '.value', summary: 'The real value, the one you would read on the front panel: 8000 (Hz), or "LP" for a named setting. This is what you get when you do not ask for one of the others. Set it and the DPD works out the MIDI to send.' },
+  { id: 'normalizedValue', label: '.normalizedValue', summary: 'The same value as a position from 0 to 1, worked out from the control\'s own min and max. Use it for curves, and to make two controls with different ranges move together.' },
+  { id: 'midiValue', label: '.midiValue', requiresDeviceHost: true, summary: 'The value as MIDI — 101, say — encoded the way the DPD would encode it. Only for a control bound to a device parameter, and only with the device host attached.' },
 ];
 
 export const VALUE_ACCESSOR_IDS = VALUE_ACCESSORS.map((a) => a.id);
@@ -489,8 +489,8 @@ export const LIFECYCLE_HOOKS = [
 // names passed directly (Q4): one obvious datum directly, several fields as one object.
 
 export const CONTROL_EVENTS = [
-  { id: 'valueChange', fn: 'onValueChange', payload: 'value', summary: 'Live — fires continuously while the value is moving (for GUI/preview).' },
-  { id: 'valueChanged', fn: 'onValueChanged', payload: 'value', summary: 'Settled — fires when the value reaches its final value (for transmit).' },
+  { id: 'valueChange', fn: 'onValueChange', payload: 'value', summary: 'Fires over and over while the value is moving. Use it for things on screen that should follow the control.' },
+  { id: 'valueChanged', fn: 'onValueChanged', payload: 'value', summary: 'Fires once, when the value settles. This is the moment to tell the synth.' },
   { id: 'click', fn: 'onClick', payload: 'mouse', summary: 'Clicked. mouse.x, mouse.y.' },
   { id: 'doubleClick', fn: 'onDoubleClick', payload: 'mouse', summary: 'Double-clicked.' },
   { id: 'pointerDown', fn: 'onPointerDown', payload: 'mouse', summary: 'Mouse pressed. mouse.x/.y/.button/.modifiers.' },
@@ -499,7 +499,7 @@ export const CONTROL_EVENTS = [
   { id: 'hoverStart', fn: 'onHoverStart', payload: null, summary: 'Mouse entered the control.' },
   { id: 'hoverEnd', fn: 'onHoverEnd', payload: null, summary: 'Mouse left the control.' },
   { id: 'wheel', fn: 'onWheel', payload: 'wheel', summary: 'Scrolled over the control. wheel.delta.' },
-  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'State swapped (hover/pressed/disabled).' },
+  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'The control changed state: hover, pressed or disabled.' },
 ];
 
 // `panelStateChanged` used to be declared here. There is no panel-state feature in the model —
@@ -529,7 +529,7 @@ export const DEVICE_EVENTS = [
   { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', decoded: true, summary: 'A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.' },
   // raw (escape hatch)
   { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.' },
-  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value. Note: cc.channel is 0-based here, unlike sendCC and onNoteIn.' },
+  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value. cc.channel is 0-based here, unlike sendCC and onNoteIn.' },
   // The most common message on the wire had no event of its own: a panel reacting to played notes
   // had to take onMidiIn and decode status nibbles by hand, in every language, including the
   // note-on-with-velocity-0 case that actually means note-off. Both are derived from the STATUS

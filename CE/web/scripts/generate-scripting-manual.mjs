@@ -97,7 +97,7 @@ export function generateManual() {
     '| Language | Version | Runs live in the editor | Runtime |',
     '|---|---|---|---|',
     ...SCRIPT_LANGUAGES.map((l) => {
-      const live = l.live ? (l.subset ? '✅ (interpreted subset)' : '✅') : '⬜ preview via WebView only';
+      const live = l.live ? (l.subset ? '✅ (interpreted subset)' : '✅') : '⬜ preview only';
       return `| **${l.label}**${TIER1_LANGUAGES.includes(l.id) ? ' (Tier 1)' : ''} | ${l.version} | ${live} | ${l.host} |`;
     }),
   ].join('\n');
@@ -180,13 +180,14 @@ sending MIDI, check the badges and use only commands that work in both places.
 
 ## The same script in every language
 
-One handler, written as real source in every language — these exact snippets are validated
-against each language's real toolchain by \`npm run test:script-exports\`. Two API shapes:
+The same handler, written out in every language. These are real files: each one is put through
+that language's own toolchain by \`npm run test:script-exports\`, so none of them can go stale.
+The commands reach your handler in one of two ways:
 
-- **Lua / JavaScript / TypeScript / Python** — the API is injected as globals: \`set()\`,
-  \`sendCC()\`, …
-- **C++ / C# / Java** *(ctx-based)* — handlers take \`(ctx, event)\` and reach the same API
-  through \`ctx\` (C# uses .NET naming: \`ctx.SetValue\`, \`ctx.SendCC\`).
+- **Lua / JavaScript / TypeScript / Python** — every command is a plain global function:
+  \`set()\`, \`sendCC()\`, …
+- **C++ / C# / Java** *(ctx-based)* — your handler takes \`(ctx, event)\`, and the same commands
+  hang off \`ctx\` (C# uses .NET naming: \`ctx.SetValue\`, \`ctx.SendCC\`).
 
 ${crossLanguage}
 
@@ -229,15 +230,16 @@ Everything on the panel is reachable by a **dot-path** rooted on a control's nam
 \`"cutoff.value"\`, \`"button2.background.fill.colour"\`. Read and write them with \`get\`/\`set\`
 (below). Renaming a control automatically updates its name in every script.
 
-**Handles** are the convenience form of the same operation: \`panel.get("cutoff")\` returns a
-handle that remembers the prefix — \`h.set("value", 8000)\` (Lua: \`h:set("value", 8000)\`),
-\`h.get("value")\`, and \`h.on("valueChanged", fn)\`. \`self\` is the same kind of handle, bound
-to the control the script is attached to. *(The spec's dot-object form — \`panel.cutoff.value\` —
-remains optional planned sugar.)*
+A **handle** remembers the control name so you do not type it again.
+\`panel.get("cutoff")\` gives you one, and then \`h.set("value", 8000)\`
+(Lua: \`h:set("value", 8000)\`), \`h.get("value")\` and \`h.on("valueChanged", fn)\` all act on
+that control. \`self\` is the handle for the control your script is attached to.
+*(\`panel.cutoff.value\` is in the spec but is not built yet.)*
 
-A control's value has three faces — suffix the path with the one you need. (**DPD** = the
-Device Profile Designer: the device map that knows each parameter's bytes, ranges, and enums,
-and converts between these representations for you.)
+A control's value can be read three ways. Add the one you want to the end of the path.
+
+The table below mentions the **DPD**, the Device Profile Designer. That is the device map: it
+knows each parameter's bytes, ranges and enums, and converts between these three forms for you.
 
 ${accessors}
 
@@ -252,14 +254,15 @@ ${LIFECYCLE_HOOKS.map(memberSection).join('\n')}
 
 Two ways to subscribe:
 
-- **A control's own events**: just define the named function (\`function onValueChanged(value) … end\`)
-  in the script attached to that control — the target is implicitly the control itself.
-- **Anything else** (another control, the panel, the device, or a custom \`emit\`): register
-  explicitly with \`on(target, event, handler)\`.
+- **A control's own events** — write the named function in the script attached to that control
+  (\`function onValueChanged(value) … end\`). There is nothing else to set up: the control it
+  listens to is the one it is attached to.
+- **Anything else** — another control, the panel, the device, or your own \`emit\` — needs
+  \`on(target, event, handler)\`, where you name what to listen to.
 
-Payloads are passed directly with a descriptive name — one obvious datum comes as itself
-(\`onValueChanged(value)\`), several fields come as one named object (\`onClick(mouse)\` →
-\`mouse.x\`). The Payload column lists each object's fields.
+Your handler is passed the data directly. When there is one thing to pass, you get that thing:
+\`onValueChanged(value)\`. When there are several, you get one object holding them:
+\`onClick(mouse)\`, then \`mouse.x\`. The Payload column lists what is in each object.
 
 ### Control events
 
@@ -280,15 +283,16 @@ ${[...commandsByCategory.entries()].map(([category, items]) =>
 ).join('\n')}
 ## Helpers
 
-Host-provided and identical in every language. Only what the language lacks or what must be
-domain-consistent — plain math (\`min\`/\`max\`/\`abs\`/\`sin\`) stays with the language's own library.
+The app provides these, and they give the same answer in every language. They exist only where
+a language has nothing of its own, or where all the languages must agree on the answer. Plain
+maths (\`min\`/\`max\`/\`abs\`/\`sin\`) stays with your own language's library.
 
 ${[...helpersByCategory.entries()].map(([category, items]) => `### ${category}\n\n${helperTable(items)}`).join('\n\n')}
 
 ## When things go wrong
 
-The design rule (spec Q11): **a broken script never crashes the panel.** What that means in
-practice:
+One rule holds everywhere: **a broken script never takes the panel down with it.** What that
+means in practice:
 
 - **A handler throws** → that handler stops; every other handler and the panel keep running.
   The error is printed in the editor's script console (script name + message) and, in an
@@ -300,10 +304,11 @@ practice:
 - **A component command aimed at the wrong component** (e.g. \`phraseSeed\` on a knob) → an
   error line naming what was expected; nothing changes.
 - **A valid command with an unknown argument** (an unknown seed name, an out-of-grid cell, an
-  unknown preset) → a deliberate no-op, with a console line so it never looks like a dead
-  footswitch.
-- **Runaway scripts** → loop, depth, and MIDI-flood guards plus an infinite-loop watchdog trip
-  invisibly and log when they do. Scripts see only this API — no filesystem, network, or OS.
+  unknown preset) → nothing happens, on purpose, and a line goes to the console so it never
+  looks like a dead footswitch.
+- **Runaway scripts** → guards on loops, recursion depth and MIDI flooding, plus a watchdog for
+  a script that never finishes. They stop it without disturbing the panel, and log that they
+  did. A script sees only this API — no files, no network, no operating system.
 
 ## Further reading
 
