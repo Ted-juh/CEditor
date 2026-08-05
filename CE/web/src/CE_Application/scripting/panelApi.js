@@ -1199,7 +1199,7 @@ export const COMMANDS = [
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'text', type: 'string', required: true }],
     scopes: 'any',
-    snippet: { lua: 'ce.ui.copy(bytesToHex(buildDump("patch")))$0', javascript: 'ce.ui.copy(bytesToHex(buildDump("patch")));$0' },
+    snippet: { lua: 'ce.ui.copy(ce.storage.encode(buildDump("${1:patch}")))$0', javascript: 'ce.ui.copy(ce.storage.encode(buildDump("${1:patch}")));$0' },
   },
 
   /* --- Drawing (design doc §6 phase 5) ---

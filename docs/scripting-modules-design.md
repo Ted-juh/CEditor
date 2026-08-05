@@ -1,5 +1,11 @@
 # Scripting modules — design
 
+> **What this is:** the design record for the module system, written before it was built and then
+> extended as each phase landed — sections 10 onward are titled *as built* and describe shipped
+> work. Section 1 is the API as it stood when the design started (89 names, one flat namespace);
+> it is the baseline the argument runs from, not a description of the API today. For what the API
+> is now, read the [scripting manual](scripting-manual.md) or open `docs/api-explorer.html`.
+
 How to grow the panel scripting API from "adjust the controls someone placed" to "build, draw and
 animate the panel" **without** ending up with a 250-name global namespace that can never be changed.
 

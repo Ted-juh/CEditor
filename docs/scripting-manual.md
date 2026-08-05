@@ -1366,11 +1366,11 @@ Put text on the clipboard. The write is asynchronous and a browser may refuse it
 
 ```lua
 -- Lua
-ce.ui.copy(bytesToHex(buildDump("patch")))
+ce.ui.copy(ce.storage.encode(buildDump("patch")))
 ```
 ```js
 // JavaScript
-ce.ui.copy(bytesToHex(buildDump("patch")));
+ce.ui.copy(ce.storage.encode(buildDump("patch")));
 ```
 
 ### Drawing
