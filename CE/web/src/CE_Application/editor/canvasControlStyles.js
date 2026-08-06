@@ -59,6 +59,31 @@ export function getEnabledValueRows(valueSection) {
 }
 
 /**
+ * The row a selector shows before anyone has touched it — the same answer
+ * interactionRuntime's findDefaultRow gives preview: the default row, else the
+ * first enabled one.
+ *
+ * The editor canvas has no interaction runtime (it is built only for preview,
+ * custom components and explicit preview sessions), so a Combobox on the canvas
+ * fell back to its authored Text.content. That content is seeded as "Option 1"
+ * when the component is created, and nothing rewrites it — so renaming the rows
+ * to Clean / Crunch / Space left the canvas saying "Option 1" while preview
+ * correctly said "Clean". Two answers to "what does this control show", and the
+ * one you design against was the wrong one.
+ */
+export function getDefaultValueRow(valueSection) {
+  const rows = getEnabledValueRows(valueSection);
+  return rows.find((row) => row?.selectedByDefault === true) ?? rows[0] ?? null;
+}
+
+/** Its label, or '' when there are no rows to speak for. */
+export function getDefaultValueRowLabel(valueSection) {
+  const row = getDefaultValueRow(valueSection);
+  if (!row) return '';
+  return String(row.displayText ?? row.internalValue ?? row.id ?? '');
+}
+
+/**
  * Glow renders as stacked text-shadow layers; whole-number intensity adds
  * full-opacity copies, the fractional remainder gets a scaled-alpha copy.
  */
