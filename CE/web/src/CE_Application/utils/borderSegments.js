@@ -43,9 +43,19 @@ function getSideStrokes(border, side) {
 
 function getCornerStrokes(border, corners, pos) {
   const c = normalizeCorner(corners, pos);
-  const thick = c.thickness || 2;
-  const dotRadius = c.dotRadius || 2;
-  const colour = `#${(c.colour || 'FFFFFFFF').slice(-6)}`;
+
+  // `linked: true` means "all sides the same", and a corner is part of the border — so it takes
+  // the border's colour and thickness, not the corner defaults.
+  //
+  // It used to read only the corner, whose defaults are FFFFFFFF at thickness 2. That is invisible
+  // while the border is also white, which is the default, and shows up the moment anyone sets a
+  // coloured rounded border: four dark sides and four white arcs at twice the width. On a small
+  // control the two top arcs read as a stray chevron floating above it.
+  const linked = border ? border.linked !== false : false;
+  const thick = (linked ? border.thickness : c.thickness) || c.thickness || 2;
+  const dotRadius = (linked ? border.dotRadius : c.dotRadius) || c.dotRadius || 2;
+  const rawColour = (linked ? border.colour : c.colour) || c.colour || 'FFFFFFFF';
+  const colour = `#${rawColour.slice(-6)}`;
   const cornerDash = c.borderStyle || 'solid';
   const sideHint = (pos === 'tl' || pos === 'tr') ? 'top' : 'bottom';
 

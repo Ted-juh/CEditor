@@ -170,10 +170,22 @@ function boundCustom(parameter, build, box) {
       feedback: { receiveUpdates: true, ignoreOwnEchoes: true, echoWindowMs: 250 },
     }],
   };
-  // Adoption's numeric half still applies — a custom component has no Text to stamp a label into,
-  // and a choice parameter's Value.rows mean nothing to one that draws its own options.
-  for (const [dotted, value] of Object.entries(parameterAdoptionPatches('Knob', parameter))) {
-    if (dotted.startsWith('Behavior.')) setPath(control, dotted, value);
+  // Adoption, but into the VALUE CHANNEL — which is where a custom component keeps its range.
+  //
+  // The first version copied adoption's `Behavior.*` patches straight on, which quietly CREATED a
+  // Behavior section on a control type that does not have one. CustomComponent carries `Behaviors`
+  // (plural: the behaviour modules it drives its parts with); singular `Behavior` belongs to the
+  // native interactive controls. A section the type never declares is a section nothing downstream
+  // agrees about, and it showed up on screen as stray marks above every fader.
+  const channel = control._children.ValueChannels?._children?.value;
+  if (channel) {
+    if (parameter.range) {
+      channel.min = parameter.range.min;
+      channel.max = parameter.range.max;
+      channel.step = parameter.type === 'float' ? (parameter.range.max - parameter.range.min) / 1000 : 1;
+      channel.type = parameter.type === 'float' ? 'float' : 'int';
+    }
+    if (typeof parameter.default === 'number') channel.defaultValue = parameter.default;
   }
   return control;
 }
