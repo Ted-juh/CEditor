@@ -66,7 +66,11 @@ function label(text, { x, y, w, h = 13 }, { size = 9, colour = SKIN.labelDim, bo
         Fill: { colour },
       },
     },
-    Background: { _children: { Fill: { colour: '00000000' } } },
+    // Border OFF, explicitly. SECTION_DEFAULTS.Background.Border is `enabled: true` at 2px of
+    // FFFFFFFF, so every Label is born inside a thick white rectangle. On a panel made mostly of
+    // small captions that is the loudest thing on screen — forty white boxes drowning the controls
+    // they name.
+    Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 } } },
     ContentLayout: { mode: 'text_only', horizontalAlign: align, verticalAlign: 'center', paddingLeft: 2, paddingRight: 2, paddingTop: 0, paddingBottom: 0 },
   });
 }
@@ -104,7 +108,7 @@ function sectionBox(box, originX, originY) {
         Fill: { colour: 'FF13161A' },
       },
     },
-    Background: { _children: { Fill: { colour: box.tint }, Corners: { radius: 4 } } },
+    Background: { _children: { Fill: { colour: box.tint }, Border: { enabled: false, thickness: 0 }, Corners: { radius: 4 } } },
     ContentLayout: { mode: 'text_only', horizontalAlign: 'center', verticalAlign: 'center', paddingLeft: 8, paddingRight: 8, paddingTop: 1, paddingBottom: 1 },
   });
 

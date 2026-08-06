@@ -54,3 +54,23 @@ test('an unlinked border still lets each corner keep its own colour', () => {
   );
   assert.ok(corners(segments).length > 0, 'expected corner segments');
 });
+
+test('a translucent border keeps its alpha', () => {
+  // Border colours are stored AARRGGBB and both stroke paths took `.slice(-6)`, which is the RGB
+  // and nothing else. The button component types set `66FFFFFF` — a 40% white hairline — and drew
+  // a solid white one, so every control on a panel looked outlined in marker pen.
+  const segments = segmentsFor({ enabled: true, linked: true, colour: '66FFFFFF', thickness: 1 });
+  const colours = new Set(segments.flatMap((s) => s.layers?.map((l) => l.colour) ?? [s.colour]));
+
+  assert.ok(colours.size > 0, 'expected some border segments');
+  for (const colour of colours) {
+    assert.notEqual(colour.toUpperCase(), '#FFFFFF', 'a 40% white border painted fully opaque');
+    assert.match(colour, /^#[0-9A-Fa-f]{8}$/, `expected an alpha-carrying colour, got ${colour}`);
+  }
+});
+
+test('an opaque border is still written without a redundant alpha byte', () => {
+  const segments = segmentsFor({ enabled: true, linked: true, colour: 'FF102030', thickness: 1 });
+  const colours = [...new Set(segments.flatMap((s) => s.layers?.map((l) => l.colour) ?? [s.colour]))];
+  for (const colour of colours) assert.match(colour, /^#102030FF$/i, `unexpected colour ${colour}`);
+});

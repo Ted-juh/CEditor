@@ -11,7 +11,24 @@
 
 import { resolveStroke } from './strokeResolver.js';
 import { normalizeCorner } from './cornerNormalization.js';
+
 import { buildCornerPath } from './cornerPaths.js';
+
+/**
+ * AARRGGBB -> a CSS colour that keeps its alpha.
+ *
+ * Border colours are stored alpha-first, and both stroke paths used to take `.slice(-6)` — the RGB
+ * and nothing else. Every translucent border therefore painted fully opaque: the button types set
+ * `66FFFFFF`, a 40% white hairline, and drew a solid white one. It reads as if every control on a
+ * panel has been outlined in marker pen, and it is wrong everywhere borders are drawn, not just
+ * here.
+ */
+function strokeColour(raw) {
+  const hex = String(raw ?? 'FFFFFFFF').replace('#', '');
+  if (hex.length === 8) return `#${hex.slice(2)}${hex.slice(0, 2)}`;   // AARRGGBB -> #RRGGBBAA
+  if (hex.length === 6) return `#${hex}`;
+  return '#FFFFFF';
+}
 
 const MULTI_STYLES = new Set(['groove', 'ridge', 'inset', 'outset']);
 const ADJACENT_SIDES = {
@@ -36,7 +53,7 @@ function getSideStrokes(border, side) {
   const s = (border?.linked) ? border : (border?.[side] ?? border);
   const thick = s?.thickness || 2;
   const dotRadius = s?.dotRadius || 2;
-  const colour = `#${(s?.colour || 'FFFFFFFF').slice(-6)}`;
+  const colour = strokeColour(s?.colour);
   const style = s?.style || 'solid';
   return resolveStroke(style, thick, colour, side, dotRadius);
 }
@@ -55,7 +72,7 @@ function getCornerStrokes(border, corners, pos) {
   const thick = (linked ? border.thickness : c.thickness) || c.thickness || 2;
   const dotRadius = (linked ? border.dotRadius : c.dotRadius) || c.dotRadius || 2;
   const rawColour = (linked ? border.colour : c.colour) || c.colour || 'FFFFFFFF';
-  const colour = `#${rawColour.slice(-6)}`;
+  const colour = strokeColour(rawColour);
   const cornerDash = c.borderStyle || 'solid';
   const sideHint = (pos === 'tl' || pos === 'tr') ? 'top' : 'bottom';
 
