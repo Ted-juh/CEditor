@@ -20,10 +20,25 @@ server-renders every control on it, and fails if the committed copy differs.
 |---|---|---|
 | `QA-01-components.cepanel` | Every one of the 49 component types renders at its **authored default** — the state a user meets first, and the one nothing else checks. | Nothing is interactive, bound, or scripted here. |
 | `QA-02-properties.cepanel` | The cross-cutting sections survive being **driven hard**: nine stacked text-effect layers, four live background fill layers, rotation + scale + opacity at once. | Component-specific sections (Arp, Matrix, …) sit at defaults — those are their own sheet's job. |
+| `QA-06-roland-gaia.cepanel` *(generated on demand)* | A real hardware editor: **162 controls bound to the Roland GAIA SH-01 profile**, all three tone layers on screen at once, every control adopting its range and choices from the profile. | Without a synth attached it proves the bytes we would send, not that the synth liked them. |
 
 Planned, not yet built: QA-03 states/interaction, QA-04 scripting (7 languages × 36 events),
-QA-05 component verbs (23 families / 425 verbs), QA-06 device & MIDI, QA-07 custom-component
-packages, QA-08 export.
+QA-05 component verbs (23 families / 425 verbs), QA-07 custom-component packages, QA-08 export.
+
+### QA-06 is not committed
+
+It is **28 MB**, and it is gitignored for that reason — run `npm run qa:panels` (or the generator
+directly) and it appears in this folder. Everything else about it is still checked on every
+`npm test`: the sheet is rebuilt in memory, every control is rendered, and its bindings are
+asserted against the profile.
+
+Why all three tones are visible: on the hardware you press TONE SELECT and one set of knobs points
+at a different layer. That is a limit of having one set of knobs, not of the synth — Tone 1/2/3 are
+three address blocks at a 0x0100 stride, so a screen can show all three. There is no keyboard on
+the sheet: it edits a patch, and the synth has its own keys.
+
+The profile behind it is generated and cross-checked against Roland's published MIDI implementation
+— see [tools/scripts/qa/roland-gaia/README.md](../../tools/scripts/qa/roland-gaia/README.md).
 
 ## How to run a pass
 
@@ -51,12 +66,26 @@ The same test server-renders every control through `CanvasControl`. One type is 
 in `NO_SSR`: `PixelDisplay` touches `window` during render, so it has no server pass. That is worth
 knowing rather than working around — it is the one component this gate cannot see.
 
-## A finding the suite produced immediately
+## Findings the suite produced immediately
 
-`QA-01-components.cepanel` is **2.7 MB for 107 controls** — roughly 25 KB of JSON per control, which
-is what a full section tree costs. Undo currently keeps 50 whole-panel snapshots, so a panel this
-size implies well over 100 MB of undo history.
+**1. Panel documents do not scale.** `QA-01` is 2.7 MB for 107 controls. `QA-06` — a *small*
+hardware editor, 162 bound controls — is **28 MB**. Undo keeps 50 whole-panel snapshots, so
+editing that panel implies over a gigabyte of undo history.
 
-That is not a flaw in the sheet. It is the first thing the sheet is for: if the editor is
-uncomfortable holding a panel with one of each component on it, that is a beta-blocking fact about
-the editor, and it was invisible until something built that panel.
+**2. The cost is concentrated, and it is the Parts tree.** Per-control document size:
+
+| Component | Size | Of which `Parts` |
+|---|---|---|
+| Knob | 100 KB | 93 KB (17 parts) |
+| Slider | 100 KB | 93 KB |
+| ToggleButton / Combobox | ~16 KB | — |
+| Label | ~12 KB | — |
+
+Every one of a knob's 17 parts carries a full `Background`/`Text`/`Effects` section at its
+defaults. Nothing elides defaults on serialization, so a knob that has never been touched still
+writes 93 KB. Sixty knobs — an ordinary synth panel — is 6 MB before anything is styled.
+
+Neither of these is a flaw in the sheets. They are the first thing the sheets are for: an editor
+that is uncomfortable holding one of each component, or a document format where a plain knob costs
+100 KB, are beta-blocking facts, and both were invisible until something built the panel that
+showed them.

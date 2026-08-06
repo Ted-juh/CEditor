@@ -17,14 +17,25 @@ import { fileURLToPath } from 'node:url';
 
 import { serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
 import { buildComponentsSheet } from './sheets/components.mjs';
+import { buildGaiaSheet } from './sheets/gaia.mjs';
 import { buildPropertiesSheet } from './sheets/properties.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
 
+/**
+ * `commit: false` means the sheet is generated on demand and gitignored rather than checked in.
+ *
+ * Only QA-06 is in that category, and the reason is itself the most useful thing the suite has
+ * found so far: a realistic synth editor — 162 bound controls, which is a SMALL hardware editor —
+ * serializes to 28 MB. A single Knob is 100 KB, 93 KB of which is its 17-part `Parts` tree, and
+ * every one of those parts carries a full Background/Text/Effects section. Committing that would
+ * put 28 MB in the repo to prove a point better made by the number itself.
+ */
 export const SHEETS = [
-  { file: 'QA-01-components.cepanel', build: buildComponentsSheet },
-  { file: 'QA-02-properties.cepanel', build: buildPropertiesSheet },
+  { file: 'QA-01-components.cepanel', build: buildComponentsSheet, commit: true },
+  { file: 'QA-02-properties.cepanel', build: buildPropertiesSheet, commit: true },
+  { file: 'QA-06-roland-gaia.cepanel', build: buildGaiaSheet, commit: false },
 ];
 
 /**
@@ -70,6 +81,7 @@ function main() {
     const json = serializeSheet(sheet);
 
     if (check) {
+      if (!sheet.commit) continue;
       let current = null;
       try { current = readFileSync(target, 'utf8'); } catch { /* missing counts as stale */ }
       if (current !== json) stale.push(sheet.file);

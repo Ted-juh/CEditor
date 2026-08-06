@@ -1,0 +1,7866 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": "1.0.0",
+  "minCEditorVersion": "0.9.0",
+  "id": "roland-gaia-sh01",
+  "name": "Roland GAIA SH-01 (full)",
+  "manufacturer": "Roland",
+  "family": "SH",
+  "status": "experimental",
+  "trust": "local",
+  "sources": [
+    {
+      "type": "manual",
+      "title": "Roland SH-01 GAIA MIDI Implementation (v1.01, Sep 2010)",
+      "notes": "Section 3 Parameter Address Map, transcribed in full for Patch Common and Patch Tone. Model ID 00 00 41, DT1=12 / RQ1=11, roland-7bit checksum. Temporary Patch 10 00 00 00; Tone 1/2/3 at block offsets 00 01 00 / 00 02 00 / 00 03 00. Verified against the manual's own Example 1: F0 41 10 00 00 41 12 10 00 01 00 06 69 F7."
+    }
+  ],
+  "variables": {
+    "deviceId": 16,
+    "channel": 1
+  },
+  "identity": {
+    "requestDeviceId": "$deviceId",
+    "manufacturerId": [
+      "41"
+    ],
+    "familyCode": [
+      "41",
+      "02"
+    ],
+    "modelNumber": [
+      "00",
+      "00"
+    ],
+    "revision": [
+      "00",
+      "03",
+      "00",
+      "00"
+    ],
+    "timeoutMs": 1000,
+    "retries": 0
+  },
+  "coverage": {
+    "singleParameterWrite": "complete-for-patch-common-and-all-three-tones",
+    "editBufferDumpRequest": "block-rq1-per-tone",
+    "editBufferDumpParse": "notImplemented",
+    "bankDump": "notImplemented",
+    "patchNameEdit": "complete-single-dt1-write",
+    "realtimeEditing": "complete-for-transcribed-blocks",
+    "notTranscribed": [
+      "Patch Distortion",
+      "Patch Flanger",
+      "Patch Delay",
+      "Patch Reverb",
+      "Patch Arpeggio"
+    ]
+  },
+  "timing": {
+    "minDelayBetweenMessagesMs": 20
+  },
+  "messageRecipes": [
+    {
+      "id": "dt1",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "12",
+        "$address",
+        "$encodedValue",
+        "$checksum",
+        "F7"
+      ],
+      "checksum": {
+        "type": "roland-7bit",
+        "from": "$address",
+        "to": "$encodedValue"
+      },
+      "delayAfterMs": 20
+    },
+    {
+      "id": "rq1",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "$address",
+        "$size",
+        "$checksum",
+        "F7"
+      ],
+      "checksum": {
+        "type": "roland-7bit",
+        "from": "$address",
+        "to": "$size"
+      },
+      "delayAfterMs": 20
+    },
+    {
+      "id": "volumeCc",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 7,
+      "value": "$encodedValue"
+    }
+  ],
+  "requests": [
+    {
+      "id": "identityRequest",
+      "name": "Identity Request",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "7E",
+        "$deviceId",
+        "06",
+        "01",
+        "F7"
+      ],
+      "response": {
+        "kind": "identity"
+      },
+      "timeoutMs": 1000,
+      "retries": 0
+    },
+    {
+      "id": "requestCommon",
+      "name": "Request common",
+      "kind": "sysex",
+      "messageRecipe": "rq1",
+      "address": "10 00 00 00",
+      "size": "00 00 00 3D",
+      "response": {
+        "kind": "dt1",
+        "address": "10 00 00 00"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestTone1",
+      "name": "Request tone1",
+      "kind": "sysex",
+      "messageRecipe": "rq1",
+      "address": "10 00 01 00",
+      "size": "00 00 00 3E",
+      "response": {
+        "kind": "dt1",
+        "address": "10 00 01 00"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestTone2",
+      "name": "Request tone2",
+      "kind": "sysex",
+      "messageRecipe": "rq1",
+      "address": "10 00 02 00",
+      "size": "00 00 00 3E",
+      "response": {
+        "kind": "dt1",
+        "address": "10 00 02 00"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestTone3",
+      "name": "Request tone3",
+      "kind": "sysex",
+      "messageRecipe": "rq1",
+      "address": "10 00 03 00",
+      "size": "00 00 00 3E",
+      "response": {
+        "kind": "dt1",
+        "address": "10 00 03 00"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    }
+  ],
+  "startup": {
+    "policy": "pull",
+    "syncDirection": "pull",
+    "sync": [
+      {
+        "request": "identityRequest"
+      },
+      {
+        "request": "requestCommon"
+      },
+      {
+        "request": "requestTone1"
+      },
+      {
+        "request": "requestTone2"
+      },
+      {
+        "request": "requestTone3"
+      }
+    ]
+  },
+  "parameters": [
+    {
+      "id": "common.patchName",
+      "name": "Patch Name",
+      "group": "Patch Common",
+      "type": "patchName",
+      "address": "10 00 00 00",
+      "length": 12,
+      "default": "INIT PATCH  ",
+      "display": {
+        "mode": "text",
+        "shortLabel": "Name"
+      },
+      "encoding": {
+        "type": "ascii",
+        "length": 12,
+        "pad": 32
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": false,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": false
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "TextInput"
+      }
+    },
+    {
+      "id": "common.patchLevel",
+      "name": "Patch Level",
+      "group": "Patch Common",
+      "address": "10 00 00 0C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "patchLevel"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "common.patchTempo",
+      "name": "Patch Tempo",
+      "group": "Patch Common",
+      "address": "10 00 00 0D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 5,
+        "max": 300
+      },
+      "default": 5,
+      "display": {
+        "mode": "number",
+        "unit": "BPM",
+        "shortLabel": "patchTempo"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 3
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "common.arpeggioSwitch",
+      "name": "Arpeggio Switch",
+      "group": "Patch Common",
+      "address": "10 00 00 10",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "arpeggioSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.portamentoSwitch",
+      "name": "Portamento Switch",
+      "group": "Patch Common",
+      "address": "10 00 00 12",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "portamentoSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.portamentoTime",
+      "name": "Portamento Time",
+      "group": "Patch Common",
+      "address": "10 00 00 13",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "portamentoTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "common.monoSwitch",
+      "name": "Mono Switch",
+      "group": "Patch Common",
+      "address": "10 00 00 14",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "monoSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.octaveShift",
+      "name": "Octave Shift",
+      "group": "Patch Common",
+      "address": "10 00 00 15",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 61,
+        "max": 67
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "octaveShift",
+        "min": -3,
+        "max": 3
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.pitchBendRangeUp",
+      "name": "Pitch Bend Range Up",
+      "group": "Patch Common",
+      "address": "10 00 00 16",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 24
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchBendRangeUp"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "common.pitchBendRangeDown",
+      "name": "Pitch Bend Range Down",
+      "group": "Patch Common",
+      "address": "10 00 00 17",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 24
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchBendRangeDown"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "common.tone1Switch",
+      "name": "Tone1 Switch",
+      "group": "Patch Common",
+      "address": "10 00 00 19",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tone1Switch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.tone1Select",
+      "name": "Tone1 Select",
+      "group": "Patch Common",
+      "address": "10 00 00 1A",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tone1Select"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.tone2Switch",
+      "name": "Tone2 Switch",
+      "group": "Patch Common",
+      "address": "10 00 00 1B",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tone2Switch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.tone2Select",
+      "name": "Tone2 Select",
+      "group": "Patch Common",
+      "address": "10 00 00 1C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tone2Select"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.tone3Switch",
+      "name": "Tone3 Switch",
+      "group": "Patch Common",
+      "address": "10 00 00 1D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tone3Switch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.tone3Select",
+      "name": "Tone3 Select",
+      "group": "Patch Common",
+      "address": "10 00 00 1E",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tone3Select"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.syncRingSelect",
+      "name": "SYNC/RING Select",
+      "group": "Patch Common",
+      "address": "10 00 00 1F",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "sync",
+          "label": "SYNC",
+          "value": 1
+        },
+        {
+          "id": "ring",
+          "label": "RING",
+          "value": 2
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "syncRingSelect"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.effectsMasterSwitch",
+      "name": "Effects Master Switch",
+      "group": "Patch Common",
+      "address": "10 00 00 20",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "effectsMasterSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.delayTempoSyncSwitch",
+      "name": "Delay Tempo Sync Switch",
+      "group": "Patch Common",
+      "address": "10 00 00 22",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "delayTempoSyncSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.lowBoostSwitch",
+      "name": "Low Boost Switch",
+      "group": "Patch Common",
+      "address": "10 00 00 23",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "lowBoostSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.dBeamAssign",
+      "name": "D Beam Assign",
+      "group": "Patch Common",
+      "address": "10 00 00 24",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "lforate",
+      "choices": [
+        {
+          "id": "lforate",
+          "label": "LFO-RATE",
+          "value": 0
+        },
+        {
+          "id": "lfofadetime",
+          "label": "LFO-FADE-TIME",
+          "value": 1
+        },
+        {
+          "id": "lfopitchmod",
+          "label": "LFO-PITCH-MOD",
+          "value": 2
+        },
+        {
+          "id": "lfofiltermod",
+          "label": "LFO-FILTER-MOD",
+          "value": 3
+        },
+        {
+          "id": "lfoampmod",
+          "label": "LFO-AMP-MOD",
+          "value": 4
+        },
+        {
+          "id": "oscpitch",
+          "label": "OSC-PITCH",
+          "value": 5
+        },
+        {
+          "id": "oscdetune",
+          "label": "OSC-DETUNE",
+          "value": 6
+        },
+        {
+          "id": "oscpwm",
+          "label": "OSC-PWM",
+          "value": 7
+        },
+        {
+          "id": "oscpw",
+          "label": "OSC-PW",
+          "value": 8
+        },
+        {
+          "id": "oscenva",
+          "label": "OSC-ENV-A",
+          "value": 9
+        },
+        {
+          "id": "oscenvd",
+          "label": "OSC-ENV-D",
+          "value": 10
+        },
+        {
+          "id": "oscenvmod",
+          "label": "OSC-ENV-MOD",
+          "value": 11
+        },
+        {
+          "id": "filtercutoff",
+          "label": "FILTER-CUTOFF",
+          "value": 12
+        },
+        {
+          "id": "filterresonance",
+          "label": "FILTER-RESONANCE",
+          "value": 13
+        },
+        {
+          "id": "filterenva",
+          "label": "FILTER-ENV-A",
+          "value": 14
+        },
+        {
+          "id": "filterenvd",
+          "label": "FILTER-ENV-D",
+          "value": 15
+        },
+        {
+          "id": "filterenvs",
+          "label": "FILTER-ENV-S",
+          "value": 16
+        },
+        {
+          "id": "filterenvr",
+          "label": "FILTER-ENV-R",
+          "value": 17
+        },
+        {
+          "id": "filterenvmod",
+          "label": "FILTER-ENV-MOD",
+          "value": 18
+        },
+        {
+          "id": "amplevel",
+          "label": "AMP-LEVEL",
+          "value": 19
+        },
+        {
+          "id": "ampenva",
+          "label": "AMP-ENV-A",
+          "value": 20
+        },
+        {
+          "id": "ampenvd",
+          "label": "AMP-ENV-D",
+          "value": 21
+        },
+        {
+          "id": "ampenvs",
+          "label": "AMP-ENV-S",
+          "value": 22
+        },
+        {
+          "id": "ampenvr",
+          "label": "AMP-ENV-R",
+          "value": 23
+        },
+        {
+          "id": "efxctrl",
+          "label": "EFX-CTRL",
+          "value": 24
+        },
+        {
+          "id": "porttime",
+          "label": "PORT-TIME",
+          "value": 25
+        },
+        {
+          "id": "bender",
+          "label": "BENDER",
+          "value": 26
+        },
+        {
+          "id": "modulation",
+          "label": "MODULATION",
+          "value": 27
+        },
+        {
+          "id": "filtercutoffkf",
+          "label": "FILTER-CUTOFF-KF",
+          "value": 28
+        },
+        {
+          "id": "efxlevel",
+          "label": "EFX-LEVEL",
+          "value": 29
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "dBeamAssign"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.dBeamPolarity",
+      "name": "D Beam Polarity",
+      "group": "Patch Common",
+      "address": "10 00 00 29",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "normal",
+      "choices": [
+        {
+          "id": "normal",
+          "label": "NORMAL",
+          "value": 0
+        },
+        {
+          "id": "reverse",
+          "label": "REVERSE",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "dBeamPolarity"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.effectsDistortionSelect",
+      "name": "Effects Distortion Select",
+      "group": "Patch Common",
+      "address": "10 00 00 2A",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "effectsDistortionSelect"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.effectsFlangerSelect",
+      "name": "Effects Flanger Select",
+      "group": "Patch Common",
+      "address": "10 00 00 2B",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "effectsFlangerSelect"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.effectsDelaySelect",
+      "name": "Effects Delay Select",
+      "group": "Patch Common",
+      "address": "10 00 00 2C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "effectsDelaySelect"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "common.effectsReverbSelect",
+      "name": "Effects Reverb Select",
+      "group": "Patch Common",
+      "address": "10 00 00 2D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "effectsReverbSelect"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.osc.wave",
+      "name": "OSC Wave",
+      "group": "Tone 1 · OSC",
+      "address": "10 00 01 00",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "saw",
+      "choices": [
+        {
+          "id": "saw",
+          "label": "SAW",
+          "value": 0
+        },
+        {
+          "id": "sqr",
+          "label": "SQR",
+          "value": 1
+        },
+        {
+          "id": "pwsqr",
+          "label": "PW-SQR",
+          "value": 2
+        },
+        {
+          "id": "tri",
+          "label": "TRI",
+          "value": 3
+        },
+        {
+          "id": "sine",
+          "label": "SINE",
+          "value": 4
+        },
+        {
+          "id": "noise",
+          "label": "NOISE",
+          "value": 5
+        },
+        {
+          "id": "supersaw",
+          "label": "SUPER-SAW",
+          "value": 6
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "wave"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.osc.waveVariation",
+      "name": "OSC Wave Variation",
+      "group": "Tone 1 · OSC",
+      "address": "10 00 01 01",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "a",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A",
+          "value": 0
+        },
+        {
+          "id": "b",
+          "label": "B",
+          "value": 1
+        },
+        {
+          "id": "c",
+          "label": "C",
+          "value": 2
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "waveVariation"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.osc.pitch",
+      "name": "OSC Pitch",
+      "group": "Tone 1 · OSC",
+      "address": "10 00 01 03",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 40,
+        "max": 88
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitch",
+        "min": -24,
+        "max": 24
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.osc.detune",
+      "name": "OSC Detune",
+      "group": "Tone 1 · OSC",
+      "address": "10 00 01 04",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 14,
+        "max": 114
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "detune",
+        "min": -50,
+        "max": 50
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.osc.pulseWidthModDepth",
+      "name": "OSC Pulse Width Mod Depth",
+      "group": "Tone 1 · OSC",
+      "address": "10 00 01 05",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pulseWidthModDepth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.osc.pulseWidth",
+      "name": "OSC Pulse Width",
+      "group": "Tone 1 · OSC",
+      "address": "10 00 01 06",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pulseWidth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.osc.pitchEnvAttackTime",
+      "name": "OSC Pitch Env Attack Time",
+      "group": "Tone 1 · OSC",
+      "address": "10 00 01 07",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchEnvAttackTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.osc.pitchEnvDecay",
+      "name": "OSC Pitch Env Decay",
+      "group": "Tone 1 · OSC",
+      "address": "10 00 01 08",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchEnvDecay"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.osc.pitchEnvDepth",
+      "name": "OSC Pitch Env Depth",
+      "group": "Tone 1 · OSC",
+      "address": "10 00 01 09",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchEnvDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.filter.mode",
+      "name": "FILTER Mode",
+      "group": "Tone 1 · Filter",
+      "address": "10 00 01 0A",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "bypass",
+      "choices": [
+        {
+          "id": "bypass",
+          "label": "BYPASS",
+          "value": 0
+        },
+        {
+          "id": "lpf",
+          "label": "LPF",
+          "value": 1
+        },
+        {
+          "id": "hpf",
+          "label": "HPF",
+          "value": 2
+        },
+        {
+          "id": "bpf",
+          "label": "BPF",
+          "value": 3
+        },
+        {
+          "id": "pkg",
+          "label": "PKG",
+          "value": 4
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "mode"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.filter.slope",
+      "name": "FILTER Slope",
+      "group": "Tone 1 · Filter",
+      "address": "10 00 01 0B",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "12db",
+      "choices": [
+        {
+          "id": "12db",
+          "label": "-12 dB",
+          "value": 0
+        },
+        {
+          "id": "24db",
+          "label": "-24 dB",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "slope"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.filter.cutoff",
+      "name": "FILTER Cutoff",
+      "group": "Tone 1 · Filter",
+      "address": "10 00 01 0C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "cutoff"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.filter.cutoffKeyfollow",
+      "name": "FILTER Cutoff Keyfollow",
+      "group": "Tone 1 · Filter",
+      "address": "10 00 01 0D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 54,
+        "max": 74
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "cutoffKeyfollow",
+        "min": -100,
+        "max": 100
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.filter.envVelocitySens",
+      "name": "FILTER Env Velocity Sens",
+      "group": "Tone 1 · Filter",
+      "address": "10 00 01 0E",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envVelocitySens",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.filter.resonance",
+      "name": "FILTER Resonance",
+      "group": "Tone 1 · Filter",
+      "address": "10 00 01 0F",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "resonance"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.filter.envAttackTime",
+      "name": "FILTER Env Attack Time",
+      "group": "Tone 1 · Filter",
+      "address": "10 00 01 10",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envAttackTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.filter.envDecayTime",
+      "name": "FILTER Env Decay Time",
+      "group": "Tone 1 · Filter",
+      "address": "10 00 01 11",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envDecayTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.filter.envSustainLevel",
+      "name": "FILTER Env Sustain Level",
+      "group": "Tone 1 · Filter",
+      "address": "10 00 01 12",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envSustainLevel"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.filter.envReleaseTime",
+      "name": "FILTER Env Release Time",
+      "group": "Tone 1 · Filter",
+      "address": "10 00 01 13",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envReleaseTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.filter.envDepth",
+      "name": "FILTER Env Depth",
+      "group": "Tone 1 · Filter",
+      "address": "10 00 01 14",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.amp.level",
+      "name": "AMP Level",
+      "group": "Tone 1 · Amp",
+      "address": "10 00 01 15",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.amp.levelVelocitySens",
+      "name": "AMP Level Velocity Sens",
+      "group": "Tone 1 · Amp",
+      "address": "10 00 01 16",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "levelVelocitySens",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.amp.envAttackTime",
+      "name": "AMP Env Attack Time",
+      "group": "Tone 1 · Amp",
+      "address": "10 00 01 17",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envAttackTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.amp.envDecayTime",
+      "name": "AMP Env Decay Time",
+      "group": "Tone 1 · Amp",
+      "address": "10 00 01 18",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envDecayTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.amp.envSustainLevel",
+      "name": "AMP Env Sustain Level",
+      "group": "Tone 1 · Amp",
+      "address": "10 00 01 19",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envSustainLevel"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.amp.envReleaseTime",
+      "name": "AMP Env Release Time",
+      "group": "Tone 1 · Amp",
+      "address": "10 00 01 1A",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envReleaseTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.amp.pan",
+      "name": "AMP Pan",
+      "group": "Tone 1 · Amp",
+      "address": "10 00 01 1B",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pan",
+        "min": -64,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.lfo.shape",
+      "name": "LFO Shape",
+      "group": "Tone 1 · LFO",
+      "address": "10 00 01 1C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "tri",
+      "choices": [
+        {
+          "id": "tri",
+          "label": "TRI",
+          "value": 0
+        },
+        {
+          "id": "sin",
+          "label": "SIN",
+          "value": 1
+        },
+        {
+          "id": "saw",
+          "label": "SAW",
+          "value": 2
+        },
+        {
+          "id": "sqr",
+          "label": "SQR",
+          "value": 3
+        },
+        {
+          "id": "sh",
+          "label": "S&H",
+          "value": 4
+        },
+        {
+          "id": "rnd",
+          "label": "RND",
+          "value": 5
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "shape"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.lfo.rate",
+      "name": "LFO Rate",
+      "group": "Tone 1 · LFO",
+      "address": "10 00 01 1D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "rate"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.lfo.tempoSyncSwitch",
+      "name": "LFO Tempo Sync Switch",
+      "group": "Tone 1 · LFO",
+      "address": "10 00 01 1E",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.lfo.tempoSyncNote",
+      "name": "LFO Tempo Sync Note",
+      "group": "Tone 1 · LFO",
+      "address": "10 00 01 1F",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "16",
+      "choices": [
+        {
+          "id": "16",
+          "label": "16",
+          "value": 0
+        },
+        {
+          "id": "12",
+          "label": "12",
+          "value": 1
+        },
+        {
+          "id": "8",
+          "label": "8",
+          "value": 2
+        },
+        {
+          "id": "4",
+          "label": "4",
+          "value": 3
+        },
+        {
+          "id": "2",
+          "label": "2",
+          "value": 4
+        },
+        {
+          "id": "1",
+          "label": "1",
+          "value": 5
+        },
+        {
+          "id": "34",
+          "label": "3/4",
+          "value": 6
+        },
+        {
+          "id": "23",
+          "label": "2/3",
+          "value": 7
+        },
+        {
+          "id": "12",
+          "label": "1/2",
+          "value": 8
+        },
+        {
+          "id": "38",
+          "label": "3/8",
+          "value": 9
+        },
+        {
+          "id": "13",
+          "label": "1/3",
+          "value": 10
+        },
+        {
+          "id": "14",
+          "label": "1/4",
+          "value": 11
+        },
+        {
+          "id": "316",
+          "label": "3/16",
+          "value": 12
+        },
+        {
+          "id": "16",
+          "label": "1/6",
+          "value": 13
+        },
+        {
+          "id": "18",
+          "label": "1/8",
+          "value": 14
+        },
+        {
+          "id": "332",
+          "label": "3/32",
+          "value": 15
+        },
+        {
+          "id": "112",
+          "label": "1/12",
+          "value": 16
+        },
+        {
+          "id": "116",
+          "label": "1/16",
+          "value": 17
+        },
+        {
+          "id": "124",
+          "label": "1/24",
+          "value": 18
+        },
+        {
+          "id": "132",
+          "label": "1/32",
+          "value": 19
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncNote"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.lfo.fadeTime",
+      "name": "LFO Fade Time",
+      "group": "Tone 1 · LFO",
+      "address": "10 00 01 20",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "fadeTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.lfo.keyTrigger",
+      "name": "LFO Key Trigger",
+      "group": "Tone 1 · LFO",
+      "address": "10 00 01 21",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "keyTrigger"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.lfo.pitchDepth",
+      "name": "LFO Pitch Depth",
+      "group": "Tone 1 · LFO",
+      "address": "10 00 01 22",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.lfo.filterDepth",
+      "name": "LFO Filter Depth",
+      "group": "Tone 1 · LFO",
+      "address": "10 00 01 23",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "filterDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.lfo.ampDepth",
+      "name": "LFO Amp Depth",
+      "group": "Tone 1 · LFO",
+      "address": "10 00 01 24",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "ampDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.lfo.panDepth",
+      "name": "LFO Pan Depth",
+      "group": "Tone 1 · LFO",
+      "address": "10 00 01 25",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "panDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.modLfo.shape",
+      "name": "Modulation LFO Shape",
+      "group": "Tone 1 · Mod LFO",
+      "address": "10 00 01 26",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "tri",
+      "choices": [
+        {
+          "id": "tri",
+          "label": "TRI",
+          "value": 0
+        },
+        {
+          "id": "sin",
+          "label": "SIN",
+          "value": 1
+        },
+        {
+          "id": "saw",
+          "label": "SAW",
+          "value": 2
+        },
+        {
+          "id": "sqr",
+          "label": "SQR",
+          "value": 3
+        },
+        {
+          "id": "sh",
+          "label": "S&H",
+          "value": 4
+        },
+        {
+          "id": "rnd",
+          "label": "RND",
+          "value": 5
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "shape"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.modLfo.rate",
+      "name": "Modulation LFO Rate",
+      "group": "Tone 1 · Mod LFO",
+      "address": "10 00 01 27",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "rate"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.modLfo.tempoSyncSwitch",
+      "name": "Modulation LFO Tempo Sync Switch",
+      "group": "Tone 1 · Mod LFO",
+      "address": "10 00 01 28",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.modLfo.tempoSyncNote",
+      "name": "Modulation LFO Tempo Sync Note",
+      "group": "Tone 1 · Mod LFO",
+      "address": "10 00 01 29",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "16",
+      "choices": [
+        {
+          "id": "16",
+          "label": "16",
+          "value": 0
+        },
+        {
+          "id": "12",
+          "label": "12",
+          "value": 1
+        },
+        {
+          "id": "8",
+          "label": "8",
+          "value": 2
+        },
+        {
+          "id": "4",
+          "label": "4",
+          "value": 3
+        },
+        {
+          "id": "2",
+          "label": "2",
+          "value": 4
+        },
+        {
+          "id": "1",
+          "label": "1",
+          "value": 5
+        },
+        {
+          "id": "34",
+          "label": "3/4",
+          "value": 6
+        },
+        {
+          "id": "23",
+          "label": "2/3",
+          "value": 7
+        },
+        {
+          "id": "12",
+          "label": "1/2",
+          "value": 8
+        },
+        {
+          "id": "38",
+          "label": "3/8",
+          "value": 9
+        },
+        {
+          "id": "13",
+          "label": "1/3",
+          "value": 10
+        },
+        {
+          "id": "14",
+          "label": "1/4",
+          "value": 11
+        },
+        {
+          "id": "316",
+          "label": "3/16",
+          "value": 12
+        },
+        {
+          "id": "16",
+          "label": "1/6",
+          "value": 13
+        },
+        {
+          "id": "18",
+          "label": "1/8",
+          "value": 14
+        },
+        {
+          "id": "332",
+          "label": "3/32",
+          "value": 15
+        },
+        {
+          "id": "112",
+          "label": "1/12",
+          "value": 16
+        },
+        {
+          "id": "116",
+          "label": "1/16",
+          "value": 17
+        },
+        {
+          "id": "124",
+          "label": "1/24",
+          "value": 18
+        },
+        {
+          "id": "132",
+          "label": "1/32",
+          "value": 19
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncNote"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone1.modLfo.pitchDepth",
+      "name": "Modulation LFO Pitch Depth",
+      "group": "Tone 1 · Mod LFO",
+      "address": "10 00 01 2C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.modLfo.filterDepth",
+      "name": "Modulation LFO Filter Depth",
+      "group": "Tone 1 · Mod LFO",
+      "address": "10 00 01 2D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "filterDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.modLfo.ampDepth",
+      "name": "Modulation LFO Amp Depth",
+      "group": "Tone 1 · Mod LFO",
+      "address": "10 00 01 2E",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "ampDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone1.modLfo.panDepth",
+      "name": "Modulation LFO Pan Depth",
+      "group": "Tone 1 · Mod LFO",
+      "address": "10 00 01 2F",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "panDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.osc.wave",
+      "name": "OSC Wave",
+      "group": "Tone 2 · OSC",
+      "address": "10 00 02 00",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "saw",
+      "choices": [
+        {
+          "id": "saw",
+          "label": "SAW",
+          "value": 0
+        },
+        {
+          "id": "sqr",
+          "label": "SQR",
+          "value": 1
+        },
+        {
+          "id": "pwsqr",
+          "label": "PW-SQR",
+          "value": 2
+        },
+        {
+          "id": "tri",
+          "label": "TRI",
+          "value": 3
+        },
+        {
+          "id": "sine",
+          "label": "SINE",
+          "value": 4
+        },
+        {
+          "id": "noise",
+          "label": "NOISE",
+          "value": 5
+        },
+        {
+          "id": "supersaw",
+          "label": "SUPER-SAW",
+          "value": 6
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "wave"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone2.osc.waveVariation",
+      "name": "OSC Wave Variation",
+      "group": "Tone 2 · OSC",
+      "address": "10 00 02 01",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "a",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A",
+          "value": 0
+        },
+        {
+          "id": "b",
+          "label": "B",
+          "value": 1
+        },
+        {
+          "id": "c",
+          "label": "C",
+          "value": 2
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "waveVariation"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone2.osc.pitch",
+      "name": "OSC Pitch",
+      "group": "Tone 2 · OSC",
+      "address": "10 00 02 03",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 40,
+        "max": 88
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitch",
+        "min": -24,
+        "max": 24
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.osc.detune",
+      "name": "OSC Detune",
+      "group": "Tone 2 · OSC",
+      "address": "10 00 02 04",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 14,
+        "max": 114
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "detune",
+        "min": -50,
+        "max": 50
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.osc.pulseWidthModDepth",
+      "name": "OSC Pulse Width Mod Depth",
+      "group": "Tone 2 · OSC",
+      "address": "10 00 02 05",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pulseWidthModDepth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.osc.pulseWidth",
+      "name": "OSC Pulse Width",
+      "group": "Tone 2 · OSC",
+      "address": "10 00 02 06",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pulseWidth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.osc.pitchEnvAttackTime",
+      "name": "OSC Pitch Env Attack Time",
+      "group": "Tone 2 · OSC",
+      "address": "10 00 02 07",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchEnvAttackTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.osc.pitchEnvDecay",
+      "name": "OSC Pitch Env Decay",
+      "group": "Tone 2 · OSC",
+      "address": "10 00 02 08",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchEnvDecay"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.osc.pitchEnvDepth",
+      "name": "OSC Pitch Env Depth",
+      "group": "Tone 2 · OSC",
+      "address": "10 00 02 09",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchEnvDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.filter.mode",
+      "name": "FILTER Mode",
+      "group": "Tone 2 · Filter",
+      "address": "10 00 02 0A",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "bypass",
+      "choices": [
+        {
+          "id": "bypass",
+          "label": "BYPASS",
+          "value": 0
+        },
+        {
+          "id": "lpf",
+          "label": "LPF",
+          "value": 1
+        },
+        {
+          "id": "hpf",
+          "label": "HPF",
+          "value": 2
+        },
+        {
+          "id": "bpf",
+          "label": "BPF",
+          "value": 3
+        },
+        {
+          "id": "pkg",
+          "label": "PKG",
+          "value": 4
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "mode"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone2.filter.slope",
+      "name": "FILTER Slope",
+      "group": "Tone 2 · Filter",
+      "address": "10 00 02 0B",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "12db",
+      "choices": [
+        {
+          "id": "12db",
+          "label": "-12 dB",
+          "value": 0
+        },
+        {
+          "id": "24db",
+          "label": "-24 dB",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "slope"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone2.filter.cutoff",
+      "name": "FILTER Cutoff",
+      "group": "Tone 2 · Filter",
+      "address": "10 00 02 0C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "cutoff"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.filter.cutoffKeyfollow",
+      "name": "FILTER Cutoff Keyfollow",
+      "group": "Tone 2 · Filter",
+      "address": "10 00 02 0D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 54,
+        "max": 74
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "cutoffKeyfollow",
+        "min": -100,
+        "max": 100
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.filter.envVelocitySens",
+      "name": "FILTER Env Velocity Sens",
+      "group": "Tone 2 · Filter",
+      "address": "10 00 02 0E",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envVelocitySens",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.filter.resonance",
+      "name": "FILTER Resonance",
+      "group": "Tone 2 · Filter",
+      "address": "10 00 02 0F",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "resonance"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.filter.envAttackTime",
+      "name": "FILTER Env Attack Time",
+      "group": "Tone 2 · Filter",
+      "address": "10 00 02 10",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envAttackTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.filter.envDecayTime",
+      "name": "FILTER Env Decay Time",
+      "group": "Tone 2 · Filter",
+      "address": "10 00 02 11",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envDecayTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.filter.envSustainLevel",
+      "name": "FILTER Env Sustain Level",
+      "group": "Tone 2 · Filter",
+      "address": "10 00 02 12",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envSustainLevel"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.filter.envReleaseTime",
+      "name": "FILTER Env Release Time",
+      "group": "Tone 2 · Filter",
+      "address": "10 00 02 13",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envReleaseTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.filter.envDepth",
+      "name": "FILTER Env Depth",
+      "group": "Tone 2 · Filter",
+      "address": "10 00 02 14",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.amp.level",
+      "name": "AMP Level",
+      "group": "Tone 2 · Amp",
+      "address": "10 00 02 15",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.amp.levelVelocitySens",
+      "name": "AMP Level Velocity Sens",
+      "group": "Tone 2 · Amp",
+      "address": "10 00 02 16",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "levelVelocitySens",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.amp.envAttackTime",
+      "name": "AMP Env Attack Time",
+      "group": "Tone 2 · Amp",
+      "address": "10 00 02 17",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envAttackTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.amp.envDecayTime",
+      "name": "AMP Env Decay Time",
+      "group": "Tone 2 · Amp",
+      "address": "10 00 02 18",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envDecayTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.amp.envSustainLevel",
+      "name": "AMP Env Sustain Level",
+      "group": "Tone 2 · Amp",
+      "address": "10 00 02 19",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envSustainLevel"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.amp.envReleaseTime",
+      "name": "AMP Env Release Time",
+      "group": "Tone 2 · Amp",
+      "address": "10 00 02 1A",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envReleaseTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.amp.pan",
+      "name": "AMP Pan",
+      "group": "Tone 2 · Amp",
+      "address": "10 00 02 1B",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pan",
+        "min": -64,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.lfo.shape",
+      "name": "LFO Shape",
+      "group": "Tone 2 · LFO",
+      "address": "10 00 02 1C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "tri",
+      "choices": [
+        {
+          "id": "tri",
+          "label": "TRI",
+          "value": 0
+        },
+        {
+          "id": "sin",
+          "label": "SIN",
+          "value": 1
+        },
+        {
+          "id": "saw",
+          "label": "SAW",
+          "value": 2
+        },
+        {
+          "id": "sqr",
+          "label": "SQR",
+          "value": 3
+        },
+        {
+          "id": "sh",
+          "label": "S&H",
+          "value": 4
+        },
+        {
+          "id": "rnd",
+          "label": "RND",
+          "value": 5
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "shape"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone2.lfo.rate",
+      "name": "LFO Rate",
+      "group": "Tone 2 · LFO",
+      "address": "10 00 02 1D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "rate"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.lfo.tempoSyncSwitch",
+      "name": "LFO Tempo Sync Switch",
+      "group": "Tone 2 · LFO",
+      "address": "10 00 02 1E",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone2.lfo.tempoSyncNote",
+      "name": "LFO Tempo Sync Note",
+      "group": "Tone 2 · LFO",
+      "address": "10 00 02 1F",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "16",
+      "choices": [
+        {
+          "id": "16",
+          "label": "16",
+          "value": 0
+        },
+        {
+          "id": "12",
+          "label": "12",
+          "value": 1
+        },
+        {
+          "id": "8",
+          "label": "8",
+          "value": 2
+        },
+        {
+          "id": "4",
+          "label": "4",
+          "value": 3
+        },
+        {
+          "id": "2",
+          "label": "2",
+          "value": 4
+        },
+        {
+          "id": "1",
+          "label": "1",
+          "value": 5
+        },
+        {
+          "id": "34",
+          "label": "3/4",
+          "value": 6
+        },
+        {
+          "id": "23",
+          "label": "2/3",
+          "value": 7
+        },
+        {
+          "id": "12",
+          "label": "1/2",
+          "value": 8
+        },
+        {
+          "id": "38",
+          "label": "3/8",
+          "value": 9
+        },
+        {
+          "id": "13",
+          "label": "1/3",
+          "value": 10
+        },
+        {
+          "id": "14",
+          "label": "1/4",
+          "value": 11
+        },
+        {
+          "id": "316",
+          "label": "3/16",
+          "value": 12
+        },
+        {
+          "id": "16",
+          "label": "1/6",
+          "value": 13
+        },
+        {
+          "id": "18",
+          "label": "1/8",
+          "value": 14
+        },
+        {
+          "id": "332",
+          "label": "3/32",
+          "value": 15
+        },
+        {
+          "id": "112",
+          "label": "1/12",
+          "value": 16
+        },
+        {
+          "id": "116",
+          "label": "1/16",
+          "value": 17
+        },
+        {
+          "id": "124",
+          "label": "1/24",
+          "value": 18
+        },
+        {
+          "id": "132",
+          "label": "1/32",
+          "value": 19
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncNote"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone2.lfo.fadeTime",
+      "name": "LFO Fade Time",
+      "group": "Tone 2 · LFO",
+      "address": "10 00 02 20",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "fadeTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.lfo.keyTrigger",
+      "name": "LFO Key Trigger",
+      "group": "Tone 2 · LFO",
+      "address": "10 00 02 21",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "keyTrigger"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone2.lfo.pitchDepth",
+      "name": "LFO Pitch Depth",
+      "group": "Tone 2 · LFO",
+      "address": "10 00 02 22",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.lfo.filterDepth",
+      "name": "LFO Filter Depth",
+      "group": "Tone 2 · LFO",
+      "address": "10 00 02 23",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "filterDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.lfo.ampDepth",
+      "name": "LFO Amp Depth",
+      "group": "Tone 2 · LFO",
+      "address": "10 00 02 24",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "ampDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.lfo.panDepth",
+      "name": "LFO Pan Depth",
+      "group": "Tone 2 · LFO",
+      "address": "10 00 02 25",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "panDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.modLfo.shape",
+      "name": "Modulation LFO Shape",
+      "group": "Tone 2 · Mod LFO",
+      "address": "10 00 02 26",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "tri",
+      "choices": [
+        {
+          "id": "tri",
+          "label": "TRI",
+          "value": 0
+        },
+        {
+          "id": "sin",
+          "label": "SIN",
+          "value": 1
+        },
+        {
+          "id": "saw",
+          "label": "SAW",
+          "value": 2
+        },
+        {
+          "id": "sqr",
+          "label": "SQR",
+          "value": 3
+        },
+        {
+          "id": "sh",
+          "label": "S&H",
+          "value": 4
+        },
+        {
+          "id": "rnd",
+          "label": "RND",
+          "value": 5
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "shape"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone2.modLfo.rate",
+      "name": "Modulation LFO Rate",
+      "group": "Tone 2 · Mod LFO",
+      "address": "10 00 02 27",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "rate"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.modLfo.tempoSyncSwitch",
+      "name": "Modulation LFO Tempo Sync Switch",
+      "group": "Tone 2 · Mod LFO",
+      "address": "10 00 02 28",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone2.modLfo.tempoSyncNote",
+      "name": "Modulation LFO Tempo Sync Note",
+      "group": "Tone 2 · Mod LFO",
+      "address": "10 00 02 29",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "16",
+      "choices": [
+        {
+          "id": "16",
+          "label": "16",
+          "value": 0
+        },
+        {
+          "id": "12",
+          "label": "12",
+          "value": 1
+        },
+        {
+          "id": "8",
+          "label": "8",
+          "value": 2
+        },
+        {
+          "id": "4",
+          "label": "4",
+          "value": 3
+        },
+        {
+          "id": "2",
+          "label": "2",
+          "value": 4
+        },
+        {
+          "id": "1",
+          "label": "1",
+          "value": 5
+        },
+        {
+          "id": "34",
+          "label": "3/4",
+          "value": 6
+        },
+        {
+          "id": "23",
+          "label": "2/3",
+          "value": 7
+        },
+        {
+          "id": "12",
+          "label": "1/2",
+          "value": 8
+        },
+        {
+          "id": "38",
+          "label": "3/8",
+          "value": 9
+        },
+        {
+          "id": "13",
+          "label": "1/3",
+          "value": 10
+        },
+        {
+          "id": "14",
+          "label": "1/4",
+          "value": 11
+        },
+        {
+          "id": "316",
+          "label": "3/16",
+          "value": 12
+        },
+        {
+          "id": "16",
+          "label": "1/6",
+          "value": 13
+        },
+        {
+          "id": "18",
+          "label": "1/8",
+          "value": 14
+        },
+        {
+          "id": "332",
+          "label": "3/32",
+          "value": 15
+        },
+        {
+          "id": "112",
+          "label": "1/12",
+          "value": 16
+        },
+        {
+          "id": "116",
+          "label": "1/16",
+          "value": 17
+        },
+        {
+          "id": "124",
+          "label": "1/24",
+          "value": 18
+        },
+        {
+          "id": "132",
+          "label": "1/32",
+          "value": 19
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncNote"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone2.modLfo.pitchDepth",
+      "name": "Modulation LFO Pitch Depth",
+      "group": "Tone 2 · Mod LFO",
+      "address": "10 00 02 2C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.modLfo.filterDepth",
+      "name": "Modulation LFO Filter Depth",
+      "group": "Tone 2 · Mod LFO",
+      "address": "10 00 02 2D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "filterDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.modLfo.ampDepth",
+      "name": "Modulation LFO Amp Depth",
+      "group": "Tone 2 · Mod LFO",
+      "address": "10 00 02 2E",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "ampDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone2.modLfo.panDepth",
+      "name": "Modulation LFO Pan Depth",
+      "group": "Tone 2 · Mod LFO",
+      "address": "10 00 02 2F",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "panDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.osc.wave",
+      "name": "OSC Wave",
+      "group": "Tone 3 · OSC",
+      "address": "10 00 03 00",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "saw",
+      "choices": [
+        {
+          "id": "saw",
+          "label": "SAW",
+          "value": 0
+        },
+        {
+          "id": "sqr",
+          "label": "SQR",
+          "value": 1
+        },
+        {
+          "id": "pwsqr",
+          "label": "PW-SQR",
+          "value": 2
+        },
+        {
+          "id": "tri",
+          "label": "TRI",
+          "value": 3
+        },
+        {
+          "id": "sine",
+          "label": "SINE",
+          "value": 4
+        },
+        {
+          "id": "noise",
+          "label": "NOISE",
+          "value": 5
+        },
+        {
+          "id": "supersaw",
+          "label": "SUPER-SAW",
+          "value": 6
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "wave"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone3.osc.waveVariation",
+      "name": "OSC Wave Variation",
+      "group": "Tone 3 · OSC",
+      "address": "10 00 03 01",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "a",
+      "choices": [
+        {
+          "id": "a",
+          "label": "A",
+          "value": 0
+        },
+        {
+          "id": "b",
+          "label": "B",
+          "value": 1
+        },
+        {
+          "id": "c",
+          "label": "C",
+          "value": 2
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "waveVariation"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone3.osc.pitch",
+      "name": "OSC Pitch",
+      "group": "Tone 3 · OSC",
+      "address": "10 00 03 03",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 40,
+        "max": 88
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitch",
+        "min": -24,
+        "max": 24
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.osc.detune",
+      "name": "OSC Detune",
+      "group": "Tone 3 · OSC",
+      "address": "10 00 03 04",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 14,
+        "max": 114
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "detune",
+        "min": -50,
+        "max": 50
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.osc.pulseWidthModDepth",
+      "name": "OSC Pulse Width Mod Depth",
+      "group": "Tone 3 · OSC",
+      "address": "10 00 03 05",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pulseWidthModDepth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.osc.pulseWidth",
+      "name": "OSC Pulse Width",
+      "group": "Tone 3 · OSC",
+      "address": "10 00 03 06",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pulseWidth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.osc.pitchEnvAttackTime",
+      "name": "OSC Pitch Env Attack Time",
+      "group": "Tone 3 · OSC",
+      "address": "10 00 03 07",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchEnvAttackTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.osc.pitchEnvDecay",
+      "name": "OSC Pitch Env Decay",
+      "group": "Tone 3 · OSC",
+      "address": "10 00 03 08",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchEnvDecay"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.osc.pitchEnvDepth",
+      "name": "OSC Pitch Env Depth",
+      "group": "Tone 3 · OSC",
+      "address": "10 00 03 09",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchEnvDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.filter.mode",
+      "name": "FILTER Mode",
+      "group": "Tone 3 · Filter",
+      "address": "10 00 03 0A",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "bypass",
+      "choices": [
+        {
+          "id": "bypass",
+          "label": "BYPASS",
+          "value": 0
+        },
+        {
+          "id": "lpf",
+          "label": "LPF",
+          "value": 1
+        },
+        {
+          "id": "hpf",
+          "label": "HPF",
+          "value": 2
+        },
+        {
+          "id": "bpf",
+          "label": "BPF",
+          "value": 3
+        },
+        {
+          "id": "pkg",
+          "label": "PKG",
+          "value": 4
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "mode"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone3.filter.slope",
+      "name": "FILTER Slope",
+      "group": "Tone 3 · Filter",
+      "address": "10 00 03 0B",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "12db",
+      "choices": [
+        {
+          "id": "12db",
+          "label": "-12 dB",
+          "value": 0
+        },
+        {
+          "id": "24db",
+          "label": "-24 dB",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "slope"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone3.filter.cutoff",
+      "name": "FILTER Cutoff",
+      "group": "Tone 3 · Filter",
+      "address": "10 00 03 0C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "cutoff"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.filter.cutoffKeyfollow",
+      "name": "FILTER Cutoff Keyfollow",
+      "group": "Tone 3 · Filter",
+      "address": "10 00 03 0D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 54,
+        "max": 74
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "cutoffKeyfollow",
+        "min": -100,
+        "max": 100
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.filter.envVelocitySens",
+      "name": "FILTER Env Velocity Sens",
+      "group": "Tone 3 · Filter",
+      "address": "10 00 03 0E",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envVelocitySens",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.filter.resonance",
+      "name": "FILTER Resonance",
+      "group": "Tone 3 · Filter",
+      "address": "10 00 03 0F",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "resonance"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.filter.envAttackTime",
+      "name": "FILTER Env Attack Time",
+      "group": "Tone 3 · Filter",
+      "address": "10 00 03 10",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envAttackTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.filter.envDecayTime",
+      "name": "FILTER Env Decay Time",
+      "group": "Tone 3 · Filter",
+      "address": "10 00 03 11",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envDecayTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.filter.envSustainLevel",
+      "name": "FILTER Env Sustain Level",
+      "group": "Tone 3 · Filter",
+      "address": "10 00 03 12",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envSustainLevel"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.filter.envReleaseTime",
+      "name": "FILTER Env Release Time",
+      "group": "Tone 3 · Filter",
+      "address": "10 00 03 13",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envReleaseTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.filter.envDepth",
+      "name": "FILTER Env Depth",
+      "group": "Tone 3 · Filter",
+      "address": "10 00 03 14",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.amp.level",
+      "name": "AMP Level",
+      "group": "Tone 3 · Amp",
+      "address": "10 00 03 15",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.amp.levelVelocitySens",
+      "name": "AMP Level Velocity Sens",
+      "group": "Tone 3 · Amp",
+      "address": "10 00 03 16",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "levelVelocitySens",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.amp.envAttackTime",
+      "name": "AMP Env Attack Time",
+      "group": "Tone 3 · Amp",
+      "address": "10 00 03 17",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envAttackTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.amp.envDecayTime",
+      "name": "AMP Env Decay Time",
+      "group": "Tone 3 · Amp",
+      "address": "10 00 03 18",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envDecayTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.amp.envSustainLevel",
+      "name": "AMP Env Sustain Level",
+      "group": "Tone 3 · Amp",
+      "address": "10 00 03 19",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envSustainLevel"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.amp.envReleaseTime",
+      "name": "AMP Env Release Time",
+      "group": "Tone 3 · Amp",
+      "address": "10 00 03 1A",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "envReleaseTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.amp.pan",
+      "name": "AMP Pan",
+      "group": "Tone 3 · Amp",
+      "address": "10 00 03 1B",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pan",
+        "min": -64,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.lfo.shape",
+      "name": "LFO Shape",
+      "group": "Tone 3 · LFO",
+      "address": "10 00 03 1C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "tri",
+      "choices": [
+        {
+          "id": "tri",
+          "label": "TRI",
+          "value": 0
+        },
+        {
+          "id": "sin",
+          "label": "SIN",
+          "value": 1
+        },
+        {
+          "id": "saw",
+          "label": "SAW",
+          "value": 2
+        },
+        {
+          "id": "sqr",
+          "label": "SQR",
+          "value": 3
+        },
+        {
+          "id": "sh",
+          "label": "S&H",
+          "value": 4
+        },
+        {
+          "id": "rnd",
+          "label": "RND",
+          "value": 5
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "shape"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone3.lfo.rate",
+      "name": "LFO Rate",
+      "group": "Tone 3 · LFO",
+      "address": "10 00 03 1D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "rate"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.lfo.tempoSyncSwitch",
+      "name": "LFO Tempo Sync Switch",
+      "group": "Tone 3 · LFO",
+      "address": "10 00 03 1E",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone3.lfo.tempoSyncNote",
+      "name": "LFO Tempo Sync Note",
+      "group": "Tone 3 · LFO",
+      "address": "10 00 03 1F",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "16",
+      "choices": [
+        {
+          "id": "16",
+          "label": "16",
+          "value": 0
+        },
+        {
+          "id": "12",
+          "label": "12",
+          "value": 1
+        },
+        {
+          "id": "8",
+          "label": "8",
+          "value": 2
+        },
+        {
+          "id": "4",
+          "label": "4",
+          "value": 3
+        },
+        {
+          "id": "2",
+          "label": "2",
+          "value": 4
+        },
+        {
+          "id": "1",
+          "label": "1",
+          "value": 5
+        },
+        {
+          "id": "34",
+          "label": "3/4",
+          "value": 6
+        },
+        {
+          "id": "23",
+          "label": "2/3",
+          "value": 7
+        },
+        {
+          "id": "12",
+          "label": "1/2",
+          "value": 8
+        },
+        {
+          "id": "38",
+          "label": "3/8",
+          "value": 9
+        },
+        {
+          "id": "13",
+          "label": "1/3",
+          "value": 10
+        },
+        {
+          "id": "14",
+          "label": "1/4",
+          "value": 11
+        },
+        {
+          "id": "316",
+          "label": "3/16",
+          "value": 12
+        },
+        {
+          "id": "16",
+          "label": "1/6",
+          "value": 13
+        },
+        {
+          "id": "18",
+          "label": "1/8",
+          "value": 14
+        },
+        {
+          "id": "332",
+          "label": "3/32",
+          "value": 15
+        },
+        {
+          "id": "112",
+          "label": "1/12",
+          "value": 16
+        },
+        {
+          "id": "116",
+          "label": "1/16",
+          "value": 17
+        },
+        {
+          "id": "124",
+          "label": "1/24",
+          "value": 18
+        },
+        {
+          "id": "132",
+          "label": "1/32",
+          "value": 19
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncNote"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone3.lfo.fadeTime",
+      "name": "LFO Fade Time",
+      "group": "Tone 3 · LFO",
+      "address": "10 00 03 20",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "fadeTime"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.lfo.keyTrigger",
+      "name": "LFO Key Trigger",
+      "group": "Tone 3 · LFO",
+      "address": "10 00 03 21",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "keyTrigger"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone3.lfo.pitchDepth",
+      "name": "LFO Pitch Depth",
+      "group": "Tone 3 · LFO",
+      "address": "10 00 03 22",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.lfo.filterDepth",
+      "name": "LFO Filter Depth",
+      "group": "Tone 3 · LFO",
+      "address": "10 00 03 23",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "filterDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.lfo.ampDepth",
+      "name": "LFO Amp Depth",
+      "group": "Tone 3 · LFO",
+      "address": "10 00 03 24",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "ampDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.lfo.panDepth",
+      "name": "LFO Pan Depth",
+      "group": "Tone 3 · LFO",
+      "address": "10 00 03 25",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "panDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.modLfo.shape",
+      "name": "Modulation LFO Shape",
+      "group": "Tone 3 · Mod LFO",
+      "address": "10 00 03 26",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "tri",
+      "choices": [
+        {
+          "id": "tri",
+          "label": "TRI",
+          "value": 0
+        },
+        {
+          "id": "sin",
+          "label": "SIN",
+          "value": 1
+        },
+        {
+          "id": "saw",
+          "label": "SAW",
+          "value": 2
+        },
+        {
+          "id": "sqr",
+          "label": "SQR",
+          "value": 3
+        },
+        {
+          "id": "sh",
+          "label": "S&H",
+          "value": 4
+        },
+        {
+          "id": "rnd",
+          "label": "RND",
+          "value": 5
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "shape"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone3.modLfo.rate",
+      "name": "Modulation LFO Rate",
+      "group": "Tone 3 · Mod LFO",
+      "address": "10 00 03 27",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "rate"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.modLfo.tempoSyncSwitch",
+      "name": "Modulation LFO Tempo Sync Switch",
+      "group": "Tone 3 · Mod LFO",
+      "address": "10 00 03 28",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "ON",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncSwitch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone3.modLfo.tempoSyncNote",
+      "name": "Modulation LFO Tempo Sync Note",
+      "group": "Tone 3 · Mod LFO",
+      "address": "10 00 03 29",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "16",
+      "choices": [
+        {
+          "id": "16",
+          "label": "16",
+          "value": 0
+        },
+        {
+          "id": "12",
+          "label": "12",
+          "value": 1
+        },
+        {
+          "id": "8",
+          "label": "8",
+          "value": 2
+        },
+        {
+          "id": "4",
+          "label": "4",
+          "value": 3
+        },
+        {
+          "id": "2",
+          "label": "2",
+          "value": 4
+        },
+        {
+          "id": "1",
+          "label": "1",
+          "value": 5
+        },
+        {
+          "id": "34",
+          "label": "3/4",
+          "value": 6
+        },
+        {
+          "id": "23",
+          "label": "2/3",
+          "value": 7
+        },
+        {
+          "id": "12",
+          "label": "1/2",
+          "value": 8
+        },
+        {
+          "id": "38",
+          "label": "3/8",
+          "value": 9
+        },
+        {
+          "id": "13",
+          "label": "1/3",
+          "value": 10
+        },
+        {
+          "id": "14",
+          "label": "1/4",
+          "value": 11
+        },
+        {
+          "id": "316",
+          "label": "3/16",
+          "value": 12
+        },
+        {
+          "id": "16",
+          "label": "1/6",
+          "value": 13
+        },
+        {
+          "id": "18",
+          "label": "1/8",
+          "value": 14
+        },
+        {
+          "id": "332",
+          "label": "3/32",
+          "value": 15
+        },
+        {
+          "id": "112",
+          "label": "1/12",
+          "value": 16
+        },
+        {
+          "id": "116",
+          "label": "1/16",
+          "value": 17
+        },
+        {
+          "id": "124",
+          "label": "1/24",
+          "value": 18
+        },
+        {
+          "id": "132",
+          "label": "1/32",
+          "value": 19
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "tempoSyncNote"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "tone3.modLfo.pitchDepth",
+      "name": "Modulation LFO Pitch Depth",
+      "group": "Tone 3 · Mod LFO",
+      "address": "10 00 03 2C",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "pitchDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.modLfo.filterDepth",
+      "name": "Modulation LFO Filter Depth",
+      "group": "Tone 3 · Mod LFO",
+      "address": "10 00 03 2D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "filterDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.modLfo.ampDepth",
+      "name": "Modulation LFO Amp Depth",
+      "group": "Tone 3 · Mod LFO",
+      "address": "10 00 03 2E",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "ampDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "tone3.modLfo.panDepth",
+      "name": "Modulation LFO Pan Depth",
+      "group": "Tone 3 · Mod LFO",
+      "address": "10 00 03 2F",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "panDepth",
+        "min": -63,
+        "max": 63
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "master.volume",
+      "name": "Master Volume",
+      "group": "Global",
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 100,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "Volume"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "controlChange"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "volumeCc",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    }
+  ],
+  "tests": [
+    {
+      "name": "Universal Identity Request",
+      "kind": "identityRequest",
+      "expectedHex": "F0 7E 10 06 01 F7"
+    },
+    {
+      "name": "Tone 1 Filter Cutoff 64",
+      "parameter": "tone1.filter.cutoff",
+      "value": 64,
+      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 0C 40 23 F7"
+    },
+    {
+      "name": "Tone 2 Filter Cutoff 64 (same value, +0x0100 address)",
+      "parameter": "tone2.filter.cutoff",
+      "value": 64,
+      "expectedHex": "F0 41 10 00 00 41 12 10 00 02 0C 40 22 F7"
+    },
+    {
+      "name": "Tone 3 Filter Cutoff 64 (same value, +0x0200 address)",
+      "parameter": "tone3.filter.cutoff",
+      "value": 64,
+      "expectedHex": "F0 41 10 00 00 41 12 10 00 03 0C 40 21 F7"
+    },
+    {
+      "name": "Tone 1 OSC Wave = SUPER-SAW",
+      "parameter": "tone1.osc.wave",
+      "value": 6,
+      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 00 06 69 F7"
+    },
+    {
+      "name": "Tone 3 AMP Pan hard left (wire 0 = L64)",
+      "parameter": "tone3.amp.pan",
+      "value": 0,
+      "expectedHex": "F0 41 10 00 00 41 12 10 00 03 1B 00 52 F7"
+    },
+    {
+      "name": "Patch Level 127",
+      "parameter": "common.patchLevel",
+      "value": 127,
+      "expectedHex": "F0 41 10 00 00 41 12 10 00 00 0C 7F 65 F7"
+    }
+  ]
+}

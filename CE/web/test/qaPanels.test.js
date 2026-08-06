@@ -34,6 +34,7 @@ import CanvasControl from '../src/CE_Application/editor/CanvasControl.svelte';
 import { SHEETS, serializeSheet } from '../../../tools/scripts/qa/make-qa-panels.mjs';
 import { coveredTypes, GROUPS } from '../../../tools/scripts/qa/sheets/components.mjs';
 import { coveredSections, EXEMPT, RECIPES } from '../../../tools/scripts/qa/sheets/properties.mjs';
+import { gaiaProfile } from '../../../tools/scripts/qa/sheets/gaia.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const QA_DIR = path.join(REPO, 'CE/qa');
@@ -172,7 +173,7 @@ test('the SSR exemption list names real component types, with reasons', () => {
 
 /* ------------------------------------------------------------------ 4. freshness */
 
-for (const sheet of SHEETS) {
+for (const sheet of SHEETS.filter((s) => s.commit)) {
   test(`${sheet.file} on disk matches the generator`, () => {
     let committed;
     try {
@@ -183,3 +184,52 @@ for (const sheet of SHEETS) {
     assert.equal(committed, serializeSheet(sheet), `CE/qa/${sheet.file} is stale — run: node tools/scripts/qa/make-qa-panels.mjs`);
   });
 }
+
+/* ------------------------------------------------------------------ 5. QA-06 device bindings */
+
+test('QA-06 binds every parameter the GAIA profile declares', () => {
+  // A device sheet that covers most of a profile is the same defect as the fifteen-parameter
+  // profile it replaced: it looks complete, and the parameter nobody bound is the one nobody
+  // finds. So the assertion is equality, not coverage.
+  const sheet = SHEETS.find((s) => s.file === 'QA-06-roland-gaia.cepanel');
+  const doc = JSON.parse(serializeSheet(sheet));
+
+  const bound = new Set();
+  for (const control of doc.controls) {
+    for (const binding of control._children?.DeviceBindings?.bindings ?? []) {
+      if (binding.parameterId) bound.add(binding.parameterId);
+    }
+  }
+
+  const declared = new Set(gaiaProfile().parameters.map((p) => p.id));
+  const unbound = [...declared].filter((id) => !bound.has(id));
+  const phantom = [...bound].filter((id) => !declared.has(id));
+
+  assert.deepEqual(unbound, [], `profile parameters with no control on QA-06: ${unbound.join(', ')}`);
+  assert.deepEqual(phantom, [], `QA-06 binds parameters the profile does not declare: ${phantom.join(', ')}`);
+});
+
+test('QA-06 keeps the three tones on separate addresses', () => {
+  // The failure this catches is a copy-paste one: three columns that all drive tone 1, which
+  // looks completely correct on screen and sends every edit to the wrong layer.
+  const sheet = SHEETS.find((s) => s.file === 'QA-06-roland-gaia.cepanel');
+  const doc = JSON.parse(serializeSheet(sheet));
+  const perTone = { tone1: 0, tone2: 0, tone3: 0 };
+
+  for (const control of doc.controls) {
+    for (const binding of control._children?.DeviceBindings?.bindings ?? []) {
+      const prefix = String(binding.parameterId ?? '').split('.')[0];
+      if (prefix in perTone) perTone[prefix] += 1;
+    }
+  }
+
+  assert.ok(perTone.tone1 > 0, 'no tone 1 bindings at all');
+  assert.equal(perTone.tone1, perTone.tone2, 'tone 1 and tone 2 have different numbers of bound controls');
+  assert.equal(perTone.tone2, perTone.tone3, 'tone 2 and tone 3 have different numbers of bound controls');
+});
+
+test('QA-06 declares the profile it needs', () => {
+  const sheet = SHEETS.find((s) => s.file === 'QA-06-roland-gaia.cepanel');
+  const doc = JSON.parse(serializeSheet(sheet));
+  assert.deepEqual(doc.requiredProfiles, [{ role: 'primary', profileId: 'roland-gaia-sh01', version: '*' }]);
+});

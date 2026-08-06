@@ -1923,3 +1923,6 @@ Source/CPanel_Build/modules/juce_gui_basics/windows/juce_TopLevelWindow.h
 Source/CPanel_Build/modules/juce_gui_basics/windows/juce_VBlankAttachment.cpp
 Source/CPanel_Build/modules/juce_gui_basics/windows/juce_VBlankAttachment.h
 Source/CPanel_Build/modules/juce_gui_basics/windows/juce_WindowUtils.h
+
+# Generated on demand — see CE/qa/README.md (28 MB; not worth committing)
+CE/qa/QA-06-roland-gaia.cepanel
