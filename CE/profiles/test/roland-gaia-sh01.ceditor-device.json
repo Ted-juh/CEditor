@@ -42,19 +42,16 @@
     "retries": 0
   },
   "coverage": {
-    "singleParameterWrite": "complete-for-patch-common-and-all-three-tones",
-    "editBufferDumpRequest": "block-rq1-per-tone",
+    "singleParameterWrite": "complete-for-every-block-the-front-panel-reaches",
+    "editBufferDumpRequest": "block-rq1-per-block",
     "editBufferDumpParse": "notImplemented",
     "bankDump": "notImplemented",
     "patchNameEdit": "complete-single-dt1-write",
     "realtimeEditing": "complete-for-transcribed-blocks",
     "notTranscribed": [
-      "Patch Distortion",
-      "Patch Flanger",
-      "Patch Delay",
-      "Patch Reverb",
-      "Patch Arpeggio"
-    ]
+      "Patch Arpeggio Pattern (Note 1-16)"
+    ],
+    "effectParameterMeanings": "type-dependent; not documented in the MIDI implementation"
   },
   "timing": {
     "minDelayBetweenMessagesMs": 20
@@ -188,6 +185,76 @@
       },
       "timeoutMs": 1000,
       "retries": 1
+    },
+    {
+      "id": "requestDistortion",
+      "name": "Request distortion",
+      "kind": "sysex",
+      "messageRecipe": "rq1",
+      "address": "10 00 04 00",
+      "size": "00 00 01 01",
+      "response": {
+        "kind": "dt1",
+        "address": "10 00 04 00"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestFlanger",
+      "name": "Request flanger",
+      "kind": "sysex",
+      "messageRecipe": "rq1",
+      "address": "10 00 06 00",
+      "size": "00 00 00 51",
+      "response": {
+        "kind": "dt1",
+        "address": "10 00 06 00"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestDelay",
+      "name": "Request delay",
+      "kind": "sysex",
+      "messageRecipe": "rq1",
+      "address": "10 00 08 00",
+      "size": "00 00 00 51",
+      "response": {
+        "kind": "dt1",
+        "address": "10 00 08 00"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestReverb",
+      "name": "Request reverb",
+      "kind": "sysex",
+      "messageRecipe": "rq1",
+      "address": "10 00 0A 00",
+      "size": "00 00 00 51",
+      "response": {
+        "kind": "dt1",
+        "address": "10 00 0A 00"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioCommon",
+      "name": "Request arpeggioCommon",
+      "kind": "sysex",
+      "messageRecipe": "rq1",
+      "address": "10 00 0C 00",
+      "size": "00 00 00 08",
+      "response": {
+        "kind": "dt1",
+        "address": "10 00 0C 00"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
     }
   ],
   "startup": {
@@ -208,6 +275,21 @@
       },
       {
         "request": "requestTone3"
+      },
+      {
+        "request": "requestDistortion"
+      },
+      {
+        "request": "requestFlanger"
+      },
+      {
+        "request": "requestDelay"
+      },
+      {
+        "request": "requestReverb"
+      },
+      {
+        "request": "requestArpeggioCommon"
       }
     ]
   },
@@ -324,7 +406,7 @@
       }
     },
     {
-      "id": "common.arpeggioSwitch",
+      "id": "common.switch",
       "name": "Arpeggio Switch",
       "group": "Patch Common",
       "address": "10 00 00 10",
@@ -354,7 +436,7 @@
       ],
       "display": {
         "mode": "choice",
-        "shortLabel": "arpeggioSwitch"
+        "shortLabel": "switch"
       },
       "normalization": {
         "mode": "choiceIndex"
@@ -969,7 +1051,7 @@
       }
     },
     {
-      "id": "common.delayTempoSyncSwitch",
+      "id": "common.tempoSyncSwitch",
       "name": "Delay Tempo Sync Switch",
       "group": "Patch Common",
       "address": "10 00 00 22",
@@ -999,7 +1081,7 @@
       ],
       "display": {
         "mode": "choice",
-        "shortLabel": "delayTempoSyncSwitch"
+        "shortLabel": "tempoSyncSwitch"
       },
       "normalization": {
         "mode": "choiceIndex"
@@ -7782,6 +7864,4486 @@
       }
     },
     {
+      "id": "distortion.type",
+      "name": "Distortion Type",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 00",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "dist",
+          "label": "DIST",
+          "value": 1
+        },
+        {
+          "id": "fuzz",
+          "label": "FUZZ",
+          "value": 2
+        },
+        {
+          "id": "bitcrash",
+          "label": "BIT CRASH",
+          "value": 3
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "type"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "distortion.parameter1",
+      "name": "MFX Parameter 1",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 01",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter1",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter2",
+      "name": "MFX Parameter 2",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 05",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter2",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter3",
+      "name": "MFX Parameter 3",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 09",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter3",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter4",
+      "name": "MFX Parameter 4",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 0D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter4",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter5",
+      "name": "MFX Parameter 5",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 11",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter5",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter6",
+      "name": "MFX Parameter 6",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 15",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter6",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter7",
+      "name": "MFX Parameter 7",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 19",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter7",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter8",
+      "name": "MFX Parameter 8",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 1D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter8",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter9",
+      "name": "MFX Parameter 9",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 21",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter9",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter10",
+      "name": "MFX Parameter 10",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 25",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter10",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter11",
+      "name": "MFX Parameter 11",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 29",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter11",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter12",
+      "name": "MFX Parameter 12",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 2D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter12",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter13",
+      "name": "MFX Parameter 13",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 31",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter13",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter14",
+      "name": "MFX Parameter 14",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 35",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter14",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter15",
+      "name": "MFX Parameter 15",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 39",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter15",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter16",
+      "name": "MFX Parameter 16",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 3D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter16",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter17",
+      "name": "MFX Parameter 17",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 41",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter17",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter18",
+      "name": "MFX Parameter 18",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 45",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter18",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter19",
+      "name": "MFX Parameter 19",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 49",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter19",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter20",
+      "name": "MFX Parameter 20",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 4D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter20",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter21",
+      "name": "MFX Parameter 21",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 51",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter21",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter22",
+      "name": "MFX Parameter 22",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 55",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter22",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter23",
+      "name": "MFX Parameter 23",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 59",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter23",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter24",
+      "name": "MFX Parameter 24",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 5D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter24",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter25",
+      "name": "MFX Parameter 25",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 61",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter25",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter26",
+      "name": "MFX Parameter 26",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 65",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter26",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter27",
+      "name": "MFX Parameter 27",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 69",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter27",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter28",
+      "name": "MFX Parameter 28",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 6D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter28",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter29",
+      "name": "MFX Parameter 29",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 71",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter29",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter30",
+      "name": "MFX Parameter 30",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 75",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter30",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter31",
+      "name": "MFX Parameter 31",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 79",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter31",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "distortion.parameter32",
+      "name": "MFX Parameter 32",
+      "group": "Effects · Distortion",
+      "address": "10 00 04 7D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter32",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.type",
+      "name": "Flanger Type",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 00",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "flanger",
+          "label": "FLANGER",
+          "value": 1
+        },
+        {
+          "id": "phaser",
+          "label": "PHASER",
+          "value": 2
+        },
+        {
+          "id": "pitchshifter",
+          "label": "PITCH SHIFTER",
+          "value": 3
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "type"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "flanger.parameter1",
+      "name": "Flanger Parameter 1",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 01",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter1",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter2",
+      "name": "Flanger Parameter 2",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 05",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter2",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter3",
+      "name": "Flanger Parameter 3",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 09",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter3",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter4",
+      "name": "Flanger Parameter 4",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 0D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter4",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter5",
+      "name": "Flanger Parameter 5",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 11",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter5",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter6",
+      "name": "Flanger Parameter 6",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 15",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter6",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter7",
+      "name": "Flanger Parameter 7",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 19",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter7",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter8",
+      "name": "Flanger Parameter 8",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 1D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter8",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter9",
+      "name": "Flanger Parameter 9",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 21",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter9",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter10",
+      "name": "Flanger Parameter 10",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 25",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter10",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter11",
+      "name": "Flanger Parameter 11",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 29",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter11",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter12",
+      "name": "Flanger Parameter 12",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 2D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter12",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter13",
+      "name": "Flanger Parameter 13",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 31",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter13",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter14",
+      "name": "Flanger Parameter 14",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 35",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter14",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter15",
+      "name": "Flanger Parameter 15",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 39",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter15",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter16",
+      "name": "Flanger Parameter 16",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 3D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter16",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter17",
+      "name": "Flanger Parameter 17",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 41",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter17",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter18",
+      "name": "Flanger Parameter 18",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 45",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter18",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter19",
+      "name": "Flanger Parameter 19",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 49",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter19",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "flanger.parameter20",
+      "name": "Flanger Parameter 20",
+      "group": "Effects · Flanger",
+      "address": "10 00 06 4D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter20",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.type",
+      "name": "Delay Type",
+      "group": "Effects · Delay",
+      "address": "10 00 08 00",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "delay",
+          "label": "DELAY",
+          "value": 1
+        },
+        {
+          "id": "panningdelay",
+          "label": "PANNING DELAY",
+          "value": 2
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "type"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "delay.parameter1",
+      "name": "Delay Parameter 1",
+      "group": "Effects · Delay",
+      "address": "10 00 08 01",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter1",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter2",
+      "name": "Delay Parameter 2",
+      "group": "Effects · Delay",
+      "address": "10 00 08 05",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter2",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter3",
+      "name": "Delay Parameter 3",
+      "group": "Effects · Delay",
+      "address": "10 00 08 09",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter3",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter4",
+      "name": "Delay Parameter 4",
+      "group": "Effects · Delay",
+      "address": "10 00 08 0D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter4",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter5",
+      "name": "Delay Parameter 5",
+      "group": "Effects · Delay",
+      "address": "10 00 08 11",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter5",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter6",
+      "name": "Delay Parameter 6",
+      "group": "Effects · Delay",
+      "address": "10 00 08 15",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter6",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter7",
+      "name": "Delay Parameter 7",
+      "group": "Effects · Delay",
+      "address": "10 00 08 19",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter7",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter8",
+      "name": "Delay Parameter 8",
+      "group": "Effects · Delay",
+      "address": "10 00 08 1D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter8",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter9",
+      "name": "Delay Parameter 9",
+      "group": "Effects · Delay",
+      "address": "10 00 08 21",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter9",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter10",
+      "name": "Delay Parameter 10",
+      "group": "Effects · Delay",
+      "address": "10 00 08 25",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter10",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter11",
+      "name": "Delay Parameter 11",
+      "group": "Effects · Delay",
+      "address": "10 00 08 29",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter11",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter12",
+      "name": "Delay Parameter 12",
+      "group": "Effects · Delay",
+      "address": "10 00 08 2D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter12",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter13",
+      "name": "Delay Parameter 13",
+      "group": "Effects · Delay",
+      "address": "10 00 08 31",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter13",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter14",
+      "name": "Delay Parameter 14",
+      "group": "Effects · Delay",
+      "address": "10 00 08 35",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter14",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter15",
+      "name": "Delay Parameter 15",
+      "group": "Effects · Delay",
+      "address": "10 00 08 39",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter15",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter16",
+      "name": "Delay Parameter 16",
+      "group": "Effects · Delay",
+      "address": "10 00 08 3D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter16",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter17",
+      "name": "Delay Parameter 17",
+      "group": "Effects · Delay",
+      "address": "10 00 08 41",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter17",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter18",
+      "name": "Delay Parameter 18",
+      "group": "Effects · Delay",
+      "address": "10 00 08 45",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter18",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter19",
+      "name": "Delay Parameter 19",
+      "group": "Effects · Delay",
+      "address": "10 00 08 49",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter19",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "delay.parameter20",
+      "name": "Delay Parameter 20",
+      "group": "Effects · Delay",
+      "address": "10 00 08 4D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter20",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.type",
+      "name": "Reverb Type",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 00",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "OFF",
+          "value": 0
+        },
+        {
+          "id": "reverb",
+          "label": "REVERB",
+          "value": 1
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "type"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "reverb.parameter1",
+      "name": "Reverb Parameter 1",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 01",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter1",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter2",
+      "name": "Reverb Parameter 2",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 05",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter2",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter3",
+      "name": "Reverb Parameter 3",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 09",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter3",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter4",
+      "name": "Reverb Parameter 4",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 0D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter4",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter5",
+      "name": "Reverb Parameter 5",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 11",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter5",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter6",
+      "name": "Reverb Parameter 6",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 15",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter6",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter7",
+      "name": "Reverb Parameter 7",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 19",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter7",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter8",
+      "name": "Reverb Parameter 8",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 1D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter8",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter9",
+      "name": "Reverb Parameter 9",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 21",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter9",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter10",
+      "name": "Reverb Parameter 10",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 25",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter10",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter11",
+      "name": "Reverb Parameter 11",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 29",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter11",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter12",
+      "name": "Reverb Parameter 12",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 2D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter12",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter13",
+      "name": "Reverb Parameter 13",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 31",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter13",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter14",
+      "name": "Reverb Parameter 14",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 35",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter14",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter15",
+      "name": "Reverb Parameter 15",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 39",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter15",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter16",
+      "name": "Reverb Parameter 16",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 3D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter16",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter17",
+      "name": "Reverb Parameter 17",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 41",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter17",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter18",
+      "name": "Reverb Parameter 18",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 45",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter18",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter19",
+      "name": "Reverb Parameter 19",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 49",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter19",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "reverb.parameter20",
+      "name": "Reverb Parameter 20",
+      "group": "Effects · Reverb",
+      "address": "10 00 0A 4D",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 12768,
+        "max": 52768
+      },
+      "default": 32768,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "parameter20",
+        "min": -20000,
+        "max": 20000
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 4
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "arp.grid",
+      "name": "Arpeggio Grid",
+      "group": "Arpeggio",
+      "address": "10 00 0C 00",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "04",
+      "choices": [
+        {
+          "id": "04",
+          "label": "04_",
+          "value": 0
+        },
+        {
+          "id": "08",
+          "label": "08_",
+          "value": 1
+        },
+        {
+          "id": "08l",
+          "label": "08L",
+          "value": 2
+        },
+        {
+          "id": "08h",
+          "label": "08H",
+          "value": 3
+        },
+        {
+          "id": "08t",
+          "label": "08t",
+          "value": 4
+        },
+        {
+          "id": "16",
+          "label": "16_",
+          "value": 5
+        },
+        {
+          "id": "16l",
+          "label": "16L",
+          "value": 6
+        },
+        {
+          "id": "16h",
+          "label": "16H",
+          "value": 7
+        },
+        {
+          "id": "16t",
+          "label": "16t",
+          "value": 8
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "grid"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "arp.duration",
+      "name": "Arpeggio Duration",
+      "group": "Arpeggio",
+      "address": "10 00 0C 01",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "30",
+      "choices": [
+        {
+          "id": "30",
+          "label": "30",
+          "value": 0
+        },
+        {
+          "id": "40",
+          "label": "40",
+          "value": 1
+        },
+        {
+          "id": "50",
+          "label": "50",
+          "value": 2
+        },
+        {
+          "id": "60",
+          "label": "60",
+          "value": 3
+        },
+        {
+          "id": "70",
+          "label": "70",
+          "value": 4
+        },
+        {
+          "id": "80",
+          "label": "80",
+          "value": 5
+        },
+        {
+          "id": "90",
+          "label": "90",
+          "value": 6
+        },
+        {
+          "id": "100",
+          "label": "100",
+          "value": 7
+        },
+        {
+          "id": "120",
+          "label": "120",
+          "value": 8
+        },
+        {
+          "id": "ful",
+          "label": "FUL",
+          "value": 9
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "duration"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "arp.motif",
+      "name": "Arpeggio Motif",
+      "group": "Arpeggio",
+      "address": "10 00 0C 02",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Combobox"
+      },
+      "type": "choice",
+      "default": "upl",
+      "choices": [
+        {
+          "id": "upl",
+          "label": "UP/L",
+          "value": 0
+        },
+        {
+          "id": "uplh",
+          "label": "UP/L&H",
+          "value": 1
+        },
+        {
+          "id": "up",
+          "label": "UP/_",
+          "value": 2
+        },
+        {
+          "id": "downl",
+          "label": "DOWN/L",
+          "value": 3
+        },
+        {
+          "id": "downlh",
+          "label": "DOWN/L&H",
+          "value": 4
+        },
+        {
+          "id": "down",
+          "label": "DOWN/_",
+          "value": 5
+        },
+        {
+          "id": "updownl",
+          "label": "UP&DOWN/L",
+          "value": 6
+        },
+        {
+          "id": "updownlh",
+          "label": "UP&DOWN/L&H",
+          "value": 7
+        },
+        {
+          "id": "updown",
+          "label": "UP&DOWN/_",
+          "value": 8
+        },
+        {
+          "id": "randoml",
+          "label": "RANDOM/L",
+          "value": 9
+        },
+        {
+          "id": "random",
+          "label": "RANDOM/_",
+          "value": 10
+        },
+        {
+          "id": "phrase",
+          "label": "PHRASE",
+          "value": 11
+        }
+      ],
+      "display": {
+        "mode": "choice",
+        "shortLabel": "motif"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "arp.octaveRange",
+      "name": "Arpeggio Octave Range",
+      "group": "Arpeggio",
+      "address": "10 00 0C 03",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "bipolar",
+      "range": {
+        "min": 61,
+        "max": 67
+      },
+      "default": 64,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "octaveRange",
+        "min": -3,
+        "max": 3
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      }
+    },
+    {
+      "id": "arp.accentRate",
+      "name": "Arpeggio Accent Rate",
+      "group": "Arpeggio",
+      "address": "10 00 0C 04",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 100
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "accentRate"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "arp.velocity",
+      "name": "Arpeggio Velocity",
+      "group": "Arpeggio",
+      "address": "10 00 0C 05",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "description": "0 = REAL (played velocity); 1-127 = fixed",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "default": 0,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "velocity"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
+      "id": "arp.endStep",
+      "name": "End Step",
+      "group": "Arpeggio",
+      "address": "10 00 0C 06",
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Knob"
+      },
+      "type": "integer",
+      "range": {
+        "min": 1,
+        "max": 32
+      },
+      "default": 1,
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "endStep"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "nibbles",
+        "count": 2
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      }
+    },
+    {
       "id": "master.volume",
       "name": "Master Volume",
       "group": "Global",
@@ -7825,6 +12387,13 @@
       "name": "Universal Identity Request",
       "kind": "identityRequest",
       "expectedHex": "F0 7E 10 06 01 F7"
+    },
+    {
+      "name": "Reverb block request in User Patch A-2 (manual Example 2)",
+      "kind": "rq1",
+      "address": "20 01 0A 00",
+      "size": "00 00 00 51",
+      "expectedHex": "F0 41 10 00 00 41 11 20 01 0A 00 00 00 00 51 04 F7"
     },
     {
       "name": "Tone 1 Filter Cutoff 64",

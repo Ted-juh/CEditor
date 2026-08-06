@@ -18,7 +18,22 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { BLOCKS, MODEL, PATCH_COMMON, PATCH_TONE, TEMPORARY_PATCH } from './address-map.mjs';
+import {
+  BLOCK_SIZES, BLOCKS, MODEL, PATCH_ARPEGGIO_COMMON, PATCH_COMMON, PATCH_DELAY, PATCH_DISTORTION,
+  PATCH_FLANGER, PATCH_REVERB, PATCH_TONE, TEMPORARY_PATCH, USER_PATCH_A1,
+} from './address-map.mjs';
+
+/**
+ * The blocks that are not tones and not Patch Common: each is one table emitted once, against its
+ * own base. Kept as data so adding a block is a row here rather than another loop below.
+ */
+const EXTRA_BLOCKS = [
+  { block: 'distortion', prefix: 'distortion', group: 'Effects · Distortion', table: PATCH_DISTORTION },
+  { block: 'flanger', prefix: 'flanger', group: 'Effects · Flanger', table: PATCH_FLANGER },
+  { block: 'delay', prefix: 'delay', group: 'Effects · Delay', table: PATCH_DELAY },
+  { block: 'reverb', prefix: 'reverb', group: 'Effects · Reverb', table: PATCH_REVERB },
+  { block: 'arpeggioCommon', prefix: 'arp', group: 'Arpeggio', table: PATCH_ARPEGGIO_COMMON },
+];
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../../..');
@@ -53,6 +68,18 @@ function addressFor(blockOffset, paramOffset) {
   return formatBytes(sum);
 }
 
+/** A block inside user patch slot `n` (0 = A-1, 1 = A-2, ... 63 = H-8). */
+function addressForUserPatch(slot, blockOffset) {
+  const bytes = parseBytes(USER_PATCH_A1);
+  bytes[1] += slot;
+  const block = parseBytes(blockOffset);
+  block.forEach((value, i) => { bytes[i + 1] += value; });
+  for (let i = bytes.length - 1; i > 0; i--) {
+    if (bytes[i] > 0x7f) { bytes[i - 1] += Math.floor(bytes[i] / 0x80); bytes[i] %= 0x80; }
+  }
+  return formatBytes(bytes);
+}
+
 /* ------------------------------------------------------------------ naming */
 
 /** "FILTER Env Attack Time" -> { section: 'filter', leaf: 'envAttackTime' } */
@@ -60,6 +87,11 @@ function splitName(name) {
   const SECTIONS = [
     ['Modulation LFO ', 'modLfo'],
     ['OSC ', 'osc'], ['FILTER ', 'filter'], ['AMP ', 'amp'], ['LFO ', 'lfo'],
+    // Effect and arpeggio tables repeat their block's name in every row ("Distortion Type",
+    // "Flanger Parameter 3", "Arpeggio Grid"). The block is already in the id prefix, so strip it
+    // rather than emit distortion.distortionType.
+    ['Distortion ', ''], ['Flanger ', ''], ['Delay ', ''], ['Reverb ', ''],
+    ['Arpeggio ', ''], ['MFX ', ''],
   ];
   for (const [prefix, section] of SECTIONS) {
     if (name.startsWith(prefix)) return { section, leaf: camel(name.slice(prefix.length)) };
@@ -125,6 +157,7 @@ function buildParameter(entry, { idPrefix, group, blockOffset }) {
   return {
     ...base,
     type: bipolar && entry.displayMin < 0 ? 'bipolar' : 'integer',
+    ...(entry.note ? { description: entry.note } : {}),
     range: { min: entry.min, max: entry.max },
     default: bipolar ? Math.round((entry.min + entry.max) / 2) : entry.min,
     display: {
@@ -170,6 +203,12 @@ function rolandChecksum(bytes) {
   return (128 - (sum % 128)) % 128;
 }
 
+/** An RQ1 read, as the exact bytes that should appear on the wire. */
+function rq1Hex(deviceId, address, size) {
+  const body = [...parseBytes(address), ...parseBytes(size)];
+  return formatBytes([0xf0, 0x41, deviceId, 0x00, 0x00, 0x41, 0x11, ...body, rolandChecksum(body), 0xf7]);
+}
+
 /** A DT1 write, as the exact bytes that should appear on the wire. */
 function dt1Hex(deviceId, address, value) {
   const addr = parseBytes(address);
@@ -186,6 +225,17 @@ function buildTests(deviceId, parameters) {
   const byId = new Map(parameters.map((p) => [p.id, p]));
   const vectors = [
     { name: 'Universal Identity Request', kind: 'identityRequest', expectedHex: `F0 7E ${formatBytes([deviceId])} 06 01 F7` },
+    // The manual's Example 2, verbatim: RQ1 for REVERB in USER PATCH A-2. It is the only vector
+    // here that addresses a user patch rather than the edit buffer, and it is worth keeping for
+    // exactly that reason — it exercises the 20 nn 00 00 base and a size the manual states, so a
+    // mistake in either would show up against a printed answer rather than against our own.
+    {
+      name: 'Reverb block request in User Patch A-2 (manual Example 2)',
+      kind: 'rq1',
+      address: addressForUserPatch(1, BLOCKS.reverb),
+      size: BLOCK_SIZES.reverb,
+      expectedHex: rq1Hex(deviceId, addressForUserPatch(1, BLOCKS.reverb), BLOCK_SIZES.reverb),
+    },
   ];
 
   for (const [id, value, label] of [
@@ -222,6 +272,12 @@ export function buildProfile() {
         group: `Tone ${tone} · ${SECTION_LABEL[section] ?? 'Misc'}`,
         blockOffset: BLOCKS[`tone${tone}`],
       }));
+    }
+  }
+
+  for (const { block, prefix, group, table } of EXTRA_BLOCKS) {
+    for (const entry of table) {
+      parameters.push(buildParameter(entry, { idPrefix: prefix, group, blockOffset: BLOCKS[block] }));
     }
   }
 
@@ -281,13 +337,25 @@ export function buildProfile() {
       // against the manual; the effects and arpeggio blocks are not transcribed yet, and neither
       // is bulk dump parsing. Saying "broad" here would be the same lie the 15-parameter profile
       // told by omission.
-      singleParameterWrite: 'complete-for-patch-common-and-all-three-tones',
-      editBufferDumpRequest: 'block-rq1-per-tone',
+      singleParameterWrite: 'complete-for-every-block-the-front-panel-reaches',
+      editBufferDumpRequest: 'block-rq1-per-block',
       editBufferDumpParse: 'notImplemented',
       bankDump: 'notImplemented',
       patchNameEdit: 'complete-single-dt1-write',
       realtimeEditing: 'complete-for-transcribed-blocks',
-      notTranscribed: ['Patch Distortion', 'Patch Flanger', 'Patch Delay', 'Patch Reverb', 'Patch Arpeggio'],
+      notTranscribed: ['Patch Arpeggio Pattern (Note 1-16)'],
+      // Two honest gaps, both stated rather than papered over:
+      //
+      //  - The Arpeggio PATTERN blocks (00 0D 00 .. 00 1C 00) are sixteen notes x an original note
+      //    plus thirty-two steps: 528 values of step-sequencer data. They are addresses, not
+      //    controls — a panel drives them with an Arpeggiator component and a dump, not with 528
+      //    knobs — so they are deliberately not expanded into parameters.
+      //
+      //  - The effect parameters are named as the manual names them ("Flanger Parameter 3"). What
+      //    each one DOES depends on the selected type, and that mapping — including which three
+      //    become the front panel's CONTROL 1/2/3 — is in the owner's manual, not the MIDI
+      //    implementation. Renaming them from a guess would be worse than leaving them factual.
+      effectParameterMeanings: 'type-dependent; not documented in the MIDI implementation',
     },
     timing: { minDelayBetweenMessagesMs: 20 },
     messageRecipes: [
@@ -318,15 +386,20 @@ export function buildProfile() {
         retries: 0,
       },
       // One request per block, because that is how the synth answers: RQ1 with the block base and
-      // its total size. Tone sizes are 0x3E; Patch Common is 0x3D.
-      ...[['common', '00 00 00 3D'], ['tone1', '00 00 00 3E'], ['tone2', '00 00 00 3E'], ['tone3', '00 00 00 3E']]
-        .map(([block, size]) => ({
+      // its total size. Sizes come from BLOCK_SIZES, which is transcribed from the manual rather
+      // than computed from the last offset — the two disagree for Distortion.
+      ...[
+        ['common', 'common'], ['tone1', 'tone'], ['tone2', 'tone'], ['tone3', 'tone'],
+        ['distortion', 'distortion'], ['flanger', 'flanger'], ['delay', 'delay'],
+        ['reverb', 'reverb'], ['arpeggioCommon', 'arpeggioCommon'],
+      ]
+        .map(([block, sizeKey]) => ({
           id: `request${block[0].toUpperCase()}${block.slice(1)}`,
           name: `Request ${block}`,
           kind: 'sysex',
           messageRecipe: 'rq1',
           address: addressFor(BLOCKS[block], '00 00'),
-          size,
+          size: BLOCK_SIZES[sizeKey],
           response: { kind: 'dt1', address: addressFor(BLOCKS[block], '00 00') },
           timeoutMs: 1000,
           retries: 1,
@@ -335,7 +408,14 @@ export function buildProfile() {
     startup: {
       policy: 'pull',
       syncDirection: 'pull',
-      sync: [{ request: 'identityRequest' }, { request: 'requestCommon' }, { request: 'requestTone1' }, { request: 'requestTone2' }, { request: 'requestTone3' }],
+      sync: [
+        { request: 'identityRequest' },
+        { request: 'requestCommon' },
+        { request: 'requestTone1' }, { request: 'requestTone2' }, { request: 'requestTone3' },
+        { request: 'requestDistortion' }, { request: 'requestFlanger' },
+        { request: 'requestDelay' }, { request: 'requestReverb' },
+        { request: 'requestArpeggioCommon' },
+      ],
     },
     parameters,
     tests: buildTests(deviceId, parameters),
@@ -361,7 +441,10 @@ function main() {
   writeFileSync(out, json);
   const profile = JSON.parse(json);
   console.log(`Wrote ${path.relative(REPO, out)}`);
-  console.log(`  ${profile.parameters.length} parameters (${PATCH_COMMON.length - 11} common + 3 x ${PATCH_TONE.length} tone)`);
+  const groups = new Map();
+  for (const parameter of profile.parameters) groups.set(parameter.group, (groups.get(parameter.group) ?? 0) + 1);
+  console.log(`  ${profile.parameters.length} parameters across ${groups.size} groups`);
+  console.log(`  common ${PATCH_COMMON.length - 11}, tone 3 x ${PATCH_TONE.length}, effects ${PATCH_DISTORTION.length + PATCH_FLANGER.length + PATCH_DELAY.length + PATCH_REVERB.length}, arpeggio ${PATCH_ARPEGGIO_COMMON.length}`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main();

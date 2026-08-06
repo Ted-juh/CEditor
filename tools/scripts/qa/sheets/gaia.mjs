@@ -221,8 +221,32 @@ export function buildGaiaSheet() {
     deepest = Math.max(deepest, cursorY);
   }
 
+  // ---- Everything the tone columns did not claim: effects, arpeggio, anything added later.
+  //
+  // Derived rather than listed. The first version placed Patch Common and three tone columns and
+  // named nothing else, so when the profile grew from 162 parameters to 265 the sheet silently
+  // stopped covering 103 of them. The binding gate caught it, which is what the gate is for — but
+  // a sheet should not need a gate to notice a whole missing block. It now places every group it
+  // has not already placed, so a block added to the profile turns up here on the next run.
+  const placed = new Set([
+    'Patch Common', 'Global',
+    ...[1, 2, 3].flatMap((tone) => TONE_SECTIONS.map((section) => `Tone ${tone} \u00b7 ${section}`)),
+  ]);
+  const remaining = [...byGroup.keys()].filter((group) => !placed.has(group)).sort();
+
+  y = deepest + 28;
+  for (const group of remaining) {
+    const key = group.replace(/\W+/g, '_');
+    controls.push(label(group.toUpperCase(), { x: GRID.marginX, y, width: GRID.sheetWidth - GRID.marginX * 2, height: COLUMN.sectionHeight }, `gaia_grp_${key}`, { size: 11, bold: true, fill: 'FF262C31', colour: 'FFBFD4E6' }));
+    y += COLUMN.sectionHeight + 6;
+
+    const laid = layoutSection(byGroup.get(group), { x: GRID.marginX, y, columnWidth: GRID.sheetWidth - GRID.marginX * 2, keyPrefix: `gaia_${key}` });
+    controls.push(...laid.controls);
+    y = laid.bottom + 14;
+  }
+
   panel.controls = controls;
-  panel.height = deepest + GRID.marginY;
+  panel.height = y + GRID.marginY;
   // The panel declares which profile it needs, the way the editor writes it when you drop a
   // parameter onto a control — so opening this sheet asks for the profile rather than silently
   // rendering 162 unbound controls.

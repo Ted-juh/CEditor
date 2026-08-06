@@ -5,8 +5,18 @@ node tools/scripts/qa/roland-gaia/make-gaia-profile.mjs           # regenerate
 node tools/scripts/qa/roland-gaia/make-gaia-profile.mjs --check   # fail if the committed copy is stale
 ```
 
-Emits `CE/profiles/test/roland-gaia-sh01.ceditor-device.json` — **162 parameters**: Patch Common
-plus all three tone layers.
+Emits `CE/profiles/test/roland-gaia-sh01.ceditor-device.json` — **265 parameters**: Patch Common,
+all three tone layers, the four effect blocks, and Arpeggio Common.
+
+| Block | Base | Size | Parameters |
+|---|---|---|---|
+| Patch Common | `10 00 00 00` | `00 00 00 3D` | 26 (+ patch name as one 12-byte field) |
+| Patch Tone 1 / 2 / 3 | `10 00 01/02/03 00` | `00 00 00 3E` | 45 each |
+| Distortion | `10 00 04 00` | `00 00 01 01` | 33 |
+| Flanger | `10 00 06 00` | `00 00 00 51` | 21 |
+| Delay | `10 00 08 00` | `00 00 00 51` | 21 |
+| Reverb | `10 00 0A 00` | `00 00 00 51` | 21 |
+| Arpeggio Common | `10 00 0C 00` | `00 00 00 08` | 7 |
 
 ## Why this exists
 
@@ -41,32 +51,55 @@ what QA-06 then does.
 
 ## How it is verified
 
-`CE/web/test/gaiaProfile.test.js`, and the assertion that matters is the first one:
+`CE/web/test/gaiaProfile.test.js`, and the assertions that matter are the two that come from
+outside our own code:
 
-> **Roland's own worked example.** "SH-01 MIDI Implementation" v1.01, §4 Example 1 prints the exact
-> bytes for setting Tone 1 OSC Wave to SUPER-SAW:
+> **Example 1 — a DT1 write.** Setting Tone 1 OSC Wave to SUPER-SAW:
 >
 > ```
 > F0 41 10 00 00 41 12 10 00 01 00 06 69 F7
 > ```
 >
-> The generated profile's golden vector is that string, character for character. Address
-> arithmetic (four 7-bit bytes with carry) and the Roland checksum are both confirmed by something
-> outside our own code. No amount of internal consistency would have caught an error in either.
+> **Example 2 — an RQ1 read.** The REVERB block of USER PATCH A-2:
+>
+> ```
+> F0 41 10 00 00 41 11 20 01 0A 00 00 00 00 51 04 F7
+> ```
+>
+> Both are reproduced character for character. They check different things: Example 1 the edit
+> buffer, DT1 and a value; Example 2 the user-patch base (`20 nn 00 00`), RQ1 and a block size.
+> Address arithmetic (four 7-bit bytes with carry) and the Roland checksum are confirmed by a
+> printed answer rather than by our own consistency.
+
+**Block sizes are transcribed, not computed.** Deriving Distortion's size from its last offset
+gives `00 00 01 11`; the manual's table foot says `00 00 01 01`. A size that is too large is not a
+rounding error — the synth answers a different question, or does not answer at all. That one was
+caught by reading the table rather than by any test, which is why `BLOCK_SIZES` exists and why a
+test pins it.
 
 The rest: the 0x0100 stride on **every** parameter rather than a sample, every address 7-bit clean
 and unique, every choice parameter's default actually among its choices, and every bipolar
 parameter carrying a display range as well as a wire range — that last one is the difference
 between a pan knob reading "0" at centre and reading "64".
 
-## What is not transcribed
+## What is still not covered, and why
 
-Patch Distortion, Flanger, Delay, Reverb and Arpeggio. The profile's `coverage.notTranscribed`
-names them, and a test asserts it does. The demo profile's real failing was never being wrong; it
-was being silent, and repeating that would be worse the second time.
+**The arpeggio PATTERN blocks** (`00 0D 00` … `00 1C 00`) — sixteen notes, each an original note
+plus thirty-two steps. 528 values of step-sequencer data. They are addresses, not controls: a panel
+drives them with an Arpeggiator component and a dump, not with 528 knobs. Deliberately not expanded
+into parameters; `coverage.notTranscribed` says so and a test asserts it does.
 
-Bulk-dump parsing is also unbuilt (`editBufferDumpParse: notImplemented`), which is the same gap
-the 2026-08-03 completeness review flags as the missing preset/librarian layer.
+**What an effect parameter actually controls.** The manual gives `Flanger Parameter 3` an address,
+a range and that name. What it *does* depends on the selected type, and the mapping — including
+which three become the front panel's CONTROL 1/2/3 — lives in the owner's manual, not the MIDI
+implementation. The names here are the manual's names. Renaming them from a guess would be worse
+than leaving them factual, so `coverage.effectParameterMeanings` records the gap instead.
+
+**Bulk-dump parsing** (`editBufferDumpParse: notImplemented`) — the same gap the 2026-08-03
+completeness review flags as the missing preset/librarian layer.
+
+The demo profile's real failing was never being wrong; it was being silent. Repeating that would be
+worse the second time.
 
 ## Source
 

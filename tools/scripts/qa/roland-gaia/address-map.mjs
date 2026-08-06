@@ -110,6 +110,136 @@ export const PATCH_TONE = [
   {"offset":"00 2F","name":"Modulation LFO Pan Depth","min":1,"max":127,"displayMin":-63,"displayMax":63}
 ];
 
+// The four effect blocks share a shape: a Type selector, then a bank of 4-nibble parameters whose
+// MEANING depends on the type selected. The MIDI implementation gives the addresses and the ranges
+// and stops there — "Distortion Parameter 3" is what the manual calls it, and which front-panel
+// knob that is (EFFECTS has SELECT CONTROL, CONTROL 1/2/3 and LEVEL) is documented in the owner's
+// manual, not this one. So the names here are the manual's names. Anything better would be a guess
+// wearing a label.
+
+/** Patch Distortion — OFF / DIST / FUZZ / BIT CRASH, then 32 type-dependent parameters. */
+export const PATCH_DISTORTION = [
+  {"offset":"00 00","name":"Distortion Type","min":0,"max":3,"labels":["OFF","DIST","FUZZ","BIT CRASH"]},
+  {"offset":"00 01","name":"MFX Parameter 1","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 05","name":"MFX Parameter 2","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 09","name":"MFX Parameter 3","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 0D","name":"MFX Parameter 4","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 11","name":"MFX Parameter 5","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 15","name":"MFX Parameter 6","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 19","name":"MFX Parameter 7","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 1D","name":"MFX Parameter 8","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 21","name":"MFX Parameter 9","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 25","name":"MFX Parameter 10","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 29","name":"MFX Parameter 11","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 2D","name":"MFX Parameter 12","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 31","name":"MFX Parameter 13","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 35","name":"MFX Parameter 14","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 39","name":"MFX Parameter 15","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 3D","name":"MFX Parameter 16","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 41","name":"MFX Parameter 17","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 45","name":"MFX Parameter 18","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 49","name":"MFX Parameter 19","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 4D","name":"MFX Parameter 20","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 51","name":"MFX Parameter 21","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 55","name":"MFX Parameter 22","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 59","name":"MFX Parameter 23","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 5D","name":"MFX Parameter 24","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 61","name":"MFX Parameter 25","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 65","name":"MFX Parameter 26","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 69","name":"MFX Parameter 27","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 6D","name":"MFX Parameter 28","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 71","name":"MFX Parameter 29","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 75","name":"MFX Parameter 30","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 79","name":"MFX Parameter 31","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 7D","name":"MFX Parameter 32","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4}
+];
+
+/** Patch Flanger — OFF / FLANGER / PHASER / PITCH SHIFTER, then 20 type-dependent parameters. */
+export const PATCH_FLANGER = [
+  {"offset":"00 00","name":"Flanger Type","min":0,"max":3,"labels":["OFF","FLANGER","PHASER","PITCH SHIFTER"]},
+  {"offset":"00 01","name":"Flanger Parameter 1","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 05","name":"Flanger Parameter 2","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 09","name":"Flanger Parameter 3","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 0D","name":"Flanger Parameter 4","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 11","name":"Flanger Parameter 5","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 15","name":"Flanger Parameter 6","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 19","name":"Flanger Parameter 7","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 1D","name":"Flanger Parameter 8","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 21","name":"Flanger Parameter 9","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 25","name":"Flanger Parameter 10","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 29","name":"Flanger Parameter 11","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 2D","name":"Flanger Parameter 12","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 31","name":"Flanger Parameter 13","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 35","name":"Flanger Parameter 14","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 39","name":"Flanger Parameter 15","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 3D","name":"Flanger Parameter 16","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 41","name":"Flanger Parameter 17","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 45","name":"Flanger Parameter 18","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 49","name":"Flanger Parameter 19","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 4D","name":"Flanger Parameter 20","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4}
+];
+
+/** Patch Delay — OFF / DELAY / PANNING DELAY, then 20 type-dependent parameters. */
+export const PATCH_DELAY = [
+  {"offset":"00 00","name":"Delay Type","min":0,"max":2,"labels":["OFF","DELAY","PANNING DELAY"]},
+  {"offset":"00 01","name":"Delay Parameter 1","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 05","name":"Delay Parameter 2","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 09","name":"Delay Parameter 3","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 0D","name":"Delay Parameter 4","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 11","name":"Delay Parameter 5","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 15","name":"Delay Parameter 6","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 19","name":"Delay Parameter 7","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 1D","name":"Delay Parameter 8","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 21","name":"Delay Parameter 9","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 25","name":"Delay Parameter 10","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 29","name":"Delay Parameter 11","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 2D","name":"Delay Parameter 12","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 31","name":"Delay Parameter 13","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 35","name":"Delay Parameter 14","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 39","name":"Delay Parameter 15","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 3D","name":"Delay Parameter 16","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 41","name":"Delay Parameter 17","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 45","name":"Delay Parameter 18","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 49","name":"Delay Parameter 19","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 4D","name":"Delay Parameter 20","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4}
+];
+
+/** Patch Reverb — OFF / REVERB, then 20 type-dependent parameters. */
+export const PATCH_REVERB = [
+  {"offset":"00 00","name":"Reverb Type","min":0,"max":1,"labels":["OFF","REVERB"]},
+  {"offset":"00 01","name":"Reverb Parameter 1","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 05","name":"Reverb Parameter 2","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 09","name":"Reverb Parameter 3","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 0D","name":"Reverb Parameter 4","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 11","name":"Reverb Parameter 5","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 15","name":"Reverb Parameter 6","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 19","name":"Reverb Parameter 7","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 1D","name":"Reverb Parameter 8","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 21","name":"Reverb Parameter 9","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 25","name":"Reverb Parameter 10","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 29","name":"Reverb Parameter 11","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 2D","name":"Reverb Parameter 12","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 31","name":"Reverb Parameter 13","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 35","name":"Reverb Parameter 14","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 39","name":"Reverb Parameter 15","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 3D","name":"Reverb Parameter 16","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 41","name":"Reverb Parameter 17","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 45","name":"Reverb Parameter 18","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 49","name":"Reverb Parameter 19","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4},
+  {"offset":"00 4D","name":"Reverb Parameter 20","min":12768,"max":52768,"displayMin":-20000,"displayMax":20000,"nibbles":4}
+];
+
+/** Patch Arpeggio Common — grid, duration, motif, octave range, accent, velocity, end step. */
+export const PATCH_ARPEGGIO_COMMON = [
+  {"offset":"00 00","name":"Arpeggio Grid","min":0,"max":8,"labels":["04_","08_","08L","08H","08t","16_","16L","16H","16t"]},
+  {"offset":"00 01","name":"Arpeggio Duration","min":0,"max":9,"labels":["30","40","50","60","70","80","90","100","120","FUL"]},
+  {"offset":"00 02","name":"Arpeggio Motif","min":0,"max":11,"labels":["UP/L","UP/L&H","UP/_","DOWN/L","DOWN/L&H","DOWN/_","UP&DOWN/L","UP&DOWN/L&H","UP&DOWN/_","RANDOM/L","RANDOM/_","PHRASE"]},
+  {"offset":"00 03","name":"Arpeggio Octave Range","min":61,"max":67,"displayMin":-3,"displayMax":3},
+  {"offset":"00 04","name":"Arpeggio Accent Rate","min":0,"max":100},
+  {"offset":"00 05","name":"Arpeggio Velocity","min":0,"max":127,"note":"0 = REAL (played velocity); 1-127 = fixed"},
+  {"offset":"00 06","name":"End Step","min":1,"max":32,"nibbles":2}
+];
+
 /** Block offsets inside a Patch, from the manual's Patch table. */
 export const BLOCKS = {
   common: '00 00 00',
@@ -125,6 +255,29 @@ export const BLOCKS = {
 
 /** The edit buffer. User patches live at 20 nn 00 00, one per slot A-1 .. H-8. */
 export const TEMPORARY_PATCH = '10 00 00 00';
+
+/** First user patch slot (A-1). A-2 is 20 01 00 00, and so on to H-8 at 20 3F 00 00. */
+export const USER_PATCH_A1 = '20 00 00 00';
+
+/**
+ * Each block's Total Size, exactly as the manual prints it at the foot of its table.
+ *
+ * These are what an RQ1 asks for, and they are transcribed rather than derived: the first draft
+ * computed Distortion's from its last offset and got 01 11, where the manual says 01 01. A size
+ * that is too large is not a rounding error — the synth answers a different question or does not
+ * answer at all.
+ */
+export const BLOCK_SIZES = {
+  system: '00 00 00 6E',
+  common: '00 00 00 3D',
+  tone: '00 00 00 3E',
+  distortion: '00 00 01 01',
+  flanger: '00 00 00 51',
+  delay: '00 00 00 51',
+  reverb: '00 00 00 51',
+  arpeggioCommon: '00 00 00 08',
+  arpeggioPattern: '00 00 00 42',
+};
 
 /** Roland DT1/RQ1 envelope bytes for this model. Model ID is three bytes: 00 00 41. */
 export const MODEL = { manufacturer: '41', modelId: ['00', '00', '41'], dt1: '12', rq1: '11' };

@@ -23,7 +23,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildProfile } from '../../../tools/scripts/qa/roland-gaia/make-gaia-profile.mjs';
-import { PATCH_COMMON, PATCH_TONE } from '../../../tools/scripts/qa/roland-gaia/address-map.mjs';
+import {
+  BLOCK_SIZES, PATCH_ARPEGGIO_COMMON, PATCH_COMMON, PATCH_DELAY, PATCH_DISTORTION,
+  PATCH_FLANGER, PATCH_REVERB, PATCH_TONE,
+} from '../../../tools/scripts/qa/roland-gaia/address-map.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const profile = buildProfile();
@@ -37,10 +40,62 @@ const byId = new Map(profile.parameters.map((p) => [p.id, p]));
  */
 const MANUAL_EXAMPLE_1 = 'F0 41 10 00 00 41 12 10 00 01 00 06 69 F7';
 
-test('the profile reproduces the manual\'s own worked example, byte for byte', () => {
+/**
+ * §4 Example 2 — Getting the data (RQ1) of REVERB in USER PATCH:A-2. The second independent check,
+ * and a different one: it exercises the user-patch base (20 nn 00 00) rather than the edit buffer,
+ * the RQ1 command rather than DT1, and a block SIZE rather than a value.
+ */
+const MANUAL_EXAMPLE_2 = 'F0 41 10 00 00 41 11 20 01 0A 00 00 00 00 51 04 F7';
+
+test('the profile reproduces the manual\'s DT1 example, byte for byte', () => {
   const vector = profile.tests.find((t) => t.parameter === 'tone1.osc.wave' && t.value === 6);
   assert.ok(vector, 'the golden vector for Tone 1 OSC Wave = SUPER-SAW is missing');
   assert.equal(vector.expectedHex, MANUAL_EXAMPLE_1);
+});
+
+test('the profile reproduces the manual\'s RQ1 example, byte for byte', () => {
+  const vector = profile.tests.find((t) => t.kind === 'rq1');
+  assert.ok(vector, 'the golden vector for the manual\'s RQ1 example is missing');
+  assert.equal(vector.expectedHex, MANUAL_EXAMPLE_2);
+});
+
+test('block sizes are the manual\'s, not ones we computed', () => {
+  // Distortion is the one that caught this: computing its size from the last offset gives 01 11,
+  // and the manual's table foot says 01 01. A size that is too large is not a rounding error —
+  // the synth answers a different question, or does not answer.
+  assert.equal(BLOCK_SIZES.distortion, '00 00 01 01');
+  assert.equal(BLOCK_SIZES.reverb, '00 00 00 51');
+  assert.equal(BLOCK_SIZES.common, '00 00 00 3D');
+  assert.equal(BLOCK_SIZES.tone, '00 00 00 3E');
+
+  for (const request of profile.requests) {
+    if (!request.size) continue;
+    assert.ok(Object.values(BLOCK_SIZES).includes(request.size),
+      `${request.id} asks for ${request.size}, which is not a size the manual states`);
+  }
+});
+
+test('every transcribed block reaches the profile, whole', () => {
+  const count = (prefix) => profile.parameters.filter((p) => p.id.startsWith(`${prefix}.`)).length;
+  assert.equal(count('distortion'), PATCH_DISTORTION.length);
+  assert.equal(count('flanger'), PATCH_FLANGER.length);
+  assert.equal(count('delay'), PATCH_DELAY.length);
+  assert.equal(count('reverb'), PATCH_REVERB.length);
+  assert.equal(count('arp'), PATCH_ARPEGGIO_COMMON.length);
+});
+
+test('the effect parameter banks are 4-nibble and bipolar', () => {
+  // 16 bits split across four bytes of four bits each, wire 12768..52768 shown as -20000..+20000.
+  // Getting either half wrong sends a plausible number to the wrong place.
+  for (const parameter of profile.parameters) {
+    if (!/^(distortion|flanger|delay|reverb)\.parameter\d+$/.test(parameter.id)) continue;
+    assert.equal(parameter.encoding.type, 'nibbles', `${parameter.id}: effect parameters are nibble-encoded`);
+    assert.equal(parameter.encoding.count, 4, `${parameter.id}: four nibbles, not ${parameter.encoding.count}`);
+    assert.equal(parameter.type, 'bipolar');
+    assert.equal(parameter.display.min, -20000);
+    assert.equal(parameter.display.max, 20000);
+    assert.equal(parameter.default, 32768, `${parameter.id}: the centre of 12768..52768 is 32768, which displays as 0`);
+  }
 });
 
 test('every tone parameter exists on all three tones, at a 0x0100 stride', () => {
@@ -124,9 +179,11 @@ test('coverage is stated honestly, and names what is not transcribed', () => {
   // profile does not do has to be written down where a user of it will read it.
   assert.ok(Array.isArray(profile.coverage.notTranscribed) && profile.coverage.notTranscribed.length > 0,
     'coverage must name the blocks that are not transcribed');
-  for (const block of ['Patch Distortion', 'Patch Flanger', 'Patch Delay', 'Patch Reverb']) {
-    assert.ok(profile.coverage.notTranscribed.includes(block), `coverage does not mention ${block}`);
-  }
+  assert.ok(profile.coverage.notTranscribed.some((b) => /Arpeggio Pattern/.test(b)),
+    'the 16 arpeggio pattern blocks are deliberately not expanded — coverage has to say so');
+  // And the other honest gap: what an effect parameter actually controls is type-dependent and is
+  // not in this manual, so the profile says that rather than inventing names for them.
+  assert.match(profile.coverage.effectParameterMeanings, /not documented/i);
   assert.ok(profile.sources?.[0]?.title?.includes('MIDI Implementation'), 'the profile should say where its map came from');
 });
 
