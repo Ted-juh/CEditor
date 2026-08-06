@@ -1,0 +1,10 @@
+1x bg #05080A
+1x bg #262E35
+1x bg #464F58
+8x bg #6C7883
+3x bg #B9C4CD
+1x bg #F6FAFD
+1x bg #FFFFFF
+1x bg linear-gradient(180deg, #8A949E 0%, #3C444C 45%, #171B1F 100%)
+1x bg linear-gradient(180deg, #FFFFFF 0%, #9AA6B0 100%)
+1x bg radial-gradient(ellipse 72% 72% at 34% 28%, #48535D 0%, #2A323A 55%, #141A1E 100%)

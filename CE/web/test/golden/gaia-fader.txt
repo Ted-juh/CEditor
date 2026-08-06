@@ -1,0 +1,7 @@
+16x shape path
+8x stroke #00000066 @ 1
+8x stroke #FFFFFF @ 1
+1x bg #000000
+1x bg #0C0F11
+1x bg #3D4C57
+1x bg #E7ECF0

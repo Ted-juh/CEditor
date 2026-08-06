@@ -59,6 +59,25 @@ Add a component or a section without doing one of those and the test fails, nami
 edit. That is deliberate, and it is the same shape as `componentCoverage.test.js`: a gap has no
 symptom, so the gap itself has to be the thing that fails.
 
+### The gap the render gate does not cover
+
+`qaPanels.test.js` asks whether a control produced output. Three rendering bugs shipped in a row
+while every test was green, because all three produced plenty of perfectly valid output that simply
+looked wrong: a linked border painting its corner arcs white at double width, every border throwing
+away its alpha so a 40% hairline came out opaque, and every `Label` being born inside a 2px white
+rectangle. Two were spotted by a human looking at a screenshot.
+
+`visualGolden.test.js` closes that. Each specimen is server-rendered and reduced to what decides
+its appearance — stroke colours and widths, fills, shape primitives — and compared against a
+committed baseline in `CE/web/test/golden/`. Reintroducing the alpha bug fails four specimens
+immediately. Update a baseline with `UPDATE_GOLDEN=1 npm test`, and read the diff in the commit; a
+baseline regenerated without looking at it is worse than none.
+
+What it still does not cover: a purely visual regression that changes no attribute — a part drawn
+in the wrong z-order, a layout that overlaps. Pixel diffing would catch those, and it needs a
+browser and a running dev server and drifts on font hinting between machines. The QA sheets and an
+eye are still the backstop.
+
 The same test server-renders every control through `CanvasControl`. One type is exempt and says so
 in `NO_SSR`: `PixelDisplay` touches `window` during render, so it has no server pass. That is worth
 knowing rather than working around — it is the one component this gate cannot see.
