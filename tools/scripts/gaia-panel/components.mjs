@@ -67,8 +67,50 @@ function binding(name, source, target, { outputMin = 0, outputMax = 1, round = f
   };
 }
 
+/** A text part, for the option names beside an LED. */
+function text(name, content, { x, y, width, height }, { size = 9, colour = 'FFC3CDD6', align = 'left' } = {}) {
+  const section = clone(SECTION_DEFAULTS.Text);
+  section.content = content;
+  section._children.Fill.colour = colour;
+  section._children.Font.size = size;
+  section._children.Font.family = 'Arial';
+  section._children.Font.weightValue = 600;
+  section._children.Font.weight = 'SemiBold';
+  section._children.Position.justification = align === 'left' ? 'centredLeft' : 'centred';
+
+  return createPartNode(name, {
+    role: 'custom',
+    zIndex: 8,
+    layout: { x, y, width, height, xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top' },
+    sections: { Text: section },
+  });
+}
+
+/** A binding that picks its output from a table keyed by the source value. */
+function enumBinding(name, source, target, enumMap) {
+  return {
+    _type: 'Binding',
+    name,
+    enabled: true,
+    source,
+    mapMode: 'enum',
+    target,
+    outputUnit: '',
+    inputMin: 0,
+    inputMax: 1,
+    outputMin: 0,
+    outputMax: 1,
+    falseValue: 0,
+    trueValue: 1,
+    enumMap,
+    clamp: false,
+    round: false,
+    invert: false,
+  };
+}
+
 /** Assemble a CustomComponent control from parts + one value channel. */
-function component({ name, width, height, parts, bindings, behavior, hitZone }) {
+function component({ name, width, height, parts, bindings, behavior, hitZone, hitZones, channel }) {
   const control = createControl('CustomComponent', {
     name,
     Core: { name },
@@ -79,11 +121,11 @@ function component({ name, width, height, parts, bindings, behavior, hitZone }) 
   control._children.ValueChannels = {
     _type: 'ValueChannels',
     _children: {
-      value: createValueChannel('value', { label: 'Value', min: 0, max: 1, step: 0.001, defaultValue: 0 }),
+      value: channel ?? createValueChannel('value', { label: 'Value', min: 0, max: 1, step: 0.001, defaultValue: 0 }),
     },
   };
   control._children.Behaviors = { _type: 'Behaviors', _children: { drive: behavior } };
-  control._children.HitZones = { _type: 'HitZones', _children: { grab: hitZone } };
+  control._children.HitZones = { _type: 'HitZones', _children: hitZones ?? { grab: hitZone } };
   control._children.Bindings = { ...createCustomComponentBlankBindingsDefaults(), _children: bindings };
   control._children.Designer = createCustomComponentDesignerDefaults();
   control._children.Links = createCustomComponentLinksDefaults();
@@ -189,5 +231,84 @@ export function gaiaKnob({ size = 54, ticks = 11 } = {}) {
       // -135deg at minimum to +135deg at maximum: the 270-degree sweep the instrument uses.
       pointerAngle: binding('pointerAngle', 'channel.value.normalized', 'Parts.pointer.Layout.rotation', { outputMin: -135, outputMax: 135, round: true }),
     },
+  });
+}
+
+const LED_ON = 'FFFF3B30';
+const LED_OFF = 'FF3A1E1C';
+const LED_RIM = 'FF120A0A';
+
+/**
+ * An LED column: one lamp per option, and only the selected one is lit.
+ *
+ * This is the control the instrument uses wherever a parameter has a handful of named settings —
+ * WAVE, FILTER MODE, LFO SHAPE, MOD. Every option is printed and visible at once with a lamp beside
+ * it, which is why a dropdown reads so wrong in its place: on the hardware you can see what is
+ * selected AND what else there is, without touching anything.
+ *
+ * It is a different SHAPE of binding from the fader and the knob, which is the reason it needed its
+ * own component rather than a variant of theirs. Those map a continuous 0..1 onto a position or an
+ * angle. This one maps a selected INDEX onto which lamp is lit, which the binding layer expresses
+ * as `mapMode: 'enum'` — a table keyed by the source value. One binding per lamp, each with a table
+ * that names its own index the lit colour and every other index the dark one.
+ */
+export function gaiaLeds({ options, width = 96, rowHeight = 15 } = {}) {
+  const count = options.length;
+  const height = count * rowHeight + 8;
+  const parts = {};
+  const bindings = {};
+  const hitZones = {};
+
+  parts.plate = rect('plate', { x: 0, y: 0, width, height }, 'FF171C20', {
+    zIndex: 0, radius: 4, borderColour: '55000000', borderThickness: 1,
+  });
+
+  options.forEach((option, index) => {
+    const y = 4 + index * rowHeight;
+
+    // The lamp: a dark bezel with the lamp face inside it, so an unlit LED still reads as a lamp
+    // rather than as an empty circle.
+    parts[`bezel${index}`] = rect(`bezel${index}`, { x: 7, y: y + 3, width: 9, height: 9 }, LED_RIM, { zIndex: 2, radius: 999 });
+    parts[`led${index}`] = rect(`led${index}`, { x: 8.5, y: y + 4.5, width: 6, height: 6 }, LED_OFF, { zIndex: 3, radius: 999 });
+    parts[`name${index}`] = text(`name${index}`, option.label, { x: 22, y: y + 1, width: width - 26, height: rowHeight - 2 }, { size: 9 });
+
+    // The table that lights exactly one lamp. Written per lamp rather than per value because the
+    // binding layer resolves one target at a time.
+    const litMap = {};
+    const textMap = {};
+    options.forEach((other, otherIndex) => {
+      litMap[String(other.value)] = otherIndex === index ? LED_ON : LED_OFF;
+      textMap[String(other.value)] = otherIndex === index ? 'FFFFFFFF' : 'FF8A959E';
+    });
+
+    bindings[`led${index}`] = enumBinding(`led${index}`, 'channel.value.raw', `Parts.led${index}.Background.Fill.colour`, litMap);
+    bindings[`name${index}`] = enumBinding(`name${index}`, 'channel.value.raw', `Parts.name${index}.Text.Fill.colour`, textMap);
+
+    hitZones[`pick${index}`] = createHitZone(`pick${index}`, {
+      targetBehavior: 'drive',
+      targetValueChannel: 'value',
+      action: 'setValue',
+      payload: option.value,
+      bounds: { x: 0, y: (y / height) * 100, width: 100, height: (rowHeight / height) * 100, unit: 'percent' },
+    });
+  });
+
+  const values = options.map((option) => Number(option.value));
+  return component({
+    name: 'GAIA LED Column',
+    width,
+    height,
+    parts,
+    channel: createValueChannel('value', {
+      label: 'Value',
+      type: 'int',
+      min: Math.min(...values),
+      max: Math.max(...values),
+      step: 1,
+      defaultValue: values[0],
+    }),
+    behavior: createBehaviorModule('drive', { type: 'selector', valueChannel: 'value', geometry: 'vertical', role: 'selector' }),
+    hitZones,
+    bindings,
   });
 }

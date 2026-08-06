@@ -19,7 +19,7 @@ import { createControl } from '../../../CE/web/src/CE_Application/models/compone
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
 import { COMMON_STRIP, EFFECTS_STRIP, PANEL_WIDTH, SKIN, TONE_STRIP } from './layout.mjs';
-import { gaiaFader, gaiaKnob } from './components.mjs';
+import { gaiaFader, gaiaKnob, gaiaLeds } from './components.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -170,8 +170,9 @@ function boundCustom(parameter, build, box) {
       feedback: { receiveUpdates: true, ignoreOwnEchoes: true, echoWindowMs: 250 },
     }],
   };
+  // Adoption's numeric half still applies — a custom component has no Text to stamp a label into,
+  // and a choice parameter's Value.rows mean nothing to one that draws its own options.
   for (const [dotted, value] of Object.entries(parameterAdoptionPatches('Knob', parameter))) {
-    // Only the numeric shape applies; a custom component has no Text to stamp a label into.
     if (dotted.startsWith('Behavior.')) setPath(control, dotted, value);
   }
   return control;
@@ -188,6 +189,18 @@ function boundCustom(parameter, build, box) {
  */
 const KINDS = {
   leds: (parameter, spec, at) => {
+    // A custom LED column, not a RadioButtonGroup. Every option printed with a lamp beside it, one
+    // lit — which is how you read WAVE or FILTER MODE on the instrument without touching anything.
+    const options = (parameter.choices ?? []).map((choice) => ({ label: choice.label, value: choice.value }));
+    if (options.length === 0) return KINDS.ledsLegacy(parameter, spec, at);
+
+    const build = () => gaiaLeds({ options, width: SKIN.ledW, rowHeight: SKIN.ledRow });
+    const h = options.length * SKIN.ledRow + 8;
+    const control = boundCustom(parameter, build, { x: at.x, y: at.y, w: SKIN.ledW, h });
+    return { controls: [control], caption: spec.label ? { text: spec.label, x: at.x, y: at.y - 14, w: SKIN.ledW } : null, bottom: at.y + h };
+  },
+
+  ledsLegacy: (parameter, spec, at) => {
     const rows = parameter.choices?.length ?? 2;
     const h = Math.max(28, rows * SKIN.ledRow + 8);
     const control = bound(parameter, 'RadioButtonGroup', { x: at.x, y: at.y, w: SKIN.ledW, h }, {
