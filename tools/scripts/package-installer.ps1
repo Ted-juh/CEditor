@@ -144,7 +144,10 @@ function Build-And-Stage-Native([string]$RepoRoot, [string]$StageDir, [string]$C
 
     Push-Location $RepoRoot
     try {
-        $cmd = "`"$vcvars`" && cmake -S . -B `"$buildDir`" -G `"Ninja Multi-Config`" -DCEDITOR_DEV_MODE=OFF && cmake --build `"$buildDir`" --config $Configuration && cmake --install `"$buildDir`" --config $Configuration --prefix `"$StageDir`""
+        # CE_VST_GENERIC_PLAYER: the installer ships the player without a panel baked in — the
+        # export pipeline bakes one per panel later. Saying so turns the no-panel warning into a
+        # status line, so a packaging run that warns is a run worth reading.
+        $cmd = "`"$vcvars`" && cmake -S . -B `"$buildDir`" -G `"Ninja Multi-Config`" -DCEDITOR_DEV_MODE=OFF -DCE_VST_GENERIC_PLAYER=ON && cmake --build `"$buildDir`" --config $Configuration && cmake --install `"$buildDir`" --config $Configuration --prefix `"$StageDir`""
         cmd /c $cmd
 
         if ($LASTEXITCODE -ne 0) {
