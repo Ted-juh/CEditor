@@ -50,6 +50,12 @@ public:
         std::function<juce::var (const juce::String& kind, const juce::var& payload)> panelQuery;
         std::function<bool (const juce::String& parameterId, const juce::var& value,
                             const juce::String& role)> deviceWrite;
+        // ce.device.setVariable / setTiming. A write like deviceWrite, not a question like
+        // deviceQuery — and it lands on the PROJECT's role mapping rather than the device
+        // profile, because a profile is shared and two panels driving two units of the same
+        // synth must be able to disagree about a device id without editing it.
+        std::function<bool (const juce::String& kind, const juce::String& name,
+                            const juce::var& value, const juce::String& role)> deviceSet;
         // The transport snapshot behind tempo() / isPlaying() / transportInfo(). Unset means
         // nothing is reporting one, and the prelude reports valid=false rather than guessing.
         std::function<juce::var()> transportState;
@@ -286,6 +292,12 @@ public:
         }
         return callbacks.deviceWrite && callbacks.deviceWrite (parameterId, value, role);
     }
+    // Unset means no device host, and the base returns false for exactly that reason: the verb
+    // reports that it did nothing rather than returning a quiet success. Same shape as
+    // deviceWrite's tail above.
+    bool deviceSet (const juce::String& kind, const juce::String& name,
+                    const juce::var& value, const juce::String& role) override
+    { return callbacks.deviceSet && callbacks.deviceSet (kind, name, value, role); }
     juce::var transportState() override
     { return callbacks.transportState ? callbacks.transportState() : juce::var(); }
     // ce.anim routes to the runtime, never to a callback: the animation list has to live in ONE
