@@ -20,22 +20,19 @@ server-renders every control on it, and fails if the committed copy differs.
 |---|---|---|
 | `QA-01-components.cepanel` | Every one of the 49 component types renders at its **authored default** — the state a user meets first, and the one nothing else checks. | Nothing is interactive, bound, or scripted here. |
 | `QA-02-properties.cepanel` | The cross-cutting sections survive being **driven hard**: nine stacked text-effect layers, four live background fill layers, rotation + scale + opacity at once. | Component-specific sections (Arp, Matrix, …) sit at defaults — those are their own sheet's job. |
-| `QA-06-roland-gaia.cepanel` *(generated on demand)* | A real hardware editor: **162 controls bound to the Roland GAIA SH-01 profile**, all three tone layers on screen at once, every control adopting its range and choices from the profile. | Without a synth attached it proves the bytes we would send, not that the synth liked them. |
+| `QA-06-roland-gaia.cepanel` | A real hardware editor: **162 controls bound to the Roland GAIA SH-01 profile**, all three tone layers on screen at once, every control adopting its range and choices from the profile. | Without a synth attached it proves the bytes we would send, not that the synth liked them. |
 
 Planned, not yet built: QA-03 states/interaction, QA-04 scripting (7 languages × 36 events),
 QA-05 component verbs (23 families / 425 verbs), QA-07 custom-component packages, QA-08 export.
 
-### QA-06 is not committed
-
-It is **28 MB**, and it is gitignored for that reason — run `npm run qa:panels` (or the generator
-directly) and it appears in this folder. Everything else about it is still checked on every
-`npm test`: the sheet is rebuilt in memory, every control is rendered, and its bindings are
-asserted against the profile.
+### About QA-06
 
 Why all three tones are visible: on the hardware you press TONE SELECT and one set of knobs points
 at a different layer. That is a limit of having one set of knobs, not of the synth — Tone 1/2/3 are
 three address blocks at a 0x0100 stride, so a screen can show all three. There is no keyboard on
 the sheet: it edits a patch, and the synth has its own keys.
+
+It was gitignored for a while at 28 MB. It is 392 KB now, so it is checked in like the others.
 
 The profile behind it is generated and cross-checked against Roland's published MIDI implementation
 — see [tools/scripts/qa/roland-gaia/README.md](../../tools/scripts/qa/roland-gaia/README.md).
@@ -68,39 +65,46 @@ knowing rather than working around — it is the one component this gate cannot 
 
 ## Findings the suite produced immediately
 
-**1. A knob cost 100 KB to write down, and 93 KB of it was nothing.** *(fixed — see below)*
+**Panel documents were being written in full, and almost all of it was defaults.** *(fixed)*
 
-Every Slider and Knob is created with seventeen fully-materialized semantic parts, each carrying a
-complete `Background` (a `Fill` with sixty-odd fields, a `Border` with a per-side object) and a
-`Text` at defaults. Nothing elided defaults on save, so a knob nobody had styled still wrote 93 KB.
+`createControl()` materializes every section a component type declares, at its defaults. That is
+the right in-memory model — everything that reads a control reads deep paths off it. It was also
+what got written to disk, so an untouched Knob cost 100 KB (93 KB of it the seventeen slider parts,
+each carrying a complete `Background` and `Text`), and a 162-control synth editor came to 28 MB.
+Autosave paid it again; the undo stack, which keeps 50 whole-panel snapshots, paid it fifty times.
 
-It was pure redundancy: `SliderFamilyRenderer` has always resolved parts through
-`resolveSliderSemanticParts()`, which rebuilds every default part whether the document carried it
-or not. Documents now store only the parts that differ, and `deserializePanel` restores the rest on
-load — that second half is not optional, because only the *renderer* resolves. The Slider,
-Slider-label, Animations and Behavior editors and `interactionRuntime`'s hit-testing all read
-`getSection(control, 'Parts')` directly, so eliding without rehydrating would have produced a knob
-that draws perfectly and has an empty Parts inspector.
+Documents now store each control as a **diff against the pristine control of its type**, and
+`deserializePanel` applies the diff back. Nothing else in the editor changes: the model it holds is
+the full control, exactly as before.
 
 | | before | after |
 |---|---|---|
-| One knob (marginal) | ~100 KB | **~12 KB** |
-| `QA-01` (107 controls) | 2.7 MB | **2.3 MB** |
-| `QA-02` (33 controls) | 1.3 MB | **0.68 MB** |
-| `QA-06` (343 controls) | **28.2 MB** | **6.7 MB** |
+| One knob (marginal) | ~100 KB | **~520 B** |
+| One button (marginal) | ~16 KB | **~195 B** |
+| `QA-01` (107 controls) | 2.7 MB | **88 KB** |
+| `QA-02` (33 controls) | 1.3 MB | **36 KB** |
+| `QA-06` (343 controls) | **28.2 MB** | **392 KB** |
 
-Existing panels need no conversion: they load, and shrink the next time they are saved (a 213 KB
-one-knob fixture re-saves to 26 KB with the author's edit intact). `sliderPartsElision.test.js`
-holds all of it, including the byte figures — a default that quietly re-materialized parts on save
-would otherwise put the 93 KB back with no other symptom.
+Three things this had to get right, all of them in `documentShape.test.js`:
 
-**2. Panel documents are still heavy, and the rest is the section tree.** QA-06 is 6.7 MB, not
-0.7 MB. What is left in a knob is `States`, `Behavior`, `Animations` and the remaining sections, all
-written at their defaults — the same class of problem one level up, and not this change's to fix.
-With 50 whole-panel undo snapshots, editing QA-06 still implies a few hundred MB of history.
-General default-elision across all sections is the follow-on, and it needs the same
-elide-plus-rehydrate discipline to be safe.
+- **It is lossless.** `expandControl(shrinkControl(c))` deep-equals `c`, asserted for all 49
+  component types and for every kind of edit — deep single fields, shortened arrays, falsy values,
+  three-deep nesting. The file being smaller is a free consequence of that; without it the size
+  would not matter, because the panel would be wrong.
+- **A missing key means two things.** "Unchanged, take the default" and "the author deleted it".
+  A diff that cannot tell them apart resurrects deleted states and layers on the next load, on a
+  panel that had been working. Removals are recorded explicitly in a `_removed` list.
+- **The exported plugin never runs any of this.** `Player/PanelValueModel.h` parses the `.cepanel`
+  in C++ and reads `Core`, `Behavior` and `Scripts` straight off `controls[]`; a field elided out
+  of the authoring document is simply absent to it. So the build payload opts out
+  (`serializePanel(panel, { elide: false })`) and the split is explicit rather than something the
+  exporter has to remember.
 
-Neither of these is a flaw in the sheets. They are the first thing the sheets are for: a document
-format where a plain knob cost 100 KB was a beta-blocking fact, and it was invisible until
-something built the panel that showed it.
+Existing panels need no conversion — they load, and shrink the next time they are saved.
+
+`CustomComponent` is never elided: its instances come from a saved package rather than from
+`createControl`, so there is no meaningful default to diff against.
+
+This was not a flaw in the sheets. It is the first thing the sheets were for: a document format
+where a plain knob cost 100 KB was a beta-blocking fact, and it was invisible until something built
+the panel that showed it.

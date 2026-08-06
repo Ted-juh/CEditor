@@ -24,18 +24,15 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
 
 /**
- * `commit: false` means the sheet is generated on demand and gitignored rather than checked in.
+ * `commit: true` means the sheet is checked in, so it opens on a machine that has never run Node.
  *
- * Only QA-06 is in that category, and the reason is itself the most useful thing the suite has
- * found so far: a realistic synth editor — 162 bound controls, which is a SMALL hardware editor —
- * serializes to 28 MB. A single Knob is 100 KB, 93 KB of which is its 17-part `Parts` tree, and
- * every one of those parts carries a full Background/Text/Effects section. Committing that would
- * put 28 MB in the repo to prove a point better made by the number itself.
+ * All three are, now. QA-06 was gitignored while it was 28 MB; eliding defaults took it to 392 KB
+ * and the reason to keep it out went with them.
  */
 export const SHEETS = [
   { file: 'QA-01-components.cepanel', build: buildComponentsSheet, commit: true },
   { file: 'QA-02-properties.cepanel', build: buildPropertiesSheet, commit: true },
-  { file: 'QA-06-roland-gaia.cepanel', build: buildGaiaSheet, commit: false },
+  { file: 'QA-06-roland-gaia.cepanel', build: buildGaiaSheet, commit: true },
 ];
 
 /**

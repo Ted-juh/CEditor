@@ -206,6 +206,21 @@ function serializePanelDocument(panel) {
   });
 }
 
+/**
+ * The document handed to the exporter, which is not the same document we save.
+ *
+ * A saved .cepanel stores each control as a diff against its type's defaults and is expanded again
+ * by deserializePanel. The exported plugin never runs that code: Player/PanelValueModel.h parses
+ * the .cepanel in C++ and reads Core, Behavior and Scripts directly off controls[]. A field that
+ * was elided is simply absent to it. So the build payload is written in full.
+ */
+function serializePanelForExport(panel) {
+  return serializePanel(panel, {
+    deviceSession: getProjectDeviceSessionSnapshot(),
+    elide: false,
+  });
+}
+
 function restorePanelDeviceSession(panel, label) {
   if (!panel?.deviceSession) return;
 
@@ -978,7 +993,7 @@ export function buildActivePanelVst3() {
   buildInFlight = true;
   cinfo(`[vst3] Building "${productName}" — runs npm + cmake, may take a minute…`);
   // Serialize with the GUID merged in so the temp .cepanel carries it too (harmless if unused).
-  bridgeBuildVst3(String(panel.id), serializePanelDocument({ ...panel, panelGuid: guid }), guid, productName);
+  bridgeBuildVst3(String(panel.id), serializePanelForExport({ ...panel, panelGuid: guid }), guid, productName);
   return true;
 }
 

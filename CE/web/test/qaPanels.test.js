@@ -30,6 +30,7 @@ import { render } from 'svelte/server';
 import { COMPONENT_TYPES } from '../src/CE_Application/models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import CanvasControl from '../src/CE_Application/editor/CanvasControl.svelte';
+import { expandControl } from '../src/CE_Application/stores/documentShape.js';
 
 import { SHEETS, serializeSheet } from '../../../tools/scripts/qa/make-qa-panels.mjs';
 import { coveredTypes, GROUPS } from '../../../tools/scripts/qa/sheets/components.mjs';
@@ -115,14 +116,18 @@ for (const sheet of SHEETS) {
     assert.ok(doc.panelGuid, 'every panel document carries an export identity');
     assert.ok(doc.width > 0 && doc.height > 0, 'a sheet shorter than its content hides its last row');
 
+    // Core.id and Core.controlType are never elided — expandControl looks the type up by them.
     const ids = doc.controls.map((control) => control._children?.Core?.id);
     assert.ok(ids.every(Boolean), 'every control needs a Core.id');
     assert.equal(new Set(ids).size, ids.length, 'duplicate Core.id — two controls would share one selection');
   });
 
   test(`${sheet.file} is laid out inside the sheet, with nothing stacked at the origin`, () => {
+    // Expanded, not raw: the document stores controls as a diff against their type's defaults, so
+    // a control sitting at its default width has no `width` in the file at all. Reading geometry
+    // off the raw document would compare against undefined and pass by accident.
     const doc = JSON.parse(serializeSheet(sheet));
-    for (const control of doc.controls) {
+    for (const control of doc.controls.map(expandControl)) {
       const { x, y, width, height } = control._children.Transform;
       const id = control._children.Core.id;
       assert.ok(x >= 0 && y >= 0, `${id} placed off the top-left of the sheet at ${x},${y}`);
@@ -137,7 +142,8 @@ for (const sheet of SHEETS) {
 for (const sheet of SHEETS) {
   test(`${sheet.file} — every control renders`, () => {
     const doc = JSON.parse(serializeSheet(sheet));
-    const allControls = doc.controls;
+    // Render what the editor would hold, not what the file holds.
+    const allControls = doc.controls.map(expandControl);
     const failures = [];
     let rendered = 0;
 
@@ -195,7 +201,7 @@ test('QA-06 binds every parameter the GAIA profile declares', () => {
   const doc = JSON.parse(serializeSheet(sheet));
 
   const bound = new Set();
-  for (const control of doc.controls) {
+  for (const control of doc.controls.map(expandControl)) {
     for (const binding of control._children?.DeviceBindings?.bindings ?? []) {
       if (binding.parameterId) bound.add(binding.parameterId);
     }
@@ -216,7 +222,7 @@ test('QA-06 keeps the three tones on separate addresses', () => {
   const doc = JSON.parse(serializeSheet(sheet));
   const perTone = { tone1: 0, tone2: 0, tone3: 0 };
 
-  for (const control of doc.controls) {
+  for (const control of doc.controls.map(expandControl)) {
     for (const binding of control._children?.DeviceBindings?.bindings ?? []) {
       const prefix = String(binding.parameterId ?? '').split('.')[0];
       if (prefix in perTone) perTone[prefix] += 1;
