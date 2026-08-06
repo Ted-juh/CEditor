@@ -18,7 +18,18 @@ import {
   getSliderDirection,
 } from './sliderBehavior.js';
 
+import { mouseScrubOverrides } from './mouseBehavior.js';
+
 import { readStoredJson } from './localStorageState.js';
+
+// The Mouse section is layered last, over the geometry-derived options and the
+// app-level defaults alike: it is the one place an author overrode the feel
+// deliberately, so nothing downstream should be able to win against it. An
+// absent or untouched section contributes {} and leaves the options identical
+// to what they were before the Mouse tab existed.
+function withMouse(options, mouse) {
+  return { ...options, ...mouseScrubOverrides(mouse, options) };
+}
 
 // The historical spinner feel: one step per 18 px of travel.
 const SCRUB_PIXELS_PER_STEP = 18;
@@ -67,7 +78,7 @@ export function getCircularSliderDragMode(behavior) {
   return mode === 'knob' || mode === 'rotary' ? mode : 'absolute';
 }
 
-export function createCircularSliderScrub(behavior, startNormalized = 0) {
+export function createCircularSliderScrub(behavior, startNormalized = 0, mouse = null) {
   const sensitivityScale = Math.max(0.01, numberOr(behavior?.circularDragSensitivity, 1));
   const base = getCircularSliderDragMode(behavior) === 'rotary'
     ? {
@@ -81,45 +92,45 @@ export function createCircularSliderScrub(behavior, startNormalized = 0) {
         ...presets.knob,
         sensitivity: (1 / 250) * sensitivityScale,
       };
-  return new DragScrub({
+  return new DragScrub(withMouse({
     ...base,
     deadZone: 0,
     min: 0,
     max: 1,
     ...appScrubOverrides(),
-  }, Math.max(0, Math.min(1, numberOr(startNormalized, 0))));
+  }, mouse), Math.max(0, Math.min(1, numberOr(startNormalized, 0))));
 }
 
-function linearTrackScrub(vertical, inverted) {
-  return new DragScrub({
+function linearTrackScrub(vertical, inverted, mouse) {
+  return new DragScrub(withMouse({
     ...(vertical ? presets.linearVertical : presets.linearHorizontal),
     invertX: !vertical && inverted,
     invertY: vertical && inverted,
     min: 0,
     max: 1,
-  }, 0);
+  }, mouse), 0);
 }
 
 // Linear slider: absolute track mapping over the hitbox, normalised 0..1.
-export function createSliderTrackScrub(behavior) {
+export function createSliderTrackScrub(behavior, mouse = null) {
   const vertical = getSliderOrientation(behavior) === 'vertical';
   const direction = getSliderDirection(behavior);
-  return linearTrackScrub(vertical, vertical ? direction === 'ttb' : direction === 'rtl');
+  return linearTrackScrub(vertical, vertical ? direction === 'ttb' : direction === 'rtl', mouse);
 }
 
 // Range-family slider role: same mapping, orientation read from the range block.
-export function createRangeTrackScrub(behavior) {
+export function createRangeTrackScrub(behavior, mouse = null) {
   const vertical = getRangeOrientation(behavior) === 'vertical';
   const direction = getRangeDirection(behavior);
-  return linearTrackScrub(vertical, vertical ? direction === 'ttb' : direction === 'rtl');
+  return linearTrackScrub(vertical, vertical ? direction === 'ttb' : direction === 'rtl', mouse);
 }
 
-export function createRangeScrub(behavior, startValue = 0) {
+export function createRangeScrub(behavior, startValue = 0, mouse = null) {
   const vertical = getRangeOrientation(behavior) === 'vertical';
   const direction = getRangeDirection(behavior);
   const reversed = isMouseDirectionReversed(behavior);
   const step = getRangeStep(behavior);
-  return new DragScrub({
+  return new DragScrub(withMouse({
     ...presets.numberField,
     axis: vertical ? 'y' : 'x',
     invertX: !vertical && ((direction === 'rtl') !== reversed),
@@ -131,5 +142,5 @@ export function createRangeScrub(behavior, startValue = 0) {
     ...appScrubOverrides(),
     // The surface's own 5 px drag threshold gates engagement, never the core.
     deadZone: 0,
-  }, startValue);
+  }, mouse), startValue);
 }

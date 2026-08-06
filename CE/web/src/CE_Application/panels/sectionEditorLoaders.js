@@ -19,6 +19,7 @@ const EAGER_COMPONENT_EDITORS = {
 };
 
 const LAZY_COMPONENT_LOADERS = {
+  mouse: () => import('../sections/MouseEditor.svelte'),
   text: () => import('../sections/TextEditor.svelte'),
   contentlayout: () => import('../sections/ContentLayoutEditor.svelte'),
   icon: () => import('../sections/IconEditor.svelte'),

@@ -17,8 +17,8 @@
   --ink:        #16171C;
   --ink-2:      #4A4D58;
   --ink-3:      #797D8B;
-  --rule:       #D6D9E2;
-  --rule-soft:  #E6E8EF;
+  --rule:       #B4B9C9;
+  --rule-soft:  #D2D6E1;
   --accent:     #2E6FA8;
   --accent-2:   #E3EDF6;
   --signal:     #17805A;
@@ -30,13 +30,13 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --ground:    #0E0F14;
-    --raised:    #15171F;
-    --sunken:    #11131A;
+    --raised:    #1A1D27;
+    --sunken:    #131620;
     --ink:       #E6E8F0;
     --ink-2:     #A8ACBB;
     --ink-3:     #747989;
-    --rule:      #282B38;
-    --rule-soft: #1E212C;
+    --rule:      #4A5068;
+    --rule-soft: #3C4257;
     --accent:    #5B9BD5;
     --accent-2:  #162634;
     --signal:    #39D98A;
@@ -47,9 +47,9 @@
   }
 }
 :root[data-theme="dark"] {
-  --ground:#0E0F14; --raised:#15171F; --sunken:#11131A;
+  --ground:#0E0F14; --raised:#1A1D27; --sunken:#131620;
   --ink:#E6E8F0; --ink-2:#A8ACBB; --ink-3:#747989;
-  --rule:#282B38; --rule-soft:#1E212C;
+  --rule:#4A5068; --rule-soft:#3C4257;
   --accent:#5B9BD5; --accent-2:#162634;
   --signal:#39D98A; --amber:#F2C94C; --alert:#E05C5C;
   --code-bg:#0A0B0F; --shadow:none;
@@ -57,7 +57,7 @@
 :root[data-theme="light"] {
   --ground:#FAFAFB; --raised:#FFFFFF; --sunken:#F0F1F5;
   --ink:#16171C; --ink-2:#4A4D58; --ink-3:#797D8B;
-  --rule:#D6D9E2; --rule-soft:#E6E8EF;
+  --rule:#B4B9C9; --rule-soft:#D2D6E1;
   --accent:#2E6FA8; --accent-2:#E3EDF6;
   --signal:#17805A; --amber:#8A6A0F; --alert:#B03A3A;
   --code-bg:#F4F5F8; --shadow:0 1px 2px rgba(20,25,45,.06);
@@ -140,7 +140,7 @@ a { color: var(--accent); }
 .views {
   display: flex; flex-wrap: wrap; gap: 0;
   border-bottom: 1px solid var(--rule); margin-top: 26px;
-  position: sticky; top: 0; z-index: 5; background: var(--bg);
+  position: sticky; top: 0; z-index: 5; background: var(--ground);
 }
 .views a {
   padding: 15px 22px 13px 0; margin-right: 26px;
@@ -282,8 +282,10 @@ pre code { font-size: inherit; }
 .grp[hidden] { display: none; }
 .grp > summary {
   display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
-  padding: 17px 0; cursor: pointer; list-style: none;
+  padding: 15px 14px; cursor: pointer; list-style: none;
+  background: var(--sunken); border-left: 3px solid var(--accent);
 }
+.grp { margin-bottom: 6px; }
 .grp > summary::-webkit-details-marker { display: none; }
 .grp > summary::before {
   content: "▸"; color: var(--ink-3); font-size: 11px; width: 10px; flex: none;
@@ -299,7 +301,7 @@ pre code { font-size: inherit; }
 .grp-body { padding-left: 17px; border-left: 1px solid var(--rule); margin-left: 4px; }
 /* A subgroup is the same shape one size down — it is a level of the same tree, not a new idea. */
 .grp.sub { border-bottom: 0; }
-.grp.sub > summary { padding: 11px 0; }
+.grp.sub > summary { padding: 10px 12px; background: var(--sunken); border-left: 2px solid var(--rule); }
 .grp.sub .grp-name { font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
 .grp.sub .grp-blurb { font-size: 12.5px; color: var(--ink-3); }
 .grp.sub + .grp.sub { border-top: 1px solid var(--rule-soft); }
@@ -331,8 +333,11 @@ pre code { font-size: inherit; }
 .mod > summary {
   display: grid; grid-template-columns: minmax(190px, 260px) minmax(0, 1fr) auto;
   gap: 4px 26px; align-items: start;
-  padding: 15px 0; cursor: pointer; list-style: none;
+  padding: 15px 12px; cursor: pointer; list-style: none;
+  background: var(--raised); border: 1px solid var(--rule-soft);
 }
+.mod { margin: 8px 0; }
+.mod .members { padding-left: 12px; padding-right: 12px; }
 .mod > summary::-webkit-details-marker { display: none; }
 .mod > summary:hover .mod-id { text-decoration: underline; text-underline-offset: 3px; }
 .mod-id { font-family: var(--mono); font-size: 13.5px; font-weight: 600; color: var(--accent); word-break: break-word; }
@@ -355,6 +360,7 @@ pre code { font-size: inherit; }
    one line at the top, and the prose full width underneath them. Nothing scrolls sideways except
    the code samples, which have their own overflow. */
 .members { padding: 0 0 20px; }
+#hooktable .mem, #evtable .mem { border-bottom: 1px solid var(--rule); }
 .mem {
   padding: 14px 0 16px;
   border-bottom: 1px solid var(--rule-soft);
@@ -383,7 +389,7 @@ pre code { font-size: inherit; }
 }
 .m-doc { color: var(--ink-2); margin: 0 0 10px; max-width: 82ch; overflow-wrap: break-word; }
 
-/* The declared arguments. `opts` in a signature says nothing about the ten fields it may carry;
+/* The declared arguments. `opts` in a signature says nothing about the ten fields you can set in it;
    these come straight from the contract's params. */
 .m-args { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 10px; }
 .m-arg {
@@ -552,6 +558,7 @@ pre code { font-size: inherit; }
       <a href="#start">What a script is</a>
       <a href="#paths">Addressing</a>
       <a href="#transmit">Writing &amp; the synth</a>
+      <a href="#rehearsal">Preview puts things back</a>
       <a href="#events">Reacting</a>
       <a href="#modules">Modules</a>
       <a href="#timing">Musical time</a>
@@ -566,6 +573,8 @@ pre code { font-size: inherit; }
       <a href="#from-data">Eight, from a table</a>
       <a href="#drumkit">Asking the instrument</a>
       <a href="#wiring">A panel is a graph</a>
+      <a href="#sequencer">A step sequencer</a>
+      <a href="#ghost">A synth that does not exist</a>
     </div>
     <div data-nav="reference">
       <h2>Reference</h2>
@@ -583,26 +592,26 @@ pre code { font-size: inherit; }
 <main class="page">
 <div class="band">
 
-<!-- Three views, one at a time. The page used to be a single scroll: ten concept lessons, then
-     four full tutorials, then 737 members of reference. Whichever of the three you had come for,
+<!-- Three views, one at a time. The page used to be a single scroll: eleven concept lessons, then
+     six full tutorials, then every member of the reference. Whichever of the three you had come for,
      you scrolled through the others to reach it. -->
 <nav class="views" id="views" aria-label="Sections of the manual">
-  <a href="#/manual" data-view="manual">Manual<span>Ten lessons, in order</span></a>
-  <a href="#/tutorials" data-view="tutorials">Tutorials<span>Four panels, built step by step</span></a>
-  <a href="#/reference" data-view="reference">Reference<span>Every module and verb</span></a>
+  <a href="#/manual" data-view="manual">Manual</a>
+  <a href="#/tutorials" data-view="tutorials">Tutorials</a>
+  <a href="#/reference" data-view="reference">Reference</a>
 </nav>
 
 <div class="view" id="view-manual">
 <header class="top">
   <p class="eyebrow">Panel scripting</p>
-  <h1>Adding your own behaviour to a panel</h1>
+  <h1>Add your own behaviour to a panel</h1>
   <p class="lede">
-    A panel can carry scripts, so it can do things the controls alone cannot: send a particular
-    message when a button is pressed, work out one value from another, fill the whole panel from
-    what the synth reports. You can write them in Lua, JavaScript, TypeScript, Python or a
-    C&#8209;like language, and they all use the same set of commands. <b>A script behaves the same
-    way while you are building the panel as it does in the finished plugin</b> &mdash; if it works
-    while you are testing it, it works when you share it.
+    A panel can hold scripts. A script lets the panel do things the controls alone cannot do.
+    It can send a special message when a button is pressed. It can work out one value from
+    another. It can fill the whole panel from data the synth sends. You can write scripts in
+    Lua, JavaScript, TypeScript, Python or a C&#8209;like language. All of them use the same
+    set of commands. <b>A script works the same way while you build the panel and in the
+    finished plugin.</b> If it works while you test it, it works when you share it.
   </p>
   <dl class="tally">
     <div><dt>Modules</dt><dd id="t-mod">&ndash;</dd></div>
@@ -617,7 +626,6 @@ pre code { font-size: inherit; }
 <section id="start">
   <div class="rule-head">
     <h2>The manual</h2>
-    <p>Ten things, in the order you need them</p>
     <span style="flex:1"></span>
     <div class="lang-pick" role="group" aria-label="Sample language">
       <button type="button" data-lang="lua" aria-pressed="true">Lua</button>
@@ -628,26 +636,28 @@ pre code { font-size: inherit; }
   <div class="lesson">
     <p class="lesson-n">01 &middot; What a script is</p>
     <div class="lesson-text prose">
-      <h3>You write the reactions; the panel decides when they run</h3>
+      <h3>You write what should happen. The panel decides when it runs.</h3>
       <p>
-        A script is a list of things to do when something happens. You do not start it yourself and
-        you do not tell it when to stop. Instead you write a section with a particular name, and the
-        panel runs that section at the moment the name describes. Attach a script to a knob and give
-        it a section called <code>onValueChanged</code>, and that section runs every time somebody
-        finishes turning the knob.
+        A script is a list of things to do when something happens. You do not start the script
+        yourself. You do not stop it either. Instead, you write a section with a special name.
+        The panel runs that section when the matching event happens. For example, attach a script
+        to a knob. Give it a section called <code>onValueChanged</code>. That section runs every
+        time someone finishes turning the knob.
       </p>
       <p>
-        Everything you can do is a command you simply call by name. Three of them &mdash;
-        <code>set</code>, <code>get</code> and <code>log</code> &mdash; are always available. The
-        rest are grouped into modules you switch on for the panel, which
-        <a href="#modules">Modules</a> explains. Commands in a module can be written either way:
-        <code>ce.midi.sendCC</code> says which group it came from, and plain <code>sendCC</code> is
-        shorter. They do exactly the same thing, so use whichever reads better to you.
+        Every action in a script is a command. You call a command by its name. A small set of
+        core commands is always available. <code>set</code>, <code>get</code> and <code>log</code>
+        are the ones you will use most. All other
+        commands live in groups called modules. You switch modules on for the panel. The
+        <a href="#modules">Modules</a> lesson explains this. You can write a module command in two
+        ways. <code>ce.midi.sendCC</code> shows which module it comes from. Plain
+        <code>sendCC</code> is shorter. Both do exactly the same thing. Use the one you like
+        better.
       </p>
       <p class="note">
-        There is nothing to set up first &mdash; no list of files to include, no step to run before
-        your script works. Tick the modules the panel should have, and every command in them is
-        ready by the time your first line runs.
+        You do not need to set anything up first. There are no files to include. There is no step
+        to run before your script works. Tick the modules the panel needs. Then every command in
+        them is ready when your first line runs.
       </p>
     </div>
     <div class="lesson-code">
@@ -666,28 +676,27 @@ end</code></pre>
   <div class="lesson" id="paths">
     <p class="lesson-n">02 &middot; Addressing</p>
     <div class="lesson-text prose">
-      <h3>Every control is reached by the name you gave it</h3>
+      <h3>You reach a control by the name you gave it</h3>
       <p>
-        To read or change a control, you name it. Not an internal number you never see &mdash; the
-        name in the editor. If you called a knob "cutoff", then that is what your script says. Add
-        a dot and you can reach further in: what it is set to, what colour it is, any setting it
-        has.
+        To read or change a control, use its name. Not a hidden number. Use the name you typed in
+        the editor. If you named a knob "cutoff", write "cutoff" in your script. Add a dot to
+        reach a detail of the control: its value, its colour, or any other setting.
       </p>
       <p>
-        The name on its own means the control's value, so <code>get("cutoff")</code> and
-        <code>get("cutoff.value")</code> ask the same question. If you later rename the control,
-        every script that mentions it is updated to match, so nothing breaks.
+        The name on its own means the control's value. So <code>get("cutoff")</code> and
+        <code>get("cutoff.value")</code> give the same answer. If you rename the control later,
+        every script that uses the name is updated too. Nothing breaks.
       </p>
       <p>
-        A value can be read in three ways. <code>.value</code> is the real one you would read off
-        the front panel, like 8000&nbsp;Hz. <code>.normalizedValue</code> is the same thing as a
-        position between 0 and 1, which is useful when you want two controls with different ranges
-        to move together. <code>.midiValue</code> is the number that actually goes to the synth.
+        You can read a value in three ways. <code>.value</code> is the real value you would read
+        on the front panel, like 8000&nbsp;Hz. <code>.normalizedValue</code> is the same value as
+        a position between 0 and 1. This is useful when two controls with different ranges must
+        move together. <code>.midiValue</code> is the number that is sent to the synth.
       </p>
       <p class="note warn">
-        <code>set</code> tells you whether it worked. If you mistype a name there is nothing to
-        change, so check the answer when it matters &mdash; otherwise a typo just quietly does
-        nothing.
+        <code>set</code> tells you if it worked. If you mistype a name, there is no control to
+        change. Then <code>set</code> does nothing and reports failure. Check the answer when it
+        matters. Otherwise a typo does nothing, and you will not notice.
       </p>
     </div>
     <div class="lesson-code">
@@ -718,29 +727,28 @@ if (!set("cutof.value", 1)) {
   <div class="lesson" id="transmit">
     <p class="lesson-n">03 &middot; Writing and the synth</p>
     <div class="lesson-text prose">
-      <h3>Changing a control normally tells the synth too</h3>
+      <h3>When your script changes a control, the synth is normally told too</h3>
       <p>
-        When your script changes a control, the panel treats it as though somebody had moved it by
-        hand: the control updates on screen <i>and</i> the synth is told. That is almost always what
-        you want.
+        When your script changes a control, the panel treats it like a change by hand. The control
+        updates on screen, <i>and</i> the synth is told. This is almost always what you want.
       </p>
       <p>
-        There is one case where it is not. If your script is responding to something the synth just
-        sent, sending it straight back would start the two of them talking in circles. So a change
-        made while you are handling an incoming message <b>is not sent back automatically</b>. You
-        do not have to remember this or set anything &mdash; the panel keeps track of why the change
-        happened.
+        There is one exception. Sometimes your script reacts to a message the synth just sent. If
+        your change went straight back, the panel and the synth would answer each other without
+        end. So a change made while you handle an incoming message <b>is not sent back
+        automatically</b>. You do not need to remember this or set anything. The panel keeps track
+        of why the change happened.
       </p>
       <p>
-        You can override it for a group of lines when you need to. A button that resets forty
-        controls to a starting patch should update all of them and only then tell the synth. A
-        reply confirming a setting does need to go out, even though it came from an incoming
-        message. Wrap the lines in <code>noTransmit</code> or <code>transmit</code> and normal
-        behaviour returns as soon as the group ends, even if something goes wrong inside it.
+        You can change this rule for a group of lines. Two examples. A button resets forty
+        controls to a starting patch. It should update them all first, and tell the synth only
+        after that. A reply that confirms a setting must go out, even during an incoming message.
+        Wrap the lines in <code>noTransmit</code> or <code>transmit</code>. Normal behaviour
+        returns when the group ends. This is true even if an error happens inside the group.
       </p>
     </div>
     <div class="lesson-code">
-      <p class="cap">Scoped, not per&#8209;line</p>
+      <p class="cap">One setting for a whole block</p>
       <pre data-lua><code>noTransmit(function()
   set("cutoff.value", 8000)
   set("reso.value", 40)
@@ -760,42 +768,91 @@ transmit(() =&gt; {
     </div>
   </div>
 
-  <div class="lesson" id="events">
-    <p class="lesson-n">04 &middot; Reacting</p>
+  <div class="lesson" id="rehearsal">
+    <p class="lesson-n">04 &middot; Preview puts things back</p>
     <div class="lesson-text prose">
-      <h3>Three ways to be told that something happened</h3>
+      <h3>A preview is a rehearsal, not an edit</h3>
       <p>
-        For things that happen to the control your script is attached to, write a section with the
-        matching name: <code>onValueChanged</code> when its value settles,
-        <code>onClick</code> when it is clicked, <code>onNoteIn</code> when a note arrives. Nothing
-        else to set up &mdash; the name is the whole connection.
+        Turn the preview off and your panel is exactly as you left it. Everything the preview
+        changed is put back: a knob you dragged, a colour a script set, a control a script made.
+        This is on purpose. A script can run a hundred times while you work on it, and it never
+        slowly rewrites the panel underneath you.
       </p>
       <p>
-        To hear about something <i>else</i> &mdash; another control, the transport, one of the
-        components &mdash; use <code>on</code> and say what you are listening to:
-        <code>on("cutoff", "onValueChanged", …)</code>. Listen to <code>"*"</code> and you hear
-        about all of them, which is why what you are handed always says which one it came from.
+        Sometimes you mean it. You write a script that recolours forty controls, you run it once,
+        and you want to keep the result. Say so with <code>ce.panel.keep</code>. Give it a path to
+        keep one property, or call it with nothing to keep everything that run did. It answers
+        <code>true</code> if something was kept.
       </p>
       <p>
-        Two of these look almost the same and the difference is worth knowing.
-        <code>onValueChange</code> runs over and over while a knob is still being turned, which
-        suits anything on screen that should follow along. <code>onValueChanged</code> &mdash; note
-        the <b>d</b> &mdash; runs once, when the knob is let go, which is when you want to tell the
+        Two things are never put back, because they cannot be. MIDI you already sent is gone out
+        the wire. Anything you stored with <code>ce.storage.saveSetting</code> was stored because
+        you asked for it to last. Controls a script created are the other way round: they are
+        always cleared, even by <code>keep</code>, because the next run builds them again and a
+        kept one would sit next to its own copy forever.
+      </p>
+      <p>
+        None of this applies to the exported plugin. There is no preview there — the plugin owns
+        its panel, and nothing is put back. <code>ce.panel.keep</code> is marked
+        <b>panel view only</b> for that reason: in the plugin it has nothing to do.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Keeping one change, and keeping the lot</p>
+      <pre data-lua><code>set("Cutoff.Background.Fill.colour", "#5B9BD5")
+ce.panel.keep("Cutoff.Background.Fill.colour")
+
+for _, name in ipairs({ "Cutoff", "Reso", "Drive" }) do
+  set(name .. ".Background.Fill.colour", "#5B9BD5")
+end
+ce.panel.keep()</code></pre>
+      <pre data-js hidden><code>set("Cutoff.Background.Fill.colour", "#5B9BD5");
+ce.panel.keep("Cutoff.Background.Fill.colour");
+
+for (const name of ["Cutoff", "Reso", "Drive"]) {
+  set(name + ".Background.Fill.colour", "#5B9BD5");
+}
+ce.panel.keep();</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson" id="events">
+    <p class="lesson-n">05 &middot; Reacting</p>
+    <div class="lesson-text prose">
+      <h3>Three ways to hear that something happened</h3>
+      <p>
+        Some events happen to the control your script is attached to. For those, write a section
+        with the matching name. <code>onValueChanged</code> runs when the value settles.
+        <code>onClick</code> runs when the control is clicked. <code>onNoteIn</code> runs when a
+        note arrives. There is nothing else to set up. The name alone makes the link.
+      </p>
+      <p>
+        You can also listen to something <i>else</i>: another control, the transport, or one of
+        the components. Use <code>on</code> and name what you are listening to:
+        <code>on("cutoff", "onValueChanged", …)</code>. Listen to <code>"*"</code> to hear about
+        all of them. The data your section receives always says which control the event came
+        from.
+      </p>
+      <p>
+        Two event names look almost the same. The difference matters.
+        <code>onValueChange</code> runs again and again while a knob is being turned. Use it for
+        things on screen that should follow the knob. <code>onValueChanged</code> has a <b>d</b>
+        at the end. It runs once, when the knob is released. That is the moment to tell the
         synth.
       </p>
       <p>
-        <code>watch</code> is the third way. It is not tied to any event: you give it something to
-        keep an eye on, and it runs whenever that changes. Use it for the settings no event covers,
-        like a colour or a size.
+        <code>watch</code> is the third way. It is not tied to any event. You give it something
+        to watch, and it runs whenever that thing changes. Use it for settings that no event
+        covers, like a colour or a size.
       </p>
       <p class="note">
-        With <code>on</code>, both spellings of an event work &mdash; <code>"step"</code> and
-        <code>"onStep"</code> mean the same thing, so you do not have to remember which one this
+        With <code>on</code>, both spellings of an event name work. <code>"step"</code> and
+        <code>"onStep"</code> mean the same thing. You do not have to remember which one this
         page used.
       </p>
     </div>
     <div class="lesson-code">
-      <p class="cap">Three ways to be told</p>
+      <p class="cap">Three ways to hear about it</p>
       <pre data-lua><code>function onValueChanged(value)
   sendCC(1, 74, value)
 end
@@ -822,33 +879,46 @@ watch("cutoff.background.fill.colour", (c) =&gt; {
   </div>
 
   <div class="lesson" id="modules">
-    <p class="lesson-n">05 &middot; Modules</p>
+    <p class="lesson-n">06 &middot; Modules</p>
     <div class="lesson-text prose">
-      <h3>Switch on the groups of commands you need</h3>
+      <h3>Switch on the command groups your panel needs</h3>
       <p>
-        There are <b id="i-mem">555</b> commands in all, sorted into <b id="i-mod">41</b> groups
-        called modules. A panel would be needlessly large if it carried every one, so you tick the
-        modules your panel uses and only those are included when you share it. If you are curious
-        what that costs, <a href="#weight">What it weighs</a> has the real figures.
+        There are <b id="i-mem">738</b> commands in total. They are sorted into
+        <b id="i-mod">41</b> groups called modules. A panel that carried every command would be
+        too large. So you tick only the modules your panel uses. Only those are included when you
+        share the panel. The section <a href="#weight">What it weighs</a> shows the real sizes.
       </p>
       <p>
-        <code>ce.core</code> is always on, and its commands never need a prefix &mdash; that is why
-        you write plain <code>set</code> and <code>get</code>. Everything in the other modules can
-        be written either way, so <code>ce.midi.sendCC</code> and <code>sendCC</code> are the same
+        <code>ce.core</code> is always on. Its commands never need a prefix. That is why you
+        write plain <code>set</code> and <code>get</code>. Commands in the other modules can be
+        written in both ways. <code>ce.midi.sendCC</code> and <code>sendCC</code> are the same
         command.
       </p>
       <p>
-        If you call something from a module you have not switched on, nothing happens and the
+        You may call a command from a module you have not switched on. Then nothing happens. The
         console tells you which module to tick. Your script keeps running.
       </p>
+      <p>
+        A script can ask what it has. <code>ce.has("ce.midi")</code> answers whether that module is
+        both switched on and reachable from where the script is running right now, so a panel-view
+        module answers <code>false</code> with the window closed. <code>ce.modules</code> is the
+        whole list, <code>ce.runtime</code> says which of the two places you are in, and
+        <code>ce.language</code> names the language the script is written in. Use them to write one
+        script that adapts, instead of two that nearly match.
+      </p>
       <p class="note">
-        Some commands need the panel window to be open, and the reference marks those
+        Your scripts can run in two places. The first place is the panel window, while it is
+        open. The second place is the plugin itself, with the window closed. In a DAW, people
+        close the plugin window all the time, and the plugin keeps making sound. Your scripts
+        keep running there too. Timers keep ticking. MIDI keeps arriving. Some commands need
+        the window. Drawing, asking the user a question, and driving the components are like
+        this. With the window shut, there is nothing to draw on and no one to ask. The
+        reference marks these commands
         <b class="rt-webview" style="font-family:var(--mono);font-size:11px">panel view only</b>.
-        Drawing, asking a question and driving the components are all in that group, for the
-        obvious reason: with the window shut there is nothing to draw on and nobody to ask. The
-        rest, marked
-        <b class="rt-any" style="font-family:var(--mono);font-size:11px">cross-runtime</b>, work
-        either way.
+        Calling one with the window closed does nothing, and a note goes to the log. All other
+        commands are marked
+        <b class="rt-any" style="font-family:var(--mono);font-size:11px">cross-runtime</b>.
+        They work the same in both places.
       </p>
     </div>
     <div class="lesson-code">
@@ -875,30 +945,31 @@ const m = quantizeNote(63, 60, "minor");</code></pre>
   </div>
 
   <div class="lesson" id="timing">
-    <p class="lesson-n">06 &middot; Musical time</p>
+    <p class="lesson-n">07 &middot; Musical time</p>
     <div class="lesson-text prose">
-      <h3>Working in beats and bars rather than milliseconds</h3>
+      <h3>Work in beats and bars instead of milliseconds</h3>
       <p>
-        <code>ce.time</code> knows the current tempo &mdash; from the editor while you are building,
-        or from your music software once the panel is running in it &mdash; and converts between
-        beats and milliseconds for you. So setting a delay to a dotted eighth note, the calculation
-        every synth panel ends up needing, is a single line.
+        <code>ce.time</code> knows the current tempo. While you build, the tempo comes from the
+        editor. In the finished plugin, it comes from your music software. <code>ce.time</code>
+        converts between beats and milliseconds for you. For example, you can set a delay time to
+        a dotted eighth note in one line. Almost every synth panel needs that calculation at some
+        point.
       </p>
       <p>
-        There are three ways to make something happen later. <code>after</code> does it once, a
-        given number of milliseconds from now. <code>startTimer</code> repeats at a fixed rate.
-        <code>syncTimer</code> repeats on a musical interval &mdash; every sixteenth note, say
-        &mdash; and speeds up or slows down with the tempo.
+        There are three ways to make something happen later. <code>after</code> runs it once,
+        after a number of milliseconds. <code>startTimer</code> repeats it at a fixed rate.
+        <code>syncTimer</code> repeats it on a musical interval, such as every sixteenth note. It
+        speeds up or slows down with the tempo.
       </p>
       <p class="note warn">
-        <code>onBeat</code> and <code>onBar</code> are checked about thirty times a second, so they
-        land within a frame of the beat. That is close enough to light an indicator or advance a
-        sequencer, but it is not exact to the sample, so do not rely on it for anything that has to
-        line up perfectly with recorded audio.
+        <code>onBeat</code> and <code>onBar</code> are checked about thirty times per second. So
+        they run very close to the beat, but not exactly on it. That is close enough to light an
+        indicator or to advance a sequencer. It is not exact to the sample. Do not use it for
+        anything that must line up perfectly with recorded audio.
       </p>
     </div>
     <div class="lesson-code">
-      <p class="cap">Settle, then send</p>
+      <p class="cap">Wait, then send</p>
       <pre data-lua><code>sendProgramChange(1, 12)
 ce.time.after(40, function()
   sendDump("patch")
@@ -927,27 +998,28 @@ function onTimer(info) {
   </div>
 
   <div class="lesson" id="components">
-    <p class="lesson-n">07 &middot; Components</p>
+    <p class="lesson-n">08 &middot; Components</p>
     <div class="lesson-text prose">
-      <h3>Setting up a component, and hearing back from it</h3>
+      <h3>Set up a component, and hear back from it</h3>
       <p>
-        The bigger components &mdash; the arpeggiator, chord pad, sequencers, envelope, the displays
-        &mdash; each have their own module of commands, and the
-        <a href="#/reference">Reference</a> shows a picture of every one. Each command starts with
-        the name of the control, and each one tells you whether it worked. Ask for something the
-        component does not have and it says no rather than storing a setting that does nothing.
+        The big components each have their own module of commands. These are the arpeggiator, the
+        chord pad, the sequencers, the envelope, and the displays. The
+        <a href="#/reference">Reference</a> shows a picture of each one. Every command starts
+        with the name of the control. Every command tells you if it worked. If you ask for
+        something the component does not have, the command says no. It does not store a setting
+        that does nothing.
       </p>
       <p>
-        <code>read</code> asks a component what it is currently set to, using the same words you
-        would use to set it. Where a component holds a list of things &mdash; steps, nodes,
-        breakpoints, destinations &mdash; <code>size</code> tells you how many there are,
-        <code>fill</code> replaces them all at once, and <code>insert</code> and <code>remove</code>
-        change one.
+        <code>read</code> asks a component for its current setting. It uses the same words you
+        would use to set it. Some components hold a list of things: steps, nodes, breakpoints, or
+        destinations. For those lists, <code>size</code> tells you how many items there are.
+        <code>fill</code> replaces all the items at once. <code>insert</code> and
+        <code>remove</code> change one item.
       </p>
       <p>
-        Components also tell you when things happen: a step playing, a scene changing, a pad being
-        hit, a recording finishing. Those need the panel window open, since that is where the
-        components are actually running.
+        Components also tell you when things happen: a step plays, a scene changes, a pad is hit,
+        a recording finishes. These events need the panel window to be open. That is where the
+        components run.
       </p>
     </div>
     <div class="lesson-code">
@@ -978,41 +1050,42 @@ on(a, "onStep", (step) =&gt; {
   </div>
 
   <div class="lesson" id="typography">
-    <p class="lesson-n">08 &middot; Typography</p>
+    <p class="lesson-n">09 &middot; Typography</p>
     <div class="lesson-text prose">
-      <h3>Setting text and fonts safely</h3>
+      <h3>Set text and fonts safely</h3>
       <p>
-        You could already change any text setting with <code>set</code> &mdash;
-        <code>set("Label.Text.Font.size", 18)</code> has always worked. So <code>ce.text</code> is
-        not about reaching further. It is about three things you cannot do by writing a setting
-        directly.
+        You can already change any text setting with <code>set</code>. For example,
+        <code>set("Label.Text.Font.size", 18)</code> works. So <code>ce.text</code> does not
+        reach any further than <code>set</code>. It exists for three things you cannot do by
+        writing a setting directly.
       </p>
       <p>
-        <b>It knows which fonts exist.</b> <code>fonts()</code> lists the ones you can actually
-        pick, and <code>font("Inter Tight")</code> tells you about one of them, or nothing if it is
-        not there. Ask for a font nobody has and it says so, rather than storing the name and
-        quietly showing you something else. Check <code>portable</code> before you settle on a
-        face. A built-in font works everywhere. One from your own library lives on this computer
-        and is not part of the panel, so it looks right while you build and falls back to something
-        else for whoever you send it to.
+        <b>It knows which fonts exist.</b> <code>fonts()</code> lists the fonts you can really
+        pick. <code>font("Inter Tight")</code> gives details about one font. It gives nothing if
+        the font is not there. So if you ask for a missing font, you find out at once. The name
+        is not stored while the screen quietly shows another font. Also check the
+        <code>portable</code> field before you choose a font. A built-in font works everywhere. A
+        font from your own library lives only on this computer. It is not part of the panel. It
+        looks right while you build. For the person you send the panel to, it falls back to a
+        different font.
       </p>
       <p>
-        <b>It keeps related settings in step.</b> Boldness is stored in two places, and different
-        parts of the app read different ones. Change only one and the editor and the finished panel
-        disagree about how bold your text is. <code>style()</code> always writes both, so you
-        cannot get into that state.
+        <b>It keeps related settings equal.</b> Boldness is stored in two places. Different parts
+        of the app read different ones. If you change only one, the editor and the finished panel
+        disagree about how bold your text is. <code>style()</code> always writes both. So that
+        problem cannot happen.
       </p>
       <p>
-        <b>It can measure text.</b> <code>measure()</code> tells you how much room a control's text
-        takes up in its own font, using the same code that draws it, so spacing and wrapping are
-        all accounted for. <code>fit()</code> then shrinks the size until the text fits the control
-        and tells you what it settled on &mdash; useful when you want to line something else up
-        with it.
+        <b>It can measure text.</b> <code>measure()</code> tells you how much room a control's
+        text needs in its own font. It uses the same code that draws the text. So spacing and
+        wrapping are included. <code>fit()</code> shrinks the font size until the text fits the
+        control. It also tells you the final size. That is useful when you want to line up
+        something else with the text.
       </p>
       <p class="note">
-        These need the panel window open, because the font list is the editor's and measuring needs
-        something to measure on. A command that guessed the answer would be worse than one that
-        tells you it cannot help right now.
+        These commands need the panel window to be open. The font list belongs to the editor.
+        Measuring needs a real screen to measure on. A command that guessed the answer would be
+        worse than one that says it cannot help right now.
       </p>
     </div>
     <div class="lesson-code">
@@ -1059,31 +1132,32 @@ if (!fitted.fits) {
   </div>
 
   <div class="lesson" id="keeping">
-    <p class="lesson-n">09 &middot; Keeping things</p>
+    <p class="lesson-n">10 &middot; Keeping things</p>
     <div class="lesson-text prose">
-      <h3>Remembering things, for a while or for good</h3>
+      <h3>Keep data for a short time or for good</h3>
       <p>
-        <code>state</code> is a scratch pad of your own. Anything you put in it is still there next
-        time your script runs, and it is wiped when the panel is reloaded. It is what you want for
-        counting things or remembering where you got to.
+        <code>state</code> is your own note pad. Anything you put in it is still there the next
+        time your script runs. It is wiped when the panel is reloaded. Use it for counting things
+        or for remembering where you got to.
       </p>
       <p>
-        Settings are for things that should still be there tomorrow, and you choose how far they
-        travel. <code>"panel"</code> keeps them with the panel, so they go wherever the panel goes
-        and every script on it can see them. <code>"script"</code> keeps them to your script alone.
-        <code>"local"</code> keeps them on this computer and out of the panel entirely &mdash; a
-        panel you send to somebody else should not arrive carrying your choice of MIDI port.
+        Settings are for things that should still be there tomorrow. You choose how far each
+        setting travels. <code>"panel"</code> stores it with the panel. It goes wherever the
+        panel goes, and every script on the panel can see it. <code>"script"</code> stores it for
+        your script alone. <code>"local"</code> stores it on this computer only. It is never part
+        of the panel. For example, a panel you send to someone else should not carry your choice
+        of MIDI port.
       </p>
       <p>
-        <code>encode</code> and <code>decode</code> turn a value into text and back, which is how
-        you fit something structured into a place that only takes text. They are here rather than
-        borrowed from your language because not all five languages have one, and all five have to
-        produce exactly the same text. That also means you can compare two values by comparing
-        their text.
+        <code>encode</code> turns a value into text. <code>decode</code> turns that text back
+        into a value. Use them to fit structured data into a place that only takes text. They are
+        built in for two reasons. Not all five languages have their own version. And all five
+        must produce exactly the same text. Because the text is always the same, you can also
+        compare two values by comparing their text.
       </p>
     </div>
     <div class="lesson-code">
-      <p class="cap">Scratch, saved, shipped</p>
+      <p class="cap">Short-term, saved, and local</p>
       <pre data-lua><code>state.hits = (state.hits or 0) + 1
 
 ce.storage.saveSetting("bank", 3)
@@ -1110,32 +1184,33 @@ if (back === undefined) logError("bad config");</code></pre>
   </div>
 
   <div class="lesson" id="debug">
-    <p class="lesson-n">10 &middot; When it breaks</p>
+    <p class="lesson-n">11 &middot; When it breaks</p>
     <div class="lesson-text prose">
-      <h3>Finding out what went wrong</h3>
+      <h3>Find out what went wrong</h3>
       <p>
-        Three commands write to the script console, and they are marked differently there so a real
-        problem does not look like a note to yourself: <code>log</code> for ordinary messages,
-        <code>logWarn</code> for something odd, <code>logError</code> for something that failed.
+        Three commands write to the script console. Use <code>log</code> for normal messages. Use
+        <code>logWarn</code> for something odd. Use <code>logError</code> for something that
+        failed. Each level looks different in the console. So a real problem does not look like a
+        note to yourself.
       </p>
       <p>
-        Reporting an error does not stop your script &mdash; the rest of the section still runs. If
-        you want it to stop, use your own language's way of raising an error.
+        Reporting an error does not stop your script. The rest of the section still runs. If you
+        want to stop, raise an error in your own language's way.
       </p>
       <p>
-        <code>onError</code> is the safety net. Write a section with that name and it is told about
-        any failure your script did not deal with, which is how a panel can report its own problems
-        when nobody is watching the console. Failures are written to the console as well either
-        way, so a broken safety net cannot hide them.
+        <code>onError</code> is the safety net. Write a section with that name. It is told about
+        every failure your script did not handle. This lets a panel report its own problems when
+        no one is watching the console. Failures are always written to the console as well. So a
+        broken <code>onError</code> section cannot hide them.
       </p>
       <p class="note">
-        Most commands that can fail tell you by handing back <code>false</code> rather than by
-        raising an error &mdash; <code>set</code>, <code>saveSetting</code>, and every component
-        command. Checking the answer is usually simpler than catching anything.
+        Most commands that can fail do not raise an error. They return <code>false</code>
+        instead. <code>set</code>, <code>saveSetting</code>, and every component command work
+        this way. Checking the answer is usually simpler than catching errors.
       </p>
     </div>
     <div class="lesson-code">
-      <p class="cap">Levels and the backstop</p>
+      <p class="cap">Three levels, and onError</p>
       <pre data-lua><code>log("normal")
 logWarn("odd, but carrying on")
 logError("could not do that")
@@ -1157,14 +1232,13 @@ function onError(info) {
 </div><!-- /view-manual -->
 
 <!-- ============================================================== TUTORIALS -->
-<!-- Its own view. These four are complete working scripts of 150 lines and up, and they used to
+<!-- Its own view. These six are complete working scripts of 150 lines and up, and they used to
      sit in the same run as the forty-line concept lessons — so the manual took a very long scroll
      to get past, whichever of the two you had come for. -->
 <div class="view" id="view-tutorials" hidden>
 <section id="tutorials">
   <div class="rule-head">
     <h2>Tutorials</h2>
-    <p>Four panels, built from nothing, one line at a time</p>
     <span style="flex:1"></span>
     <div class="lang-pick" role="group" aria-label="Sample language">
       <button type="button" data-lang="lua" aria-pressed="true">Lua</button>
@@ -1173,47 +1247,48 @@ function onError(info) {
   </div>
 
   <p class="prose">
-    These are longer than the lessons and meant to be followed start to finish. Every line runs:
-    the numbers in the comments are what the calls actually returned, and the test suite builds
-    each of these panels again on every change, in both languages, and checks they come out the
-    same. If a tutorial here has gone stale, the build fails.
+    These tutorials are longer than the lessons. Follow each one from start to finish.
+    Every line in the code really runs. The numbers in the comments are the real values
+    the calls returned. The test suite builds each of these panels again on every change,
+    in both languages, and checks the results match. If a tutorial goes stale, the build fails.
   </p>
 
   <div class="lesson wide" id="walkthrough">
     <p class="lesson-n">01 &middot; A button, from nothing</p>
     <div data-shot="tutorial-walkthrough"></div>
     <div class="lesson-text prose">
-      <h3>One button, using most of what you have just read</h3>
+      <h3>One button, using the commands from the manual</h3>
       <p>
-        The whole of the manual so far, applied to a single control. Every line below really runs.
-        The numbers in the comments are what the calls actually returned, and the test suite runs
-        the whole thing again on every change.
+        This tutorial builds a single button. It uses most of the commands from the manual.
+        Every line below really runs. The numbers in the comments are the real values the
+        calls returned. The test suite runs the whole script again on every change.
       </p>
       <p>
-        This is a <b>panel</b> script, in the <code>onPanelBuild</code> section &mdash; the one
-        that exists for building things. Anything a script created last time is cleared before it
-        runs, so running it twice cannot give you two of everything.
+        This is a <b>panel</b> script. The code sits in the <code>onPanelBuild</code> section.
+        That section is for building things. Before it runs, the editor removes everything the
+        script created last time. So running the script twice cannot create two of everything.
       </p>
       <p>
-        Three steps here are easy to get wrong. First, <code>create()</code> hands back the name it
-        actually used, which may not be the one you asked for if something already had it &mdash;
-        so keep what it gives you.
+        Three steps are easy to get wrong. First, <code>create()</code> returns the name it
+        actually used. If the name you asked for was already taken, the returned name is
+        different. Always keep the name it gives you.
       </p>
       <p>
-        Second, a control's fill is made of layers: a solid colour, a gradient, an image and an
-        overlay, stacked in an order you control. That is why the states below change the
-        gradient's opacity rather than the colour underneath it. A gradient at full opacity hides
-        the solid layer completely, so changing that colour would store something nobody ever sees.
+        Second, a control's fill has layers: a solid colour, a gradient, an image, and an
+        overlay. You control the order of the layers. In the states below, the script changes
+        the gradient's opacity, not the colour under it. A gradient at full opacity hides the
+        solid layer completely. Changing that hidden colour would store a value nobody can see.
       </p>
       <p>
-        Third, watch the spelling. A gradient stop takes <code>color</code> while the fill around
-        it takes <code>colour</code>. The gradient editor is older than the rest and kept its own
-        spelling.
+        Third, watch the spelling. A gradient stop uses <code>color</code>. That is the US
+        spelling, with 6 digits. The fill around it uses <code>colour</code>. That is the
+        British spelling, with 8 digits (AARRGGBB). The gradient editor is older than the rest
+        and kept its own spelling.
       </p>
       <p class="note">
-        <code>bind()</code> says yes for a parameter nothing has declared yet, deliberately &mdash;
-        a script is allowed to declare one later. So checking for that is up to you, which is what
-        the guard in the listing does.
+        <code>bind()</code> says yes even for a parameter that nothing has declared yet. This is
+        on purpose. A script is allowed to declare the parameter later. So you must check for
+        the parameter yourself. The guard in the code below does that check.
       </p>
     </div>
     <div class="lesson-code">
@@ -1373,8 +1448,8 @@ on(NAME, "valueChanged", (v) =&gt; {
              { duration: 180, curve: "outCubic" });
 });</code></pre>
       <p class="note">
-        Every line of that could have been done in the Properties panel, one field at a time. Here
-        is what could not.
+        You could set every value above in the Properties panel, one field at a time. The next
+        tutorials show things the Properties panel cannot do.
       </p>
     </div>
   </div>
@@ -1385,35 +1460,35 @@ on(NAME, "valueChanged", (v) =&gt; {
     <div class="lesson-text prose">
       <h3>Describe the panel once, and let the script build it</h3>
       <p>
-        The same eight pads, built from a list of eight rows. The gain is not that it is shorter.
-        It is that what you keep is now the <i>rule</i>. Change the number of columns to 2 and the
-        grid reflows and the group resizes to match. Add a ninth row and you get a ninth pad
-        &mdash; coloured, labelled, wired up and playing &mdash; with no other change.
+        This builds the same eight pads. This time a table with eight rows describes them.
+        The table drives everything. Change the number of columns to 2 and the grid reflows.
+        The group resizes to match. Add a ninth row and you get a ninth pad. The new pad is
+        coloured, labelled, wired up, and playing. You change nothing else.
       </p>
       <p>
-        Each part of it does a different job. The <b>list</b> is the drum kit, kept separate from
-        the panel. The <b>function</b> is why eight pads cannot drift apart the way eight
-        copy-pasted blocks would. Plain <b>arithmetic</b> places them and sizes the group to fit,
-        and <code>shade()</code> works out each gradient's darker end rather than you typing
-        sixteen colour codes. The <b>label is worked out</b> from the same row that sets the rate,
-        so the two cannot disagree.
+        Each part of the code has one job. The <b>list</b> holds the drum kit data. It stays
+        separate from the panel. The <b>function</b> builds one pad from one row. That is why
+        the eight pads always match. Simple <b>arithmetic</b> places each pad and sizes the
+        group to fit. The <code>shade()</code> function computes the darker end of each
+        gradient. You do not type sixteen colour codes. The label comes from the same row that
+        sets the roll rate. So the label and the rate always agree.
       </p>
       <p>
-        <b>The drum roll is a setting, not a script.</b> A button can already repeat while it is
-        held, with its own delay and interval, and a script that rebuilt that with a timer would
-        be writing a worse copy of something the control does for you. What the script adds is the
-        part a stored number cannot do: it works the interval out from the tempo, so the roll
-        follows the music instead of being stuck at whatever was typed in.
+        <b>The drum roll is a button setting, not a script timer.</b> A button can already
+        repeat while it is held. It has its own delay and interval settings. A script timer
+        would only be a worse copy of that. The script adds one thing a stored number cannot
+        do. It computes the interval from the host tempo. So the roll follows the music.
       </p>
       <p>
-        The <b>handler holding its own row</b> is the part with no equivalent setting at all.
-        Eight handlers, each remembering which pad it belongs to. A control can store one note; it
-        cannot store "this button, that note, that velocity" eight times over.
+        The <b>handler that keeps its own row</b> has no equivalent setting at all. The script
+        defines one handler. Each pad gets its own copy, and each copy remembers its own row of
+        the table. So each pad plays its own note and velocity. A control can store one note.
+        It cannot store eight different notes and velocities.
       </p>
       <p class="note">
-        An ordinary pad fires <code>onClick</code> once, when you let go. A repeating pad fires it
-        over and over while it is held, and <i>not</i> again on release, because it has already
-        fired. The same handler covers both.
+        An ordinary pad fires <code>onClick</code> once, when you release it. A repeating pad
+        fires it again and again while you hold it. It does <i>not</i> fire again on release,
+        because it has already fired. The same handler covers both kinds.
       </p>
     </div>
     <div class="lesson-code">
@@ -1445,7 +1520,7 @@ local CH = 10                                   -- GM drums</code></pre>
 const BAY = "Pads", COLS = 4, W = 84, H = 44, GAP = 10, PAD = 16;
 const CH = 10;                                  // GM drums</code></pre>
 
-      <p class="cap">The rule</p>
+      <p class="cap">The code</p>
       <pre data-lua><code>-- Darken a 6-digit hex. Plain Lua: this is arithmetic.
 local function shade(hex, f)
   local out = ""
@@ -1617,9 +1692,9 @@ function onPanelBuild() {
   });
 }</code></pre>
       <p class="note">
-        Both languages build the identical panel &mdash; same positions, same derived colours, down
-        to <code>A5563B</code>&#8202;&rarr;&#8202;<code>522B1D</code>. The test suite runs both and
-        compares.
+        Both languages build the identical panel. The positions are the same. The derived
+        colours are the same, down to <code>A5563B</code>&#8202;&rarr;&#8202;<code>522B1D</code>.
+        The test suite runs both versions and compares the results.
       </p>
     </div>
   </div>
@@ -1628,43 +1703,44 @@ function onPanelBuild() {
     <p class="lesson-n">03 &middot; Asking the instrument</p>
     <div data-shot="tutorial-drumkit"></div>
     <div class="lesson-text prose">
-      <h3>Let the component do the work, and ask it what it did</h3>
+      <h3>Let the component do the work, then ask it what it did</h3>
       <p>
-        The last tutorial built a drum kit out of eight separate buttons, and there was nothing
-        wrong with it. This is the same kit as a <b>single Drum Pads control</b>. The reason to
-        prefer it is not that it is shorter: three of the things a drum grid does cannot be built
-        from eight independent buttons at all.
+        Tutorial 02 built a drum kit from eight separate buttons. That worked. This tutorial
+        builds the same kit as a <b>single Drum Pads control</b>. The single control is not
+        just shorter. Three features of a drum grid cannot be built from separate buttons at
+        all.
       </p>
       <p>
-        <b>Choke groups.</b> A closed hi-hat has to silence an open one. Separate buttons cannot do
-        that, because none of them knows the others exist. <b>Strike position.</b> Where in the pad
-        you land decides how hard it sounds, and a button has no inside. <b>Corner zones.</b> The
-        four corners of every pad can do something different &mdash; a roll under one thumb, a flam
-        under the other &mdash; which turns sixteen triggers into something you can play.
+        <b>Choke groups.</b> A closed hi-hat has to silence an open hi-hat. Separate buttons
+        cannot do this, because no button knows the other buttons exist. <b>Strike
+        position.</b> The spot where your finger lands sets how hard the note sounds. A plain
+        button cannot tell where you hit it. <b>Corner zones.</b> Each corner of a pad can do
+        a different action, for example a roll or a flam. This gives you many more moves than
+        sixteen plain triggers.
       </p>
       <p>
-        <b>Only set what differs.</b> Everything else follows the kit. One call to
-        <code>fill()</code> writes all eight notes at once, and the choke groups sort themselves
-        out, because which pads choke each other is worked out from the notes. Look at what the
-        script actually stored: pad 1 has nothing set, because 36 was the note it was going to play
-        anyway, and pinning it there would only stop it following the base note later.
+        <b>Only set what differs from the defaults.</b> The kit handles the rest. One call to
+        <code>fill()</code> writes all eight notes in one step. You never set the choke groups.
+        The control works them out from the notes. Look at what the script actually stored.
+        Pad 1 stores nothing, because 36 was already its default note. Storing 36 anyway would
+        pin the pad, and it would stop following the base note later.
       </p>
       <p>
-        <b>So ask, rather than tell.</b> <code>read()</code> answers with what the component
-        settled on, not with what you stored. That is what lets the rest be worked out: "give a
-        roll to every pad in a choke group" finds the hi-hats without you typing a single position,
-        names them in the log from the same answer, and keeps being right when the kit, the rows or
-        the columns change underneath it.
+        <b>Ask the control instead of telling it.</b> <code>read()</code> returns what the
+        control settled on, not what you stored. This lets the script work things out. The
+        loop below gives a roll to every pad in a choke group. It finds the hi-hats without
+        any typed pad positions. It names them in the log from the same answer. It stays
+        correct when the kit, the rows, or the columns change.
       </p>
       <p>
-        The roll is worked out too. Its rate is a note value rather than a number of milliseconds,
-        so a 1/32 roll stays a 1/32 when the tempo moves. And the roll delay is what lets one pad
-        do two jobs: tap it and it strikes once, lean on it and it rolls.
+        The roll settings are computed too. The roll rate is a note value, not a number of
+        milliseconds. So a 1/32 roll stays a 1/32 when the tempo changes. The roll delay lets
+        one pad do two jobs. Tap the pad and it strikes once. Hold the pad and it rolls.
       </p>
       <p class="note">
-        Corner zones are set for the <b>whole grid</b> rather than per pad, deliberately. A corner
-        is a gesture your hand learns once. Corners that meant different things on neighbouring
-        pads would be the opposite of an instrument you can play without looking.
+        Corner zones are set for the <b>whole grid</b>, not per pad. This is on purpose. Your
+        hand learns each corner action once. If a corner meant different things on different
+        pads, the grid would be much harder to play.
       </p>
     </div>
     <div class="lesson-code">
@@ -1740,7 +1816,7 @@ function onPanelBuild() {
 
   log("rolling: " + rolled.join(", "));</code></pre>
 
-      <p class="cap">One gesture vocabulary, for every pad</p>
+      <p class="cap">The same corner actions on every pad</p>
       <pre data-lua><code>  D.zones(KIT, true)
   D.cornerSize(KIT, 0.3)              -- how much of a pad each corner claims
   D.cornerTopLeft(KIT, "accent")      -- full velocity, wherever it landed
@@ -1756,9 +1832,10 @@ end</code></pre>
   D.cornerBottomRight(KIT, "flam");   // a grace note ahead of the main one
 }</code></pre>
       <p class="note">
-        What it logs is <code>rolling: CH Hat, OP Hat</code> &mdash; two names the script never
-        wrote down, for two pads it never numbered. The remaining corner, <code>choke</code>, is the
-        cymbal grab: it silences the group and sounds nothing of its own.
+        The script logs <code>rolling: CH Hat, OP Hat</code>. The script never typed those two
+        names, and it never typed those pad numbers. One more corner action exists,
+        <code>choke</code>. It works like grabbing a cymbal. It silences the whole choke group
+        and plays no sound of its own.
       </p>
     </div>
   </div>
@@ -1767,47 +1844,46 @@ end</code></pre>
     <p class="lesson-n">04 &middot; A panel is a graph</p>
     <div data-shot="tutorial-wiring"></div>
     <div class="lesson-text prose">
-      <h3>Wiring controls up to each other</h3>
+      <h3>Connecting controls to each other</h3>
       <p>
-        The last three tutorials built controls. This one <b>connects</b> them. A meter can follow
-        a knob. An LCD can take its reading from one control and its backlight from another. An
-        arpeggiator can take its notes from a chord pad. Once any of that is true, the panel is no
-        longer a list of controls but a set of connections.
+        The last three tutorials built controls. This one <b>connects</b> them. A meter can
+        follow a knob. An LCD can take its reading from one control and its backlight from
+        another. An arpeggiator can take its notes from a chord pad. With connections like
+        these, the panel is more than a list of controls. It is a set of connections.
       </p>
       <p>
-        <b>You name the control, the same as everywhere else.</b> Underneath, the connection is
-        stored against something that survives a rename, but your script never sees that and never
-        needs to &mdash; <code>read()</code> gives you the name back.
+        <b>You name the control, the same as everywhere else.</b> Inside the editor, the
+        connection is stored in a way that survives a rename. Your script never sees that
+        stored form and never needs to. <code>read()</code> gives you the name back.
       </p>
       <p>
-        <b>Not every control can drive every field, and being told so is the useful part.</b> Watch
-        what happens to <code>Title</code>, an ordinary label, in the listing. It is accepted as
-        the LCD's backlight source and refused as the meter's level. One control, two answers,
-        because the two fields want different things: anything can answer "is this on", but not
-        everything can answer "how far up is this". The command says which, in words:
-        <span class="q">refused &mdash; it is not a knob, slider or other range control</span>. A
-        connection that failed quietly would look exactly like one that worked, right up until the
-        meter sat still.
+        <b>Not every control can drive every field.</b> The command tells you when a connection
+        is refused, and that answer is useful. Watch <code>Title</code> in the code below. It
+        is an ordinary label. The LCD accepts it as a backlight source. The meter refuses it as
+        a level source. The two fields need different things. Any control can answer "is this
+        on". Only some controls can answer "how far up is this". The command gives the reason
+        in words: <span class="q">refused &mdash; it is not a knob, slider or other range
+        control</span>. A connection that failed silently would look like a working one, until
+        you noticed the meter never moved.
       </p>
       <p>
-        That is why the answer is worth reading. The loop below works through a list of intended
-        connections and <b>counts the ones that took</b>, so a panel building itself against
-        somebody else's layout can cope rather than half-work.
+        So read the answer each call returns. The loop below tries a list of planned
+        connections. It <b>counts how many connections succeeded</b>. A script that builds on
+        someone else's layout can then handle missing controls instead of half-working.
       </p>
       <p>
-        <b>Then it reads the connections back.</b> The last block walks the panel, asks what each
-        control is, and asks each one what is driving it. Nothing in that block knows what the
-        earlier blocks did &mdash; it would report a panel that was wired entirely by hand, just as
-        well.
+        <b>The last block reads the connections back.</b> It walks the panel, asks what type
+        each control is, and asks each control what drives it. That block uses nothing from the
+        earlier blocks. It would report connections made by hand in the editor just as well.
       </p>
       <p class="note">
-        Naming no control disconnects it, which is a real setting rather than the absence of one.
-        A connection whose target has since been deleted reads back as disconnected too, which is
-        the honest answer: either way the control is running on its own value.
+        Naming no control disconnects the field. That is a real setting, not just a missing
+        one. A connection whose target was later deleted also reads back as disconnected. In
+        both cases the control runs on its own value.
       </p>
     </div>
     <div class="lesson-code">
-      <p class="cap">The rig</p>
+      <p class="cap">The controls</p>
       <pre data-lua><code>local M = ce.components.meter
 local L = ce.components.lcd
 
@@ -1827,7 +1903,7 @@ function onPanelBuild() {
   ce.panel.create("LcdDisplay", { name: "Screen", x: 270, y: 110, width: 240, height: 90 });
   ce.panel.create("Label",      { name: "Title",  x: 40,  y: 180, width: 200, height: 24 });</code></pre>
 
-      <p class="cap">Wire it, and count what took</p>
+      <p class="cap">Make the connections, and count the successes</p>
       <pre data-lua><code>  -- The last row is deliberately impossible: a Label has no value to give a Meter.
   -- The row above it is the same Label driving the LCD's backlight, which is fine.
   local WIRING = {
@@ -1862,7 +1938,7 @@ function onPanelBuild() {
   }
   log("wired " + made + " of " + WIRING.length);</code></pre>
 
-      <p class="cap">Read the graph back</p>
+      <p class="cap">Read the connections back</p>
       <pre data-lua><code>  -- Nothing below knows what the two blocks above did. It reports the wiring of
   -- whatever panel it is pointed at, including links made entirely by hand.
   local SOURCES = {
@@ -1893,11 +1969,310 @@ end</code></pre>
   });
 }</code></pre>
       <p class="note">
-        What it logs, in order: <code>could not wire Title &rarr; Level.source</code>,
-        <code>wired 3 of 4</code>, then the graph &mdash; <code>Cutoff &rarr; Level.source</code>,
+        The script logs these lines, in this order: <code>could not wire Title &rarr;
+        Level.source</code>, then <code>wired 3 of 4</code>, then the three connections:
+        <code>Cutoff &rarr; Level.source</code>,
         <code>Reso &rarr; Screen.valueSource</code>,
         <code>Title &rarr; Screen.backlightSource</code>.
       </p>
+    </div>
+  </div>
+
+  <div class="lesson wide" id="sequencer">
+    <p class="lesson-n">05 &middot; A step sequencer</p>
+    <div data-shot="tutorial-sequencer"></div>
+    <div class="lesson-text prose">
+      <h3>Make the panel play notes, in time, on its own</h3>
+      <p>
+        This tutorial builds a small instrument: eight step buttons, a PLAY button, and a NEW
+        button. Press PLAY and the panel plays a note pattern, in time with the clock. Press NEW
+        and you get a fresh pattern. You need no hardware for this. Everything runs in the
+        preview.
+      </p>
+      <p>
+        The first block builds the row. Each step is a toggle button. A toggle button holds a
+        value: 1 when it is on, 0 when it is off. That value <b>is</b> the pattern memory. A step
+        plays when its button is on. There is no separate list to keep in sync.
+      </p>
+      <p>
+        The second block makes a pattern. <code>ce.music.scale(48, "pentatonicMin")</code> gives
+        the five notes of a C minor pentatonic scale. Notes from one scale always sound good
+        together. That is why generated patterns here are never sour.
+        <code>ce.math.euclid(8, 5)</code> spreads 5 hits as evenly as possible over 8 steps. This
+        gives a musical rhythm instead of a random one.
+      </p>
+      <p>
+        Notice <code>ce.math.seed(state.seed)</code>. The random commands in this API are seeded.
+        The same seed number always gives the same "random" pattern, in every language. So a
+        pattern is saved as one small number. NEW just counts the seed up by one. Press NEW three
+        times, and pattern number 3 is always the same pattern number 3.
+      </p>
+      <p>
+        The third block is the clock. <code>ce.time.syncTimer("beat", 0.25)</code> fires the
+        timer every quarter of a beat. That is a sixteenth note. The timer follows the tempo: turn
+        the tempo up and the pattern speeds up with it. On each tick, <code>onTimer</code> moves
+        one step forward, wraps back to step 1 after step 8, and plays the step's note if its
+        button is on. The last number in <code>sendNote</code> releases the note after 120
+        milliseconds. You never send a note-off yourself.
+      </p>
+      <p class="note">
+        Every command in this tutorial is cross-runtime. So the sequencer keeps playing in a DAW
+        with the plugin window closed. That is the second place scripts run, described in
+        <a href="#modules">lesson 06</a>. One more idea to try: the pattern lives in <code>state</code>, so it
+        is gone when the panel reloads. Save <code>state.seed</code> with
+        <code>ce.storage.saveSetting</code> and restore it in <code>onPanelReady</code>, and your
+        pattern survives.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">The row of steps</p>
+      <pre data-lua><code>local STEPS = 8
+local CH = 1
+
+function onPanelBuild()
+  ce.panel.batch(function()
+    for i = 1, STEPS do
+      ce.panel.create("Button", {
+        name = "step" .. i, x = 16 + (i - 1) * 40, y = 40, width = 36, height = 36,
+      })
+      set("step" .. i .. ".Behavior.subtype", "toggle")
+      set("step" .. i .. ".Text.content", "")
+    end
+    ce.panel.create("Button", { name = "play", x = 16, y = 90, width = 76, height = 28 })
+    set("play.Text.content", "PLAY")
+    set("play.Behavior.subtype", "toggle")
+    ce.panel.create("Button", { name = "gen", x = 100, y = 90, width = 76, height = 28 })
+    set("gen.Text.content", "NEW")
+    ce.panel.create("Label", { name = "pos", x = 184, y = 90, width = 100, height = 28 })
+    set("pos.Text.content", "ready")
+  end)
+  newPattern()
+end</code></pre>
+      <pre data-js hidden><code>const STEPS = 8
+const CH = 1
+
+function onPanelBuild() {
+  ce.panel.batch(() => {
+    for (let i = 1; i <= STEPS; i += 1) {
+      ce.panel.create("Button", {
+        name: "step" + i, x: 16 + (i - 1) * 40, y: 40, width: 36, height: 36,
+      })
+      set("step" + i + ".Behavior.subtype", "toggle")
+      set("step" + i + ".Text.content", "")
+    }
+    ce.panel.create("Button", { name: "play", x: 16, y: 90, width: 76, height: 28 })
+    set("play.Text.content", "PLAY")
+    set("play.Behavior.subtype", "toggle")
+    ce.panel.create("Button", { name: "gen", x: 100, y: 90, width: 76, height: 28 })
+    set("gen.Text.content", "NEW")
+    ce.panel.create("Label", { name: "pos", x: 184, y: 90, width: 100, height: 28 })
+    set("pos.Text.content", "ready")
+  })
+  newPattern()
+}</code></pre>
+
+      <p class="cap">A pattern from a seed</p>
+      <pre data-lua><code>function newPattern()
+  state.seed = (state.seed or 0) + 1
+  ce.math.seed(state.seed)
+  local notes = ce.music.scale(48, "pentatonicMin")
+  local hits = ce.math.euclid(8, 5)
+  state.notes = {}
+  for i = 1, STEPS do
+    state.notes[i] = ce.math.choice(notes)
+    set("step" .. i .. ".value", hits[i] and 1 or 0)
+  end
+end</code></pre>
+      <pre data-js hidden><code>function newPattern() {
+  state.seed = (state.seed ?? 0) + 1
+  ce.math.seed(state.seed)
+  const notes = ce.music.scale(48, "pentatonicMin")
+  const hits = ce.math.euclid(8, 5)
+  state.notes = {}
+  for (let i = 1; i <= STEPS; i += 1) {
+    state.notes[i] = ce.math.choice(notes)
+    set("step" + i + ".value", hits[i - 1] ? 1 : 0)
+  }
+}</code></pre>
+
+      <p class="cap">The clock</p>
+      <pre data-lua><code>on("gen", "click", function()
+  newPattern()
+end)
+
+on("play", "valueChanged", function(value)
+  if value > 0 then
+    state.step = 0
+    ce.time.syncTimer("beat", 0.25)
+  else
+    ce.time.stopTimer("beat")
+  end
+end)
+
+function onTimer(info)
+  if info.id ~= "beat" then return end
+  state.step = state.step % STEPS + 1
+  set("pos.Text.content", "step " .. state.step)
+  if get("step" .. state.step .. ".value") > 0 then
+    sendNote(CH, state.notes[state.step], 100, 120)
+  end
+end</code></pre>
+      <pre data-js hidden><code>on("gen", "click", () => {
+  newPattern()
+})
+
+on("play", "valueChanged", (value) => {
+  if (value > 0) {
+    state.step = 0
+    ce.time.syncTimer("beat", 0.25)
+  } else {
+    ce.time.stopTimer("beat")
+  }
+})
+
+function onTimer(info) {
+  if (info.id !== "beat") return
+  state.step = state.step % STEPS + 1
+  set("pos.Text.content", "step " + state.step)
+  if (get("step" + state.step + ".value") > 0) {
+    sendNote(CH, state.notes[state.step], 100, 120)
+  }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson wide" id="ghost">
+    <p class="lesson-n">06 &middot; A synth that does not exist</p>
+    <div data-shot="tutorial-ghost"></div>
+    <div class="lesson-text prose">
+      <h3>Teach the app a synth it has never met</h3>
+      <p>
+        Normally a device profile tells the app what your synth understands. This tutorial shows
+        what to do when there is no profile: you teach the app from a script. To keep it
+        followable for everyone, we invent a synth. Call it the FS-1. Its MIDI maker number is
+        <code>7D</code>. That number is reserved for experiments, so no real synth will ever be
+        confused by it. Because the synth is invented, we will also play its part ourselves. The
+        panel cannot tell the difference. Yours at home will work exactly the same way.
+      </p>
+      <p>
+        The first block teaches the app two parameters. <code>defineParameter</code> needs one
+        thing above all: how the value reaches the synth. For <code>cutoff</code> that is a plain
+        CC number. That is the simplest form. For <code>resonance</code> it is a SysEx message,
+        written as a template. <code>$value</code> marks where the value goes.
+        <code>$checksum</code> marks where the checksum goes, and <code>$checksumStart</code>
+        marks where the checksum starts counting. The <code>F0</code> and <code>F7</code> frame
+        bytes are added for you. A parameter with no way to reach the synth is refused, and the
+        message says why.
+      </p>
+      <p>
+        The second block builds two knobs and connects them with <code>ce.device.bind</code>.
+        Tutorial 01 warned that <code>bind()</code> says yes even for a parameter nobody has
+        declared. Here is the other half of that story: now the parameters really exist, so the
+        binding really works. Turn the Cutoff knob and CC 74 goes out. Turn Reso and the SysEx
+        message goes out, checksum and all.
+      </p>
+      <p>
+        The third block teaches the app the FS-1's patch dump. <code>defineDump</code> describes
+        three things. The bytes that ask for the dump. How to recognise the reply: it starts with
+        <code>F0 7D 01 20</code> and ends with <code>F7</code>. And where each value sits: the
+        payload starts 4 bytes in, cutoff is payload byte 0, resonance is payload byte 1. Every
+        field must name a parameter you already defined. An unknown name is refused at once.
+      </p>
+      <p>
+        Then we play the synth's part. <code>ce.midi.feed</code> injects bytes as if the hardware
+        had sent them. The reply carries the values 96 and 40. Press RECEIVE and watch: the app
+        recognises the dump, both knobs move to the values from the message, and
+        <code>onDumpReceived</code> fires. With a real synth you would send
+        <code>ce.device.requestDump("patch")</code> and the real reply would arrive the same way.
+      </p>
+      <p class="note">
+        One rule is doing quiet work here. Values that arrive <b>from</b> the synth are not sent
+        back out to it. The knobs move, and nothing echoes. Without that rule, every dump would
+        answer the synth with a storm of messages carrying the values it just told you.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Teach the app two parameters</p>
+      <pre data-lua><code>ce.device.defineParameter("cutoff", {
+  name = "Cutoff", group = "Filter", min = 0, max = 127, cc = 74,
+})
+
+ce.device.defineParameter("resonance", {
+  name = "Resonance", group = "Filter", min = 0, max = 127,
+  sysex = { "7d", "01", "42", "$checksumStart", "$value", "$checksum" },
+  checksum = "sum-7bit",
+})</code></pre>
+      <pre data-js hidden><code>ce.device.defineParameter("cutoff", {
+  name: "Cutoff", group: "Filter", min: 0, max: 127, cc: 74,
+})
+
+ce.device.defineParameter("resonance", {
+  name: "Resonance", group: "Filter", min: 0, max: 127,
+  sysex: ["7d", "01", "42", "$checksumStart", "$value", "$checksum"],
+  checksum: "sum-7bit",
+})</code></pre>
+
+      <p class="cap">Two knobs, really connected</p>
+      <pre data-lua><code>function onPanelBuild()
+  ce.panel.create("Knob", { name = "Cutoff", x = 24, y = 40, width = 64, height = 64 })
+  ce.panel.create("Knob", { name = "Reso", x = 104, y = 40, width = 64, height = 64 })
+  set("Cutoff.Behavior.max", 127)
+  set("Reso.Behavior.max", 127)
+  ce.panel.create("Button", { name = "recv", x = 24, y = 120, width = 100, height = 28 })
+  set("recv.Text.content", "RECEIVE")
+  ce.panel.create("Label", { name = "status", x = 140, y = 120, width = 160, height = 28 })
+  set("status.Text.content", "press RECEIVE")
+  ce.device.bind("Cutoff", "cutoff")
+  ce.device.bind("Reso", "resonance")
+end</code></pre>
+      <pre data-js hidden><code>function onPanelBuild() {
+  ce.panel.create("Knob", { name: "Cutoff", x: 24, y: 40, width: 64, height: 64 })
+  ce.panel.create("Knob", { name: "Reso", x: 104, y: 40, width: 64, height: 64 })
+  set("Cutoff.Behavior.max", 127)
+  set("Reso.Behavior.max", 127)
+  ce.panel.create("Button", { name: "recv", x: 24, y: 120, width: 100, height: 28 })
+  set("recv.Text.content", "RECEIVE")
+  ce.panel.create("Label", { name: "status", x: 140, y: 120, width: 160, height: 28 })
+  set("status.Text.content", "press RECEIVE")
+  ce.device.bind("Cutoff", "cutoff")
+  ce.device.bind("Reso", "resonance")
+}</code></pre>
+
+      <p class="cap">The dump, and the synth's part</p>
+      <pre data-lua><code>ce.device.defineDump("patch", {
+  request = { "f0", "7d", "01", "10", "f7" },
+  match = { prefix = { "f0", "7d", "01", "20" }, suffix = { "f7" } },
+  offset = 4,
+  fields = {
+    { parameter = "cutoff", offset = 0 },
+    { parameter = "resonance", offset = 1 },
+  },
+})
+
+on("recv", "click", function()
+  ce.midi.feed({ 0xF0, 0x7D, 0x01, 0x20, 96, 40, 0xF7 })
+end)
+
+function onDumpReceived(dump)
+  set("status.Text.content", "got " .. dump.kind)
+end</code></pre>
+      <pre data-js hidden><code>ce.device.defineDump("patch", {
+  request: ["f0", "7d", "01", "10", "f7"],
+  match: { prefix: ["f0", "7d", "01", "20"], suffix: ["f7"] },
+  offset: 4,
+  fields: [
+    { parameter: "cutoff", offset: 0 },
+    { parameter: "resonance", offset: 1 },
+  ],
+})
+
+on("recv", "click", () => {
+  ce.midi.feed([0xF0, 0x7D, 0x01, 0x20, 96, 40, 0xF7])
+})
+
+function onDumpReceived(dump) {
+  set("status.Text.content", "got " + dump.kind)
+}</code></pre>
     </div>
   </div>
 </section>
@@ -1908,28 +2283,37 @@ end</code></pre>
 <section id="surface">
   <div class="rule-head">
     <h2>Reference</h2>
-    <p>Every command, sorted into groups you can open one at a time</p>
   </div>
 
   <p class="prose">
-    Every command here comes with a worked example. The <b id="i-derived">90</b> whose answer
-    depends only on what you pass in show that answer too, and those numbers were not typed by hand
-    &mdash; they are what the command actually returned when it was run, and the tests check every
-    one of them again on each change. Where a command takes a set of options, they are written out
-    underneath it: what each one holds, what happens if you leave it out, and the exact way to
-    write the whole thing in each language. The component examples pick their values from the same
-    lists the components themselves use, so an example cannot suggest a setting that does not
-    exist.
+    Every command on this page has a small code example. You can copy it into your
+    own script. Some examples also show the result of the command:
+  </p>
+  <pre data-lua style="max-width:48ch"><code>ce.midi.checksum("roland", { 64, 0, 127 })
+--> 65</code></pre>
+  <pre data-js hidden style="max-width:48ch"><code>ce.midi.checksum("roland", [64, 0, 127])
+//> 65</code></pre>
+  <p class="prose">
+    The result after the arrow is not made up. It is the real output of the command,
+    and tests check it after every change. Some commands have options. Below those
+    commands you will see a table. It lists each option, what it does, and what
+    happens if you leave it out. Most options have a default value, and the table
+    shows it. Some have none. Those say <code>not set</code>: leaving the option out
+    does not substitute a value, it means the command skips that part of its work
+    altogether. A dash means the option is required and cannot be left out. The
+    table also shows how to type the options in each language. For component
+    commands, the example settings come from the component's own list of valid
+    settings. So an example can never show a setting that does not exist.
   </p>
   <p class="note">
-    Search looks inside the option names and their values too. That is the only way to find
-    something like <code>stagger</code> or <code>outCubic</code>, since neither of them appears in
-    any command's name.
+    Search also looks inside option names and option values. That is how you can find
+    words like <code>stagger</code> or <code>outCubic</code>. These words do not appear
+    in any command name.
   </p>
 
   <div class="finder">
     <label class="sr" for="q">Find a verb or module</label>
-    <input id="q" type="search" placeholder="Find a verb — sendNote, quantize, fill, probe…" autocomplete="off" spellcheck="false">
+    <input id="q" type="search" placeholder="Search commands: sendNote, quantize, fill…" autocomplete="off" spellcheck="false">
     <div class="seg" role="group" aria-label="Runtime">
       <button type="button" data-rt="all" aria-pressed="true">All</button>
       <button type="button" data-rt="any" aria-pressed="false">Cross-runtime</button>
@@ -1947,7 +2331,6 @@ end</code></pre>
 <section id="hooks">
   <div class="rule-head">
     <h2>Lifecycle hooks</h2>
-    <p>Write a section with one of these names and the panel runs it at the right moment</p>
   </div>
   <div class="members" id="hooktable"></div>
 </section>
@@ -1955,7 +2338,6 @@ end</code></pre>
 <section id="eventlist">
   <div class="rule-head">
     <h2>Events</h2>
-    <p>Things the panel tells you about, by name or through <code>on</code></p>
   </div>
   <div class="members" id="evtable"></div>
 </section>
@@ -1963,19 +2345,18 @@ end</code></pre>
 <section id="weight">
   <div class="rule-head">
     <h2>What it weighs</h2>
-    <p>How much each group of commands adds to your panel &mdash; measured, not guessed</p>
   </div>
   <div class="weigh">
     <div>
       <p class="prose">
-        Tick the modules your panel uses and this tells you how much they add to it, in each
-        language. There is a small fixed amount every panel carries whatever you pick, which is
-        counted in as well.
+        Tick the modules your panel uses. The readout shows how much they add to your
+        panel, in each language. Every panel also carries a small fixed shared amount,
+        no matter what you pick. That amount is included in the numbers.
       </p>
       <div class="picks" id="picks"></div>
     </div>
     <div class="readout">
-      <h3>Prelude size</h3>
+      <h3>What your panel carries</h3>
       <table id="costtable"></table>
     </div>
   </div>
@@ -1985,103 +2366,102 @@ end</code></pre>
 <section id="changes">
   <div class="rule-head">
     <h2>What changed</h2>
-    <p>Newest first</p>
   </div>
   <p class="prose">
-    The number of commands roughly tripled over these releases. Six of them added nothing new
-    at all: they were corrections, where something had been quietly doing the wrong thing.
+    The number of commands roughly tripled across these releases. Six of the releases
+    added nothing new. They fixed things that were quietly doing the wrong thing.
   </p>
   <ol class="ships">
     <li class="ship">
       <div class="ship-id"><b>Images</b>Pictures on a control</div>
       <div class="ship-body">
-        <p>Eight commands for the pictures a control can carry &mdash; a background image, an overlay, a picture or texture inside the text, and the icon it shows &mdash; plus a way to see what is in the icon library.</p>
-        <p class="note">Three things here are easy to get wrong, so the commands handle them for you. Background pictures stack on top of one another, while a picture inside text replaces whatever was there &mdash; so setting one up the wrong way leaves you with a layer that is fully configured and completely invisible. The word <code>fill</code> means "crop to fit" on a background and "stretch to fit" on text. And an icon from your library lives on this computer rather than in the panel, so it will not travel; <code>embed</code> copies it in so that it does.</p>
+        <p>Eight commands for the pictures a control can carry: a background image, an overlay, a picture or texture inside the text, and the icon it shows. There is also a command that lists what is in the icon library.</p>
+        <p class="note">Three things here are easy to get wrong. The commands handle them for you. First, background picture layers stack on top of each other. A picture inside text replaces the old one instead. Mix these up and you can build a layer that is set up correctly but never shows. Second, the word <code>fill</code> means two different things. On a background it means crop to fit. On text it means stretch to fit. Third, an icon from your library is stored on your computer, not in the panel. So the icon does not travel with the panel. The <code>embed</code> command copies the icon into the panel so it does.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Drawing</b>Drawing on a control</div>
       <div class="ship-body">
-        <p>Eleven more drawing commands: grids, sets of lines and points, smooth curves, polygons, images, clipping, blending, and a way to group a run of drawing together.</p>
-        <p class="note">The bigger change is speed. Anything worth drawing &mdash; a waveform, a set of tick marks, a grid of steps &mdash; means drawing the same thing many times over, and that used to get dramatically slower the more you drew. Drawing 256 line segments took longer than a single frame allows, before anything appeared on screen. Grids, lines and points are now one command for the whole set, and <code>batch</code> groups a run of drawing into one update &mdash; around fourteen times faster for those 256 segments.</p>
+        <p>Eleven more drawing commands: grids, sets of lines and points, smooth curves, polygons, images, clipping, blending, and a way to group drawing steps together.</p>
+        <p class="note">The bigger change is speed. Drawing many small things used to get much slower the more you drew. Drawing 256 line segments took longer than one screen frame allows. Grids, lines, and points are now one command for the whole set. The <code>batch</code> command groups many drawing steps into one screen update. For those 256 segments, this is about fourteen times faster.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Checksums</b>Checksums that agree with each other</div>
       <div class="ship-body">
-        <p>Many synths expect a checksum at the end of a message, and there are several ways of working one out. Scripts knew three of them and device profiles knew a different two, under different names &mdash; so a script could produce a checksum no profile could describe, and a synth using anything unusual could not have a working profile at all.</p>
-        <p class="note">Both now read the same list of eleven, so they cannot disagree. Ask for one that is not on the list and you get nothing back, with a message saying what is available, rather than a checksum for the wrong synth. Found along the way, and worse: while you were building a profile the editor and the finished export worked checksums out differently, so the preview was wrong and the export was right &mdash; the least helpful way round for that to be.</p>
+        <p>Many synths expect a checksum at the end of a message. There are several ways to work one out. Scripts knew three ways. Device profiles knew a different two, under different names. So a script could make a checksum that no profile could describe. And a synth with an unusual checksum could not have a working profile at all.</p>
+        <p class="note">Scripts and profiles now read the same list of eleven checksum types. They cannot disagree. If you ask for a type that is not on the list, you get nothing back, plus a message listing the valid types. You do not get a checksum for the wrong synth. This work also found a worse bug. While you built a profile, the editor and the finished export worked checksums out differently. The preview was wrong and the export was right.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>This page</b>This page</div>
       <div class="ship-body">
-        <p>A worked example for every command, the options written out as a table instead of described in passing, and the description moved under the name rather than into a column you had to scroll sideways to read.</p>
-        <p class="note">Generating the examples' answers instead of typing them turned up two commands whose descriptions were misleading: <code>blend</code> looked as though it took two numbers when it takes two lists, and passing numbers returned an empty list, which is correct and baffling.</p>
+        <p>Every command now has a worked example. Options are shown in a table instead of described in passing. Each description now sits under the command name, not in a wide column you had to scroll sideways to read.</p>
+        <p class="note">The example results are generated by running the commands, not typed by hand. Doing this exposed two misleading descriptions. <code>blend</code> looked like it took two numbers. It takes two lists. Passing numbers returned an empty list, which was correct but very confusing.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Text</b>Text and fonts</div>
       <div class="ship-body">
-        <p>Seven commands for typography: which fonts exist, what a font can do, setting a control's text style, measuring text, and shrinking it to fit.</p>
-        <p class="note">None of this is newly possible &mdash; every text setting could already be changed directly. What was missing was knowing which fonts are really available, keeping the two places boldness is stored in agreement, and being able to measure a control's own text in its own font.</p>
+        <p>Seven commands for text: list the fonts, ask what a font can do, set a control's text style, measure text, and shrink text to fit.</p>
+        <p class="note">None of this was newly possible. Every text setting could already be changed directly. Three things were missing. Knowing which fonts are really available. Keeping the two places where boldness is stored in agreement, because the editor and the export could disagree. And measuring a control's own text in its own font.</p>
       </div>
     </li>
     <li class="ship">
-      <div class="ship-id"><b>Components</b>Components can tell you what they are doing</div>
+      <div class="ship-id"><b>Components</b>Components report what they are doing</div>
       <div class="ship-body">
-        <p>Eleven things a component now reports: a step playing, a cycle completing, a pad hit or released, a scene or stage changing, a value settling, a bounce, a recall, a zone, a voicing.</p>
-        <p class="note">Before this a script could drive every setting of a component and never be told anything back.</p>
+        <p>Components now report eleven kinds of events: a step playing, a cycle finishing, a pad hit or released, a scene or stage changing, a value settling, a bounce, a recall, a zone, a voicing.</p>
+        <p class="note">Before this, a script could change every setting of a component but was never told anything back.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Components</b>Every component setting reachable</div>
       <div class="ship-body">
-        <p>The component commands went from 229 to 302. Every component gained <code>read</code>, so you can ask what it is set to; the ones holding lists gained ways to count, replace, add and remove items; and every command now tells you whether it worked.</p>
-        <p class="note">A real bug turned up here. Most of the settings offering a fixed choice of values were offering the wrong ones &mdash; the arpeggiator accepted a pattern it has never had, and refused "chord", which it does have. The choices now come from the same list each component itself reads.</p>
+        <p>The component commands went from 229 to 302. Every component gained <code>read</code>, so you can ask what it is set to. Components that hold lists gained commands to count, replace, add, and remove items. And every command now tells you whether it worked.</p>
+        <p class="note">A real bug turned up here. Many settings offer a fixed choice of values, and most of them listed the wrong values. The arpeggiator accepted a pattern it has never had. It refused "chord", which it does have. The choices now come from the same list each component itself reads.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Storage</b>Saved settings that do not collide</div>
       <div class="ship-body">
-        <p>Settings gained the three scopes described in the manual, so two scripts saving something under the same name no longer overwrite each other without saying so, plus a way to store structured values as text.</p>
+        <p>Saved settings gained the three scopes described in the manual. Two scripts can now save something under the same name without silently overwriting each other. There is also a way to store structured values as text.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Panel</b>Arranging controls from a script</div>
       <div class="ship-body">
-        <p>Twenty-seven ways of aligning and distributing controls existed on the canvas right-click menu and nowhere else. The menu and your script now call exactly the same ones.</p>
+        <p>The canvas right-click menu has twenty-seven ways to align and spread out controls. Before, only the menu could use them. Now the menu and your script call exactly the same commands.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Drawing</b>Gradients, dashes and colour</div>
       <div class="ship-body">
-        <p>Gradients, dashed lines, transparency and transforms as well as flat shapes, the panel's own LCD font, a way to measure text &mdash; and eight colour commands taken from the app's own, so a colour your script lightens matches the border next to it.</p>
+        <p>Drawing gained gradients, dashed lines, transparency, and transforms, as well as flat shapes. It also gained the panel's own LCD font and a way to measure text. Eight colour commands were taken from the app's own colour code. So a colour your script lightens matches the border next to it.</p>
       </div>
     </li>
     <li class="ship">
-      <div class="ship-id"><b>Dialogs</b>Asking a question, not just making a statement</div>
+      <div class="ship-id"><b>Dialogs</b>Scripts can ask questions</div>
       <div class="ship-body">
-        <p>A script could tell somebody something; now it can ask. A choice between buttons, a line of text, or a pick from a list.</p>
+        <p>A script could only show a message. Now it can also ask a question: a choice between buttons, a line of text, or a pick from a list.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Animation</b>Movement that matches the panel</div>
       <div class="ship-body">
-        <p>Seven more ways to move a value over time. The curves are now worked out from the very same shapes the Properties panel stores, rather than from formulas that merely looked similar.</p>
+        <p>Seven more ways to move a value over time. The curves now come from the same shapes the Properties panel stores. Before, they came from formulas that only looked similar.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Time</b>The transport's own grid</div>
       <div class="ship-body">
-        <p>Note divisions, bar and beat positions, swing, loops, and tempo worked out from taps or from an incoming clock. Lua had no clock of its own at all, so there was nothing to ask.</p>
+        <p>Note divisions, bar and beat positions, swing, loops, and tempo worked out from taps or from an incoming clock. Before this, Lua had no clock of its own at all.</p>
       </div>
     </li>
     <li class="ship">
       <div class="ship-id"><b>Music</b>Scales, chords and voicing</div>
       <div class="ship-body">
-        <p>Scales, chords, voice leading and arpeggio ordering &mdash; the musical working-out the Chord Pad and Harmoniser already did internally, which a script could not reach.</p>
-        <p class="note">Reading a flat note name used to fail and quietly return note 0, which is a real note.</p>
+        <p>Scales, chords, voice leading, and arpeggio ordering. The Chord Pad and Harmoniser already did this musical work inside the app. Scripts could not reach it before.</p>
+        <p class="note">Reading a flat note name used to fail and quietly return note 0. Note 0 is a real note, so the mistake was easy to miss.</p>
       </div>
     </li>
   </ol>
@@ -2090,11 +2470,12 @@ end</code></pre>
 
 <footer class="foot">
   <p>
-    Generated by <code>tools/scripts/gen-api-explorer.mjs</code> from
-    <code>CE/web/src/CE_Application/scripting/panelApi.js</code> — the same module the five runtimes
-    are tested against, so the tables on this page cannot drift from the API. Weights are measured
-    from the language preludes by <code>tools/scripts/gen-script-modules.mjs</code>. The prose is
-    hand-written; the data is not.
+    This page is generated by <code>tools/scripts/gen-api-explorer.mjs</code> from
+    <code>CE/web/src/CE_Application/scripting/panelApi.js</code>. That is the same module
+    the five runtimes are tested against. So the tables on this page cannot drift from the
+    API. The weights are measured from the language preludes by
+    <code>tools/scripts/gen-script-modules.mjs</code>. The prose is hand-written. The data
+    is not.
   </p>
 </footer>
 
@@ -2141,7 +2522,7 @@ end</code></pre>
       </tr>`;
   }
 
-  /** An options object, in full: the literal you type, then every field it may carry.
+  /** An options object, in full: the literal you type, then every field you can set in it.
    *
    *  Open by default when there are few enough to read at a glance. `opts` is the argument people
    *  get stuck on, and a reader who has to click to find out what `curve` accepts is one click
@@ -2150,7 +2531,7 @@ end</code></pre>
     const lit = a.literal ?? {};
     const literal = lit.lua ? `
       <div class="m-lit">
-        <p class="cap">Written like this &mdash; the two languages differ only in = versus :</p>
+        <p class="cap">What you type</p>
         <pre data-lua><code>${esc(lit.lua)}</code></pre>
         <pre data-js hidden><code>${esc(lit.js ?? lit.lua)}</code></pre>
       </div>` : "";
@@ -2165,10 +2546,12 @@ end</code></pre>
       return head + fieldRow(f);
     }).join("");
 
+    // What the reader does with the object, not a description of it: a handed-to-you payload is
+    // something you read fields off, an options object is something you fill in.
     const n = a.fields.length;
     const what = a.given
-      ? `${n} field${n === 1 ? "" : "s"} it carries`
-      : `${n} field${n === 1 ? "" : "s"} it may carry`;
+      ? `${n} field${n === 1 ? "" : "s"} you can read`
+      : `${n} field${n === 1 ? "" : "s"} you can set`;
     return `
       <details class="m-fields"${n <= 12 ? " open" : ""}>
         <summary><b>${esc(a.name)}</b> &mdash; ${what}</summary>
@@ -2198,8 +2581,8 @@ end</code></pre>
   function egBlock(v) {
     if (!v.eg) return "";
     const label = v.eg.derived
-      ? 'Example <b>&mdash; result verified against the implementation</b>'
-      : (v.eg.fromTable ? 'Example <b>&mdash; values from the component’s own table</b>' : "Example");
+      ? 'Example <b>&mdash; the result is what the call really returned</b>'
+      : (v.eg.fromTable ? 'Example <b>&mdash; the settings come from the component itself</b>' : "Example");
     return `<div class="m-eg">
       <p class="cap">${label}</p>
       <pre data-lua><code>${esc(v.eg.lua ?? "")}</code></pre>
@@ -2216,7 +2599,7 @@ end</code></pre>
   $("#t-any").textContent = DATA.totals.crossRuntime;
   $("#i-mem").textContent = num(DATA.totals.members);
   $("#i-mod").textContent = DATA.totals.modules;
-  if (DATA.coverage) $("#i-derived").textContent = DATA.coverage.derived;
+  const derivedEl = $("#i-derived"); if (DATA.coverage && derivedEl) derivedEl.textContent = DATA.coverage.derived;
 
   /* ------------------------------------------------------- language toggle */
   // One preference for the whole page. A per-block toggle makes you re-pick your own language ten
@@ -2290,7 +2673,7 @@ end</code></pre>
       </summary>
       <div class="members">
         ${shot(`component-${m.id.replace("ce.components.", "")}`,
-    `${m.id.replace("ce.components.", "")} — what this module drives`)}
+    `${m.id.replace("ce.components.", "")} — the control these commands drive`)}
         ${m.members.map((v) => `
           <article class="mem" data-hay="${esc((v.path + " " + v.flat + " " + v.sig + " " + v.doc
             + " " + argHay(v)).toLowerCase())}">

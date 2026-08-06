@@ -96,6 +96,8 @@ const TUTORIALS = [
   { id: 'from-data' },
   { id: 'drumkit' },
   { id: 'wiring' },
+  { id: 'sequencer' },
+  { id: 'ghost' },
 ];
 
 /** The box a set of built controls occupies, plus a margin, so nothing is cropped. */

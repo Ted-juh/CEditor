@@ -64,7 +64,11 @@ import {
   allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID,
 } from './panelApi.js';
 import { extensionSource } from './extensionModules.js';
-import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
+import { panelPreviewSessions, previewModeEnabled, updatePanelPreviewSession } from '../stores/interactionPreview.js';
+import { isLiveValuePath, hasLiveValue, liveValuePatch, readLiveValue } from './liveValue.js';
+import {
+  setPreviewRehearsalEnabled, isRehearsing, keepAllInRehearsal, keepPropertyInRehearsal,
+} from '../stores/previewRehearsal.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
 import { isSourceScript } from './scriptModel.js';
@@ -146,6 +150,10 @@ let host = null;
  */
 export function setRuntimeHost(h) {
   host = h ?? null;
+  // A host means the player, which owns its document: its panel is loaded from the .cepanel and
+  // reloaded when it changes, so there is nothing to put back and nothing to rehearse. The editor
+  // installs no host, which is exactly the case the rehearsal exists for.
+  setPreviewRehearsalEnabled(host == null);
   if (host) {
     live.activePanelId = host.panel?.id ?? 'player';
     snapshotValues();
@@ -465,15 +473,27 @@ function setValue(path, value, formOrOpts = '') {
   //    the player too. `wrote` still comes from the host, which is the part only the host knows.
   const shape = probeNestedWrite(control, modelPath, value);
 
+  // A control's live value is session state in BOTH runtimes (scripting/liveValue.js). The player
+  // has always done this through its host; the editor used to fall through to a document write at
+  // `Value.value`, a path Knob and Slider do not have — so the headline call of the whole API moved
+  // the knob in the shipped plugin and did nothing in the preview the author was testing in.
+  const live = isLiveValuePath(modelPath) && hasLiveValue(control);
+  const liveId = live ? String(control?._children?.Core?.id ?? '') : '';
+
   let wrote = true;
   if (host) {
     wrote = host.writeValue(control, modelPath, value) !== false;
+  } else if (live && liveId) {
+    updatePanelPreviewSession(liveId, liveValuePatch(value));
+    wrote = true;
   } else {
     wrote = shape.writes;
     if (wrote) updateControlProperty(control?._children?.Core?.id, modelPath, value);
   }
 
-  if (wrote && shape.fresh && shape.typed) {
+  // A live value needs no `Value` section to move, so the fresh-key warning does not apply to it —
+  // Button has that section without the field, and would otherwise warn on every write.
+  if (wrote && !live && shape.fresh && shape.typed) {
     addScriptTrace('warn', '',
       `set("${path}"): "${modelPath}" is a new property on a section with a fixed shape. `
       + 'It was written, but nothing reads it — check the spelling.');
@@ -531,7 +551,16 @@ function getValue(path, form = '') {
   if (addressed.form === 'midiValue') { reportNeedsDeviceHost('get(.midiValue)', addressed.path); return undefined; }
 
   const modelPath = resolveModelPath(control, segs);
-  const raw = host ? host.readValue(control, modelPath) : valueAtPath(control, modelPath);
+  let raw;
+  if (host) {
+    raw = host.readValue(control, modelPath);
+  } else {
+    // Same order the player's host reads in: the session first, the document behind it.
+    raw = isLiveValuePath(modelPath) && hasLiveValue(control)
+      ? readLiveValue(get(panelPreviewSessions), control)
+      : undefined;
+    if (raw === undefined) raw = valueAtPath(control, modelPath);
+  }
   if (addressed.form !== 'normalizedValue') return raw;
 
   const range = rangeOf(control);
@@ -4882,6 +4911,59 @@ function panelOrderImpl(names, where) {
  * The flush happens whatever the callback does, including throwing: a half-built panel that cannot
  * be undone is worse than a half-built panel.
  */
+/**
+ * ce.panel.keep — promote what this preview did into the authored document.
+ *
+ * Preview is a rehearsal (stores/previewRehearsal.js): the panel is photographed when preview
+ * starts and put back when it stops, so a script's writes are undone with everything else. This is
+ * the one way to say "no, that one was real" — it writes today\'s value into the photograph, so
+ * putting the photograph back preserves it.
+ *
+ * With no path it keeps the whole run, which is the batch-edit shape: run a recolouring script,
+ * call keep(), stop preview, save. A control the script CREATED is still cleared on stop either
+ * way — the next build mints it again, and a kept copy would sit beside the new one for ever.
+ */
+function panelKeepImpl(path) {
+  if (!isRehearsing()) {
+    addScriptTrace('log', '',
+      'ce.panel.keep(): nothing to keep — the panel is not being previewed, so it is not being '
+      + 'rehearsed either. In the exported plugin there is no rehearsal at all.');
+    return false;
+  }
+
+  if (path === undefined || path === null || String(path).trim() === '') {
+    keepAllInRehearsal();
+    addScriptTrace('log', '', 'ce.panel.keep(): keeping everything this preview changed.');
+    return true;
+  }
+
+  const { name, segs } = splitScriptPath(String(path));
+  const control = findControlByName(name);
+  if (!control) {
+    addScriptTrace('error', '', `ce.panel.keep("${path}"): control "${name}" not found on the active panel`);
+    return false;
+  }
+  const generatedBy = control?._children?.Core?.generatedBy;
+  if (generatedBy) {
+    addScriptTrace('error', '',
+      `ce.panel.keep("${path}"): "${name}" was created by a script, and a created control cannot be `
+      + 'kept — the next run builds it again, so the kept copy would sit beside the new one every '
+      + 'time. Create it in onPanelBuild and let it be rebuilt, or add it in the editor.');
+    return false;
+  }
+
+  const modelPath = resolveModelPath(control, segs);
+  const value = valueAtPath(control, modelPath);
+  const kept = keepPropertyInRehearsal(control?._children?.Core?.id, modelPath, value);
+  if (!kept) {
+    addScriptTrace('error', '',
+      `ce.panel.keep("${path}"): "${modelPath}" does not lead to a property on "${name}" that can be `
+      + 'kept. Only a single stored property can be — a live value is not one, since it is session '
+      + 'state rather than part of the document.');
+  }
+  return kept;
+}
+
 function panelBatchImpl(scriptId, fn) {
   if (typeof fn !== 'function') {
     addScriptTrace('error', scriptId ?? '', 'ce.panel.batch(fn) needs a function to run — nothing was done.');
@@ -6441,6 +6523,7 @@ function buildApi(ownerName, scriptId = '') {
     panelRect: (names) => panelRectImpl(names),
     panelOrder: (names, where) => panelOrderImpl(names, where),
     panelBatch: (fn) => panelBatchImpl(scriptId, fn),
+    panelKeep: (path) => panelKeepImpl(path),
     panelEach: (fn) => panelEachImpl(scriptId, fn),
     panelSnapshot: () => panelSnapshotImpl(),
     panelRestore: (snap) => panelRestoreImpl(snap),
@@ -7537,6 +7620,11 @@ function onPreviewModeChanged(on) {
     clearAllDrawings();         // …and a drawing outliving its panel is painted onto nothing
     stopAllAnimations();        // …and an animation writing into a panel that is gone is noise
     clearScriptUi();            // …and a message about a panel nobody is looking at is worse
+    // …and a reactive rule outliving its preview rewrites the document forever after. compute()
+    // re-runs on every store change, so a rule registered during a preview kept firing while the
+    // author typed into the Properties panel afterwards — overwriting the field they were editing.
+    // Last, because it drops the handlers onPanelClose was dispatched into just above.
+    resetScriptState();
   }
   live.prevPreviewOn = on;
 }

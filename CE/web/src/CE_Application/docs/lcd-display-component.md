@@ -1,5 +1,7 @@
 # LCD Display — Component Design Notes
 
+> Status: **shipped 🟢** as `ce.components.lcd` (35 members). Original design notes follow.
+>
 > Part of the [panel parts backlog](./README.md). Timing for this component is
 > designed separately in [timer-system.md](./timer-system.md).
 >

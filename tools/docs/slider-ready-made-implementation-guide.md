@@ -17,7 +17,7 @@ The existing interactive architecture already supports this direction through
 
 Related reference:
 
-- `docs/interactive-components-implementation-spec.md`
+- `tools/docs/interactive-components-implementation-spec.md`
 
 ## Direct Answers
 

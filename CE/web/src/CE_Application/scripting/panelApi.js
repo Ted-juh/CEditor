@@ -200,9 +200,9 @@ export const PANEL_PROPERTIES = [
 // host can answer — it is marked accordingly and reports rather than returning a quiet nothing.
 
 export const VALUE_ACCESSORS = [
-  { id: 'value', label: '.value', summary: 'The real, human value — e.g. 8000 (Hz) or "LP" (enum name). The default. Setting it lets the DPD convert to MIDI on send.' },
-  { id: 'normalizedValue', label: '.normalizedValue', summary: 'The 0–1 position, from the control\'s own min/max. For uniform math, curves, and linking controls of different ranges.' },
-  { id: 'midiValue', label: '.midiValue', requiresDeviceHost: true, summary: 'The value as MIDI (e.g. 101), as the DPD would encode it. Device-bound controls only, and only with the device host attached — the encoding lives there, not in the panel.' },
+  { id: 'value', label: '.value', summary: 'The real value, the one you would read on the front panel: 8000 (Hz), or "LP" for a named setting. This is what you get when you do not ask for one of the others. Set it and the DPD works out the MIDI to send.' },
+  { id: 'normalizedValue', label: '.normalizedValue', summary: 'The same value as a position from 0 to 1, worked out from the control\'s own min and max. Use it for curves, and to make two controls with different ranges move together.' },
+  { id: 'midiValue', label: '.midiValue', requiresDeviceHost: true, summary: 'The value as MIDI — 101, say — encoded the way the DPD would encode it. Only for a control bound to a device parameter, and only with the device host attached.' },
 ];
 
 export const VALUE_ACCESSOR_IDS = VALUE_ACCESSORS.map((a) => a.id);
@@ -282,8 +282,7 @@ const SHARED_OPTION_FIELDS = {
   },
   beats: {
     name: 'beats', type: 'number', sample: '2',
-    summary: 'A length in beats instead of milliseconds. Overrides `duration`, and follows the '
-      + 'tempo, so the same move is the same musical length at any speed.',
+    summary: 'Length in beats instead of milliseconds. Overrides `duration` and follows the tempo.',
   },
   sync: {
     name: 'sync', type: 'true or false', default: 'false',
@@ -296,8 +295,8 @@ const SHARED_OPTION_FIELDS = {
   },
   stagger: {
     name: 'stagger', type: 'number', default: '0', unit: 'milliseconds',
-    summary: 'When `path` is a list, offset each one after the first by this much, so they set off '
-      + 'in turn rather than together.',
+    summary: 'When `path` is a list, offset each move after the first by this much, so they start '
+      + 'in turn.',
   },
   repeat: {
     name: 'repeat', type: 'number', default: '1',
@@ -310,8 +309,8 @@ const SHARED_OPTION_FIELDS = {
   },
   done: {
     name: 'done', type: 'function',
-    summary: 'Called when the move ends: done(completed). `completed` is false when something '
-      + 'stopped it early, so you can tell finishing from being cancelled.',
+    summary: 'Called when the move ends: done(completed). `completed` is false if the move was '
+      + 'stopped early.',
   },
   animFrom: {
     name: 'from', type: 'number', sample: '0',
@@ -321,7 +320,7 @@ const SHARED_OPTION_FIELDS = {
   /* --- dialogs and messages (ce.ui) -------------------------------------- */
   uiKind: {
     name: 'kind', type: 'text', default: '"info"', values: ['info', 'warn', 'error'],
-    summary: 'How serious it is, which sets the colour and the icon.',
+    summary: 'Severity of the message. Sets the colour and the icon.',
   },
   uiTitle: { name: 'title', type: 'text', sample: '"Overwrite the patch?"', summary: 'The bold line at the top.' },
   uiMessage: { name: 'message', type: 'text', sample: '"This cannot be undone."', summary: 'The body text under the heading.' },
@@ -344,11 +343,11 @@ const SHARED_OPTION_FIELDS = {
   /* --- image layers (ce.image) -------------------------------------------- */
   tint: {
     name: 'tint', type: 'colour',
-    summary: 'A colour to wash the image with, as "#RRGGBB". Omit it to leave the image as it is.',
+    summary: 'Tint colour, as "#RRGGBB". Omit to leave the image untinted.',
   },
   opacity: {
     name: 'opacity', type: 'number', default: '1', unit: '0 to 1',
-    summary: 'How solid the image is. 0 is invisible, 1 is fully opaque.',
+    summary: 'Image opacity. 0 is invisible, 1 is fully opaque.',
   },
   imageRotation: {
     name: 'rotation', type: 'number', default: '0', unit: 'degrees',
@@ -391,7 +390,7 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onPanelBuild', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
     signature: 'onPanelBuild()',
-    summary: 'Phase 1b — build the panel. The place to create, clone and parent controls, typically from what the device reports. Runs after onPanelLoad and before onPanelReady, in the panel view only: there is no renderer window-closed, so nothing here can run in a DAW with the window shut. Every control a script creates is cleared before this fires, so the handler always starts from the authored panel and running it twice cannot double the layout.',
+    summary: 'Phase 1b — build the panel: create, clone and parent controls. Runs after onPanelLoad and before onPanelReady, panel view only. Script-created controls are cleared before each run, so it always starts from the authored panel.',
     params: [],
     snippet: {
       lua: 'function onPanelBuild()\n  for i = 1, 4 do\n    ce.panel.create("Knob", { name = "osc" .. i, x = 20 + i * 90, y = 40 })\n  end\n  $0\nend',
@@ -401,14 +400,14 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onError', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onError(info)',
-    summary: 'A script failed. `info` carries script, scriptId, event, phase ("load" | "dispatch") and message. Runs everywhere, which is the point — window-closed there is nobody watching a log, so this is how a panel reports its own failures. The error is always logged as well; this is in addition to that, never instead of it. An error raised inside onError is logged and not re-dispatched, so a broken reporter cannot loop.',
+    summary: 'A script failed. `info` carries script, scriptId, event, phase ("load" | "dispatch") and message. Runs in every runtime, including window-closed; the error is always logged as well. An error raised inside onError is logged and not re-dispatched, so a broken reporter cannot loop.',
     params: [{ name: 'info', type: 'object', fields: optionFields([
       { name: 'script', type: 'text', summary: 'The name of the script that failed.' },
       { name: 'scriptId', type: 'text', summary: 'Its id, which stays the same when it is renamed.' },
       { name: 'event', type: 'text', summary: 'The handler that was running, such as "onValueChanged".' },
       { name: 'phase', type: 'text', values: ['load', 'dispatch'],
         summary: 'Whether it failed while being loaded or while handling an event.' },
-      { name: 'message', type: 'text', summary: 'What went wrong, in words.' },
+      { name: 'message', type: 'text', summary: 'The error message.' },
     ]) }],
     snippet: {
       lua: 'function onError(info)\n  set("status.text", info.script .. ": " .. info.message)\n  $0\nend',
@@ -418,7 +417,7 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onDraw', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
     signature: 'onDraw(info)',
-    summary: 'Paint on top of the control this script is attached to. `info` carries target, width and height — the control\'s own size, so the drawing scales with it. Called when something asks for a repaint, not every frame: to animate, drive it from onTimer and call ce.draw.redraw(). Panel view only; there is no surface with the window shut.',
+    summary: 'Paint on top of the control this script is attached to. `info` carries target, width and height (the control\'s current size). Called on repaint, not every frame: to animate, drive it from onTimer and call ce.draw.redraw(). Panel view only.',
     params: [{ name: 'info', type: 'object', fields: optionFields([
       { name: 'target', type: 'text', summary: 'The name of the control being painted.' },
       { name: 'width', type: 'number', unit: 'pixels', summary: 'How wide the control is right now.' },
@@ -446,14 +445,14 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onPanelClose', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelClose()',
-    summary: 'Phase 4 — the view is going away: preview stopped, or the plugin window was closed. Your scripts keep running (timers still tick, MIDI still arrives) — a plugin with its window shut is still playing. For "my scripts are being torn down", use onPanelDestroy.',
+    summary: 'Phase 4 — the view is closing: preview stopped, or the plugin window was closed. Scripts keep running (timers still tick, MIDI still arrives). For script teardown, use onPanelDestroy.',
     params: [],
     snippet: { lua: 'function onPanelClose()\n  $0\nend', javascript: 'function onPanelClose() {\n  $0\n}' },
   },
   {
     id: 'onPanelDestroy', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelDestroy()',
-    summary: 'Phase 5 — your scripts are going away: the panel was switched, the script set replaced, or the plugin unloaded. The last thing that runs. Everything still works here — timers, state, MIDI — so this is where you restore the synth, send a final dump, or release what you took. Fires exactly once per loaded script set, whether or not onPanelClose ever did; a window that was never opened never closed, but it is still destroyed.',
+    summary: 'Phase 5 — scripts are being torn down: panel switched, script set replaced, or plugin unloaded. The last hook to run; timers, state and MIDI still work, so restore the synth or send a final dump here. Fires exactly once per loaded script set, even if onPanelClose never fired.',
     params: [],
     snippet: { lua: 'function onPanelDestroy()\n  $0\nend', javascript: 'function onPanelDestroy() {\n  $0\n}' },
   },
@@ -490,8 +489,8 @@ export const LIFECYCLE_HOOKS = [
 // names passed directly (Q4): one obvious datum directly, several fields as one object.
 
 export const CONTROL_EVENTS = [
-  { id: 'valueChange', fn: 'onValueChange', payload: 'value', summary: 'Live — fires continuously while the value is moving (for GUI/preview).' },
-  { id: 'valueChanged', fn: 'onValueChanged', payload: 'value', summary: 'Settled — fires when the value reaches its final value (for transmit).' },
+  { id: 'valueChange', fn: 'onValueChange', payload: 'value', summary: 'Fires over and over while the value is moving. Use it for things on screen that should follow the control.' },
+  { id: 'valueChanged', fn: 'onValueChanged', payload: 'value', summary: 'Fires once, when the value settles. This is the moment to tell the synth.' },
   { id: 'click', fn: 'onClick', payload: 'mouse', summary: 'Clicked. mouse.x, mouse.y.' },
   { id: 'doubleClick', fn: 'onDoubleClick', payload: 'mouse', summary: 'Double-clicked.' },
   { id: 'pointerDown', fn: 'onPointerDown', payload: 'mouse', summary: 'Mouse pressed. mouse.x/.y/.button/.modifiers.' },
@@ -500,7 +499,7 @@ export const CONTROL_EVENTS = [
   { id: 'hoverStart', fn: 'onHoverStart', payload: null, summary: 'Mouse entered the control.' },
   { id: 'hoverEnd', fn: 'onHoverEnd', payload: null, summary: 'Mouse left the control.' },
   { id: 'wheel', fn: 'onWheel', payload: 'wheel', summary: 'Scrolled over the control. wheel.delta.' },
-  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'State swapped (hover/pressed/disabled).' },
+  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'The control changed state: hover, pressed or disabled.' },
 ];
 
 // `panelStateChanged` used to be declared here. There is no panel-state feature in the model —
@@ -530,13 +529,13 @@ export const DEVICE_EVENTS = [
   { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', decoded: true, summary: 'A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.' },
   // raw (escape hatch)
   { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.' },
-  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value. note: cc.channel is 0-based here, unlike sendCC and unlike onNoteIn — a long-standing quirk that cannot be changed without breaking panels that already compensate.' },
+  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value. cc.channel is 0-based here, unlike sendCC and onNoteIn.' },
   // The most common message on the wire had no event of its own: a panel reacting to played notes
   // had to take onMidiIn and decode status nibbles by hand, in every language, including the
   // note-on-with-velocity-0 case that actually means note-off. Both are derived from the STATUS
   // BYTE rather than from the host's messageType, so the two runtimes cannot classify differently.
   { id: 'noteIn', fn: 'onNoteIn', payload: 'note', decoded: false,
-    summary: 'A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 is not one of these — it is a note-off, and arrives as onNoteOffIn.' },
+    summary: 'A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 counts as a note-off and arrives as onNoteOffIn instead.' },
   { id: 'noteOffIn', fn: 'onNoteOffIn', payload: 'note', decoded: false,
     summary: 'A note was released. note.channel (1-16), note.note, note.velocity (the release velocity, 0 when the device sent a note-on with velocity 0 instead of a note-off).' },
   { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'Raw SysEx arrived.' },
@@ -568,21 +567,21 @@ export const COMPONENT_EVENTS = [
   { id: 'hit', fn: 'onHit', payload: 'hit', runtime: RUNTIME_WEBVIEW,
     summary: 'A pad, key or ribbon was struck. hit.target, hit.id, hit.note, hit.velocity. Chord Pad, Drum Pads, Note Ribbon.' },
   { id: 'release', fn: 'onRelease', payload: 'release', runtime: RUNTIME_WEBVIEW,
-    summary: '…and let go. release.target, release.id, release.note.' },
+    summary: 'A pad, key or ribbon was released. release.target, release.id, release.note.' },
   { id: 'scene', fn: 'onScene', payload: 'scene', runtime: RUNTIME_WEBVIEW,
-    summary: 'The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on the recall, so a scripted jump and a footswitch are one event.' },
+    summary: 'The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on any recall, scripted or footswitch.' },
   { id: 'stage', fn: 'onStage', payload: 'stage', runtime: RUNTIME_WEBVIEW,
-    summary: 'A component entered a new stage of what it was doing. stage.target, stage.stage, stage.previous. The Recorder ("idle"/"armed"/"recording"/"overdub") and the Envelope ("sustain"/"release"/"end"). not onStateChanged, which is a control\'s hover/pressed state.' },
+    summary: 'A component entered a new stage. stage.target, stage.stage, stage.previous. Raised by the Recorder ("idle"/"armed"/"recording"/"overdub") and the Envelope ("sustain"/"release"/"end"). Not onStateChanged, which is a control\'s hover/pressed state.' },
   { id: 'settled', fn: 'onSettled', payload: 'settled', runtime: RUNTIME_WEBVIEW,
-    summary: 'A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick — the moment the return ends, which is not something a value stream tells you.' },
+    summary: 'A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick.' },
   { id: 'bounce', fn: 'onBounce', payload: 'bounce', runtime: RUNTIME_WEBVIEW,
     summary: 'The Kinetic ball hit a wall. bounce.target, bounce.x, bounce.y, bounce.vx, bounce.vy.' },
   { id: 'recall', fn: 'onRecall', payload: 'recall', runtime: RUNTIME_WEBVIEW,
-    summary: 'The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blending is continuous and has no moment to report.' },
+    summary: 'The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blend mode does not fire it.' },
   { id: 'zone', fn: 'onZone', payload: 'zone', runtime: RUNTIME_WEBVIEW,
-    summary: 'A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value. What you light an overload led from, without polling the level.' },
+    summary: 'A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value.' },
   { id: 'voiced', fn: 'onVoiced', payload: 'voiced', runtime: RUNTIME_WEBVIEW,
-    summary: 'A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). The Zone Splitter (which zone took it) and the Harmoniser (which voices it added).' },
+    summary: 'A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). Raised by the Zone Splitter and the Harmoniser.' },
 ];
 
 export const EVENTS = { control: CONTROL_EVENTS, panel: PANEL_EVENTS, time: TIME_EVENTS, device: DEVICE_EVENTS, component: COMPONENT_EVENTS };
@@ -603,7 +602,7 @@ export const COMMANDS = [
   /* --- Values (Q1) --- */
   {
     id: 'set', category: 'Values', signature: 'set(path, value [, opts])',
-    summary: 'Write a value at a path. Suffix the path with .normalizedValue to write a 0–1 position instead of the real value. Transmits to the synth by default (Q2); silence is auto-inferred when reacting to inbound MIDI.',
+    summary: 'Write a value at a path. Suffix the path with .normalizedValue to write a 0–1 position instead of the real value. Transmits to the synth by default; writes made while reacting to inbound MIDI stay silent.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'value', type: 'value', required: true },
@@ -680,8 +679,7 @@ export const COMMANDS = [
   {
     id: 'watch', category: 'Events & Flow', signature: 'watch(path, fn)',
     summary: 'Call fn(value, previous) whenever any model path changes — a nested section field, a '
-      + 'colour, a device binding — not just the eleven declared control events. Source-agnostic: it '
-      + 'fires whether a script, the user or inbound MIDI moved it.',
+      + 'colour, a device binding. Fires regardless of source: script, user, or inbound MIDI.',
     params: [
       { name: 'path', type: 'string', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -694,9 +692,8 @@ export const COMMANDS = [
   },
   {
     id: 'compute', category: 'Events & Flow', signature: 'compute(path, fn)',
-    summary: 'Make a property a formula instead of a constant: fn is re-evaluated whenever anything '
-      + 'moves, and its result is written to path. Unlike doing it in a handler, the runtime owns '
-      + 'the re-evaluation, so it cannot fall out of step with an event you forgot to hook.',
+    summary: 'Make a property a formula: fn is re-evaluated whenever anything moves, and its result '
+      + 'is written to path.',
     params: [
       { name: 'path', type: 'string', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -709,9 +706,8 @@ export const COMMANDS = [
   },
   {
     id: 'intercept', category: 'Events & Flow', signature: 'intercept(path, fn)',
-    summary: 'Sit in front of every write to path. fn(value, prev) returns a replacement value to '
-      + 'transform it (clamp, quantize, snap), false to reject it, or nothing to accept it unchanged. '
-      + 'The panel has no way to express what happens when a value changes; this does.',
+    summary: 'Intercept every write to path. fn(value, prev) returns a replacement value to '
+      + 'transform it (clamp, quantize, snap), false to reject it, or nothing to accept it unchanged.',
     params: [
       { name: 'path', type: 'string', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -724,9 +720,8 @@ export const COMMANDS = [
   },
   {
     id: 'defineAction', category: 'Events & Flow', signature: 'defineAction(name, fn)',
-    summary: 'Register a named action this panel can be built out of: run("name") calls it from any '
-      + 'script in any language, and it is offered wherever the panel binds actions. Scripts stop '
-      + 'being only things the panel triggers and become things the panel is made of.',
+    summary: 'Register a named action. run("name") calls it from any script in any language, and it '
+      + 'is offered wherever the panel binds actions.',
     params: [
       { name: 'name', type: 'string', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -774,7 +769,7 @@ export const COMMANDS = [
   },
   {
     id: 'after', category: 'Events & Flow', signature: 'after(ms, fn) -> id',
-    summary: 'Run `fn` once, `ms` from now. Every other timer here repeats, so a one-shot delay — send a program change, wait for the synth to settle, then send the dump — was written as a repeating timer that stops itself, which is easy to get wrong: a callback that throws before it cancels runs forever. Returns an id you can pass to stopTimer to cancel it before it fires.',
+    summary: 'Run `fn` once, `ms` from now. Returns an id; pass it to stopTimer to cancel before it fires.',
     params: [
       { name: 'ms', type: 'number', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -796,14 +791,14 @@ export const COMMANDS = [
   /* --- Device / MIDI: bulk (Q9) --- */
   {
     id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind [, fn [, opts]])',
-    summary: 'Ask the synth to send a dump. `kind` is defined by the DPD ("patch"/"tone"/"global"…) or declared by defineDump. With `fn`, the reply comes back to it — fn(values, info) — instead of only reaching onDumpReceived with nothing tying it to the request. `info.ok` is false when nothing arrived in time (`opts.timeout`, 3000ms by default), so a callback is never left hanging. fn runs after onDumpReceived, so both see the same panel.',
+    summary: 'Ask the synth to send a dump. `kind` is defined by the DPD ("patch"/"tone"/"global"…) or declared by defineDump. With `fn`, the reply is delivered to fn(values, info); `info.ok` is false when nothing arrived within `opts.timeout` (default 3000ms). fn runs after onDumpReceived, so both see the same panel.',
     params: [
       { name: 'kind', type: 'dumpKind', required: true },
       { name: 'fn', type: 'function', required: false },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'timeout', type: 'number', default: '3000', unit: 'milliseconds',
           summary: 'How long to wait for the reply before giving up and calling `fn` with '
-            + 'info.ok = false, so a callback is never left hanging.' },
+            + 'info.ok = false.' },
       ]) },
     ],
     scopes: 'any',
@@ -814,7 +809,7 @@ export const COMMANDS = [
   },
   {
     id: 'applyDump', category: 'Device / MIDI', signature: 'applyDump(bytes)',
-    summary: 'Fill the whole panel from a received dump (walks the DPD map). Silent automatically — inbound context. Also accepts an already-decoded { parameter: value } map, which is how a panel can be filled with no device host attached.',
+    summary: 'Fill the whole panel from a received dump (walks the DPD map). Silent automatically — inbound context. Also accepts an already-decoded { parameter: value } map, which works with no device host attached.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
     scopes: 'any',
     snippet: { lua: 'applyDump(${1:bytes})$0', javascript: 'applyDump(${1:bytes})$0' },
@@ -828,7 +823,7 @@ export const COMMANDS = [
   },
   {
     id: 'buildDump', category: 'Device / MIDI', signature: 'buildDump(kind)',
-    summary: 'Build the dump bytes from the panel values without sending. Needs the device host: the panel→bytes encoding is the DPD codec, which lives there, so this returns nothing in a plain browser tab and says so.',
+    summary: 'Build the dump bytes from the panel values without sending. Requires the device host (the DPD codec lives there); returns nothing in a plain browser tab and reports why.',
     requiresDeviceHost: true,
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
     scopes: 'any',
@@ -852,7 +847,7 @@ export const COMMANDS = [
      answer. Case is normalised to upper; hex is case-insensitive everywhere it is read. */
   {
     id: 'lighten', category: 'Value / range', signature: 'lighten(colour [, amount]) -> string',
-    summary: 'Scale each channel toward white. `amount` 0..1, default 0.4 — the border renderer\'s own highlight, so a script-drawn bevel matches the one the panel draws beside it. Nothing back for a colour it cannot read.',
+    summary: 'Scale each channel toward white. `amount` 0..1, default 0.4 (the border renderer\'s highlight amount). Returns nothing for a colour it cannot read.',
     params: [
       { name: 'colour', type: 'string', required: true },
       { name: 'amount', type: 'number', required: false },
@@ -861,7 +856,7 @@ export const COMMANDS = [
   },
   {
     id: 'darken', category: 'Value / range', signature: 'darken(colour [, amount]) -> string',
-    summary: 'Scale each channel toward black. `amount` 0..1, default 0.55 — the border groove shading, for the same reason lighten\'s default is what it is.',
+    summary: 'Scale each channel toward black. `amount` 0..1, default 0.55 (the border groove shading amount).',
     params: [
       { name: 'colour', type: 'string', required: true },
       { name: 'amount', type: 'number', required: false },
@@ -870,7 +865,7 @@ export const COMMANDS = [
   },
   {
     id: 'mixColour', category: 'Value / range', signature: 'mixColour(a, b, t) -> string',
-    summary: 'Blend two colours, `t` 0..1. not an app algorithm, and said so rather than implied: it is lerp() per channel in plain RGB, which is the blend a meter fading from green to red actually wants.',
+    summary: 'Blend two colours, `t` 0..1. Per-channel linear interpolation in plain RGB.',
     params: [
       { name: 'a', type: 'string', required: true },
       { name: 'b', type: 'string', required: true },
@@ -880,7 +875,7 @@ export const COMMANDS = [
   },
   {
     id: 'colourAlpha', category: 'Value / range', signature: 'colourAlpha(colour, a) -> string',
-    summary: 'A colour with an alpha, in the panel\'s form: AARRGGBB, no leading #, which is what a stored colour property holds. The one verb here that does not return #RRGGBB, because it is the only form a stored colour can carry an alpha in — css\'s #rrggbbaa is the same bytes the other way round, and mixing them up is silent. To make a drawing translucent use ce.draw.opacity().',
+    summary: 'Apply an alpha to a colour, returned in the panel\'s stored form: AARRGGBB, no leading #. The one colour command that does not return #RRGGBB. Warning: css\'s #rrggbbaa is the same bytes in the opposite order. To make a drawing translucent use ce.draw.opacity().',
     params: [
       { name: 'colour', type: 'string', required: true },
       { name: 'a', type: 'number', required: true },
@@ -889,13 +884,13 @@ export const COMMANDS = [
   },
   {
     id: 'hexToRgb', category: 'Value / range', signature: 'hexToRgb(colour) -> table',
-    summary: 'A colour as { r, g, b }, each 0..255. Nothing back for a colour it cannot read, which is what tells a typo from black.',
+    summary: 'A colour as { r, g, b }, each 0..255. Returns nothing for a colour it cannot read.',
     params: [{ name: 'colour', type: 'string', required: true }],
     scopes: 'any',
   },
   {
     id: 'rgbToHex', category: 'Value / range', signature: 'rgbToHex(r, g, b) -> string',
-    summary: 'Channels 0..255 back to "#RRGGBB". Out-of-range channels are clamped rather than wrapped — 300 is white, not 44.',
+    summary: 'Convert channels 0..255 to "#RRGGBB". Out-of-range channels are clamped, not wrapped.',
     params: [
       { name: 'r', type: 'number', required: true },
       { name: 'g', type: 'number', required: true },
@@ -905,13 +900,13 @@ export const COMMANDS = [
   },
   {
     id: 'hexToHsl', category: 'Value / range', signature: 'hexToHsl(colour) -> table',
-    summary: 'A colour as { h, s, l } — hue 0..360, saturation and lightness 0..100, the colour editor\'s own ranges. Grey has hue and saturation 0, which is a fact about grey rather than a lost hue: guard on it if you meant to keep one.',
+    summary: 'A colour as { h, s, l } — hue 0..360, saturation and lightness 0..100 (the colour editor\'s ranges). Grey returns hue 0 and saturation 0.',
     params: [{ name: 'colour', type: 'string', required: true }],
     scopes: 'any',
   },
   {
     id: 'hslToHex', category: 'Value / range', signature: 'hslToHex(h, s, l) -> string',
-    summary: 'The inverse: hue 0..360, saturation and lightness 0..100, back to "#RRGGBB". Rotating a hue and going back is how a script builds a palette from one colour.',
+    summary: 'Convert hue 0..360, saturation and lightness 0..100 to "#RRGGBB". Inverse of hexToHsl.',
     params: [
       { name: 'h', type: 'number', required: true },
       { name: 's', type: 'number', required: true },
@@ -931,7 +926,7 @@ export const COMMANDS = [
      runtimes evaluating the same formula at the same elapsed time cannot. */
   {
     id: 'animateTo', category: 'Animation', signature: 'animateTo(path, target [, opts])',
-    summary: 'Slide a value to where you want it instead of jumping there. Give it a list of controls rather than one and a single call moves them all, with `stagger` setting them off one after another. Starting a second move on the same control replaces the first, since a value can only be heading one place; the replaced one is told it was cancelled rather than finished.',
+    summary: 'Animate a value to `target` instead of jumping there. Pass a list of controls to move them all in one call, with `stagger` offsetting their starts. Starting a second move on the same control replaces the first; the replaced one reports cancelled, not finished.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
@@ -941,8 +936,7 @@ export const COMMANDS = [
           { name: 'curve', type: 'text', default: '"linear"',
             values: ['linear', 'exp', 'log', 's', 'inQuad', 'outQuad', 'inOutQuad', 'outCubic'],
             summary: 'The shape of the move. The first four are ce.math.curve\'s; the last four are '
-              + 'the Properties panel\'s, and are evaluated as the same curves the panel stores. An '
-              + 'unrecognised name is reported and the move runs linear.' },
+              + 'the Properties panel\'s. An unrecognised name is reported and the move runs linear.' },
           'animFrom', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
     ],
@@ -977,14 +971,14 @@ export const COMMANDS = [
   },
   {
     id: 'animateStop', category: 'Animation', signature: 'animateStop([path])',
-    summary: 'Stop the animation on `path`, leaving the value where it got to. No path stops every animation this panel is running. `done` fires with completed = false, so a "then do X" can tell cancelling from finishing — use finish() to jump to the target instead.',
+    summary: 'Stop the animation on `path`, leaving the value where it got to. No path stops every animation this panel is running. `done` fires with completed = false; use finish() to jump to the target instead.',
     params: [{ name: 'path', type: 'path', required: false }],
     scopes: 'any',
     snippet: { lua: 'ce.anim.stop("${1:cutoff}")$0', javascript: 'ce.anim.stop("${1:cutoff}");$0' },
   },
   {
     id: 'animateRunning', category: 'Animation', signature: 'animateRunning([path])',
-    summary: 'Is `path` being animated right now? With no path, is anything? The guard before starting a gesture you do not want to interrupt.',
+    summary: 'Return whether `path` is being animated right now. With no path, return whether any animation is running.',
     params: [{ name: 'path', type: 'path', required: false }],
     scopes: 'any',
     snippet: { lua: 'if not ce.anim.running("${1:cutoff}") then $0 end', javascript: 'if (!ce.anim.running("${1:cutoff}")) { $0 }' },
@@ -1000,7 +994,7 @@ export const COMMANDS = [
      now. These seven are the other direction: things a stored property structurally cannot be. */
   {
     id: 'animateEnvelope', category: 'Animation', signature: 'animateEnvelope(path, points [, opts])',
-    summary: 'Move a value through a whole shape rather than from one number to another — an attack and decay, a hold and fall, any curve you can draw. This is what `to` cannot do: `to` has a single destination, and an envelope goes up before it comes down. The shape is a list of { x, y } points between 0 and 1, the same ones the Envelope component uses, so a sweep from a script and an Envelope drawn beside it trace the same line.',
+    summary: 'Move a value through a multi-point shape — an attack and decay, a hold and fall. `points` is a list of { x, y } points between 0 and 1, the same format the Envelope component uses. Unlike `to`, the value can rise and fall within one animation.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'points', type: 'list', required: true },
@@ -1021,36 +1015,36 @@ export const COMMANDS = [
   },
   {
     id: 'animateValue', category: 'Animation', signature: 'animateValue(path) -> table',
-    summary: 'Where an animation is: { path, kind, value, progress, from, to, elapsed, remaining, paused, cycle, sync }, or nothing when the path is not animating. running() says whether; this says how far, which is what a progress ring, a guard on a gesture, or a decision about whether to interrupt actually needs. `elapsed` and `remaining` are nil for a transport-synced animation, because how long it has left depends on a tempo nobody has played yet.',
+    summary: 'Describe the animation on `path`: { path, kind, value, progress, from, to, elapsed, remaining, paused, cycle, sync }. Returns nothing when the path is not animating. `elapsed` and `remaining` are nil for a transport-synced animation.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
   {
     id: 'animateList', category: 'Animation', signature: 'animateList() -> list',
-    summary: 'Every animation running, in path order, each described as animateValue describes it. The read ce.time.timers() and ce.panel.entries() both got — and the one that makes `repeat = -1` safe to offer, because a script can always find what it started and stop it.',
+    summary: 'List every running animation, in path order, each described as animateValue describes it.',
     scopes: 'any',
   },
   {
     id: 'animatePause', category: 'Animation', signature: 'animatePause(path)',
-    summary: 'Hold an animation where it is, without ending it. stop() is destructive and there was no non-destructive hold, so "freeze the sweep while the user is dragging" meant stopping it and rebuilding the remainder by hand. Returns false when nothing is running on the path, or it is already paused.',
+    summary: 'Hold an animation where it is, without ending it. Returns false when nothing is running on the path, or it is already paused.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
   {
     id: 'animateResume', category: 'Animation', signature: 'animateResume(path)',
-    summary: 'Carry on from where pause() held it — the animation continues rather than restarting, which is the whole difference from stopping and starting again.',
+    summary: 'Resume an animation from where pause() held it; it continues rather than restarting.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
   {
     id: 'animateReverse', category: 'Animation', signature: 'animateReverse(path)',
-    summary: 'Turn a running animation around from where it is, travelling back at the same rate — a move that was 80% done takes 80% of its duration to get home. animateTo(path, from) would restart at the full duration, so an almost-finished move would take as long coming back as the whole journey took: a bounce rather than a snap back. An envelope reverses its shape as well as its direction.',
+    summary: 'Turn a running animation around from where it is, travelling back at the same rate — a move that was 80% done takes 80% of its duration to get home. An envelope reverses its shape as well as its direction.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
   {
     id: 'animateFinish', category: 'Animation', signature: 'animateFinish(path)',
-    summary: 'Jump to the target and complete: the value lands exactly where the animation was going and `done` fires with completed = true. stop() leaves it stranded halfway, which is right for a cancel and wrong for "skip the animation" — a footswitch that should apply a patch now rather than watch it glide.',
+    summary: 'Jump to the target and complete: the value lands exactly where the animation was going and `done` fires with completed = true. Use stop() to cancel instead, leaving the value where it is.',
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
@@ -1061,15 +1055,15 @@ export const COMMANDS = [
      than a return value, because an answer necessarily arrives later than the call. */
   {
     id: 'uiNotify', category: 'User feedback', signature: 'uiNotify(message [, opts])',
-    summary: 'Show a brief message to whoever is using the panel, and return its ID. `opts` may carry { kind ("info" | "warn" | "error"), duration (ms, default 3000; 0 or less means until dismissed) }. For "the patch loaded", not for debugging — log() is for debugging. The id is what makes the message addressable: ce.ui.update(id, …) replaces it in place and ce.ui.dismiss(id) takes it back, which together are how you show progress instead of stacking ten toasts.',
+    summary: 'Show a brief message to the panel user and return its ID. `opts` takes { kind ("info" | "warn" | "error"), duration (ms, default 3000; 0 or less means until dismissed) }. For user-facing events, not debugging — use log() for that. Pass the ID to ce.ui.update(id, …) to replace the message in place, or to ce.ui.dismiss(id) to remove it.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'message', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         'uiKind',
         { name: 'duration', type: 'number', default: '3000', unit: 'milliseconds',
-          summary: 'How long the message stays up. 0 or less keeps it there until something '
-            + 'dismisses it, which is what you want while a job is still running.' },
+          summary: 'How long the message stays up. 0 or less keeps it visible until something '
+            + 'dismisses it.' },
       ]) },
     ],
     scopes: 'any',
@@ -1077,7 +1071,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiStatus', category: 'User feedback', signature: 'uiStatus([message] [, opts])',
-    summary: 'Put a line in the status bar and leave it there. No message clears it. Unlike notify this persists, so it suits a state ("Recording", "Synced") rather than an event. `opts` may carry { kind ("info" | "warn" | "error") }, the same vocabulary notify uses and for the same reason: a state can be a warning, and "Device not responding" in the same colour as "Ready" is a warning nobody sees. Read it back with ce.ui.state().',
+    summary: 'Put a line in the status bar; it persists until replaced. No message clears it. Use for a state ("Recording", "Synced") rather than an event — notify is for events. `opts` takes { kind ("info" | "warn" | "error") }. Read it back with ce.ui.state().',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'message', type: 'string', required: false },
@@ -1088,7 +1082,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiDialog', category: 'User feedback', signature: 'uiDialog(opts [, onChoice]) -> boolean',
-    summary: 'Ask a question with buttons. The answer arrives later than the call, so it comes back through `onChoice` rather than as a return value — it is given the label that was clicked, or nothing if the dialog was dismissed. What the call itself returns is whether a dialog appeared at all: false means there was nobody to ask, and your callback has already run with no answer. Only one dialog can be open at a time.',
+    summary: 'Ask a question with buttons. The answer arrives asynchronously through `onChoice`, which receives the clicked label, or nothing if the dialog was dismissed. The call itself returns whether a dialog appeared: false means there was nobody to ask and the callback has already run with no answer. Only one dialog can be open at a time.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'opts', type: 'object', required: true, fields: optionFields([
@@ -1120,7 +1114,7 @@ export const COMMANDS = [
      them, and it copies to the clipboard in six places. A script could do none of those. */
   {
     id: 'uiPrompt', category: 'User feedback', signature: 'uiPrompt(opts [, onAnswer]) -> boolean',
-    summary: 'Ask somebody to type something — naming a patch, say. The answer comes back through `onAnswer` as text, or as nothing if they cancelled. Those two are deliberately different: an empty answer is something a person might mean, and no answer is not. Enter accepts. Returns whether a dialog appeared; false means the callback has already run with no answer.',
+    summary: 'Ask the user to type text. The answer comes back through `onAnswer` as text, or as nothing if they cancelled — an empty answer and no answer are distinct. Enter accepts. Returns whether a dialog appeared; false means the callback has already run with no answer.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'opts', type: 'object', required: true,
@@ -1142,15 +1136,14 @@ export const COMMANDS = [
   },
   {
     id: 'uiChoose', category: 'User feedback', signature: 'uiChoose(opts [, onAnswer]) -> boolean',
-    summary: 'Ask somebody to pick from a list — which is what you want past about three choices, where buttons stop working. The answer is the item they chose, a list of items if you allowed more than one, or nothing if they cancelled. A long list scrolls rather than growing, so forty presets cannot push the buttons off the screen.',
+    summary: 'Ask the user to pick from a list. The answer is the chosen item, a list of items if `multiple` is set, or nothing if they cancelled. A long list scrolls rather than growing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'opts', type: 'object', required: true,
         fields: optionFields([
           'uiTitle', 'uiMessage',
           { name: 'items', type: 'list of text', required: true,
-            summary: 'The choices to offer. The list scrolls, so a long one cannot push the '
-              + 'buttons off screen.' },
+            summary: 'The choices to offer. A long list scrolls.' },
           { name: 'default', type: 'text', default: 'nothing selected', sample: '"Init"',
             summary: 'The item selected when the dialog opens.' },
           { name: 'multiple', type: 'true or false', default: 'false',
@@ -1167,7 +1160,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiDismiss', category: 'User feedback', signature: 'uiDismiss([id]) -> number',
-    summary: 'Take a message back — the thing whoever is looking at it can already do by clicking it. With no id it clears every one, because "stop saying things" is a real request and making a script remember six ids to make it would be busywork. Returns how many went.',
+    summary: 'Remove a message; the user can also do this by clicking it. With no id, clears every message. Returns how many were removed.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'id', type: 'number', required: false }],
     scopes: 'any',
@@ -1175,7 +1168,7 @@ export const COMMANDS = [
   },
   {
     id: 'uiUpdate', category: 'User feedback', signature: 'uiUpdate(id, message [, opts]) -> boolean',
-    summary: 'Change a message that is already on screen, leaving it where it is. This is how you show progress: dismissing and showing a new one makes it flicker and jump to the bottom each time. Give the original message a duration of 0 so it stays put, then update it as you go. Returns false once that message has gone, which is how you learn it was dismissed by hand and you can stop.',
+    summary: 'Change a message that is already on screen, in place. To show progress, give the original message a duration of 0 so it stays put, then update it as you go. Returns false once the message has gone — for example dismissed by hand — so you can stop updating.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'id', type: 'number', required: true },
@@ -1183,8 +1176,8 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         'uiKind',
         { name: 'duration', type: 'number', default: 'unchanged', sample: '5000',
-          summary: 'A new lifetime for the message. Left out, a message that was staying put '
-            + 'stays put and a timed one gets its full time back.' },
+          summary: 'A new lifetime for the message. If omitted, a sticky message stays sticky '
+            + 'and a timed one gets its full time back.' },
       ]) },
     ],
     scopes: 'any',
@@ -1195,18 +1188,18 @@ export const COMMANDS = [
   },
   {
     id: 'uiState', category: 'User feedback', signature: 'uiState() -> table',
-    summary: 'What is on screen: { status, statusKind, notifications ([{ id, message, kind, sticky }]), dialog }. One read rather than three. It is also how you tell apart the two reasons dialog() can answer false — nobody to ask, or a dialog already open — which need completely different handling and otherwise look the same.',
+    summary: 'Return what is on screen: { status, statusKind, notifications ([{ id, message, kind, sticky }]), dialog }. Use `dialog` to tell apart the two reasons dialog() can return false — nobody to ask, or a dialog already open.',
     runtime: RUNTIME_WEBVIEW,
     scopes: 'any',
     snippet: { lua: 'if not ce.ui.state().dialog then $0 end', javascript: 'if (!ce.ui.state().dialog) { $0 }' },
   },
   {
     id: 'uiCopy', category: 'User feedback', signature: 'uiCopy(text) -> boolean',
-    summary: 'Put text on the clipboard — a SysEx string, a patch name, a parameter table. The app does this in six places of its own and a script could not do it at all. The write is asynchronous and a browser may refuse it outright without a click behind it, so the return says the copy was attempted rather than that it landed; a refusal is reported to the console. There is deliberately no matching read: a script silently helping itself to whatever somebody last copied is not a panel\'s business.',
+    summary: 'Put text on the clipboard. The write is asynchronous and a browser may refuse it without a user gesture: the return means the copy was attempted, and a refusal is reported to the console. There is no clipboard read.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'text', type: 'string', required: true }],
     scopes: 'any',
-    snippet: { lua: 'ce.ui.copy(bytesToHex(buildDump("patch")))$0', javascript: 'ce.ui.copy(bytesToHex(buildDump("patch")));$0' },
+    snippet: { lua: 'ce.ui.copy(ce.storage.encode(buildDump("${1:patch}")))$0', javascript: 'ce.ui.copy(ce.storage.encode(buildDump("${1:patch}")));$0' },
   },
 
   /* --- Drawing (design doc §6 phase 5) ---
@@ -1222,7 +1215,7 @@ export const COMMANDS = [
      a drawing is a product of the script, never part of the document. */
   {
     id: 'drawClear', category: 'Drawing', signature: 'drawClear([target])',
-    summary: 'Throw away what was drawn on this control. The usual first line of onDraw, because a draw adds to the list rather than replacing it.',
+    summary: 'Discard everything drawn on this control. Drawing commands accumulate rather than replace, so this is the usual first line of onDraw.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'target', type: 'string', required: false }],
     scopes: 'any',
@@ -1238,7 +1231,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawStroke', category: 'Drawing', signature: 'drawStroke([colour] [, width] [, opts])',
-    summary: 'The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` carries { dash (a list of on/off lengths, the way every drawing API since PostScript spells it \u2014 the panel\u2019s own beat marks are { 3, 3 }), dashOffset (how far into that pattern to start \u2014 advance it on a timer and the dash marches), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }.',
+    summary: 'The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` takes { dash (a list of on/off lengths, e.g. { 3, 3 }), dashOffset (how far into that pattern to start), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'colour', type: 'value', required: false },
@@ -1284,7 +1277,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawLine', category: 'Drawing', signature: 'drawLine(x1, y1, x2, y2)',
-    summary: 'A straight line. Stroke only — a line has no inside.',
+    summary: 'A straight line. Stroke only; fill does not apply.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'x1', type: 'number', required: true }, { name: 'y1', type: 'number', required: true },
@@ -1295,7 +1288,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawPath', category: 'Drawing', signature: 'drawPath(points [, closed])',
-    summary: 'A polyline through a flat list of coordinates — { x1, y1, x2, y2, ... }. This is the scope trace and the envelope shape. `closed` joins the last point back to the first.',
+    summary: 'A polyline through a flat list of coordinates — { x1, y1, x2, y2, ... }. `closed` joins the last point back to the first.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'points', type: 'array', required: true },
@@ -1309,7 +1302,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawArc', category: 'Drawing', signature: 'drawArc(x, y, radius, from, to)',
-    summary: 'An arc centred on (x, y). Angles are degrees with 0 at twelve o\'clock, increasing clockwise — the way a knob\'s arc is described, and the same convention the Meter\'s arcStart/arcSweep use. Stroked with the current stroke; filled as a pie slice if a fill is set. The shape a knob ring, a radial meter or a pan indicator is, and the one thing path() could not express.',
+    summary: 'An arc centred on (x, y). Angles are degrees with 0 at twelve o\'clock, increasing clockwise — the same convention the Meter\'s arcStart/arcSweep use. Stroked with the current stroke; filled as a pie slice if a fill is set.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
@@ -1330,7 +1323,7 @@ export const COMMANDS = [
      script could do none of it. */
   {
     id: 'drawGradient', category: 'Drawing', signature: 'drawGradient(stops [, angle]) -> value',
-    summary: 'A gradient to use instead of a flat colour with fill() or stroke(). Give it a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place them yourself; you can mix the two and let the unplaced ones fall where they may. The angle is the panel\'s own — 0 is up, 90 is to the right, the same as the gradients in the Background section. Fewer than two usable colours gives you nothing back, since a gradient from one colour to nothing is just a colour.',
+    summary: 'Build a gradient to use in place of a flat colour with fill() or stroke(). Give a plain list of colours to space them evenly, or a list of { at, colour, opacity } to place them yourself; the two forms can be mixed. `angle` is 0 for up and 90 for right, the same as the Background section\'s gradients. Fewer than two usable colours returns nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'stops', type: 'list', required: true },
@@ -1344,21 +1337,21 @@ export const COMMANDS = [
   },
   {
     id: 'drawOpacity', category: 'Drawing', signature: 'drawOpacity(a)',
-    summary: 'How opaque everything drawn after this is, 0..1. Applies like fill and stroke do — to what follows, not to one shape — because the whole style model here is "what was in force when the command was issued". A value that is not a number clears it. This makes a drawing translucent; ce.math.alpha() makes a stored colour translucent, and they are different questions with different answers.',
+    summary: 'Set the opacity for everything drawn after this, 0..1. Like fill and stroke, it applies to what follows, not to one shape. A value that is not a number clears it. To make a stored colour translucent instead, use ce.math.alpha().',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'a', type: 'number', required: true }],
     scopes: 'any',
   },
   {
     id: 'drawTransform', category: 'Drawing', signature: 'drawTransform([opts])',
-    summary: 'Rotate, move or scale everything drawn after this. `opts` carries { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it. Without this a knob pointer means computing every corner with sin and cos by hand, and getting the centre wrong is the classic way a pointer ends up orbiting the wrong point.',
+    summary: 'Rotate, move or scale everything drawn after this. `opts` takes { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'rotate', type: 'number', default: '0', unit: 'degrees',
         summary: 'Turn everything drawn after this clockwise.' },
       { name: 'cx', type: 'number', default: 'the middle of the control', unit: 'pixels', sample: '40',
-        summary: 'The horizontal point to rotate about. Getting this wrong is the usual reason a '
-          + 'knob pointer orbits somewhere it should not.' },
+        summary: 'The horizontal point to rotate about. A wrong centre makes the shape orbit '
+          + 'the wrong point.' },
       { name: 'cy', type: 'number', default: 'the middle of the control', unit: 'pixels', sample: '40',
         summary: 'The vertical point to rotate about.' },
       { name: 'x', type: 'number', default: '0', unit: 'pixels', summary: 'Move everything sideways.' },
@@ -1374,7 +1367,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawEllipse', category: 'Drawing', signature: 'drawEllipse(cx, cy, rx, ry)',
-    summary: 'An ellipse. circle() only does round, and a meter cap, an XY cursor or a squashed glow is not round.',
+    summary: 'An ellipse centred on (cx, cy), with horizontal radius rx and vertical radius ry.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'cx', type: 'number', required: true }, { name: 'cy', type: 'number', required: true },
@@ -1384,7 +1377,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawPixelText', category: 'Drawing', signature: 'drawPixelText(text, x, y [, scale])',
-    summary: 'Text in the app’s own 5x7 LCD font — the one the LCD components print with — so a readout a script draws and a readout the panel draws are the same letters. `scale` is a whole-number pixel size, 1 by default. Drawn literally, one square per lit pixel: it is a bitmap font, and rendering it smoothly would stop it being that font. (x, y) is the top-left, unlike text() whose y is the baseline — a grid font has no baseline to speak of.',
+    summary: 'Text in the app’s built-in 5x7 LCD font, the same one the LCD components use. `scale` is a whole-number pixel size, 1 by default. Drawn one square per lit pixel, with no smoothing. (x, y) is the top-left corner, unlike text() whose y is the baseline.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'text', type: 'string', required: true },
@@ -1395,7 +1388,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawMeasure', category: 'Drawing', signature: 'drawMeasure(text [, opts]) -> table',
-    summary: 'How wide a string will be: { width, height, exact }. Nothing could ask before, so a box behind a label, a column of right-aligned numbers or a truncation had no way to be worked out. `opts` carries { size, family } for ordinary text, or { pixel = true, scale } for the LCD font. `exact` is the honest part: the pixel font is a grid and its answer is arithmetic, while a proportional font has to be measured — and with no surface to measure on this falls back to an estimate and says so, rather than returning a guess as though it were a fact.',
+    summary: 'Measure a string before drawing it: returns { width, height, exact }. `opts` takes { size, family } for ordinary text, or { pixel = true, scale } for the LCD font. The pixel font is a fixed grid, so its answer is exact; a proportional font must be measured, and when no surface is available the result is an estimate with `exact` false.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'text', type: 'string', required: true },
@@ -1413,14 +1406,14 @@ export const COMMANDS = [
   },
   {
     id: 'drawBatch', category: 'Drawing', signature: 'drawBatch(fn) -> boolean',
-    summary: 'Send a run of drawing commands as a single update instead of one each. Worth reaching for whenever you are drawing in a loop — a waveform, a set of tick marks — where it is several times faster. The commands that already do a whole set at once (grid, lines, points) do not need it.',
+    summary: 'Send a run of drawing commands as a single update instead of one each. Use it when drawing in a loop — a waveform, a set of tick marks — where it is several times faster. grid, lines and points already send a whole set at once and do not need it.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
   },
   {
     id: 'drawGrid', category: 'Drawing', signature: 'drawGrid([opts]) -> boolean',
-    summary: 'A whole lattice as one command and one path. `opts` may carry { x, y, width, height } (defaulting to the control\'s box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. Both forms exist because both are how you actually know it: a step sequencer knows it has 16 columns, a ruler knows it wants a line every 10 pixels. The closing line is drawn, so a 4-column grid has five verticals rather than a missing right edge.',
+    summary: 'Draw a whole grid as one command and one path. `opts` takes { x, y, width, height } (defaulting to the control\'s box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. The closing line is drawn, so a 4-column grid has five verticals.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false,
       fields: optionFields([
@@ -1433,8 +1426,8 @@ export const COMMANDS = [
         { name: 'height', type: 'number', default: 'the control\'s height', unit: 'pixels', sample: '60',
           summary: 'How tall the grid is.' },
         { name: 'step', type: 'number', unit: 'pixels', sample: '10',
-          summary: 'Spacing both ways — a line every this many pixels. Use this or `columns`, not '
-            + 'both: a ruler knows its spacing, a step sequencer knows its count.' },
+          summary: 'Spacing both ways — a line every this many pixels. Use this or `columns`, '
+            + 'not both.' },
         { name: 'stepX', type: 'number', unit: 'pixels', sample: '10', summary: 'Horizontal spacing on its own.' },
         { name: 'stepY', type: 'number', unit: 'pixels', sample: '20', summary: 'Vertical spacing on its own.' },
         { name: 'columns', type: 'number', sample: '16',
@@ -1446,14 +1439,14 @@ export const COMMANDS = [
   },
   {
     id: 'drawLines', category: 'Drawing', signature: 'drawLines(segments) -> boolean',
-    summary: 'Many disjoint line segments in one command — a list of [x1, y1, x2, y2]. drawPath already draws a connected run cheaply; this is for geometry that is not connected: tick marks, a vu ladder, a scatter of whiskers, a grid you are computing yourself. One command and one path instead of one of each per segment.',
+    summary: 'Draw many disjoint line segments as one command — a list of [x1, y1, x2, y2]. For unconnected geometry: tick marks, a vu ladder, a grid you compute yourself. drawPath draws a connected run.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'segments', type: 'list', required: true }],
     scopes: 'any',
   },
   {
     id: 'drawPoints', category: 'Drawing', signature: 'drawPoints(points [, radius]) -> boolean',
-    summary: 'A scatter of dots as one command — a list of [x, y], with `radius` defaulting to 1.5. The radius is the dot\'s own rather than the stroke width\'s, so a thin outline and a fat dot are independent.',
+    summary: 'A scatter of dots as one command — a list of [x, y], with `radius` defaulting to 1.5. The radius is independent of the stroke width.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'points', type: 'list', required: true },
@@ -1463,7 +1456,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawCurve', category: 'Drawing', signature: 'drawCurve(points [, opts]) -> boolean',
-    summary: 'A smooth curve through the given points, not merely near them — a Catmull-Rom spline emitted as cubic Béziers. One command for the whole curve, rather than a loop approximating it with short straight segments.',
+    summary: 'A smooth curve through the given points — a Catmull-Rom spline emitted as cubic Béziers, in one command.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'points', type: 'list', required: true },
@@ -1479,7 +1472,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawPolygon', category: 'Drawing', signature: 'drawPolygon(cx, cy, radius, sides [, opts]) -> boolean',
-    summary: 'A regular polygon — hexagonal pads, a radar plot\'s frame, a triangle indicator. `opts.rotation` is in degrees with 0 at twelve o\'clock, clockwise, the same convention drawArc uses, so a polygon and an arc drawn at the same angle line up. Fewer than three sides is raised to three.',
+    summary: 'A regular polygon centred on (cx, cy). `opts.rotation` is in degrees with 0 at twelve o\'clock, clockwise — the same convention drawArc uses, so a polygon and an arc at the same angle line up. Fewer than three sides is raised to three.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'cx', type: 'number', required: true },
@@ -1496,7 +1489,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawImage', category: 'Drawing', signature: 'drawImage(src, x, y, w, h [, opts]) -> boolean',
-    summary: 'Draw an image. `src` must be something the renderer can load — a data URL, or a library icon\'s dataUrl from ce.image.asset(). A bare asset name is refused rather than accepted and drawn as nothing, which is the failure this verb is most likely to be handed. `opts.fit` is "fill" (stretch, the default), "contain" or "cover".',
+    summary: 'Draw an image. `src` must be a data URL or a library icon\'s dataUrl from ce.image.asset(); a bare asset name is refused rather than drawn as nothing. `opts.fit` is "fill" (stretch, the default), "contain" or "cover".',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'src', type: 'string', required: true },
@@ -1514,7 +1507,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawClip', category: 'Drawing', signature: 'drawClip([x, y, w, h]) -> boolean',
-    summary: 'Restrict everything drawn after this to a rectangle. Style, not a shape: it applies until changed, and save()/restore() put it back. No arguments clears it. This cannot be emulated — a script could previously only avoid drawing outside a region, never clip what it drew. The control\'s own bounds still clip on top, so a clip can narrow the drawing area but never widen it.',
+    summary: 'Restrict everything drawn after this to a rectangle. It is a style, not a shape: it applies until changed, and save()/restore() put it back. No arguments clears it. The control\'s own bounds still clip on top, so a clip can narrow the drawing area but never widen it.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'x', type: 'number', required: false },
@@ -1535,21 +1528,21 @@ export const COMMANDS = [
   },
   {
     id: 'drawSave', category: 'Drawing', signature: 'drawSave() -> boolean',
-    summary: 'Push the current style — fill, stroke, width, dash, dash offset, cap, join, opacity, transform, clip and blend — so restore() can put it back. Use it when you want to change the style for one shape and put things back afterwards, without having to remember the old values yourself. What you save is cleared at the start of each drawing pass, so forgetting to restore cannot leak into the next one.',
+    summary: 'Push the current style — fill, stroke, width, dash, dash offset, cap, join, opacity, transform, clip and blend — so restore() can put it back. The stack is cleared at the start of each drawing pass, so a forgotten restore cannot leak into the next one.',
     runtime: RUNTIME_WEBVIEW,
     params: [],
     scopes: 'any',
   },
   {
     id: 'drawRestore', category: 'Drawing', signature: 'drawRestore() -> boolean',
-    summary: 'Pop the style that save() pushed. Reports and returns false when nothing was saved, rather than silently resetting to defaults — an unbalanced restore is a bug in the script and worth hearing about.',
+    summary: 'Pop the style that save() pushed. Reports and returns false when nothing was saved, rather than silently resetting to defaults.',
     runtime: RUNTIME_WEBVIEW,
     params: [],
     scopes: 'any',
   },
   {
     id: 'imageAssets', category: 'Images', signature: 'imageAssets([opts]) -> list',
-    summary: 'The icon library, as { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `opts` narrows with { vector = true } or { embeddable = true }. `portable` is false for every entry, and that is the honest answer rather than a bug: the payload lives in app settings, not in the panel document, so a reference to it does not survive an export. `embeddable` says whether ce.image.embed() can fix that by copying the data URL into the layer.',
+    summary: 'List the icon library, as { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `opts` narrows with { vector = true } or { embeddable = true }. `portable` is false for every entry: the payload lives in app settings, not in the panel document, so a reference to it does not survive an export. `embeddable` says whether ce.image.embed() can copy the data URL into a layer.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'vector', type: 'true or false',
@@ -1562,14 +1555,14 @@ export const COMMANDS = [
   },
   {
     id: 'imageAsset', category: 'Images', signature: 'imageAsset(idOrName) -> table|nil',
-    summary: 'One library asset, by id first and then by name — the same order the renderer resolves in, so what you see is what will be picked. Nothing back when the library has no such asset, which is the guard to call before writing one. The name fallback is worth knowing about: a coincidental name match looks exactly like success.',
+    summary: 'Look up one library asset, by id first and then by name — the same resolution order the renderer uses. Returns nil when the library has no such asset; call it before writing an asset reference. Beware the name fallback: a coincidental name match is indistinguishable from an id hit.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'idOrName', type: 'string', required: true }],
     scopes: 'any',
   },
   {
     id: 'imageSet', category: 'Images', signature: 'imageSet(target, src [, opts]) -> boolean',
-    summary: 'Put a picture on one of a control\'s four image layers and switch that layer on. This does two things a plain set() does not: it always writes the picture and the switch together, so you cannot end up with a layer that is turned on and empty, and it turns the layer on the way that layer actually works — background layers stack, while a picture inside text replaces whatever was there. An option the chosen layer does not have is refused and reported, rather than stored where nothing will read it.',
+    summary: 'Set an image on one of a control\'s four image layers and switch that layer on, always writing the picture and the switch together so a layer cannot be on and empty. Background layers composite with each other; a picture inside text replaces whatever was there. An option the chosen layer does not have is refused and reported, not stored.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1577,16 +1570,16 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false,
         fields: optionFields([
           { name: 'layer', type: 'text', default: '"image"', values: IMAGE_LAYER_IDS,
-            summary: 'Which of the control\'s four image layers this is about. The first two are '
-              + 'background layers and stack; the last two fill the text and are exclusive. Every '
-              + 'option below applies only to the layers that actually have it — one that does '
-              + 'not is refused and reported rather than stored where nothing reads it.' },
+            summary: 'Which of the control\'s four image layers to write. The first two are '
+              + 'background layers and stack; the last two fill the text and are exclusive. Each '
+              + 'option below applies only to layers that have it; an unsupported option is '
+              + 'refused and reported.' },
           { name: 'fit', type: 'text', default: '"fill" on a background, "cover" on text',
             values: [...new Set([...BACKGROUND_FITS, ...TEXT_FITS])],
-            summary: 'How the image fills the layer. This is the one option whose words mean two '
-              + `different things: on a background it is one of ${BACKGROUND_FITS.join(', ')} and `
-              + `"fill" means COVER, while on text it is one of ${TEXT_FITS.join(', ')} and `
-              + '"fill" means stretch. The text texture layer always tiles and takes no fit.' },
+            summary: 'How the image fills the layer. The meaning differs by layer type: on a '
+              + `background it is one of ${BACKGROUND_FITS.join(', ')} and "fill" means COVER; `
+              + `on text it is one of ${TEXT_FITS.join(', ')} and "fill" means stretch. The `
+              + 'text texture layer always tiles and takes no fit.' },
           { name: 'align', type: 'text', default: '"center"', values: BACKGROUND_ALIGNS,
             summary: 'Where the image sits when it does not fill the layer. Background layers '
               + 'only — on a text layer use offsetX and offsetY instead. Note the hyphens.' },
@@ -1607,7 +1600,7 @@ export const COMMANDS = [
           { name: 'flipV', type: 'true or false', default: 'false',
             summary: 'Mirror it top to bottom. Background layers only.' },
           { name: 'grayscale', type: 'true or false', default: 'false',
-            summary: 'Drain the colour out of it. Background layers only.' },
+            summary: 'Remove all colour from the image. Background layers only.' },
           { name: 'saturation', type: 'number', default: '1',
             summary: 'Colour intensity. 0 is grey, 1 is unchanged, above 1 is stronger. '
               + 'Background layers only.' },
@@ -1629,7 +1622,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageClear', category: 'Images', signature: 'imageClear(target [, layer]) -> boolean',
-    summary: 'Turn a layer off and blank its source — two or three fields that have to agree, which is why it is a verb rather than a set(). An exclusive text layer also goes back to "solid", because a selected mode with no source paints nothing and looks broken.',
+    summary: 'Turn a layer off and blank its source in one step. An exclusive text layer also resets to "solid", because a selected mode with no source paints nothing.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1640,7 +1633,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageRead', category: 'Images', signature: 'imageRead(target [, layer]) -> table',
-    summary: 'The layer\'s whole state, plus the three things the fields alone do not tell you: `active` is whether it will actually paint (which for a text layer depends on `mode` and not on `Enabled` at all), `source` is "data" | "file" | "none", and `portable` says whether it survives an export. Only an embedded data URL does.',
+    summary: 'Read the layer\'s full state, plus three derived fields: `active` is whether the layer will actually paint (for a text layer this depends on `mode`, not on `Enabled`), `source` is "data" | "file" | "none", and `portable` says whether it survives an export — only an embedded data URL does.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1651,7 +1644,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageIcon', category: 'Images', signature: 'imageIcon(target, idOrName [, opts]) -> boolean',
-    summary: 'Point a control\'s Icon section at a library asset. `opts` may carry { size, fit, tint, opacity, rotation }. Writes the id and the name, because the renderer resolves by id and falls back to the name — writing one leaves the fallback deciding. An asset the library does not have is refused rather than stored, which is the difference between an icon that is missing and an icon that is silently wrong.',
+    summary: 'Point a control\'s Icon section at a library asset. `opts` takes { size, fit, tint, opacity, rotation }. Writes both the id and the name, because the renderer resolves by id and falls back to the name. An asset the library does not have is refused rather than stored.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1661,7 +1654,7 @@ export const COMMANDS = [
           { name: 'size', type: 'number', default: '16', unit: 'pixels',
             summary: 'How big the icon is drawn.' },
           { name: 'fit', type: 'text', default: '"contain"',
-            summary: 'How the icon fills its box, in the Icon section\'s own words.' },
+            summary: 'How the icon fills its box, using the Icon section\'s own values.' },
           'tint', 'opacity', 'imageRotation',
         ]) },
     ],
@@ -1669,7 +1662,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageEmbed', category: 'Images', signature: 'imageEmbed(target [, layer]) -> boolean',
-    summary: 'Turn a layer\'s source into one that travels: copy the resolved data URL into the layer, replacing a file path that only exists on this machine. This is the verb with no equivalent anywhere else in the app — the difference between a panel that looks right here and one that looks right after an export. Already-embedded sources return true unchanged. A file the host has not read yet returns false and says so rather than blocking: the read is asynchronous, it is requested, and calling again once it lands succeeds.',
+    summary: 'Copy the layer\'s resolved data URL into the layer, replacing a machine-local file path, so the image survives export. Already-embedded sources return true unchanged. A file the host has not read yet returns false; the read is requested, and calling again once it lands succeeds.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1687,7 +1680,7 @@ export const COMMANDS = [
   },
   {
     id: 'textFonts', category: 'Typography', signature: 'textFonts([opts]) -> list',
-    summary: 'Every font this panel can use, with what each one can do. Read `portable` before you settle on one: a built-in font works everywhere, while a font from your library lives on this computer and is not part of the panel — so it looks right while you build and falls back to something else for whoever you send it to. `featuresKnown` tells you whether a font has actually been checked for its typographic features, so an empty list is not mistaken for a fact.',
+    summary: 'List every font the panel can use, with per-font capabilities. `portable` says whether the font survives an export: built-in fonts work everywhere, while a library font lives on this machine, is not part of the panel document, and falls back to a system font for other users. `featuresKnown` says whether the font\'s typographic features have actually been checked; when it is false, an empty feature list means unchecked, not featureless.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'portable', type: 'true or false',
@@ -1702,14 +1695,14 @@ export const COMMANDS = [
   },
   {
     id: 'textFont', category: 'Typography', signature: 'textFont(family) -> table|nil',
-    summary: 'One font descriptor by family name, or nothing when no such font is available — the guard to call before writing a family, and the way to ask what variable axes a face actually has. Matched case-insensitively against the stored family and its label, the way the Properties panel matches it.',
+    summary: 'Get one font descriptor by family name, or nil when no such font is available. Matched case-insensitively against the stored family and its label, the same matching the Properties panel uses. Use it to check a family before writing it, or to ask what variable axes a face has.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'family', type: 'string', required: true }],
     scopes: 'any',
   },
   {
     id: 'textStyle', category: 'Typography', signature: 'textStyle(target, opts) -> boolean',
-    summary: 'Set a control\'s type: font, size, weight, spacing, alignment and the rest, in one call. Worth using instead of writing the settings directly, because boldness is stored in two places that must agree — set one alone and the editor and the finished panel disagree about how bold your text is. A font nobody has, a feature the font does not offer, and an option that is not a text option are all refused and reported. Says false if any part of what you asked for did not apply.',
+    summary: 'Set a control\'s type — font, size, weight, spacing, alignment and the rest — in one call. Boldness is stored as a pair of fields that must agree; this always writes both together, where setting one directly leaves them inconsistent. An unavailable font, a feature the font does not offer, or an option that is not a text option is refused and reported. Returns false if any part did not apply.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1721,8 +1714,8 @@ export const COMMANDS = [
         // fall behind again.
         fields: optionFields([
           { name: 'family', type: 'text', sample: '"Inter Tight"',
-            summary: 'The font family. One nobody has is refused rather than stored, where a bare '
-              + 'set() would keep the typo and quietly fall back to a system font.' },
+            summary: 'The font family. An unavailable family is refused rather than stored; a '
+              + 'bare set() would store it and quietly fall back to a system font.' },
           { name: 'size', type: 'number', unit: 'pixels', sample: '18',
             summary: 'How big the text is drawn.' },
           { name: 'weight', type: 'number or text', sample: '600',
@@ -1734,7 +1727,7 @@ export const COMMANDS = [
           { name: 'caseMode', type: 'text', default: '"normal"', values: CASE_MODES,
             summary: 'Re-case the text as it is drawn, without changing what it says.' },
           { name: 'scriptMode', type: 'text', default: '"normal"', values: SCRIPT_MODES,
-            summary: 'Raise or lower the text, smaller, as a superscript or subscript.' },
+            summary: 'Draw the text smaller and raised or lowered, as superscript or subscript.' },
           { name: 'justification', type: 'text', values: JUSTIFICATIONS,
             summary: 'Where the text sits inside the control.' },
           { name: 'letterSpacing', type: 'number', default: '0', unit: 'pixels',
@@ -1770,7 +1763,7 @@ export const COMMANDS = [
   },
   {
     id: 'textAxis', category: 'Typography', signature: 'textAxis(target, tag, value) -> boolean',
-    summary: 'Set one variable-font axis by its four-letter tag, clamped to the range the font declares. An axis the face does not have is refused rather than stored, because a stored axis nothing reads is indistinguishable from one that worked. Setting `wght` moves the weight pair with it, which is what the Properties panel\'s own axis control does — otherwise a variable face renders its old weight.',
+    summary: 'Set one variable-font axis by its four-letter tag, clamped to the range the font declares. An axis the face does not have is refused rather than stored. Setting `wght` also updates the weight pair, matching the Properties panel\'s own axis control — otherwise a variable face renders its old weight.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1781,7 +1774,7 @@ export const COMMANDS = [
   },
   {
     id: 'textRead', category: 'Typography', signature: 'textRead(target [, name]) -> value|table',
-    summary: 'Read one text field by name, from whichever of Font / Multiline / Position owns it — so `size` and `lineHeight` are both just names and a script need not know which node they live on. With no name, the whole state: { content, resolvedWeight, font, multiline, position }. That is what makes typography snapshot-and-restorable without naming ninety fields, and `resolvedWeight` is the weight the renderer will actually use rather than either half of the pair.',
+    summary: 'Read one text field by name, from whichever of Font / Multiline / Position owns it — `size` and `lineHeight` are both just names; the script need not know which node holds them. With no name, return the whole state: { content, resolvedWeight, font, multiline, position }. `resolvedWeight` is the weight the renderer will actually use, not either half of the stored pair.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1791,7 +1784,7 @@ export const COMMANDS = [
   },
   {
     id: 'textMeasure', category: 'Typography', signature: 'textMeasure(target [, text]) -> table',
-    summary: 'How much room a control\'s text takes up, in its own font: { width, height, lines, truncated, exact }. It measures through the same code that draws the text, so the answer is the layout you will actually get — spacing, wrapping and line limits included. Pass `text` to measure something the control does not hold yet, for a label about to be filled in. `exact` is false when there was no surface to measure on and the answer is an estimate.',
+    summary: 'Measure the room a control\'s text takes up, in its own font: { width, height, lines, truncated, exact }. Measures through the same code that draws the text, so the result matches the actual layout — spacing, wrapping and line limits included. Pass `text` to measure text the control does not hold yet. `exact` is false when there was no surface to measure on and the answer is an estimate.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
@@ -1801,14 +1794,14 @@ export const COMMANDS = [
   },
   {
     id: 'textFit', category: 'Typography', signature: 'textFit(target [, opts]) -> table',
-    summary: 'Shrink Font.size until the text fits the control\'s box, and report what it settled on: { size, fits, changed, exact }. `opts` may carry { min = 6, max = the current size, text }. Text.Multiline.fitMode = "shrink" already scales text down at paint time, but that is a paint-time scale — the stored size never changes, so nothing can ask what it ended up at and nothing else can be aligned to it. This writes the size. `fits` is false when even `min` overflows, which is an answer rather than a failure.',
+    summary: 'Shrink Font.size until the text fits the control\'s box, write that size, and report { size, fits, changed, exact }. `opts` takes { min = 6, max = the current size, text }. Unlike Text.Multiline.fitMode = "shrink", which scales only at paint time and never changes the stored size, this writes the size so other things can read and align to it. `fits` is false when even `min` overflows; the call still succeeds.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'min', type: 'number', default: '6', unit: 'pixels',
-          summary: 'The smallest size to shrink to. If the text still overflows at this size the '
-            + 'answer comes back with fits = false, which is a report rather than a failure.' },
+          summary: 'The smallest size to shrink to. If the text still overflows at this size, the '
+            + 'result has fits = false; the call still succeeds.' },
         { name: 'max', type: 'number', default: 'the control\'s current size', unit: 'pixels', sample: '24',
           summary: 'The largest size to try.' },
         { name: 'text', type: 'text', default: 'the control\'s own text', sample: '"PATCH NAME"',
@@ -1820,7 +1813,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawText', category: 'Drawing', signature: 'drawText(x, y, text [, opts])',
-    summary: 'Text at (x, y), which is its left baseline. `opts` may carry { size, align, family }; align is "left" | "middle" | "right".',
+    summary: 'Text at (x, y), which is its left baseline. `opts` takes { size, align, family }; align is "left" | "middle" | "right".',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
@@ -1837,7 +1830,7 @@ export const COMMANDS = [
   },
   {
     id: 'drawRedraw', category: 'Drawing', signature: 'drawRedraw([target])',
-    summary: 'Ask for onDraw to run again. Nothing repaints on its own — that is deliberate, because a per-frame callback nobody asked for is a performance trap. Animate by calling this from onTimer.',
+    summary: 'Ask for onDraw to run again. Nothing repaints on its own; to animate, call this from onTimer.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'target', type: 'string', required: false }],
     scopes: 'any',
@@ -1860,14 +1853,13 @@ export const COMMANDS = [
      from a script. */
   {
     id: 'panelCreate', category: 'Panel structure', signature: 'panelCreate(type, props)',
-    summary: 'Create a control and return its name (nil if the type is unknown — panelTypes() lists them). `props` may carry name, x, y, width, height, and any section override such as { Behavior = { min = 0, max = 127 } }.',
+    summary: 'Create a control and return its name (nil if the type is unknown — panelTypes() lists them). `props` takes name, x, y, width, height, and any section override such as { Behavior = { min = 0, max = 127 } }.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'type', type: 'string', required: true },
       { name: 'props', type: 'object', required: false, fields: optionFields([
         { name: 'name', type: 'text', default: 'one derived from the type', sample: '"cutoff"',
-          summary: 'What to call the control. This is what every other verb addresses it by, so it '
-            + 'is worth choosing.' },
+          summary: 'The control\'s name. Every other command addresses the control by this name.' },
         { name: 'x', type: 'number', default: '0', unit: 'pixels',
           summary: 'Distance from the left edge of whatever contains it.' },
         { name: 'y', type: 'number', default: '0', unit: 'pixels',
@@ -1891,7 +1883,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelClone', category: 'Panel structure', signature: 'panelClone(name, props)',
-    summary: 'Copy an existing control, including its sections, and return the copy\'s name. The usual way to make eight of something the author designed once.',
+    summary: 'Copy an existing control, including its sections, and return the copy\'s name. `props` overrides properties on the copy.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'name', type: 'string', required: true },
@@ -1951,7 +1943,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelTypes', category: 'Panel structure', signature: 'panelTypes()',
-    summary: 'Every component type panelCreate accepts, as a list of names. Ask rather than guess — the list grows.',
+    summary: 'Every component type panelCreate accepts, as a list of names.',
     runtime: RUNTIME_WEBVIEW,
     params: [],
     scopes: 'any',
@@ -1981,7 +1973,7 @@ export const COMMANDS = [
      back through it, exactly as the canvas does. */
   {
     id: 'panelAlign', category: 'Panel structure', signature: 'panelAlign(names, edge [, opts]) -> number',
-    summary: 'Line controls up on one edge: "left" | "hCenter" | "right" | "top" | "vCenter" | "bottom". By default they align to the bounding box of the lot; `opts.to` names one of them to align to instead — what the canvas calls a key object. Returns how many moved. Names that are not controls are reported and skipped rather than silently ignored.',
+    summary: 'Align controls on one edge: "left" | "hCenter" | "right" | "top" | "vCenter" | "bottom". Default reference is the group\'s bounding box; `opts.to` names one control to align to instead (the canvas\'s key object). Returns how many moved. Names that are not controls are reported and skipped.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2000,7 +1992,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelDistribute', category: 'Panel structure', signature: 'panelDistribute(names, what [, opts]) -> number',
-    summary: 'Spread controls evenly. `what` is "leftEdges" | "hCenters" | "rightEdges" | "topEdges" | "vCenters" | "bottomEdges", which even out the positions, or "hSpacing" | "vSpacing", which even out the gaps — differently-sized controls end up evenly spaced rather than evenly placed, and those are different pictures. The first and last stay put, which is what makes this different from laying things out in a row. `opts.gap` forces a gap instead of computing one; `opts.align` also lines up the cross axis. Needs at least two.',
+    summary: 'Spread controls evenly. `what` is "leftEdges" | "hCenters" | "rightEdges" | "topEdges" | "vCenters" | "bottomEdges" (even out positions) or "hSpacing" | "vSpacing" (even out the gaps between differently-sized controls). The first and last controls stay put. `opts.gap` forces a fixed gap instead of computing one; `opts.align` also lines up the cross axis. Needs at least two controls.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2033,7 +2025,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelGrid', category: 'Panel structure', signature: 'panelGrid(names [, opts]) -> number',
-    summary: 'Tidy controls into a grid. `opts` carries { columns (3), gapX (10), gapY (10) }. Cells are uniform, sized by the biggest control, so a grid stays a grid — and the order is reading order, rows quantised to 20px then left to right, which makes "tidy" match what the eye already sees rather than document order. The first control in that order anchors the origin.',
+    summary: 'Arrange controls into a grid. `opts` takes { columns (3), gapX (10), gapY (10) }. Cells are uniform, sized by the biggest control. Order is reading order — rows quantised to 20px, then left to right — not document order. The first control in that order anchors the origin.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2054,7 +2046,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelCircle', category: 'Panel structure', signature: 'panelCircle(names [, opts]) -> number',
-    summary: 'Arrange controls around a circle centred on their own bounding box. `opts` carries { radius (100), startAngle (0, degrees) }. Order is the order you gave, so the ring reads the way the list does.',
+    summary: 'Arrange controls around a circle centred on their own bounding box. `opts` takes { radius (100), startAngle (0, degrees) }. Placement follows the order of `names`.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2069,7 +2061,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelFlip', category: 'Panel structure', signature: 'panelFlip(names, axis) -> number',
-    summary: 'Mirror where controls sit about the centre of their bounding box — "horizontal" or "vertical". It moves them; it does not rotate or mirror the controls themselves, because "flip the layout" and "flip the artwork" are different requests.',
+    summary: 'Mirror control positions about the centre of their bounding box — "horizontal" or "vertical". Moves the controls only; it does not rotate or mirror the controls themselves.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2079,14 +2071,14 @@ export const COMMANDS = [
   },
   {
     id: 'panelRect', category: 'Panel structure', signature: 'panelRect(name) -> table',
-    summary: 'Where a control is in panel coordinates: { x, y, width, height, right, bottom }. Transform.x is not that once anything is inside a container, so "draw a line between these two controls" or "is this one above that one" had no answer. Given a list of names it is the bounding box of the lot, which is what "how big is this group" means. Nothing back when no name resolves.',
+    summary: 'A control\'s position in panel coordinates: { x, y, width, height, right, bottom }. Unlike Transform.x, this accounts for container offsets. Given a list of names, returns the bounding box of the group. Returns nothing when no name resolves.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'name', type: 'value', required: true }],
     scopes: 'any',
   },
   {
     id: 'panelOrder', category: 'Panel structure', signature: 'panelOrder(names, where) -> number',
-    summary: 'Z-order: "front" | "forward" | "backward" | "back". Order is document order rather than a property, which is exactly why set() could never do it. Controls move within their own parent — bringing something to the front of a container it is not in is not a thing — and later in the list paints later, so "front" is the end.',
+    summary: 'Change z-order: "front" | "forward" | "backward" | "back". Controls move within their own parent only. Later in document order paints later, so "front" is the end of the list.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'names', type: 'list', required: true },
@@ -2096,13 +2088,24 @@ export const COMMANDS = [
   },
   {
     id: 'panelBatch', category: 'Panel structure', signature: 'panelBatch(fn) -> boolean',
-    summary: 'Everything `fn` does is one undo step. The editor debounces its history snapshots, which groups a drag nicely and leaves a script that creates forty controls landing as an unpredictable number of steps; this brackets the work so it undoes as "build the page" rather than forty times. The flush happens whatever the callback does, including throwing — a half-built panel that cannot be undone is worse than a half-built panel. In the player there is no history to group and the callback simply runs.',
+    summary: 'Run `fn` so that everything it does is a single undo step. The history flush happens even if the callback throws. In the player there is no history and the callback simply runs.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
     snippet: {
       lua: 'ce.panel.batch(function()\n  $0\nend)',
       javascript: 'ce.panel.batch(() => {\n  $0\n});',
+    },
+  },
+  {
+    id: 'panelKeep', category: 'Panel structure', signature: 'panelKeep([path]) -> boolean',
+    summary: 'Keep what a preview changed. Preview is a rehearsal: the panel goes back to how you authored it when preview stops, so a script\'s writes are undone with it. `panelKeep("Cutoff.Background.Fill.colour")` keeps one property; `panelKeep()` with no path keeps everything the run did. Returns whether anything was kept. A control the script itself created cannot be kept — it is built fresh by the next run, so keeping one would leave a copy beside it every time. Panel view only: the exported plugin owns its document and never puts it back.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'path', type: 'path', required: false }],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.panel.keep("${1:Cutoff.Background.Fill.colour}")$0',
+      javascript: 'ce.panel.keep("${1:Cutoff.Background.Fill.colour}")$0',
     },
   },
   {
@@ -2121,7 +2124,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelEntry', category: 'Panel structure', signature: 'panelEntry(control, section, name)',
-    summary: 'One entry out of a collection section, or nil. Matched case-insensitively, the way a path is.',
+    summary: 'One entry out of a collection section, or nil. The name is matched case-insensitively, like a path.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
@@ -2136,7 +2139,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelDefine', category: 'Panel structure', signature: 'panelDefine(control, section, name, spec)',
-    summary: 'Create an entry in a collection section, or replace one that is there. The spec is merged over the section\'s own template, so declaring a state is one line rather than a hand-written node — hand-writing _type and both patch maps every time is how a verb like this ends up unused. Returns whether it landed.',
+    summary: 'Create an entry in a collection section, or replace an existing one. The spec is merged over the section\'s own template, so a partial spec is enough. Returns whether it landed.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
@@ -2152,7 +2155,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelUndefine', category: 'Panel structure', signature: 'panelUndefine(control, section, name)',
-    summary: 'Remove an entry from a collection section. Returns whether there was one, so "already gone" reads differently from "removed". Nothing script-facing could remove one of these before — set(path, nil) leaves the entry exactly where it was.',
+    summary: 'Remove an entry from a collection section. Returns whether an entry existed. set(path, nil) does not remove entries; this is the command that does.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
@@ -2167,7 +2170,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelPatch', category: 'Panel structure', signature: 'panelPatch(control, state, patch [, part])',
-    summary: 'Change how a control looks in one of its states — hovered, pressed, disabled. This needs its own command because the entries are themselves written as paths, which plain set() cannot address without losing its way. It merges what you give it into what is already there rather than replacing the lot, and returns how many entries were applied. Use `part` to patch one part of a custom component rather than the whole thing.',
+    summary: 'Change how a control looks in one of its states — hovered, pressed, disabled. The patch is merged into the existing state rather than replacing it. Returns how many entries were applied. Use `part` to patch one part of a custom component. State entries are themselves paths, which plain set() cannot address.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },
@@ -2213,7 +2216,7 @@ export const COMMANDS = [
   },
   {
     id: 'beatsToMs', category: 'Time', signature: 'beatsToMs(beats [, bpm])',
-    summary: 'Musical time to milliseconds at the current tempo — the delay-time calculation a synth panel needs most. Pass `bpm` to override. Returns nil when there is no tempo to work from.',
+    summary: 'Convert beats to milliseconds at the current tempo. Pass `bpm` to override. Returns nil when there is no tempo to work from.',
     params: [
       { name: 'beats', type: 'number', required: true },
       { name: 'bpm', type: 'number', required: false },
@@ -2233,7 +2236,7 @@ export const COMMANDS = [
   },
   {
     id: 'syncTimer', category: 'Time', signature: 'syncTimer(id, beats [, opts])',
-    summary: 'startTimer with a musical interval: syncTimer("step", 0.25) fires every sixteenth at the current tempo, and follows the tempo — change it and the timer re-times itself. Re-arming resets the timer\'s phase, so a tempo change costs one hiccup; that beats a timer permanently at the wrong rate. Pass { follow = false } to freeze the interval at the tempo it was created with. Nothing is started when no tempo is being reported, and it says so.',
+    summary: 'startTimer with a musical interval: syncTimer("step", 0.25) fires every sixteenth at the current tempo. The interval follows tempo changes; each re-arm resets the timer\'s phase. Pass { follow = false } to freeze the interval at the creation tempo. When no tempo is being reported, nothing is started and the failure is reported.',
     params: [
       { name: 'id', type: 'string', required: true },
       { name: 'beats', type: 'number', required: true },
@@ -2244,7 +2247,7 @@ export const COMMANDS = [
   },
   {
     id: 'afterBeats', category: 'Time', signature: 'afterBeats(beats, fn) -> id',
-    summary: 'after() with a musical delay: afterBeats(2, fn) runs fn in two beats\' time. startTimer had syncTimer and the one-shot had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot fires once, so the delay is computed when you call it and does not follow a later tempo change. Returns the timer id, which stopTimer cancels. Nothing is scheduled when no tempo is being reported — it says so rather than firing immediately.',
+    summary: 'after() with a musical delay: afterBeats(2, fn) runs fn in two beats\' time. The delay is computed at call time and does not follow a later tempo change. Returns the timer id, which stopTimer cancels. When no tempo is being reported, nothing is scheduled (it does not fire immediately) and the failure is reported.',
     params: [
       { name: 'beats', type: 'number', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -2257,7 +2260,7 @@ export const COMMANDS = [
   },
   {
     id: 'runningTimers', category: 'Time', signature: 'runningTimers() -> list',
-    summary: 'The timer ids currently running, sorted — the ones started by name with startTimer or syncTimer. One-shots are not listed, any of them: after() hands you its id already, and the runtime\'s own (sendNote\'s note-off) is not a script\'s to cancel.',
+    summary: 'The ids of running named timers (startTimer or syncTimer), sorted. One-shot timers are not listed; after() already returns its id.',
     scopes: 'any',
     snippet: { lua: 'for _, id in ipairs(runningTimers()) do log(id) end$0', javascript: 'for (const id of runningTimers()) log(id);$0' },
   },
@@ -2274,26 +2277,26 @@ export const COMMANDS = [
      component's grid are the same grid. */
   {
     id: 'nowMs', category: 'Time', signature: 'nowMs() -> number',
-    summary: 'A monotonic millisecond reading. not a wall clock and not a date — the origin is arbitrary and only differences mean anything, which is deliberate: a wall clock jumps when the machine syncs its time and a script measuring across that jump measures the jump. This exists because there was no clock at all: the Lua engine opens base, math, string and table and not os, so a Lua script could not read one, and Date/time.time() disagree about epoch and unit anyway.',
+    summary: 'A monotonic millisecond reading. The origin is arbitrary; only differences are meaningful. Not a wall clock or date.',
     scopes: 'any',
     snippet: { lua: 'local t0 = nowMs()$0', javascript: 'const t0 = nowMs();$0' },
   },
   {
     id: 'beatsPerDivision', category: 'Time', signature: 'beatsPerDivision(name) -> number',
-    summary: 'A note division as a fraction of a beat: "1/16" → 0.25, "1/8T" → 0.333…, "1/4D" → 1.5. The vocabulary every sequencer property in the app speaks, and the one conversion a script could not do. Returns nothing for a name this build does not know — a component falls back to 1/16 because it has to keep running, a script that mistyped a division should find out.',
+    summary: 'A note division as a fraction of a beat: "1/16" → 0.25, "1/8T" → 0.333…, "1/4D" → 1.5. The same names every sequencer property uses. Returns nothing for a name this build does not know.',
     params: [{ name: 'name', type: 'string', required: true }],
     scopes: 'any',
     snippet: { lua: 'local beats = beatsPerDivision("1/16")$0', javascript: 'const beats = beatsPerDivision("1/16");$0' },
   },
   {
     id: 'divisionNames', category: 'Time', signature: 'divisionNames() -> list',
-    summary: 'Every division this build knows, in picker order: { id, label, beats }. What to build a menu from, rather than hard-coding fourteen strings that go stale the moment one is added.',
+    summary: 'Every division this build knows, in picker order: { id, label, beats }. Build menus from this list rather than hard-coding the names.',
     scopes: 'any',
     snippet: { lua: 'for _, d in ipairs(divisionNames()) do log(d.label) end$0', javascript: 'for (const d of divisionNames()) log(d.label);$0' },
   },
   {
     id: 'barBeatAt', category: 'Time', signature: 'barBeatAt(beats [, beatsPerBar]) -> table',
-    summary: 'Where a beat position falls musically — for any position, not only the one the transport is at. Returns { bar, beat, tick, text, beatsPerBar }, bars and beats counting from 1 as musicians do, ticks at 24 ppqn. `text` is the Transport component\'s own readout ("3.2.00"), so a script\'s label and the component\'s agree character for character.',
+    summary: 'Convert any beat position to a musical position: { bar, beat, tick, text, beatsPerBar }. Bars and beats are 1-based; ticks are at 24 ppqn. `text` is the Transport component\'s own readout format ("3.2.00").',
     params: [
       { name: 'beats', type: 'number', required: true },
       { name: 'beatsPerBar', type: 'number', required: false },
@@ -2312,7 +2315,7 @@ export const COMMANDS = [
   },
   {
     id: 'stepsBetween', category: 'Time', signature: 'stepsBetween(from, to, division [, max]) -> table',
-    summary: 'How many step boundaries went by between two readings: { steps, dropped }. Use it so a sequence you are driving yourself never loses a step — if a frame runs late, you still play the steps it slept through instead of leaving a hole in the bar. `max` limits the catching up (16 by default), so coming back to a window that was hidden for a minute does not fire hundreds of notes at once; anything skipped is reported rather than quietly dropped. When it does have to skip, it keeps the most recent steps, since catching up to now matters more than replaying where you were.',
+    summary: 'Count step boundaries crossed between two beat positions: { steps, dropped }. Use it to catch up steps a late frame slept through. `max` caps the catch-up (default 16); anything over the cap is counted in `dropped`, and the most recent steps are the ones kept.',
     params: [
       { name: 'from', type: 'number', required: true },
       { name: 'to', type: 'number', required: true },
@@ -2323,7 +2326,7 @@ export const COMMANDS = [
   },
   {
     id: 'swingOffset', category: 'Time', signature: 'swingOffset(step, amount, division) -> number',
-    summary: 'The panel\'s shuffle: every odd step pushed later by up to half a step, in beats, to add to that step\'s position. `amount` is 0..1, the same number the Transport\'s swing property holds. Two sequencers at "the same" swing really are the same swing only if they compute it the same way — which is why this is the transport\'s function and not a second one.',
+    summary: 'The swing offset for a step, in beats, to add to that step\'s position: every odd step is pushed later by up to half a step. `amount` is 0..1, the same number the Transport\'s swing property holds. Uses the transport\'s own swing calculation.',
     params: [
       { name: 'step', type: 'number', required: true },
       { name: 'amount', type: 'number', required: true },
@@ -2333,7 +2336,7 @@ export const COMMANDS = [
   },
   {
     id: 'cycleAt', category: 'Time', signature: 'cycleAt(beats, bars [, beatsPerBar]) -> table',
-    summary: 'For anything whose rate is a loop length in bars rather than a step — a take, a slow sweep. Returns { phase, count, length }: phase 0–1 through the cycle, how many have completed, and the cycle in beats. Derived from the position and never accumulated, so a cycle running for an hour is still exactly on the bar line.',
+    summary: 'Position within a repeating cycle of `bars` bars: { phase, count, length }. `phase` is 0–1 through the cycle, `count` how many have completed, `length` the cycle in beats. Derived from the position, never accumulated, so it stays exact over long runs.',
     params: [
       { name: 'beats', type: 'number', required: true },
       { name: 'bars', type: 'number', required: true },
@@ -2343,7 +2346,7 @@ export const COMMANDS = [
   },
   {
     id: 'loopedBeats', category: 'Time', signature: 'loopedBeats(beats, startBeats, lengthBeats) -> table',
-    summary: 'Fold a timeline position into a loop: { beats, pass }. Before the loop start the position is untouched — you can run in to a loop from earlier in the song, which is what every DAW does and what a count-in needs. `pass` is which time round you are, and -1 before the loop has been reached; watching it for changes tells you a wrap happened, without a wrap handler that can miss one. The looped position is a pure function of the un-looped one rather than a counter that gets reset, which is what makes it exact after an hour.',
+    summary: 'Fold a timeline position into a loop: { beats, pass }. Positions before the loop start are returned untouched, so a run-in or count-in works. `pass` is which time round the loop you are, and -1 before the loop is reached; watch it for changes to detect a wrap. The looped position is a pure function of the un-looped one, so it stays exact over long runs.',
     params: [
       { name: 'beats', type: 'number', required: true },
       { name: 'startBeats', type: 'number', required: true },
@@ -2353,7 +2356,7 @@ export const COMMANDS = [
   },
   {
     id: 'tapTempo', category: 'Time', signature: 'tapTempo(times [, resetMs]) -> number',
-    summary: 'Tempo from tap times, in the milliseconds now() reports. Taps more than `resetMs` apart (2000 by default) start a new measurement rather than averaging across the pause — otherwise the first tap after a break poisons it, which is exactly what a hand-rolled tap tempo gets wrong. Returns nothing from fewer than two usable taps, and the result is clamped to 20–300 bpm.',
+    summary: 'Tempo from a list of tap times, in the milliseconds now() reports. Taps more than `resetMs` apart (default 2000) start a new measurement rather than averaging across the pause. Returns nothing from fewer than two usable taps; the result is clamped to 20–300 bpm.',
     params: [
       { name: 'times', type: 'list', required: true },
       { name: 'resetMs', type: 'number', required: false },
@@ -2362,7 +2365,7 @@ export const COMMANDS = [
   },
   {
     id: 'clockTempo', category: 'Time', signature: 'clockTempo(intervalsMs) -> number',
-    summary: 'Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note) — what a script filtering 0xF8 with ce.midi.interceptIn is holding and could not turn into a bpm. The median, not the mean: one late pulse from a usb hiccup drags an average around, and a wobbling readout is worse than a slightly stale one. Nothing comes back from an empty list.',
+    summary: 'Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note), e.g. 0xF8 intervals collected with ce.midi.interceptIn. Uses the median interval, so one late pulse does not skew the result. Returns nothing from an empty list.',
     params: [{ name: 'intervalsMs', type: 'list', required: true }],
     scopes: 'any',
   },
@@ -2388,7 +2391,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceParameters', category: 'Device / MIDI', signature: 'deviceParameters([opts])',
-    summary: 'The profile\'s parameter descriptors: { id, name, group, type, min, max, access }. `opts` may carry { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report — while ce.device is enabled. A gated call returns nil like any other, because a module that is off has no answer to give.',
+    summary: 'The profile\'s parameter descriptors: { id, name, group, type, min, max, access }. `opts` takes { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report; returns nil when ce.device is gated off.',
     requiresDeviceHost: true,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       'role',
@@ -2429,7 +2432,7 @@ export const COMMANDS = [
   // that discovered eight oscillators could enumerate them and not address them.
   {
     id: 'deviceRead', category: 'Device / MIDI', signature: 'deviceRead(id [, role]) -> value',
-    summary: 'The last known value of a device parameter — what the synth most recently told us, from a dump or a parameter message. Not a live query: asking the synth is asynchronous, and this verb is not. Nothing comes back if the device has never reported it, which is different from zero.',
+    summary: 'The last reported value of a device parameter, from a dump or a parameter message. Not a live query of the synth. Returns nothing if the device has never reported it — distinct from zero.',
     requiresDeviceHost: true,
     params: [
       { name: 'id', type: 'string', required: true },
@@ -2443,7 +2446,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceWrite', category: 'Device / MIDI', signature: 'deviceWrite(id, value [, role]) -> boolean',
-    summary: 'Set a device parameter on the synth, by parameter id, whether or not a control is bound to it. The device profile encodes it. Returns whether the message was dispatched — not whether the synth accepted it, which nothing can know synchronously. `value` is in the parameter\'s own units, the ones deviceParameter() reports min and max for.',
+    summary: 'Set a device parameter on the synth by parameter id; no control binding is required. The device profile encodes the message. Returns whether the message was dispatched, not whether the synth accepted it. `value` is in the parameter\'s own units, the ones deviceParameter() reports min and max for.',
     requiresDeviceHost: true,
     params: [
       { name: 'id', type: 'string', required: true },
@@ -2482,7 +2485,7 @@ export const COMMANDS = [
   {
     id: 'deviceDefineParameter', category: 'Device / MIDI',
     signature: 'deviceDefineParameter(id, spec [, role]) -> boolean',
-    summary: 'Teach the app a parameter at runtime, for a synth it has no profile for. `spec` says how it reaches the synth — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — plus name/group/type/min/max for what parameters() reports. The declaration is refused (and says why) when there is no wire format: a descriptor that enumerates and sends nothing is worse than an error, because the panel looks built. A declared id overrides a profile one, so a script can correct one wrong parameter without redeclaring the rest. Sysex template tokens: a hex literal, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.',
+    summary: 'Declare a device parameter at runtime, for a synth with no shipped profile. `spec` gives the wire format — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — plus name/group/type/min/max for what parameters() reports. A spec with no wire format is refused, and the refusal says why. A declared id overrides a profile one, so a script can correct one wrong parameter without redeclaring the rest. Sysex template tokens: a hex literal, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.',
     params: [
       { name: 'id', type: 'string', required: true },
       { name: 'spec', type: 'object', required: true, fields: optionFields([
@@ -2530,7 +2533,7 @@ export const COMMANDS = [
   {
     id: 'deviceDefineDump', category: 'Device / MIDI',
     signature: 'deviceDefineDump(kind, spec [, role]) -> boolean',
-    summary: 'Describe a SysEx dump layout at runtime: `request` (the bytes that ask for it), `match` ({ prefix, suffix }), `offset`/`size` for the payload, an optional `checksum`, and `fields` — one { parameter, offset } per value the dump carries. Every field must name a parameter defineParameter already declared; an unknown one is refused rather than decoded to nothing months later. A declared layout is matched against arriving SysEx, fills the bound controls and raises onDumpReceived, exactly as a profile-defined dump does.',
+    summary: 'Declare a SysEx dump layout at runtime: `request` (the bytes that ask for it), `match` ({ prefix, suffix }), `offset`/`size` for the payload, an optional `checksum`, and `fields` — one { parameter, offset } per value the dump carries. Every field must name a parameter already declared with defineParameter; an unknown one is refused. A declared layout is matched against arriving SysEx, fills the bound controls and raises onDumpReceived, exactly as a profile-defined dump does.',
     params: [
       { name: 'kind', type: 'string', required: true },
       { name: 'spec', type: 'object', required: true, fields: optionFields([
@@ -2549,8 +2552,8 @@ export const COMMANDS = [
             + 'ce.midi.checksum\'s.' },
         { name: 'fields', type: 'list of objects', required: true,
           summary: 'Where each value sits inside the payload, one { parameter, offset } per '
-            + 'value. Every parameter must be one defineParameter already declared; an unknown '
-            + 'name is refused now rather than decoding to nothing months later.' },
+            + 'value. Every parameter must already be declared with defineParameter; an unknown '
+            + 'name is refused.' },
       ]) },
       { name: 'role', type: 'string', required: false },
     ],
@@ -2566,7 +2569,7 @@ export const COMMANDS = [
     // Panel view only for the same reason ce.panel.create is: the binding lives on the control
     // model, and there is no control model with the window shut.
     runtime: RUNTIME_WEBVIEW,
-    summary: 'Wire a control to a device parameter at runtime. ce.panel.create could already make a control and nothing could connect it to anything, so a self-building panel built dead controls; this is the other half of that pair. Replaces whatever was bound to the same port rather than adding a second binding, and switches DeviceBindings back on if the control had it off. `opts` takes { role, port }; port defaults to "value".',
+    summary: 'Wire a control to a device parameter at runtime. Replaces whatever was bound to the same port rather than adding a second binding, and switches DeviceBindings back on if the control had it off. `opts` takes { role, port }; port defaults to "value".',
     params: [
       { name: 'control', type: 'string', required: true },
       { name: 'parameterId', type: 'string', required: true },
@@ -2587,7 +2590,7 @@ export const COMMANDS = [
     id: 'deviceUnbind', category: 'Device / MIDI',
     signature: 'deviceUnbind(control [, port]) -> boolean',
     runtime: RUNTIME_WEBVIEW,
-    summary: 'Remove a control\'s device binding. Returns whether there was one to remove, so "already clean" reads differently from "cleaned up".',
+    summary: 'Remove a control\'s device binding. Returns whether there was one to remove.',
     params: [
       { name: 'control', type: 'string', required: true },
       { name: 'port', type: 'string', required: false },
@@ -2600,7 +2603,7 @@ export const COMMANDS = [
   },
   {
     id: 'devicePorts', category: 'Device / MIDI', signature: 'devicePorts([opts]) -> list',
-    summary: 'What is actually plugged in: [{ id, name, direction, type, hardware, role }]. connected(role) only answers yes/no for a role somebody configured in advance; this enumerates the real ports, so a panel can offer the user a choice or notice a device that showed up. `hardware` is false for the two placeholder rows the app always lists ("No MIDI Input", "Preview Only"), and `role` is the role currently using the port, or empty. `opts.direction` narrows to "in" or "out".',
+    summary: 'Enumerate the MIDI ports: [{ id, name, direction, type, hardware, role }]. `hardware` is false for the two placeholder rows the app always lists ("No MIDI Input", "Preview Only"); `role` is the role currently using the port, or empty. `opts.direction` narrows to "in" or "out".',
     requiresDeviceHost: true,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'direction', type: 'text', values: ['in', 'out'],
@@ -2614,7 +2617,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceVariables', category: 'Device / MIDI', signature: 'deviceVariables([role]) -> table',
-    summary: 'The variables every message recipe interpolates — `channel`, `deviceId` and whatever else the profile declares — as their effective values: the profile\'s defaults with this project\'s overrides on top. Nothing back when no profile is mapped to the role.',
+    summary: 'The variables every message recipe interpolates — `channel`, `deviceId` and whatever else the profile declares — as their effective values: the profile\'s defaults with this project\'s overrides applied. Returns nothing when no profile is mapped to the role.',
     requiresDeviceHost: true,
     params: [{ name: 'role', type: 'string', required: false }],
     scopes: 'any',
@@ -2626,7 +2629,7 @@ export const COMMANDS = [
   {
     id: 'deviceSetVariable', category: 'Device / MIDI',
     signature: 'deviceSetVariable(name, value [, role]) -> boolean',
-    summary: 'Point this panel at a different unit: set one recipe variable, 0..127. The write lands on this project\'s override rather than on the profile, which is a shared document — two panels driving two units of the same synth sit on different device ids without editing it. Individual uses clamp further (a channel is 1..16).',
+    summary: 'Set one recipe variable, 0..127 — e.g. to point this panel at a different unit. The write lands on this project\'s override, not on the shared profile, so two panels can use different device ids for the same synth. Individual uses clamp further (a channel is 1..16).',
     requiresDeviceHost: true,
     params: [
       { name: 'name', type: 'string', required: true },
@@ -2653,7 +2656,7 @@ export const COMMANDS = [
   {
     id: 'deviceSetTiming', category: 'Device / MIDI',
     signature: 'deviceSetTiming(name, ms [, role]) -> boolean',
-    summary: 'Slow the panel down for a device that cannot keep up — an override on this project, in milliseconds, 0..60000. Same rule as setVariable: the profile is left alone.',
+    summary: 'Set one timing override for this project, in milliseconds, 0..60000 — e.g. to slow the panel down for a device that cannot keep up. As with setVariable, the profile itself is not modified.',
     requiresDeviceHost: true,
     params: [
       { name: 'name', type: 'string', required: true },
@@ -2669,7 +2672,7 @@ export const COMMANDS = [
   {
     id: 'deviceCoverage', category: 'Device / MIDI',
     signature: 'deviceCoverage([feature [, role]]) -> table|string',
-    summary: 'What the profile says it can do, in the profile\'s own words. No feature gives the whole map — `singleParameterWrite`, `realtimeEditing`, `editBufferDumpParse` and so on. Deliberately not a yes/no: real profiles answer "complete", "partial" and "notImplemented" but also "filter-block-rq1" and "broad-with-packed-text-and-requests", so a boolean would be a guess wearing the clothes of a fact. Test the words you care about.',
+    summary: 'The profile\'s self-reported feature coverage, as strings rather than booleans. With no feature, returns the whole map — `singleParameterWrite`, `realtimeEditing`, `editBufferDumpParse` and so on. Profiles answer "complete", "partial" and "notImplemented", but also free-form values such as "filter-block-rq1". Test the words you care about.',
     requiresDeviceHost: true,
     params: [
       { name: 'feature', type: 'string', required: false },
@@ -2730,7 +2733,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendRPN', category: 'Device / MIDI', signature: 'sendRPN(channel, msb, lsb, value)',
-    summary: 'Send a registered parameter number — the standard path for pitch-bend range (0,0), fine tuning (0,1) and coarse tuning (0,2), which is the kind of thing a panel sets once at load. Same shape as sendNRPN; the difference is CC 101/100 instead of 99/98.',
+    summary: 'Send a registered parameter number (RPN): the standard path for pitch-bend range (0,0), fine tuning (0,1) and coarse tuning (0,2). Same shape as sendNRPN, but uses CC 101/100 instead of 99/98.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'msb', type: 'number', required: true },
@@ -2742,7 +2745,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendSongPosition', category: 'Device / MIDI', signature: 'sendSongPosition(beats)',
-    summary: 'Song Position Pointer — where in the song the next start should resume from, in MIDI beats (one beat = six clocks = a sixteenth note). The piece of sendTransport that was missing for anything driving an external sequencer.',
+    summary: 'Send a Song Position Pointer: where the next start or continue resumes from, in MIDI beats (one beat = six clocks = a sixteenth note).',
     params: [{ name: 'beats', type: 'number', required: true }],
     scopes: 'any',
     snippet: { lua: 'sendSongPosition(${1:0})$0', javascript: 'sendSongPosition(${1:0});$0' },
@@ -2756,16 +2759,14 @@ export const COMMANDS = [
   // sendCC. That is what makes them portable to every runtime and every exported language.
   {
     id: 'sendMidi', category: 'Device / MIDI', signature: 'sendMidi(bytes)',
-    summary: 'Send raw MIDI bytes exactly as given — no wrapping, no channel maths. The primitive the other message verbs are built on; reach for one of those first.',
+    summary: 'Send raw MIDI bytes exactly as given — no wrapping, no channel maths. Every other message command is built on this one; reach for one of those first.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
     scopes: 'any',
     snippet: { lua: 'sendMidi({0x90, 60, 100})$0', javascript: 'sendMidi([0x90, 60, 100])$0' },
   },
   {
     id: 'sendNote', category: 'Device / MIDI', signature: 'sendNote(channel, note, velocity [, ms])',
-    summary: 'Note on. `note` is a MIDI number or a name ("C3"). Velocity 0 is a note off, as the MIDI spec has it. '
-      + 'Give `ms` and the note off is scheduled for you — every script that plays a note was otherwise '
-      + 'hand-rolling a timer for it, and a panel cannot play a note at all.',
+    summary: 'Note on. `note` is a MIDI number or a name ("C3"). Velocity 0 is a note off. Give `ms` and the matching note off is scheduled automatically.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'note', type: 'value', required: true },
@@ -2777,10 +2778,9 @@ export const COMMANDS = [
   },
   {
     id: 'interceptMidiIn', category: 'Device / MIDI', signature: 'interceptMidiIn(fn)',
-    summary: 'Sit in the inbound path. fn(bytes) returns replacement bytes to rewrite the message, '
-      + 'false to swallow it, or nothing to pass it through — before the panel\'s bindings, the note '
-      + 'input and the transport see it. onCcIn only lets you react after a binding has already moved '
-      + 'the control; this is how a velocity curve, a channel remap or a MIDI-learn layer is built.',
+    summary: 'Intercept inbound MIDI before the panel\'s bindings, note input and transport see it. '
+      + 'fn(bytes) returns replacement bytes to rewrite the message, false to swallow it, or nothing '
+      + 'to pass it through.',
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
     snippet: {
@@ -2790,9 +2790,9 @@ export const COMMANDS = [
   },
   {
     id: 'interceptMidiOut', category: 'Device / MIDI', signature: 'interceptMidiOut(fn)',
-    summary: 'Sit in the outbound path — every message the panel sends, from a script or from a '
-      + 'control\'s own binding. Rewrite, thin or block it. CC flooding on a fast drag has no answer '
-      + 'from a panel, whose bindings are fixed and which has nothing between them and the port.',
+    summary: 'Intercept outbound MIDI — every message the panel sends, from a script or from a '
+      + 'control\'s own binding. fn(bytes) returns replacement bytes to rewrite the message, false '
+      + 'to swallow it, or nothing to pass it through.',
     params: [{ name: 'fn', type: 'function', required: true }],
     scopes: 'any',
     snippet: {
@@ -2802,19 +2802,17 @@ export const COMMANDS = [
   },
   {
     id: 'feedMidi', category: 'Device / MIDI', signature: 'feedMidi(bytes)',
-    summary: 'Inject a message as if it had arrived from the hardware, so the panel\'s own bindings, '
-      + 'note input and transport all act on it. set() moves a control directly and bypasses every '
-      + 'binding; this is how a script-built arpeggiator or sequencer drives the panel instead of '
-      + 'around it. Inbound filters run on it, so a fed message obeys the same rules as a real one.',
+    summary: 'Inject a message as if it had arrived from the hardware: the panel\'s own bindings, '
+      + 'note input and transport all act on it. Inbound intercepts and filters run on it, so a fed '
+      + 'message obeys the same rules as a real one.',
     params: [{ name: 'bytes', type: 'value', required: true }],
     scopes: 'any',
     snippet: { lua: 'feedMidi(${1:{0x90, 60, 100\}})$0', javascript: 'feedMidi([${1:0x90, 60, 100}])$0' },
   },
   {
     id: 'routeMidi', category: 'Device / MIDI', signature: 'routeMidi(role, fn)',
-    summary: 'Send everything in the block to a named device role instead of the default. Blocks '
-      + 'rather than a per-call argument, the same shape noTransmit() uses — a panel binds one device '
-      + 'at design time, so notes to one synth and CCs to another is otherwise impossible.',
+    summary: 'Send everything inside `fn` to a named device role instead of the default device. '
+      + 'Block-scoped, the same shape noTransmit() uses.',
     params: [
       { name: 'role', type: 'string', required: true },
       { name: 'fn', type: 'function', required: true },
@@ -2827,7 +2825,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendNoteOff', category: 'Device / MIDI', signature: 'sendNoteOff(channel, note [, velocity])',
-    summary: 'Note off. Release velocity defaults to 0. Nothing schedules this for you — a note you start is a note you stop.',
+    summary: 'Note off. Release velocity defaults to 0. Nothing schedules this for you: send it for every note you start.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'note', type: 'value', required: true },
@@ -2838,7 +2836,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendProgramChange', category: 'Device / MIDI', signature: 'sendProgramChange(channel, program [, bankMsb, bankLsb])',
-    summary: 'Program change, with an optional bank select (CC 0 / CC 32) sent first, which is the order devices expect.',
+    summary: 'Program change, with an optional bank select (CC 0 / CC 32) sent first.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'program', type: 'number', required: true },
@@ -2850,7 +2848,7 @@ export const COMMANDS = [
   },
   {
     id: 'sendPitchBend', category: 'Device / MIDI', signature: 'sendPitchBend(channel, value)',
-    summary: 'Pitch bend, 0–16383 with 8192 at centre — the raw 14-bit value, because how many semitones that is depends on the synth\'s bend range, not on us.',
+    summary: 'Pitch bend as the raw 14-bit value: 0–16383, centre 8192. How many semitones that spans depends on the synth\'s bend range.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'value', type: 'number', required: true },
@@ -2885,14 +2883,14 @@ export const COMMANDS = [
   },
   {
     id: 'sendSysex', category: 'Device / MIDI', signature: 'sendSysex(bytes)',
-    summary: 'Send a raw SysEx message (device-scope, power use).',
+    summary: 'Send a raw SysEx message.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
     scopes: 'any',
     snippet: { lua: 'sendSysex(${1:bytes})$0', javascript: 'sendSysex(${1:bytes})$0' },
   },
   {
     id: 'checksum', category: 'Device / MIDI', signature: 'checksum(type, bytes [, opts]) -> number',
-    summary: 'Work out the checksum a synth expects at the end of a message. Eleven methods: "sum-7bit", "roland-7bit" (also spelled "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" and "crc32". Device profiles read the same list, so a script and a profile cannot disagree about what a name means. A name that is not on the list returns nothing and tells you what it would have accepted. Mind the size: the 7-bit ones fit in a single SysEx byte and the CRCs do not, so pass those through to7bit() before sending.',
+    summary: 'Compute the checksum a synth expects at the end of a message. Eleven methods: "sum-7bit", "roland-7bit" (also spelled "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" and "crc32"; a name not on the list returns nothing and reports the accepted names. The 7-bit methods fit in a single SysEx byte, the CRCs do not — pass CRC results through to7bit() before sending.',
     params: [
       { name: 'type', type: 'string', required: true,
         values: ['sum-7bit', 'roland-7bit', 'ones-complement-7bit', 'xor-7bit', 'offset-7bit',
@@ -2900,8 +2898,8 @@ export const COMMANDS = [
       { name: 'bytes', type: 'bytes', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
         { name: 'offset', type: 'number', default: '0',
-          summary: 'The constant the "offset-7bit" algorithm subtracts from. Only that algorithm '
-            + 'reads it, and the constant is yours to supply because it varies by manufacturer.' },
+          summary: 'The constant the "offset-7bit" method subtracts from. Only that method reads '
+            + 'it; the value varies by manufacturer.' },
       ]) },
     ],
     scopes: 'any',
@@ -2927,14 +2925,14 @@ export const COMMANDS = [
   // the first one already, but nothing said so, which made it undefined behaviour people relied on.
   {
     id: 'state', category: 'Storage', signature: 'state',
-    summary: 'A table of your own that survives between handler calls, private to this script. Cleared when the script reloads — for anything that must outlive the session use saveSetting.',
+    summary: 'A table that persists between handler calls, private to this script. Cleared when the script reloads; use saveSetting for anything that must outlive the session.',
     params: [],
     scopes: 'any',
     snippet: { lua: 'state.${1:count} = (state.${1:count} or 0) + 1$0', javascript: 'state.${1:count} = (state.${1:count} ?? 0) + 1;$0' },
   },
   {
     id: 'saveSetting', category: 'Storage', signature: 'saveSetting(key, value [, opts]) -> boolean',
-    summary: 'Save a value so it is still there next time. While you are building, a panel setting is kept with the panel and travels with it; in the finished plugin it goes into your music software\'s project. Returns false when there was nowhere to put it, so you can tell that apart from success.',
+    summary: 'Save a value persistently. In the editor a panel-scope setting is stored with the panel and travels with it; in an exported plugin it is stored in the host\'s project. Returns false when storage is unavailable.',
     params: [
       { name: 'key', type: 'string', required: true },
       { name: 'value', type: 'value', required: true },
@@ -2945,7 +2943,7 @@ export const COMMANDS = [
   },
   {
     id: 'loadSetting', category: 'Storage', signature: 'loadSetting(key [, fallback [, opts]])',
-    summary: 'Read back a value saved with saveSetting. Returns `fallback` when the key has never been written — and `opts.scope` has to match the scope it was saved in, because a private setting and a shared one of the same name are two different values.',
+    summary: 'Read back a value saved with saveSetting. Returns `fallback` when the key has never been written. `opts.scope` must match the scope the value was saved in — the same key in different scopes names different values.',
     params: [
       { name: 'key', type: 'string', required: true },
       { name: 'fallback', type: 'value', required: false },
@@ -2959,13 +2957,13 @@ export const COMMANDS = [
   // after itself and could not show somebody what it had kept.
   {
     id: 'listSettings', category: 'Storage', signature: 'listSettings([opts]) -> list',
-    summary: 'Every key saved in one scope, in no particular order. An empty list means nothing has been written — not that settings are unavailable, which is what ce.storage.info() is for. `opts.scope` as elsewhere; a panel listing hides other scripts\u2019 private keys.',
+    summary: 'List every key saved in one scope, in no particular order. An empty list means nothing has been written; use storageInfo() to check whether storage is available. `opts.scope` as elsewhere; a panel-scope listing omits other scripts\u2019 private keys.',
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }], scopes: 'any',
     snippet: { lua: 'for _, k in ipairs(ce.storage.settings()) do $0 end', javascript: 'for (const k of ce.storage.settings()) { $0 }' },
   },
   {
     id: 'forgetSetting', category: 'Storage', signature: 'forgetSetting(key [, opts]) -> boolean',
-    summary: 'Delete a saved setting. Returns whether there was one to delete, so a script can tell "cleaned up" from "there was nothing there". `opts.scope` as elsewhere.',
+    summary: 'Delete a saved setting. Returns whether a value existed to delete. `opts.scope` as elsewhere.',
     params: [
       { name: 'key', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
@@ -2986,7 +2984,7 @@ export const COMMANDS = [
      value somewhere the caller did not ask for is how a private setting becomes a shared one. */
   {
     id: 'allSettings', category: 'Storage', signature: 'allSettings([opts]) -> table',
-    summary: 'Every setting in one scope, as a table of key to value. The read every other module got — listing keys and looping to fetch each one was the only way before. `opts.scope` is "panel" (default), "script" or "local". A panel-scope listing hides other scripts’ private keys rather than showing an unusable spelling of them.',
+    summary: 'Every setting in one scope, as a table of key to value. `opts.scope` is "panel" (default), "script" or "local". A panel-scope listing omits other scripts’ private keys.',
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
     scopes: 'any',
     snippet: {
@@ -2996,19 +2994,19 @@ export const COMMANDS = [
   },
   {
     id: 'clearSettings', category: 'Storage', signature: 'clearSettings([opts]) -> number',
-    summary: 'Forget everything in one scope, and say how many went. Panel scope leaves other scripts’ private keys alone: "clear my settings" must not mean "clear everybody’s".',
+    summary: 'Delete every setting in one scope; returns how many were deleted. Panel scope leaves other scripts’ private keys untouched.',
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
     scopes: 'any',
   },
   {
     id: 'storageInfo', category: 'Storage', signature: 'storageInfo([opts]) -> table',
-    summary: 'Which store a scope is talking to and what is in it: { scope, backing, available, count, bytes }. The three scopes have genuinely different backing — the panel document, this machine, the DAW project state — and a script that has just failed to persist something deserves to know which one it was talking to. `available` is the honest field: false means writes in this scope will not stick, which is worth saying once rather than discovering per key.',
+    summary: 'Describe a scope\'s store: { scope, backing, available, count, bytes }. `backing` names where values live — the panel document, this machine, or the DAW project state. `available` false means writes in this scope will not persist.',
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
     scopes: 'any',
   },
   {
     id: 'encodeJson', category: 'Storage', signature: 'encodeJson(value [, opts]) -> string',
-    summary: 'A value as JSON text. `opts.indent` pretty-prints with that many spaces. Nothing back for a value with no JSON form — a cycle, a function — rather than a string that is not the value. This is here because the Lua engine opens base, math, string and table and has no json module, while JavaScript and Python each have their own with different names: "use the language’s own" was never available to a cross-runtime script, the same Q10 exception ce.time.now() is.',
+    summary: 'Encode a value as JSON text. `opts.indent` pretty-prints with that many spaces. Returns nothing for a value with no JSON form — a cycle, a function. Identical in every runtime, including Lua, which has no json module of its own.',
     params: [
       { name: 'value', type: 'value', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
@@ -3022,7 +3020,7 @@ export const COMMANDS = [
   },
   {
     id: 'decodeJson', category: 'Storage', signature: 'decodeJson(text) -> value',
-    summary: 'Turn text back into a value. Text that is not valid JSON gives you nothing, which is how you tell a config somebody mistyped from one that is simply empty. Worth knowing: a JSON null comes back as nothing at all, so {"a":1,"b":null} arrives with one key and [1,null,2] with two entries. Not every language can hold a null, and all of them have to agree, so encoding and then decoding is not quite a round trip where nulls are involved.',
+    summary: 'Decode JSON text into a value. Invalid JSON returns nothing. A JSON null also decodes to nothing: {"a":1,"b":null} arrives with one key and [1,null,2] with two entries, so encode-then-decode is not a full round trip where nulls are involved.',
     params: [{ name: 'text', type: 'string', required: true }],
     scopes: 'any',
   },
@@ -3043,7 +3041,7 @@ export const COMMANDS = [
   // so a real failure read exactly like a debug print.
   {
     id: 'logWarn', category: 'Debug', signature: 'logWarn(message [, value])',
-    summary: 'Print at warning level: something is off but the panel carries on. Reads differently from log() in the console, which is the whole point.',
+    summary: 'Print at warning level: something is off but the panel carries on. Rendered distinctly from log() in the console.',
     params: [
       { name: 'message', type: 'string', required: true },
       { name: 'value', type: 'value', required: false },
@@ -3053,7 +3051,7 @@ export const COMMANDS = [
   },
   {
     id: 'logError', category: 'Debug', signature: 'logError(message [, value])',
-    summary: 'Print at error level: something the panel could not do. Reporting it does not stop the handler — this prints, it does not throw. To stop, use your language\'s own error()/throw, which is exactly why the flat name is logError and not error.',
+    summary: 'Print at error level: something the panel could not do. Prints without throwing — the handler continues. To stop the handler, use your language\'s own error()/throw.',
     params: [
       { name: 'message', type: 'string', required: true },
       { name: 'value', type: 'value', required: false },
@@ -3167,7 +3165,7 @@ export const PANEL_COMMANDS = [
   panelVerb('harmonyShape', 'harmonyShape(target, shape)', 'Apply a named chord shape / preset.',
     [T, { name: 'shape', type: 'string', required: true }]),
   panelVerb('harmonyVoicing', 'harmonyVoicing(target, voicing)',
-    `Voicing spread — ${oneOf(HAND_WRITTEN_VALUES['harmony.voicing'])}. There is no fourth.`,
+    `Voicing spread — ${oneOf(HAND_WRITTEN_VALUES['harmony.voicing'])}.`,
     [T, { name: 'voicing', type: 'string', required: true }]),
   panelVerb('harmonyInversion', 'harmonyInversion(target, inversion)', 'Chord inversion.',
     [T, { name: 'inversion', type: 'number', required: true }]),
@@ -3210,21 +3208,21 @@ export const PANEL_COMMANDS = [
      one shape a script is most likely to want is the same across all twenty-eight. */
   panelVerb('splitRead', 'splitRead(target [, field])',
     'Read the Zone Splitter\'s settings — the whole section, or one field by name (`zones`, `preset`). '
-    + 'By model field name rather than by verb name: this family predates the component spec.',
+    + 'Fields are addressed by model field name, not by verb name.',
     [T, { name: 'field', type: 'string', required: false }]),
   panelVerb('phraseRead', 'phraseRead(target [, field])',
     'Read the Phrase Sequencer\'s settings — the whole section, or one field by name.',
     [T, { name: 'field', type: 'string', required: false }]),
   panelVerb('recorderRead', 'recorderRead(target [, field])',
-    'Read the Phrase Recorder\'s state — the whole section, or one field by name. This is how a '
-    + 'script finds out whether it is recording, and what the take actually contains.',
+    'Read the Phrase Recorder\'s state — the whole section, or one field by name. Includes '
+    + 'recording status and the take contents.',
     [T, { name: 'field', type: 'string', required: false }]),
   panelVerb('harmonyRead', 'harmonyRead(target [, field])',
     'Read the Harmoniser\'s settings — the whole section, or one field by name.',
     [T, { name: 'field', type: 'string', required: false }]),
   panelVerb('setlistRead', 'setlistRead(target [, field])',
-    'Read the Setlist — the whole section, or one field by name. `scenes` is the list, and `index` '
-    + 'is where it is, which a script had no way to ask before.',
+    'Read the Setlist — the whole section, or one field by name. `scenes` is the scene list; '
+    + '`index` is the current position.',
     [T, { name: 'field', type: 'string', required: false }]),
 
   // --- Panel values: snapshot / restore ---
@@ -3233,13 +3231,13 @@ export const PANEL_COMMANDS = [
   // footswitch action in a DAW with the window shut — which is exactly where it has to work.
   {
     id: 'panelSnapshot', category: 'Panel components', signature: 'panelSnapshot() -> object',
-    summary: 'Every control\'s current value, as an object keyed by control name. Pair it with saveSetting to keep one, or hold it in `state` for an A/B compare. Controls with no value of their own are left out rather than recorded as nothing.',
+    summary: 'Every control\'s current value, as an object keyed by control name. Controls with no value of their own are omitted. Pair it with saveSetting to persist one, or hold it in `state` for an A/B compare.',
     params: [], scopes: 'any',
     snippet: { lua: 'local before = ce.panel.snapshot()$0', javascript: 'const before = ce.panel.snapshot();$0' },
   },
   {
     id: 'panelEach', category: 'Panel components', signature: 'panelEach(fn) -> number',
-    summary: 'Call `fn(name)` once for every control in the panel, containers included, in document order. Returns how many there were. Cross-runtime, like snapshot and for the same reason: walking the panel does not need a renderer. To ask what a control is rather than what it is called, use ce.panel.info() — which does.',
+    summary: 'Call `fn(name)` once for every control in the panel, containers included, in document order. Returns how many there were. Works in any runtime. To inspect a control rather than list its name, use ce.panel.info() — which is panel view only.',
     params: [{ name: 'fn', type: 'function', required: true }], scopes: 'any',
     snippet: {
       lua: 'ce.panel.each(function(name)\n  $0\nend)',
@@ -3248,7 +3246,7 @@ export const PANEL_COMMANDS = [
   },
   {
     id: 'panelRestore', category: 'Panel components', signature: 'panelRestore(snapshot) -> number',
-    summary: 'Put the values back, and return how many landed. A name the panel no longer has is skipped rather than failing the whole restore — a snapshot taken before an edit is still worth most of what it holds.',
+    summary: 'Write snapshot values back to the panel; returns how many landed. A name the panel no longer has is skipped rather than failing the whole restore.',
     params: [{ name: 'snapshot', type: 'object', required: true }], scopes: 'any',
     snippet: { lua: 'ce.panel.restore(before)$0', javascript: 'ce.panel.restore(before);$0' },
   },
@@ -3280,7 +3278,7 @@ export const HELPERS = [
   { id: 'round', category: 'Value / range', signature: 'round(v)', summary: 'Nearest whole number.' },
   { id: 'snap', category: 'Value / range', signature: 'snap(v, step)', summary: 'Snap to the nearest step.' },
   { id: 'curve', category: 'Value / range', signature: 'curve(v, shape)',
-    summary: 'Apply a named response curve: "linear", "exp", "log" or "s". A name it does not know is reported and treated as linear, rather than silently doing nothing. For a shape this list does not have, use map().' },
+    summary: 'Apply a named response curve: "linear", "exp", "log" or "s". An unknown name is reported and treated as linear. For other shapes use map().' },
   { id: 'lerp', category: 'Value / range', signature: 'lerp(a, b, t)', summary: 'Blend between a and b by t (0–1).' },
   // wrap, and why it is not `%`. The five runtimes DISAGREE about the sign of a modulo: (-1) % 12
   // is 11 in Lua and Python and -1 in JavaScript, C++, C# and Java. So the ordinary way to write a
@@ -3288,20 +3286,20 @@ export const HELPERS = [
   // engine the panel is running in, and nothing said so. This is the one arithmetic a synth panel
   // does constantly, which is why it belongs to the module rather than to each panel.
   { id: 'wrap', category: 'Value / range', signature: 'wrap(v, lo, hi)',
-    summary: 'Bring a value round into a range, half-open: wrap(12, 0, 12) is 0, and wrap(-1, 0, 12) is 11. Use it for pitch classes, LFO phase and step indices instead of the language\'s %, whose sign differs between the runtimes — the same expression gives 11 in Lua and -1 in JavaScript.' },
+    summary: 'Wrap a value into a half-open range: wrap(12, 0, 12) is 0, wrap(-1, 0, 12) is 11. Use for pitch classes, LFO phase and step indices instead of the language\'s %, whose sign on negatives differs between runtimes — the same expression gives 11 in Lua and -1 in JavaScript.' },
   // map, and why `curve` was not enough. curve() is a CLOSED set of four names, so a taper it does
   // not have could not be expressed at all — and a properties panel cannot hold an arbitrary curve
   // either, since a property stores a constant. Breakpoints are the smallest thing that can.
   { id: 'mapCurve', category: 'Value / range', signature: 'mapCurve(v, points)',
-    summary: 'A response curve of your own: straight lines through breakpoints, given as {{x, y}, …} — map(v, {{0,0},{0.5,0.9},{1,1}}) is a knob that opens fast and finishes slowly. Points are sorted by x, so the order you write them in does not matter; outside the outermost points the value is held rather than extrapolated. Two points with the same x is a step, and the later one wins.' },
+    summary: 'Piecewise-linear curve through breakpoints given as {{x, y}, …}: map(v, {{0,0},{0.5,0.9},{1,1}}). Points are sorted by x; outside the outermost points the value is held, not extrapolated. Two points with the same x form a step, and the later one wins.' },
   { id: 'quantizeTo', category: 'Value / range', signature: 'quantizeTo(v, values)',
-    summary: 'Snap to the nearest value in a list, rather than to a regular step: quantizeTo(9, {0, 8, 16}) is 8. snap() covers evenly spaced settings; this covers the ones a synth actually has. A tie goes to the lower value, so the result never depends on rounding.' },
+    summary: 'Snap to the nearest value in a list: quantizeTo(9, {0, 8, 16}) is 8. A tie goes to the lower value. For evenly spaced steps use snap().' },
   { id: 'randomChoice', category: 'Value / range', signature: 'randomChoice(values [, weights])',
-    summary: 'Pick one of a list, using the seeded generator — so a "random" patch replays. With `weights`, the chance of each is its weight over the total; a missing or negative weight counts as zero, and all-zero weights fall back to an even pick. Exactly one number is drawn from the generator either way, so adding weights does not change what everything after it picks.' },
+    summary: 'Pick one entry from a list, using the seeded generator. With `weights`, each entry\'s chance is its weight over the total; a missing or negative weight counts as zero, and all-zero weights fall back to an even pick. Exactly one number is drawn either way, so adding weights does not shift later draws.' },
   { id: 'dbToGain', category: 'Value / range', signature: 'dbToGain(db)',
-    summary: 'Decibels to a linear gain: 0 dB is 1, -6 dB is about 0.5. Neither Lua nor JavaScript has it, and a level control that reads in dB and sends a linear value needs it on every move.' },
+    summary: 'Convert decibels to linear gain: 0 dB is 1, -6 dB is about 0.5.' },
   { id: 'gainToDb', category: 'Value / range', signature: 'gainToDb(gain)',
-    summary: 'The inverse. A gain of zero or less returns -144 dB — the 24-bit noise floor — rather than negative infinity, which is a number half the runtimes cannot carry through a value and none can display.' },
+    summary: 'Convert linear gain to decibels. A gain of zero or less returns -144 dB (the 24-bit noise floor) rather than negative infinity.' },
 
   // --- the rest of the arithmetic a synth panel actually does (design doc §32) ---
   // Nothing here duplicates the language's own scalar maths — min/max/abs/floor/ceil/sin all exist
@@ -3309,52 +3307,52 @@ export const HELPERS = [
   // domain-specific, list-shaped (Lua's varargs make the language version unusable over a table),
   // or has to be identical in five runtimes to be worth anything.
   { id: 'norm', category: 'Value / range', signature: 'norm(v, lo, hi)',
-    summary: 'A value to its 0–1 position in a range, clamped. scale(v, lo, hi, 0, 1) is the hand-rolled version and it does not clamp, so a value past the end came out past 1 and stayed wrong all the way down the chain. The value model already has a .normalizedValue face; this is that conversion for numbers a script is holding itself.' },
+    summary: 'Convert a value to its 0–1 position in a range, clamped at both ends.' },
   { id: 'denorm', category: 'Value / range', signature: 'denorm(t, lo, hi)',
-    summary: 'The inverse: a 0–1 position back into a range, clamped at both ends.' },
+    summary: 'Convert a 0–1 position back into a range, clamped at both ends.' },
   { id: 'bipolar', category: 'Value / range', signature: 'bipolar(t)',
-    summary: '0–1 to -1..+1. The two shapes a modulation source is ever in, and the conversion sits in the middle of every modulation script.' },
+    summary: 'Convert 0–1 to -1..+1.' },
   { id: 'unipolar', category: 'Value / range', signature: 'unipolar(v)',
-    summary: '-1..+1 back to 0–1.' },
+    summary: 'Convert -1..+1 to 0–1.' },
   { id: 'fold', category: 'Value / range', signature: 'fold(v, lo, hi)',
-    summary: 'Come back off the end of a range instead of round it. wrap() jumps from the top to the bottom, which is right for a pitch class and wrong for a modulation depth — a fold reflects, so the movement stays continuous. Wave folding is the audible version of the same idea, and neither is expressible with the language\'s %.' },
+    summary: 'Reflect a value off the ends of a range: where wrap() jumps from top to bottom, fold keeps the movement continuous. Right for modulation depths where wrap() suits pitch classes.' },
   { id: 'indexOfRange', category: 'Value / range', signature: 'indexOfRange(t, count)',
-    summary: 'A 0–1 position to one of `count` slots, zero-based — which preset, which step, which pad. The hand-rolled floor(t * count) returns `count` itself at exactly 1.0, one past the end of the list it is addressing, and that off-by-one only appears when a knob is turned fully up.' },
+    summary: 'Convert a 0–1 position to a zero-based index over `count` slots. At exactly 1.0 it returns count - 1, not `count`.' },
   { id: 'crossfade', category: 'Value / range', signature: 'crossfade(a, b, t [, law])',
-    summary: 'Blend a to b with a fade law: "linear", "equalPower" or "sharp" — the same three the Crossfader component has, which a script could not compute. equalPower is the one that matters: a linear fade between two sounds dips in the middle, audibly, which is why the component defaults away from it.' },
+    summary: 'Blend a to b with a fade law: "linear", "equalPower" or "sharp" — the same three as the Crossfader component. A linear fade between two sounds dips audibly in the middle; equalPower does not.' },
   { id: 'approach', category: 'Value / range', signature: 'approach(current, target, maxStep)',
-    summary: 'Move toward a target, no further than maxStep in one call. A rate limit with no state of its own, so it works from any handler without the script keeping a timer — ce.anim owns motion the runtime drives, this is the one a script drives itself, per incoming message. How you smooth a jumpy expression pedal.' },
+    summary: 'Move current toward target, no further than maxStep in one call. Stateless — works from any handler without the script keeping a timer.' },
   { id: 'roundTo', category: 'Value / range', signature: 'roundTo(v, decimals)',
-    summary: 'Round to a number of decimal places, for a readout. JavaScript\'s toFixed returns a string and Lua has no equivalent at all, so every panel showing a tidy number wrote this itself.' },
+    summary: 'Round to a number of decimal places. Returns a number, not a string.' },
   { id: 'almost', category: 'Value / range', signature: 'almost(a, b [, epsilon])',
-    summary: 'Float comparison that means what == is assumed to mean. A panel compares values constantly — has this reached its target, is this at the detent — and every one of those values arrived through a scale() or a curve().' },
+    summary: 'Float equality within `epsilon`. Use instead of == on values that have passed through scale() or curve().' },
   { id: 'minOf', category: 'Value / range', signature: 'minOf(values)',
-    summary: 'The smallest in a list, or nil for an empty one. Lua\'s math.min takes varargs, so over a table it needs table.unpack and falls over on a long one; JavaScript needs a spread with the same limit. A panel deals in lists constantly — macro slots, matrix rows, envelope points, the values out of a dump.' },
+    summary: 'The smallest in a list, or nil for an empty one.' },
   { id: 'maxOf', category: 'Value / range', signature: 'maxOf(values)', summary: 'The largest in a list, or nil for an empty one.' },
-  { id: 'sumOf', category: 'Value / range', signature: 'sumOf(values)', summary: 'The total of a list. Zero for an empty one — a sum of nothing is nothing, not an absence.' },
-  { id: 'meanOf', category: 'Value / range', signature: 'meanOf(values)', summary: 'The average of a list, or nil for an empty one — unlike a sum, an average of nothing does not exist.' },
+  { id: 'sumOf', category: 'Value / range', signature: 'sumOf(values)', summary: 'The total of a list; 0 for an empty one.' },
+  { id: 'meanOf', category: 'Value / range', signature: 'meanOf(values)', summary: 'The average of a list, or nil for an empty one.' },
   // `a, b` said nothing about these being LISTS, and with no return annotation the signature read
   // like lerp's. Passing two numbers returns an empty list, which is correct and baffling.
   { id: 'blend', category: 'Value / range', signature: 'blend(fromList, toList, t) -> list',
-    summary: 'Morph one list of values into another, element by element — which is what a snapshot morph is, and a script could only do it one value at a time. Both arguments are lists: for two single numbers you want lerp. The shorter list decides the length: padding with zeros would drag the missing entries to nothing, and on a patch that is a set of parameters slammed to their minimum.' },
+    summary: 'Interpolate one list of values into another, element by element. Both arguments are lists — for two single numbers use lerp. The shorter list decides the result length; missing entries are dropped, not padded with zeros.' },
   { id: 'randomFloat', category: 'Value / range', signature: 'randomFloat(lo, hi)',
-    summary: 'A seeded random float in a range. random(lo, hi) returns whole numbers — the form a note or a step wants — so until now there was no seeded way to get a fractional one without doing the arithmetic by hand.' },
+    summary: 'A seeded random float in a range. random(lo, hi) returns whole numbers; this returns fractional ones.' },
   { id: 'randomGaussian', category: 'Value / range', signature: 'randomGaussian([mean, sd])',
-    summary: 'A bell rather than a slab: most values near the middle. Humanising velocity or timing with a uniform random is the thing that sounds mechanical. Box-Muller, always consuming exactly two draws — it deliberately does not cache the second value the way the textbook version does, because a varying draw count would break seed replay.' },
+    summary: 'A seeded normally distributed random value, most results near `mean`. Always consumes exactly two draws from the generator, so seed replay stays stable.' },
   { id: 'randomWalk', category: 'Value / range', signature: 'randomWalk(current, step, lo, hi)',
-    summary: 'Drift rather than jump — a generative line that stays musical. Folded at the ends rather than clamped, because a walk that clamps sticks to the end it hit and stops moving.' },
+    summary: 'One step of a seeded random walk: drift from `current` by up to `step`. Folded at lo and hi rather than clamped, so the walk does not stick at the ends.' },
   { id: 'randomBool', category: 'Value / range', signature: 'randomBool([chance])',
-    summary: 'A weighted coin — the probability gate every step sequencer wants. `chance` is the odds of true, 0.5 by default.' },
+    summary: 'A seeded weighted coin. `chance` is the probability of true, 0.5 by default.' },
   { id: 'shuffle', category: 'Value / range', signature: 'shuffle(values)',
-    summary: 'A new list in seeded random order (Fisher-Yates, exactly one draw per element after the first). The same seed shuffles the same way, which is what makes a shuffled pattern something you can get back.' },
+    summary: 'A new list in seeded random order (Fisher-Yates, exactly one draw per element after the first). The same seed shuffles the same way.' },
   { id: 'toDegrees', category: 'Value / range', signature: 'toDegrees(radians)', summary: 'Radians to degrees — the unit ce.draw\'s arcs are in.' },
   { id: 'toRadians', category: 'Value / range', signature: 'toRadians(degrees)', summary: 'Degrees to radians — the unit the language\'s trigonometry is in.' },
   { id: 'distance', category: 'Value / range', signature: 'distance(x1, y1, x2, y2)',
     summary: 'The distance between two points. For XY pads, joysticks, the Orbit and hit testing in ce.draw.' },
   { id: 'angleOf', category: 'Value / range', signature: 'angleOf(x1, y1, x2, y2)',
-    summary: 'The angle from one point to another in ce.draw\'s own convention: degrees, 0 at twelve o\'clock, increasing clockwise, 0–360. Rebuilding that from atan2 by hand is where a knob pointer ends up running backwards or a quadrant out.' },
+    summary: 'The angle from one point to another in ce.draw\'s convention: degrees, 0 at twelve o\'clock, increasing clockwise, 0–360.' },
   { id: 'polar', category: 'Value / range', signature: 'polar(angle, radius)',
-    summary: 'The inverse: an angle and a radius to { x, y } offsets from a centre, in the same convention. Together with angleOf, what a knob ring, a radial meter or a pan indicator is drawn from.' },
+    summary: 'Convert an angle and radius to { x, y } offsets from a centre, in the same convention as angleOf.' },
 
   // --- the transforms the Properties panel itself applies (design doc §33) ---
   // The panel does not only store constants; it CONFIGURES value transforms — a Macro slot's
@@ -3364,41 +3362,41 @@ export const HELPERS = [
   // anything it worked out alongside a bound control came out subtly different. These are the
   // app's own functions, matched exactly.
   { id: 'shapeCurve', category: 'Value / range', signature: 'shapeCurve(v, curve [, tension])',
-    summary: 'Bend a value the way the panel itself bends one — the curve an Envelope segment or a Router breakpoint uses. This is not the same as curve(), which is a simpler and older set of shapes, so a curve name read straight out of a control belongs here rather than there. Both spellings of the s-curve are accepted. `tension` defaults to 1.6 rather than 0, matching the app: leaving it unset does not give you a straight line. With `tension` set to 1 this is also the curve a Macro slot uses, so shape(v, curve, 1) reproduces the third of the app\'s three curve families — the one nothing else names.' },
+    summary: 'Bend a value with the panel\'s own curve family — the one Envelope segments and Router breakpoints use, distinct from curve(). Both spellings of the s-curve are accepted. `tension` defaults to 1.6, matching the app — unset does not mean linear. With `tension` set to 1 this is also the curve a Macro slot uses, so shape(v, curve, 1) reproduces it.' },
   { id: 'deadzone', category: 'Value / range', signature: 'deadzone(v, amount [, invert])',
-    summary: 'The Expression Router\'s input shaping: below the threshold the value is zero, and the remaining range rescales to fill 0–1 so response starts right at the edge of the dead zone. The rescale is the part a hand-rolled version leaves out, and leaving it out loses the top of the range.' },
+    summary: 'The Expression Router\'s input shaping: below the threshold the value is zero, and the remaining range rescales to fill 0–1 so response starts at the edge of the dead zone.' },
   { id: 'weightsFor', category: 'Value / range', signature: 'weightsFor(points, x, y [, power])',
-    summary: 'The inverse-distance blend weights a Timbre Space and a Preset Constellation use, normalised so they sum to 1. `power` is the blend sharpness — higher means the nearest anchor dominates sooner. Pair with blendBy() to morph a set of values the way the pad does.' },
+    summary: 'The inverse-distance blend weights a Timbre Space and a Preset Constellation use, normalised to sum to 1. `power` is the blend sharpness — higher makes the nearest anchor dominate sooner. Pair with blendBy() to morph values.' },
   { id: 'blendBy', category: 'Value / range', signature: 'blendBy(values, weights)',
-    summary: 'A weighted average — what weightsFor() is for, and what a morph pad is. blend() interpolates two lists; this collapses many values by weight.' },
+    summary: 'A weighted average: collapse `values` by `weights`, as a morph pad does. blend() interpolates two lists; this blends many values into one.' },
   { id: 'tickStops', category: 'Value / range', signature: 'tickStops(major [, minor])',
-    summary: 'The 0–1 stop positions a slider\'s scale is drawn from, as { major, minor }. Use these when you are drawing your own scale, so your minor ticks line up with the ones the app draws beside them rather than being visibly out of step.' },
+    summary: 'The 0–1 stop positions a slider\'s scale is drawn from, as { major, minor }. Use when drawing your own scale so its ticks line up with the app\'s.' },
   { id: 'dbPosition', category: 'Value / range', signature: 'dbPosition(fraction [, floorDb, ceilDb])',
-    summary: 'Where a level sits on a dB meter, 0–1. gainToDb answers "how many dB is this"; this answers "how far up the meter does it go", which is the question a script drawing a meter is asking. Defaults match the Meter component: floor -60, ceiling +6.' },
+    summary: 'The 0–1 position of a level on a dB meter. Defaults match the Meter component: floor -60, ceiling +6.' },
 
   // --- taming what arrives on the wire (design doc §34) ---
   // A controller does not send tidy numbers. It sends a value that jitters, crosses a threshold
   // repeatedly, spikes once, and has already been through a taper. These four are what a script
   // needs to make that usable, and none of them composes out of what was already here.
   { id: 'smooth', category: 'Value / range', signature: 'smooth(current, target, coefficient [, epsilon])',
-    summary: 'Smooth out a jumpy value — a twitchy expression pedal, a noisy CC. It moves quickly at first and then eases in, which is the response you want for that. Different from approach(), which moves a fixed amount each time and is really a speed limit. The important part is that it arrives: smoothing like this gets closer and closer forever, so a value smoothed by hand ends up sitting at 0.9999 and transmitting for ever. This one snaps to the target once it is close enough.' },
+    summary: 'Exponential smoothing toward a target — fast at first, easing as it closes. Snaps to the target once within `epsilon`, so the value arrives rather than approaching forever. approach() is the fixed-step alternative.' },
   { id: 'hysteresis', category: 'Value / range', signature: 'hysteresis(value, on, low, high)',
-    summary: 'A Schmitt trigger: turns on at `high`, off at `low`, and holds in between. `on` is the state it is in now, and the return is the state it should be. A plain threshold chatters — a CC hovering on the line flips a switch dozens of times a second, which on a bound control is dozens of MIDI messages a second. Two thresholds plus the current state is the fix, and nothing else in the module composes to it.' },
+    summary: 'A Schmitt trigger: turns on at `high`, off at `low`, and holds in between. `on` is the current state; the return is the new one. Two thresholds keep a value hovering on a line from flipping the state repeatedly.' },
   { id: 'median', category: 'Value / range', signature: 'median(values)',
-    summary: 'The middle value of a list, or the mean of the two middle ones; nil for an empty list. Distinct from mean() and the reason is the point: a mean smears a spike across the result, a median rejects it. On a noisy controller reading that is the difference between a glitch you can hear and one you cannot.' },
+    summary: 'The middle value of a list, or the mean of the two middle ones; nil for an empty list. Unlike a mean, a median rejects a single spike.' },
   { id: 'euclid', category: 'Value / range', signature: 'euclid(steps, pulses [, rotation])',
-    summary: 'A Euclidean rhythm: `pulses` hits spread as evenly as they will go across `steps`, handed back as a list of yes/no. This is the same working-out the Arpeggiator uses for its rest pattern, so a sequencer or gate you write yourself lands on the same rhythm rather than an approximation of it. `rotation` turns the whole pattern round without changing the spacing between hits.' },
+    summary: 'A Euclidean rhythm: `pulses` hits spread as evenly as possible across `steps`, returned as a list of yes/no — the same algorithm as the Arpeggiator\'s rest pattern. `rotation` rotates the pattern without changing the spacing between hits.' },
   { id: 'unshape', category: 'Value / range', signature: 'unshape(y, curve [, tension])',
-    summary: 'The inverse of shape(). Going device → panel through a taper needs it: a value shaped on the way out has to be un-shaped on the way back, or the control lands somewhere other than where it started. Only map() is invertible by hand — swap x and y — while a named curve is not. `hold` is a step, so many inputs give the same output and there is no true inverse; it returns the earliest input that produces the output, which is the only answer that is a function.' },
+    summary: 'The inverse of shape(): un-taper a value shaped on the way out. `hold` is a step with no true inverse; it returns the earliest input that produces the output.' },
   // Seeded, and seeded is the point: the language's own math.random cannot promise the same
   // sequence in five runtimes, so a randomised patch could not be reproduced and a generative
   // sequence would sound different in the editor and in the exported plugin.
   { id: 'random', category: 'Value / range', signature: 'random([lo, hi])',
-    summary: 'A random number. With no arguments, a float in [0, 1). With two, a whole number from lo to hi inclusive — the form a script actually wants for a note or a step. Seeded, so the same seed replays the same sequence in every runtime.' },
+    summary: 'A seeded random number. With no arguments, a float in [0, 1). With two, a whole number from lo to hi inclusive. The same seed replays the same sequence in every runtime.' },
   { id: 'randomSeed', category: 'Value / range', signature: 'randomSeed(n)',
-    summary: 'Set the seed of the generator this script is drawing from. The same seed replays the same sequence — which is what makes a "random" patch something you can get back. Reseeding with 0 is treated as the default seed rather than as a dead generator. Seeds one generator: every script has its own, and inside a script every named stream has its own, so this cannot reach into somebody else\'s sequence.' },
+    summary: 'Set the seed of this script\'s generator; the same seed replays the same sequence. Reseeding with 0 uses the default seed. Every script has its own generator, and every named stream its own, so this never reaches another script\'s sequence.' },
   { id: 'randomStream', category: 'Value / range', signature: 'randomStream(name, fn)',
-    summary: 'Give a run of random draws their own private sequence, so two generative parts of one script do not tread on each other — shuffling in one leaves what the other gets alone, and so does seeding it. Normal behaviour returns when the block ends, even if something goes wrong inside it. Each script\'s streams are its own, so two scripts using the same name still do not share one.' },
+    summary: 'Run `fn` with random draws taken from a private named sequence, so two generative parts of one script do not affect each other\'s draws or seeds. The normal generator returns when the block ends, even on error. Streams are per script — two scripts using the same name do not share one.' },
   // music
   // Middle C is C4 — scientific pitch notation, which is what every runtime has always computed.
   // These summaries said "C3" (the Yamaha convention) from the start, so the docs and the code
@@ -3406,7 +3404,7 @@ export const HELPERS = [
   // semitones. The code is right and stays; the wording is what was wrong.
   {
     id: 'noteName', category: 'Music', signature: 'noteName(n [, flats])',
-    summary: 'MIDI note number → name, e.g. 60 → "C4" (middle C). With `flats` omitted you get this module\'s plain-ASCII spelling ("C#4") — what noteNumber has always round-tripped. Pass `flats` and you get the panel\'s spelling instead, from the same table the Chord Pad, Harmoniser and Arpeggiator print from: true → "E♭4", false → "C♯4". `ce.music.spelling` answers which one a key wants.',
+    summary: 'MIDI note number → name: 60 → "C4" (middle C). With `flats` omitted, the plain-ASCII spelling ("C#4"), which noteNumber round-trips. With `flats` given, the panel\'s spelling: true → "E♭4", false → "C♯4". `ce.music.spelling` answers which a key wants.',
     params: [
       { name: 'n', type: 'number', required: true },
       { name: 'flats', type: 'boolean', required: false },
@@ -3414,7 +3412,7 @@ export const HELPERS = [
   },
   {
     id: 'noteNumber', category: 'Music', signature: 'noteNumber(name) -> number',
-    summary: 'Note name → MIDI number, e.g. "C4" → 60. Middle C is C4. Reads all four spellings — "C#4", "C♯4", "Db4", "D♭4" — so a name the panel printed can be read back. A name it cannot read returns nothing: 0 is a real note (C-1), so returning it for a misspelling meant a typo played a wrong note in silence.',
+    summary: 'Note name → MIDI number: "C4" → 60 (middle C is C4). Reads all four spellings — "C#4", "C♯4", "Db4", "D♭4". A name it cannot read returns nothing, not 0 — 0 is a real note (C-1).',
     params: [{ name: 'name', type: 'string', required: true }],
   },
   // Scales, chords and quantise-to-scale — what §2 defined ce.music as, finished. The interval
@@ -3423,7 +3421,7 @@ export const HELPERS = [
   // every prelude. `root` and `note` accept a MIDI number or a name ("C4"), like sendNote does.
   {
     id: 'scaleNotes', category: 'Music', signature: 'scaleNotes(root [, scale]) -> list',
-    summary: 'The notes of one octave of a scale, ascending from `root`. Seven notes for the modes, five for the pentatonics, six for blues — the root is not repeated at the top. `scale` defaults to "major"; an unknown name returns nothing rather than guessing.',
+    summary: 'One octave of a scale, ascending from `root` — seven notes for the modes, five for the pentatonics, six for blues; the root is not repeated at the top. `scale` defaults to "major"; an unknown name returns nothing.',
     params: [
       { name: 'root', type: 'value', required: true },
       { name: 'scale', type: 'string', required: false },
@@ -3439,7 +3437,7 @@ export const HELPERS = [
   },
   {
     id: 'quantizeNote', category: 'Music', signature: 'quantizeNote(note, root [, scale]) -> number',
-    summary: 'Snap a note to the nearest one in a scale, searching both directions. A tie goes up, always, so two runtimes cannot disagree about a note exactly between two scale tones. `scale` defaults to "major"; an unknown name returns nothing.',
+    summary: 'Snap a note to the nearest one in a scale, searching both directions; a tie goes up. `scale` defaults to "major"; an unknown name returns nothing.',
     params: [
       { name: 'note', type: 'value', required: true },
       { name: 'root', type: 'value', required: true },
@@ -3453,7 +3451,7 @@ export const HELPERS = [
   // Chord Pad labelling the same chord have to agree, or the panel contradicts itself on screen.
   {
     id: 'noteSpelling', category: 'Music', signature: 'noteSpelling(root [, scale]) -> boolean',
-    summary: 'Does this key write its accidentals as flats? F, B♭, E♭, A♭, D♭ and G♭ do — judged by the relative major, so C minor spells E♭/A♭ rather than D♯/G♯, exactly as the Chord Pad does. Pass the answer to noteName and a script\'s labels match the panel\'s without having to decide anything. An unknown scale returns nothing.',
+    summary: 'Whether a key writes its accidentals as flats — F, B♭, E♭, A♭, D♭ and G♭ do. Judged by the relative major, so C minor spells E♭/A♭ rather than D♯/G♯. Pass the result to noteName to match the panel\'s labels. An unknown scale returns nothing.',
     params: [
       { name: 'root', type: 'value', required: true },
       { name: 'scale', type: 'string', required: false },
@@ -3461,7 +3459,7 @@ export const HELPERS = [
   },
   {
     id: 'inScale', category: 'Music', signature: 'inScale(note, root [, scale]) -> boolean',
-    summary: 'Is this note in the key? Octave-blind, like every key question — C2 and C5 are both the tonic of C. `scale` defaults to "major"; an unknown name returns nothing.',
+    summary: 'Whether a note is in the key, octave-blind — C2 and C5 are both the tonic of C. `scale` defaults to "major"; an unknown name returns nothing.',
     params: [
       { name: 'note', type: 'value', required: true },
       { name: 'root', type: 'value', required: true },
@@ -3470,7 +3468,7 @@ export const HELPERS = [
   },
   {
     id: 'scaleDegree', category: 'Music', signature: 'scaleDegree(note, root [, scale]) -> number',
-    summary: 'Which degree of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key has no degree and returns nothing rather than the nearest one — rounding here is what turns a wrong note into a plausible chord, and quantizeNote is the verb that rounds on purpose.',
+    summary: 'The degree of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key returns nothing rather than the nearest degree; use quantizeNote to round to the key on purpose.',
     params: [
       { name: 'note', type: 'value', required: true },
       { name: 'root', type: 'value', required: true },
@@ -3479,7 +3477,7 @@ export const HELPERS = [
   },
   {
     id: 'degreeChord', category: 'Music', signature: 'degreeChord(root, scale, degree [, size]) -> table',
-    summary: 'Which chord a key builds on a given degree — the same working-out the Chord Pad does. Degrees start at 1, so degreeChord(60, "major", 5) is the chord on the fifth. `size` is how many notes: 3 for a triad, 4 for a seventh. You get back the notes, the chord spelled the way the key spells it ("E♭m7") and its roman numeral. Use this when you want the chord a key implies; use chordNotes when you already know which chord you want.',
+    summary: 'The chord a key builds on a degree. Degrees start at 1, so degreeChord(60, "major", 5) is the chord on the fifth; `size` is the note count — 3 for a triad, 4 for a seventh. Returns the notes, the chord name spelled as the key spells it ("E♭m7") and its roman numeral. For a chord you already know, use chordNotes.',
     params: [
       { name: 'root', type: 'value', required: true },
       { name: 'scale', type: 'string', required: true },
@@ -3489,12 +3487,12 @@ export const HELPERS = [
   },
   {
     id: 'chordQuality', category: 'Music', signature: 'chordQuality(notes) -> string',
-    summary: 'Name a chord from the notes in it: [60, 63, 70] → "min7". Reads intervals above the lowest note, so it takes a chord from chordNotes, from degreeChord, or one a script built by hand — the inverse of chordNotes. The vocabulary is the panel\'s (maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7, m7b5), so a chord this names and a chord the Chord Pad labels agree.',
+    summary: 'Name a chord from its notes: [60, 63, 70] → "min7". Reads intervals above the lowest note — the inverse of chordNotes. Vocabulary: maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7, m7b5 — the same names the Chord Pad uses.',
     params: [{ name: 'notes', type: 'list', required: true }],
   },
   {
     id: 'voiceLead', category: 'Music', signature: 'voiceLead(notes, previous [, mode]) -> list',
-    summary: 'Rearrange a chord so it moves as little as possible from the one before it — the Harmoniser\'s voice leading, available to any script that sends chords. "closest" keeps every note as close as it can; "smooth" holds the top note still, which keeps a melody in place while the notes underneath move; "off" gives you root position. With no previous chord there is nothing to move away from, so the first chord of a phrase comes back untouched.',
+    summary: 'Rearrange a chord to move as little as possible from the one before it — the Harmoniser\'s voice leading. "closest" keeps every note as close as it can; "smooth" holds the top note still; "off" gives root position. With no previous chord, the notes come back untouched.',
     params: [
       { name: 'notes', type: 'list', required: true },
       { name: 'previous', type: 'list', required: true },
@@ -3503,7 +3501,7 @@ export const HELPERS = [
   },
   {
     id: 'expandOctaves', category: 'Music', signature: 'expandOctaves(notes [, octaves]) -> list',
-    summary: 'The same note set repeated up over `octaves` octaves (1..4), ascending — the Arpeggiator\'s own expansion, the step before arpOrder. Anything that would land above 127 is dropped rather than clamped: clamping stacks strays on one pitch, which sounds like a stuck key rather than like nothing.',
+    summary: 'Repeat a note set upward over `octaves` octaves (1..4), ascending — the Arpeggiator\'s own expansion, the step before arpOrder. Notes that would land above 127 are dropped, not clamped.',
     params: [
       { name: 'notes', type: 'list', required: true },
       { name: 'octaves', type: 'number', required: false },
@@ -3511,7 +3509,7 @@ export const HELPERS = [
   },
   {
     id: 'arpOrder', category: 'Music', signature: 'arpOrder(notes, pattern) -> list',
-    summary: 'The order an arpeggiator pattern plays notes in, as a list of steps — each step being a list of notes, so "chord" (everything at once) comes back the same shape as the rest. The patterns are up, down, updown, downup, asPlayed, random and chord. Notes are used in the order you give them, which is what makes "asPlayed" meaningful; sort them first if you want a rising run. "updown" and "downup" do not play the turning points twice. "random" hands the notes back in the order given, exactly as the panel\'s arpeggiator does, because it picks its step as it plays; for a shuffled order use ce.math.shuffle.',
+    summary: 'The step order an arpeggiator pattern plays, as a list of steps — each step a list of notes, so "chord" comes back the same shape as the rest. Patterns: up, down, updown, downup, asPlayed, random, chord. Notes are used in the order given — sort them first for a rising run. "updown" and "downup" do not play the turning points twice. "random" returns the notes in the order given, as the panel\'s arpeggiator does — it picks its step as it plays; use ce.math.shuffle for a shuffled order.',
     params: [
       { name: 'notes', type: 'list', required: true },
       { name: 'pattern', type: 'string', required: true },
@@ -3580,20 +3578,19 @@ export const MODULE_GROUPS = [
     blurb: 'Always available, in every script.',
     modules: ['ce.core'] },
   { id: 'sound', label: 'Notes, MIDI and time',
-    blurb: 'Talking to the instrument, and doing it in time with the music.',
+    blurb: 'MIDI in and out, the connected device, music theory, and musical time.',
     modules: ['ce.midi', 'ce.device', 'ce.music', 'ce.time'] },
   { id: 'numbers', label: 'Working out values',
-    blurb: 'Arithmetic on values and ranges, and moving a value over time instead of jumping it.',
+    blurb: 'Value and range arithmetic, and moving a value over time.',
     modules: ['ce.math', 'ce.anim'] },
   { id: 'panel', label: 'The panel itself',
-    blurb: 'Building and arranging controls, and remembering things between sessions.',
+    blurb: 'Creating and arranging controls, and saving things that outlive the session.',
     modules: ['ce.panel', 'ce.storage'] },
   { id: 'appearance', label: 'How it looks',
-    blurb: 'Drawing, images, type, and talking to whoever is using the panel.',
+    blurb: 'Drawing, images, typography, and dialogs with the user.',
     modules: ['ce.draw', 'ce.image', 'ce.text', 'ce.ui'] },
   { id: 'components', label: 'Components',
-    blurb: 'One module per interactive component. Each takes the control\'s name first, and every '
-      + 'verb reports whether the component now holds what you asked for.',
+    blurb: 'One module per component. Every command names the control first, and tells you whether the setting took.',
     componentGroups: true },
 ];
 
@@ -3620,7 +3617,7 @@ export const COMPONENT_GROUPS = [
 
 export const MODULES = [
   { id: 'ce.core', version: '1.1', requires: [], runtime: RUNTIME_ANY, global: true,
-    summary: 'Values, flow and logging — the verbs every script uses. Never namespaced.' },
+    summary: 'Values, flow and logging — the commands every script uses. Never namespaced.' },
   // requires ce.music because sendNote/sendAftertouch accept a note NAME, and resolving it is
   // noteNumber() — a ce.music member. Gating ce.music away would leave sendNote(1, "C4", …)
   // reading a stub and sending note 0. panelApiParity.test.js walks the preludes and fails on any
@@ -3639,42 +3636,42 @@ export const MODULES = [
   // which is precisely the hanging this closed. The prelude-dependency test caught it the moment
   // the call appeared, which is the drift that rule exists to stop.
   { id: 'ce.device', version: '1.3', requires: ['ce.core', 'ce.time'], runtime: RUNTIME_ANY,
-    summary: 'The connected synth: what it is, what parameters it has, reading and setting one, and bulk dumps — plus declaring a parameter, a dump layout or a binding for a synth the app has no profile for, and enumerating the ports that are really there. Needs the device host.' },
+    summary: 'The connected synth: identity, parameters, reading and setting them, and bulk dumps — plus declaring parameters, dump layouts and bindings for a synth the app has no profile for, and enumerating available ports. Needs the device host.' },
   // requires ce.core because curve() now REPORTS a shape it does not know instead of silently
   // returning the input, and reporting is log(). ce.core is global and never gated, so the
   // dependency costs nothing at runtime — but it is a real call and the prelude-dependency test
   // is right to want it declared.
   { id: 'ce.math', version: '1.8', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels, colour — plus a seeded random you can pick from. Pure: no host involved.' },
+    summary: 'Value and range arithmetic: wrapping, curves, list snapping, decibels, colour, and seeded random. Pure — no host involved.' },
   { id: 'ce.music', version: '1.2', requires: [], runtime: RUNTIME_ANY,
-    summary: 'Note names and numbers, scales, chords, and snapping a note to a key — plus what a key implies: which degree a note is, the chord built on a degree and its numeral, how a key spells its accidentals, and the Harmoniser\'s and Arpeggiator\'s own voicing and walk.' },
+    summary: 'Note names and numbers, scales, chords, snapping a note to a key, key spelling, scale degrees and degree chords, chord naming, voice leading, and arpeggio expansion and ordering.' },
   { id: 'ce.time', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain, one-shot or beat-synced — plus the transport\'s own grid: note divisions, bar/beat at any position, the steps between two readings, swing, cycles, loop folding and tempo from taps or clock pulses. And a monotonic clock, because there was none.' },
+    summary: 'Musical time: tempo, transport position, beat/bar events, timers (plain, one-shot or beat-synced), note divisions, bar/beat at any position, steps between readings, swing, cycles, loop folding, tempo from taps or clock pulses, and a monotonic clock.' },
   // requires ce.math because envelope() drives the value through ce.math.map — one lookup, shared
   // with the Envelope component — and ce.time because `beats` and `sync` are the transport's.
   { id: 'ce.anim', version: '1.1', requires: ['ce.core', 'ce.math', 'ce.time'], runtime: RUNTIME_ANY,
-    summary: 'Move a value over time instead of jumping it: to a destination, with a spring, or through a shape you draw — delayed, staggered, repeating, tempo-synced, and telling you when it is done. Cross-runtime: a sweep has to work with the panel shut too.' },
+    summary: 'Move a value over time: to a destination, with a spring, or through a drawn shape — delayed, staggered, repeating, tempo-synced, with completion callbacks. Cross-runtime: works with the panel shut.' },
   { id: 'ce.ui', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Tell the person using the panel something, take it back, or replace it; ask them a question — a choice, a line of text, or a pick from a list; and put something on their clipboard. Panel view only — there is nobody to tell, ask or copy for with the window shut.' },
+    summary: 'Notifications (show, retract, replace), questions — a choice, a line of text, or a pick from a list — and the clipboard. Panel view only.' },
   { id: 'ce.draw', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Draw on top of any control: scope traces, envelope shapes, XY pads, readouts. Gradients, dashes, opacity and transforms as well as flat shapes, plus the panel\'s own LCD font and a way to measure text. Panel view only — there is no surface with the window shut.' },
+    summary: 'Draw on top of any control: shapes, gradients, dashes, opacity and transforms, plus the panel\'s own LCD font and text measurement. Panel view only.' },
   // The first MIXED module. Its structure verbs are panel-view only and say so individually, but
   // snapshot/restore are not — so declaring the whole module unavailable window-closed would make
   // ce.has("ce.panel") tell a script to skip two verbs that work perfectly there. The per-member
   // stubs are what state the boundary precisely; the module says "some of this reaches you".
   { id: 'ce.panel', version: '1.4', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Build the panel from a script and arrange what is there: create, clone, parent and find controls, then align, distribute, match, order, grid or circle them — panel view only, each verb says so. snapshot/restore work anywhere.' },
+    summary: 'Create, clone, parent and find controls, then align, distribute, match, order, grid or circle them — panel view only, each command says so. snapshot/restore work anywhere.' },
   { id: 'ce.storage', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Per-script scratch state, and settings that outlive the session — shared with the panel, private to one script, or kept on this machine only. Plus JSON, because one of the four runtimes has none.' },
+    summary: 'Per-script scratch state, and settings that outlive the session — shared with the panel, private to one script, or kept on this machine only. Plus JSON encode/decode.' },
   // Panel view only, and for a reason worth stating: the font catalogue is the editor's, and the
   // measuring is done on a canvas. A player host has neither, and a typography verb that answered
   // from a guess would be worse than one that says it is not there.
   // Panel view only, for the same reason ce.text is: the icon library and the file cache are the
   // editor's, and a verb that answered from a guess would be worse than one that says it is absent.
   { id: 'ce.image', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'The image layers a control carries — background image and overlay, text image and texture, and the Icon section — plus the icon library they can draw from. A Label has 102 image-related fields and a Knob 864; all were writable by path and none was named anywhere in this API. What this adds is knowing which assets exist, keeping the two activation models straight (background layers composite, text layers are exclusive), and being honest about which sources survive an export.' },
+    summary: 'The image layers a control carries — background image and overlay, text image and texture, and the Icon section — plus the icon library they draw from. Background layers composite; text layers are exclusive. Reports which image sources survive an export.' },
   { id: 'ce.text', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Typography as something a script can reason about: what fonts exist and what they support, style writes that keep weight consistent instead of half-applying it, variable axes, and measuring a control\'s own text in its own font so it can be fitted to its box. The fields were always reachable with set() — the rules around them were not.' },
+    summary: 'Typography: which fonts exist and what they support, style writes that keep weight consistent, variable axes, and measuring a control\'s text in its own font to fit it to its box.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Zone Splitter. Panel view only — the component is modelled there.' },
   { id: 'ce.components.phrase', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -3871,7 +3868,7 @@ const MODULE_MEMBERS = {
     // `batch` are all §1 collisions as bare globals, so the flat spellings keep the panel prefix.
     align: 'panelAlign', distribute: 'panelDistribute', match: 'panelMatch',
     grid: 'panelGrid', circle: 'panelCircle', flip: 'panelFlip',
-    rect: 'panelRect', order: 'panelOrder', batch: 'panelBatch',
+    rect: 'panelRect', order: 'panelOrder', batch: 'panelBatch', keep: 'panelKeep',
   },
   'ce.storage': { state: 'state', saveSetting: 'saveSetting', loadSetting: 'loadSetting',
                   settings: 'listSettings', forget: 'forgetSetting',

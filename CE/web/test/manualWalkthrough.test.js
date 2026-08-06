@@ -20,7 +20,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { get } from 'svelte/store';
 
-import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import {
+  scriptApiForTesting, deliverSysexForTesting, setRuntimeHost, clearDeviceRuntimeDefinitions,
+} from '../src/CE_Application/scripting/panelRuntime.js';
+import { valueAtPath, setNestedValue } from '../src/CE_Application/stores/controlTreeUtils.js';
+import { decodeDump } from '../src/CE_Application/scripting/deviceDefinitions.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
@@ -207,7 +211,7 @@ test('the Lua and the JavaScript in the manual describe the same panel', () => {
   // Hand-written twins, not a machine translation, so only a test can promise they agree. The Lua
   // is checked by TRANSLITERATION rather than by running a Lua engine here: what can drift is the
   // data and the arithmetic, and both are visible in the source.
-  for (const lesson of ['walkthrough', 'from-data', 'drumkit', 'wiring']) {
+  for (const lesson of ['walkthrough', 'from-data', 'drumkit', 'wiring', 'sequencer', 'ghost']) {
     const lua = listings(lesson, 'lua').join('\n');
     const js = listings(lesson, 'js').join('\n');
 
@@ -317,4 +321,144 @@ test('lesson 14 reads the graph back by name, not by id', () => {
   assert.ok(!/ctl[_-]?[0-9a-f]{6,}/i.test(said), 'an id leaked into what the script printed');
   // The refused link left nothing behind: the Meter is driven by the knob and by nothing else.
   assert.equal((said.match(/-> {2}Level\.source/g) ?? []).length, 1);
+});
+
+/* --------------------------------------------------------------- 15 · a step sequencer */
+
+/** Run a lesson's listings and hand back the api plus its top-level handlers. */
+function runLesson(lessonId, { sendNote } = {}) {
+  panels.set([{
+    id: 'p', name: 'P', controls: [],
+    scripting: { modules: MODULES.map((m) => m.id) },
+  }]);
+  activePanelId.set('p');
+  clearScriptTrace();
+  const api = scriptApiForTesting('', 'manual');
+  const names = ['ce', 'set', 'get', 'log', 'logWarn', 'logError', 'on', 'sendNote', 'state'];
+  const values = names.map((n) => (n === 'sendNote' && sendNote ? sendNote : api[n]));
+  const source = listings(lessonId, 'js').join('\n');
+  // eslint-disable-next-line no-new-func
+  const fn = new Function(...names, `${source}
+    return {
+      onPanelBuild: typeof onPanelBuild === 'function' ? onPanelBuild : null,
+      onTimer: typeof onTimer === 'function' ? onTimer : null,
+    };`);
+  const handlers = fn(...values);
+  assert.ok(handlers.onPanelBuild, `lesson "${lessonId}" no longer declares onPanelBuild`);
+  return { api, handlers };
+}
+
+test('the sequencer builds its row, and a seeded pattern with five hits in the scale', () => {
+  try {
+    const { api, handlers } = runLesson('sequencer');
+    handlers.onPanelBuild();
+
+    const names = flatControls(get(panels)[0].controls).map((c) => c._children.Core.name);
+    for (let i = 1; i <= 8; i += 1) assert.ok(names.includes(`step${i}`), `step${i} missing`);
+    for (const n of ['play', 'gen', 'pos']) assert.ok(names.includes(n), `${n} missing`);
+
+    // euclid(8, 5) puts exactly five hits on the row, whatever the seed picks as notes.
+    let on = 0;
+    for (let i = 1; i <= 8; i += 1) if (api.get(`step${i}.value`) > 0) on += 1;
+    assert.equal(on, 5, 'five of the eight steps are on');
+
+    // Every chosen note is from the scale the lesson names — the "never sour" claim.
+    const scale = api.ce.music.scale(48, 'pentatonicMin');
+    for (let i = 1; i <= 8; i += 1) {
+      assert.ok(scale.includes(api.state.notes[i]), `note ${i} (${api.state.notes[i]}) is in the scale`);
+    }
+  } finally { panels.set([]); }
+});
+
+test('the sequencer advances, wraps, and plays only the steps that are on', () => {
+  try {
+    const sent = [];
+    const { api, handlers } = runLesson('sequencer', { sendNote: (...a) => sent.push(a) });
+    handlers.onPanelBuild();
+    assert.ok(handlers.onTimer, 'the lesson no longer declares onTimer');
+
+    for (let i = 1; i <= 8; i += 1) api.set(`step${i}.value`, i === 3 ? 1 : 0);
+    api.state.step = 0;
+    for (let t = 0; t < 8; t += 1) handlers.onTimer({ id: 'beat' });
+
+    assert.equal(api.state.step, 8, 'eight ticks from zero end on step 8');
+    assert.equal(api.get('pos.Text.content'), 'step 8');
+    assert.equal(sent.length, 1, 'exactly one live step, so exactly one note');
+    assert.equal(sent[0][0], 1, 'channel 1');
+    assert.equal(sent[0][1], api.state.notes[3], "step 3's own note");
+    assert.equal(sent[0][3], 120, 'released after 120 ms');
+    // A ninth tick wraps back to step 1.
+    handlers.onTimer({ id: 'beat' });
+    assert.equal(api.state.step, 1, 'the row wraps after step 8');
+  } finally { panels.set([]); }
+});
+
+/* ------------------------------------------------------- 16 · a synth that does not exist */
+
+test('the ghost synth is taught: dump decodes, bindings write, bound knobs send', () => {
+  // Host mode, as deviceStructure.test.js runs it. Headless there is no preview session for the
+  // decoded values to move knobs through, so the two halves of that journey are asserted
+  // separately: the declared layout decodes the fed bytes, and the bindings really send.
+  const panel = {
+    id: 'p', name: 'FS1', width: 800, height: 400, controls: [],
+    scripting: { modules: MODULES.map((m) => m.id) },
+  };
+  setRuntimeHost({
+    panel,
+    scripts: [],
+    readValue: (control, path) => valueAtPath(control, path),
+    writeValue: (control, path, value) => (String(path).toLowerCase() === 'value.value'
+      ? (setNestedValue(control, path, value), true)
+      : setNestedValue(control, path, value)),
+  });
+  clearDeviceRuntimeDefinitions();
+  clearScriptTrace();
+  try {
+    const api = scriptApiForTesting('', 'manual');
+    const names = ['ce', 'set', 'get', 'log', 'logWarn', 'logError', 'on', 'sendNote', 'state'];
+    const values = names.map((n) => api[n]);
+    const source = listings('ghost', 'js').join('\n');
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(...names, `${source}
+      return typeof onPanelBuild === 'function' ? onPanelBuild : null;`);
+    const onPanelBuild = fn(...values);
+    assert.ok(onPanelBuild, 'the lesson no longer declares onPanelBuild');
+    onPanelBuild();
+
+    const built = panel.controls.map((c) => c._children.Core.name);
+    for (const n of ['Cutoff', 'Reso', 'recv', 'status']) assert.ok(built.includes(n), `${n} missing`);
+
+    // The declarations were accepted — a refusal would have said so in the trace.
+    assert.doesNotMatch(traced(), /refused|not a defined parameter/i);
+
+    // The declared layout reads 96 and 40 out of the exact bytes the RECEIVE button feeds.
+    assert.deepEqual(decodeDump('mainSynth', 'F0 7D 01 20 60 28 F7'), {
+      ok: true, kind: 'patch', name: 'patch', values: { cutoff: 96, resonance: 40 },
+    });
+    // bind() wrote real bindings…
+    const bindingsOf = (name) => panel.controls
+      .find((c) => c._children.Core.name === name)._children.DeviceBindings.bindings;
+    assert.equal(bindingsOf('Cutoff')[0].parameterId, 'cutoff');
+    assert.equal(bindingsOf('Reso')[0].parameterId, 'resonance');
+
+    // …and a bound knob really SENDS: the CC parameter as B0 4A (CC 74), the SysEx parameter
+    // through its template — maker byte 7D, address 42, the value, a checksum, all framed.
+    const midiLines = () => get(scriptTrace)
+      .filter((t) => t.kind === 'midi').map((t) => String(t.message ?? ''));
+    clearScriptTrace();
+    api.set('Cutoff.value', 100);
+    assert.ok(midiLines().some((l) => l.includes('B0 4A 64')), `no CC 74 send in:\n${traced()}`);
+    clearScriptTrace();
+    api.set('Reso.value', 40);
+    assert.ok(midiLines().some((l) => l.includes('F0 7D 01 42 28')), `no templated sysex in:\n${traced()}`);
+
+    // Last, because arriving sysex opens the inbound-silence window the lesson's note describes —
+    // after it, writes stop echoing out, which would silence the send assertions above.
+    clearScriptTrace();
+    deliverSysexForTesting({ deviceRole: 'mainSynth', hex: 'F0 7D 09 20 60 28 F7' });
+    assert.match(traced(), /dump:/, 'a non-matching sysex is reported');
+  } finally {
+    setRuntimeHost(null);
+    clearDeviceRuntimeDefinitions();
+  }
 });

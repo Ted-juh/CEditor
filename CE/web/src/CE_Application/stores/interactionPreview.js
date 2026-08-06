@@ -2,6 +2,7 @@ import { writable, derived, get } from 'svelte/store';
 import { selectedControl } from './controls.js';
 import { panels, resolvedActivePanelId, selectedComponentId } from './panels.js';
 import { setDebugDock } from './debugDock.js';
+import { beginPreviewRehearsal, endPreviewRehearsal } from './previewRehearsal.js';
 import { resolveInteractiveControl, serializeInteractionRuntime, resolveInteractionContext } from '../utils/interactionRuntime.js';
 import { dependsOnId, dependsResetOnChange, visibleChoiceRows, firstDependentValue } from '../utils/dependentChoices.js';
 import { getNextEnumValue } from '../utils/enumBehavior.js';
@@ -248,11 +249,21 @@ export function removeInteractionPreviewSession(controlId) {
 
 export function setPreviewModeEnabled(enabled) {
   const nextEnabled = enabled === true;
+  const wasEnabled = get(previewModeEnabled) === true;
+
+  // Photograph the document BEFORE anything runs against it: the runtime's subscriber fires
+  // synchronously inside .set(), and onPanelBuild creates controls the moment it does.
+  if (nextEnabled && !wasEnabled) beginPreviewRehearsal();
+
   previewModeEnabled.set(nextEnabled);
+
   if (!nextEnabled) {
     panelPreviewDebugEnabled.set(false);
     panelPreviewSessions.set({});
     previewInspectedControlId.set('');
+    // …and put it back AFTER, so the teardown the runtime just did inside .set() — onPanelClose,
+    // its writes included — is inside the bracket rather than landing on the restored document.
+    endPreviewRehearsal();
   }
 }
 

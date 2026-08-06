@@ -34,6 +34,12 @@ const MAX_HISTORY = 50;
 // Per-context history: Map<contextKey, { undoStack: [], redoStack: [] }>
 const historyMap = new Map();
 let isRestoring = false;
+// Recording is suspended for the length of a preview run. Everything a preview does to the
+// document — a script's writes, and the gesture handlers that edit the model directly — is put
+// back when preview stops (stores/previewRehearsal.js), so none of it belongs in the author's
+// undo history. Without this a 60Hz animation or a timer script fills all 50 slots in seconds and
+// evicts the real edits underneath.
+let suppressed = false;
 let debounceTimer = null;
 let lastSnapshotJson = null;
 
@@ -132,7 +138,7 @@ function restoreSnapshot(context, json) {
  * Called automatically via debounce, or manually before destructive actions.
  */
 export function pushSnapshot() {
-  if (isRestoring) return;
+  if (isRestoring || suppressed) return;
   clearTimeout(debounceTimer);
   debounceTimer = null;
 
@@ -169,9 +175,27 @@ export function pushSnapshot() {
  * Groups rapid changes (drag, typing) into one snapshot.
  */
 function scheduleSnapshot() {
-  if (isRestoring) return;
+  if (isRestoring || suppressed) return;
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(pushSnapshot, 400);
+}
+
+/**
+ * Stop (or resume) recording undo steps.
+ *
+ * Called around a preview run. Resuming re-baselines, so the next real edit is measured against
+ * what is on screen now rather than against a preview state that has since been put back.
+ */
+export function setHistoryRecordingSuppressed(on) {
+  const next = on === true;
+  if (next === suppressed) return;
+  suppressed = next;
+  if (suppressed) {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = null;
+  } else {
+    resetBaseline();
+  }
 }
 
 /** Reset the committed baseline to the active context's current state. */
