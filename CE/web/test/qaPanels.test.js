@@ -239,3 +239,42 @@ test('QA-06 declares the profile it needs', () => {
   const doc = JSON.parse(serializeSheet(sheet));
   assert.deepEqual(doc.requiredProfiles, [{ role: 'primary', profileId: 'roland-gaia-sh01', version: '*' }]);
 });
+
+test('QA-06 controls actually carry the profile\'s ranges and choices', () => {
+  // The gap this closes, found by looking at the sheet rather than at the tests: the first draft
+  // set `adoptMetadata: true` on every binding and stopped. Every assertion above still passed —
+  // the bindings were all there, all correct, all pointing at the right parameter — and every
+  // knob on screen read 0.00–1.00 and every combobox said "Option 1", because `adoptMetadata` is
+  // a flag the editor reads when a parameter is DROPPED, and a generated sheet has no drop.
+  //
+  // "Is it bound" and "is it shaped like what it is bound to" are two questions. Only the first
+  // was being asked.
+  const sheet = SHEETS.find((s) => s.file === 'QA-06-roland-gaia.cepanel');
+  const doc = JSON.parse(serializeSheet(sheet));
+  const byId = new Map(gaiaProfile().parameters.map((p) => [p.id, p]));
+  const wrong = [];
+
+  for (const control of doc.controls.map(expandControl)) {
+    const binding = control._children?.DeviceBindings?.bindings?.[0];
+    const parameter = binding?.parameterId ? byId.get(binding.parameterId) : null;
+    if (!parameter) continue;
+
+    const behavior = control._children.Behavior ?? {};
+    const id = control._children.Core.id;
+
+    if (parameter.type === 'integer' || parameter.type === 'bipolar') {
+      if (behavior.min !== parameter.range.min || behavior.max !== parameter.range.max) {
+        wrong.push(`${id}: reads ${behavior.min}..${behavior.max}, profile says ${parameter.range.min}..${parameter.range.max}`);
+      }
+    } else if (parameter.type === 'choice') {
+      const rows = control._children.Value?.rows ?? [];
+      if (rows.length !== parameter.choices.length) {
+        wrong.push(`${id}: has ${rows.length} options, profile declares ${parameter.choices.length}`);
+      } else if (rows[0]?.displayText !== parameter.choices[0].label) {
+        wrong.push(`${id}: first option reads "${rows[0]?.displayText}", profile says "${parameter.choices[0].label}"`);
+      }
+    }
+  }
+
+  assert.deepEqual(wrong, [], `controls bound to a parameter but not shaped like it:\n  ${wrong.slice(0, 12).join('\n  ')}`);
+});

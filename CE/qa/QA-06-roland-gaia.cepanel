@@ -130,8 +130,8 @@
       "controlName": "gaia_common_common_patchLevel",
       "path": "gaia_common_common_patchLevel.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -142,9 +142,9 @@
       "label": "gaia_common_common_patchTempo",
       "controlName": "gaia_common_common_patchTempo",
       "path": "gaia_common_common_patchTempo.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 5,
+      "max": 300,
+      "defaultValue": 5,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -182,8 +182,8 @@
       "controlName": "gaia_common_common_portamentoTime",
       "path": "gaia_common_common_portamentoTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -207,9 +207,9 @@
       "label": "gaia_common_common_octaveShift",
       "controlName": "gaia_common_common_octaveShift",
       "path": "gaia_common_common_octaveShift.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 61,
+      "max": 67,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -221,8 +221,8 @@
       "controlName": "gaia_common_common_pitchBendRangeUp",
       "path": "gaia_common_common_pitchBendRangeUp.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 24,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -234,8 +234,8 @@
       "controlName": "gaia_common_common_pitchBendRangeDown",
       "path": "gaia_common_common_pitchBendRangeDown.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 24,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -325,7 +325,7 @@
       "controlName": "gaia_common_common_syncRingSelect",
       "path": "gaia_common_common_syncRingSelect.value",
       "min": 0,
-      "max": 1,
+      "max": 2,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -377,7 +377,7 @@
       "controlName": "gaia_common_common_dBeamAssign",
       "path": "gaia_common_common_dBeamAssign.value",
       "min": 0,
-      "max": 2,
+      "max": 29,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -455,8 +455,8 @@
       "controlName": "gaia_common_master_volume",
       "path": "gaia_common_master_volume.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 100,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -468,7 +468,7 @@
       "controlName": "gaia_t1_tone1_osc_wave",
       "path": "gaia_t1_tone1_osc_wave.value",
       "min": 0,
-      "max": 2,
+      "max": 6,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -481,7 +481,7 @@
       "controlName": "gaia_t1_tone1_osc_waveVariation",
       "path": "gaia_t1_tone1_osc_waveVariation.value",
       "min": 0,
-      "max": 1,
+      "max": 2,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -493,9 +493,9 @@
       "label": "gaia_t1_tone1_osc_pitch",
       "controlName": "gaia_t1_tone1_osc_pitch",
       "path": "gaia_t1_tone1_osc_pitch.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 40,
+      "max": 88,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -506,9 +506,9 @@
       "label": "gaia_t1_tone1_osc_detune",
       "controlName": "gaia_t1_tone1_osc_detune",
       "path": "gaia_t1_tone1_osc_detune.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 14,
+      "max": 114,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -520,8 +520,8 @@
       "controlName": "gaia_t1_tone1_osc_pulseWidthModDepth",
       "path": "gaia_t1_tone1_osc_pulseWidthModDepth.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -533,8 +533,8 @@
       "controlName": "gaia_t1_tone1_osc_pulseWidth",
       "path": "gaia_t1_tone1_osc_pulseWidth.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -546,8 +546,8 @@
       "controlName": "gaia_t1_tone1_osc_pitchEnvAttackTime",
       "path": "gaia_t1_tone1_osc_pitchEnvAttackTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -559,8 +559,8 @@
       "controlName": "gaia_t1_tone1_osc_pitchEnvDecay",
       "path": "gaia_t1_tone1_osc_pitchEnvDecay.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -571,9 +571,9 @@
       "label": "gaia_t1_tone1_osc_pitchEnvDepth",
       "controlName": "gaia_t1_tone1_osc_pitchEnvDepth",
       "path": "gaia_t1_tone1_osc_pitchEnvDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -585,7 +585,7 @@
       "controlName": "gaia_t1_tone1_filter_mode",
       "path": "gaia_t1_tone1_filter_mode.value",
       "min": 0,
-      "max": 1,
+      "max": 4,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -611,8 +611,8 @@
       "controlName": "gaia_t1_tone1_filter_cutoff",
       "path": "gaia_t1_tone1_filter_cutoff.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -623,9 +623,9 @@
       "label": "gaia_t1_tone1_filter_cutoffKeyfollow",
       "controlName": "gaia_t1_tone1_filter_cutoffKeyfollow",
       "path": "gaia_t1_tone1_filter_cutoffKeyfollow.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 54,
+      "max": 74,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -636,9 +636,9 @@
       "label": "gaia_t1_tone1_filter_envVelocitySens",
       "controlName": "gaia_t1_tone1_filter_envVelocitySens",
       "path": "gaia_t1_tone1_filter_envVelocitySens.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -650,8 +650,8 @@
       "controlName": "gaia_t1_tone1_filter_resonance",
       "path": "gaia_t1_tone1_filter_resonance.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -663,8 +663,8 @@
       "controlName": "gaia_t1_tone1_filter_envAttackTime",
       "path": "gaia_t1_tone1_filter_envAttackTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -676,8 +676,8 @@
       "controlName": "gaia_t1_tone1_filter_envDecayTime",
       "path": "gaia_t1_tone1_filter_envDecayTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -689,8 +689,8 @@
       "controlName": "gaia_t1_tone1_filter_envSustainLevel",
       "path": "gaia_t1_tone1_filter_envSustainLevel.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -702,8 +702,8 @@
       "controlName": "gaia_t1_tone1_filter_envReleaseTime",
       "path": "gaia_t1_tone1_filter_envReleaseTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -714,9 +714,9 @@
       "label": "gaia_t1_tone1_filter_envDepth",
       "controlName": "gaia_t1_tone1_filter_envDepth",
       "path": "gaia_t1_tone1_filter_envDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -728,8 +728,8 @@
       "controlName": "gaia_t1_tone1_amp_level",
       "path": "gaia_t1_tone1_amp_level.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -740,9 +740,9 @@
       "label": "gaia_t1_tone1_amp_levelVelocitySens",
       "controlName": "gaia_t1_tone1_amp_levelVelocitySens",
       "path": "gaia_t1_tone1_amp_levelVelocitySens.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -754,8 +754,8 @@
       "controlName": "gaia_t1_tone1_amp_envAttackTime",
       "path": "gaia_t1_tone1_amp_envAttackTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -767,8 +767,8 @@
       "controlName": "gaia_t1_tone1_amp_envDecayTime",
       "path": "gaia_t1_tone1_amp_envDecayTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -780,8 +780,8 @@
       "controlName": "gaia_t1_tone1_amp_envSustainLevel",
       "path": "gaia_t1_tone1_amp_envSustainLevel.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -793,8 +793,8 @@
       "controlName": "gaia_t1_tone1_amp_envReleaseTime",
       "path": "gaia_t1_tone1_amp_envReleaseTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -806,8 +806,8 @@
       "controlName": "gaia_t1_tone1_amp_pan",
       "path": "gaia_t1_tone1_amp_pan.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -819,7 +819,7 @@
       "controlName": "gaia_t1_tone1_lfo_shape",
       "path": "gaia_t1_tone1_lfo_shape.value",
       "min": 0,
-      "max": 2,
+      "max": 5,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -832,8 +832,8 @@
       "controlName": "gaia_t1_tone1_lfo_rate",
       "path": "gaia_t1_tone1_lfo_rate.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -858,7 +858,7 @@
       "controlName": "gaia_t1_tone1_lfo_tempoSyncNote",
       "path": "gaia_t1_tone1_lfo_tempoSyncNote.value",
       "min": 0,
-      "max": 2,
+      "max": 19,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -871,8 +871,8 @@
       "controlName": "gaia_t1_tone1_lfo_fadeTime",
       "path": "gaia_t1_tone1_lfo_fadeTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -896,9 +896,9 @@
       "label": "gaia_t1_tone1_lfo_pitchDepth",
       "controlName": "gaia_t1_tone1_lfo_pitchDepth",
       "path": "gaia_t1_tone1_lfo_pitchDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -909,9 +909,9 @@
       "label": "gaia_t1_tone1_lfo_filterDepth",
       "controlName": "gaia_t1_tone1_lfo_filterDepth",
       "path": "gaia_t1_tone1_lfo_filterDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -922,9 +922,9 @@
       "label": "gaia_t1_tone1_lfo_ampDepth",
       "controlName": "gaia_t1_tone1_lfo_ampDepth",
       "path": "gaia_t1_tone1_lfo_ampDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -935,9 +935,9 @@
       "label": "gaia_t1_tone1_lfo_panDepth",
       "controlName": "gaia_t1_tone1_lfo_panDepth",
       "path": "gaia_t1_tone1_lfo_panDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -949,7 +949,7 @@
       "controlName": "gaia_t1_tone1_modLfo_shape",
       "path": "gaia_t1_tone1_modLfo_shape.value",
       "min": 0,
-      "max": 2,
+      "max": 5,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -962,8 +962,8 @@
       "controlName": "gaia_t1_tone1_modLfo_rate",
       "path": "gaia_t1_tone1_modLfo_rate.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -988,7 +988,7 @@
       "controlName": "gaia_t1_tone1_modLfo_tempoSyncNote",
       "path": "gaia_t1_tone1_modLfo_tempoSyncNote.value",
       "min": 0,
-      "max": 2,
+      "max": 19,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -1000,9 +1000,9 @@
       "label": "gaia_t1_tone1_modLfo_pitchDepth",
       "controlName": "gaia_t1_tone1_modLfo_pitchDepth",
       "path": "gaia_t1_tone1_modLfo_pitchDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1013,9 +1013,9 @@
       "label": "gaia_t1_tone1_modLfo_filterDepth",
       "controlName": "gaia_t1_tone1_modLfo_filterDepth",
       "path": "gaia_t1_tone1_modLfo_filterDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1026,9 +1026,9 @@
       "label": "gaia_t1_tone1_modLfo_ampDepth",
       "controlName": "gaia_t1_tone1_modLfo_ampDepth",
       "path": "gaia_t1_tone1_modLfo_ampDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1039,9 +1039,9 @@
       "label": "gaia_t1_tone1_modLfo_panDepth",
       "controlName": "gaia_t1_tone1_modLfo_panDepth",
       "path": "gaia_t1_tone1_modLfo_panDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1053,7 +1053,7 @@
       "controlName": "gaia_t2_tone2_osc_wave",
       "path": "gaia_t2_tone2_osc_wave.value",
       "min": 0,
-      "max": 2,
+      "max": 6,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -1066,7 +1066,7 @@
       "controlName": "gaia_t2_tone2_osc_waveVariation",
       "path": "gaia_t2_tone2_osc_waveVariation.value",
       "min": 0,
-      "max": 1,
+      "max": 2,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -1078,9 +1078,9 @@
       "label": "gaia_t2_tone2_osc_pitch",
       "controlName": "gaia_t2_tone2_osc_pitch",
       "path": "gaia_t2_tone2_osc_pitch.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 40,
+      "max": 88,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1091,9 +1091,9 @@
       "label": "gaia_t2_tone2_osc_detune",
       "controlName": "gaia_t2_tone2_osc_detune",
       "path": "gaia_t2_tone2_osc_detune.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 14,
+      "max": 114,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1105,8 +1105,8 @@
       "controlName": "gaia_t2_tone2_osc_pulseWidthModDepth",
       "path": "gaia_t2_tone2_osc_pulseWidthModDepth.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1118,8 +1118,8 @@
       "controlName": "gaia_t2_tone2_osc_pulseWidth",
       "path": "gaia_t2_tone2_osc_pulseWidth.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1131,8 +1131,8 @@
       "controlName": "gaia_t2_tone2_osc_pitchEnvAttackTime",
       "path": "gaia_t2_tone2_osc_pitchEnvAttackTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1144,8 +1144,8 @@
       "controlName": "gaia_t2_tone2_osc_pitchEnvDecay",
       "path": "gaia_t2_tone2_osc_pitchEnvDecay.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1156,9 +1156,9 @@
       "label": "gaia_t2_tone2_osc_pitchEnvDepth",
       "controlName": "gaia_t2_tone2_osc_pitchEnvDepth",
       "path": "gaia_t2_tone2_osc_pitchEnvDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1170,7 +1170,7 @@
       "controlName": "gaia_t2_tone2_filter_mode",
       "path": "gaia_t2_tone2_filter_mode.value",
       "min": 0,
-      "max": 1,
+      "max": 4,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -1196,8 +1196,8 @@
       "controlName": "gaia_t2_tone2_filter_cutoff",
       "path": "gaia_t2_tone2_filter_cutoff.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1208,9 +1208,9 @@
       "label": "gaia_t2_tone2_filter_cutoffKeyfollow",
       "controlName": "gaia_t2_tone2_filter_cutoffKeyfollow",
       "path": "gaia_t2_tone2_filter_cutoffKeyfollow.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 54,
+      "max": 74,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1221,9 +1221,9 @@
       "label": "gaia_t2_tone2_filter_envVelocitySens",
       "controlName": "gaia_t2_tone2_filter_envVelocitySens",
       "path": "gaia_t2_tone2_filter_envVelocitySens.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1235,8 +1235,8 @@
       "controlName": "gaia_t2_tone2_filter_resonance",
       "path": "gaia_t2_tone2_filter_resonance.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1248,8 +1248,8 @@
       "controlName": "gaia_t2_tone2_filter_envAttackTime",
       "path": "gaia_t2_tone2_filter_envAttackTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1261,8 +1261,8 @@
       "controlName": "gaia_t2_tone2_filter_envDecayTime",
       "path": "gaia_t2_tone2_filter_envDecayTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1274,8 +1274,8 @@
       "controlName": "gaia_t2_tone2_filter_envSustainLevel",
       "path": "gaia_t2_tone2_filter_envSustainLevel.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1287,8 +1287,8 @@
       "controlName": "gaia_t2_tone2_filter_envReleaseTime",
       "path": "gaia_t2_tone2_filter_envReleaseTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1299,9 +1299,9 @@
       "label": "gaia_t2_tone2_filter_envDepth",
       "controlName": "gaia_t2_tone2_filter_envDepth",
       "path": "gaia_t2_tone2_filter_envDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1313,8 +1313,8 @@
       "controlName": "gaia_t2_tone2_amp_level",
       "path": "gaia_t2_tone2_amp_level.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1325,9 +1325,9 @@
       "label": "gaia_t2_tone2_amp_levelVelocitySens",
       "controlName": "gaia_t2_tone2_amp_levelVelocitySens",
       "path": "gaia_t2_tone2_amp_levelVelocitySens.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1339,8 +1339,8 @@
       "controlName": "gaia_t2_tone2_amp_envAttackTime",
       "path": "gaia_t2_tone2_amp_envAttackTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1352,8 +1352,8 @@
       "controlName": "gaia_t2_tone2_amp_envDecayTime",
       "path": "gaia_t2_tone2_amp_envDecayTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1365,8 +1365,8 @@
       "controlName": "gaia_t2_tone2_amp_envSustainLevel",
       "path": "gaia_t2_tone2_amp_envSustainLevel.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1378,8 +1378,8 @@
       "controlName": "gaia_t2_tone2_amp_envReleaseTime",
       "path": "gaia_t2_tone2_amp_envReleaseTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1391,8 +1391,8 @@
       "controlName": "gaia_t2_tone2_amp_pan",
       "path": "gaia_t2_tone2_amp_pan.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1404,7 +1404,7 @@
       "controlName": "gaia_t2_tone2_lfo_shape",
       "path": "gaia_t2_tone2_lfo_shape.value",
       "min": 0,
-      "max": 2,
+      "max": 5,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -1417,8 +1417,8 @@
       "controlName": "gaia_t2_tone2_lfo_rate",
       "path": "gaia_t2_tone2_lfo_rate.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1443,7 +1443,7 @@
       "controlName": "gaia_t2_tone2_lfo_tempoSyncNote",
       "path": "gaia_t2_tone2_lfo_tempoSyncNote.value",
       "min": 0,
-      "max": 2,
+      "max": 19,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -1456,8 +1456,8 @@
       "controlName": "gaia_t2_tone2_lfo_fadeTime",
       "path": "gaia_t2_tone2_lfo_fadeTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1481,9 +1481,9 @@
       "label": "gaia_t2_tone2_lfo_pitchDepth",
       "controlName": "gaia_t2_tone2_lfo_pitchDepth",
       "path": "gaia_t2_tone2_lfo_pitchDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1494,9 +1494,9 @@
       "label": "gaia_t2_tone2_lfo_filterDepth",
       "controlName": "gaia_t2_tone2_lfo_filterDepth",
       "path": "gaia_t2_tone2_lfo_filterDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1507,9 +1507,9 @@
       "label": "gaia_t2_tone2_lfo_ampDepth",
       "controlName": "gaia_t2_tone2_lfo_ampDepth",
       "path": "gaia_t2_tone2_lfo_ampDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1520,9 +1520,9 @@
       "label": "gaia_t2_tone2_lfo_panDepth",
       "controlName": "gaia_t2_tone2_lfo_panDepth",
       "path": "gaia_t2_tone2_lfo_panDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1534,7 +1534,7 @@
       "controlName": "gaia_t2_tone2_modLfo_shape",
       "path": "gaia_t2_tone2_modLfo_shape.value",
       "min": 0,
-      "max": 2,
+      "max": 5,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -1547,8 +1547,8 @@
       "controlName": "gaia_t2_tone2_modLfo_rate",
       "path": "gaia_t2_tone2_modLfo_rate.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1573,7 +1573,7 @@
       "controlName": "gaia_t2_tone2_modLfo_tempoSyncNote",
       "path": "gaia_t2_tone2_modLfo_tempoSyncNote.value",
       "min": 0,
-      "max": 2,
+      "max": 19,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -1585,9 +1585,9 @@
       "label": "gaia_t2_tone2_modLfo_pitchDepth",
       "controlName": "gaia_t2_tone2_modLfo_pitchDepth",
       "path": "gaia_t2_tone2_modLfo_pitchDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1598,9 +1598,9 @@
       "label": "gaia_t2_tone2_modLfo_filterDepth",
       "controlName": "gaia_t2_tone2_modLfo_filterDepth",
       "path": "gaia_t2_tone2_modLfo_filterDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1611,9 +1611,9 @@
       "label": "gaia_t2_tone2_modLfo_ampDepth",
       "controlName": "gaia_t2_tone2_modLfo_ampDepth",
       "path": "gaia_t2_tone2_modLfo_ampDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1624,9 +1624,9 @@
       "label": "gaia_t2_tone2_modLfo_panDepth",
       "controlName": "gaia_t2_tone2_modLfo_panDepth",
       "path": "gaia_t2_tone2_modLfo_panDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1638,7 +1638,7 @@
       "controlName": "gaia_t3_tone3_osc_wave",
       "path": "gaia_t3_tone3_osc_wave.value",
       "min": 0,
-      "max": 2,
+      "max": 6,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -1651,7 +1651,7 @@
       "controlName": "gaia_t3_tone3_osc_waveVariation",
       "path": "gaia_t3_tone3_osc_waveVariation.value",
       "min": 0,
-      "max": 1,
+      "max": 2,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -1663,9 +1663,9 @@
       "label": "gaia_t3_tone3_osc_pitch",
       "controlName": "gaia_t3_tone3_osc_pitch",
       "path": "gaia_t3_tone3_osc_pitch.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 40,
+      "max": 88,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1676,9 +1676,9 @@
       "label": "gaia_t3_tone3_osc_detune",
       "controlName": "gaia_t3_tone3_osc_detune",
       "path": "gaia_t3_tone3_osc_detune.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 14,
+      "max": 114,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1690,8 +1690,8 @@
       "controlName": "gaia_t3_tone3_osc_pulseWidthModDepth",
       "path": "gaia_t3_tone3_osc_pulseWidthModDepth.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1703,8 +1703,8 @@
       "controlName": "gaia_t3_tone3_osc_pulseWidth",
       "path": "gaia_t3_tone3_osc_pulseWidth.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1716,8 +1716,8 @@
       "controlName": "gaia_t3_tone3_osc_pitchEnvAttackTime",
       "path": "gaia_t3_tone3_osc_pitchEnvAttackTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1729,8 +1729,8 @@
       "controlName": "gaia_t3_tone3_osc_pitchEnvDecay",
       "path": "gaia_t3_tone3_osc_pitchEnvDecay.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1741,9 +1741,9 @@
       "label": "gaia_t3_tone3_osc_pitchEnvDepth",
       "controlName": "gaia_t3_tone3_osc_pitchEnvDepth",
       "path": "gaia_t3_tone3_osc_pitchEnvDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1755,7 +1755,7 @@
       "controlName": "gaia_t3_tone3_filter_mode",
       "path": "gaia_t3_tone3_filter_mode.value",
       "min": 0,
-      "max": 1,
+      "max": 4,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -1781,8 +1781,8 @@
       "controlName": "gaia_t3_tone3_filter_cutoff",
       "path": "gaia_t3_tone3_filter_cutoff.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1793,9 +1793,9 @@
       "label": "gaia_t3_tone3_filter_cutoffKeyfollow",
       "controlName": "gaia_t3_tone3_filter_cutoffKeyfollow",
       "path": "gaia_t3_tone3_filter_cutoffKeyfollow.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 54,
+      "max": 74,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1806,9 +1806,9 @@
       "label": "gaia_t3_tone3_filter_envVelocitySens",
       "controlName": "gaia_t3_tone3_filter_envVelocitySens",
       "path": "gaia_t3_tone3_filter_envVelocitySens.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1820,8 +1820,8 @@
       "controlName": "gaia_t3_tone3_filter_resonance",
       "path": "gaia_t3_tone3_filter_resonance.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1833,8 +1833,8 @@
       "controlName": "gaia_t3_tone3_filter_envAttackTime",
       "path": "gaia_t3_tone3_filter_envAttackTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1846,8 +1846,8 @@
       "controlName": "gaia_t3_tone3_filter_envDecayTime",
       "path": "gaia_t3_tone3_filter_envDecayTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1859,8 +1859,8 @@
       "controlName": "gaia_t3_tone3_filter_envSustainLevel",
       "path": "gaia_t3_tone3_filter_envSustainLevel.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1872,8 +1872,8 @@
       "controlName": "gaia_t3_tone3_filter_envReleaseTime",
       "path": "gaia_t3_tone3_filter_envReleaseTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1884,9 +1884,9 @@
       "label": "gaia_t3_tone3_filter_envDepth",
       "controlName": "gaia_t3_tone3_filter_envDepth",
       "path": "gaia_t3_tone3_filter_envDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1898,8 +1898,8 @@
       "controlName": "gaia_t3_tone3_amp_level",
       "path": "gaia_t3_tone3_amp_level.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1910,9 +1910,9 @@
       "label": "gaia_t3_tone3_amp_levelVelocitySens",
       "controlName": "gaia_t3_tone3_amp_levelVelocitySens",
       "path": "gaia_t3_tone3_amp_levelVelocitySens.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1924,8 +1924,8 @@
       "controlName": "gaia_t3_tone3_amp_envAttackTime",
       "path": "gaia_t3_tone3_amp_envAttackTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1937,8 +1937,8 @@
       "controlName": "gaia_t3_tone3_amp_envDecayTime",
       "path": "gaia_t3_tone3_amp_envDecayTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1950,8 +1950,8 @@
       "controlName": "gaia_t3_tone3_amp_envSustainLevel",
       "path": "gaia_t3_tone3_amp_envSustainLevel.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1963,8 +1963,8 @@
       "controlName": "gaia_t3_tone3_amp_envReleaseTime",
       "path": "gaia_t3_tone3_amp_envReleaseTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1976,8 +1976,8 @@
       "controlName": "gaia_t3_tone3_amp_pan",
       "path": "gaia_t3_tone3_amp_pan.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -1989,7 +1989,7 @@
       "controlName": "gaia_t3_tone3_lfo_shape",
       "path": "gaia_t3_tone3_lfo_shape.value",
       "min": 0,
-      "max": 2,
+      "max": 5,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -2002,8 +2002,8 @@
       "controlName": "gaia_t3_tone3_lfo_rate",
       "path": "gaia_t3_tone3_lfo_rate.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -2028,7 +2028,7 @@
       "controlName": "gaia_t3_tone3_lfo_tempoSyncNote",
       "path": "gaia_t3_tone3_lfo_tempoSyncNote.value",
       "min": 0,
-      "max": 2,
+      "max": 19,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -2041,8 +2041,8 @@
       "controlName": "gaia_t3_tone3_lfo_fadeTime",
       "path": "gaia_t3_tone3_lfo_fadeTime.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -2066,9 +2066,9 @@
       "label": "gaia_t3_tone3_lfo_pitchDepth",
       "controlName": "gaia_t3_tone3_lfo_pitchDepth",
       "path": "gaia_t3_tone3_lfo_pitchDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -2079,9 +2079,9 @@
       "label": "gaia_t3_tone3_lfo_filterDepth",
       "controlName": "gaia_t3_tone3_lfo_filterDepth",
       "path": "gaia_t3_tone3_lfo_filterDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -2092,9 +2092,9 @@
       "label": "gaia_t3_tone3_lfo_ampDepth",
       "controlName": "gaia_t3_tone3_lfo_ampDepth",
       "path": "gaia_t3_tone3_lfo_ampDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -2105,9 +2105,9 @@
       "label": "gaia_t3_tone3_lfo_panDepth",
       "controlName": "gaia_t3_tone3_lfo_panDepth",
       "path": "gaia_t3_tone3_lfo_panDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -2119,7 +2119,7 @@
       "controlName": "gaia_t3_tone3_modLfo_shape",
       "path": "gaia_t3_tone3_modLfo_shape.value",
       "min": 0,
-      "max": 2,
+      "max": 5,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -2132,8 +2132,8 @@
       "controlName": "gaia_t3_tone3_modLfo_rate",
       "path": "gaia_t3_tone3_modLfo_rate.value",
       "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "max": 127,
+      "defaultValue": 0,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -2158,7 +2158,7 @@
       "controlName": "gaia_t3_tone3_modLfo_tempoSyncNote",
       "path": "gaia_t3_tone3_modLfo_tempoSyncNote.value",
       "min": 0,
-      "max": 2,
+      "max": 19,
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
@@ -2170,9 +2170,9 @@
       "label": "gaia_t3_tone3_modLfo_pitchDepth",
       "controlName": "gaia_t3_tone3_modLfo_pitchDepth",
       "path": "gaia_t3_tone3_modLfo_pitchDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -2183,9 +2183,9 @@
       "label": "gaia_t3_tone3_modLfo_filterDepth",
       "controlName": "gaia_t3_tone3_modLfo_filterDepth",
       "path": "gaia_t3_tone3_modLfo_filterDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -2196,9 +2196,9 @@
       "label": "gaia_t3_tone3_modLfo_ampDepth",
       "controlName": "gaia_t3_tone3_modLfo_ampDepth",
       "path": "gaia_t3_tone3_modLfo_ampDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -2209,9 +2209,9 @@
       "label": "gaia_t3_tone3_modLfo_panDepth",
       "controlName": "gaia_t3_tone3_modLfo_panDepth",
       "path": "gaia_t3_tone3_modLfo_panDepth.value",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
+      "min": 1,
+      "max": 127,
+      "defaultValue": 64,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -2402,6 +2402,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -2478,6 +2483,12 @@
           "y": 75,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 5,
+          "max": 300,
+          "defaultCurrentValue": 5
         },
         "DeviceBindings": {
           "bindings": [
@@ -2559,6 +2570,34 @@
         "Text": {
           "content": "arpeggioSwitch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -2639,6 +2678,34 @@
         "Text": {
           "content": "portamentoSwitch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -2715,6 +2782,11 @@
           "y": 75,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -2796,6 +2868,34 @@
         "Text": {
           "content": "monoSwitch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -2872,6 +2972,12 @@
           "y": 75,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 61,
+          "max": 67,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -2950,6 +3056,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 24,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -3026,6 +3137,11 @@
           "y": 75,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 24,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -3107,6 +3223,34 @@
         "Text": {
           "content": "tone1Switch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -3186,6 +3330,34 @@
         },
         "Text": {
           "content": "tone1Select"
+        },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
         },
         "DeviceBindings": {
           "bindings": [
@@ -3267,6 +3439,34 @@
         "Text": {
           "content": "tone2Switch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -3346,6 +3546,34 @@
         },
         "Text": {
           "content": "tone2Select"
+        },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
         },
         "DeviceBindings": {
           "bindings": [
@@ -3427,6 +3655,34 @@
         "Text": {
           "content": "tone3Switch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -3506,6 +3762,34 @@
         },
         "Text": {
           "content": "tone3Select"
+        },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
         },
         "DeviceBindings": {
           "bindings": [
@@ -3587,6 +3871,43 @@
         "Text": {
           "content": "syncRingSelect"
         },
+        "Behavior": {
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sync",
+              "displayText": "SYNC",
+              "internalValue": "sync",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "ring",
+              "displayText": "RING",
+              "internalValue": "ring",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -3666,6 +3987,34 @@
         },
         "Text": {
           "content": "effectsMasterSwitch"
+        },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
         },
         "DeviceBindings": {
           "bindings": [
@@ -3747,6 +4096,34 @@
         "Text": {
           "content": "delayTempoSyncSwitch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -3826,6 +4203,34 @@
         },
         "Text": {
           "content": "lowBoostSwitch"
+        },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
         },
         "DeviceBindings": {
           "bindings": [
@@ -3907,6 +4312,313 @@
         "Text": {
           "content": "dBeamAssign"
         },
+        "Behavior": {
+          "defaultValue": "lforate"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "lforate",
+              "displayText": "LFO-RATE",
+              "internalValue": "lforate",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "lfofadetime",
+              "displayText": "LFO-FADE-TIME",
+              "internalValue": "lfofadetime",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "lfopitchmod",
+              "displayText": "LFO-PITCH-MOD",
+              "internalValue": "lfopitchmod",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "lfofiltermod",
+              "displayText": "LFO-FILTER-MOD",
+              "internalValue": "lfofiltermod",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "lfoampmod",
+              "displayText": "LFO-AMP-MOD",
+              "internalValue": "lfoampmod",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "oscpitch",
+              "displayText": "OSC-PITCH",
+              "internalValue": "oscpitch",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "oscdetune",
+              "displayText": "OSC-DETUNE",
+              "internalValue": "oscdetune",
+              "sendValue": 6,
+              "receiveValue": 6,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "oscpwm",
+              "displayText": "OSC-PWM",
+              "internalValue": "oscpwm",
+              "sendValue": 7,
+              "receiveValue": 7,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "oscpw",
+              "displayText": "OSC-PW",
+              "internalValue": "oscpw",
+              "sendValue": 8,
+              "receiveValue": 8,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "oscenva",
+              "displayText": "OSC-ENV-A",
+              "internalValue": "oscenva",
+              "sendValue": 9,
+              "receiveValue": 9,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "oscenvd",
+              "displayText": "OSC-ENV-D",
+              "internalValue": "oscenvd",
+              "sendValue": 10,
+              "receiveValue": 10,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "oscenvmod",
+              "displayText": "OSC-ENV-MOD",
+              "internalValue": "oscenvmod",
+              "sendValue": 11,
+              "receiveValue": 11,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "filtercutoff",
+              "displayText": "FILTER-CUTOFF",
+              "internalValue": "filtercutoff",
+              "sendValue": 12,
+              "receiveValue": 12,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "filterresonance",
+              "displayText": "FILTER-RESONANCE",
+              "internalValue": "filterresonance",
+              "sendValue": 13,
+              "receiveValue": 13,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "filterenva",
+              "displayText": "FILTER-ENV-A",
+              "internalValue": "filterenva",
+              "sendValue": 14,
+              "receiveValue": 14,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "filterenvd",
+              "displayText": "FILTER-ENV-D",
+              "internalValue": "filterenvd",
+              "sendValue": 15,
+              "receiveValue": 15,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "filterenvs",
+              "displayText": "FILTER-ENV-S",
+              "internalValue": "filterenvs",
+              "sendValue": 16,
+              "receiveValue": 16,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "filterenvr",
+              "displayText": "FILTER-ENV-R",
+              "internalValue": "filterenvr",
+              "sendValue": 17,
+              "receiveValue": 17,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "filterenvmod",
+              "displayText": "FILTER-ENV-MOD",
+              "internalValue": "filterenvmod",
+              "sendValue": 18,
+              "receiveValue": 18,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "amplevel",
+              "displayText": "AMP-LEVEL",
+              "internalValue": "amplevel",
+              "sendValue": 19,
+              "receiveValue": 19,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "ampenva",
+              "displayText": "AMP-ENV-A",
+              "internalValue": "ampenva",
+              "sendValue": 20,
+              "receiveValue": 20,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "ampenvd",
+              "displayText": "AMP-ENV-D",
+              "internalValue": "ampenvd",
+              "sendValue": 21,
+              "receiveValue": 21,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "ampenvs",
+              "displayText": "AMP-ENV-S",
+              "internalValue": "ampenvs",
+              "sendValue": 22,
+              "receiveValue": 22,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "ampenvr",
+              "displayText": "AMP-ENV-R",
+              "internalValue": "ampenvr",
+              "sendValue": 23,
+              "receiveValue": 23,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "efxctrl",
+              "displayText": "EFX-CTRL",
+              "internalValue": "efxctrl",
+              "sendValue": 24,
+              "receiveValue": 24,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "porttime",
+              "displayText": "PORT-TIME",
+              "internalValue": "porttime",
+              "sendValue": 25,
+              "receiveValue": 25,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "bender",
+              "displayText": "BENDER",
+              "internalValue": "bender",
+              "sendValue": 26,
+              "receiveValue": 26,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "modulation",
+              "displayText": "MODULATION",
+              "internalValue": "modulation",
+              "sendValue": 27,
+              "receiveValue": 27,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "filtercutoffkf",
+              "displayText": "FILTER-CUTOFF-KF",
+              "internalValue": "filtercutoffkf",
+              "sendValue": 28,
+              "receiveValue": 28,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "efxlevel",
+              "displayText": "EFX-LEVEL",
+              "internalValue": "efxlevel",
+              "sendValue": 29,
+              "receiveValue": 29,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -3986,6 +4698,33 @@
         },
         "Text": {
           "content": "dBeamPolarity"
+        },
+        "Behavior": {
+          "defaultValue": "normal"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "normal",
+              "displayText": "NORMAL",
+              "internalValue": "normal",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "reverse",
+              "displayText": "REVERSE",
+              "internalValue": "reverse",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
         },
         "DeviceBindings": {
           "bindings": [
@@ -4067,6 +4806,34 @@
         "Text": {
           "content": "effectsDistortionSelect"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -4146,6 +4913,34 @@
         },
         "Text": {
           "content": "effectsFlangerSelect"
+        },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
         },
         "DeviceBindings": {
           "bindings": [
@@ -4227,6 +5022,34 @@
         "Text": {
           "content": "effectsDelaySelect"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -4307,6 +5130,34 @@
         "Text": {
           "content": "effectsReverbSelect"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -4383,6 +5234,11 @@
           "y": 247,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 100
         },
         "DeviceBindings": {
           "bindings": [
@@ -4552,6 +5408,83 @@
         "Text": {
           "content": "wave"
         },
+        "Behavior": {
+          "defaultValue": "saw"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "saw",
+              "displayText": "SAW",
+              "internalValue": "saw",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sqr",
+              "displayText": "SQR",
+              "internalValue": "sqr",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "pwsqr",
+              "displayText": "PW-SQR",
+              "internalValue": "pwsqr",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "tri",
+              "displayText": "TRI",
+              "internalValue": "tri",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sine",
+              "displayText": "SINE",
+              "internalValue": "sine",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "noise",
+              "displayText": "NOISE",
+              "internalValue": "noise",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "supersaw",
+              "displayText": "SUPER-SAW",
+              "internalValue": "supersaw",
+              "sendValue": 6,
+              "receiveValue": 6,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -4632,6 +5565,43 @@
         "Text": {
           "content": "waveVariation"
         },
+        "Behavior": {
+          "defaultValue": "a"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "a",
+              "displayText": "A",
+              "internalValue": "a",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "b",
+              "displayText": "B",
+              "internalValue": "b",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "c",
+              "displayText": "C",
+              "internalValue": "c",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -4708,6 +5678,12 @@
           "y": 406,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 40,
+          "max": 88,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -4786,6 +5762,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 14,
+          "max": 114,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -4862,6 +5844,11 @@
           "y": 492,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -4940,6 +5927,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -5016,6 +6008,11 @@
           "y": 492,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -5094,6 +6091,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -5170,6 +6172,12 @@
           "y": 578,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -5295,6 +6303,63 @@
         "Text": {
           "content": "mode"
         },
+        "Behavior": {
+          "defaultValue": "bypass"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "bypass",
+              "displayText": "BYPASS",
+              "internalValue": "bypass",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "lpf",
+              "displayText": "LPF",
+              "internalValue": "lpf",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "hpf",
+              "displayText": "HPF",
+              "internalValue": "hpf",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "bpf",
+              "displayText": "BPF",
+              "internalValue": "bpf",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "pkg",
+              "displayText": "PKG",
+              "internalValue": "pkg",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -5375,6 +6440,33 @@
         "Text": {
           "content": "slope"
         },
+        "Behavior": {
+          "defaultValue": "12db"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "12db",
+              "displayText": "-12 dB",
+              "internalValue": "12db",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "24db",
+              "displayText": "-24 dB",
+              "internalValue": "24db",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -5451,6 +6543,11 @@
           "y": 693,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -5529,6 +6626,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 54,
+          "max": 74,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -5605,6 +6708,12 @@
           "y": 779,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -5683,6 +6792,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -5759,6 +6873,11 @@
           "y": 779,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -5837,6 +6956,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -5913,6 +7037,11 @@
           "y": 865,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -5991,6 +7120,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -6067,6 +7201,12 @@
           "y": 865,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -6189,6 +7329,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -6265,6 +7410,12 @@
           "y": 980,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -6343,6 +7494,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -6419,6 +7575,11 @@
           "y": 980,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -6497,6 +7658,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -6574,6 +7740,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -6650,6 +7821,11 @@
           "y": 1066,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -6775,6 +7951,73 @@
         "Text": {
           "content": "shape"
         },
+        "Behavior": {
+          "defaultValue": "tri"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "tri",
+              "displayText": "TRI",
+              "internalValue": "tri",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sin",
+              "displayText": "SIN",
+              "internalValue": "sin",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "saw",
+              "displayText": "SAW",
+              "internalValue": "saw",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sqr",
+              "displayText": "SQR",
+              "internalValue": "sqr",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sh",
+              "displayText": "S&H",
+              "internalValue": "sh",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "rnd",
+              "displayText": "RND",
+              "internalValue": "rnd",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -6851,6 +8094,11 @@
           "y": 1181,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -6932,6 +8180,34 @@
         "Text": {
           "content": "tempoSyncSwitch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -7012,6 +8288,213 @@
         "Text": {
           "content": "tempoSyncNote"
         },
+        "Behavior": {
+          "defaultValue": "16"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "16",
+              "displayText": "16",
+              "internalValue": "16",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "12",
+              "internalValue": "12",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "8",
+              "displayText": "8",
+              "internalValue": "8",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "4",
+              "displayText": "4",
+              "internalValue": "4",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "2",
+              "displayText": "2",
+              "internalValue": "2",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "1",
+              "displayText": "1",
+              "internalValue": "1",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "34",
+              "displayText": "3/4",
+              "internalValue": "34",
+              "sendValue": 6,
+              "receiveValue": 6,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "23",
+              "displayText": "2/3",
+              "internalValue": "23",
+              "sendValue": 7,
+              "receiveValue": 7,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "1/2",
+              "internalValue": "12",
+              "sendValue": 8,
+              "receiveValue": 8,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "38",
+              "displayText": "3/8",
+              "internalValue": "38",
+              "sendValue": 9,
+              "receiveValue": 9,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "13",
+              "displayText": "1/3",
+              "internalValue": "13",
+              "sendValue": 10,
+              "receiveValue": 10,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "14",
+              "displayText": "1/4",
+              "internalValue": "14",
+              "sendValue": 11,
+              "receiveValue": 11,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "316",
+              "displayText": "3/16",
+              "internalValue": "316",
+              "sendValue": 12,
+              "receiveValue": 12,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "16",
+              "displayText": "1/6",
+              "internalValue": "16",
+              "sendValue": 13,
+              "receiveValue": 13,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "18",
+              "displayText": "1/8",
+              "internalValue": "18",
+              "sendValue": 14,
+              "receiveValue": 14,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "332",
+              "displayText": "3/32",
+              "internalValue": "332",
+              "sendValue": 15,
+              "receiveValue": 15,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "112",
+              "displayText": "1/12",
+              "internalValue": "112",
+              "sendValue": 16,
+              "receiveValue": 16,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "116",
+              "displayText": "1/16",
+              "internalValue": "116",
+              "sendValue": 17,
+              "receiveValue": 17,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "124",
+              "displayText": "1/24",
+              "internalValue": "124",
+              "sendValue": 18,
+              "receiveValue": 18,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "132",
+              "displayText": "1/32",
+              "internalValue": "132",
+              "sendValue": 19,
+              "receiveValue": 19,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -7088,6 +8571,11 @@
           "y": 1267,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -7169,6 +8657,34 @@
         "Text": {
           "content": "keyTrigger"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -7245,6 +8761,12 @@
           "y": 1267,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -7323,6 +8845,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -7400,6 +8928,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -7476,6 +9010,12 @@
           "y": 1353,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -7601,6 +9141,73 @@
         "Text": {
           "content": "shape"
         },
+        "Behavior": {
+          "defaultValue": "tri"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "tri",
+              "displayText": "TRI",
+              "internalValue": "tri",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sin",
+              "displayText": "SIN",
+              "internalValue": "sin",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "saw",
+              "displayText": "SAW",
+              "internalValue": "saw",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sqr",
+              "displayText": "SQR",
+              "internalValue": "sqr",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sh",
+              "displayText": "S&H",
+              "internalValue": "sh",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "rnd",
+              "displayText": "RND",
+              "internalValue": "rnd",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -7677,6 +9284,11 @@
           "y": 1468,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -7758,6 +9370,34 @@
         "Text": {
           "content": "tempoSyncSwitch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -7838,6 +9478,213 @@
         "Text": {
           "content": "tempoSyncNote"
         },
+        "Behavior": {
+          "defaultValue": "16"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "16",
+              "displayText": "16",
+              "internalValue": "16",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "12",
+              "internalValue": "12",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "8",
+              "displayText": "8",
+              "internalValue": "8",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "4",
+              "displayText": "4",
+              "internalValue": "4",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "2",
+              "displayText": "2",
+              "internalValue": "2",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "1",
+              "displayText": "1",
+              "internalValue": "1",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "34",
+              "displayText": "3/4",
+              "internalValue": "34",
+              "sendValue": 6,
+              "receiveValue": 6,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "23",
+              "displayText": "2/3",
+              "internalValue": "23",
+              "sendValue": 7,
+              "receiveValue": 7,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "1/2",
+              "internalValue": "12",
+              "sendValue": 8,
+              "receiveValue": 8,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "38",
+              "displayText": "3/8",
+              "internalValue": "38",
+              "sendValue": 9,
+              "receiveValue": 9,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "13",
+              "displayText": "1/3",
+              "internalValue": "13",
+              "sendValue": 10,
+              "receiveValue": 10,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "14",
+              "displayText": "1/4",
+              "internalValue": "14",
+              "sendValue": 11,
+              "receiveValue": 11,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "316",
+              "displayText": "3/16",
+              "internalValue": "316",
+              "sendValue": 12,
+              "receiveValue": 12,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "16",
+              "displayText": "1/6",
+              "internalValue": "16",
+              "sendValue": 13,
+              "receiveValue": 13,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "18",
+              "displayText": "1/8",
+              "internalValue": "18",
+              "sendValue": 14,
+              "receiveValue": 14,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "332",
+              "displayText": "3/32",
+              "internalValue": "332",
+              "sendValue": 15,
+              "receiveValue": 15,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "112",
+              "displayText": "1/12",
+              "internalValue": "112",
+              "sendValue": 16,
+              "receiveValue": 16,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "116",
+              "displayText": "1/16",
+              "internalValue": "116",
+              "sendValue": 17,
+              "receiveValue": 17,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "124",
+              "displayText": "1/24",
+              "internalValue": "124",
+              "sendValue": 18,
+              "receiveValue": 18,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "132",
+              "displayText": "1/32",
+              "internalValue": "132",
+              "sendValue": 19,
+              "receiveValue": 19,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -7914,6 +9761,12 @@
           "y": 1554,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -7992,6 +9845,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -8069,6 +9928,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -8145,6 +10010,12 @@
           "y": 1554,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -8314,6 +10185,83 @@
         "Text": {
           "content": "wave"
         },
+        "Behavior": {
+          "defaultValue": "saw"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "saw",
+              "displayText": "SAW",
+              "internalValue": "saw",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sqr",
+              "displayText": "SQR",
+              "internalValue": "sqr",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "pwsqr",
+              "displayText": "PW-SQR",
+              "internalValue": "pwsqr",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "tri",
+              "displayText": "TRI",
+              "internalValue": "tri",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sine",
+              "displayText": "SINE",
+              "internalValue": "sine",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "noise",
+              "displayText": "NOISE",
+              "internalValue": "noise",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "supersaw",
+              "displayText": "SUPER-SAW",
+              "internalValue": "supersaw",
+              "sendValue": 6,
+              "receiveValue": 6,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -8394,6 +10342,43 @@
         "Text": {
           "content": "waveVariation"
         },
+        "Behavior": {
+          "defaultValue": "a"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "a",
+              "displayText": "A",
+              "internalValue": "a",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "b",
+              "displayText": "B",
+              "internalValue": "b",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "c",
+              "displayText": "C",
+              "internalValue": "c",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -8470,6 +10455,12 @@
           "y": 406,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 40,
+          "max": 88,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -8548,6 +10539,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 14,
+          "max": 114,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -8624,6 +10621,11 @@
           "y": 492,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -8702,6 +10704,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -8778,6 +10785,11 @@
           "y": 492,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -8856,6 +10868,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -8932,6 +10949,12 @@
           "y": 578,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -9057,6 +11080,63 @@
         "Text": {
           "content": "mode"
         },
+        "Behavior": {
+          "defaultValue": "bypass"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "bypass",
+              "displayText": "BYPASS",
+              "internalValue": "bypass",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "lpf",
+              "displayText": "LPF",
+              "internalValue": "lpf",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "hpf",
+              "displayText": "HPF",
+              "internalValue": "hpf",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "bpf",
+              "displayText": "BPF",
+              "internalValue": "bpf",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "pkg",
+              "displayText": "PKG",
+              "internalValue": "pkg",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -9137,6 +11217,33 @@
         "Text": {
           "content": "slope"
         },
+        "Behavior": {
+          "defaultValue": "12db"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "12db",
+              "displayText": "-12 dB",
+              "internalValue": "12db",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "24db",
+              "displayText": "-24 dB",
+              "internalValue": "24db",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -9213,6 +11320,11 @@
           "y": 693,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -9291,6 +11403,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 54,
+          "max": 74,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -9367,6 +11485,12 @@
           "y": 779,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -9445,6 +11569,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -9521,6 +11650,11 @@
           "y": 779,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -9599,6 +11733,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -9675,6 +11814,11 @@
           "y": 865,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -9753,6 +11897,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -9829,6 +11978,12 @@
           "y": 865,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -9951,6 +12106,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -10027,6 +12187,12 @@
           "y": 980,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -10105,6 +12271,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -10181,6 +12352,11 @@
           "y": 980,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -10259,6 +12435,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -10336,6 +12517,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -10412,6 +12598,11 @@
           "y": 1066,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -10537,6 +12728,73 @@
         "Text": {
           "content": "shape"
         },
+        "Behavior": {
+          "defaultValue": "tri"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "tri",
+              "displayText": "TRI",
+              "internalValue": "tri",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sin",
+              "displayText": "SIN",
+              "internalValue": "sin",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "saw",
+              "displayText": "SAW",
+              "internalValue": "saw",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sqr",
+              "displayText": "SQR",
+              "internalValue": "sqr",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sh",
+              "displayText": "S&H",
+              "internalValue": "sh",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "rnd",
+              "displayText": "RND",
+              "internalValue": "rnd",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -10613,6 +12871,11 @@
           "y": 1181,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -10694,6 +12957,34 @@
         "Text": {
           "content": "tempoSyncSwitch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -10774,6 +13065,213 @@
         "Text": {
           "content": "tempoSyncNote"
         },
+        "Behavior": {
+          "defaultValue": "16"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "16",
+              "displayText": "16",
+              "internalValue": "16",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "12",
+              "internalValue": "12",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "8",
+              "displayText": "8",
+              "internalValue": "8",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "4",
+              "displayText": "4",
+              "internalValue": "4",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "2",
+              "displayText": "2",
+              "internalValue": "2",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "1",
+              "displayText": "1",
+              "internalValue": "1",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "34",
+              "displayText": "3/4",
+              "internalValue": "34",
+              "sendValue": 6,
+              "receiveValue": 6,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "23",
+              "displayText": "2/3",
+              "internalValue": "23",
+              "sendValue": 7,
+              "receiveValue": 7,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "1/2",
+              "internalValue": "12",
+              "sendValue": 8,
+              "receiveValue": 8,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "38",
+              "displayText": "3/8",
+              "internalValue": "38",
+              "sendValue": 9,
+              "receiveValue": 9,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "13",
+              "displayText": "1/3",
+              "internalValue": "13",
+              "sendValue": 10,
+              "receiveValue": 10,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "14",
+              "displayText": "1/4",
+              "internalValue": "14",
+              "sendValue": 11,
+              "receiveValue": 11,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "316",
+              "displayText": "3/16",
+              "internalValue": "316",
+              "sendValue": 12,
+              "receiveValue": 12,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "16",
+              "displayText": "1/6",
+              "internalValue": "16",
+              "sendValue": 13,
+              "receiveValue": 13,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "18",
+              "displayText": "1/8",
+              "internalValue": "18",
+              "sendValue": 14,
+              "receiveValue": 14,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "332",
+              "displayText": "3/32",
+              "internalValue": "332",
+              "sendValue": 15,
+              "receiveValue": 15,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "112",
+              "displayText": "1/12",
+              "internalValue": "112",
+              "sendValue": 16,
+              "receiveValue": 16,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "116",
+              "displayText": "1/16",
+              "internalValue": "116",
+              "sendValue": 17,
+              "receiveValue": 17,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "124",
+              "displayText": "1/24",
+              "internalValue": "124",
+              "sendValue": 18,
+              "receiveValue": 18,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "132",
+              "displayText": "1/32",
+              "internalValue": "132",
+              "sendValue": 19,
+              "receiveValue": 19,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -10850,6 +13348,11 @@
           "y": 1267,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -10931,6 +13434,34 @@
         "Text": {
           "content": "keyTrigger"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -11007,6 +13538,12 @@
           "y": 1267,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -11085,6 +13622,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -11162,6 +13705,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -11238,6 +13787,12 @@
           "y": 1353,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -11363,6 +13918,73 @@
         "Text": {
           "content": "shape"
         },
+        "Behavior": {
+          "defaultValue": "tri"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "tri",
+              "displayText": "TRI",
+              "internalValue": "tri",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sin",
+              "displayText": "SIN",
+              "internalValue": "sin",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "saw",
+              "displayText": "SAW",
+              "internalValue": "saw",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sqr",
+              "displayText": "SQR",
+              "internalValue": "sqr",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sh",
+              "displayText": "S&H",
+              "internalValue": "sh",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "rnd",
+              "displayText": "RND",
+              "internalValue": "rnd",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -11439,6 +14061,11 @@
           "y": 1468,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -11520,6 +14147,34 @@
         "Text": {
           "content": "tempoSyncSwitch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -11600,6 +14255,213 @@
         "Text": {
           "content": "tempoSyncNote"
         },
+        "Behavior": {
+          "defaultValue": "16"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "16",
+              "displayText": "16",
+              "internalValue": "16",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "12",
+              "internalValue": "12",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "8",
+              "displayText": "8",
+              "internalValue": "8",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "4",
+              "displayText": "4",
+              "internalValue": "4",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "2",
+              "displayText": "2",
+              "internalValue": "2",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "1",
+              "displayText": "1",
+              "internalValue": "1",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "34",
+              "displayText": "3/4",
+              "internalValue": "34",
+              "sendValue": 6,
+              "receiveValue": 6,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "23",
+              "displayText": "2/3",
+              "internalValue": "23",
+              "sendValue": 7,
+              "receiveValue": 7,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "1/2",
+              "internalValue": "12",
+              "sendValue": 8,
+              "receiveValue": 8,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "38",
+              "displayText": "3/8",
+              "internalValue": "38",
+              "sendValue": 9,
+              "receiveValue": 9,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "13",
+              "displayText": "1/3",
+              "internalValue": "13",
+              "sendValue": 10,
+              "receiveValue": 10,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "14",
+              "displayText": "1/4",
+              "internalValue": "14",
+              "sendValue": 11,
+              "receiveValue": 11,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "316",
+              "displayText": "3/16",
+              "internalValue": "316",
+              "sendValue": 12,
+              "receiveValue": 12,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "16",
+              "displayText": "1/6",
+              "internalValue": "16",
+              "sendValue": 13,
+              "receiveValue": 13,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "18",
+              "displayText": "1/8",
+              "internalValue": "18",
+              "sendValue": 14,
+              "receiveValue": 14,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "332",
+              "displayText": "3/32",
+              "internalValue": "332",
+              "sendValue": 15,
+              "receiveValue": 15,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "112",
+              "displayText": "1/12",
+              "internalValue": "112",
+              "sendValue": 16,
+              "receiveValue": 16,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "116",
+              "displayText": "1/16",
+              "internalValue": "116",
+              "sendValue": 17,
+              "receiveValue": 17,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "124",
+              "displayText": "1/24",
+              "internalValue": "124",
+              "sendValue": 18,
+              "receiveValue": 18,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "132",
+              "displayText": "1/32",
+              "internalValue": "132",
+              "sendValue": 19,
+              "receiveValue": 19,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -11676,6 +14538,12 @@
           "y": 1554,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -11754,6 +14622,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -11831,6 +14705,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -11907,6 +14787,12 @@
           "y": 1554,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -12076,6 +14962,83 @@
         "Text": {
           "content": "wave"
         },
+        "Behavior": {
+          "defaultValue": "saw"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "saw",
+              "displayText": "SAW",
+              "internalValue": "saw",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sqr",
+              "displayText": "SQR",
+              "internalValue": "sqr",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "pwsqr",
+              "displayText": "PW-SQR",
+              "internalValue": "pwsqr",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "tri",
+              "displayText": "TRI",
+              "internalValue": "tri",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sine",
+              "displayText": "SINE",
+              "internalValue": "sine",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "noise",
+              "displayText": "NOISE",
+              "internalValue": "noise",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "supersaw",
+              "displayText": "SUPER-SAW",
+              "internalValue": "supersaw",
+              "sendValue": 6,
+              "receiveValue": 6,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -12156,6 +15119,43 @@
         "Text": {
           "content": "waveVariation"
         },
+        "Behavior": {
+          "defaultValue": "a"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "a",
+              "displayText": "A",
+              "internalValue": "a",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "b",
+              "displayText": "B",
+              "internalValue": "b",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "c",
+              "displayText": "C",
+              "internalValue": "c",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -12232,6 +15232,12 @@
           "y": 406,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 40,
+          "max": 88,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -12310,6 +15316,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 14,
+          "max": 114,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -12386,6 +15398,11 @@
           "y": 492,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -12464,6 +15481,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -12540,6 +15562,11 @@
           "y": 492,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -12618,6 +15645,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -12694,6 +15726,12 @@
           "y": 578,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -12819,6 +15857,63 @@
         "Text": {
           "content": "mode"
         },
+        "Behavior": {
+          "defaultValue": "bypass"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "bypass",
+              "displayText": "BYPASS",
+              "internalValue": "bypass",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "lpf",
+              "displayText": "LPF",
+              "internalValue": "lpf",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "hpf",
+              "displayText": "HPF",
+              "internalValue": "hpf",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "bpf",
+              "displayText": "BPF",
+              "internalValue": "bpf",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "pkg",
+              "displayText": "PKG",
+              "internalValue": "pkg",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -12899,6 +15994,33 @@
         "Text": {
           "content": "slope"
         },
+        "Behavior": {
+          "defaultValue": "12db"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "12db",
+              "displayText": "-12 dB",
+              "internalValue": "12db",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "24db",
+              "displayText": "-24 dB",
+              "internalValue": "24db",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -12975,6 +16097,11 @@
           "y": 693,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -13053,6 +16180,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 54,
+          "max": 74,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -13129,6 +16262,12 @@
           "y": 779,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -13207,6 +16346,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -13283,6 +16427,11 @@
           "y": 779,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -13361,6 +16510,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -13437,6 +16591,11 @@
           "y": 865,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -13515,6 +16674,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -13591,6 +16755,12 @@
           "y": 865,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -13713,6 +16883,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -13789,6 +16964,12 @@
           "y": 980,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -13867,6 +17048,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -13943,6 +17129,11 @@
           "y": 980,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -14021,6 +17212,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -14098,6 +17294,11 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -14174,6 +17375,11 @@
           "y": 1066,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -14299,6 +17505,73 @@
         "Text": {
           "content": "shape"
         },
+        "Behavior": {
+          "defaultValue": "tri"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "tri",
+              "displayText": "TRI",
+              "internalValue": "tri",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sin",
+              "displayText": "SIN",
+              "internalValue": "sin",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "saw",
+              "displayText": "SAW",
+              "internalValue": "saw",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sqr",
+              "displayText": "SQR",
+              "internalValue": "sqr",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sh",
+              "displayText": "S&H",
+              "internalValue": "sh",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "rnd",
+              "displayText": "RND",
+              "internalValue": "rnd",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -14375,6 +17648,11 @@
           "y": 1181,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -14456,6 +17734,34 @@
         "Text": {
           "content": "tempoSyncSwitch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -14536,6 +17842,213 @@
         "Text": {
           "content": "tempoSyncNote"
         },
+        "Behavior": {
+          "defaultValue": "16"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "16",
+              "displayText": "16",
+              "internalValue": "16",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "12",
+              "internalValue": "12",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "8",
+              "displayText": "8",
+              "internalValue": "8",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "4",
+              "displayText": "4",
+              "internalValue": "4",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "2",
+              "displayText": "2",
+              "internalValue": "2",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "1",
+              "displayText": "1",
+              "internalValue": "1",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "34",
+              "displayText": "3/4",
+              "internalValue": "34",
+              "sendValue": 6,
+              "receiveValue": 6,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "23",
+              "displayText": "2/3",
+              "internalValue": "23",
+              "sendValue": 7,
+              "receiveValue": 7,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "1/2",
+              "internalValue": "12",
+              "sendValue": 8,
+              "receiveValue": 8,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "38",
+              "displayText": "3/8",
+              "internalValue": "38",
+              "sendValue": 9,
+              "receiveValue": 9,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "13",
+              "displayText": "1/3",
+              "internalValue": "13",
+              "sendValue": 10,
+              "receiveValue": 10,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "14",
+              "displayText": "1/4",
+              "internalValue": "14",
+              "sendValue": 11,
+              "receiveValue": 11,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "316",
+              "displayText": "3/16",
+              "internalValue": "316",
+              "sendValue": 12,
+              "receiveValue": 12,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "16",
+              "displayText": "1/6",
+              "internalValue": "16",
+              "sendValue": 13,
+              "receiveValue": 13,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "18",
+              "displayText": "1/8",
+              "internalValue": "18",
+              "sendValue": 14,
+              "receiveValue": 14,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "332",
+              "displayText": "3/32",
+              "internalValue": "332",
+              "sendValue": 15,
+              "receiveValue": 15,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "112",
+              "displayText": "1/12",
+              "internalValue": "112",
+              "sendValue": 16,
+              "receiveValue": 16,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "116",
+              "displayText": "1/16",
+              "internalValue": "116",
+              "sendValue": 17,
+              "receiveValue": 17,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "124",
+              "displayText": "1/24",
+              "internalValue": "124",
+              "sendValue": 18,
+              "receiveValue": 18,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "132",
+              "displayText": "1/32",
+              "internalValue": "132",
+              "sendValue": 19,
+              "receiveValue": 19,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -14612,6 +18125,11 @@
           "y": 1267,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -14693,6 +18211,34 @@
         "Text": {
           "content": "keyTrigger"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -14769,6 +18315,12 @@
           "y": 1267,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -14847,6 +18399,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -14924,6 +18482,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -15000,6 +18564,12 @@
           "y": 1353,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -15125,6 +18695,73 @@
         "Text": {
           "content": "shape"
         },
+        "Behavior": {
+          "defaultValue": "tri"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "tri",
+              "displayText": "TRI",
+              "internalValue": "tri",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sin",
+              "displayText": "SIN",
+              "internalValue": "sin",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "saw",
+              "displayText": "SAW",
+              "internalValue": "saw",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sqr",
+              "displayText": "SQR",
+              "internalValue": "sqr",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "sh",
+              "displayText": "S&H",
+              "internalValue": "sh",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "rnd",
+              "displayText": "RND",
+              "internalValue": "rnd",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -15201,6 +18838,11 @@
           "y": 1468,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "max": 127,
+          "defaultCurrentValue": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -15282,6 +18924,34 @@
         "Text": {
           "content": "tempoSyncSwitch"
         },
+        "Behavior": {
+          "valueType": "enum",
+          "defaultValue": "off"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "off",
+              "displayText": "OFF",
+              "internalValue": "off",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "on",
+              "displayText": "ON",
+              "internalValue": "on",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -15362,6 +19032,213 @@
         "Text": {
           "content": "tempoSyncNote"
         },
+        "Behavior": {
+          "defaultValue": "16"
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "16",
+              "displayText": "16",
+              "internalValue": "16",
+              "sendValue": 0,
+              "receiveValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "12",
+              "internalValue": "12",
+              "sendValue": 1,
+              "receiveValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "8",
+              "displayText": "8",
+              "internalValue": "8",
+              "sendValue": 2,
+              "receiveValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "4",
+              "displayText": "4",
+              "internalValue": "4",
+              "sendValue": 3,
+              "receiveValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "2",
+              "displayText": "2",
+              "internalValue": "2",
+              "sendValue": 4,
+              "receiveValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "1",
+              "displayText": "1",
+              "internalValue": "1",
+              "sendValue": 5,
+              "receiveValue": 5,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "34",
+              "displayText": "3/4",
+              "internalValue": "34",
+              "sendValue": 6,
+              "receiveValue": 6,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "23",
+              "displayText": "2/3",
+              "internalValue": "23",
+              "sendValue": 7,
+              "receiveValue": 7,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "12",
+              "displayText": "1/2",
+              "internalValue": "12",
+              "sendValue": 8,
+              "receiveValue": 8,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "38",
+              "displayText": "3/8",
+              "internalValue": "38",
+              "sendValue": 9,
+              "receiveValue": 9,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "13",
+              "displayText": "1/3",
+              "internalValue": "13",
+              "sendValue": 10,
+              "receiveValue": 10,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "14",
+              "displayText": "1/4",
+              "internalValue": "14",
+              "sendValue": 11,
+              "receiveValue": 11,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "316",
+              "displayText": "3/16",
+              "internalValue": "316",
+              "sendValue": 12,
+              "receiveValue": 12,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "16",
+              "displayText": "1/6",
+              "internalValue": "16",
+              "sendValue": 13,
+              "receiveValue": 13,
+              "selectedByDefault": true,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "18",
+              "displayText": "1/8",
+              "internalValue": "18",
+              "sendValue": 14,
+              "receiveValue": 14,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "332",
+              "displayText": "3/32",
+              "internalValue": "332",
+              "sendValue": 15,
+              "receiveValue": 15,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "112",
+              "displayText": "1/12",
+              "internalValue": "112",
+              "sendValue": 16,
+              "receiveValue": 16,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "116",
+              "displayText": "1/16",
+              "internalValue": "116",
+              "sendValue": 17,
+              "receiveValue": 17,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "124",
+              "displayText": "1/24",
+              "internalValue": "124",
+              "sendValue": 18,
+              "receiveValue": 18,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            },
+            {
+              "id": "132",
+              "displayText": "1/32",
+              "internalValue": "132",
+              "sendValue": 19,
+              "receiveValue": 19,
+              "selectedByDefault": false,
+              "enabled": true,
+              "visualOverrides": {}
+            }
+          ]
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -15438,6 +19315,12 @@
           "y": 1554,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [
@@ -15516,6 +19399,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -15593,6 +19482,12 @@
           "width": 108,
           "height": 62
         },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
         "DeviceBindings": {
           "bindings": [
             {
@@ -15669,6 +19564,12 @@
           "y": 1554,
           "width": 108,
           "height": 62
+        },
+        "Behavior": {
+          "valueType": "int",
+          "min": 1,
+          "max": 127,
+          "defaultCurrentValue": 64
         },
         "DeviceBindings": {
           "bindings": [

@@ -20,6 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createControl } from '../../../../CE/web/src/CE_Application/models/componentTypes.js';
+import { parameterAdoptionPatches } from '../../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel } from '../../../../CE/web/src/CE_Application/stores/panelModel.js';
 import { GRID, styleSheet } from '../layout.mjs';
 
@@ -63,13 +64,27 @@ function label(text, box, id, { size = 11, bold = false, fill = '00000000', colo
   });
 }
 
+/** Set a dotted 'Section.path' on a freshly built control. */
+function setPath(control, path, value) {
+  const keys = path.split('.');
+  let node = control._children;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (!node[keys[i]]) node[keys[i]] = {};
+    node = node[keys[i]];
+  }
+  node[keys[keys.length - 1]] = value;
+}
+
 /**
  * One bound control for one profile parameter.
  *
- * The binding is the point of the sheet. `adoptMetadata` is on, so the control takes its range,
- * choices and display from the profile rather than from anything written here — which means a
- * wrong range on screen is a wrong range in the profile, and that is exactly the failure this
- * sheet should surface rather than paper over.
+ * The binding alone is not enough, and the first draft of this sheet proved it: it set
+ * `adoptMetadata: true` and stopped there, so every knob rendered 0.00–1.00 and every combobox
+ * said "Option 1". `adoptMetadata` is a flag the editor reads when a parameter is DROPPED onto a
+ * control — the thing that actually shapes the control is adoptParameterMetadata, which stamps the
+ * range, choices and label onto it. A generated sheet has no drop, so it applies the same rules
+ * itself, from the same module the editor uses (parameterAdoptionRules.js) rather than a copy that
+ * would drift.
  */
 function boundControl(parameter, box, id) {
   const type = parameter.ui?.preferredComponent ?? 'Knob';
@@ -92,11 +107,20 @@ function boundControl(parameter, box, id) {
     },
   };
 
-  if (type === 'ToggleButton' || type === 'RadioButtonGroup' || type === 'Combobox') {
-    overrides.Text = { content: parameter.display?.shortLabel ?? parameter.name };
+  const control = createControl(type, overrides);
+
+  // Same rules the canvas runs on a parameter drop: range, choices, value type, button behaviour.
+  for (const [path, value] of Object.entries(parameterAdoptionPatches(type, parameter))) {
+    setPath(control, path, value);
   }
 
-  return createControl(type, overrides);
+  // A label for the controls whose own text is not their label — a knob has no room for one, so
+  // the caption above it carries the name and the control carries the value.
+  if (type === 'ToggleButton' && !control._children.Text?.content) {
+    setPath(control, 'Text.content', parameter.display?.shortLabel ?? parameter.name);
+  }
+
+  return control;
 }
 
 /** Lay a section's parameters out as a wrapped row of cells inside a column. */
