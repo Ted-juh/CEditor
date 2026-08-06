@@ -339,8 +339,24 @@ export function buildGaiaPanel() {
   const controls = [];
   const missing = [];
 
+  // The dark control plate the sections sit on, and the white body around it. Emitted first so
+  // everything else lands on top — the panel has no z-order beyond document order.
+  const PLATE_INSET = 10;
+  const plate = createControl('Background', {
+    Core: { id: 'gaia_plate', name: 'plate' },
+    Transform: { x: PLATE_INSET, y: PLATE_INSET, width: PANEL_WIDTH - PLATE_INSET * 2, height: 10 },
+    Background: {
+      _children: {
+        Fill: { colour: SKIN.plate },
+        Border: { enabled: true, thickness: 1, colour: SKIN.plateEdge },
+        Corners: { radius: 10 },
+      },
+    },
+  });
+  controls.push(plate);
+
   // Header, then three tone strips, then arpeggio + effects.
-  let y = 14;
+  let y = 26;
   const common = buildStrip(COMMON_STRIP, byId, { originX: 16, originY: y });
   controls.push(...common.controls);
   missing.push(...common.missing);
@@ -368,9 +384,17 @@ export function buildGaiaPanel() {
     throw new Error(`layout.mjs places parameters the profile does not have:\n  ${[...new Set(missing)].join('\n  ')}`);
   }
 
+  // The instrument's own branding, bottom-left on the white body exactly where Roland prints it.
+  const brandY = y + 16;
+  controls.push(label('Roland', { x: 26, y: brandY, w: 120, h: 30 }, { size: 24, bold: true, colour: 'FF23282D', align: 'left' }));
+  controls.push(label('GAIA', { x: 150, y: brandY - 2, w: 130, h: 34 }, { size: 28, bold: true, colour: 'FFB0161C', align: 'left' }));
+  controls.push(label('SYNTHESIZER  SH-01', { x: 286, y: brandY + 12, w: 220, h: 14 }, { size: 10, colour: 'FF5A626A', align: 'left' }));
+
+  plate._children.Transform.height = y - PLATE_INSET + 4;
+
   panel.controls = controls;
   panel.width = PANEL_WIDTH;
-  panel.height = y + 14;
+  panel.height = brandY + 46;
   panel.bgColour = SKIN.panelBg;
   panel.gridEnabled = false;
   panel.snapToGrid = false;

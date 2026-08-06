@@ -28,7 +28,12 @@ export const TINT = {
 };
 
 export const SKIN = {
-  panelBg: 'FF16191C',
+  // The instrument is a WHITE body with a dark control area inset into it, and that contrast is
+  // the first thing anyone recognises about a GAIA — more than any individual knob. So the panel
+  // is silver and the controls sit on a dark plate, the same way they do on the hardware.
+  panelBg: 'FFE4E6E8',
+  plate: 'FF15181B',
+  plateEdge: 'FF3A4148',
   boxFill: 'FF23272B',
   boxBorder: '33FFFFFF',
   headerText: 'FF11141600',

@@ -143,16 +143,45 @@ export function gaiaFader({ width = 30, height = 108 } = {}) {
  * component and not a styled Knob — rotation of an arbitrary part is not something the built-in
  * one exposes.
  */
-export function gaiaKnob({ size = 54 } = {}) {
+export function gaiaKnob({ size = 54, ticks = 11 } = {}) {
   const r = size / 2;
+
+  // The ring of tick marks printed around every knob on the instrument. Placed here rather than
+  // left to a generator because their whole job is to sit on an arc at fixed angles, and thirteen
+  // lines of trigonometry is less machinery than a generator that has to be told the same thing.
+  const tickParts = {};
+  const sweep = 270;
+  for (let i = 0; i < ticks; i++) {
+    const deg = -135 + (sweep * i) / (ticks - 1);
+    const rad = (deg - 90) * (Math.PI / 180);
+    const ringR = r - 2;
+    const major = i === 0 || i === ticks - 1 || i === (ticks - 1) / 2;
+    const len = major ? 5 : 3;
+    tickParts[`tick${i}`] = rect(
+      `tick${i}`,
+      {
+        x: r + Math.cos(rad) * (ringR - len / 2) - 1,
+        y: r + Math.sin(rad) * (ringR - len / 2) - len / 2,
+        width: major ? 2 : 1.5,
+        height: len,
+      },
+      major ? 'FFB9C4CD' : 'FF6C7883',
+      { zIndex: 0, radius: 1 },
+    );
+  }
+
   return component({
     name: 'GAIA Knob',
     width: size,
     height: size,
     parts: {
-      body: rect('body', { x: 3, y: 3, width: size - 6, height: size - 6 }, 'FF1B2126', { zIndex: 1, radius: 999, borderColour: 'FF454F58', borderThickness: 2 }),
-      cap: rect('cap', { x: 8, y: 8, width: size - 16, height: size - 16 }, 'FF2A3238', { zIndex: 2, radius: 999, borderColour: '3300000', borderThickness: 1 }),
-      pointer: rect('pointer', { x: r - 1.5, y: 6, width: 3, height: r - 6 }, 'FFF2F6F9', { zIndex: 6, radius: 2 }),
+      ...tickParts,
+      // A dark cylinder with a lighter rim and a lit chamfer, which is what gives the hardware's
+      // knobs their depth. Three stacked circles do it; a gradient would do it better.
+      body: rect('body', { x: 6, y: 6, width: size - 12, height: size - 12 }, 'FF0F1417', { zIndex: 1, radius: 999, borderColour: 'FF59646E', borderThickness: 2 }),
+      face: rect('face', { x: 9, y: 9, width: size - 18, height: size - 18 }, 'FF272F36', { zIndex: 2, radius: 999, borderColour: '55000000', borderThickness: 1 }),
+      chamfer: rect('chamfer', { x: 12, y: 11, width: size - 24, height: (size - 24) / 2 }, '18FFFFFF', { zIndex: 3, radius: 999 }),
+      pointer: rect('pointer', { x: r - 2, y: 10, width: 4, height: r - 13 }, 'FFF4F8FB', { zIndex: 6, radius: 2 }),
     },
     behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'circular', role: 'knob', dragMode: 'vertical' }),
     hitZone: createHitZone('grab', { targetBehavior: 'drive', targetValueChannel: 'value', action: 'setValue', bounds: { x: 0, y: 0, width: 100, height: 100, unit: 'percent' } }),
