@@ -21,6 +21,12 @@
 /.claude/
 *.cache
 *.exe
+# ...except the vendored JUCE helpers. juceaide and the LV2/VST3 helpers are
+# part of the JUCE 8.0.7 install this repo carries, and find_package(JUCE)
+# hard-fails without them. The blanket *.exe above had been quietly excluding
+# them: JUCE/include and JUCE/lib were committed, JUCE/bin never was, and CI
+# could not configure as a result.
+!JUCE/bin/**
 *.obj
 *.pdb
 *.user

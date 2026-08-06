@@ -1,7 +1,14 @@
 # CEditor CI — Windows build + full test suite.
 #
-# Everything the build needs is in the repo (vendored JUCE 8.0.7 install incl. juceaide,
-# WebView2 SDK in CE/thirdparty), except Lua/sol2 which FetchContent pulls at configure time.
+# Everything the build needs is in the repo (vendored JUCE 8.0.7 install, WebView2 SDK in
+# CE/thirdparty), except Lua/sol2 which FetchContent pulls at configure time.
+#
+# "Vendored JUCE install" means all three parts: JUCE/include, JUCE/lib AND the helper
+# executables in JUCE/bin/JUCE-8.0.7 (juceaide, juce_lv2_helper, juce_vst3_helper). That last
+# part was missing for a long stretch — a blanket `*.exe` in .gitignore kept it out — and this
+# comment used to claim it was present while configure failed on every run. .gitignore now has
+# an explicit exception for JUCE/bin, CMakeLists checks for the files before find_package, and
+# CE/web/test/vendoredJuceHelpers.test.js fails if the ignore rule creeps back.
 # The web bundle must be built BEFORE CMake configure: CMakeLists globs CE/web/dist into
 # PlayerWebData (the embedded player UI).
 #

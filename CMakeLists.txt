@@ -11,6 +11,46 @@ enable_testing()
 option(CEDITOR_DEV_MODE "Load the frontend from the Vite dev server" ON)
 
 # JUCE 8.0.7 from local install
+#
+# The install is vendored in three parts: headers and module sources under
+# JUCE/include, the CMake package under JUCE/lib, and three helper executables
+# under JUCE/bin. The third part is easy to lose — a blanket `*.exe` in
+# .gitignore silently kept it out of the repository, and the only symptom was
+# find_package below failing inside a generated import file with "the imported
+# target references the file ... but this file does not exist", which reads
+# like a corrupt JUCE install rather than a missing commit.
+#
+# So check first and say what is actually wrong. These files are not
+# buildable from what is vendored here (the install carries no juceaide
+# source), so the fix is always to copy them in from a JUCE 8.0.7 install.
+set(JUCE_VENDORED_BIN "${CMAKE_SOURCE_DIR}/JUCE/bin/JUCE-8.0.7")
+set(JUCE_REQUIRED_HELPERS juceaide juce_lv2_helper juce_vst3_helper)
+if(WIN32)
+    set(JUCE_HELPER_SUFFIX ".exe")
+else()
+    set(JUCE_HELPER_SUFFIX "")
+endif()
+
+set(JUCE_MISSING_HELPERS "")
+foreach(helper IN LISTS JUCE_REQUIRED_HELPERS)
+    if(NOT EXISTS "${JUCE_VENDORED_BIN}/${helper}${JUCE_HELPER_SUFFIX}")
+        list(APPEND JUCE_MISSING_HELPERS "  JUCE/bin/JUCE-8.0.7/${helper}${JUCE_HELPER_SUFFIX}")
+    endif()
+endforeach()
+
+if(JUCE_MISSING_HELPERS)
+    string(REPLACE ";" "\n" JUCE_MISSING_HELPERS_TEXT "${JUCE_MISSING_HELPERS}")
+    message(FATAL_ERROR
+        "The vendored JUCE 8.0.7 install is missing its helper executables:\n"
+        "${JUCE_MISSING_HELPERS_TEXT}\n\n"
+        "JUCE/include and JUCE/lib are committed but JUCE/bin is not, so "
+        "find_package(JUCE) cannot resolve juce::juceaide and the plugin "
+        "format helpers.\n\n"
+        "Copy them from a JUCE 8.0.7 install (they sit in bin/JUCE-8.0.7 "
+        "there too) and commit them. .gitignore has an exception for this "
+        "directory; without it the blanket *.exe rule drops them again.")
+endif()
+
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/JUCE/lib/cmake/JUCE-8.0.7")
 find_package(JUCE CONFIG REQUIRED)
 
