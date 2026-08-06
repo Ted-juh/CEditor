@@ -93,14 +93,42 @@ export function getSliderPrimaryRole(behavior = null, activeHandle = '') {
   return mode === 'range' ? 'start' : 'current';
 }
 
+/**
+ * Where a single-value slider sits before anyone touches it.
+ *
+ * `defaultCurrentValue` is the authored answer — it is what the Slider tab's "Default Current"
+ * field writes, and what exportParameters serialises as the parameter's default. It has to win.
+ *
+ * It did not. `centerValue` was consulted first and returned whenever it was finite, and it is
+ * ALWAYS finite: both section templates ship one (0.5). So the authored default was dead for
+ * every slider whose Centre had not been changed by hand, and the two paths disagreed —
+ * exportParameters wrote the author's -6 into the file while the canvas and preview started at
+ * clamp(0.5, -60, 12) = 0.5 dB. Saved state and visible state describing different sliders.
+ *
+ * Centre is not a starting value and does not claim to be: its own field describes it as an
+ * "optional centre reference value for bipolar sliders and centre markers", and the only other
+ * reader is SliderFamilyRenderer drawing that marker. A bipolar slider that should rest at its
+ * centre already gets there honestly — the presets set defaultCurrentValue to the centre for
+ * exactly that case (SliderEditor's applyPreset).
+ *
+ * So centre stays as a fallback for a behavior block carrying no default at all, ahead of the
+ * midpoint, and stops overriding an author who said what they wanted.
+ */
 function defaultCurrentValueFor(behavior = null) {
   const min = getSliderMin(behavior);
   const max = getSliderMax(behavior);
+
+  const authored = behavior?.defaultCurrentValue;
+  if (Number.isFinite(Number(authored))) {
+    return clamp(Number(authored), min, max);
+  }
+
   const centerValue = behavior?.centerValue;
   if (Number.isFinite(Number(centerValue))) {
-    return clamp(numberOr(centerValue, min), min, max);
+    return clamp(Number(centerValue), min, max);
   }
-  return clamp(numberOr(behavior?.defaultCurrentValue, min + ((max - min) / 2)), min, max);
+
+  return clamp(min + ((max - min) / 2), min, max);
 }
 
 export function getSliderDefaultValues(behavior = null) {
