@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
 // Stamp the build with the git commit + time so the running app can show
@@ -17,7 +18,23 @@ function buildStamp() {
     sha: run('git rev-parse --short HEAD') || 'unknown',
     branch: run('git rev-parse --abbrev-ref HEAD') || 'unknown',
     time: `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`,
+    version: projectVersion(),
   };
+}
+
+// The product version, read from the one place that already decides it: CMakeLists' project().
+// package-installer.ps1 greps the same line to name CEditor-Setup-<version>.exe, so the number in
+// the status bar and the number on the installer cannot drift.
+//
+// They had. The status bar carried a hardcoded "CEditor v0.1.0" while the installer said 0.2.0 —
+// a string nobody remembers to edit, disagreeing with the artifact users actually download.
+function projectVersion() {
+  try {
+    const cmake = readFileSync(fileURLToPath(new URL('../../CMakeLists.txt', import.meta.url)), 'utf8');
+    return cmake.match(/project\s*\(\s*CEditor\s+VERSION\s+([0-9]+\.[0-9]+\.[0-9]+)\s*\)/)?.[1] ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
 }
 
 export default defineConfig(({ command }) => ({

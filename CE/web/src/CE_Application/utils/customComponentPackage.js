@@ -444,6 +444,26 @@ function readinessStep(id, label, done, detail, target = 'overview', severity = 
   };
 }
 
+/**
+ * What is actually wrong, not how many things are wrong.
+ *
+ * This read "1 blocking issue(s)" and stopped there, so the one thing standing between a
+ * component and being reusable was a number. The issues themselves are already written as
+ * finished sentences -- "Component has no value channels.", "Published input \"gain\" targets
+ * missing value channel \"level\"." -- and were being counted and discarded. A tester hit exactly
+ * this: the blocker named no rule and no field, and Fix had nothing to offer because there was
+ * nothing to act on.
+ *
+ * Several issues are summarised rather than concatenated, because this renders inline in a nudge
+ * strip; the first is the one to fix first, and the rest are still listed in full on the
+ * overview.
+ */
+function describeBlockingIssues(issues = []) {
+  if (!issues.length) return 'No blocking package issues';
+  if (issues.length === 1) return issues[0];
+  return `${issues[0]} (+${issues.length - 1} more)`;
+}
+
 export function analyzeCustomComponentReadiness(control) {
   const summary = summarizeCustomComponent(control);
   const validation = validateCustomComponentPackage(control);
@@ -459,7 +479,7 @@ export function analyzeCustomComponentReadiness(control) {
     readinessStep('publicApi', 'Panel API', publicApiCount > 0, `${summary.publicInputs ?? 0} input(s), ${summary.publicOutputs ?? 0} output(s)`, 'links', 'recommended'),
     readinessStep('properties', 'Editable Properties', (summary.editableProperties ?? 0) > 0, `${summary.editableProperties ?? 0} published property control(s)`, 'states', 'recommended'),
     readinessStep('assets', 'Packaged Assets', (summary.images ?? 0) + (summary.filmstrips ?? 0) > 0, `${summary.images ?? 0} image(s), ${summary.filmstrips ?? 0} filmstrip(s)`, 'assets', 'optional'),
-    readinessStep('validPackage', 'Package Validity', validation.ok, validation.ok ? 'No blocking package issues' : `${validation.issues.length} blocking issue(s)`, 'overview', 'required'),
+    readinessStep('validPackage', 'Package Validity', validation.ok, describeBlockingIssues(validation.issues), 'overview', 'required'),
   ];
   const requiredSteps = steps.filter((step) => step.severity === 'required');
   const doneCount = steps.filter((step) => step.done).length;

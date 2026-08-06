@@ -81,7 +81,7 @@
     applyTextCaseMode, applyTextReadingOrientation, buildFontFeatureSettings,
     buildFontVariationSettings, buildGlowShadowLayers, buildSingleBlurFilterValue,
     buildTextBlurFilterValue, buildTextFillLayerStyle, buildTextShadowValue,
-    cssColor, customHitZoneStyle, getEnabledValueRows, lineCanvasFont,
+    cssColor, customHitZoneStyle, getDefaultValueRowLabel, getEnabledValueRows, lineCanvasFont,
     lineGeometry, lineLayerFor, normalizeFillMode, normalizeKey,
     normalizeLastLineAlign, normalizeScriptMode, normalizeTextCaseMode,
     normalizeTextFlowMode, normalizeTextLayerOrder, normalizeTextOrientation,
@@ -1402,8 +1402,18 @@
   let textVariantCaps = $derived(textCaseVariantCaps(textCaseMode));
   let textFillMode = $derived(normalizeFillMode(textFill?.mode));
   let rawTextContent = $derived.by(() => {
-    if ((buttonType === 'cyclic' || buttonType === 'combobox') && interactionRuntime?.signals?.valueDisplay !== undefined) {
+    const isSelectorFace = buttonType === 'cyclic' || buttonType === 'combobox';
+    if (isSelectorFace && interactionRuntime?.signals?.valueDisplay !== undefined) {
       return String(interactionRuntime.signals.valueDisplay ?? '');
+    }
+
+    // No runtime: the plain editor canvas. A selector still has to show the row it will open
+    // on, or the canvas disagrees with preview about the same control -- "Option 1" against
+    // "Clean" -- and the disagreement is invisible until you run it. Same resolution preview
+    // uses, so the two cannot say different things.
+    if (isSelectorFace) {
+      const label = getDefaultValueRowLabel(sourceValueSection ?? valueSection);
+      if (label) return label;
     }
 
     return String(text?.content ?? '');

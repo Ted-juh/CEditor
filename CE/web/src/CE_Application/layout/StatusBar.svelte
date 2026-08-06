@@ -9,13 +9,14 @@
    * "Device not responding" rendered in the same colour as "Ready" is a warning nobody sees.
    */
   import { scriptStatus } from '../stores/scriptUi.js';
+  import { appVersion } from '../buildInfo.js';
 </script>
 
 <div class="status-bar">
   <span class={['status-item', `status-${$scriptStatus.kind}`]}>{$scriptStatus.message || 'Ready'}</span>
   <span class="spacer"></span>
   <span class="status-item dim">No selection</span>
-  <span class="status-item dim">CEditor v0.1.0</span>
+  <span class="status-item dim">CEditor v{appVersion}</span>
 </div>
 
 <style>

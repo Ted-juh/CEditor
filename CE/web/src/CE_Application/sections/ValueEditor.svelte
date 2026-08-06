@@ -64,8 +64,24 @@
     updateRows(next);
   }
 
+  // Every reader of selectedByDefault takes the FIRST match — PanelPreviewSurface,
+  // interactionPreview, InteractiveTestSurface, interactionRuntime and exportParameters all
+  // `.find()` it. So a second ticked row was never "two defaults", it was one default plus a row
+  // that looked ticked and did nothing. Ticking one now unticks the rest, unless the control is
+  // genuinely multi-select (Behavior > Select = multi), where several defaults are meaningful.
+  //
+  // Unticking is still allowed and leaves none: the readers fall back to the first enabled row,
+  // which is a defined answer rather than an accident.
+  let allowsMultipleDefaults = $derived(String(behavior?.selectionMode ?? 'single') === 'multi');
+
   function updateRow(index, key, nextValue) {
-    const next = rows.map((row, rowIndex) => rowIndex === index ? { ...row, [key]: nextValue } : row);
+    const exclusiveDefault = key === 'selectedByDefault' && nextValue === true && !allowsMultipleDefaults;
+    const next = rows.map((row, rowIndex) => {
+      if (rowIndex === index) return { ...row, [key]: nextValue };
+      return exclusiveDefault && row?.selectedByDefault === true
+        ? { ...row, selectedByDefault: false }
+        : row;
+    });
     updateRows(next);
   }
 </script>

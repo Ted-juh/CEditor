@@ -187,9 +187,35 @@ function stripGeneratedControls(controls) {
     });
 }
 
+/** `Untitled 7` and friends — a stand-in the app invented, not a name anyone chose. */
+const PLACEHOLDER_PANEL_NAME = /^Untitled \d+$/;
+
+/** `C:\dev\x\qa-beta-smoke.cepanel` -> `qa-beta-smoke`. Handles both separators. */
+function panelNameFromPath(filePath) {
+  const leaf = String(filePath ?? '').split(/[\\/]/).pop() ?? '';
+  return leaf.replace(/\.cepanel$/i, '').trim();
+}
+
 export function serializePanel(panel, options = {}) {
   const { id, modified, ...data } = panel;
   data.controls = stripGeneratedControls(data.controls);
+
+  // Panel identity. deserializePanel prefers the name the host derives from the filename, so a
+  // stale `name` in the document is invisible in the app and only shows up when someone reads the
+  // file — which is how it was found: a panel saved as qa-beta-smoke.cepanel still said
+  // "Untitled 2" inside, because Save As serialises before the dialog has returned a path.
+  //
+  // Two cases, so the field is either right or absent, never misleading:
+  //   - the panel has a file: the file IS the name, so write that
+  //   - it does not, and is still carrying an invented "Untitled N": write nothing, and let
+  //     whoever opens it name it from wherever it ended up
+  // A name the author actually typed is always kept.
+  const fromPath = panelNameFromPath(data.filePath);
+  if (fromPath) {
+    data.name = fromPath;
+  } else if (PLACEHOLDER_PANEL_NAME.test(String(data.name ?? ''))) {
+    delete data.name;
+  }
   const deviceSession = options.deviceSession ?? data.deviceSession;
   if (deviceSession) data.deviceSession = normalizeProjectDeviceSession(deviceSession);
   else delete data.deviceSession;
