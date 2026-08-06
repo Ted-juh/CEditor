@@ -191,11 +191,23 @@ set(CE_VST_COMPANY_NAME "Tedjuh-inc"         CACHE STRING "Plugin vendor / compa
 set(CE_VST_MFR_CODE     "Tdjh"               CACHE STRING "4-char plugin manufacturer code")
 set(CE_VST_VERSION      "1.0.0"              CACHE STRING "Plugin version string")
 # Empty by default: the export pipeline always passes the real panel via -DCE_VST_PANEL_PATH.
-# A plugin built without it loads no panel (blank player) — warn so a manual build isn't confusing.
+# A plugin built without it loads no panel (blank player) — worth saying so, because a manual
+# build that produces a blank plugin is otherwise baffling.
+#
+# But the installer build ALWAYS has an empty panel path, by design: it ships the generic player
+# and the per-panel plugins are produced later by the export pipeline. Warning there fired on
+# every single packaging run about a state that was entirely correct, which is how a warning
+# stops being read. So the installer passes -DCE_VST_GENERIC_PLAYER=ON to say "this one is
+# meant to be panel-less", and gets a status line instead. A hand build still gets the warning.
 set(CE_VST_PANEL_PATH   ""                   CACHE STRING "Panel document the plugin loads")
+option(CE_VST_GENERIC_PLAYER "Building the panel-less player deliberately (suppresses the no-panel warning)" OFF)
 if (CE_VST_PANEL_PATH STREQUAL "")
-    message(WARNING "CE_VST_PANEL_PATH is not set — CEditorPlayerVST will build but load no panel. "
-                    "Pass -DCE_VST_PANEL_PATH=<your.cepanel> for a usable plugin (the export pipeline does this automatically).")
+    if (CE_VST_GENERIC_PLAYER)
+        message(STATUS "CEditorPlayerVST: generic player build, no panel baked in (as intended).")
+    else()
+        message(WARNING "CE_VST_PANEL_PATH is not set — CEditorPlayerVST will build but load no panel. "
+                        "Pass -DCE_VST_PANEL_PATH=<your.cepanel> for a usable plugin (the export pipeline does this automatically).")
+    endif()
 endif()
 
 juce_add_plugin(CEditorPlayerVST
