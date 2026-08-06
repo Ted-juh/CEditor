@@ -4,4 +4,6 @@
 1x bg #000000
 1x bg #0C0F11
 1x bg #3D4C57
+16x bg #5C666F
+6x bg #9AA6B0
 1x bg #E7ECF0

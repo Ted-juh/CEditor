@@ -22,9 +22,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildProfile } from '../../../tools/scripts/qa/roland-gaia/make-gaia-profile.mjs';
+import { addressFor, buildProfile } from '../../../tools/scripts/qa/roland-gaia/make-gaia-profile.mjs';
 import {
-  BLOCK_SIZES, PATCH_ARPEGGIO_COMMON, PATCH_COMMON, PATCH_DELAY, PATCH_DISTORTION,
+  BLOCK_SIZES, BLOCKS, PATCH_ARPEGGIO_COMMON, PATCH_COMMON, PATCH_DELAY, PATCH_DISTORTION,
   PATCH_FLANGER, PATCH_REVERB, PATCH_TONE,
 } from '../../../tools/scripts/qa/roland-gaia/address-map.mjs';
 
@@ -174,17 +174,56 @@ test('bipolar parameters carry the display range as well as the wire range', () 
   }
 });
 
-test('coverage is stated honestly, and names what is not transcribed', () => {
-  // The demo profile's real failing was not being wrong — it was being silent. Whatever this
-  // profile does not do has to be written down where a user of it will read it.
-  assert.ok(Array.isArray(profile.coverage.notTranscribed) && profile.coverage.notTranscribed.length > 0,
-    'coverage must name the blocks that are not transcribed');
-  assert.ok(profile.coverage.notTranscribed.some((b) => /Arpeggio Pattern/.test(b)),
-    'the 16 arpeggio pattern blocks are deliberately not expanded — coverage has to say so');
-  // And the other honest gap: what an effect parameter actually controls is type-dependent and is
-  // not in this manual, so the profile says that rather than inventing names for them.
+test('coverage is stated honestly, and every block in the map has parameters', () => {
+  // The demo profile's real failing was not being wrong — it was being silent. This used to check
+  // that `notTranscribed` NAMED the arpeggio pattern blocks; they are transcribed now, so the
+  // check that keeps its teeth is the stronger one: every block the address map declares must
+  // have parameters addressed inside it. A block added to BLOCKS and never emitted fails here,
+  // which is the failure the old assertion was standing in for.
+  const addresses = profile.parameters.map((p) => p.address).filter(Boolean);
+  for (const [name, offset] of Object.entries(BLOCKS)) {
+    // The block's base address, which every parameter inside it shares as a prefix.
+    const base = addressFor(offset, '00 00').slice(0, 8);
+    assert.ok(addresses.some((address) => address.startsWith(base)),
+      `block "${name}" (${offset}) is in the address map and has no parameters — either emit it or take it out`);
+  }
+
+  assert.ok(Array.isArray(profile.coverage.notTranscribed),
+    'coverage must carry a notTranscribed list, even when it is empty');
+  assert.equal(profile.coverage.notTranscribed.length, 0,
+    `every block is transcribed now — if that changed, say which: ${profile.coverage.notTranscribed.join(', ')}`);
+
+  // The honest gap that remains: what an effect parameter actually controls is type-dependent and
+  // is not in this manual, so the profile says that rather than inventing names for them.
   assert.match(profile.coverage.effectParameterMeanings, /not documented/i);
   assert.ok(profile.sources?.[0]?.title?.includes('MIDI Implementation'), 'the profile should say where its map came from');
+});
+
+test('the arpeggio pattern is sixteen lanes of thirty-two steps, at the manual\'s addresses', () => {
+  // 528 addresses is the kind of number that is easy to get nearly right. The manual prints the
+  // ends of both dimensions — Note 1 at 00 0D 00, Note 16 at 00 1C 00, Step 1 at offset 00 02 and
+  // Step 32 at 00 40 — so the corners are checkable against something other than our own loop.
+  const pattern = profile.parameters.filter((p) => p.id.startsWith('arpPattern.'));
+  assert.equal(pattern.length, 16 * 33, `expected 16 lanes x (1 note + 32 steps), got ${pattern.length}`);
+
+  const byId = new Map(pattern.map((p) => [p.id, p]));
+  for (const [id, address] of [
+    ['arpPattern.note1.originalNote', '10 00 0D 00'],
+    ['arpPattern.note1.step1Data', '10 00 0D 02'],
+    ['arpPattern.note1.step32Data', '10 00 0D 40'],
+    ['arpPattern.note16.originalNote', '10 00 1C 00'],
+    ['arpPattern.note16.step32Data', '10 00 1C 40'],
+  ]) {
+    assert.equal(byId.get(id)?.address, address, `${id} is at the wrong address`);
+  }
+
+  // Every value in the block is two nibbles wide — a step holds 0..128, which does not fit in the
+  // 0..127 a single 7-bit byte carries. Encoding one as u7 would truncate a tie to a rest.
+  for (const parameter of pattern) {
+    assert.equal(parameter.encoding.type, 'nibbles', `${parameter.id}: not nibble-encoded`);
+    assert.equal(parameter.encoding.count, 2, `${parameter.id}: wrong nibble count`);
+    assert.equal(parameter.range.max, 128, `${parameter.id}: a step tops out at 128 (tie), not ${parameter.range.max}`);
+  }
 });
 
 test('the committed profile matches the generator', () => {

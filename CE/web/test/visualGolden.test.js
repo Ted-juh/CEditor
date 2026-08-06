@@ -41,7 +41,7 @@ import { render } from 'svelte/server';
 
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import CanvasControl from '../src/CE_Application/editor/CanvasControl.svelte';
-import { gaiaFader, gaiaKnob, gaiaLeds } from '../../../tools/scripts/gaia-panel/components.mjs';
+import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from '../../../tools/scripts/gaia-panel/components.mjs';
 
 const GOLDEN_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'golden');
 const UPDATING = process.env.UPDATE_GOLDEN === '1';
@@ -128,6 +128,13 @@ const SPECIMENS = {
     gaiaLeds({ options: [{ label: 'SAW', value: 0 }, { label: 'SQR', value: 1 }, { label: 'SINE', value: 2 }] }),
     'g_leds', 96, 53,
   ),
+
+  // The printed envelope, which is nothing BUT geometry: five points, four rotated segments, and
+  // a pivot on each. The first draft of the wave glyphs had exactly this shape of bug — strokes
+  // rotating about their own centres, so every polyline came apart into scattered marks — and it
+  // rendered without an error and without a failing test. Angles and origins are the whole
+  // specimen here.
+  'gaia-envelope': () => place(gaiaEnvelope({ stages: 'adsr', width: 200, height: 42 }), 'g_env', 200, 42),
 };
 
 for (const [name, build] of Object.entries(SPECIMENS)) {
@@ -175,6 +182,32 @@ test('a rotated part that loses its pivot fails the gate', () => {
   const after = paintSummary(renderControl(control));
 
   assert.notEqual(after, before, 'moving a rotated part\'s pivot changed nothing in the paint summary');
+});
+
+test('a polyline whose strokes lose their pivot fails the gate', () => {
+  // The wave-glyph bug in its own right: a segment authored as "start here, this long, at this
+  // angle" rotates about its own centre unless pinned to its left edge, so it swings half its
+  // length backwards and the shape falls apart. Same colours, same lengths, same angles — only
+  // the origin moves, which is exactly the class of defect a colour-only summary cannot see.
+  const control = SPECIMENS['gaia-envelope']();
+  const before = paintSummary(renderControl(control));
+
+  for (const part of Object.values(control._children.Parts._children)) delete part._children.Layout.pivotX;
+  const after = paintSummary(renderControl(control));
+
+  assert.notEqual(after, before, 'unpinning every segment pivot changed nothing in the paint summary');
+});
+
+test('the arpeggio grid draws its steps, rows and blocks', () => {
+  // Not a golden — the grid materializes its ruler, rows and blocks at render time from
+  // Designer.arpeggiator, so what is worth pinning is that it HAS them. A grid that renders as an
+  // empty rectangle is the failure mode, and it renders perfectly happily.
+  const control = place(gaiaArpGrid({ width: 1200, height: 240, steps: 32 }), 'g_arp', 1200, 240);
+  const body = renderControl(control);
+
+  assert.match(body, /\bC4\b/, 'no note labels — the piano-roll rows did not materialize');
+  assert.match(body, /\b32\b/, 'no step 32 on the ruler — the step count did not reach the grid');
+  assert.ok(body.length > 20000, `arpeggio grid rendered thin (${body.length} bytes) — rows or blocks are missing`);
 });
 
 test('a specimen that loses its alpha fails the gate', () => {

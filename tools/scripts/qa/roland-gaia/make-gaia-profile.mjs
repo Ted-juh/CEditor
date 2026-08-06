@@ -19,8 +19,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  BLOCK_SIZES, BLOCKS, MODEL, PATCH_ARPEGGIO_COMMON, PATCH_COMMON, PATCH_DELAY, PATCH_DISTORTION,
-  PATCH_FLANGER, PATCH_REVERB, PATCH_TONE, TEMPORARY_PATCH, USER_PATCH_A1,
+  BLOCK_SIZES, BLOCKS, MODEL, PATCH_ARPEGGIO_COMMON, PATCH_ARPEGGIO_PATTERN, PATCH_COMMON,
+  PATCH_DELAY, PATCH_DISTORTION, PATCH_FLANGER, PATCH_REVERB, PATCH_TONE, TEMPORARY_PATCH,
+  USER_PATCH_A1,
 } from './address-map.mjs';
 
 /**
@@ -53,7 +54,7 @@ const formatBytes = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().pad
  * every offset in this map and would break the moment one crossed 0x80, which is the kind of bug
  * that only appears on the parameter nobody tested.
  */
-function addressFor(blockOffset, paramOffset) {
+export function addressFor(blockOffset, paramOffset) {
   const bytes = parseBytes(TEMPORARY_PATCH);
   const block = parseBytes(blockOffset);   // 3 bytes, right-aligned into bytes 1..3
   const param = parseBytes(paramOffset);   // 2 bytes, right-aligned into bytes 2..3
@@ -281,6 +282,18 @@ export function buildProfile() {
     }
   }
 
+  // The arpeggio pattern: sixteen lanes of thirty-two steps. 528 addresses, emitted the same way
+  // the three tones are — one table against sixteen bases — because that is what it is.
+  for (let note = 1; note <= 16; note++) {
+    for (const entry of PATCH_ARPEGGIO_PATTERN) {
+      parameters.push(buildParameter(entry, {
+        idPrefix: `arpPattern.note${note}`,
+        group: `Arpeggio Pattern · Note ${note}`,
+        blockOffset: BLOCKS[`arpeggioPattern${note}`],
+      }));
+    }
+  }
+
   // Master Volume is CC 7, not a SysEx address — carried over from the demo profile, where it was
   // the one parameter that did not go through DT1. Dropping it would have been a silent regression.
   parameters.push({
@@ -333,28 +346,28 @@ export function buildProfile() {
       retries: 0,
     },
     coverage: {
-      // Honest about what is and is not built. The Patch Common + three Tone blocks are complete
-      // against the manual; the effects and arpeggio blocks are not transcribed yet, and neither
-      // is bulk dump parsing. Saying "broad" here would be the same lie the 15-parameter profile
-      // told by omission.
-      singleParameterWrite: 'complete-for-every-block-the-front-panel-reaches',
+      // Honest about what is and is not built. Every block the manual prints an address map for is
+      // transcribed, including all sixteen arpeggio pattern lanes; bulk dump PARSING is not.
+      // Saying "broad" here would be the same lie the 15-parameter profile told by omission.
+      singleParameterWrite: 'complete-for-every-block-in-the-address-map',
       editBufferDumpRequest: 'block-rq1-per-block',
       editBufferDumpParse: 'notImplemented',
       bankDump: 'notImplemented',
       patchNameEdit: 'complete-single-dt1-write',
       realtimeEditing: 'complete-for-transcribed-blocks',
-      notTranscribed: ['Patch Arpeggio Pattern (Note 1-16)'],
-      // Two honest gaps, both stated rather than papered over:
+      notTranscribed: [],
+      // The arpeggio pattern IS here now — sixteen lanes at 00 0D 00 .. 00 1C 00, each an original
+      // note plus thirty-two step slots, 528 addresses. An earlier draft left them out on the
+      // grounds that "they are addresses, not controls". That was backwards: they are exactly what
+      // a step grid writes, and leaving them out is what made a graphical arpeggiator impossible
+      // to wire. Whether a given editor drives them one DT1 at a time or with a block dump is a
+      // panel's decision; the profile's job is to know where they live.
       //
-      //  - The Arpeggio PATTERN blocks (00 0D 00 .. 00 1C 00) are sixteen notes x an original note
-      //    plus thirty-two steps: 528 values of step-sequencer data. They are addresses, not
-      //    controls — a panel drives them with an Arpeggiator component and a dump, not with 528
-      //    knobs — so they are deliberately not expanded into parameters.
-      //
-      //  - The effect parameters are named as the manual names them ("Flanger Parameter 3"). What
-      //    each one DOES depends on the selected type, and that mapping — including which three
-      //    become the front panel's CONTROL 1/2/3 — is in the owner's manual, not the MIDI
-      //    implementation. Renaming them from a guess would be worse than leaving them factual.
+      // The one gap that remains, stated rather than papered over: the effect parameters are named
+      // as the manual names them ("Flanger Parameter 3"). What each one DOES depends on the
+      // selected type, and that mapping — including which three become the front panel's
+      // CONTROL 1/2/3 — is in the owner's manual, not the MIDI implementation. Renaming them from
+      // a guess would be worse than leaving them factual.
       effectParameterMeanings: 'type-dependent; not documented in the MIDI implementation',
     },
     timing: { minDelayBetweenMessagesMs: 20 },

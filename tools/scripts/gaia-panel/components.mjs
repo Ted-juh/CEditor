@@ -16,7 +16,7 @@
 // Each publishes one `value` channel, which is what the panel binds a device parameter to.
 
 import {
-  createBehaviorModule, createCustomComponentBlankBindingsDefaults,
+  createArpPatternChannel, createBehaviorModule, createCustomComponentBlankBindingsDefaults,
   createCustomComponentDesignerDefaults, createCustomComponentLinksDefaults,
   createHitZone, createPartNode, createValueChannel,
 } from '../../../CE/web/src/CE_Application/utils/customComponentFactory.js';
@@ -151,7 +151,10 @@ function enumBinding(name, source, target, enumMap) {
 }
 
 /** Assemble a CustomComponent control from parts + one value channel. */
-function component({ name, width, height, parts, bindings, behavior, hitZone, hitZones, channel }) {
+function component({
+  name, width, height, parts, bindings, behavior, hitZone, hitZones, channel, channels,
+  designer = null, published = null,
+}) {
   const control = createControl('CustomComponent', {
     name,
     Core: { name },
@@ -161,16 +164,16 @@ function component({ name, width, height, parts, bindings, behavior, hitZone, hi
   control._children.Parts = { _type: 'Parts', _children: parts };
   control._children.ValueChannels = {
     _type: 'ValueChannels',
-    _children: {
+    _children: channels ?? {
       value: channel ?? createValueChannel('value', { label: 'Value', min: 0, max: 1, step: 0.001, defaultValue: 0 }),
     },
   };
-  control._children.Behaviors = { _type: 'Behaviors', _children: { drive: behavior } };
-  control._children.HitZones = { _type: 'HitZones', _children: hitZones ?? { grab: hitZone } };
-  control._children.Bindings = { ...createCustomComponentBlankBindingsDefaults(), _children: bindings };
-  control._children.Designer = createCustomComponentDesignerDefaults();
+  control._children.Behaviors = { _type: 'Behaviors', _children: behavior ? { drive: behavior } : {} };
+  control._children.HitZones = { _type: 'HitZones', _children: hitZones ?? (hitZone ? { grab: hitZone } : {}) };
+  control._children.Bindings = { ...createCustomComponentBlankBindingsDefaults(), _children: bindings ?? {} };
+  control._children.Designer = { ...createCustomComponentDesignerDefaults(), ...(designer ?? {}) };
   control._children.Links = createCustomComponentLinksDefaults();
-  control._children.PublishedProperties = {
+  control._children.PublishedProperties = published ?? {
     _type: 'PublishedProperties',
     inputs: { value: { channel: 'value', label: 'Value', type: 'float' } },
     outputs: { value: { channel: 'value', label: 'Value', type: 'float' } },
@@ -191,17 +194,39 @@ const CAP_LINE = 'FF11151800';
  * The cap travels by binding the value channel to its Layout.y. Top of travel is a small y and
  * bottom is a large one, so the range is written high-to-low — a fader at zero sits at the bottom.
  */
-export function gaiaFader({ width = 30, height = 108 } = {}) {
+export function gaiaFader({ width = 30, height = 108, ticks = 11 } = {}) {
   const slotX = Math.round(width / 2) - 4;
   const capH = 13;
   const travelTop = 2;
   const travelBottom = height - capH - 2;
+
+  // The printed scale beside the slot. Every fader on the instrument has one, and without it a
+  // fader is a slot with a cap in it — the stripes are what say how far it has travelled.
+  // Longer at the ends and the middle, the way a printed scale marks its thirds.
+  const scale = {};
+  for (let i = 0; i < ticks; i++) {
+    const major = i === 0 || i === ticks - 1 || i === (ticks - 1) / 2;
+    const y = travelTop + capH / 2 + ((travelBottom - travelTop) * i) / (ticks - 1);
+    scale[`tick${i}`] = rect(`tick${i}`, {
+      x: slotX - (major ? 7 : 5),
+      y: Math.round(y * 10) / 10,
+      width: major ? 5 : 3,
+      height: 1,
+    }, major ? 'FF9AA6B0' : 'FF5C666F', { zIndex: 0 });
+    scale[`tickR${i}`] = rect(`tickR${i}`, {
+      x: slotX + 8 + 2,
+      y: Math.round(y * 10) / 10,
+      width: major ? 5 : 3,
+      height: 1,
+    }, major ? 'FF9AA6B0' : 'FF5C666F', { zIndex: 0 });
+  }
 
   return component({
     name: 'GAIA Fader',
     width,
     height,
     parts: {
+      ...scale,
       slot: rect('slot', { x: slotX, y: 4, width: 8, height: height - 8 }, SLOT, { zIndex: 1, radius: 4, borderColour: '66000000', borderThickness: 1 }),
       fill: rect('fill', { x: slotX + 1, y: height - 8, width: 6, height: 4 }, FILL, { zIndex: 2, radius: 3 }),
       cap: rect('cap', { x: 2, y: travelBottom, width: width - 4, height: capH }, CAP, { zIndex: 6, radius: 2, borderColour: CAP_LINE, borderThickness: 1 }),
@@ -338,7 +363,20 @@ export function gaiaLeds({ options, width = 96, rowHeight = 15 } = {}) {
     // rather than as an empty circle.
     parts[`bezel${index}`] = rect(`bezel${index}`, { x: 7, y: y + 3, width: 9, height: 9 }, LED_RIM, { zIndex: 2, radius: 999 });
     parts[`led${index}`] = rect(`led${index}`, { x: 8.5, y: y + 4.5, width: 6, height: 6 }, LED_OFF, { zIndex: 3, radius: 999 });
-    parts[`name${index}`] = text(`name${index}`, option.label, { x: 22, y: y + 1, width: width - 26, height: rowHeight - 2 }, { size: 9 });
+    // A glyph where the instrument prints one, and the name beside it rather than instead of it.
+    const glyph = glyphKindFor(option.label);
+    const textX = glyph ? 44 : 22;
+    if (glyph) {
+      for (const stroke of glyphStrokes(glyph, 21, y + (rowHeight - 9) / 2)) {
+        parts[`g${index}_${stroke.name}`] = rect(`g${index}_${stroke.name}`,
+          { x: stroke.x, y: stroke.y, width: stroke.width, height: stroke.height },
+          stroke.colour, { zIndex: 5, radius: 0, ...(stroke.rotation ? { pivotX: 0, pivotY: 50 } : {}) });
+        if (stroke.rotation) {
+          parts[`g${index}_${stroke.name}`]._children.Layout.rotation = stroke.rotation;
+        }
+      }
+    }
+    parts[`name${index}`] = text(`name${index}`, option.label, { x: textX, y: y + 1, width: width - textX - 4, height: rowHeight - 2 }, { size: 9 });
 
     // The table that lights exactly one lamp. Written per lamp rather than per value because the
     // binding layer resolves one target at a time.
@@ -379,4 +417,217 @@ export function gaiaLeds({ options, width = 96, rowHeight = 15 } = {}) {
     hitZones,
     bindings,
   });
+}
+
+/* ------------------------------------------------------------------ envelope drawings */
+
+/**
+ * The envelope curve the instrument PRINTS above each fader bank.
+ *
+ * Every A/D/S/R bank on the SH-01 has one silkscreened over it, and without it four identical
+ * faders labelled A D S R are four identical faders — the drawing is what says they are one shape
+ * with four handles. The pitch envelope gets the two-stage version, because that is what it has.
+ *
+ * This is printed, not driven: it does not move when the faders do. The Envelope component type
+ * declares attack/decay/sustain/release ports, but deviceBindingSync only reflects value / state /
+ * selectedChoice / text / brightness / backlight inbound, so binding those four would look wired
+ * and do nothing. A drawing that is honestly a drawing beats a control that lies.
+ */
+export function gaiaEnvelope({ stages = 'adsr', width = 200, height = 40 } = {}) {
+  const pad = 5;
+  const base = height - pad;
+  const top = pad;
+  const w = width - pad * 2;
+  const line = 'FFBFCBD6';
+  const guide = 'FF39434C';
+
+  // Corner points of the printed shape, left to right.
+  const points = stages === 'ad'
+    ? [[0, base], [0.34, top], [1, base]]
+    : [[0, base], [0.2, top], [0.46, top + (base - top) * 0.45], [0.72, top + (base - top) * 0.45], [1, base]];
+
+  const parts = {};
+  parts.baseline = rect('baseline', { x: pad, y: base, width: w, height: 1 }, guide, { zIndex: 0 });
+
+  points.forEach(([fx], index) => {
+    if (index === 0 || index === points.length - 1) return;
+    parts[`guide${index}`] = rect(`guide${index}`, { x: pad + fx * w, y: top, width: 1, height: base - top }, guide, { zIndex: 0, opacity: 0.55 });
+  });
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const [fx1, y1] = points[i];
+    const [fx2, y2] = points[i + 1];
+    const x1 = pad + fx1 * w;
+    const x2 = pad + fx2 * w;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const seg = rect(`seg${i}`, {
+      x: x1,
+      y: y1 - 0.8,
+      width: Math.hypot(dx, dy),
+      height: 1.6,
+    }, line, { zIndex: 4, radius: 1, pivotX: 0, pivotY: 50 });
+    if (dy !== 0) seg._children.Layout.rotation = Math.round((Math.atan2(dy, dx) * 180) / Math.PI * 10) / 10;
+    parts[`seg${i}`] = seg;
+  }
+
+  // A component with no hit zones and no bindings: it draws and nothing else, which is what a
+  // silkscreen does.
+  return component({ name: 'GAIA Envelope', width, height, parts });
+}
+
+/* ------------------------------------------------------------------ arpeggio grid */
+
+/**
+ * The GAIA's arpeggiator, as the grid it actually is.
+ *
+ * The MIDI implementation has sixteen Patch Arpeggio Pattern blocks at 00 0D 00 .. 00 1C 00, each
+ * an Original Note plus THIRTY-TWO step slots holding 0 for a rest and 1..127 for a velocity. That
+ * is a step sequencer, and a step sequencer drawn as knobs is not a step sequencer — you draw
+ * blocks into it.
+ *
+ * So this is the engine's own arpeggiator surface: `Designer.arpeggiator`, which materializes a
+ * ruler, note-labelled rows and the drawn blocks at render time and takes arpeggiatorDraw /
+ * arpeggiatorMove / arpeggiatorResize edits. 32 steps, the count the hardware has.
+ *
+ * WHAT IS AND IS NOT WIRED. The blocks you draw live in the component and publish through the
+ * `arpPattern` channel. They are NOT written out to those 528 addresses: the channel's write side
+ * is deliberately unbuilt (see customComponentArpeggiator.js — "a channel write racing a grid edit
+ * has no clean precedence"), and there is no pattern-to-parameter bridge yet. The addresses are in
+ * the profile so that bridge has somewhere to land; until it exists this grid edits a pattern, not
+ * a synth, and the panel's notes say so rather than leaving it to be discovered.
+ */
+export function gaiaArpGrid({ width = 1200, height = 250, steps = 32, viewNote = 60, blocks = null } = {}) {
+  // A starter pattern, so the grid opens showing what it is for rather than as an empty field.
+  const seed = blocks ?? [
+    { id: 'arp_seed_0', note: 60, step: 0, length: 1, velocity: 112 },
+    { id: 'arp_seed_1', note: 63, step: 2, length: 1, velocity: 88 },
+    { id: 'arp_seed_2', note: 67, step: 4, length: 1, velocity: 96 },
+    { id: 'arp_seed_3', note: 70, step: 6, length: 1, velocity: 80 },
+    { id: 'arp_seed_4', note: 72, step: 8, length: 2, velocity: 120 },
+    { id: 'arp_seed_5', note: 67, step: 12, length: 1, velocity: 88 },
+    { id: 'arp_seed_6', note: 63, step: 14, length: 1, velocity: 88 },
+    { id: 'arp_seed_7', note: 60, step: 16, length: 4, velocity: 104 },
+  ];
+
+  return component({
+    name: 'GAIA Arpeggio Grid',
+    width,
+    height,
+    // The field the materialized rows and blocks are drawn onto. Everything else — ruler, note
+    // labels, rows, blocks, the draw hit zone — is generated from Designer.arpeggiator at render.
+    parts: {
+      field: rect('field', { x: 0, y: 0, width, height }, 'FF0D1116', {
+        zIndex: 0, radius: 4, borderColour: '55000000', borderThickness: 1,
+      }),
+    },
+    channels: {
+      arpCurrentStep: createValueChannel('arpCurrentStep', { label: 'Current Step', type: 'int', min: 0, max: steps - 1, step: 1, defaultValue: 0 }),
+      arpStepCount: createValueChannel('arpStepCount', { label: 'Step Count', type: 'int', min: 1, max: 256, step: 1, defaultValue: steps }),
+      arpGate: createValueChannel('arpGate', { label: 'Gate', type: 'bool', min: 0, max: 1, step: 1, defaultValue: 0 }),
+      arpNote: createValueChannel('arpNote', { label: 'Note', type: 'int', min: 0, max: 127, step: 1, defaultValue: 0 }),
+      arpVelocity: createValueChannel('arpVelocity', { label: 'Velocity', type: 'int', min: 0, max: 127, step: 1, defaultValue: 0 }),
+      arpPattern: createArpPatternChannel(),
+    },
+    designer: {
+      ...createCustomComponentDesignerDefaults(),
+      arpeggiator: {
+        enabled: true,
+        stepCount: steps,
+        noteMin: 0,
+        noteMax: 127,
+        viewNote,
+        selectedBlock: '',
+        blocks: seed,
+      },
+    },
+    published: {
+      _type: 'PublishedProperties',
+      inputs: { currentStep: { channel: 'arpCurrentStep', label: 'Current Step', type: 'int' } },
+      outputs: {
+        gate: { channel: 'arpGate', label: 'Gate', type: 'bool' },
+        note: { channel: 'arpNote', label: 'Note', type: 'int' },
+        velocity: { channel: 'arpVelocity', label: 'Velocity', type: 'int' },
+        pattern: { channel: 'arpPattern', label: 'Pattern', type: 'array' },
+      },
+      editableProperties: {},
+    },
+  });
+}
+
+/* ------------------------------------------------------------------ waveform glyphs */
+
+/**
+ * The little wave drawings printed beside each option on the instrument.
+ *
+ * The SH-01 does not write "SAW" next to its oscillator LEDs — it draws a sawtooth. Words are what
+ * a spreadsheet uses; a synthesiser shows you the shape, and reading the shape is faster than
+ * reading the word once you know the panel. So each option gets its glyph, and the text moves to
+ * the right of it rather than standing in for it.
+ *
+ * Drawn from thin rects, rotated where a stroke needs to be diagonal. A sine is four short chords
+ * rather than a curve, which at 16x9 is indistinguishable from one and needs no path support.
+ */
+function glyphStrokes(kind, ox, oy, w = 18, h = 9) {
+  const c = 'FFD3DCE4';
+  const T = 1.4;
+
+  // A stroke between two points, and the reason the first attempt at these glyphs came out as
+  // scattered marks: a rotated rect turns about its own centre unless told otherwise, so a segment
+  // authored as "start here, this long, at this angle" ends up centred on its start point and
+  // swings half its length backwards. Pinning the pivot to the LEFT-MIDDLE (pivotX 0, pivotY 50)
+  // makes x,y mean "the line starts here", which is the only way polyline maths reads correctly.
+  const line = (name, x1, y1, x2, y2) => ({
+    name,
+    x: ox + x1,
+    y: oy + y1 - T / 2,
+    width: Math.max(T, Math.hypot(x2 - x1, y2 - y1)),
+    height: T,
+    rotation: Math.round((Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI * 10) / 10,
+    colour: c,
+  });
+
+  /** Connect a list of [x, y] points with segments — one glyph, written as its own shape. */
+  const poly = (points) => points.slice(0, -1).map((point, i) =>
+    line(String.fromCharCode(97 + i), point[0], point[1], points[i + 1][0], points[i + 1][1]));
+
+  const bar = (name, x, y, height) => ({ name, x: ox + x, y: oy + y, width: T, height, rotation: 0, colour: c });
+
+  switch (kind) {
+    case 'saw':
+      // A ramp and the vertical fall back — one cycle of what the panel prints.
+      return poly([[0, h], [w * 0.78, 0], [w * 0.78, h]]);
+    case 'square':
+      return poly([[0, h], [0, 0], [w * 0.5, 0], [w * 0.5, h], [w, h]]);
+    case 'pulse':
+      // Narrow duty cycle, which is what distinguishes PW-SQR from SQR at a glance.
+      return poly([[0, h], [0, 0], [w * 0.3, 0], [w * 0.3, h], [w, h]]);
+    case 'triangle':
+      return poly([[0, h], [w * 0.5, 0], [w, h]]);
+    case 'sine': {
+      // Sampled, not eyeballed: five points off an actual sine, chorded together. At 18x9 the
+      // chords are indistinguishable from a curve and need no path support.
+      const points = [0, 0.25, 0.5, 0.75, 1].map((t) => [t * w, h / 2 - (Math.sin(t * 2 * Math.PI) * h) / 2]);
+      return poly(points);
+    }
+    case 'noise':
+      // Random-height spikes — sample-and-hold, and the same mark the panel uses for RND.
+      return [bar('a', 1, 2, h - 2), bar('b', 5, 0, h), bar('c', 9, 3, h - 3), bar('d', 13, 1, h - 1)];
+    case 'supersaw':
+      // Three detuned saws stacked, which is exactly what the voice is.
+      return [0, 1, 2].flatMap((i) => poly([[i * 2.5, h], [i * 2.5 + w * 0.55, 0]])
+        .map((stroke) => ({ ...stroke, name: `${stroke.name}${i}` })));
+    default:
+      return [];
+  }
+}
+
+/** Which glyph an option label means. Anything unlisted keeps its text and gets no drawing. */
+const GLYPH_FOR = {
+  SAW: 'saw', SQR: 'square', 'PW-SQR': 'pulse', TRI: 'triangle', SINE: 'sine',
+  NOISE: 'noise', 'SUPER-SAW': 'supersaw', SIN: 'sine', 'S&H': 'noise', RND: 'noise',
+};
+
+export function glyphKindFor(label) {
+  return GLYPH_FOR[String(label).toUpperCase()] ?? null;
 }

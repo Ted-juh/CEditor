@@ -3,5 +3,12 @@
 3x bg #120A0A
 1x bg #171C20
 2x bg #3A1E1C
+10x bg #D3DCE4
 1x bg #FF3B30
 3x transform none
+1x transform rotate(-32.7deg)
+2x transform rotate(-45deg)
+1x transform rotate(-90deg)
+2x transform rotate(45deg)
+2x transform rotate(90deg)
+8x origin 0% 50%

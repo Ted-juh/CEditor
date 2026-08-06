@@ -1,0 +1,6 @@
+4x bg #39434C
+4x bg #BFCBD6
+1x transform rotate(-40.1deg)
+1x transform rotate(16.3deg)
+1x transform rotate(18.3deg)
+3x origin 0% 50%

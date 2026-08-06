@@ -240,6 +240,33 @@ export const PATCH_ARPEGGIO_COMMON = [
   {"offset":"00 06","name":"End Step","min":1,"max":32,"nibbles":2}
 ];
 
+/**
+ * Patch Arpeggio Pattern — one block per note, sixteen of them, and the reason the GAIA's
+ * arpeggiator is a step sequencer rather than a chord shuffler.
+ *
+ * Each block is one horizontal lane: an Original Note, then thirty-two step slots. A step holds
+ * 0 for a rest and 1..127 for a velocity, so "drawing a block" on a grid is literally writing a
+ * velocity into one of these 512 addresses. Every value is two nibbles, at a two-byte stride —
+ * Original Note at 00 00, Step 1 at 00 02, Step 32 at 00 40, total size 00 00 00 42.
+ *
+ * Generated rather than pasted: thirty-three rows written out sixteen times is thirty-three
+ * chances to typo an offset, and the manual's own table is this loop.
+ */
+export const PATCH_ARPEGGIO_PATTERN = [
+  { offset: '00 00', name: 'Original Note', min: 0, max: 128, nibbles: 2, note: '128 = OFF (lane unused)' },
+  ...Array.from({ length: 32 }, (unused, index) => {
+    const offset = (index + 1) * 2;
+    return {
+      offset: `00 ${offset.toString(16).toUpperCase().padStart(2, '0')}`,
+      name: `Step ${index + 1} Data`,
+      min: 0,
+      max: 128,
+      nibbles: 2,
+      note: '0 = rest, 1-127 = velocity, 128 = tie to the previous step',
+    };
+  }),
+];
+
 /** Block offsets inside a Patch, from the manual's Patch table. */
 export const BLOCKS = {
   common: '00 00 00',
@@ -251,6 +278,12 @@ export const BLOCKS = {
   delay: '00 08 00',
   reverb: '00 0A 00',
   arpeggioCommon: '00 0C 00',
+  // Note 1 at 00 0D 00 through Note 16 at 00 1C 00 — a 00 01 00 stride, the same trick the three
+  // tone blocks play one level up.
+  ...Object.fromEntries(Array.from({ length: 16 }, (unused, index) => [
+    `arpeggioPattern${index + 1}`,
+    `00 ${(0x0d + index).toString(16).toUpperCase().padStart(2, '0')} 00`,
+  ])),
 };
 
 /** The edit buffer. User patches live at 20 nn 00 00, one per slot A-1 .. H-8. */

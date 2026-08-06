@@ -18,8 +18,8 @@ import { fileURLToPath } from 'node:url';
 import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
-import { COMMON_STRIP, EFFECTS_STRIP, PANEL_WIDTH, SKIN, TONE_STRIP } from './layout.mjs';
-import { gaiaFader, gaiaKnob, gaiaLeds } from './components.mjs';
+import { ARP_STRIP, COMMON_STRIP, EFFECTS_STRIP, PANEL_WIDTH, SKIN, TONE_STRIP } from './layout.mjs';
+import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from './components.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -225,6 +225,18 @@ const KINDS = {
     return { controls: [control], caption: spec.label ? { text: spec.label, x: at.x, y: at.y - 14, w: SKIN.ledW } : null, bottom: at.y + h };
   },
 
+  // Same component at the pre-glyph width, for option lists the instrument prints as words —
+  // FILTER SLOPE, an effect TYPE, D BEAM POLARITY. Giving those a glyph gutter would be 32px of
+  // nothing in a box that has none to spare.
+  ledsNarrow: (parameter, spec, at) => {
+    const options = (parameter.choices ?? []).map((choice) => ({ label: choice.label, value: choice.value }));
+    if (options.length === 0) return KINDS.ledsLegacy(parameter, spec, at);
+    const w = 104;
+    const h = options.length * SKIN.ledRow + 8;
+    const control = boundCustom(parameter, () => gaiaLeds({ options, width: w, rowHeight: SKIN.ledRow }), { x: at.x, y: at.y, w, h });
+    return { controls: [control], caption: spec.label ? { text: spec.label, x: at.x, y: at.y - 14, w } : null, bottom: at.y + h };
+  },
+
   ledsLegacy: (parameter, spec, at) => {
     const rows = parameter.choices?.length ?? 2;
     const h = Math.max(28, rows * SKIN.ledRow + 8);
@@ -326,12 +338,37 @@ const KINDS = {
   },
 };
 
+/** Place a control that draws but does not bind — an envelope silkscreen, the arpeggio field. */
+function placeStatic(control, id, { x, y, w, h }) {
+  control._children.Core.id = nextId(id);
+  control._children.Core.name = id;
+  Object.assign(control._children.Transform, { x, y, width: w, height: h });
+  return control;
+}
+
 function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p }) {
   const controls = [];
   const missing = [];
 
   for (const box of strip.boxes) {
     controls.push(...sectionBox(box, originX, originY));
+
+    // The printed envelope drawings, before the controls so captions land on top of them.
+    for (const env of box.envelopes ?? []) {
+      const x = originX + box.x + env.x;
+      const y = originY + box.y + CONTENT_TOP + env.y;
+      controls.push(placeStatic(gaiaEnvelope({ stages: env.stages, width: env.w, height: env.h }),
+        `env_${env.bind.replace(/\W+/g, '_')}`, { x, y, w: env.w, h: env.h }));
+      if (env.title) {
+        controls.push(label(env.title, { x, y: y - 13, w: env.w, h: 13 }, { size: 8, colour: SKIN.labelDim }));
+      }
+    }
+
+    if (box.grid) {
+      const g = box.grid;
+      controls.push(placeStatic(gaiaArpGrid({ width: g.w, height: g.h, steps: g.steps }),
+        'arp_pattern_grid', { x: originX + box.x + g.x, y: originY + box.y + CONTENT_TOP + g.y, w: g.w, h: g.h }));
+    }
 
     for (const spec of box.controls) {
       const parameter = byId.get(resolve(spec.p));
@@ -360,8 +397,15 @@ CE/profiles/test/roland-gaia-sh01.ceditor-device.json. Do not hand-edit — chan
 The layout is the instrument's
   Left to right is the signal path, the way the SH-01 prints it: LFO -> OSC -> FILTER -> AMP.
   Blue for the LFO, amber for OSC/FILTER/AMP, the same as the panel. Envelopes are fader banks,
-  not knobs. WAVE, FILTER MODE, LFO SHAPE and the rest are LED columns with every option visible,
-  not dropdowns — because that is how you read them on the hardware.
+  not knobs, with the envelope curve printed over each bank the way the silkscreen does. WAVE,
+  FILTER MODE, LFO SHAPE and the rest are LED columns with every option visible, not dropdowns —
+  because that is how you read them on the hardware — and each option carries its wave GLYPH, not
+  the word for it, for the same reason.
+
+  The envelope drawings are printed, not driven: they do not move when the faders do. The Envelope
+  component declares attack/decay/sustain/release ports, but inbound device sync only reflects
+  value / state / selectedChoice / text / brightness / backlight, so wiring them would look live
+  and be dead. A drawing that is honestly a drawing beats a control that lies.
 
 Three tones, all visible
   The instrument has one strip and a TONE SELECT button, because it has one set of knobs. A screen
@@ -375,9 +419,22 @@ The effects are honest, not pretty
   manual. So this shows the type selector and the first four parameters under Roland's own names.
   Labels that looked right and were wrong would be worse.
 
+The arpeggiator is a grid, because that is what it is
+  The MIDI implementation has sixteen Patch Arpeggio Pattern blocks at 00 0D 00 .. 00 1C 00, each
+  an Original Note plus THIRTY-TWO step slots holding 0 for a rest and 1..127 for a velocity. All
+  528 addresses are in the profile now. An earlier draft left them out as "addresses, not
+  controls", which was backwards: they are exactly what a step grid writes.
+
+  So the bottom row is the engine's arpeggiator surface — draw a block, drag it, drag its right
+  edge to lengthen it. What is NOT wired: the drawn pattern is not written out to those 528
+  addresses. The arpPattern channel is read-only by design (customComponentArpeggiator.js: "a
+  channel write racing a grid edit has no clean precedence"), and no pattern-to-parameter bridge
+  exists yet. The addresses are here so that bridge has somewhere to land. Until it does, this
+  grid edits a pattern, not a synth. Its note rows are also a 12-row piano-roll view rather than
+  the hardware's sixteen fixed lanes.
+
 Not here
-  No keyboard: this edits a patch, and the synth has its own keys. No arpeggio pattern grid — that
-  is 528 values of step data, which belongs to an Arpeggiator component and a dump.`;
+  No keyboard: this edits a patch, and the synth has its own keys.`;
 
 export function buildGaiaPanel() {
   const profile = JSON.parse(readFileSync(PROFILE, 'utf8'));
@@ -428,6 +485,11 @@ export function buildGaiaPanel() {
   controls.push(...effects.controls);
   missing.push(...effects.missing);
   y += EFFECTS_STRIP.height;
+
+  const arp = buildStrip(ARP_STRIP, byId, { originX: 16, originY: y });
+  controls.push(...arp.controls);
+  missing.push(...arp.missing);
+  y += ARP_STRIP.height;
 
   if (missing.length) {
     throw new Error(`layout.mjs places parameters the profile does not have:\n  ${[...new Set(missing)].join('\n  ')}`);
