@@ -20,6 +20,7 @@
   import { saveProfileSource, requestProfileSource, latestProfileSourceSave, profileSources } from '../stores/deviceProfiles.js';
   import { familyLabel as familyLabelOf } from './dpd/dpdLabels.js';
 
+  import { deepClone } from '../utils/deepClone.js';
   let { profileId = '' } = $props();
 
   // Map an engine profileId to a new-DPD model: direct id, or via the legacy->dpd backlink map.
@@ -44,7 +45,7 @@
     appliedSavedFor = null;
     saveStatus = '';
     const id = resolveDpdId(pid);
-    model = id ? structuredClone(dpdLibrary[id]) : null;
+    model = id ? deepClone(dpdLibrary[id]) : null;
     if (pid) requestProfileSource(pid); // ask the engine for the saved source (no-op without the bridge)
   });
 
@@ -56,7 +57,7 @@
     appliedSavedFor = pid;
     try {
       const parsed = JSON.parse(entry.source);
-      if (parsed?.dpdModel?.scopes) model = structuredClone(parsed.dpdModel);
+      if (parsed?.dpdModel?.scopes) model = deepClone(parsed.dpdModel);
     } catch { /* keep the bundled model */ }
   });
 

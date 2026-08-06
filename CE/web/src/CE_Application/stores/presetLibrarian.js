@@ -14,6 +14,7 @@ import {
 import { startBulkDumpSend } from './devicePresetJobs.js';
 import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
 
+import { deepClone } from '../utils/deepClone.js';
 const STORAGE_KEY = 'ce.presetLibrarian.v1';
 
 function normalizeEntry(entry) {
@@ -57,7 +58,7 @@ export const presetLibrary = writable(normalizeLibrary(readStoredJson(STORAGE_KE
 
 function updateLibrary(mutate) {
   presetLibrary.update((library) => {
-    const next = mutate(structuredClone(library)) ?? library;
+    const next = mutate(deepClone(library)) ?? library;
     writeStoredJson(STORAGE_KEY, next);
     return next;
   });
@@ -230,7 +231,7 @@ export function exportLibraryBankJson(profileId, bankId) {
     version: 1,
     profileId,
     exportedAt: new Date().toISOString(),
-    bank: structuredClone(bank),
+    bank: deepClone(bank),
   };
 }
 

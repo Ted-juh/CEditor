@@ -5,6 +5,7 @@ import { buildFillClipPath } from './cornerPaths.js';
 import { buildBorderSegments, getDoubleGap } from './borderSegments.js';
 import { numberOr, clamp } from './primitives.js';
 
+import { deepClone } from './deepClone.js';
 export const FILMSTRIP_BAKE_WARN_PIXELS = 32_000_000;
 export const FILMSTRIP_BAKE_MAX_PIXELS = 96_000_000;
 export const FILMSTRIP_BAKE_MAX_DIMENSION = 32_767;
@@ -494,7 +495,7 @@ async function drawPart(ctx, part, width, height) {
 }
 
 function cloneWithoutFilmstripGenerators(control) {
-  const clone = structuredClone(control);
+  const clone = deepClone(control);
   const generators = clone?._children?.Generators?._children ?? {};
   for (const generator of Object.values(generators)) {
     const type = String(generator?.type ?? '').toLowerCase();

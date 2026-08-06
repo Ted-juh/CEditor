@@ -8,6 +8,7 @@
   import { activateGradientTarget } from '../stores/gradientTarget.js';
   import Image from 'lucide-svelte/icons/image';
   import Layers from 'lucide-svelte/icons/layers';
+  import { deepClone } from '../utils/deepClone.js';
   import {
     SIDES, CORNERS,
     BORDER_UNLINK_PROPS, CORNER_UNLINK_PROPS, cascadeUnlink,
@@ -284,7 +285,7 @@
     const rootPath = ctxRootPath();
     // Seed default gradient if none exists yet so the renderer has data
     if (!currentGrad) {
-      currentGrad = structuredClone(DEFAULT_GRADIENT);
+      currentGrad = deepClone(DEFAULT_GRADIENT);
       set(`${rootPath}.gradient`, currentGrad);
     }
     const target = typeof buildGradientTarget === 'function'
