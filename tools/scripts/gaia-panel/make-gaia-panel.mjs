@@ -55,15 +55,24 @@ function setPath(control, dotted, value) {
   node[keys[keys.length - 1]] = value;
 }
 
-function label(text, { x, y, w, h = 13 }, { size = 9, colour = SKIN.labelDim, bold = false, align = 'center' } = {}) {
+function label(text, { x, y, w, h = 16 }, { size = 9, colour = SKIN.labelDim, bold = false, align = 'center' } = {}) {
+  // maxLines follows the text, rather than always allowing two. Reserving a second line in a
+  // single-line box pushed the block past the box height and clipped the glyph bottoms — "NAME"
+  // rendered as "NAMF", "SHAPE" as "SHAPF". A capital E losing its bottom bar is not a subtle
+  // failure; it just does not look like a word.
+  const lines = String(text).includes('\n') ? 2 : 1;
   return createControl('Label', {
     Core: { id: nextId('lbl'), name: 'label' },
     Transform: { x, y, width: w, height: h },
     Text: {
       content: text,
       _children: {
-        Font: { size, bold, weight: bold ? 'Bold' : 'Regular', weightValue: bold ? 700 : 400, letterSpacing: 0.4 },
+        Font: { size, bold, weight: bold ? 'Bold' : 'Regular', weightValue: bold ? 700 : 400, letterSpacing: 0.3 },
         Fill: { colour },
+        // A caption is one or two short words under a control. Left to its own devices it breaks
+        // mid-word — "PORTAMENTO" came out as "PORTAME / NTO" — which no instrument does and no
+        // reader forgives. Word wrapping, two lines at most, and shrink rather than break.
+        Multiline: { wrapMode: 'word', overflowMode: 'shrink', fitMode: 'shrink', maxLines: lines, lineHeight: 1.1 },
       },
     },
     // Border OFF, explicitly. SECTION_DEFAULTS.Background.Border is `enabled: true` at 2px of
@@ -71,7 +80,7 @@ function label(text, { x, y, w, h = 13 }, { size = 9, colour = SKIN.labelDim, bo
     // small captions that is the loudest thing on screen — forty white boxes drowning the controls
     // they name.
     Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 } } },
-    ContentLayout: { mode: 'text_only', horizontalAlign: align, verticalAlign: 'center', paddingLeft: 2, paddingRight: 2, paddingTop: 0, paddingBottom: 0 },
+    ContentLayout: { mode: 'text_only', horizontalAlign: align, verticalAlign: 'center', paddingLeft: 2, paddingRight: 2, paddingTop: 1, paddingBottom: 1 },
   });
 }
 
@@ -291,6 +300,17 @@ const KINDS = {
     const control = bound(parameter, 'ToggleButton', { x: at.x, y: at.y, w: spec.w ?? 80, h: 22 }, {
       'Text.content': spec.label,
       'Background._children.Corners.radius': 4,
+      // 12pt in a 22px-tall button is what wrapped PORTAMENTO across two lines and clipped it.
+      'Text._children.Font.size': 9,
+      'Text._children.Font.weightValue': 600,
+      'Text._children.Font.weight': 'SemiBold',
+      'Text._children.Multiline.wrapMode': 'word',
+      'Text._children.Multiline.fitMode': 'shrink',
+      'Text._children.Multiline.maxLines': 1,
+      'ContentLayout.paddingLeft': 4,
+      'ContentLayout.paddingRight': 4,
+      'ContentLayout.paddingTop': 2,
+      'ContentLayout.paddingBottom': 2,
     });
     return { controls: [control], caption: null, bottom: at.y + 22 };
   },
@@ -323,7 +343,7 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
       if (built.caption) {
         controls.push(label(built.caption.text, {
           x: built.caption.x, y: built.caption.y, w: built.caption.w,
-          h: built.caption.lines === 2 ? 22 : 12,
+          h: built.caption.lines === 2 ? 26 : 16,
         }, { size: 9, colour: SKIN.label }));
       }
     }

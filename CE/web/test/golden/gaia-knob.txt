@@ -8,3 +8,5 @@
 1x bg linear-gradient(180deg, #8A949E 0%, #3C444C 45%, #171B1F 100%)
 1x bg linear-gradient(180deg, #FFFFFF 0%, #9AA6B0 100%)
 1x bg radial-gradient(ellipse 72% 72% at 34% 28%, #48535D 0%, #2A323A 55%, #141A1E 100%)
+1x transform rotate(-135deg)
+1x origin 50% 125%

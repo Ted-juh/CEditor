@@ -61,9 +61,9 @@ export const TONE_STRIP = {
       controls: [
         { p: 'lfo.shape', kind: 'leds', x: 12, y: 30, label: 'SHAPE' },
         { p: 'lfo.rate', kind: 'knob', x: 124, y: 40, label: 'RATE' },
-        { p: 'lfo.tempoSyncSwitch', kind: 'toggle', x: 196, y: 40, w: 88, label: 'TEMPO SYNC' },
+        { p: 'lfo.tempoSyncSwitch', kind: 'toggle', x: 196, y: 40, w: 92, label: 'TEMPO SYNC' },
         { p: 'lfo.tempoSyncNote', kind: 'combo', x: 196, y: 84, w: 88, label: 'NOTE' },
-        { p: 'lfo.keyTrigger', kind: 'toggle', x: 124, y: 116, w: 60, label: 'KEY TRIG' },
+        { p: 'lfo.keyTrigger', kind: 'toggle', x: 124, y: 116, w: 70, label: 'KEY TRIG' },
         // The four faders the hardware prints under the LFO, in its order.
         { p: 'lfo.fadeTime', kind: 'fader', x: 20, y: 162, label: 'FADE\nTIME' },
         { p: 'lfo.pitchDepth', kind: 'fader', x: 84, y: 162, label: 'PITCH\nDEPTH' },
@@ -146,10 +146,10 @@ export const COMMON_STRIP = {
         { p: 'common.patchTempo', kind: 'knob', x: 314, y: 26, label: 'TEMPO' },
         { p: 'common.octaveShift', kind: 'knob', x: 392, y: 26, label: 'OCTAVE' },
         { p: 'common.monoSwitch', kind: 'toggle', x: 12, y: 118, w: 62, label: 'MONO' },
-        { p: 'common.portamentoSwitch', kind: 'toggle', x: 82, y: 118, w: 92, label: 'PORTAMENTO' },
-        { p: 'common.portamentoTime', kind: 'knobSmall', x: 186, y: 106, label: 'PORTA TIME' },
-        { p: 'common.pitchBendRangeUp', kind: 'knobSmall', x: 264, y: 106, label: 'BEND UP' },
-        { p: 'common.pitchBendRangeDown', kind: 'knobSmall', x: 342, y: 106, label: 'BEND DN' },
+        { p: 'common.portamentoSwitch', kind: 'toggle', x: 82, y: 118, w: 104, label: 'PORTAMENTO' },
+        { p: 'common.portamentoTime', kind: 'knobSmall', x: 198, y: 106, label: 'PORTA TIME' },
+        { p: 'common.pitchBendRangeUp', kind: 'knobSmall', x: 276, y: 106, label: 'BEND UP' },
+        { p: 'common.pitchBendRangeDown', kind: 'knobSmall', x: 354, y: 106, label: 'BEND DN' },
       ],
     },
     {
@@ -180,13 +180,13 @@ export const COMMON_STRIP = {
     {
       title: 'EFFECTS ROUTING', tint: TINT.effects, x: 1120, y: 0, w: 464, h: 196,
       controls: [
-        { p: 'common.effectsMasterSwitch', kind: 'toggle', x: 12, y: 32, w: 84, label: 'MASTER' },
+        { p: 'common.effectsMasterSwitch', kind: 'toggle', x: 12, y: 32, w: 84, label: 'FX MASTER' },
         { p: 'common.effectsDistortionSelect', kind: 'toggle', x: 104, y: 32, w: 76, label: 'DIST' },
         { p: 'common.effectsFlangerSelect', kind: 'toggle', x: 188, y: 32, w: 76, label: 'FLANGER' },
         { p: 'common.effectsDelaySelect', kind: 'toggle', x: 272, y: 32, w: 76, label: 'DELAY' },
         { p: 'common.effectsReverbSelect', kind: 'toggle', x: 356, y: 32, w: 76, label: 'REVERB' },
         { p: 'common.lowBoostSwitch', kind: 'toggle', x: 12, y: 80, w: 84, label: 'LOW BOOST' },
-        { p: 'common.tempoSyncSwitch', kind: 'toggle', x: 104, y: 80, w: 96, label: 'DELAY SYNC' },
+        { p: 'common.tempoSyncSwitch', kind: 'toggle', x: 104, y: 80, w: 100, label: 'DELAY SYNC' },
         { p: 'master.volume', kind: 'knob', x: 384, y: 112, label: 'VOLUME' },
       ],
     },

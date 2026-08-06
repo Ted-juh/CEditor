@@ -53,6 +53,7 @@ function radial(centerX, centerY, stops, { radiusX = 60, radiusY = 60 } = {}) {
 /** A filled rectangle part. `radius: 0` is what keeps a fader cap square. */
 function rect(name, { x, y, width, height }, colour, {
   zIndex = 0, radius = 0, borderColour = '00000000', borderThickness = 0, opacity = 1, gradient = null,
+  pivotX = null, pivotY = null,
 } = {}) {
   const background = clone(SECTION_DEFAULTS.Background);
   background._children.Fill.colour = colour;
@@ -70,7 +71,17 @@ function rect(name, { x, y, width, height }, colour, {
     role: 'custom',
     zIndex,
     opacity,
-    layout: { x, y, width, height, xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top' },
+    layout: {
+      x, y, width, height,
+      xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px',
+      anchorX: 'left', anchorY: 'top',
+      // transform-origin defaults to the part's own centre (50% 50%). Anything that rotates about
+      // a point other than its own middle — a knob pointer, which must swing about the KNOB's
+      // centre — has to say so, or it pivots around itself and both the direction and the angle
+      // come out wrong.
+      ...(pivotX === null ? {} : { pivotX }),
+      ...(pivotY === null ? {} : { pivotY }),
+    },
     sections: { Background: background },
   });
 }
@@ -272,7 +283,15 @@ export function gaiaKnob({ size = 54, ticks = 11 } = {}) {
         zIndex: 3, radius: 999, opacity: 0.13,
         gradient: linear(180, [[0, 'FFFFFF'], [100, '9AA6B0']]),
       }),
-      pointer: rect('pointer', { x: r - 2, y: 12, width: 4, height: r - 15 }, 'FFF6FAFD', { zIndex: 6, radius: 2 }),
+      // The pointer sits in the top half of the knob and must swing about the knob's CENTRE, which
+      // is below its own box. pivotY is therefore over 100% — the centre expressed as a percentage
+      // of the pointer's height. Without it the bar rotated about its own midpoint: at minimum it
+      // pointed up-and-left instead of down-and-left, and every angle in between was wrong too.
+      pointer: rect('pointer', { x: r - 2, y: 12, width: 4, height: r - 15 }, 'FFF6FAFD', {
+        zIndex: 6, radius: 2,
+        pivotX: 50,
+        pivotY: ((r - 12) / (r - 15)) * 100,
+      }),
     },
     behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'circular', role: 'knob', dragMode: 'vertical' }),
     hitZone: createHitZone('grab', { targetBehavior: 'drive', targetValueChannel: 'value', action: 'setValue', bounds: { x: 0, y: 0, width: 100, height: 100, unit: 'percent' } }),

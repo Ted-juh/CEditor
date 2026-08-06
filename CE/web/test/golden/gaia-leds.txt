@@ -4,3 +4,4 @@
 1x bg #171C20
 2x bg #3A1E1C
 1x bg #FF3B30
+3x transform none

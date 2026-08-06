@@ -10,10 +10,14 @@
 // control produced output; all three produced plenty. They were found by cropping a screenshot and
 // looking at it — twice by a human, once by finally doing the same thing deliberately.
 //
+// A fourth followed: the knob pointer rotated about its own midpoint instead of the knob's centre,
+// so at minimum it aimed up-and-left where the instrument aims down-and-left. That one survived
+// even the first version of THIS file, because the summary captured colour and forgot geometry.
+//
 // So this pins the paint. Each specimen is server-rendered and reduced to the things that decide
-// what you see — the stroke colours and widths, the fills, the geometry kinds — and compared
-// against a committed baseline. A change in any of them fails with a readable diff instead of a
-// pixel percentage.
+// what you see — stroke colours and widths, fills, shape primitives, and the transforms and pivots
+// that place them — and compared against a committed baseline. A change in any of them fails with
+// a readable diff instead of a pixel percentage.
 //
 // WHY NOT A PIXEL DIFF. A real screenshot needs a browser and a running dev server, and it drifts
 // on font hinting between machines, which makes it flaky exactly where it needs to be trusted.
@@ -47,8 +51,8 @@ const UPDATING = process.env.UPDATE_GOLDEN === '1';
  *
  * Not the raw HTML: Svelte's scoped class hashes and the defs-id namespacing change for reasons
  * that have nothing to do with how a control looks, and a baseline that churns on those is a
- * baseline people regenerate without reading. What is kept is every stroke, every fill, and the
- * shape primitives — which is precisely the set all three bugs moved.
+ * baseline people regenerate without reading. What is kept is every stroke, every fill, the shape
+ * primitives, and the transforms — which between them are what all four bugs moved.
  */
 function paintSummary(body) {
   const strokes = [...body.matchAll(/stroke="([^"]+)"[^>]*?stroke-width="([^"]+)"/g)]
@@ -56,6 +60,13 @@ function paintSummary(body) {
   const fills = [...body.matchAll(/fill="(?!none)([^"]+)"/g)].map(([, colour]) => `fill ${colour}`);
   const backgrounds = [...body.matchAll(/background(?:-color)?:\s*([^;"]+)/g)].map(([, value]) => `bg ${value.trim()}`);
   const shapes = [...body.matchAll(/<(rect|circle|ellipse|path|polygon|line)\b/g)].map(([, kind]) => `shape ${kind}`);
+
+  // Transforms, because geometry is appearance too. The knob pointer pointed the wrong way for
+  // three revisions: it rotated about its own midpoint instead of the knob's centre, so at minimum
+  // it aimed up-and-left where the hardware aims down-and-left. Nothing above would have noticed —
+  // the strokes and fills were identical, only the transform-origin was wrong.
+  const transforms = [...body.matchAll(/transform:\s*([^;"]+)/g)].map(([, value]) => `transform ${value.trim()}`);
+  const origins = [...body.matchAll(/transform-origin:\s*([^;"]+)/g)].map(([, value]) => `origin ${value.trim()}`);
 
   const tally = (entries) => {
     const counts = new Map();
@@ -68,6 +79,8 @@ function paintSummary(body) {
     ...tally(strokes),
     ...tally(fills),
     ...tally(backgrounds),
+    ...tally(transforms),
+    ...tally(origins),
   ].join('\n');
 }
 
@@ -151,6 +164,17 @@ test('a specimen that loses its border fails the gate', () => {
   const after = paintSummary(renderControl(control));
 
   assert.notEqual(after, before, 'switching a border off changed nothing in the paint summary');
+});
+
+test('a rotated part that loses its pivot fails the gate', () => {
+  // The knob pointer bug, exactly: same parts, same colours, wrong transform-origin.
+  const control = SPECIMENS['gaia-knob']();
+  const before = paintSummary(renderControl(control));
+
+  delete control._children.Parts._children.pointer._children.Layout.pivotY;
+  const after = paintSummary(renderControl(control));
+
+  assert.notEqual(after, before, 'moving a rotated part\'s pivot changed nothing in the paint summary');
 });
 
 test('a specimen that loses its alpha fails the gate', () => {
