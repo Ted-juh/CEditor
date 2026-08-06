@@ -2,6 +2,7 @@ import { get } from 'svelte/store';
 import { defaultGridSize, defaultSnapToGrid } from './runtimePreferences.js';
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
+import { resolveSliderSemanticParts, stripDefaultSliderParts, usesSliderSemanticParts } from '../utils/sliderEntityFactory.js';
 
 let nextId = 1;
 
@@ -177,14 +178,78 @@ function stripGeneratedControls(controls) {
   return (controls ?? [])
     .filter((c) => c?._children?.Core?.generatedBy == null)
     .map((c) => {
-      const kids = c?._children?.Children?._children;
-      if (!kids) return c;
+      const trimmed = stripRedundantParts(c);
+      const kids = trimmed?._children?.Children?._children;
+      if (!kids) return trimmed;
       const kept = Object.fromEntries(
         Object.entries(kids).filter(([, child]) => child?._children?.Core?.generatedBy == null)
           .map(([key, child]) => [key, stripGeneratedControls([child])[0] ?? child]),
       );
-      return { ...c, _children: { ...c._children, Children: { ...c._children.Children, _children: kept } } };
+      return { ...trimmed, _children: { ...trimmed._children, Children: { ...trimmed._children.Children, _children: kept } } };
     });
+}
+
+/**
+ * Don't write down a slider part that is still exactly its default.
+ *
+ * A Knob is born with seventeen fully-materialized parts, each carrying a complete Background and
+ * Text at defaults: 93 KB of JSON for a knob nobody has styled. On a 162-control synth editor that
+ * was 93% of a 28 MB document, and it is paid again on every autosave and fifty times over in the
+ * undo stack.
+ *
+ * The parts are recomputed on read anyway — SliderFamilyRenderer resolves them through
+ * resolveSliderSemanticParts(), which fills in every default part whether the document had it or
+ * not. So the only thing the stored copy was doing was taking up room.
+ *
+ * Slider and Knob only. Number and Range share the family but render their Parts directly rather
+ * than through the resolver, so theirs have to stay on disk.
+ */
+function stripRedundantParts(control) {
+  if (!control?._children?.Parts || !usesSliderSemanticParts(control)) return control;
+
+  const parts = stripDefaultSliderParts(control._children.Parts);
+  const children = { ...control._children };
+  if (parts) children.Parts = parts;
+  else delete children.Parts;
+
+  return { ...control, _children: children };
+}
+
+/**
+ * Put the elided slider parts back on load — the other half of stripRedundantParts, and not
+ * optional.
+ *
+ * SliderFamilyRenderer would cope without this: it resolves parts on every render. Nothing else
+ * would. The Slider and Slider-label editors read `getSection(control, 'Parts')` straight off the
+ * control to populate their lists, the Animations and Behavior editors read it to enumerate what
+ * can be targeted, and interactionRuntime reads it for hit-testing and state patches. All of them
+ * see the in-memory model, where Parts has always been materialized — so eliding on save without
+ * restoring on load would leave a knob that draws correctly and has an empty Parts inspector,
+ * which is a worse bug than the one being fixed.
+ *
+ * So the document is the compact form and the in-memory model is the full one, and neither side
+ * has to know about the other.
+ */
+function rehydrateParts(controls) {
+  return (controls ?? []).map((control) => {
+    if (!control?._children) return control;
+
+    let children = control._children;
+
+    if (usesSliderSemanticParts(control)) {
+      children = { ...children, Parts: resolveSliderSemanticParts(children.Parts ?? null) };
+    }
+
+    const kids = children.Children?._children;
+    if (kids) {
+      const restored = Object.fromEntries(
+        Object.entries(kids).map(([key, child]) => [key, rehydrateParts([child])[0] ?? child]),
+      );
+      children = { ...children, Children: { ...children.Children, _children: restored } };
+    }
+
+    return children === control._children ? control : { ...control, _children: children };
+  });
 }
 
 /** `Untitled 7` and friends — a stand-in the app invented, not a name anyone chose. */
@@ -250,6 +315,9 @@ export function deserializePanel(json, filePath, name) {
   return {
     ...createPanel(),
     ...data,
+    // Documents store slider parts in their compact form (defaults elided); the in-memory model
+    // is always the full one, because everything except the renderer reads Parts directly.
+    controls: rehydrateParts(data.controls),
     id,
     filePath,
     name: name || data.name || `Untitled ${id}`,

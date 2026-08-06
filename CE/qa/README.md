@@ -68,24 +68,39 @@ knowing rather than working around — it is the one component this gate cannot 
 
 ## Findings the suite produced immediately
 
-**1. Panel documents do not scale.** `QA-01` is 2.7 MB for 107 controls. `QA-06` — a *small*
-hardware editor, 162 bound controls — is **28 MB**. Undo keeps 50 whole-panel snapshots, so
-editing that panel implies over a gigabyte of undo history.
+**1. A knob cost 100 KB to write down, and 93 KB of it was nothing.** *(fixed — see below)*
 
-**2. The cost is concentrated, and it is the Parts tree.** Per-control document size:
+Every Slider and Knob is created with seventeen fully-materialized semantic parts, each carrying a
+complete `Background` (a `Fill` with sixty-odd fields, a `Border` with a per-side object) and a
+`Text` at defaults. Nothing elided defaults on save, so a knob nobody had styled still wrote 93 KB.
 
-| Component | Size | Of which `Parts` |
+It was pure redundancy: `SliderFamilyRenderer` has always resolved parts through
+`resolveSliderSemanticParts()`, which rebuilds every default part whether the document carried it
+or not. Documents now store only the parts that differ, and `deserializePanel` restores the rest on
+load — that second half is not optional, because only the *renderer* resolves. The Slider,
+Slider-label, Animations and Behavior editors and `interactionRuntime`'s hit-testing all read
+`getSection(control, 'Parts')` directly, so eliding without rehydrating would have produced a knob
+that draws perfectly and has an empty Parts inspector.
+
+| | before | after |
 |---|---|---|
-| Knob | 100 KB | 93 KB (17 parts) |
-| Slider | 100 KB | 93 KB |
-| ToggleButton / Combobox | ~16 KB | — |
-| Label | ~12 KB | — |
+| One knob (marginal) | ~100 KB | **~12 KB** |
+| `QA-01` (107 controls) | 2.7 MB | **2.3 MB** |
+| `QA-02` (33 controls) | 1.3 MB | **0.68 MB** |
+| `QA-06` (343 controls) | **28.2 MB** | **6.7 MB** |
 
-Every one of a knob's 17 parts carries a full `Background`/`Text`/`Effects` section at its
-defaults. Nothing elides defaults on serialization, so a knob that has never been touched still
-writes 93 KB. Sixty knobs — an ordinary synth panel — is 6 MB before anything is styled.
+Existing panels need no conversion: they load, and shrink the next time they are saved (a 213 KB
+one-knob fixture re-saves to 26 KB with the author's edit intact). `sliderPartsElision.test.js`
+holds all of it, including the byte figures — a default that quietly re-materialized parts on save
+would otherwise put the 93 KB back with no other symptom.
 
-Neither of these is a flaw in the sheets. They are the first thing the sheets are for: an editor
-that is uncomfortable holding one of each component, or a document format where a plain knob costs
-100 KB, are beta-blocking facts, and both were invisible until something built the panel that
-showed them.
+**2. Panel documents are still heavy, and the rest is the section tree.** QA-06 is 6.7 MB, not
+0.7 MB. What is left in a knob is `States`, `Behavior`, `Animations` and the remaining sections, all
+written at their defaults — the same class of problem one level up, and not this change's to fix.
+With 50 whole-panel undo snapshots, editing QA-06 still implies a few hundred MB of history.
+General default-elision across all sections is the follow-on, and it needs the same
+elide-plus-rehydrate discipline to be safe.
+
+Neither of these is a flaw in the sheets. They are the first thing the sheets are for: a document
+format where a plain knob cost 100 KB was a beta-blocking fact, and it was invisible until
+something built the panel that showed it.
