@@ -25,12 +25,42 @@ import { SECTION_DEFAULTS } from '../../../CE/web/src/CE_Application/models/sect
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
+/**
+ * A linear gradient, at an angle, from a list of `[position, colour]` pairs.
+ *
+ * Stops carry a six-digit colour with no alpha — gradientToCSS builds the CSS from `color` and
+ * `position` only, so transparency has to come from the part's opacity rather than from a stop.
+ */
+function linear(angle, stops) {
+  return {
+    type: 'linear',
+    angle,
+    centerX: 50, centerY: 50, radiusX: 50, radiusY: 50, edge: 0,
+    stops: stops.map(([position, color]) => ({ color, position })),
+  };
+}
+
+/** A radial gradient centred where the light falls, for a domed face. */
+function radial(centerX, centerY, stops, { radiusX = 60, radiusY = 60 } = {}) {
+  return {
+    type: 'radial',
+    angle: 0,
+    centerX, centerY, radiusX, radiusY, edge: 0,
+    stops: stops.map(([position, color]) => ({ color, position })),
+  };
+}
+
 /** A filled rectangle part. `radius: 0` is what keeps a fader cap square. */
 function rect(name, { x, y, width, height }, colour, {
-  zIndex = 0, radius = 0, borderColour = '00000000', borderThickness = 0, opacity = 1,
+  zIndex = 0, radius = 0, borderColour = '00000000', borderThickness = 0, opacity = 1, gradient = null,
 } = {}) {
   const background = clone(SECTION_DEFAULTS.Background);
   background._children.Fill.colour = colour;
+  if (gradient) {
+    background._children.Fill.gradientEnabled = true;
+    background._children.Fill.gradient = gradient;
+    background._children.Fill.gradientOpacity = 100;
+  }
   background._children.Border.enabled = borderThickness > 0;
   background._children.Border.colour = borderColour;
   background._children.Border.thickness = borderThickness;
@@ -196,7 +226,9 @@ export function gaiaKnob({ size = 54, ticks = 11 } = {}) {
   for (let i = 0; i < ticks; i++) {
     const deg = -135 + (sweep * i) / (ticks - 1);
     const rad = (deg - 90) * (Math.PI / 180);
-    const ringR = r - 2;
+    // Outside the rim, not under it. The shaded rim grew to r-8, and ticks drawn at the old r-2
+    // vanished beneath it — the ring was there in the document and invisible on screen.
+    const ringR = r - 1;
     const major = i === 0 || i === ticks - 1 || i === (ticks - 1) / 2;
     const len = major ? 5 : 3;
     tickParts[`tick${i}`] = rect(
@@ -220,10 +252,27 @@ export function gaiaKnob({ size = 54, ticks = 11 } = {}) {
       ...tickParts,
       // A dark cylinder with a lighter rim and a lit chamfer, which is what gives the hardware's
       // knobs their depth. Three stacked circles do it; a gradient would do it better.
-      body: rect('body', { x: 6, y: 6, width: size - 12, height: size - 12 }, 'FF0F1417', { zIndex: 1, radius: 999, borderColour: 'FF59646E', borderThickness: 2 }),
-      face: rect('face', { x: 9, y: 9, width: size - 18, height: size - 18 }, 'FF272F36', { zIndex: 2, radius: 999, borderColour: '55000000', borderThickness: 1 }),
-      chamfer: rect('chamfer', { x: 12, y: 11, width: size - 24, height: (size - 24) / 2 }, '18FFFFFF', { zIndex: 3, radius: 999 }),
-      pointer: rect('pointer', { x: r - 2, y: 10, width: 4, height: r - 13 }, 'FFF4F8FB', { zIndex: 6, radius: 2 }),
+      // Five stacked circles, lit from above, which is how a photographed knob actually reads:
+      //   drop     the shadow it casts on the panel
+      //   rim      the metal collar — light at the top edge, dark at the bottom
+      //   face     the cap itself, domed by a radial that puts its highlight up and left
+      //   gloss    a soft specular smear across the top third
+      //   pointer  the printed indicator line
+      // Flat colours got the shapes right and left every knob looking like a sticker.
+      drop: rect('drop', { x: 9, y: 11, width: size - 18, height: size - 18 }, 'FF05080A', { zIndex: 0, radius: 999, opacity: 0.55 }),
+      rim: rect('rim', { x: 8, y: 8, width: size - 16, height: size - 16 }, 'FF464F58', {
+        zIndex: 1, radius: 999,
+        gradient: linear(180, [[0, '8A949E'], [45, '3C444C'], [100, '171B1F']]),
+      }),
+      face: rect('face', { x: 11, y: 11, width: size - 22, height: size - 22 }, 'FF262E35', {
+        zIndex: 2, radius: 999,
+        gradient: radial(34, 28, [[0, '48535D'], [55, '2A323A'], [100, '141A1E']], { radiusX: 72, radiusY: 72 }),
+      }),
+      gloss: rect('gloss', { x: 16, y: 14, width: size - 32, height: (size - 32) * 0.46 }, 'FFFFFFFF', {
+        zIndex: 3, radius: 999, opacity: 0.13,
+        gradient: linear(180, [[0, 'FFFFFF'], [100, '9AA6B0']]),
+      }),
+      pointer: rect('pointer', { x: r - 2, y: 12, width: 4, height: r - 15 }, 'FFF6FAFD', { zIndex: 6, radius: 2 }),
     },
     behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'circular', role: 'knob', dragMode: 'vertical' }),
     hitZone: createHitZone('grab', { targetBehavior: 'drive', targetValueChannel: 'value', action: 'setValue', bounds: { x: 0, y: 0, width: 100, height: 100, unit: 'percent' } }),
