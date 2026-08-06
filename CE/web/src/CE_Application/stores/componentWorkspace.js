@@ -6,6 +6,7 @@ import { migrateCustomComponentPlan } from '../utils/customComponentMigrations.j
 import { instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
 import { customComponentLibrary } from './customComponentLibrary.js';
 
+import { deepClone } from '../utils/deepClone.js';
 export const componentWorkspaceMode = writable('panel');
 export const componentDocuments = writable([]);
 export const activeComponentDocumentId = writable(null);
@@ -35,7 +36,7 @@ function uniqueComponentDocumentId() {
 
 export function createComponentDocument({ starterId = 'starter.blankCanvas', name = 'Untitled Component', control: sourceControl = null } = {}) {
   const control = sourceControl?._children
-    ? migrateCustomComponentPlan(structuredClone(sourceControl)).component
+    ? migrateCustomComponentPlan(deepClone(sourceControl)).component
     : createControl('CustomComponent');
 
   if (!sourceControl?._children) {
@@ -96,7 +97,7 @@ export function mutateComponentDocumentControl(controlId, mutator) {
   let changed = false;
   componentDocuments.update((documents) => documents.map((document) => {
     if (document.control?._children?.Core?.id !== controlId) return document;
-    const nextControl = structuredClone(document.control);
+    const nextControl = deepClone(document.control);
     const didMutate = mutator(nextControl) !== false;
     if (!didMutate) return document;
     changed = true;
