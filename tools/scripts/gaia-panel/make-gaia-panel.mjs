@@ -19,6 +19,7 @@ import { createControl } from '../../../CE/web/src/CE_Application/models/compone
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
 import { COMMON_STRIP, EFFECTS_STRIP, PANEL_WIDTH, SKIN, TONE_STRIP } from './layout.mjs';
+import { gaiaFader, gaiaKnob } from './components.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -110,9 +111,15 @@ function sectionBox(box, originX, originY) {
   return [frame, tab];
 }
 
-/** Build one bound control, shaped like the parameter it drives. */
-function bound(parameter, type, box, overrides = {}) {
-  const control = createControl(type, {
+/**
+ * Build one bound control, shaped like the parameter it drives.
+ *
+ * `make` lets a caller hand in a control it built itself — which is how the custom fader and knob
+ * get here. They bind exactly like a native control does: one port, one parameter, one adoption
+ * pass. The only difference is who drew them.
+ */
+function bound(parameter, type, box, overrides = {}, make = null) {
+  const control = (make ?? createControl)(type, {
     Core: { id: nextId(parameter.id.replace(/\W+/g, '_')), name: parameter.id, description: `${parameter.name} — ${parameter.address ?? parameter.messageRecipe}` },
     Transform: { x: box.x, y: box.y, width: box.w, height: box.h },
     DeviceBindings: {
@@ -133,6 +140,40 @@ function bound(parameter, type, box, overrides = {}) {
     setPath(control, dotted, value);
   }
   for (const [dotted, value] of Object.entries(overrides)) setPath(control, dotted, value);
+  return control;
+}
+
+/**
+ * A custom component, positioned and bound to a parameter.
+ *
+ * Its single published `value` channel is the port. Adoption still runs, so the component gets the
+ * parameter's range the same way a native control would — the drawing is custom, the wiring is not.
+ */
+function boundCustom(parameter, build, box) {
+  const control = build();
+  control._children.Core.id = nextId(parameter.id.replace(/\W+/g, '_'));
+  control._children.Core.name = parameter.id;
+  control._children.Core.description = `${parameter.name} — ${parameter.address ?? parameter.messageRecipe}`;
+  Object.assign(control._children.Transform, { x: box.x, y: box.y, width: box.w, height: box.h });
+  control._children.DeviceBindings = {
+    _type: 'DeviceBindings',
+    enabled: true,
+    debug: false,
+    bindings: [{
+      kind: 'deviceParameter',
+      port: 'value',
+      deviceRole: 'primary',
+      parameterId: parameter.id,
+      parameterType: parameter.type,
+      adoptMetadata: true,
+      dryRun: false,
+      feedback: { receiveUpdates: true, ignoreOwnEchoes: true, echoWindowMs: 250 },
+    }],
+  };
+  for (const [dotted, value] of Object.entries(parameterAdoptionPatches('Knob', parameter))) {
+    // Only the numeric shape applies; a custom component has no Text to stamp a label into.
+    if (dotted.startsWith('Behavior.')) setPath(control, dotted, value);
+  }
   return control;
 }
 
@@ -158,10 +199,17 @@ const KINDS = {
   },
 
   fader: (parameter, spec, at) => {
-    // A slider's default parts are a round thumb on a thin rounded track, which at this size reads
-    // as a dot on a line. The SH-01's faders are a narrow slot with a wide flat cap, and that shape
-    // is most of what makes a bank of them look like an envelope rather than a row of dials — so
-    // the two parts that carry the shape are set here.
+    // A custom component, not a Slider. SliderFamilyRenderer draws its thumb as a hardcoded
+    // circle, and a flat cap is most of what makes a bank of four read as an envelope.
+    const control = boundCustom(parameter, () => gaiaFader({ width: SKIN.faderW + 4, height: SKIN.faderH }), { x: at.x, y: at.y, w: SKIN.faderW + 4, h: SKIN.faderH });
+    return {
+      controls: [control],
+      caption: { text: spec.label, x: at.x - 12, y: at.y + SKIN.faderH + 2, w: SKIN.faderW + 24, lines: 2 },
+      bottom: at.y + SKIN.faderH + 26,
+    };
+  },
+
+  faderLegacy: (parameter, spec, at) => {
     const control = bound(parameter, 'Slider', { x: at.x, y: at.y, w: SKIN.faderW, h: SKIN.faderH }, {
       'Behavior.orientation': 'vertical',
       'Behavior.showTicks': false,
@@ -192,6 +240,11 @@ const KINDS = {
   },
 
   knob: (parameter, spec, at) => {
+    const control = boundCustom(parameter, () => gaiaKnob({ size: SKIN.knob }), { x: at.x, y: at.y, w: SKIN.knob, h: SKIN.knob });
+    return { controls: [control], caption: { text: spec.label, x: at.x - 14, y: at.y + SKIN.knob + 5, w: SKIN.knob + 28 }, bottom: at.y + SKIN.knob + 19 };
+  },
+
+  knobLegacy: (parameter, spec, at) => {
     const control = bound(parameter, 'Knob', { x: at.x, y: at.y, w: SKIN.knob, h: SKIN.knob }, {
       'Behavior.showTicks': true,
       'Behavior.showValueReadout': false,
@@ -201,11 +254,7 @@ const KINDS = {
   },
 
   knobSmall: (parameter, spec, at) => {
-    const control = bound(parameter, 'Knob', { x: at.x, y: at.y, w: 42, h: 42 }, {
-      'Behavior.showTicks': false,
-      'Behavior.showValueReadout': false,
-      'Behavior.showMinMaxLabels': false,
-    });
+    const control = boundCustom(parameter, () => gaiaKnob({ size: 42 }), { x: at.x, y: at.y, w: 42, h: 42 });
     return { controls: [control], caption: { text: spec.label, x: at.x - 14, y: at.y + 44, w: 70 }, bottom: at.y + 58 };
   },
 
