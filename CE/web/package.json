@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "node --import ./test/support/register-svelte.mjs --test",
     "test:script-exports": "node scripts/validate-script-exports.mjs",
+    "qa:panels": "node ../../tools/scripts/qa/make-qa-panels.mjs",
     "docs:manual": "node scripts/generate-scripting-manual.mjs",
     "test:all": "npm test && npm run test:script-exports"
   },
