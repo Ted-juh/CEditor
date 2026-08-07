@@ -227,8 +227,12 @@ test('a custom component keeps everything authored and drops the boilerplate', (
     'the one colour the author changed has to survive the part diff');
   assert.ok(!('Border' in stored.Parts._children.body._children.Background._children),
     'the defaulted half of an edited part section should not be written down');
-  assert.deepEqual(stored.Parts._children.plain._children.Background, { _type: 'Background' },
-    'a fully defaulted part section keeps its _type as the marker that it exists at all');
+  // `_type` is the marker that the section exists at all; `Corners.linked` is written even at its
+  // default so a build without the normalizeCorner fix still reads the section as linked rather
+  // than rendering every rounded part square. Both are deliberate, so both are pinned.
+  assert.deepEqual(stored.Parts._children.plain._children.Background,
+    { _type: 'Background', _children: { Corners: { linked: true } } },
+    'a fully defaulted part section should keep only its _type marker and Corners.linked');
   assert.deepEqual(stored.ValueChannels._children.value, { min: 0, max: 7 },
     'authored value channels are not in the shell, so they are written whole');
 });

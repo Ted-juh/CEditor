@@ -153,6 +153,27 @@ function expand(sparse, pristine) {
 // So an elided section keeps its `_type` as a marker: one key, and it is what expandPart looks the
 // defaults up by. Without it a defaulted Background would vanish on save and never come back.
 
+/**
+ * Keys inside a part's sections that are written even when they are at their default.
+ *
+ * `Corners.linked` is here for one reason: normalizeCorner reads it as `if (corners.linked)`, so a
+ * Corners object that has elided it — because `true` IS the default — takes the unlinked branch,
+ * finds no per-corner data, and returns a corner of radius 0. Every rounded thing on the panel
+ * renders as a square while `radius: 999` sits in the file untouched.
+ *
+ * cornerNormalization.js is fixed to read it as `!== false`, which is what the other tri-state
+ * field beside it already does. This entry is the other half: a build from BEFORE that fix still
+ * reads `linked` and still draws round knobs. That is the difference between an old build showing
+ * a stale panel and an old build showing a broken one, and it costs about sixteen bytes a part.
+ *
+ * Measured rather than assumed. Rendering all 370 of the GAIA panel's custom components with and
+ * without the part diff, `border-radius` was the only CSS declaration that changed — every other
+ * part property survives a partial section, because its renderer reads a leaf with a default
+ * beside it. Writing the whole Corners object instead would have cost 2.3 KB a part: 4.6 MB to
+ * 21 MB, to protect one boolean.
+ */
+const ALWAYS_WRITTEN = { Corners: ['linked'] };
+
 /** The part shell as createPartNode makes it, with `name` blanked so a real name always survives. */
 function pristinePartShell() {
   const shell = createPartNode('');
@@ -166,7 +187,16 @@ function pristinePart(part) {
   for (const [key, section] of Object.entries(part?._children ?? {})) {
     if (key === 'Layout') continue;
     const defaults = SECTION_DEFAULTS[section?._type];
-    if (defaults) shell._children[key] = JSON.parse(JSON.stringify(defaults));
+    if (!defaults) continue;
+
+    const baseline = JSON.parse(JSON.stringify(defaults));
+    // Withholding a key from the baseline is what makes shrink() write it and expand() take it
+    // back unchanged — the same mechanism an unknown section already goes through.
+    for (const [child, keys] of Object.entries(ALWAYS_WRITTEN)) {
+      const node = baseline._children?.[child];
+      if (node) for (const leaf of keys) delete node[leaf];
+    }
+    shell._children[key] = baseline;
   }
   return shell;
 }
