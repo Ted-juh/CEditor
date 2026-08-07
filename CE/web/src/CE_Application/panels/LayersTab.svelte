@@ -24,14 +24,34 @@
     addLayer, assignSelectionToLayer, moveLayer, removeLayer, renameLayer,
     setLayerLocked, setLayerVisible,
   } from '../stores/panelLayerActions.js';
-  import { layerPopulation, normalizePanelLayers } from '../utils/panelLayers.js';
+  import { layerPopulation, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
+  import { layerThumbnailUrl } from '../utils/layerThumbnail.js';
 
   let layers = $derived(normalizePanelLayers($activePanel?.layers, $activePanel?.controls ?? []));
   let population = $derived(layerPopulation(layers, $activePanel?.controls ?? []));
   let selectionCount = $derived($selectedComponentIds?.size ?? 0);
 
+  // Controls grouped once, rather than filtering the whole list inside each row — on a
+  // 400-control panel with several layers that is the difference between one pass and N.
+  let byLayer = $derived.by(() => {
+    const map = new Map();
+    for (const control of $activePanel?.controls ?? []) {
+      const name = normalizeLayerName(control?._children?.Core?.layer);
+      if (!map.has(name)) map.set(name, []);
+      map.get(name).push(control);
+    }
+    return map;
+  });
+
   // Front-to-back for display; `index` stays the model index so the actions need no translation.
-  let rows = $derived(layers.map((layer, index) => ({ layer, index })).reverse());
+  let rows = $derived(layers.map((layer, index) => ({
+    layer,
+    index,
+    // A locator, not a preview — see utils/layerThumbnail.js. Null for an empty layer, so the row
+    // can say so rather than showing a blank box that reads as a broken image.
+    thumb: layerThumbnailUrl(byLayer.get(layer.name) ?? [], $activePanel?.width ?? 0, $activePanel?.height ?? 0, 34),
+    big: layerThumbnailUrl(byLayer.get(layer.name) ?? [], $activePanel?.width ?? 0, $activePanel?.height ?? 0, 150),
+  })).reverse());
 
   let editingName = $state(null);
   let draftName = $state('');
@@ -64,8 +84,18 @@
   </div>
 
   <ul class="layer-list">
-    {#each rows as { layer, index } (layer.name)}
+    {#each rows as { layer, index, thumb, big } (layer.name)}
       <li class="layer-row" class:hidden={layer.visible === false} class:locked={layer.locked}>
+        <span class="thumb-slot">
+          {#if thumb}
+            <img class="thumb" src={thumb.url} width={thumb.width} height={thumb.height} alt="" />
+            {#if big}
+              <span class="thumb-pop"><img src={big.url} width={big.width} height={big.height} alt="" /></span>
+            {/if}
+          {:else}
+            <span class="thumb-empty" title="Nothing on this layer yet">empty</span>
+          {/if}
+        </span>
         <button
           class="icon"
           title={layer.visible === false ? 'Show layer' : 'Hide layer'}
@@ -126,8 +156,33 @@
   .hint { color: #777; font-size: 11px; }
 
   .layer-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
-  .layer-row { display: flex; align-items: center; gap: 3px; padding: 3px 5px; border-radius: 3px; background: #1E1E1E;
-               border: 1px solid #2C2C2C; }
+  .layer-row { position: relative; display: flex; align-items: center; gap: 3px; padding: 4px 5px; border-radius: 3px;
+               background: #1E1E1E; border: 1px solid #2C2C2C; }
+
+  /* Fixed box, letterboxed content: a portrait panel and a landscape one both sit in the same
+     row height without either being stretched into a lie about its shape. */
+  /* Deliberately NOT position:relative. The blow-up lives inside this element in the markup, so a
+     relative slot becomes its offset parent and "right: 8px" means 8px from the right of a 36px
+     box at the far left — which put the pop straight back over the thumbnails it came from. The
+     ROW is the offset parent; the slot only groups the markup. */
+  .thumb-slot { width: 36px; height: 36px; flex-shrink: 0; display: flex;
+                align-items: center; justify-content: center; background: #141414; border: 1px solid #2A2A2A;
+                border-radius: 2px; margin-right: 4px; }
+  .thumb { display: block; image-rendering: auto; }
+  .thumb-empty { color: #555; font-size: 8px; letter-spacing: 0.3px; }
+
+  /* The blow-up. Anchored to the ROW's right edge, not to the thumbnail: growing rightward from a
+     36px slot at the far left put it straight over the eye, lock and name of two rows. It could
+     still be clicked through (pointer-events: none) but you cannot read what you are pointing at,
+     which is most of the reason to look. The right side of a layer row is empty, so it goes there.
+     Absolute, so it never resizes a row and never pushes the list around. */
+  .thumb-pop { display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+               z-index: 40; padding: 6px; background: #101010; border: 1px solid #3A3A3A; border-radius: 4px;
+               box-shadow: 0 6px 20px rgba(0,0,0,0.6); pointer-events: none; }
+  .thumb-slot:hover .thumb-pop { display: block; }
+  .thumb-pop img { display: block; }
+
+  .layer-row.hidden .thumb { opacity: 0.3; }
   .layer-row:hover { background: #242424; }
   .layer-row.hidden .name { color: #666; text-decoration: line-through; }
   .layer-row.locked { border-color: #3A3226; }
