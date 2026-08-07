@@ -197,8 +197,24 @@ function boundCustom(parameter, build, box) {
       channel.max = parameter.range.max;
       channel.step = parameter.type === 'float' ? (parameter.range.max - parameter.range.min) / 1000 : 1;
       channel.type = parameter.type === 'float' ? 'float' : 'int';
+      // createValueChannel picked the precision from the type it was BUILT with (float, 2 decimals)
+      // and the type is being corrected here. Leaving it made every whole-numbered synth parameter
+      // read "64.00" the moment anything formatted it.
+      channel.format = { ...channel.format, precision: channel.type === 'float' ? 2 : 0 };
     }
     if (typeof parameter.default === 'number') channel.defaultValue = parameter.default;
+
+    // The range the INSTRUMENT prints, when it is not the range on the wire. Octave Shift is
+    // stored 61..67 and reads -3..+3; every MFX parameter is stored 12768..52768 and reads
+    // -20000..+20000. Without this a knob shows the wire number, which is not wrong by a rounding
+    // — it is wrong by a constant, on every bipolar parameter the machine has.
+    const displayMin = Number(parameter.display?.min);
+    const displayMax = Number(parameter.display?.max);
+    if (Number.isFinite(displayMin) && Number.isFinite(displayMax)
+      && (displayMin !== parameter.range?.min || displayMax !== parameter.range?.max)) {
+      channel.format = { ...channel.format, displayMin, displayMax };
+    }
+    if (parameter.display?.unit) channel.format = { ...channel.format, unit: String(parameter.display.unit) };
   }
   return control;
 }

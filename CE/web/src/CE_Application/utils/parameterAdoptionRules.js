@@ -35,6 +35,19 @@ export function applyParameterAdoption(set, controlType, parameter) {
     set('Behavior.max', max);
     set('Behavior.defaultCurrentValue', value);
     set('Behavior.valueType', parameter.type === 'float' ? 'float' : 'int');
+
+    // The readout's range, when the profile says it differs from the wire's. The GAIA stores Octave
+    // Shift 61..67 and prints -3..+3; adopting only the wire range put 64 on screen where the
+    // instrument shows 0, on every bipolar parameter it has. `display.min/max` has been in the
+    // profile since it was written — nothing between the profile and the screen read it.
+    const displayMin = Number(parameter?.display?.min);
+    const displayMax = Number(parameter?.display?.max);
+    const remapped = Number.isFinite(displayMin) && Number.isFinite(displayMax)
+      && (displayMin !== min || displayMax !== max);
+    set('Behavior.displayMin', remapped ? displayMin : null);
+    set('Behavior.displayMax', remapped ? displayMax : null);
+    if (parameter?.display?.unit) set('Behavior.unit', String(parameter.display.unit));
+    if (remapped && displayMin < 0) set('Behavior.showSign', true);
   }
 
   if (parameter?.type === 'choice' && Array.isArray(parameter?.choices)) {

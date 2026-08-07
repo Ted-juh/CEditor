@@ -30,6 +30,7 @@ import { materializeCustomComponent } from './customComponentMaterializer.js';
 import { applyCustomInternalScale } from './customComponentScale.js';
 import { constrainCustomValues, customConditionMatches } from './customComponentInteraction.js';
 import { clamp } from './primitives.js';
+import { formatChannelValue } from './valueDisplayScale.js';
 import { visibleChoiceRows, dependsOnId } from './dependentChoices.js';
 
 function getNodeChild(node, key) {
@@ -531,7 +532,10 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
     const channelRaw = constrainedCustomValues?.[name] ?? channel?.currentValue ?? channel?.defaultValue;
     channelSignals[`channel.${name}.raw`] = channelRaw;
     channelSignals[`channel.${name}.normalized`] = normalizeCustomChannelValue(channel, channelRaw);
-    channelSignals[`channel.${name}.display`] = String(channelRaw ?? '');
+    // The channel's own formatting AND its display scale — a knob bound to a parameter stored
+    // 61..67 and printed -3..+3 read 64 here where the instrument reads 0. String(raw) also threw
+    // away the channel's prefix/suffix/unit/precision, which nothing had ever applied.
+    channelSignals[`channel.${name}.display`] = formatChannelValue(channel, channelRaw);
     // Array channels (§12.3) additionally expose their items — whole and
     // per-index — so generators and bindings can target item i directly
     // (`channel.<name>.items`, `channel.<name>.<i>.raw|.normalized`).
@@ -559,7 +563,7 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
     role: 'component',
     valueType: String(mainChannel?.type ?? 'float'),
     valueRaw: rawValue,
-    valueDisplay: String(rawValue ?? ''),
+    valueDisplay: formatChannelValue(mainChannel, rawValue),
     valueEnum: String(modeValue ?? ''),
     valueNormalized,
     customChannels: channelSignals,

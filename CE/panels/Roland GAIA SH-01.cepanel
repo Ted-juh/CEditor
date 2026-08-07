@@ -3525,7 +3525,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -4380,10 +4380,10 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "BPM"
               },
               "snap": {
                 "enabled": true,
@@ -5235,10 +5235,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -3,
+                "displayMax": 3
               },
               "snap": {
                 "enabled": true,
@@ -6270,7 +6272,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -7125,7 +7127,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -7980,7 +7982,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -12023,7 +12025,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -15034,7 +15036,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -16600,7 +16602,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -17746,10 +17748,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -18892,10 +18896,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -20038,10 +20044,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -24375,10 +24383,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -24,
+                "displayMax": 24
               },
               "snap": {
                 "enabled": true,
@@ -25230,10 +25240,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -50,
+                "displayMax": 50
               },
               "snap": {
                 "enabled": true,
@@ -26319,7 +26331,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -27465,7 +27477,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -28611,7 +28623,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -29757,7 +29769,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -30903,10 +30915,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -34010,7 +34024,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -34865,7 +34879,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -35954,7 +35968,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -37100,7 +37114,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -38246,7 +38260,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -39392,7 +39406,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -40538,10 +40552,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -41684,10 +41700,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -42596,10 +42614,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -100,
+                "displayMax": 100
               },
               "snap": {
                 "enabled": true,
@@ -43909,7 +43929,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -44764,10 +44784,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -64,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -45619,10 +45641,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -46708,7 +46732,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -47854,7 +47878,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -49000,7 +49024,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -50146,7 +50170,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -53160,7 +53184,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -54339,10 +54363,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -55485,10 +55511,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -56631,10 +56659,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -57777,10 +57807,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -60845,7 +60877,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -62411,7 +62443,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -63557,10 +63589,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -64703,10 +64737,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -65849,10 +65885,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -70186,10 +70224,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -24,
+                "displayMax": 24
               },
               "snap": {
                 "enabled": true,
@@ -71041,10 +71081,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -50,
+                "displayMax": 50
               },
               "snap": {
                 "enabled": true,
@@ -72130,7 +72172,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -73276,7 +73318,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -74422,7 +74464,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -75568,7 +75610,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -76714,10 +76756,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -79821,7 +79865,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -80676,7 +80720,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -81765,7 +81809,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -82911,7 +82955,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -84057,7 +84101,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -85203,7 +85247,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -86349,10 +86393,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -87495,10 +87541,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -88407,10 +88455,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -100,
+                "displayMax": 100
               },
               "snap": {
                 "enabled": true,
@@ -89720,7 +89770,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -90575,10 +90625,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -64,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -91430,10 +91482,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -92519,7 +92573,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -93665,7 +93719,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -94811,7 +94865,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -95957,7 +96011,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -98971,7 +99025,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -100150,10 +100204,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -101296,10 +101352,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -102442,10 +102500,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -103588,10 +103648,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -106656,7 +106718,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -108222,7 +108284,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -109368,10 +109430,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -110514,10 +110578,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -111660,10 +111726,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -115997,10 +116065,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -24,
+                "displayMax": 24
               },
               "snap": {
                 "enabled": true,
@@ -116852,10 +116922,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -50,
+                "displayMax": 50
               },
               "snap": {
                 "enabled": true,
@@ -117941,7 +118013,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -119087,7 +119159,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -120233,7 +120305,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -121379,7 +121451,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -122525,10 +122597,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -125632,7 +125706,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -126487,7 +126561,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -127576,7 +127650,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -128722,7 +128796,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -129868,7 +129942,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -131014,7 +131088,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -132160,10 +132234,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -133306,10 +133382,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -134218,10 +134296,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -100,
+                "displayMax": 100
               },
               "snap": {
                 "enabled": true,
@@ -135531,7 +135611,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -136386,10 +136466,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -64,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -137241,10 +137323,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -138330,7 +138414,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -139476,7 +139560,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -140622,7 +140706,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -141768,7 +141852,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -144782,7 +144866,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -145961,10 +146045,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -147107,10 +147193,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -148253,10 +148341,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -149399,10 +149489,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -63,
+                "displayMax": 63
               },
               "snap": {
                 "enabled": true,
@@ -151080,10 +151172,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -3,
+                "displayMax": 3
               },
               "snap": {
                 "enabled": true,
@@ -151935,7 +152029,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -152790,7 +152884,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -153645,7 +153739,7 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
                 "unit": ""
@@ -155536,10 +155630,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -156391,10 +156487,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -157246,10 +157344,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -158101,10 +158201,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -159992,10 +160094,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -160847,10 +160951,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -161702,10 +161808,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -162557,10 +162665,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -164262,10 +164372,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -165117,10 +165229,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -165972,10 +166086,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -166827,10 +166943,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -168349,10 +168467,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -169204,10 +169324,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -170059,10 +170181,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
@@ -170914,10 +171038,12 @@
               "publicOutput": true,
               "deviceBindable": true,
               "format": {
-                "precision": 2,
+                "precision": 0,
                 "prefix": "",
                 "suffix": "",
-                "unit": ""
+                "unit": "",
+                "displayMin": -20000,
+                "displayMax": 20000
               },
               "snap": {
                 "enabled": true,
