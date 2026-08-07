@@ -115,7 +115,6 @@ test('every construct it does not fully understand is refused by name', () => {
       return c;
     }],
     ['transform scale', () => box('s', { Transform: { scale: 1.5 } })],
-    ['anchored to a parent edge', () => box('a', { Transform: { anchor: 'topRight' } })],
     ['image or overlay fill', () => withBackground((bg) => { bg.Fill.imageEnabled = true; })],
     ['per-side border', () => withBackground((bg) => Object.assign(bg.Border, { enabled: true, linked: false }))],
     ['border style "dashed"', () => withBackground((bg) => Object.assign(bg.Border, { enabled: true, style: 'dashed' }))],
@@ -144,15 +143,63 @@ test('a container is refused for what its children are', () => {
   assert.match(whyControlNotScenery(parent), /^child "Title": carries text/);
 });
 
-test('a container that sizes itself from its contents is refused by name', () => {
-  // Measuring it would mean a second implementation of CanvasControl's fit, and two implementations
-  // of the same measurement do not stay agreeing.
+test('a container that sizes itself from its contents is measured, not refused', () => {
+  // The first cut refused this, reasoning that measuring it would be a second implementation of
+  // CanvasControl's fit. Wrong conclusion from a right premise: the fit lives in containerFit.js
+  // and CanvasControl calls it. Calling the same function is not a second implementation, so the
+  // assertion here is that the compiled box is the SIZE THE CANVAS DRAWS.
   const parent = createControl('Container', {
-    Core: { id: 'p', layer: 'Scenery' },
-    Children: { fitWidth: 'contents' },
+    Core: { id: 'p', name: 'p', layer: 'Scenery' },
+    Transform: { x: 0, y: 0, width: 999, height: 999 },
+    Children: { fitWidth: 'contents', fitHeight: 'contents', padding: 10 },
   });
-  parent._children.Children._children = { kid: box('kid') };
-  assert.equal(whyControlNotScenery(parent), 'container sizes itself from its contents');
+  parent._children.Background._children.Border.enabled = false;
+  parent._children.Children._children = {
+    kid: box('kid', { Transform: { x: 5, y: 5, width: 40, height: 30 } }),
+  };
+
+  assert.equal(whyControlNotScenery(parent), null);
+  const svg = svgOf(compileScenery([parent], 400, 400));
+  // 10 padding + 5 own x + 40 wide + 10 padding = 65 x 55, not the 999 in Transform.
+  assert.match(svg, /x="0" y="0" width="65" height="55"/);
+  assert.match(svg, /x="15" y="15" width="40" height="30"/, 'the child sits at the content origin');
+});
+
+test('an anchored child is placed against the fitted edge', () => {
+  // The mechanism the whole section arc was for: a title anchored top-right of a box whose width is
+  // derived from its contents. Absolute x/y cannot express that, so if the compiler ignored the
+  // anchor the title would bake in the wrong place — visibly, and only on fitted sections.
+  const parent = createControl('Container', {
+    Core: { id: 'p', name: 'p', layer: 'Scenery' },
+    Transform: { x: 0, y: 0, width: 200, height: 100 },
+    Children: { padding: 0 },
+  });
+  parent._children.Background._children.Border.enabled = false;
+  parent._children.Children._children = {
+    badge: box('badge', { Transform: { x: 8, y: 4, width: 20, height: 10, anchor: 'topRight' } }),
+  };
+
+  assert.equal(whyControlNotScenery(parent), null);
+  // 200 wide - 20 own width - 8 inset = 172.
+  assert.match(svgOf(compileScenery([parent], 400, 400)), /x="172" y="4" width="20" height="10"/);
+});
+
+test('a clipping container cuts its children at its own rounded edge', () => {
+  const parent = createControl('Container', {
+    Core: { id: 'p', name: 'p', layer: 'Scenery' },
+    Transform: { x: 0, y: 0, width: 100, height: 100 },
+    Children: { clip: true, padding: 0 },
+  });
+  parent._children.Background._children.Border.enabled = false;
+  parent._children.Background._children.Corners.radius = 8;
+  parent._children.Children._children = {
+    kid: box('kid', { Transform: { x: 80, y: 0, width: 60, height: 20 } }),
+  };
+
+  assert.equal(whyControlNotScenery(parent), null);
+  const svg = svgOf(compileScenery([parent], 400, 400));
+  assert.match(svg, /<clipPath id="clip0"><rect x="0" y="0" width="100" height="100" rx="8" ry="8"\/><\/clipPath>/);
+  assert.match(svg, /<g clip-path="url\(#clip0\)">/, 'the children have to be inside the clipped group');
 });
 
 test('classification keeps order and reports every refusal', () => {
@@ -285,6 +332,42 @@ test('the digest covers every field the compiler reads', () => {
     mutate(control);
     const url = compileScenery([control], 400, 300).url;
     assert.ok(!seen.has(url), 'a change produced the same image — the digest is missing a field');
+    seen.add(url);
+  }
+});
+
+test('the digest covers the container fields too', () => {
+  // These reach the emitter through containerFit rather than through the box, so they are the easy
+  // ones to leave out of a key. Leaving them out means switching a section to fit-contents and
+  // watching nothing happen, with no invalidation to reach for.
+  clearSceneryCache();
+  const container = () => {
+    const parent = createControl('Container', {
+      Core: { id: 'p', name: 'p', layer: 'Scenery' },
+      Transform: { x: 0, y: 0, width: 200, height: 200 },
+      Children: { padding: 0 },
+    });
+    parent._children.Background._children.Border.enabled = false;
+    parent._children.Children._children = {
+      kid: box('kid', { Transform: { x: 5, y: 5, width: 40, height: 30 } }),
+    };
+    return parent;
+  };
+
+  const mutations = [
+    (p) => { p._children.Children.fitWidth = 'contents'; },
+    (p) => { p._children.Children.fitHeight = 'contents'; },
+    (p) => { p._children.Children.clip = true; },
+    (p) => { p._children.Children.paddingTop = 24; },
+    (p) => { p._children.Children._children.kid._children.Transform.anchor = 'bottomRight'; },
+  ];
+
+  const seen = new Set([compileScenery([container()], 400, 400).url]);
+  for (const mutate of mutations) {
+    const parent = container();
+    mutate(parent);
+    const url = compileScenery([parent], 400, 400).url;
+    assert.ok(!seen.has(url), 'a container change produced the same image — the digest is missing a field');
     seen.add(url);
   }
 });

@@ -28,7 +28,7 @@
 // The cache is keyed by a digest of exactly what was drawn.
 
 import { boxElement, svgToDataUrl, whyBackgroundNotDrawable } from './partsToSvg.js';
-import { fitsAnyAxis } from './containerFit.js';
+import { anchoredPositions, fitSettings, fitsAnyAxis, fittedSizeDeep } from './containerFit.js';
 import { getChildControls, contentOrigin } from './containment.js';
 import { numberOr } from './primitives.js';
 
@@ -87,22 +87,19 @@ export function whyControlNotScenery(control) {
 
   const transform = children.Transform ?? {};
   if (num(transform.scale, 1) !== 1) return 'transform scale';
-  if (String(transform.anchor ?? 'topLeft') !== 'topLeft') return 'anchored to a parent edge';
 
   const background = whyBackgroundNotDrawable(children.Background);
   if (background) return background;
 
-  const kids = getChildControls(control);
-  if (kids.length > 0) {
-    // A container whose size is derived from its contents would have to be measured the way
-    // CanvasControl measures it, and a second implementation of that is a second thing to keep
-    // agreeing. Refused by name until there is a reason to build it.
-    if (fitsAnyAxis(control)) return 'container sizes itself from its contents';
-    if (children.Children?.clip === true) return 'container clips its children';
-    for (const child of kids) {
-      const why = whyControlNotScenery(child);
-      if (why) return `child "${child?._children?.Core?.name ?? '?'}": ${why}`;
-    }
+  // Fitted size, anchored children and clipping are all HANDLED, not refused — see the drawing
+  // section below. The first cut refused a container that sizes itself from its contents on the
+  // grounds that measuring it would be a second implementation of CanvasControl's fit. That was
+  // the wrong conclusion from a right premise: the fit is not implemented in CanvasControl, it is
+  // implemented in containerFit.js, which CanvasControl calls. Calling the same functions is not a
+  // second implementation — writing new ones would have been.
+  for (const child of getChildControls(control)) {
+    const why = whyControlNotScenery(child);
+    if (why) return `child "${child?._children?.Core?.name ?? '?'}": ${why}`;
   }
 
   return null;
@@ -112,16 +109,25 @@ export const isSceneryControl = (control) => whyControlNotScenery(control) === n
 
 /* ------------------------------------------------------------------ drawing */
 
-/** One control and its descendants, emitted at an absolute offset in panel space. */
-function controlElements(control, offsetX, offsetY, defs, keySeed) {
+/**
+ * One control and its descendants, emitted at an absolute offset in panel space.
+ *
+ * `position` is the child's already-resolved x/y when its parent anchored it; null means read
+ * Transform, which is every top-level control and every child at the default topLeft anchor.
+ */
+function controlElements(control, offsetX, offsetY, defs, keySeed, position = null) {
   const children = control._children;
   if (children.Core?.visible === false) return '';
 
   const transform = children.Transform ?? {};
-  const x = offsetX + num(transform.x);
-  const y = offsetY + num(transform.y);
-  const width = num(transform.width);
-  const height = num(transform.height);
+  const x = offsetX + (position ? position.x : num(transform.x));
+  const y = offsetY + (position ? position.y : num(transform.y));
+
+  // The SAME size the canvas draws. fittedSizeDeep is what CanvasControl calls; calling it here
+  // rather than re-deriving it is the whole reason a fitted container can be compiled at all.
+  const size = fitsAnyAxis(control) ? fittedSizeDeep(control) : null;
+  const width = size ? size.width : num(transform.width);
+  const height = size ? size.height : num(transform.height);
 
   const self = boxElement({
     x, y, width, height,
@@ -136,13 +142,31 @@ function controlElements(control, offsetX, offsetY, defs, keySeed) {
   if (kids.length === 0) return self;
 
   // Children are positioned inside the parent's CONTENT box, so the padding has to be added before
-  // recursing — the same origin containment.contentOrigin hands the canvas.
+  // recursing — the same origin containment.contentOrigin hands the canvas. Anchored children are
+  // resolved against the content box for the same reason: an anchor is only meaningful once the
+  // parent's own size is known, which one line above is where it becomes known.
   const origin = contentOrigin(control);
-  let out = self;
+  const pad = fitSettings(control).padding;
+  const anchored = anchoredPositions(kids, width - pad.left - pad.right, height - pad.top - pad.bottom);
+
+  let inner = '';
   kids.forEach((child, index) => {
-    out += controlElements(child, x + origin.x, y + origin.y, defs, `${keySeed}_${index}`);
+    inner += controlElements(
+      child, x + origin.x, y + origin.y, defs, `${keySeed}_${index}`,
+      anchored?.get(child?._children?.Core?.id) ?? null,
+    );
   });
-  return out;
+
+  if (children.Children?.clip !== true) return self + inner;
+
+  // Clipping. A <clipPath> holding the same rounded rect the box drew, so a child that overhangs
+  // is cut exactly where the container's own edge is — including its corner radius, which is why
+  // the rect is rebuilt here rather than a plain rectangle being good enough.
+  const id = `clip${keySeed}`;
+  const radius = Math.min(num(children.Background?._children?.Corners?.radius, 0), Math.min(width, height) / 2);
+  defs.push(`<clipPath id="${id}"><rect x="${x}" y="${y}" width="${width}" height="${height}"`
+    + (radius > 0 ? ` rx="${radius}" ry="${radius}"` : '') + '/></clipPath>');
+  return `${self}<g clip-path="url(#${id})">${inner}</g>`;
 }
 
 /**
@@ -192,7 +216,7 @@ function foldControl(h, control) {
   h = fold(h, children.Core?.visible === false ? 0 : 1);
 
   const t = children.Transform ?? {};
-  for (const key of ['x', 'y', 'width', 'height', 'rotation', 'opacity']) h = fold(h, t[key] ?? '');
+  for (const key of ['x', 'y', 'width', 'height', 'rotation', 'opacity', 'anchor', 'affectsFit']) h = fold(h, t[key] ?? '');
 
   const bg = children.Background?._children ?? {};
   const fill = bg.Fill ?? {};
@@ -210,7 +234,13 @@ function foldControl(h, control) {
   const kids = getChildControls(control);
   if (kids.length) {
     const c = children.Children ?? {};
-    for (const key of ['padding', 'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom']) h = fold(h, c[key] ?? '');
+    // Fit and clip are read by the emitter now, so a change to either has to change the key. The
+    // painful version of this bug: switch a section to fit-contents, watch nothing happen, and
+    // have no invalidation to reach for because the key never moved.
+    for (const key of [
+      'padding', 'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom',
+      'fitWidth', 'fitHeight', 'minWidth', 'minHeight', 'clip',
+    ]) h = fold(h, c[key] ?? '');
     for (const child of kids) h = foldControl(h, child);
   }
   return fold(h, ']');
