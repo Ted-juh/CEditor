@@ -19,8 +19,8 @@ import assert from 'node:assert/strict';
 
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import {
-  FIT_CONTENTS, axisIsDerived, contentExtent, fitSettings, fittedSize, fittedSizeDeep,
-  fitsAnyAxis, resolveFittedSizes,
+  FIT_CONTENTS, anchoredPosition, anchoredPositions, axisIsDerived, contentExtent, fitSettings,
+  fittedSize, fittedSizeDeep, fitsAnyAxis, resolveFittedSizes,
 } from '../src/CE_Application/utils/containerFit.js';
 import { contentOrigin } from '../src/CE_Application/utils/containment.js';
 import { textAlignFor } from '../src/CE_Application/editor/canvasControlStyles.js';
@@ -179,4 +179,76 @@ test('a GAIA-shaped section sizes itself and names itself for scripts', () => {
   // Take the widest control away and the section follows, which is the entire point.
   delete filter._children.Children._children.resonance;
   assert.equal(fittedSizeDeep(filter).width, 336);
+});
+
+/* ------------------------------------------------------------------ anchoring and decoration */
+
+test('a topLeft anchor is plain x/y, so nothing that exists moves', () => {
+  // The default, and the reason this ships without touching a panel.
+  const label = createControl('Label', { Core: { id: 't' }, Transform: { x: 12, y: 8, width: 40, height: 16 } });
+  assert.equal(label._children.Transform.anchor, 'topLeft');
+  assert.deepEqual(anchoredPosition(label, 300, 200), { x: 12, y: 8 });
+  assert.equal(anchoredPositions([label], 300, 200), null, 'an unanchored child needs no override at all');
+});
+
+test('an anchored child follows the edge it is pinned to', () => {
+  // The point of the whole mechanism: a title cannot be "top-right" of a box whose width is derived
+  // from its contents, because absolute x/y is decided before the width is known.
+  const title = createControl('Label', {
+    Core: { id: 't' },
+    Transform: { x: 8, y: 6, width: 70, height: 18, anchor: 'topRight' },
+  });
+  assert.deepEqual(anchoredPosition(title, 300, 200), { x: 222, y: 6 });
+  assert.deepEqual(anchoredPosition(title, 400, 200), { x: 322, y: 6 }, 'it should follow a wider parent');
+});
+
+test('every anchor resolves where it says', () => {
+  const at = (anchor) => anchoredPosition(
+    createControl('Label', { Core: { id: 'a' }, Transform: { x: 10, y: 10, width: 20, height: 20, anchor } }),
+    100, 100,
+  );
+  assert.deepEqual(at('topLeft'), { x: 10, y: 10 });
+  assert.deepEqual(at('topRight'), { x: 70, y: 10 });
+  assert.deepEqual(at('bottomLeft'), { x: 10, y: 70 });
+  assert.deepEqual(at('bottomRight'), { x: 70, y: 70 });
+  // Centre anchors read x/y as an OFFSET from the middle, not an inset — "10px in from the middle"
+  // means nothing, "10px right of the middle" does.
+  assert.deepEqual(at('center'), { x: 50, y: 50 });
+  assert.deepEqual(at('top'), { x: 50, y: 10 });
+  assert.deepEqual(at('right'), { x: 70, y: 50 });
+});
+
+test('decoration does not decide how big its section is', () => {
+  // Without affectsFit:false a title near the right edge makes the section as wide as wherever the
+  // title sits, so moving the title resizes the section. Exactly backwards, and the reason a plain
+  // Label could not have been the header before this.
+  const knob = kid('k', 0, 0, 54, 54);
+  const title = createControl('Label', {
+    Core: { id: 't' },
+    Transform: { x: 0, y: -22, width: 300, height: 18, anchor: 'topRight', affectsFit: false },
+  });
+  assert.deepEqual(contentExtent([knob, title]), { width: 54, height: 54 });
+
+  const group = section('g', { fitWidth: FIT_CONTENTS, fitHeight: FIT_CONTENTS, padding: 10 }, [knob, title]);
+  assert.deepEqual(fittedSize(group, [knob, title]), { width: 74, height: 74 },
+    'a 300px-wide title must not make a 54px knob into a 320px section');
+});
+
+test('a section title is just a Label, with everything a Label has', () => {
+  // The design this replaced had a built-in header with its own placement and styling properties.
+  // A Label already carries Background (fill, border, corners), Text (font, colour, justification),
+  // Icon, Effects and ContentLayout — so a coloured pill tab needs no new concept, only somewhere
+  // to pin it and permission not to count.
+  const tab = createControl('Label', {
+    Core: { id: 'tab' },
+    Transform: { x: 0, y: -22, width: 74, height: 18, anchor: 'topRight', affectsFit: false },
+    Text: { content: 'FILTER' },
+  });
+  tab._children.Background._children.Fill.colour = 'FFE0A030';
+  tab._children.Background._children.Corners.radius = 4;
+
+  assert.equal(tab._children.Background._children.Fill.colour, 'FFE0A030');
+  assert.equal(tab._children.Background._children.Corners.radius, 4);
+  assert.ok(tab._children.Text._children.Font, 'a Label brings its own font');
+  assert.ok(tab._children.Effects, 'and its own effects');
 });

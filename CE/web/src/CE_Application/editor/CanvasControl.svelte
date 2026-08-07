@@ -5,7 +5,7 @@
   import { getChildControls, computeFlowLayout, controlPanelRect, panelToLocalPoint, selectionRoots, collectSubtreeIds, findControlById, buildControlIndex, getAncestorIds, flatControlsWithPanelRects } from '../utils/containment.js';
   import { containerDropTargetId } from '../stores/containerDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
-  import { axisIsDerived, fitsAnyAxis, fittedSizeDeep } from '../utils/containerFit.js';
+  import { anchoredPositions, axisIsDerived, fitSettings, fitsAnyAxis, fittedSizeDeep } from '../utils/containerFit.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import { bakeStaticPartEntries } from '../utils/staticPartBaking.js';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
@@ -524,6 +524,18 @@
       ? computeFlowLayout(childControls, displayW, childrenGap, childrenPadding)
       : null
   );
+  // Anchored children, resolved against this container's CONTENT box. A child cannot do this
+  // itself — it has no way to ask its parent how wide the parent turned out to be, especially when
+  // the parent's width is derived from the children. So the parent places them, through the same
+  // `layoutPosition` prop flow layout already uses.
+  let childAnchoredPositions = $derived.by(() => {
+    if (!childControls.length) return null;
+    const pad = fitSettings(control).padding;
+    return anchoredPositions(childControls, displayW - pad.left - pad.right, displayH - pad.top - pad.bottom);
+  });
+  // Flow layout wins where both apply: it is an explicit "the container places everything" mode,
+  // and an anchor inside it would be a control opting out of the layout it was put in.
+  let childPositions = $derived(childFlowPositions ?? childAnchoredPositions);
   let childParentOffset = $derived({
     x: parentOffset.x + displayX + childrenPadding,
     y: parentOffset.y + displayY + childrenPadding,
@@ -3492,7 +3504,7 @@
             parentOffset={childParentOffset}
             parentChainIds={childParentChainIds}
             parentGrid={myGridSection}
-            layoutPosition={childFlowPositions?.get(child._children?.Core?.id) ?? null}
+            layoutPosition={childPositions?.get(child._children?.Core?.id) ?? null}
             {...(childPreviewPropsFor?.(child) ?? {})}
           />
         {/each}

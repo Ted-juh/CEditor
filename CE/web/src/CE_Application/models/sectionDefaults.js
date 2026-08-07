@@ -32,6 +32,15 @@ export const SECTION_DEFAULTS = {
     _type: 'Transform',
     x: 0,
     y: 0,
+    // Which corner/edge of the PARENT's content box this control is measured from. 'topLeft' is
+    // absolute x/y — today's behaviour and the default, so nothing existing moves. Any other value
+    // makes x/y an INSET from that corner, which is what lets a section title stay at the top-right
+    // of a box whose width is derived from its contents rather than authored.
+    anchor: 'topLeft',
+    // Whether this control holds its parent open. Decoration — a title, a badge, a logo — should
+    // not: a title near the right edge would otherwise make the section as wide as wherever the
+    // title sits, so moving the title would resize the section. Exactly backwards.
+    affectsFit: true,
     width: 100,
     height: 40,
     minWidth: 0,

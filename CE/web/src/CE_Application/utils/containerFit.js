@@ -94,6 +94,10 @@ export function contentExtent(children, sizeOf = null) {
     if (child?._children?.Core?.visible === false) continue;
     const transform = child?._children?.Transform;
     if (!transform) continue;
+    // Decoration does not hold its parent open. Without this a section title counts toward the
+    // extent, so the title's position decides the section's width and moving the title resizes the
+    // section — the opposite of what a title is for.
+    if (transform.affectsFit === false) continue;
 
     const size = sizeOf?.(child) ?? null;
     const width = size ? size.width : num(transform.width);
@@ -176,4 +180,60 @@ export function resolveFittedSizes(controls) {
 
   for (const control of controls ?? []) visit(control);
   return sizes;
+}
+
+/* ------------------------------------------------------------------ anchoring */
+
+export const ANCHORS = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'top', 'bottom', 'left', 'right', 'center'];
+
+/**
+ * Where an anchored child actually sits, given the parent's CONTENT box.
+ *
+ * For `topLeft` — the default, and every control that exists today — this is just x/y, so nothing
+ * moves. For any other anchor, x and y become INSETS from that corner or edge, which is the whole
+ * point: a title anchored top-right keeps its distance from the right edge while the section's
+ * width is derived from its contents. Absolute x/y cannot do that, because the width is not known
+ * until after the children have been measured.
+ *
+ * Centre anchors take x/y as an OFFSET from centre rather than an inset, since "10px in from the
+ * middle" has no meaning and "10px right of the middle" does.
+ */
+export function anchoredPosition(child, contentWidth, contentHeight) {
+  const t = child?._children?.Transform ?? {};
+  const anchor = String(t.anchor ?? 'topLeft');
+  if (anchor === 'topLeft') return { x: num(t.x), y: num(t.y) };
+
+  const w = num(t.width);
+  const h = num(t.height);
+  const insetX = num(t.x);
+  const insetY = num(t.y);
+
+  const right = () => Math.max(0, contentWidth) - w - insetX;
+  const bottom = () => Math.max(0, contentHeight) - h - insetY;
+  const midX = () => (Math.max(0, contentWidth) - w) / 2 + insetX;
+  const midY = () => (Math.max(0, contentHeight) - h) / 2 + insetY;
+
+  switch (anchor) {
+    case 'topRight':    return { x: right(), y: insetY };
+    case 'bottomLeft':  return { x: insetX,  y: bottom() };
+    case 'bottomRight': return { x: right(), y: bottom() };
+    case 'top':         return { x: midX(),  y: insetY };
+    case 'bottom':      return { x: midX(),  y: bottom() };
+    case 'left':        return { x: insetX,  y: midY() };
+    case 'right':       return { x: right(), y: midY() };
+    case 'center':      return { x: midX(),  y: midY() };
+    default:            return { x: insetX,  y: insetY };
+  }
+}
+
+/** Every anchored child's resolved position, or null when none of them are anchored. */
+export function anchoredPositions(children, contentWidth, contentHeight) {
+  let positions = null;
+  for (const child of children ?? []) {
+    const anchor = String(child?._children?.Transform?.anchor ?? 'topLeft');
+    if (anchor === 'topLeft') continue;
+    positions ??= new Map();
+    positions.set(child?._children?.Core?.id, anchoredPosition(child, contentWidth, contentHeight));
+  }
+  return positions;
 }
