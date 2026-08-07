@@ -6,6 +6,7 @@
   import { containerDropTargetId } from '../stores/containerDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
+  import { bakeStaticPartEntries } from '../utils/staticPartBaking.js';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import PixelDisplayRenderer from './PixelDisplayRenderer.svelte';
@@ -353,11 +354,22 @@
     String(sourceBehavior?.family ?? behavior?.family ?? '').trim().toLowerCase() === 'range'
     && String(sourceBehavior?.role ?? behavior?.role ?? '').trim().toLowerCase() === 'slider'
   );
-  let renderedPartEntries = $derived.by(() => (
+  let visiblePartEntries = $derived.by(() => (
     isSliderControl
       ? renderPartEntries.filter(([partName]) => !SLIDER_SEMANTIC_PARTS.has(String(partName)))
       : renderPartEntries
   ));
+  // Parts that nothing can ever change are compiled to one SVG and drawn as a single element.
+  // On the GAIA panel that is 2,821 of 3,295 parts: 12,025 surface DOM nodes become 5,509 and the
+  // load halves. bakeStaticPartEntries returns its input untouched whenever it cannot help, so
+  // this needs no condition of its own — the rules all live in staticPartBaking.js.
+  //
+  // Note where this ISN'T: the component creator renders parts through InteractivePartRenderer
+  // directly rather than through CanvasControl, so authoring always sees real, separate layers.
+  // That is not an accident of this code, but it is load-bearing, and componentCreatorParts.test.js
+  // is what stops it becoming one.
+  let renderedPartEntries = $derived.by(() =>
+    bakeStaticPartEntries(renderControl, visiblePartEntries, displayW, displayH));
   let isSelected = $derived(core?.id != null && $selectedComponentIds.has(core.id));
   let isKeyObject = $derived(core?.id != null && $keyObjectId === core.id && $selectedComponentIds.size > 1);
   let isLocked = $derived(core?.locked === true);

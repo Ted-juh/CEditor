@@ -54,7 +54,30 @@ const UPDATING = process.env.UPDATE_GOLDEN === '1';
  * baseline people regenerate without reading. What is kept is every stroke, every fill, the shape
  * primitives, and the transforms — which between them are what all four bugs moved.
  */
-function paintSummary(body) {
+/**
+ * Unfold any baked static parts back into markup before summarising.
+ *
+ * Custom components compile their unchanging parts to one SVG data URL (staticPartBaking.js), and
+ * the moment that landed this gate went blind: the fader, knob, LED column and envelope all became
+ * "one element with a background-image", and the negative test that proves the gate bites — unpin
+ * every polyline pivot and watch the summary change — started passing while doing nothing.
+ *
+ * A gate that stops seeing what it was built to see is worse than no gate, because it still
+ * reports green. So the summary decodes the baked document and reads its shapes, which is the same
+ * geometry by another spelling: `<rect fill=...>` instead of a div with a background colour.
+ */
+function inlineBakedSvg(body) {
+  return body.replace(/data:image\/svg\+xml;base64,([A-Za-z0-9+/=]+)/g, (whole, base64) => {
+    try {
+      return Buffer.from(base64, 'base64').toString('utf8');
+    } catch {
+      return whole;
+    }
+  });
+}
+
+function paintSummary(rawBody) {
+  const body = inlineBakedSvg(rawBody);
   const strokes = [...body.matchAll(/stroke="([^"]+)"[^>]*?stroke-width="([^"]+)"/g)]
     .map(([, colour, width]) => `stroke ${colour} @ ${width}`);
   const fills = [...body.matchAll(/fill="(?!none)([^"]+)"/g)].map(([, colour]) => `fill ${colour}`);
@@ -67,6 +90,12 @@ function paintSummary(body) {
   // the strokes and fills were identical, only the transform-origin was wrong.
   const transforms = [...body.matchAll(/transform:\s*([^;"]+)/g)].map(([, value]) => `transform ${value.trim()}`);
   const origins = [...body.matchAll(/transform-origin:\s*([^;"]+)/g)].map(([, value]) => `origin ${value.trim()}`);
+  // A baked part writes its geometry as SVG attributes rather than CSS, so the same facts arrive
+  // spelled differently. Without these two the unfolded document contributes almost nothing and
+  // the gate is blind in exactly the place baking made it blind.
+  const svgTransforms = [...body.matchAll(/ transform="([^"]+)"/g)].map(([, value]) => `svg-transform ${value.trim()}`);
+  const boxes = [...body.matchAll(/<rect x="([^"]*)" y="([^"]*)" width="([^"]*)" height="([^"]*)"/g)]
+    .map(([, x, y, w, h]) => `box ${x},${y} ${w}x${h}`);
 
   const tally = (entries) => {
     const counts = new Map();
@@ -76,6 +105,8 @@ function paintSummary(body) {
 
   return [
     ...tally(shapes),
+    ...tally(boxes),
+    ...tally(svgTransforms),
     ...tally(strokes),
     ...tally(fills),
     ...tally(backgrounds),
