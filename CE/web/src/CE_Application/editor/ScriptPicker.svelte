@@ -20,6 +20,7 @@
     language as languageOf,
   } from '../scripting/panelApi.js';
   import { moduleAppliesToType, describeType, isKnownType } from '../scripting/componentSchema.js';
+  import { untrack } from 'svelte';
 
   let {
     language = 'lua', scope = 'component', controls = [], onInsert,
@@ -41,8 +42,12 @@
     initialTab = 'commands',
   } = $props();
 
-  let tab = $state(initialTab);
-  let query = $state(initialQuery);
+  // Seed once from the props; these are deliberately initial-only. A caller points the picker at a
+  // tab or a search term to OPEN on — after that the user owns both, so a later prop change must
+  // not yank the tab out from under them. untrack() says that on purpose rather than tripping
+  // Svelte's state_referenced_locally warning, which reads this shape as an accident.
+  let tab = $state(untrack(() => initialTab));
+  let query = $state(untrack(() => initialQuery));
   let expanded = $state(new Set());
 
   const COMMON_LEAVES = ['value', 'normalizedValue', 'midiValue', 'visible', 'x', 'y', 'background.fill.colour', 'text.text'];

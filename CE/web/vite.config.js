@@ -37,8 +37,29 @@ function projectVersion() {
   }
 }
 
+// wasmoon ships one bundle for Node and the browser. Its Emscripten glue asks for Node's `module`
+// builtin from inside the `if (isNode)` branch (dist/index.js: `await import('module')`), which in
+// WebView2 is dead code — but Vite still resolves the specifier at build time, externalizes it, and
+// warns. Handing it an empty module resolves it honestly instead of muting a real question.
+//
+// `enforce: 'pre'` is required, not stylistic: plain plugins run AFTER vite:resolve, so without it
+// the builtin is externalized (and the warning printed) before this ever sees the id.
+function stubNodeModuleBuiltin() {
+  const VIRTUAL = '\0ce:empty-node-module';
+  return {
+    name: 'ce-stub-node-module-builtin',
+    enforce: 'pre',
+    resolveId(id) {
+      return id === 'module' || id === 'node:module' ? VIRTUAL : null;
+    },
+    load(id) {
+      return id === VIRTUAL ? 'export default {}; export const createRequire = () => {};' : null;
+    },
+  };
+}
+
 export default defineConfig(({ command }) => ({
-  plugins: [svelte()],
+  plugins: [stubNodeModuleBuiltin(), svelte()],
   define: {
     __APP_BUILD__: JSON.stringify(buildStamp()),
   },
