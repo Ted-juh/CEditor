@@ -1,4 +1,5 @@
 import { sortControlsForHitTest } from './controlOrder.js';
+import { normalizeLayerName } from './panelLayers.js';
 import { contentOrigin, getChildControls } from './containment.js';
 
 /**
@@ -29,8 +30,16 @@ export function findControlsInRect(controls, rect, getSection) {
  * knob inside a container selects the knob, not the container. Sibling order
  * uses hit-test order (front-most first) at every level.
  */
-export function findControlAtPoint(controls, x, y) {
-  const hit = sortControlsForHitTest(controls).find(c => {
+export function findControlAtPoint(controls, x, y, layers = null) {
+  // A locked or hidden layer is not pickable. This is the point of locking scenery: you stop
+  // grabbing the section box when you meant the knob drawn on top of it, and the fix has to be
+  // here rather than in the click handler, because every selection route comes through this.
+  const blocked = new Set((layers ?? [])
+    .filter((layer) => layer?.locked === true || layer?.visible === false)
+    .map((layer) => layer.name));
+
+  const hit = sortControlsForHitTest(controls, (layers ?? []).map((l) => l.name)).find(c => {
+    if (blocked.size && blocked.has(normalizeLayerName(c?._children?.Core?.layer))) return false;
     const t = c._children?.Transform;
     if (!t) return false;
     return x >= t.x && x <= t.x + t.width && y >= t.y && y <= t.y + t.height;
@@ -42,7 +51,7 @@ export function findControlAtPoint(controls, x, y) {
   if (kids.length) {
     const t = hit._children.Transform;
     const origin = contentOrigin(hit);
-    const deeper = findControlAtPoint(kids, x - (t.x ?? 0) - origin.x, y - (t.y ?? 0) - origin.y);
+    const deeper = findControlAtPoint(kids, x - (t.x ?? 0) - origin.x, y - (t.y ?? 0) - origin.y, layers);
     if (deeper) return deeper;
   }
 

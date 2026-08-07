@@ -13,6 +13,7 @@
   import { showGuides } from '../stores/editorView.js';
   import { deviceParameterDrag } from '../stores/deviceParameterDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
+  import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
 
   let {
     panel,
@@ -34,7 +35,15 @@
 
   // Default layer order if the panel doesn't specify one.
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
-  let orderedControls = $derived(sortControlsForRender(panel?.controls ?? []));
+  // The panel's own layer order, not one inferred from array position. Inferring it meant
+  // deleting an unrelated control could restack the whole panel — see utils/panelLayers.js.
+  let panelLayers = $derived(normalizePanelLayers(panel?.layers, panel?.controls ?? []));
+  let orderedLayerNames = $derived(layerNames(panelLayers));
+  let hiddenLayers = $derived(new Set(panelLayers.filter((l) => l.visible === false).map((l) => l.name)));
+  let orderedControls = $derived(
+    sortControlsForRender(panel?.controls ?? [], orderedLayerNames)
+      .filter((control) => !hiddenLayers.has(normalizeLayerName(control?._children?.Core?.layer)))
+  );
   let scopedEditingControlId = $derived(scopedEditingControl?._children?.Core?.id ?? null);
 
   function bindSurface(node) {

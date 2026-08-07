@@ -21,6 +21,7 @@
     setPreviewInspectedControlId,
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
+  import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
   import { flatControls } from '../utils/containment.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
   import {
@@ -257,7 +258,15 @@
 
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
 
-  let orderedControls = $derived(sortControlsForRender(panel?.controls ?? []));
+  // The panel's own layer order, not one inferred from array position. Inferring it meant
+  // deleting an unrelated control could restack the whole panel — see utils/panelLayers.js.
+  let panelLayers = $derived(normalizePanelLayers(panel?.layers, panel?.controls ?? []));
+  let orderedLayerNames = $derived(layerNames(panelLayers));
+  let hiddenLayers = $derived(new Set(panelLayers.filter((l) => l.visible === false).map((l) => l.name)));
+  let orderedControls = $derived(
+    sortControlsForRender(panel?.controls ?? [], orderedLayerNames)
+      .filter((control) => !hiddenLayers.has(normalizeLayerName(control?._children?.Core?.layer)))
+  );
   /**
    * Id -> control, over the WHOLE tree.
    *

@@ -3230,5 +3230,14 @@
       },
       "_type": "Control"
     }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
   ]
 }

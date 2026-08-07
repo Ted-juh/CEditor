@@ -12,6 +12,7 @@
   import StickyNote from 'lucide-svelte/icons/sticky-note';
   import SwatchBook from 'lucide-svelte/icons/swatch-book';
   import Terminal from 'lucide-svelte/icons/terminal';
+  import LayersIcon from 'lucide-svelte/icons/layers';
   import ColorChooser from '../components/ColorChooser.svelte';
   import ColorSettings from '../components/ColorSettings.svelte';
   import GradientMiniPreview from '../components/GradientMiniPreview.svelte';
@@ -34,6 +35,7 @@
   const LAZY_TAB_LOADERS = {
     notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
     viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
+    layers: () => import('./LayersTab.svelte').then((module) => ({ default: module.default })),
     align: () => import('../components/AlignmentPanel.svelte').then((module) => ({ default: module.default })),
     device: () => import('../components/ParameterBrowserTab.svelte').then((module) => ({ default: module.default })),
     preview: () => import('../components/InteractionPreviewTab.svelte').then((module) => ({ default: module.default })),
@@ -410,6 +412,7 @@
     { id: 'effects',  label: 'Effects',  icon: Sparkles },
     { id: 'notepad',  label: 'Notepad',  icon: StickyNote },
     { id: 'viewer',   label: 'Viewer',   icon: Image },
+    { id: 'layers',   label: 'Layers',   icon: LayersIcon },
     { id: 'align',    label: 'Align',    icon: AlignCenter },
     { id: 'device',   label: 'Device',   icon: Cable },
     { id: 'preview',  label: 'Preview',  icon: Play },
@@ -515,6 +518,11 @@
     {:else if activeTab === 'effects'}
       <div class="tab-pane">
       <div class="placeholder">Effects editor — full editing coming soon. Use Properties Panel for quick toggles.</div>
+      </div>
+    {:else if activeTab === 'layers' && activeTabComponent?.default}
+      {@const LayersPanel = activeTabComponent.default}
+      <div class="tab-pane">
+        <LayersPanel />
       </div>
     {:else if activeTab === 'align' && activeTabComponent?.default}
       {@const AlignmentPanel = activeTabComponent.default}
