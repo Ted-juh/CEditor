@@ -1,5 +1,6 @@
-14x shape rect
+15x shape rect
 1x box 0,0 96x53
+1x box 0.5,0.5 95x52
 1x box 21,15.3 16.676978143536676x1.4
 1x box 21,21.3 9x1.4
 1x box 21,30.3 9x1.4

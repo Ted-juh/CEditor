@@ -22,6 +22,7 @@
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
+  import { buildSceneryRenderPlan } from '../utils/sceneryRenderPlan.js';
   import { flatControls } from '../utils/containment.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
   import {
@@ -267,6 +268,12 @@
     sortControlsForRender(panel?.controls ?? [], orderedLayerNames)
       .filter((control) => !hiddenLayers.has(normalizeLayerName(control?._children?.Core?.layer)))
   );
+  // What to PAINT — same decision the editor surface makes, from the same module, except that here
+  // a scenery layer compiles whether or not it is locked: there is nothing to edit in preview, so
+  // the lock has no meaning and holding the DOM elements open would buy nothing. `orderedControls`
+  // is untouched, because every other thing in this file that reads it is asking about behaviour
+  // rather than about paint.
+  let previewPlan = $derived(buildSceneryRenderPlan(panel, { preview: true }));
   /**
    * Id -> control, over the WHOLE tree.
    *
@@ -6789,7 +6796,11 @@
     <GuideLines {scale} panelWidth={panel.width} panelHeight={panel.height} />
   {/if}
 
-  {#each orderedControls as control (control._children?.Core?.id)}
+  {#each previewPlan.items as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.control._children?.Core?.id)}
+    {#if item.type === 'scenery'}
+      <img class="scenery-layer" src={item.url} width={panel.width} height={panel.height} alt="" />
+    {:else}
+    {@const control = item.control}
     <CanvasControl
       {control}
       {scale}
@@ -6826,6 +6837,7 @@
         {/each}
       </div>
     {/if}
+    {/if}
   {/each}
 </div>
 
@@ -6848,6 +6860,16 @@
     inset: 0;
     pointer-events: none;
     z-index: 0;
+  }
+
+  /* Compiled scenery. No z-index on purpose: it stacks by document order, at the depth the render
+     plan gave its layer. A number here would flatten every scenery layer into one band. */
+  .scenery-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+    pointer-events: none;
   }
 
   .grid-overlay {

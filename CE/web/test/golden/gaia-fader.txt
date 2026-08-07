@@ -1,6 +1,7 @@
 8x shape path
-23x shape rect
+24x shape rect
 1x box 11,4 8x96
+1x box 11.5,4.5 7x95
 1x box 21,17.2 3x1
 1x box 21,25.9 3x1
 1x box 21,34.6 3x1

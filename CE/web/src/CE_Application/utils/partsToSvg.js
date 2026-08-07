@@ -18,9 +18,17 @@
 // is not. `whyNotBakeable` returns the reason as a string precisely so that refusing is the easy
 // path and widening the subset is a deliberate act with a test attached.
 //
-// Text is refused permanently, not pending. SVG text and CSS text are laid out by different code
-// with different metrics; baking a caption means it moves by a pixel or two on some machines and
-// not others, which is the least debuggable defect available.
+// TEXT IS REFUSED, and the reason is not the one this comment used to give. The old wording said
+// SVG and CSS text metrics differ, which is true and would only ever cost a pixel — it reads like a
+// preference, and it is why "surely a declared conversion could allow text" kept coming up. The
+// real constraint is harder: the compiled SVG is drawn through an `<img>`, and an image document is
+// isolated. It cannot see the page's fonts — not @font-face faces the app loaded from a .cepanel's
+// stored fonts, and not reliably the system ones either. A caption in a custom face therefore
+// renders in a default face, silently, and looks like the font failed to load rather than like the
+// bake did something. Nothing about declaring the intent up front changes that; embedding the face
+// in every image would, and costs more than the DOM node it saves. This applies to the scenery
+// compile in sceneryCompile.js for exactly the same reason, and it is why a control carrying text
+// stays live there too.
 
 import { numberOr } from './primitives.js';
 
@@ -94,7 +102,7 @@ export function whyNotBakeable(part) {
   if (kind !== 'rectangle') return `part kind "${kind}"`;
 
   const children = part._children ?? {};
-  if (children.Text) return 'text part (SVG and CSS text metrics differ)';
+  if (children.Text) return 'text part (an <img> cannot see the page\'s fonts)';
   if (children.Effects) return 'effects section';
   if (part.meta && (part.meta.valueArc || part.meta.arcTrack)) return 'arc meta';
   if (part.clipChildren === true) return 'clips children';
@@ -108,6 +116,19 @@ export function whyNotBakeable(part) {
 }
 
 export const isBakeable = (part) => whyNotBakeable(part) === null;
+
+/**
+ * Why this Background cannot be drawn, or null.
+ *
+ * The same three checks `whyNotBakeable` runs, exported so the scenery compile refuses EXACTLY what
+ * the part bake refuses. Controls and parts carry the identical Fill/Border/Corners sections, and
+ * two lists of "things we understand" that were meant to agree would not stay agreeing.
+ */
+export function whyBackgroundNotDrawable(background) {
+  const children = background?._children;
+  if (!children) return 'no background to draw';
+  return fillIsPlain(children.Fill) ?? borderIsPlain(children.Border) ?? cornersArePlain(children.Corners);
+}
 
 const escapeText = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -129,24 +150,38 @@ function gradientElement(gradient, id) {
   return `<linearGradient id="${id}" x1="${at(-dx)}%" y1="${at(-dy)}%" x2="${at(dx)}%" y2="${at(dy)}%">${stops}</linearGradient>`;
 }
 
-/** One bakeable part -> one `<rect>`, plus any gradient it needs pushed onto `defs`. */
-function rectElement(part, defs, index) {
-  const layout = part._children.Layout;
-  const x = num(layout.x);
-  const y = num(layout.y);
-  const width = num(layout.width);
-  const height = num(layout.height);
+/**
+ * One filled, optionally bordered, optionally rotated box -> one `<rect>`.
+ *
+ * Shared by the part bake and the scenery compile (utils/sceneryCompile.js), deliberately: two
+ * emitters for the same Fill/Border/Corners sections would drift, and the whole safety argument for
+ * baking rests on the compiled picture being indistinguishable from the live one.
+ *
+ * THE BORDER IS ITS OWN RECT, INSET BY HALF ITS THICKNESS, which is not a detail. The live renderer
+ * draws a border as SVG segments starting at `thickness / 2` from the edge (borderSegments.js), so
+ * the stroke lies ENTIRELY INSIDE the box, over a fill that occupies the whole box. A single rect
+ * carrying both fill and stroke cannot say that: the stroke would straddle the outline and put half
+ * a border outside the element on every side, so a bordered box baked a pixel larger than it
+ * rendered. Two rects — full-box fill, inset stroke — is what the renderer actually does.
+ *
+ * @param geometry {{x, y, width, height, rotation, pivotX, pivotY, opacity}}
+ * @param background the Background section's `_children` — { Fill, Border, Corners }
+ */
+export function boxElement(geometry, background, defs, key) {
+  const width = num(geometry.width);
+  const height = num(geometry.height);
   if (!(width > 0 && height > 0)) return '';
 
-  const background = part._children.Background._children;
-  const fill = background.Fill ?? {};
-  const border = background.Border ?? {};
-  const radius = Math.min(num(background.Corners?.radius, 0), Math.min(width, height) / 2);
+  const x = num(geometry.x);
+  const y = num(geometry.y);
+  const fill = background?.Fill ?? {};
+  const border = background?.Border ?? {};
+  const radius = Math.min(num(background?.Corners?.radius, 0), Math.min(width, height) / 2);
 
   let paint;
-  let opacity = num(part.opacity, 1);
+  let opacity = num(geometry.opacity, 1);
   if (fill.gradientEnabled === true && fill.gradient) {
-    const id = `g${index}`;
+    const id = `g${key}`;
     defs.push(gradientElement(fill.gradient, id));
     paint = `url(#${id})`;
   } else {
@@ -155,25 +190,48 @@ function rectElement(part, defs, index) {
     opacity *= colour.alpha;
   }
 
-  let stroke = '';
-  if (border.enabled === true && num(border.thickness, 0) > 0) {
-    const colour = argb(border.colour, '#FFFFFF');
-    stroke = ` stroke="${colour.hex}" stroke-opacity="${colour.alpha.toFixed(3)}" stroke-width="${num(border.thickness)}"`;
-  }
-
-  // Rotation turns about the part's pivot, expressed as a percentage of its own box — the same
-  // convention the CSS renderer uses, and the one the knob pointer depends on.
-  const rotation = num(layout.rotation, 0);
+  // Rotation turns about the pivot, expressed as a percentage of the box — the same convention the
+  // CSS renderer uses, and the one the knob pointer depends on. Both rects share it, so a rotated
+  // bordered box keeps its border attached to it.
+  const rotation = num(geometry.rotation, 0);
   let transform = '';
   if (rotation) {
-    const cx = x + width * (num(layout.pivotX, 50) / 100);
-    const cy = y + height * (num(layout.pivotY, 50) / 100);
+    const cx = x + width * (num(geometry.pivotX, 50) / 100);
+    const cy = y + height * (num(geometry.pivotY, 50) / 100);
     transform = ` transform="rotate(${rotation} ${cx.toFixed(3)} ${cy.toFixed(3)})"`;
   }
 
-  return `<rect x="${x}" y="${y}" width="${width}" height="${height}"`
-    + (radius > 0 ? ` rx="${radius}" ry="${radius}"` : '')
-    + ` fill="${escapeText(paint)}" fill-opacity="${opacity.toFixed(3)}"${stroke}${transform}/>`;
+  const rounded = (r) => (r > 0 ? ` rx="${r}" ry="${r}"` : '');
+
+  let out = `<rect x="${x}" y="${y}" width="${width}" height="${height}"${rounded(radius)}`
+    + ` fill="${escapeText(paint)}" fill-opacity="${opacity.toFixed(3)}"${transform}/>`;
+
+  const thickness = border.enabled === true ? Math.max(0, num(border.thickness, 0)) : 0;
+  if (thickness > 0) {
+    // Never let the inset invert the box: a 2px border on a 3px divider would otherwise emit a
+    // negative width, which is an invalid rect the renderer drops in silence.
+    const inset = Math.min(thickness / 2, Math.min(width, height) / 2);
+    const colour = argb(border.colour, '#FFFFFF');
+    // The radius is authored against the OUTER edge; the stroke's centreline sits `inset` inside it,
+    // so its radius shrinks by the same amount — exactly how a CSS border-radius narrows inward.
+    const strokeRadius = Math.max(0, Math.min(radius - inset, Math.min(width, height) / 2 - inset));
+    out += `<rect x="${x + inset}" y="${y + inset}" width="${width - inset * 2}" height="${height - inset * 2}"`
+      + rounded(strokeRadius)
+      + ` fill="none" stroke="${colour.hex}" stroke-opacity="${(colour.alpha * num(geometry.opacity, 1)).toFixed(3)}"`
+      + ` stroke-width="${thickness}"${transform}/>`;
+  }
+
+  return out;
+}
+
+/** One bakeable part -> one `<rect>`, plus any gradient it needs pushed onto `defs`. */
+function rectElement(part, defs, index) {
+  const layout = part._children.Layout;
+  return boxElement({
+    x: layout.x, y: layout.y, width: layout.width, height: layout.height,
+    rotation: layout.rotation, pivotX: layout.pivotX, pivotY: layout.pivotY,
+    opacity: part.opacity,
+  }, part._children.Background._children, defs, index);
 }
 
 /**

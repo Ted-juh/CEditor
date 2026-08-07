@@ -14,6 +14,7 @@
   import { deviceParameterDrag } from '../stores/deviceParameterDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
+  import { buildSceneryRenderPlan } from '../utils/sceneryRenderPlan.js';
 
   let {
     panel,
@@ -35,8 +36,13 @@
 
   // Default layer order if the panel doesn't specify one.
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
-  // The panel's own layer order, not one inferred from array position. Inferring it meant
-  // deleting an unrelated control could restack the whole panel — see utils/panelLayers.js.
+  // What to paint, in order: controls, plus one image for each locked scenery layer. The decision
+  // lives in utils/sceneryRenderPlan.js so the preview surface makes it identically — a panel that
+  // changes when you press Preview is worse than one that never compiles at all.
+  let plan = $derived(buildSceneryRenderPlan(panel, { preview: false }));
+  // Children still need the flat control list for snapping, distance guides and hit-testing, and
+  // that list must include the folded ones: a control you cannot snap to because it was compiled
+  // would be a very confusing kind of invisible.
   let panelLayers = $derived(normalizePanelLayers(panel?.layers, panel?.controls ?? []));
   let orderedLayerNames = $derived(layerNames(panelLayers));
   let hiddenLayers = $derived(new Set(panelLayers.filter((l) => l.visible === false).map((l) => l.name)));
@@ -82,23 +88,29 @@
     <GuideLines {scale} panelWidth={panel.width} panelHeight={panel.height} />
   {/if}
 
-  {#each orderedControls as control (control._children?.Core?.id)}
-    <CanvasControl
-      control={scopedEditingControlId != null && scopedEditingControlId === control._children?.Core?.id
-        ? scopedEditingControl
-        : control}
-      sourceControl={control}
-      {scale}
-      {snapToGrid}
-      {gridSize}
-      gridOriginX={gridOrigin.x}
-      gridOriginY={gridOrigin.y}
-      {panelLocked}
-      allControls={orderedControls}
-      panelControls={panel.controls}
-      panelWidth={panel.width}
-      panelHeight={panel.height}
-    />
+  {#each plan.items as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.control._children?.Core?.id)}
+    {#if item.type === 'scenery'}
+      <!-- A whole locked scenery layer, as one element. Not interactive by construction: unlock
+           the layer to get the controls back. -->
+      <img class="scenery-layer" src={item.url} width={panel.width} height={panel.height} alt="" />
+    {:else}
+      <CanvasControl
+        control={scopedEditingControlId != null && scopedEditingControlId === item.control._children?.Core?.id
+          ? scopedEditingControl
+          : item.control}
+        sourceControl={item.control}
+        {scale}
+        {snapToGrid}
+        {gridSize}
+        gridOriginX={gridOrigin.x}
+        gridOriginY={gridOrigin.y}
+        {panelLocked}
+        allControls={orderedControls}
+        panelControls={panel.controls}
+        panelWidth={panel.width}
+        panelHeight={panel.height}
+      />
+    {/if}
   {/each}
 
   {#if marquee.isActive && marqueeRect.w > 1}
@@ -145,6 +157,17 @@
     inset: 0;
     pointer-events: none;
     z-index: 0;
+  }
+
+  /* Compiled scenery. Deliberately without a z-index: it stacks by document order, in the sequence
+     the render plan put it, which is the layer's own depth. Giving it a number would put every
+     scenery layer in the same band and lose the ordering the plan just worked out. */
+  .scenery-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+    pointer-events: none;
   }
 
   .grid-overlay {

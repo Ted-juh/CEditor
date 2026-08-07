@@ -18,6 +18,7 @@ import { derived, get, writable } from 'svelte/store';
 import { panels, resolvedActivePanelId, activePanel, selectedComponentIds } from './panels.js';
 import { pushSnapshot } from './history.js';
 import { mapControlsTree } from '../utils/containment.js';
+import { SCENERY_KIND } from '../utils/sceneryCompile.js';
 import {
   DEFAULT_LAYER_NAME, createLayer, findLayer, layerColour, normalizeLayerName, normalizePanelLayers,
   reorderLayers, resolveActiveLayer, uniqueLayerName,
@@ -119,6 +120,19 @@ function setLayerFlag(name, key, value) {
 
 export const setLayerVisible = (name, visible) => setLayerFlag(name, 'visible', visible === true);
 export const setLayerLocked = (name, locked) => setLayerFlag(name, 'locked', locked === true);
+
+/**
+ * Declare a layer scenery, or take the declaration back.
+ *
+ * A `kind` any layer can be flipped to, rather than a layer type you create as one. The question
+ * came up while designing this and the answer is what actually happens in use: you draw the chassis
+ * on a layer without knowing yet that it IS the chassis, and a type fixed at creation would mean
+ * making a second layer and moving everything onto it to find out. Nothing about the controls
+ * changes when the kind does — the compiler reads them, it does not rewrite them — so flipping back
+ * is free and there is no state to migrate.
+ */
+export const setLayerKind = (name, kind) =>
+  setLayerFlag(name, 'kind', kind === SCENERY_KIND ? SCENERY_KIND : 'controls');
 
 /* ------------------------------------------------------------------ the active layer */
 

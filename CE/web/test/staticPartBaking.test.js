@@ -106,7 +106,7 @@ test('the data URL is base64, not percent-encoded', () => {
 
 test('every construct the serializer does not fully understand is refused by name', () => {
   const cases = [
-    ['text part (SVG and CSS text metrics differ)', () => createPartNode('t', { sections: { Text: clone(SECTION_DEFAULTS.Text) } })],
+    ["text part (an <img> cannot see the page's fonts)", () => createPartNode('t', { sections: { Text: clone(SECTION_DEFAULTS.Text) } })],
     ['part kind "circle"', () => plainPart('c', { kind: 'circle' })],
     ['effects section', () => { const p = plainPart('e'); p._children.Effects = clone(SECTION_DEFAULTS.Effects); return p; }],
     ['arc meta', () => plainPart('a', { meta: { valueArc: { colour: 'FF0000FF' } } })],

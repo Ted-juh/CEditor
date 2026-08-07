@@ -20,16 +20,18 @@
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import Pencil from 'lucide-svelte/icons/pencil';
+  import Mountain from 'lucide-svelte/icons/mountain';
 
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
   import {
     activeLayerName, addLayer, assignSelectionToLayer, moveLayer, removeLayer, renameLayer,
-    setActiveLayer, setLayerColour, setLayerLocked, setLayerVisible, soloLayer,
+    setActiveLayer, setLayerColour, setLayerKind, setLayerLocked, setLayerVisible, soloLayer,
   } from '../stores/panelLayerActions.js';
   import {
     LAYER_COLOURS, layerColour, layerPopulation, normalizeLayerName, normalizePanelLayers,
     resolveActiveLayer,
   } from '../utils/panelLayers.js';
+  import { SCENERY_KIND, classifySceneryControls, isSceneryLayer } from '../utils/sceneryCompile.js';
   import { layerThumbnailUrl } from '../utils/layerThumbnail.js';
 
   let layers = $derived(normalizePanelLayers($activePanel?.layers, $activePanel?.controls ?? []));
@@ -57,6 +59,9 @@
     layer,
     index,
     colour: layerColour(layer),
+    // Only computed for a scenery layer — classification walks every control's whole subtree, and
+    // there is nothing to report for a layer that is not going to be compiled.
+    scenery: isSceneryLayer(layer) ? classifySceneryControls(byLayer.get(layer.name) ?? []) : null,
     // A locator, not a preview — see utils/layerThumbnail.js. Null for an empty layer, so the row
     // can say so rather than showing a blank box that reads as a broken image.
     thumb: layerThumbnailUrl(byLayer.get(layer.name) ?? [], $activePanel?.width ?? 0, $activePanel?.height ?? 0, 34),
@@ -108,7 +113,7 @@
   </div>
 
   <ul class="layer-list">
-    {#each rows as { layer, index, thumb, big, colour } (layer.name)}
+    {#each rows as { layer, index, thumb, big, colour, scenery } (layer.name)}
       <li
         class="layer-row"
         class:hidden={layer.visible === false}
@@ -154,6 +159,19 @@
           {#if layer.locked}<Lock size={13} strokeWidth={1.7} />{:else}<LockOpen size={13} strokeWidth={1.7} />{/if}
         </button>
 
+        <!-- Scenery: the whole layer draws as one image once it is locked (and always in preview).
+             A kind you flip, not a type you create — see setLayerKind. -->
+        <button
+          class="icon"
+          class:on={scenery}
+          title={scenery
+            ? `Scenery — ${scenery.foldable.length} of ${scenery.foldable.length + scenery.live.length} fold into one image when locked. Click to make it an ordinary layer.`
+            : 'Make this a scenery layer: shapes fold into one image, which is a lot fewer DOM elements'}
+          onclick={() => setLayerKind(layer.name, scenery ? 'controls' : SCENERY_KIND)}
+        >
+          <Mountain size={13} strokeWidth={1.7} />
+        </button>
+
         <button
           class="chip"
           class:tinted={!!colour}
@@ -178,6 +196,15 @@
           <button class="icon subtle" title="Rename layer" onclick={() => beginRename(layer.name)}>
             <Pencil size={11} strokeWidth={1.7} />
           </button>
+        {/if}
+
+        <!-- What the compiler could not fold, and why. A silent refusal is the failure mode that
+             makes "why is this layer still slow" unanswerable, so the reasons are on the badge. -->
+        {#if scenery && scenery.live.length > 0}
+          <span
+            class="stayed-live"
+            title={`Stays live:\n${scenery.refusals.map((r) => `• ${r.name || r.id}: ${r.why}`).join('\n')}`}
+          >{scenery.live.length} live</span>
         {/if}
 
         <span class="count" title="Controls on this layer">{population.get(layer.name) ?? 0}</span>
@@ -274,6 +301,9 @@
      costs 16px; the double-click still works for anyone who already knew. */
   .icon.subtle { width: 16px; color: #5A5A5A; }
   .layer-row:hover .icon.subtle { color: #999; }
+  .icon.on { color: #7FBF7F; background: #22301F; }
+
+  .stayed-live { color: #C9A227; font-size: 9px; white-space: nowrap; flex-shrink: 0; cursor: help; }
 
   .chip { width: 12px; height: 12px; flex-shrink: 0; border-radius: 3px; cursor: pointer; padding: 0;
           background: transparent; border: 1px solid #3A3A3A; }
