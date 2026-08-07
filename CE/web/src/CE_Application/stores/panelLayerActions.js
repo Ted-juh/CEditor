@@ -13,14 +13,14 @@
 //     sees one step rather than two, which matters because half a rename is not a state anyone
 //     wants to land on.
 
-import { get } from 'svelte/store';
+import { derived, get, writable } from 'svelte/store';
 
 import { panels, resolvedActivePanelId, activePanel, selectedComponentIds } from './panels.js';
 import { pushSnapshot } from './history.js';
 import { mapControlsTree } from '../utils/containment.js';
 import {
-  DEFAULT_LAYER_NAME, createLayer, findLayer, normalizeLayerName, normalizePanelLayers,
-  reorderLayers, uniqueLayerName,
+  DEFAULT_LAYER_NAME, createLayer, findLayer, layerColour, normalizeLayerName, normalizePanelLayers,
+  reorderLayers, resolveActiveLayer, uniqueLayerName,
 } from '../utils/panelLayers.js';
 
 /** Read the active panel's layers, migrating on the fly if the document predates them. */
@@ -119,6 +119,83 @@ function setLayerFlag(name, key, value) {
 
 export const setLayerVisible = (name, visible) => setLayerFlag(name, 'visible', visible === true);
 export const setLayerLocked = (name, locked) => setLayerFlag(name, 'locked', locked === true);
+
+/* ------------------------------------------------------------------ the active layer */
+
+// Which layer a newly-drawn control lands on. UI state, not document state: it is a statement about
+// what you are working on right now, and storing it in the .cepanel would make "where I was" a
+// property of the file, shared with everyone who opens it and undoable, which it is not.
+//
+// Deliberately NOT reset when the panel changes. Resolution is total (utils/panelLayers.js), so a
+// name that means nothing in the panel you just switched to resolves back to Main rather than
+// dropping controls somewhere invisible — and switching back finds your layer still selected.
+export const activeLayerName = writable(null);
+
+/** The layer a control drawn right now would land on, for this panel, as it stands. */
+export function targetLayerName() {
+  return resolveActiveLayer(activeLayers(), get(activeLayerName));
+}
+
+/** Pick the layer to draw on. Locked layers refuse — a control you cannot then select is a trap. */
+export function setActiveLayer(name) {
+  const target = normalizeLayerName(name);
+  const layer = findLayer(activeLayers(), target);
+  if (!layer || layer.locked === true) return;
+  activeLayerName.set(target);
+}
+
+/* ------------------------------------------------------------------ solo */
+
+/**
+ * Show only this layer — or, if it is already the only visible one, show them all again.
+ *
+ * One commit, so it is one undo step. The toggle-back is what makes this usable as a look rather
+ * than an edit: alt-click to check what is on a layer, alt-click to put the panel back.
+ */
+export function soloLayer(name) {
+  const target = normalizeLayerName(name);
+  const layers = activeLayers();
+  if (!findLayer(layers, target)) return;
+
+  const soloed = layers.every((layer) => (layer.name === target) === (layer.visible !== false));
+  commit((current) => current.map((layer) => ({
+    ...layer,
+    visible: soloed || layer.name === target,
+  })));
+}
+
+/** Colour coding. Clearing DELETES the key rather than storing null — see utils/panelLayers.js. */
+export function setLayerColour(name, colour) {
+  const target = normalizeLayerName(name);
+  commit((layers) => layers.map((layer) => {
+    if (layer.name !== target) return layer;
+    if (colour == null) {
+      const { colour: dropped, ...rest } = layer;
+      return rest;
+    }
+    return { ...layer, colour: String(colour) };
+  }));
+}
+
+/**
+ * layer name -> colour, for the canvas.
+ *
+ * A store rather than a per-control derivation because the canvas asks this question once per
+ * control per render, and 400 controls each rebuilding the layer list is exactly the kind of
+ * quadratic that makes a panel feel slow for no visible reason.
+ *
+ * Derived from `layers` ALONE, with no controls passed to the normalizer. Self-healing exists so
+ * that a control on an unlisted layer still renders; it has nothing to teach about colour, and
+ * feeding the controls in here would rebuild the map on every drag frame.
+ */
+export const layerTints = derived(activePanel, ($panel) => {
+  const map = new Map();
+  for (const layer of normalizePanelLayers($panel?.layers, [])) {
+    const colour = layerColour(layer);
+    if (colour) map.set(layer.name, colour);
+  }
+  return map;
+});
 
 /** Move the current selection onto a layer — the "put this where it belongs" action. */
 export function assignSelectionToLayer(name) {

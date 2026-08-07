@@ -40,6 +40,8 @@
   import TransportRenderer from './TransportRenderer.svelte';
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
+  import { layerTints } from '../stores/panelLayerActions.js';
+  import { normalizeLayerName } from '../utils/panelLayers.js';
   import { applyControlPatchesById, getSection, updateControlProperty, reparentControls } from '../stores/controls.js';
   import { adoptParameterMetadata } from '../utils/parameterAdoption.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
@@ -372,6 +374,12 @@
   let renderedPartEntries = $derived.by(() =>
     bakeStaticPartEntries(renderControl, visiblePartEntries, displayW, displayH));
   let isSelected = $derived(core?.id != null && $selectedComponentIds.has(core.id));
+  // The layer's colour code, if it has one. This is where colour coding actually earns its keep:
+  // in the dock you already know which layer you are looking at, on the canvas you do not, and
+  // "why won't this move" answers itself when the outline is the locked layer's colour.
+  let layerTint = $derived($layerTints.size === 0
+    ? null
+    : ($layerTints.get(normalizeLayerName(core?.layer)) ?? null));
   let isKeyObject = $derived(core?.id != null && $keyObjectId === core.id && $selectedComponentIds.size > 1);
   let isLocked = $derived(core?.locked === true);
   let isVisible = $derived(core?.visible !== false);
@@ -2751,7 +2759,7 @@
   class:device-drop-incompatible={deviceDropStatus === 'incompatible'}
   class:mouse-transparent={mouseBlocksPointer}
   class:mouse-focus-outline={mouseFocusOutline}
-  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
+  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; {layerTint ? `--layer-tint:${layerTint};` : ''} {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
   ondragover={editorInteractionEnabled ? handleDeviceParameterDragOver : undefined}
   ondrop={editorInteractionEnabled ? handleDeviceParameterDrop : undefined}
@@ -3955,8 +3963,11 @@
     border: 1px dashed rgba(255, 196, 84, 0.7);
   }
 
+  /* Tinted by the control's layer when that layer has a colour code, blue otherwise. The key-object
+     rule below still wins, because "this is the one the others align to" is a stronger thing to say
+     than "this is on the scenery layer". */
   .canvas-control.selected {
-    outline: 2px solid #5B9BD5;
+    outline: 2px solid var(--layer-tint, #5B9BD5);
     outline-offset: -1px;
   }
 

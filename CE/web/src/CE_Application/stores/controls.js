@@ -22,6 +22,7 @@ import { isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../
 import { deleteNestedValue, setNestedValue, valueAtPath } from './controlTreeUtils.js';
 import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, updatePanelInList } from './panelDocumentHelpers.js';
 import { mutateComponentDocumentControl } from './componentWorkspace.js';
+import { targetLayerName } from './panelLayerActions.js';
 
 // Re-export for convenience
 export { getSection, hasSection };
@@ -167,6 +168,13 @@ export function addControl(type, overrides = {}) {
     overrides = { ...overrides, Transform: { x: baseOffset + offset, y: baseOffset + offset } };
   }
 
+  // Land on the layer the dock is pointing at. Without this every control lands on Main and working
+  // on any other layer means drawing, selecting, and re-assigning by hand — one at a time. An
+  // explicit Core.layer in `overrides` still wins: a caller that named a layer meant it.
+  if (overrides.Core?.layer == null) {
+    overrides = { ...overrides, Core: { ...(overrides.Core ?? {}), layer: targetLayerName() } };
+  }
+
   const control = createControlFromType(type, overrides);
   const id = control._children.Core.id;
 
@@ -202,6 +210,10 @@ export function addCustomComponentPackage(value, overrides = {}) {
   });
   if (!control?._children?.Core?.id) return null;
   const id = control._children.Core.id;
+  // Same rule as addControl: a component dropped from the library lands on the layer being worked
+  // on, not always on Main. The instantiated control always carries Core.layer (it is a section
+  // default), so the test is on what the CALLER asked for, not on what came out.
+  if (overrides.Core?.layer == null) control._children.Core.layer = targetLayerName();
 
   panels.update(list =>
     list.map(p => {
@@ -597,8 +609,15 @@ export function groupSelectionIntoContainer(padding = 12) {
   const maxX = Math.max(...rects.map(({ rect }) => rect.x + rect.w)) + padding;
   const maxY = Math.max(...rects.map(({ rect }) => rect.y + rect.h)) + padding;
 
+  // The container's layer governs the whole subtree — children render inside it, not by their own
+  // layer — so a container built from controls that all share a layer has to join them. Landing on
+  // Main instead moved the group to a different paint band, and nothing about the action said so.
+  const memberLayers = new Set(rects
+    .map(({ id }) => findControlById(panel.controls, id)?._children?.Core?.layer)
+    .filter((name) => typeof name === 'string' && name));
   const container = createControlFromType('Container', {
     Transform: { x: Math.round(minX), y: Math.round(minY), width: Math.round(maxX - minX), height: Math.round(maxY - minY) },
+    ...(memberLayers.size === 1 ? { Core: { layer: [...memberLayers][0] } } : {}),
   });
   const containerId = container._children.Core.id;
 

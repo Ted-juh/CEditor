@@ -1,6 +1,7 @@
 <script>
   /**
-   * The panel's layers — add, rename, reorder, hide, lock, and move the selection onto one.
+   * The panel's layers — add, rename, reorder, hide, lock, colour, solo, and choose which one new
+   * controls land on.
    *
    * Listed TOP-FIRST, which is the opposite of the stored array. The array is paint order (index 0
    * furthest back) because that is what a renderer wants; a person reading a layer stack expects
@@ -18,18 +19,26 @@
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
+  import Pencil from 'lucide-svelte/icons/pencil';
 
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
   import {
-    addLayer, assignSelectionToLayer, moveLayer, removeLayer, renameLayer,
-    setLayerLocked, setLayerVisible,
+    activeLayerName, addLayer, assignSelectionToLayer, moveLayer, removeLayer, renameLayer,
+    setActiveLayer, setLayerColour, setLayerLocked, setLayerVisible, soloLayer,
   } from '../stores/panelLayerActions.js';
-  import { layerPopulation, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
+  import {
+    LAYER_COLOURS, layerColour, layerPopulation, normalizeLayerName, normalizePanelLayers,
+    resolveActiveLayer,
+  } from '../utils/panelLayers.js';
   import { layerThumbnailUrl } from '../utils/layerThumbnail.js';
 
   let layers = $derived(normalizePanelLayers($activePanel?.layers, $activePanel?.controls ?? []));
   let population = $derived(layerPopulation(layers, $activePanel?.controls ?? []));
   let selectionCount = $derived($selectedComponentIds?.size ?? 0);
+
+  // Resolved, not raw: a name chosen on another panel, or a layer since locked, points at Main
+  // here — the same answer addControl gets, so the dot never lies about where a control will land.
+  let targetLayer = $derived(resolveActiveLayer(layers, $activeLayerName));
 
   // Controls grouped once, rather than filtering the whole list inside each row — on a
   // 400-control panel with several layers that is the difference between one pass and N.
@@ -47,6 +56,7 @@
   let rows = $derived(layers.map((layer, index) => ({
     layer,
     index,
+    colour: layerColour(layer),
     // A locator, not a preview — see utils/layerThumbnail.js. Null for an empty layer, so the row
     // can say so rather than showing a blank box that reads as a broken image.
     thumb: layerThumbnailUrl(byLayer.get(layer.name) ?? [], $activePanel?.width ?? 0, $activePanel?.height ?? 0, 34),
@@ -55,10 +65,12 @@
 
   let editingName = $state(null);
   let draftName = $state('');
+  let swatchesFor = $state(null);
 
   function beginRename(name) {
     editingName = name;
     draftName = name;
+    swatchesFor = null;
   }
 
   function commitRename() {
@@ -66,6 +78,18 @@
       renameLayer(editingName, draftName);
     }
     editingName = null;
+  }
+
+  // Alt-click solos. Kept on the eye rather than given a button of its own because it IS the
+  // visibility control — "show only this" is the same question as "show this", asked harder.
+  function onEyeClick(event, layer) {
+    if (event.altKey) soloLayer(layer.name);
+    else setLayerVisible(layer.name, layer.visible === false);
+  }
+
+  function pickColour(name, colour) {
+    setLayerColour(name, colour);
+    swatchesFor = null;
   }
 </script>
 
@@ -76,16 +100,34 @@
     </button>
     <span class="hint">
       {#if selectionCount}
-        {selectionCount} selected — click a layer's name badge to move {selectionCount === 1 ? 'it' : 'them'} there
+        {selectionCount} selected — click a layer's name to move {selectionCount === 1 ? 'it' : 'them'} there
       {:else}
-        Front layer at the top
+        New controls go to <b>{targetLayer}</b> · alt-click an eye to solo
       {/if}
     </span>
   </div>
 
   <ul class="layer-list">
-    {#each rows as { layer, index, thumb, big } (layer.name)}
-      <li class="layer-row" class:hidden={layer.visible === false} class:locked={layer.locked}>
+    {#each rows as { layer, index, thumb, big, colour } (layer.name)}
+      <li
+        class="layer-row"
+        class:hidden={layer.visible === false}
+        class:locked={layer.locked}
+        class:target={layer.name === targetLayer}
+        class:coloured={!!colour}
+        style={colour ? `--layer-colour:${colour};` : ''}
+      >
+        <!-- The target dot. A radio, not a toggle: exactly one layer receives new controls, and
+             a locked layer cannot be it (you would draw a control you then cannot select). -->
+        <button
+          class="target-dot"
+          disabled={layer.locked}
+          title={layer.locked
+            ? 'Locked layers cannot receive new controls'
+            : `Draw new controls on ${layer.name}`}
+          onclick={() => setActiveLayer(layer.name)}
+        ><span class="dot"></span></button>
+
         <span class="thumb-slot">
           {#if thumb}
             <img class="thumb" src={thumb.url} width={thumb.width} height={thumb.height} alt="" />
@@ -98,8 +140,8 @@
         </span>
         <button
           class="icon"
-          title={layer.visible === false ? 'Show layer' : 'Hide layer'}
-          onclick={() => setLayerVisible(layer.name, layer.visible === false)}
+          title={layer.visible === false ? 'Show layer (alt-click: solo)' : 'Hide layer (alt-click: solo)'}
+          onclick={(event) => onEyeClick(event, layer)}
         >
           {#if layer.visible === false}<EyeOff size={13} strokeWidth={1.7} />{:else}<Eye size={13} strokeWidth={1.7} />{/if}
         </button>
@@ -111,6 +153,13 @@
         >
           {#if layer.locked}<Lock size={13} strokeWidth={1.7} />{:else}<LockOpen size={13} strokeWidth={1.7} />{/if}
         </button>
+
+        <button
+          class="chip"
+          class:tinted={!!colour}
+          title="Colour code this layer"
+          onclick={() => { swatchesFor = swatchesFor === layer.name ? null : layer.name; }}
+        ></button>
 
         {#if editingName === layer.name}
           <!-- svelte-ignore a11y_autofocus -->
@@ -125,6 +174,9 @@
           <button class="name" ondblclick={() => beginRename(layer.name)} onclick={() => assignSelectionToLayer(layer.name)}
                   title={selectionCount ? `Move ${selectionCount} selected here (double-click to rename)` : 'Double-click to rename'}>
             {layer.name}
+          </button>
+          <button class="icon subtle" title="Rename layer" onclick={() => beginRename(layer.name)}>
+            <Pencil size={11} strokeWidth={1.7} />
           </button>
         {/if}
 
@@ -142,6 +194,16 @@
                 disabled={layers.length <= 1} onclick={() => removeLayer(layer.name)}>
           <Trash2 size={13} strokeWidth={1.7} />
         </button>
+
+        {#if swatchesFor === layer.name}
+          <span class="swatches">
+            {#each LAYER_COLOURS as option}
+              <button class="swatch" class:on={colour === option} style="background:{option};"
+                      title={option} onclick={() => pickColour(layer.name, option)}></button>
+            {/each}
+            <button class="swatch none" title="No colour" onclick={() => pickColour(layer.name, null)}></button>
+          </span>
+        {/if}
       </li>
     {/each}
   </ul>
@@ -154,10 +216,25 @@
           border-radius: 3px; padding: 4px 8px; font-size: 11px; cursor: pointer; }
   .tool:hover { background: #2C2C2C; border-color: #4A4A4A; }
   .hint { color: #777; font-size: 11px; }
+  .hint b { color: #AAA; font-weight: 600; }
 
   .layer-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+  /* The colour is a LABEL, so it reads as an edge stripe rather than a wash: a tinted row
+     background fights the thumbnail beside it and makes eight layers look like eight themes. */
   .layer-row { position: relative; display: flex; align-items: center; gap: 3px; padding: 4px 5px; border-radius: 3px;
-               background: #1E1E1E; border: 1px solid #2C2C2C; }
+               background: #1E1E1E; border: 1px solid #2C2C2C; border-left: 3px solid #2C2C2C; }
+  .layer-row.coloured { border-left-color: var(--layer-colour); }
+
+  /* The row new controls land on. A left-edge marker would collide with the colour stripe, so the
+     target reads as a filled dot plus a lifted background — legible with or without a colour. */
+  .layer-row.target { background: #262B31; border-color: #3C4753; }
+  .target-dot { width: 14px; height: 22px; flex-shrink: 0; display: inline-flex; align-items: center;
+                justify-content: center; background: transparent; border: none; cursor: pointer; padding: 0; }
+  .target-dot:disabled { cursor: default; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid #555; box-sizing: border-box; }
+  .target-dot:hover:not(:disabled) .dot { border-color: #999; }
+  .layer-row.target .dot { background: var(--layer-colour, #5B9BD5); border-color: var(--layer-colour, #5B9BD5); }
+  .target-dot:disabled .dot { opacity: 0.3; }
 
   /* Fixed box, letterboxed content: a portrait panel and a landscape one both sit in the same
      row height without either being stretched into a lie about its shape. */
@@ -184,6 +261,7 @@
 
   .layer-row.hidden .thumb { opacity: 0.3; }
   .layer-row:hover { background: #242424; }
+  .layer-row.target:hover { background: #2B3138; }
   .layer-row.hidden .name { color: #666; text-decoration: line-through; }
   .layer-row.locked { border-color: #3A3226; }
 
@@ -192,6 +270,24 @@
   .icon:hover:not(:disabled) { background: #303030; color: #DDD; }
   .icon:disabled { opacity: 0.25; cursor: default; }
   .icon.danger:hover:not(:disabled) { background: #3A2020; color: #E88; }
+  /* Rename had only a double-click, which is not discoverable. The pencil says it out loud and
+     costs 16px; the double-click still works for anyone who already knew. */
+  .icon.subtle { width: 16px; color: #5A5A5A; }
+  .layer-row:hover .icon.subtle { color: #999; }
+
+  .chip { width: 12px; height: 12px; flex-shrink: 0; border-radius: 3px; cursor: pointer; padding: 0;
+          background: transparent; border: 1px solid #3A3A3A; }
+  .chip.tinted { background: var(--layer-colour); border-color: var(--layer-colour); }
+  .chip:hover { border-color: #6A6A6A; }
+
+  .swatches { position: absolute; left: 60px; top: 100%; margin-top: 2px; z-index: 50; display: flex; gap: 3px;
+              padding: 5px; background: #141414; border: 1px solid #3A3A3A; border-radius: 4px;
+              box-shadow: 0 6px 20px rgba(0,0,0,0.6); }
+  .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid transparent; cursor: pointer; padding: 0; }
+  .swatch.on { border-color: #FFF; }
+  .swatch.none { background: #222; border-color: #444; position: relative; }
+  .swatch.none::after { content: ''; position: absolute; inset: 1px; border-top: 1px solid #777;
+                        transform: rotate(45deg); transform-origin: center; }
 
   .name { flex: 1; min-width: 0; text-align: left; background: transparent; border: none; color: #DDD; font-size: 11px;
           font-family: inherit; padding: 3px 4px; border-radius: 3px; cursor: pointer; overflow: hidden;

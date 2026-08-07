@@ -27,7 +27,32 @@
 
 export const DEFAULT_LAYER_NAME = 'Main';
 
-/** One layer. `kind` is what step two hangs the scenery compile off; nothing reads it yet. */
+/**
+ * The colours a layer can be tagged with.
+ *
+ * Eight, and no picker. A colour here is a LABEL — "this is the scenery, that is the mod matrix" —
+ * and a label people can only choose eight of stays readable at a glance, which a free colour picker
+ * does not: two layers a shade apart are two layers nobody can tell apart on a selection outline.
+ * Hues are spread far enough to survive being a 2px line on a dark panel.
+ */
+export const LAYER_COLOURS = ['#5B9BD5', '#4FB477', '#E5A029', '#D56B6B', '#A97BD5', '#3FB8B0', '#D06BA8', '#8A9199'];
+
+/**
+ * A stored colour, or null.
+ *
+ * `colour` is deliberately ABSENT from createLayer's defaults rather than defaulting to null: every
+ * panel document carries a layer list, and a null in each of them is bytes and diff noise for a
+ * field almost nobody sets. Clearing a colour deletes the key for the same reason.
+ *
+ * Anything not from the list is refused rather than drawn. The value reaches a CSS custom property
+ * inside a style attribute, and a hand-edited document is not a trusted source of CSS.
+ */
+export function layerColour(layer) {
+  const raw = layer?.colour;
+  return typeof raw === 'string' && LAYER_COLOURS.includes(raw) ? raw : null;
+}
+
+/** One layer. `kind` is what the scenery compile hangs off — see utils/sceneryCompile.js. */
 export function createLayer(name = DEFAULT_LAYER_NAME, overrides = {}) {
   return {
     _type: 'Layer',
@@ -88,6 +113,25 @@ export function normalizePanelLayers(layers, controls) {
 
   if (out.length === 0) out.push(createLayer(DEFAULT_LAYER_NAME));
   return out;
+}
+
+/**
+ * Which layer a newly-drawn control lands on.
+ *
+ * TOTAL, and deliberately conservative at both ends. `wanted` is UI state that outlives the panel it
+ * was chosen in — switch tabs and the name may mean nothing here — and a layer can be locked after
+ * being chosen. Either way the answer is the default layer, which is exactly where every control
+ * landed before this existed.
+ *
+ * `wanted == null` short-circuits rather than falling through the lookup, so a panel with no "Main"
+ * keeps its old behaviour (a control claiming an unlisted layer causes that layer to be appended)
+ * instead of quietly acquiring a different one.
+ */
+export function resolveActiveLayer(layers, wanted) {
+  if (wanted == null) return DEFAULT_LAYER_NAME;
+  const found = findLayer(layers, wanted);
+  if (!found || found.locked === true) return DEFAULT_LAYER_NAME;
+  return found.name;
 }
 
 /** Names in paint order — what sortControlsForRender wants. */

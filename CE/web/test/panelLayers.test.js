@@ -23,11 +23,14 @@ import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { createPanel, deserializePanel, serializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { sortControlsForRender } from '../src/CE_Application/utils/controlOrder.js';
 import {
-  createLayer, layerNames, layerPopulation, normalizePanelLayers, reorderLayers, uniqueLayerName,
+  LAYER_COLOURS, createLayer, layerColour, layerNames, layerPopulation, normalizePanelLayers,
+  reorderLayers, resolveActiveLayer, uniqueLayerName,
 } from '../src/CE_Application/utils/panelLayers.js';
 import { panels, addPanel, setActivePanel, selectedComponentIds } from '../src/CE_Application/stores/panels.js';
+import { addControl } from '../src/CE_Application/stores/controls.js';
 import {
-  addLayer, assignSelectionToLayer, moveLayer, removeLayer, renameLayer, setLayerVisible,
+  activeLayerName, addLayer, assignSelectionToLayer, moveLayer, removeLayer, renameLayer,
+  setActiveLayer, setLayerColour, setLayerLocked, setLayerVisible, soloLayer,
 } from '../src/CE_Application/stores/panelLayerActions.js';
 
 const on = (id, layer) => createControl('Label', { Core: { id, layer } });
@@ -206,4 +209,105 @@ test('hiding a layer is a flag, not a deletion', () => {
   setLayerVisible('Main', false);
   assert.equal(readPanel(id).layers[0].visible, false);
   assert.equal(readPanel(id).controls.length, 1, 'hiding a layer removed its controls');
+});
+
+/* ------------------------------------------------------------------ the active layer */
+//
+// Which layer a newly-drawn control lands on. The whole risk here is that it is UI state pointing
+// at document state: the name outlives the panel it was chosen in, and the layer it names can be
+// locked or deleted underneath it. Every one of those has to land somewhere real.
+
+test('unset means exactly what happened before this existed', () => {
+  // Not "the frontmost layer" — a panel with no Main must keep appending one, because that is what
+  // a control carrying the default Core.layer has always caused.
+  assert.equal(resolveActiveLayer([createLayer('Scenery')], null), 'Main');
+  assert.equal(resolveActiveLayer([createLayer('Main'), createLayer('Scenery')], null), 'Main');
+});
+
+test('a name from another panel falls back rather than inventing a layer', () => {
+  assert.equal(resolveActiveLayer([createLayer('Main')], 'Mod Matrix'), 'Main');
+});
+
+test('a locked layer never receives new controls', () => {
+  // A control drawn onto a locked layer cannot then be selected — you would have made something
+  // you cannot touch, and nothing on screen would say why.
+  const layers = [createLayer('Main'), createLayer('Scenery', { locked: true })];
+  assert.equal(resolveActiveLayer(layers, 'Scenery'), 'Main');
+  assert.equal(resolveActiveLayer([createLayer('Main'), createLayer('Scenery')], 'Scenery'), 'Scenery');
+});
+
+test('setActiveLayer refuses a locked layer, and addControl follows the target', () => {
+  const id = livePanel('target', [on('A', 'Main')], [createLayer('Main'), createLayer('Scenery')]);
+  setActiveLayer('Scenery');
+  const drawn = addControl('Label');
+  assert.equal(drawn._children.Core.layer, 'Scenery', 'a new control ignored the target layer');
+
+  setLayerLocked('Scenery', true);
+  setActiveLayer('Scenery');
+  assert.equal(addControl('Label')._children.Core.layer, 'Main', 'a locked layer took a new control');
+  assert.equal(readPanel(id).controls.length, 3);
+  activeLayerName.set(null);
+});
+
+test('an explicit layer in the overrides beats the target', () => {
+  livePanel('explicit', [on('A', 'Main')], [createLayer('Main'), createLayer('Scenery')]);
+  setActiveLayer('Scenery');
+  assert.equal(addControl('Label', { Core: { layer: 'Main' } })._children.Core.layer, 'Main');
+  activeLayerName.set(null);
+});
+
+/* ------------------------------------------------------------------ solo */
+
+test('solo hides every other layer, and un-solo restores them', () => {
+  const id = livePanel('solo', [on('A', 'Main'), on('B', 'Scenery'), on('C', 'Trim')]);
+  soloLayer('Scenery');
+  const visible = () => readPanel(id).layers.map((l) => `${l.name}:${l.visible !== false}`);
+  assert.deepEqual(visible(), ['Main:false', 'Scenery:true', 'Trim:false']);
+
+  soloLayer('Scenery');
+  assert.deepEqual(visible(), ['Main:true', 'Scenery:true', 'Trim:true'],
+    'alt-clicking a soloed layer should put the panel back, not hide everything');
+});
+
+test('solo un-hides the layer being soloed', () => {
+  // Otherwise "show me only this" on a hidden layer shows nothing at all, which reads as a bug in
+  // solo rather than as the layer having been hidden.
+  const id = livePanel('solo-hidden', [on('A', 'Main'), on('B', 'Scenery')]);
+  setLayerVisible('Scenery', false);
+  soloLayer('Scenery');
+  assert.deepEqual(readPanel(id).layers.map((l) => l.visible !== false), [false, true]);
+});
+
+/* ------------------------------------------------------------------ colour coding */
+
+test('only a colour from the list is a colour', () => {
+  // A hand-edited document or a paste from elsewhere must not be able to put arbitrary text into a
+  // CSS custom property that ends up in a style attribute.
+  assert.equal(layerColour(createLayer('A', { colour: LAYER_COLOURS[2] })), LAYER_COLOURS[2]);
+  assert.equal(layerColour(createLayer('A')), null);
+  assert.equal(layerColour(createLayer('A', { colour: 'red; background:url(x)' })), null);
+  assert.equal(layerColour(createLayer('A', { colour: 42 })), null);
+});
+
+test('a colour survives a save and a load', () => {
+  const panel = createPanel('layers-colour');
+  panel.layers = [createLayer('Main', { colour: LAYER_COLOURS[3] })];
+  const back = deserializePanel(serializePanel(panel), null, 'colour');
+  assert.equal(layerColour(back.layers[0]), LAYER_COLOURS[3]);
+});
+
+test('clearing a colour deletes the key rather than storing null', () => {
+  // Every panel document carries a layer list. A `"colour": null` in each of them is bytes and diff
+  // noise for a field almost nobody sets — and it made three committed golden panels stale the
+  // moment the field was added with a default, which is how this rule got written down.
+  const id = livePanel('colour-clear', [on('A', 'Main')]);
+  setLayerColour('Main', LAYER_COLOURS[1]);
+  assert.equal(readPanel(id).layers[0].colour, LAYER_COLOURS[1]);
+
+  setLayerColour('Main', null);
+  assert.ok(!('colour' in readPanel(id).layers[0]), 'clearing left a null behind');
+});
+
+test('a fresh layer has no colour key at all', () => {
+  assert.ok(!('colour' in createLayer('Main')));
 });
