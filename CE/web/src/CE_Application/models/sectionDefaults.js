@@ -535,6 +535,22 @@ export const SECTION_DEFAULTS = {
     gap: 0,
     padding: 0,
     clip: false,
+    // Size derived from contents, per axis — see utils/containerFit.js. Both LOCKED is the default
+    // and is exactly today's behaviour, so no panel that already exists changes when this ships.
+    // Per axis rather than one enum because a row of sections wants equal heights and variable
+    // widths, which a single mode cannot say.
+    fitWidth: 'locked',
+    fitHeight: 'locked',
+    // Floors for a fitted axis. A section holding one small knob should not collapse to 40x40 and
+    // break a row of otherwise equal sections; 0 means "no floor", which is pure fit.
+    minWidth: 0,
+    minHeight: 0,
+    // Per-side padding, falling back to `padding` when unset. A section header needs more room at
+    // the top than at the sides, and one number cannot express that.
+    paddingLeft: null,
+    paddingRight: null,
+    paddingTop: null,
+    paddingBottom: null,
     _children: {},
   },
 

@@ -5,6 +5,7 @@
   import { getChildControls, computeFlowLayout, controlPanelRect, panelToLocalPoint, selectionRoots, collectSubtreeIds, findControlById, buildControlIndex, getAncestorIds, flatControlsWithPanelRects } from '../utils/containment.js';
   import { containerDropTargetId } from '../stores/containerDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
+  import { axisIsDerived, fitsAnyAxis, fittedSizeDeep } from '../utils/containerFit.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import { bakeStaticPartEntries } from '../utils/staticPartBaking.js';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
@@ -501,8 +502,13 @@
 
   let displayX = $derived(layoutPosition ? layoutPosition.x : (transientX ?? transform?.x ?? 0) + multiDragOffsetX);
   let displayY = $derived(layoutPosition ? layoutPosition.y : (transientY ?? transform?.y ?? 0) + multiDragOffsetY);
-  let displayW = $derived(transientW ?? transform?.width ?? 100);
-  let displayH = $derived(transientH ?? transform?.height ?? 40);
+  // A section whose size comes from its contents (utils/containerFit.js). Deep, because a section
+  // holding another fitted section cannot know its own size until the inner one does. The derived
+  // size wins over the stored Transform on a fitted axis; a transient drag still wins over both, so
+  // a half-fitted container drags on its locked axis and refuses on the other.
+  let fittedSelf = $derived(fitsAnyAxis(control) ? fittedSizeDeep(control) : null);
+  let displayW = $derived(transientW ?? fittedSelf?.width ?? transform?.width ?? 100);
+  let displayH = $derived(transientH ?? fittedSelf?.height ?? transform?.height ?? 40);
 
   // --- Container children (nesting). All empty/false for non-containers, so a
   // control with no Children section renders exactly as before. ---
@@ -1059,7 +1065,7 @@
   });
 
   // Resize handle definitions: [id, cursor, css-position]
-  const handles = [
+  const ALL_HANDLES = [
     { id: 'tl', cursor: 'nwse-resize' },
     { id: 't',  cursor: 'ns-resize' },
     { id: 'tr', cursor: 'nesw-resize' },
@@ -1069,6 +1075,20 @@
     { id: 'b',  cursor: 'ns-resize' },
     { id: 'br', cursor: 'nwse-resize' },
   ];
+
+  // A derived axis has no handle. Offering one that snaps back the instant you let go is worse
+  // than offering none — the control looks broken rather than deliberate. Corners disappear when
+  // EITHER of their axes is derived, since a corner drags both.
+  let handles = $derived.by(() => {
+    if (!fittedSelf) return ALL_HANDLES;
+    const w = axisIsDerived(control, 'width');
+    const h = axisIsDerived(control, 'height');
+    return ALL_HANDLES.filter(({ id }) => {
+      const dragsWidth = id.includes('l') || id.includes('r');
+      const dragsHeight = id.includes('t') || id.includes('b');
+      return !((dragsWidth && w) || (dragsHeight && h));
+    });
+  });
 
   const handleStyle = resizeHandleStyle;
 
