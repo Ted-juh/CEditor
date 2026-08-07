@@ -23,10 +23,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { COMPONENT_TYPES, createControl } from '../src/CE_Application/models/componentTypes.js';
+import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
+import { createPartNode } from '../src/CE_Application/utils/customComponentFactory.js';
 import { createPanel, deserializePanel, serializePanel } from '../src/CE_Application/stores/panelModel.js';
 import {
   expandControl, NEVER_ELIDED_TYPES, REMOVED_KEY, shrinkControl,
 } from '../src/CE_Application/stores/documentShape.js';
+
+const clone = (value) => JSON.parse(JSON.stringify(value));
 
 /** Deep equality that ignores key order, and says where it first differs. */
 function difference(left, right, path = '$') {
@@ -193,17 +197,70 @@ test('controls nested three deep are shrunk and restored', () => {
 
 /* ------------------------------------------------------------------ what is left alone */
 
-test('CustomComponent is never elided', () => {
-  // Its instances come from instantiateCustomComponentPackageControl, not createControl, so
-  // createControl('CustomComponent') is an empty shell rather than their default. Diffing against
-  // it would save nothing while making every custom component depend on that shell staying still.
-  assert.ok(NEVER_ELIDED_TYPES.has('CustomComponent'));
+test('a custom component keeps everything authored and drops the boilerplate', () => {
+  // This test used to assert the opposite — that CustomComponent was held out of the diff on the
+  // grounds that diffing it "would save nothing". That was measurably false: a custom component
+  // carries the same defaulted Background, Effects, Mouse, States and Animations every control
+  // does, and Background alone is 4.8 KB. The GAIA panel, which is 370 hand-drawn controls, was
+  // 45 MB. So the rule is gone, and what replaces it is this: the authored halves survive whole.
+  assert.equal(NEVER_ELIDED_TYPES.size, 0);
 
   const custom = createControl('CustomComponent', { Core: { id: 'cc' } });
+  custom._children.Parts = {
+    _type: 'Parts',
+    _children: {
+      body: createPartNode('body', { layout: { x: 3, y: 4 }, sections: { Background: clone(SECTION_DEFAULTS.Background) } }),
+      // A part left entirely at its defaults, which is the case that cannot be stored as "nothing"
+      // — "no keys" and "no Background at all" are different states of a part.
+      plain: createPartNode('plain', { sections: { Background: clone(SECTION_DEFAULTS.Background) } }),
+    },
+  };
+  custom._children.Parts._children.body._children.Background._children.Fill.colour = 'FF102030';
+  custom._children.ValueChannels = { _type: 'ValueChannels', _children: { value: { min: 0, max: 7 } } };
+
   const { document, loaded } = roundTrip(custom);
   assert.equal(difference(custom, loaded[0]), null);
-  assert.deepEqual(Object.keys(document.controls[0]._children).sort(), Object.keys(custom._children).sort(),
-    'a custom component should be written down in full');
+
+  const stored = document.controls[0]._children;
+  assert.ok(!('Effects' in stored), 'a defaulted Effects section should not be written down');
+  assert.equal(stored.Parts._children.body._children.Background._children.Fill.colour, 'FF102030',
+    'the one colour the author changed has to survive the part diff');
+  assert.ok(!('Border' in stored.Parts._children.body._children.Background._children),
+    'the defaulted half of an edited part section should not be written down');
+  assert.deepEqual(stored.Parts._children.plain._children.Background, { _type: 'Background' },
+    'a fully defaulted part section keeps its _type as the marker that it exists at all');
+  assert.deepEqual(stored.ValueChannels._children.value, { min: 0, max: 7 },
+    'authored value channels are not in the shell, so they are written whole');
+});
+
+test('a part whose section is deleted stays deleted', () => {
+  // The `_removed` failure, one level further down than the rest of this file tests it. A part
+  // with its Background taken off is a real thing to author — a text-only label layer — and it is
+  // indistinguishable from "Background at defaults" unless the removal is recorded.
+  const custom = createControl('CustomComponent', { Core: { id: 'cc2' } });
+  const part = createPartNode('bare', { sections: { Background: clone(SECTION_DEFAULTS.Background) } });
+  delete part._children.Background;
+  custom._children.Parts = { _type: 'Parts', _children: { bare: part } };
+
+  const { loaded } = roundTrip(custom);
+  assert.ok(!('Background' in loaded[0]._children.Parts._children.bare._children),
+    'the deleted part section came back on load');
+});
+
+test('a native control with an extra authored part round-trips', () => {
+  // Type parts (a Knob's track, fill, pointer) are covered by the control diff; a part someone
+  // ADDED is not in the pristine and takes the part diff. Both in one control, because getting the
+  // split wrong means diffing a sparse part against a full one, which is a diff of nothing.
+  const knob = createControl('Knob', { Core: { id: 'k' } });
+  knob._children.Parts._children.badge = createPartNode('badge', {
+    layout: { x: 2, y: 2, width: 9, height: 9 },
+    sections: { Background: clone(SECTION_DEFAULTS.Background) },
+  });
+  knob._children.Parts._children.badge._children.Background._children.Fill.colour = 'FFAA0000';
+
+  const { document, loaded } = roundTrip(knob);
+  assert.equal(difference(knob, loaded[0]), null);
+  assert.equal(document.controls[0]._children.Parts._children.badge._children.Background._children.Fill.colour, 'FFAA0000');
 });
 
 test('a control of an unknown type is passed through untouched', () => {

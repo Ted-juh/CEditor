@@ -33,6 +33,8 @@
 // time before anyone noticed.
 
 import { COMPONENT_TYPES, createControl } from '../models/componentTypes.js';
+import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
+import { createPartNode } from '../utils/customComponentFactory.js';
 
 /** Reserved key: the names present in the pristine control that this document deleted. */
 const REMOVED = '_removed';
@@ -41,15 +43,26 @@ const REMOVED = '_removed';
 const OMIT = Symbol('omit');
 
 /**
- * Types that are never elided.
+ * Types held back from the diff.
  *
- * CustomComponent instances are built by instantiateCustomComponentPackageControl() from a saved
- * package, not by createControl(), so `createControl('CustomComponent')` is not their default in
- * any meaningful sense — it is an empty shell. Diffing against it would be technically correct and
- * save nothing, while making every custom component's document depend on a shell that has no
- * reason to stay stable. Their content is authored data; authored data is written down.
+ * Empty, and it is worth saying why it used to hold CustomComponent. The argument was that its
+ * instances come from instantiateCustomComponentPackageControl() rather than createControl(), so
+ * the shell is not their default in any meaningful sense, and diffing against it "would save
+ * nothing". The first half stands. The second half was simply wrong, and measurably: a custom
+ * component carries the same Background, Effects, Mouse, States, Animations, ExternalAPI and
+ * Variants sections every other control does, all at their defaults, and Background alone is
+ * 4.8 KB. On a panel of 370 hand-drawn controls that is megabytes of identical boilerplate.
+ *
+ * What IS authored — Parts, Bindings, ValueChannels, HitZones, Behaviors, Designer — is empty in
+ * the shell, so it differs from the shell and is written down in full exactly as before. Nothing
+ * authored is being inferred; only the boilerplate stops repeating.
+ *
+ * The remaining objection was that this makes a custom component's document depend on a shell
+ * staying still. True, and it is the same dependence every one of the other forty-eight types
+ * already has: this file's whole premise is that "default" means "what createControl produced".
+ * Singling out one type bought stability nowhere and cost a great deal of disk.
  */
-const NEVER_ELIDE = new Set(['CustomComponent']);
+const NEVER_ELIDE = new Set();
 
 /** Pristine control per type, as JSON so each caller gets its own copy to mutate. */
 const pristineCache = new Map();
@@ -123,6 +136,94 @@ function expand(sparse, pristine) {
   return out;
 }
 
+/* ------------------------------------------------------------------ custom component parts */
+
+// A custom component's CONTROL is authored data and is written whole (above). Its PARTS are not:
+// a part is createPartNode()'s shell plus sections that are `deepClone(SECTION_DEFAULTS[name])` —
+// stores/controls.js addSection is literally that line — and a shape whose fill is one colour
+// still carried five kilobytes of Background defaults it never touched.
+//
+// That is where a GAIA panel's forty-five megabytes lived. A knob is 45 parts; an LED column with
+// glyphs is more; there are hundreds of them, and each one wrote out the full default tree of
+// every section it owned. Eliding the parts is the same diff as everywhere else, against a
+// baseline that is defined rather than inferred.
+//
+// THE ONE ASYMMETRY. A section whose every field is default shrinks to nothing, and "nothing" is
+// indistinguishable from "this part has no Background at all" — which is a real, different state.
+// So an elided section keeps its `_type` as a marker: one key, and it is what expandPart looks the
+// defaults up by. Without it a defaulted Background would vanish on save and never come back.
+
+/** The part shell as createPartNode makes it, with `name` blanked so a real name always survives. */
+function pristinePartShell() {
+  const shell = createPartNode('');
+  shell.name = '';
+  return shell;
+}
+
+/** The baseline for one part: its shell, plus SECTION_DEFAULTS for each section it actually owns. */
+function pristinePart(part) {
+  const shell = pristinePartShell();
+  for (const [key, section] of Object.entries(part?._children ?? {})) {
+    if (key === 'Layout') continue;
+    const defaults = SECTION_DEFAULTS[section?._type];
+    if (defaults) shell._children[key] = JSON.parse(JSON.stringify(defaults));
+  }
+  return shell;
+}
+
+function shrinkPart(part) {
+  if (!isPlainObject(part) || !isPlainObject(part._children)) return part;
+
+  const sparse = shrink(part, pristinePart(part));
+  const out = sparse === OMIT ? {} : sparse;
+
+  // Identity, always: `name` is how a binding target like `Parts.cap.Layout.y` finds it, and
+  // `_type` is what marks this as a part rather than a section.
+  out._type = part._type ?? 'Part';
+  out.name = part.name;
+  out._children = { ...out._children };
+
+  // The section markers described above.
+  for (const [key, section] of Object.entries(part._children)) {
+    if (key === 'Layout' || !SECTION_DEFAULTS[section?._type]) continue;
+    out._children[key] = { ...(out._children[key] ?? {}), _type: section._type };
+  }
+  return out;
+}
+
+function expandPart(sparse) {
+  if (!isPlainObject(sparse) || !isPlainObject(sparse._children)) return sparse;
+  return expand(sparse, pristinePart(sparse));
+}
+
+/**
+ * Map a control's AUTHORED parts through `fn`.
+ *
+ * `typeParts` names the parts the control's own pristine already has — a Knob's track, fill and
+ * pointer. Those are covered by the ordinary control diff and must be left alone: pre-shrinking
+ * one would leave a sparse part to be diffed against a full one, which is not a diff of anything.
+ * Everything else is authored — every part of a custom component, and any part someone added to a
+ * native control — and gets the part diff.
+ */
+function mapAuthoredParts(control, typeParts, fn) {
+  const parts = control?._children?.Parts?._children;
+  if (!isPlainObject(parts) || Object.keys(parts).length === 0) return control;
+
+  const mapped = Object.fromEntries(Object.entries(parts)
+    .map(([key, part]) => [key, typeParts.has(key) ? part : fn(part)]));
+
+  return {
+    ...control,
+    _children: {
+      ...control._children,
+      Parts: { ...control._children.Parts, _children: mapped },
+    },
+  };
+}
+
+/** The part names a type ships with, which the control-level diff already covers. */
+const typePartNames = (pristine) => new Set(Object.keys(pristine?._children?.Parts?._children ?? {}));
+
 /** Child controls live in a named map under the Children section. */
 const childMapOf = (control) => control?._children?.Children?._children ?? null;
 
@@ -146,12 +247,15 @@ function withChildMap(control, mapped) {
 export function shrinkControl(control) {
   const controlType = control?._children?.Core?.controlType;
   const pristine = pristineFor(controlType);
-  if (!pristine) return control;
+  // A type with no pristine — held back, or from a newer build — still gets its parts elided,
+  // since a part's baseline is SECTION_DEFAULTS and does not depend on the control's type at all.
+  if (!pristine) return mapAuthoredParts(control, new Set(), shrinkPart);
 
   const kids = childMapOf(control);
-  const working = kids && Object.keys(kids).length
+  let working = kids && Object.keys(kids).length
     ? withChildMap(control, Object.fromEntries(Object.entries(kids).map(([key, child]) => [key, shrinkControl(child)])))
     : control;
+  working = mapAuthoredParts(working, typePartNames(pristine), shrinkPart);
 
   const sparse = shrink(working, pristine);
   const out = sparse === OMIT ? {} : sparse;
@@ -172,9 +276,11 @@ export function shrinkControl(control) {
 export function expandControl(sparse) {
   const controlType = sparse?._children?.Core?.controlType;
   const pristine = pristineFor(controlType);
-  if (!pristine) return sparse;
+  if (!pristine) return mapAuthoredParts(sparse, new Set(), expandPart);
 
-  const control = expand(sparse, pristine);
+  // Captured before expand(), which consumes the pristine it is handed.
+  const typeParts = typePartNames(pristine);
+  const control = mapAuthoredParts(expand(sparse, pristine), typeParts, expandPart);
 
   const kids = childMapOf(control);
   if (kids && Object.keys(kids).length) {
