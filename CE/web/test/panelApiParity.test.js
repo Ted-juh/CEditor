@@ -20,9 +20,10 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+
+import { readText } from './support/readText.mjs';
 
 import {
   ALL_MEMBERS, ALL_EVENTS, ALL_HANDLER_NAMES, LIFECYCLE_HOOKS,
@@ -38,9 +39,8 @@ import { apiSurfaceNames, scriptApiForTesting } from '../src/CE_Application/scri
 
 const here = dirname(fileURLToPath(import.meta.url));
 const scriptingDir = join(here, '..', '..', 'src', 'Scripting');
-// Windows checkouts can carry CRLF line endings (core.autocrlf); every comparison and byte
-// count in this file is defined over the LF form the repo is authored in, so reads normalize.
-const readText = (path) => readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+// Every comparison and byte count in this file is defined over the LF form the repo is authored in,
+// which is what readText returns — see its note for why a raw read is wrong on Windows.
 const readEngine = (file) => readText(join(scriptingDir, file));
 
 // Names the runtimes bind for their own plumbing. They are not part of the script-facing contract,

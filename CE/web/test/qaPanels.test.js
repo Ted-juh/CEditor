@@ -21,9 +21,10 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { readText } from './support/readText.mjs';
 
 import { render } from 'svelte/server';
 
@@ -183,7 +184,7 @@ for (const sheet of SHEETS.filter((s) => s.commit)) {
   test(`${sheet.file} on disk matches the generator`, () => {
     let committed;
     try {
-      committed = readFileSync(path.join(QA_DIR, sheet.file), 'utf8');
+      committed = readText(path.join(QA_DIR, sheet.file));
     } catch {
       assert.fail(`CE/qa/${sheet.file} is missing — run: node tools/scripts/qa/make-qa-panels.mjs`);
     }
