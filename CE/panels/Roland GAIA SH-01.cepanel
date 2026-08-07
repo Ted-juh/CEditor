@@ -17,7 +17,7 @@
   "locked": false,
   "filePath": null,
   "width": 1600,
-  "height": 1778,
+  "height": 1796,
   "resizable": false,
   "panicShortcut": "Escape",
   "minWidth": 0,
@@ -2717,7 +2717,7 @@
           "x": 10,
           "y": 10,
           "width": 1580,
-          "height": 1710
+          "height": 1728
         },
         "Background": {
           "_children": {
@@ -153981,7 +153981,7 @@
           "x": 546,
           "y": 1232,
           "width": 256,
-          "height": 176
+          "height": 194
         },
         "Background": {
           "_children": {
@@ -154051,8 +154051,60 @@
     {
       "_children": {
         "Core": {
+          "name": "label",
+          "id": "gaia_lbl_357",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 554,
+          "y": 1411,
+          "width": 240,
+          "height": 12
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PARAM n = MFX Parameter n · meaning depends on TYPE",
+          "_children": {
+            "Fill": {
+              "colour": "FF7C8894"
+            },
+            "Font": {
+              "size": 7,
+              "letterSpacing": 0.3,
+              "bold": false
+            },
+            "Multiline": {
+              "overflowMode": "shrink",
+              "maxLines": 1,
+              "fitMode": "shrink",
+              "lineHeight": 1.1
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 1,
+          "paddingBottom": 1
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
           "name": "distortion.type",
-          "id": "gaia_distortion_type_357",
+          "id": "gaia_distortion_type_358",
           "description": "Distortion Type — 10 00 04 00",
           "controlType": "CustomComponent"
         },
@@ -154958,7 +155010,7 @@
       "_children": {
         "Core": {
           "name": "label",
-          "id": "gaia_lbl_358",
+          "id": "gaia_lbl_359",
           "controlType": "Label"
         },
         "Transform": {
@@ -155010,7 +155062,7 @@
       "_children": {
         "Core": {
           "name": "distortion.parameter1",
-          "id": "gaia_distortion_parameter1_359",
+          "id": "gaia_distortion_parameter1_360",
           "description": "MFX Parameter 1 — 10 00 04 01",
           "controlType": "CustomComponent"
         },
@@ -155814,8 +155866,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_360",
+          "name": "distortion.parameter1.caption",
+          "id": "gaia_lbl_361",
           "controlType": "Label"
         },
         "Transform": {
@@ -155867,7 +155919,7 @@
       "_children": {
         "Core": {
           "name": "distortion.parameter2",
-          "id": "gaia_distortion_parameter2_361",
+          "id": "gaia_distortion_parameter2_362",
           "description": "MFX Parameter 2 — 10 00 04 05",
           "controlType": "CustomComponent"
         },
@@ -156671,8 +156723,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_362",
+          "name": "distortion.parameter2.caption",
+          "id": "gaia_lbl_363",
           "controlType": "Label"
         },
         "Transform": {
@@ -156724,7 +156776,7 @@
       "_children": {
         "Core": {
           "name": "distortion.parameter3",
-          "id": "gaia_distortion_parameter3_363",
+          "id": "gaia_distortion_parameter3_364",
           "description": "MFX Parameter 3 — 10 00 04 09",
           "controlType": "CustomComponent"
         },
@@ -157528,8 +157580,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_364",
+          "name": "distortion.parameter3.caption",
+          "id": "gaia_lbl_365",
           "controlType": "Label"
         },
         "Transform": {
@@ -157581,7 +157633,7 @@
       "_children": {
         "Core": {
           "name": "distortion.parameter4",
-          "id": "gaia_distortion_parameter4_365",
+          "id": "gaia_distortion_parameter4_366",
           "description": "MFX Parameter 4 — 10 00 04 0D",
           "controlType": "CustomComponent"
         },
@@ -158385,8 +158437,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_366",
+          "name": "distortion.parameter4.caption",
+          "id": "gaia_lbl_367",
           "controlType": "Label"
         },
         "Transform": {
@@ -158438,14 +158490,14 @@
       "_children": {
         "Core": {
           "name": "box_FLANGER",
-          "id": "gaia_box_367",
+          "id": "gaia_box_368",
           "controlType": "Background"
         },
         "Transform": {
           "x": 812,
           "y": 1232,
           "width": 256,
-          "height": 176
+          "height": 194
         },
         "Background": {
           "_children": {
@@ -158467,7 +158519,7 @@
       "_children": {
         "Core": {
           "name": "tab_FLANGER",
-          "id": "gaia_tab_368",
+          "id": "gaia_tab_369",
           "controlType": "Label"
         },
         "Transform": {
@@ -158515,8 +158567,60 @@
     {
       "_children": {
         "Core": {
+          "name": "label",
+          "id": "gaia_lbl_370",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 820,
+          "y": 1411,
+          "width": 240,
+          "height": 12
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PARAM n = MFX Parameter n · meaning depends on TYPE",
+          "_children": {
+            "Fill": {
+              "colour": "FF7C8894"
+            },
+            "Font": {
+              "size": 7,
+              "letterSpacing": 0.3,
+              "bold": false
+            },
+            "Multiline": {
+              "overflowMode": "shrink",
+              "maxLines": 1,
+              "fitMode": "shrink",
+              "lineHeight": 1.1
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 1,
+          "paddingBottom": 1
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
           "name": "flanger.type",
-          "id": "gaia_flanger_type_369",
+          "id": "gaia_flanger_type_371",
           "description": "Flanger Type — 10 00 06 00",
           "controlType": "CustomComponent"
         },
@@ -159422,7 +159526,7 @@
       "_children": {
         "Core": {
           "name": "label",
-          "id": "gaia_lbl_370",
+          "id": "gaia_lbl_372",
           "controlType": "Label"
         },
         "Transform": {
@@ -159474,7 +159578,7 @@
       "_children": {
         "Core": {
           "name": "flanger.parameter1",
-          "id": "gaia_flanger_parameter1_371",
+          "id": "gaia_flanger_parameter1_373",
           "description": "Flanger Parameter 1 — 10 00 06 01",
           "controlType": "CustomComponent"
         },
@@ -160278,8 +160382,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_372",
+          "name": "flanger.parameter1.caption",
+          "id": "gaia_lbl_374",
           "controlType": "Label"
         },
         "Transform": {
@@ -160331,7 +160435,7 @@
       "_children": {
         "Core": {
           "name": "flanger.parameter2",
-          "id": "gaia_flanger_parameter2_373",
+          "id": "gaia_flanger_parameter2_375",
           "description": "Flanger Parameter 2 — 10 00 06 05",
           "controlType": "CustomComponent"
         },
@@ -161135,8 +161239,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_374",
+          "name": "flanger.parameter2.caption",
+          "id": "gaia_lbl_376",
           "controlType": "Label"
         },
         "Transform": {
@@ -161188,7 +161292,7 @@
       "_children": {
         "Core": {
           "name": "flanger.parameter3",
-          "id": "gaia_flanger_parameter3_375",
+          "id": "gaia_flanger_parameter3_377",
           "description": "Flanger Parameter 3 — 10 00 06 09",
           "controlType": "CustomComponent"
         },
@@ -161992,8 +162096,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_376",
+          "name": "flanger.parameter3.caption",
+          "id": "gaia_lbl_378",
           "controlType": "Label"
         },
         "Transform": {
@@ -162045,7 +162149,7 @@
       "_children": {
         "Core": {
           "name": "flanger.parameter4",
-          "id": "gaia_flanger_parameter4_377",
+          "id": "gaia_flanger_parameter4_379",
           "description": "Flanger Parameter 4 — 10 00 06 0D",
           "controlType": "CustomComponent"
         },
@@ -162849,8 +162953,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_378",
+          "name": "flanger.parameter4.caption",
+          "id": "gaia_lbl_380",
           "controlType": "Label"
         },
         "Transform": {
@@ -162902,14 +163006,14 @@
       "_children": {
         "Core": {
           "name": "box_DELAY",
-          "id": "gaia_box_379",
+          "id": "gaia_box_381",
           "controlType": "Background"
         },
         "Transform": {
           "x": 1078,
           "y": 1232,
           "width": 256,
-          "height": 176
+          "height": 194
         },
         "Background": {
           "_children": {
@@ -162931,7 +163035,7 @@
       "_children": {
         "Core": {
           "name": "tab_DELAY",
-          "id": "gaia_tab_380",
+          "id": "gaia_tab_382",
           "controlType": "Label"
         },
         "Transform": {
@@ -162979,8 +163083,60 @@
     {
       "_children": {
         "Core": {
+          "name": "label",
+          "id": "gaia_lbl_383",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1086,
+          "y": 1411,
+          "width": 240,
+          "height": 12
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PARAM n = MFX Parameter n · meaning depends on TYPE",
+          "_children": {
+            "Fill": {
+              "colour": "FF7C8894"
+            },
+            "Font": {
+              "size": 7,
+              "letterSpacing": 0.3,
+              "bold": false
+            },
+            "Multiline": {
+              "overflowMode": "shrink",
+              "maxLines": 1,
+              "fitMode": "shrink",
+              "lineHeight": 1.1
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 1,
+          "paddingBottom": 1
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
           "name": "delay.type",
-          "id": "gaia_delay_type_381",
+          "id": "gaia_delay_type_384",
           "description": "Delay Type — 10 00 08 00",
           "controlType": "CustomComponent"
         },
@@ -163700,7 +163856,7 @@
       "_children": {
         "Core": {
           "name": "label",
-          "id": "gaia_lbl_382",
+          "id": "gaia_lbl_385",
           "controlType": "Label"
         },
         "Transform": {
@@ -163752,7 +163908,7 @@
       "_children": {
         "Core": {
           "name": "delay.parameter1",
-          "id": "gaia_delay_parameter1_383",
+          "id": "gaia_delay_parameter1_386",
           "description": "Delay Parameter 1 — 10 00 08 01",
           "controlType": "CustomComponent"
         },
@@ -164556,8 +164712,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_384",
+          "name": "delay.parameter1.caption",
+          "id": "gaia_lbl_387",
           "controlType": "Label"
         },
         "Transform": {
@@ -164609,7 +164765,7 @@
       "_children": {
         "Core": {
           "name": "delay.parameter2",
-          "id": "gaia_delay_parameter2_385",
+          "id": "gaia_delay_parameter2_388",
           "description": "Delay Parameter 2 — 10 00 08 05",
           "controlType": "CustomComponent"
         },
@@ -165413,8 +165569,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_386",
+          "name": "delay.parameter2.caption",
+          "id": "gaia_lbl_389",
           "controlType": "Label"
         },
         "Transform": {
@@ -165466,7 +165622,7 @@
       "_children": {
         "Core": {
           "name": "delay.parameter3",
-          "id": "gaia_delay_parameter3_387",
+          "id": "gaia_delay_parameter3_390",
           "description": "Delay Parameter 3 — 10 00 08 09",
           "controlType": "CustomComponent"
         },
@@ -166270,8 +166426,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_388",
+          "name": "delay.parameter3.caption",
+          "id": "gaia_lbl_391",
           "controlType": "Label"
         },
         "Transform": {
@@ -166323,7 +166479,7 @@
       "_children": {
         "Core": {
           "name": "delay.parameter4",
-          "id": "gaia_delay_parameter4_389",
+          "id": "gaia_delay_parameter4_392",
           "description": "Delay Parameter 4 — 10 00 08 0D",
           "controlType": "CustomComponent"
         },
@@ -167127,8 +167283,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_390",
+          "name": "delay.parameter4.caption",
+          "id": "gaia_lbl_393",
           "controlType": "Label"
         },
         "Transform": {
@@ -167180,14 +167336,14 @@
       "_children": {
         "Core": {
           "name": "box_REVERB",
-          "id": "gaia_box_391",
+          "id": "gaia_box_394",
           "controlType": "Background"
         },
         "Transform": {
           "x": 1344,
           "y": 1232,
           "width": 256,
-          "height": 176
+          "height": 194
         },
         "Background": {
           "_children": {
@@ -167209,7 +167365,7 @@
       "_children": {
         "Core": {
           "name": "tab_REVERB",
-          "id": "gaia_tab_392",
+          "id": "gaia_tab_395",
           "controlType": "Label"
         },
         "Transform": {
@@ -167257,8 +167413,60 @@
     {
       "_children": {
         "Core": {
+          "name": "label",
+          "id": "gaia_lbl_396",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1352,
+          "y": 1411,
+          "width": 240,
+          "height": 12
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PARAM n = MFX Parameter n · meaning depends on TYPE",
+          "_children": {
+            "Fill": {
+              "colour": "FF7C8894"
+            },
+            "Font": {
+              "size": 7,
+              "letterSpacing": 0.3,
+              "bold": false
+            },
+            "Multiline": {
+              "overflowMode": "shrink",
+              "maxLines": 1,
+              "fitMode": "shrink",
+              "lineHeight": 1.1
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 1,
+          "paddingBottom": 1
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
           "name": "reverb.type",
-          "id": "gaia_reverb_type_393",
+          "id": "gaia_reverb_type_397",
           "description": "Reverb Type — 10 00 0A 00",
           "controlType": "CustomComponent"
         },
@@ -167795,7 +168003,7 @@
       "_children": {
         "Core": {
           "name": "label",
-          "id": "gaia_lbl_394",
+          "id": "gaia_lbl_398",
           "controlType": "Label"
         },
         "Transform": {
@@ -167847,7 +168055,7 @@
       "_children": {
         "Core": {
           "name": "reverb.parameter1",
-          "id": "gaia_reverb_parameter1_395",
+          "id": "gaia_reverb_parameter1_399",
           "description": "Reverb Parameter 1 — 10 00 0A 01",
           "controlType": "CustomComponent"
         },
@@ -168651,8 +168859,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_396",
+          "name": "reverb.parameter1.caption",
+          "id": "gaia_lbl_400",
           "controlType": "Label"
         },
         "Transform": {
@@ -168704,7 +168912,7 @@
       "_children": {
         "Core": {
           "name": "reverb.parameter2",
-          "id": "gaia_reverb_parameter2_397",
+          "id": "gaia_reverb_parameter2_401",
           "description": "Reverb Parameter 2 — 10 00 0A 05",
           "controlType": "CustomComponent"
         },
@@ -169508,8 +169716,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_398",
+          "name": "reverb.parameter2.caption",
+          "id": "gaia_lbl_402",
           "controlType": "Label"
         },
         "Transform": {
@@ -169561,7 +169769,7 @@
       "_children": {
         "Core": {
           "name": "reverb.parameter3",
-          "id": "gaia_reverb_parameter3_399",
+          "id": "gaia_reverb_parameter3_403",
           "description": "Reverb Parameter 3 — 10 00 0A 09",
           "controlType": "CustomComponent"
         },
@@ -170365,8 +170573,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_400",
+          "name": "reverb.parameter3.caption",
+          "id": "gaia_lbl_404",
           "controlType": "Label"
         },
         "Transform": {
@@ -170418,7 +170626,7 @@
       "_children": {
         "Core": {
           "name": "reverb.parameter4",
-          "id": "gaia_reverb_parameter4_401",
+          "id": "gaia_reverb_parameter4_405",
           "description": "Reverb Parameter 4 — 10 00 0A 0D",
           "controlType": "CustomComponent"
         },
@@ -171222,8 +171430,8 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "id": "gaia_lbl_402",
+          "name": "reverb.parameter4.caption",
+          "id": "gaia_lbl_406",
           "controlType": "Label"
         },
         "Transform": {
@@ -171275,12 +171483,12 @@
       "_children": {
         "Core": {
           "name": "box_ARPEGGIO PATTERN",
-          "id": "gaia_box_403",
+          "id": "gaia_box_407",
           "controlType": "Background"
         },
         "Transform": {
           "x": 16,
-          "y": 1416,
+          "y": 1434,
           "width": 1568,
           "height": 292
         },
@@ -171304,12 +171512,12 @@
       "_children": {
         "Core": {
           "name": "tab_ARPEGGIO PATTERN",
-          "id": "gaia_tab_404",
+          "id": "gaia_tab_408",
           "controlType": "Label"
         },
         "Transform": {
           "x": 18,
-          "y": 1418,
+          "y": 1436,
           "width": 166,
           "height": 20
         },
@@ -171353,12 +171561,12 @@
       "_children": {
         "Core": {
           "name": "arp_pattern_grid",
-          "id": "gaia_arp_pattern_grid_405",
+          "id": "gaia_arp_pattern_grid_409",
           "controlType": "CustomComponent"
         },
         "Transform": {
           "x": 28,
-          "y": 1458,
+          "y": 1476,
           "width": 1544,
           "height": 240
         },
@@ -171752,12 +171960,12 @@
       "_children": {
         "Core": {
           "name": "label",
-          "id": "gaia_lbl_406",
+          "id": "gaia_lbl_410",
           "controlType": "Label"
         },
         "Transform": {
           "x": 26,
-          "y": 1732,
+          "y": 1750,
           "height": 30
         },
         "Background": {
@@ -171806,12 +172014,12 @@
       "_children": {
         "Core": {
           "name": "label",
-          "id": "gaia_lbl_407",
+          "id": "gaia_lbl_411",
           "controlType": "Label"
         },
         "Transform": {
           "x": 150,
-          "y": 1730,
+          "y": 1748,
           "width": 130,
           "height": 34
         },
@@ -171861,12 +172069,12 @@
       "_children": {
         "Core": {
           "name": "label",
-          "id": "gaia_lbl_408",
+          "id": "gaia_lbl_412",
           "controlType": "Label"
         },
         "Transform": {
           "x": 286,
-          "y": 1744,
+          "y": 1762,
           "width": 220,
           "height": 14
         },

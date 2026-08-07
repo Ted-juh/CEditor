@@ -15,6 +15,8 @@
 //
 // Colours are the panel's: LFO in blue, OSC/FILTER/AMP in amber, everything else grey.
 
+import { anyEffectHasNames, genericParameterLabel } from './effect-parameters.mjs';
+
 /** The SH-01's own section colours, read off the instrument. */
 export const TINT = {
   lfo: 'FF3B8FD0',
@@ -210,7 +212,7 @@ export const COMMON_STRIP = {
  * panel rather than inventing labels that would look right and be wrong.
  */
 export const EFFECTS_STRIP = {
-  height: 184,
+  height: 202,
   boxes: [
     {
       title: 'ARPEGGIO', tint: TINT.arp, x: 0, y: 0, w: 520, h: 176,
@@ -231,13 +233,24 @@ export const EFFECTS_STRIP = {
       ['delay', 'DELAY', 1062],
       ['reverb', 'REVERB', 1328],
     ].map(([prefix, title, x]) => ({
-      title, tint: TINT.effects, x, y: 0, w: 256, h: 176,
+      // 194 rather than the arpeggio box's 176: the printed caveat needs a row of its own under the
+      // bottom knobs' captions, and sharing it put two lines of text in the same 16px band.
+      title, tint: TINT.effects, x, y: 0, w: 256, h: 194,
+      // Printed on the panel, not just in the notepad: the knobs are right here and the caveat
+      // belongs where someone is looking at them. Drops away by itself once the names table in
+      // effect-parameters.mjs is filled in.
+      note: anyEffectHasNames() ? null : 'PARAM n = MFX Parameter n · meaning depends on TYPE',
       controls: [
         { p: `${prefix}.type`, kind: 'ledsNarrow', x: 12, y: 30, label: 'TYPE' },
-        { p: `${prefix}.parameter1`, kind: 'knobSmall', x: 122, y: 26, label: 'PARAM 1' },
-        { p: `${prefix}.parameter2`, kind: 'knobSmall', x: 190, y: 26, label: 'PARAM 2' },
-        { p: `${prefix}.parameter3`, kind: 'knobSmall', x: 122, y: 92, label: 'PARAM 3' },
-        { p: `${prefix}.parameter4`, kind: 'knobSmall', x: 190, y: 92, label: 'PARAM 4' },
+        // `captionName` makes the caption addressable, so the generated relabel script can find it.
+        ...[0, 1, 2, 3].map((i) => ({
+          p: `${prefix}.parameter${i + 1}`,
+          kind: 'knobSmall',
+          x: i % 2 === 0 ? 122 : 190,
+          y: i < 2 ? 26 : 92,
+          label: genericParameterLabel(i),
+          captionName: `${prefix}.parameter${i + 1}.caption`,
+        })),
       ],
     })),
   ],

@@ -22,6 +22,7 @@ import { createScript } from '../../../CE/web/src/CE_Application/scripting/scrip
 import { ARP_STRIP, COMMON_STRIP, EFFECTS_STRIP, PANEL_WIDTH, SKIN, TONE_STRIP } from './layout.mjs';
 import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from './components.mjs';
 import { ARP_LANES, arpBridgeScript } from './arp-bridge.mjs';
+import { effectLabelScript } from './effect-parameters.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -57,14 +58,16 @@ function setPath(control, dotted, value) {
   node[keys[keys.length - 1]] = value;
 }
 
-function label(text, { x, y, w, h = 16 }, { size = 9, colour = SKIN.labelDim, bold = false, align = 'center' } = {}) {
+function label(text, { x, y, w, h = 16 }, { size = 9, colour = SKIN.labelDim, bold = false, align = 'center', name = 'label' } = {}) {
   // maxLines follows the text, rather than always allowing two. Reserving a second line in a
   // single-line box pushed the block past the box height and clipped the glyph bottoms — "NAME"
   // rendered as "NAMF", "SHAPE" as "SHAPF". A capital E losing its bottom bar is not a subtle
   // failure; it just does not look like a word.
   const lines = String(text).includes('\n') ? 2 : 1;
   return createControl('Label', {
-    Core: { id: nextId('lbl'), name: 'label' },
+    // Captions are all called 'label' unless a caller needs to find one again — the effect
+    // parameter captions do, because a generated script renames them when the TYPE selector moves.
+    Core: { id: nextId('lbl'), name },
     Transform: { x, y, width: w, height: h },
     Text: {
       content: text,
@@ -123,7 +126,44 @@ function sectionBox(box, originX, originY) {
     ContentLayout: { mode: 'text_only', horizontalAlign: 'center', verticalAlign: 'center', paddingLeft: 8, paddingRight: 8, paddingTop: 1, paddingBottom: 1 },
   });
 
-  return [frame, tab];
+  // An optional printed caveat along the bottom of the box, where whoever is looking at the knobs
+  // will see it. The notepad already says this; the notepad is not where anyone is looking.
+  if (!box.note) return [frame, tab];
+  return [frame, tab, label(box.note, { x: x + 8, y: y + box.h - 15, w: box.w - 16, h: 12 },
+    { size: 7, colour: SKIN.labelDim, align: 'center' })];
+}
+
+/**
+ * What the effect-caption relabel script needs to address, resolved from the built panel.
+ *
+ * BY CONTROL ID, not by name. Every bound control here is named after its parameter —
+ * "distortion.type" — and the script path syntax splits on dots, so `get("distortion.type")` looks
+ * for a control called "distortion" and finds nothing. findControlByName matches ids as well, and
+ * the ids are dot-free, so those are what get baked in.
+ *
+ * Returns only the effects whose four captions AND type selector were all found: a partial block
+ * would produce a script that renames three captions and leaves the fourth reading whatever it was.
+ */
+function effectLabelBlocks(controls, byId) {
+  const byName = new Map();
+  for (const control of controls) {
+    const core = control?._children?.Core;
+    if (core?.name && !byName.has(core.name)) byName.set(core.name, core.id);
+  }
+
+  const blocks = {};
+  for (const effect of ['distortion', 'flanger', 'delay', 'reverb']) {
+    const typeControlId = byName.get(`${effect}.type`);
+    const captionIds = Array.from({ length: 4 }, (unused, i) => byName.get(`${effect}.parameter${i + 1}.caption`));
+    if (!typeControlId || captionIds.some((id) => !id)) continue;
+
+    // Wire value -> printed label, straight from the profile's own choice list, so the script does
+    // no label matching and cannot disagree with the profile about capitalisation.
+    const labelByValue = {};
+    for (const choice of byId.get(`${effect}.type`)?.choices ?? []) labelByValue[choice.value] = choice.label;
+    blocks[effect] = { captionIds, typeControlId, labelByValue };
+  }
+  return blocks;
 }
 
 /**
@@ -399,7 +439,7 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
         controls.push(label(built.caption.text, {
           x: built.caption.x, y: built.caption.y, w: built.caption.w,
           h: built.caption.lines === 2 ? 26 : 16,
-        }, { size: 9, colour: SKIN.label }));
+        }, { size: 9, colour: SKIN.label, name: spec.captionName ?? 'label' }));
       }
     }
   }
@@ -551,6 +591,22 @@ export function buildGaiaPanel() {
     description: 'Writes the drawn arpeggio grid to the GAIA\'s sixteen Patch Arpeggio Pattern blocks.',
     source: arpBridgeScript('arp_pattern_grid', { lanes: ARP_LANES, steps: ARP_STRIP.boxes[0].grid.steps }),
   })];
+
+  // The effect knobs' captions, IF anyone has filled in the names table. Null while it is empty,
+  // so the panel carries no dead script waiting for the owner's manual — see effect-parameters.mjs.
+  const relabel = effectLabelScript(effectLabelBlocks(controls, byId));
+  if (relabel) {
+    panel.scripts.push(createScript({
+      id: 'gaia_effect_parameter_labels',
+      name: 'Effect captions → selected type',
+      language: 'javascript',
+      scope: 'panel',
+      event: 'onPanelLoad',
+      target: '*',
+      description: 'Renames each effect block\'s four parameter captions when its TYPE selector moves.',
+      source: relabel,
+    }));
+  }
   panel.panelGuid = 'a1a7c3e0-5f21-4b8e-9d44-6ca0f2b71e93';
   panel.scriptId = 'roland_gaia_sh01';
   panel.filePath = null;
