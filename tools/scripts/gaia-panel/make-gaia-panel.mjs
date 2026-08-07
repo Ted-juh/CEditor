@@ -18,8 +18,10 @@ import { fileURLToPath } from 'node:url';
 import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
+import { createScript } from '../../../CE/web/src/CE_Application/scripting/scriptModel.js';
 import { ARP_STRIP, COMMON_STRIP, EFFECTS_STRIP, PANEL_WIDTH, SKIN, TONE_STRIP } from './layout.mjs';
 import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from './components.mjs';
+import { ARP_LANES, arpBridgeScript } from './arp-bridge.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -442,12 +444,19 @@ The arpeggiator is a grid, because that is what it is
   controls", which was backwards: they are exactly what a step grid writes.
 
   So the bottom row is the engine's arpeggiator surface — draw a block, drag it, drag its right
-  edge to lengthen it. What is NOT wired: the drawn pattern is not written out to those 528
-  addresses. The arpPattern channel is read-only by design (customComponentArpeggiator.js: "a
-  channel write racing a grid edit has no clean precedence"), and no pattern-to-parameter bridge
-  exists yet. The addresses are here so that bridge has somewhere to land. Until it does, this
-  grid edits a pattern, not a synth. Its note rows are also a 12-row piano-roll view rather than
-  the hardware's sixteen fixed lanes.
+  edge to lengthen it. It reaches the synth: the panel script "Arpeggio pattern -> synth" turns
+  the blocks into the sixteen lanes the GAIA stores and writes them. A block of length 4 is one
+  velocity followed by three ties (128), not four velocities — four velocities is four retriggers,
+  and it sounds like a stutter rather than a held note.
+
+  Two things worth knowing about it. It writes only what CHANGED: 528 messages per pointer move
+  would be seconds of MIDI for dragging one block one step, so the script keeps the last lanes it
+  sent and diffs. And the GAIA has sixteen lanes while the grid does not stop you drawing a
+  seventeenth note — the extra notes are not sent, and the script says which ones in the console
+  rather than dropping them quietly.
+
+  The grid's note rows are still a 12-row piano-roll view rather than the hardware's sixteen fixed
+  lanes; the lanes are assigned by ascending note when the pattern is written.
 
 Not here
   No keyboard: this edits a patch, and the synth has its own keys.`;
@@ -528,6 +537,20 @@ export function buildGaiaPanel() {
   panel.description = 'Roland GAIA SH-01 — all three tones, laid out like the instrument';
   panel.requiredProfiles = [{ role: 'primary', profileId: profile.id, version: '*' }];
   panel.notepad = { activeNoteIndex: 0, notes: [{ name: 'About this panel', content: NOTES }] };
+  // The grid actually reaches the synth now — see arp-bridge.mjs. A panel-scope script rather than
+  // a binding because 528 addresses driven by one array channel is not a shape bindings have, and
+  // because the write has to DIFF: sending all 528 on every pointer move during a drag is seconds
+  // of MIDI for moving one block one step.
+  panel.scripts = [createScript({
+    id: 'gaia_arp_pattern_bridge',
+    name: 'Arpeggio pattern → synth',
+    language: 'javascript',
+    scope: 'panel',
+    event: 'onPanelLoad',
+    target: '*',
+    description: 'Writes the drawn arpeggio grid to the GAIA\'s sixteen Patch Arpeggio Pattern blocks.',
+    source: arpBridgeScript('arp_pattern_grid', { lanes: ARP_LANES, steps: ARP_STRIP.boxes[0].grid.steps }),
+  })];
   panel.panelGuid = 'a1a7c3e0-5f21-4b8e-9d44-6ca0f2b71e93';
   panel.scriptId = 'roland_gaia_sh01';
   panel.filePath = null;
