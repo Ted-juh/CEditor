@@ -7,8 +7,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { readText } from './support/readText.mjs';
+import { assertSameText, readText } from './support/readText.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -135,6 +134,7 @@ test('every control renders', () => {
 });
 
 test('the committed panel matches the generator', () => {
-  assert.equal(readText(PANEL), serializeGaiaPanel(),
-    'CE/panels/Roland GAIA SH-01.cepanel is stale — run: node tools/scripts/gaia-panel/make-gaia-panel.mjs');
+  assertSameText(readText(PANEL), serializeGaiaPanel(),
+    'CE/panels/Roland GAIA SH-01.cepanel is stale — run: node tools/scripts/gaia-panel/make-gaia-panel.mjs',
+    { actual: 'committed', expected: 'the generator' });
 });

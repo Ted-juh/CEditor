@@ -33,8 +33,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { readText } from './support/readText.mjs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { assertSameText, readText } from './support/readText.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -187,9 +187,10 @@ for (const [name, build] of Object.entries(SPECIMENS)) {
       assert.fail(`no baseline for "${name}" — run: UPDATE_GOLDEN=1 npm test, then read the diff before committing it`);
     }
 
-    assert.equal(summary, baseline,
+    assertSameText(summary, baseline,
       `"${name}" paints differently than its baseline.\n`
-      + 'If the change is intended: UPDATE_GOLDEN=1 npm test, then READ the diff in the commit.\n');
+      + 'If the change is intended: UPDATE_GOLDEN=1 npm test, then READ the diff in the commit.',
+      { actual: 'painted now', expected: 'the committed baseline' });
   });
 }
 
