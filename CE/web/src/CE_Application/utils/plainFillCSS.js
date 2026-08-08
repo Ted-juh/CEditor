@@ -168,15 +168,29 @@ function declarations(style) {
   return out.map((d) => d.trim()).filter(Boolean);
 }
 
-/** An image layer reduced to background properties alone, or null if it needs more than those. */
-function absorbableImageStyle(style) {
-  if (!style) return null;
+// A stand-in url for working out WHICH properties a layer needs. Must contain no `;`, `(` or `)`.
+const PROBE_SRC = 'x';
+
+/**
+ * An image layer reduced to background properties alone, or null if it needs more than those.
+ *
+ * THE SHAPE IS DECIDED ON A STUB URL, and the real one is substituted into the single declaration
+ * that carries it. Which properties buildLayerStyle emits depends on fit, align, opacity, blend,
+ * blur, tint and the colour adjustments — never on the picture's bytes. A baked data URL runs to
+ * tens of kilobytes, and `declarations` walks character by character to respect the parentheses
+ * around it, so reading the payload cost 0.2 ms per baked part on every render: 27 ms of a panel
+ * load spent scanning base64 to rediscover four property names.
+ */
+function absorbableImageStyle(fill, layerId, src, width, height) {
+  const probe = imageLayerStyle(fill, layerId, PROBE_SRC, width, height);
+  if (!probe) return null;
   const kept = [];
-  for (const decl of declarations(style)) {
+  for (const decl of declarations(probe)) {
     const split = decl.indexOf(':');
     if (split < 0) return null;
     const prop = decl.slice(0, split).trim();
     const value = decl.slice(split + 1).trim();
+    if (prop === 'background-image') { kept.push(`background-image: url('${src}')`); continue; }
     if (RIDES_ALONG.has(prop)) { kept.push(`${prop}: ${value}`); continue; }
     // buildLayerStyle always writes these two; at their identity values they say nothing and are
     // dropped rather than carried onto an element whose children would inherit the consequences.
@@ -232,7 +246,9 @@ export function whyFillNotPlainCSS(background) {
     // needs no lookup — and every image this actually catches is one, because they are the baked
     // static art of custom components (utils/staticPartBaking.js), 154 of them on the GAIA panel.
     if (!src.startsWith('data:')) return `${layer} source is a stored file`;
-    if (!absorbableImageStyle(imageLayerStyle(fill, layer, src, 1, 1))) return `${layer} needs more than a background`;
+    // 1x1 for the probe: the property SET does not depend on the box, and the one property
+    // that would — a rotated layer's cover scale — is refused along with the transform itself.
+    if (!absorbableImageStyle(fill, layer, src, 1, 1)) return `${layer} needs more than a background`;
     return null;
   }
 
@@ -259,9 +275,7 @@ export function plainFillCSS(background, width, height) {
 
   let paint;
   if (layer === 'image' || layer === 'overlay') {
-    // Already validated by whyFillNotPlainCSS; the real width and height matter here because a
-    // rotated layer's cover scale is computed from them.
-    paint = absorbableImageStyle(imageLayerStyle(fill, layer, String(fill[`${layer}Src`]), width, height));
+    paint = absorbableImageStyle(fill, layer, String(fill[`${layer}Src`]), width, height);
   } else {
     const colour = layer === 'solid' ? argbToCss(fill.colour) : gradientToCSS(fill.gradient);
     paint = colour ? `background: ${colour};` : null;
