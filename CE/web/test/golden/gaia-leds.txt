@@ -28,4 +28,5 @@
 10x fill #D3DCE4
 2x bg #3A1E1C
 1x bg #FF3B30
+3x radius 999px 999px 999px 999px
 3x transform none

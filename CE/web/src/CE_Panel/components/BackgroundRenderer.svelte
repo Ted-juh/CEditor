@@ -5,6 +5,7 @@
   import { buildFillClipPath, buildInsetFillClipPath } from '../../CE_Application/utils/cornerPaths.js';
   import { gradientCoords } from '../../CE_Application/utils/gradientGeometry.js';
   import { buildBorderSegments, getDoubleGap } from '../../CE_Application/utils/borderSegments.js';
+  import { plainBorderCSS } from '../../CE_Application/utils/plainBorderCSS.js';
   import { fileCache, loadFile } from '../../CE_Application/stores/fileCache.js';
   import { resolveStroke } from '../../CE_Application/utils/strokeResolver.js';
 
@@ -176,17 +177,23 @@
 
   let hasBorder = $derived(border?.enabled && width > 0 && height > 0);
 
+  // A uniform solid outline is one CSS declaration on one div. The eleven-element segment path
+  // below exists for the borders that genuinely need it — per-side, dashed, gradient-filled,
+  // chamfered, double — and this short-circuits the overwhelming majority that do not. See
+  // utils/plainBorderCSS.js for why the two draw the identical band of pixels.
+  let cssBorder = $derived(hasBorder ? plainBorderCSS(border, corners, width, height) : null);
+
   // ============ BUILD SEGMENTS ============
 
   let outerSegments = $derived.by(() =>
-    hasBorder
+    hasBorder && !cssBorder
       ? buildBorderSegments(width, height, border, corners).map((seg, idx) => ({ ...seg, _ring: 'outer', _flowId: `outer-${idx}` }))
       : []
   );
 
   // Inner border segments for double (same border, smaller box, translated)
   let innerSegments = $derived.by(() => {
-    if (!hasBorder) return [];
+    if (!hasBorder || cssBorder) return [];
     const gap = getDoubleGap(border);
     if (gap <= 0) return [];
     const innerW = width - 2 * gap;
@@ -602,6 +609,11 @@
     <div class="bg-fill-layer" style={fillLayerStyles[layerId]}></div>
   {/if}
 {/each}
+
+<!-- Border (CSS) — the plain case, one element instead of eleven -->
+{#if cssBorder}
+  <div class="bg-border-css" style={cssBorder}></div>
+{/if}
 
 <!-- Border (SVG) -->
 {#if hasBorder && (outerSegments.length > 0 || innerSegments.length > 0)}

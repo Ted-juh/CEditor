@@ -83,6 +83,14 @@ function paintSummary(rawBody) {
     .map(([, colour, width]) => `stroke ${colour} @ ${width}`);
   const fills = [...body.matchAll(/fill="(?!none)([^"]+)"/g)].map(([, colour]) => `fill ${colour}`);
   const backgrounds = [...body.matchAll(/background(?:-color)?:\s*([^;"]+)/g)].map(([, value]) => `bg ${value.trim()}`);
+
+  // A plain border is CSS now, not eight stroked paths (utils/plainBorderCSS.js). Without these two
+  // lines this gate goes blind to the exact three bugs it was built for — the double-width corner
+  // arcs, the thrown-away alpha, and the Label born inside a white rectangle — because all of them
+  // live in a `border:` declaration the stroke regex above cannot see. That is the same way baking
+  // blinded it once already, which is what inlineBakedSvg exists to undo.
+  const cssBorders = [...body.matchAll(/(?:^|[;"\s])border:\s*([^;"]+)/g)].map(([, value]) => `border ${value.trim()}`);
+  const cssRadii = [...body.matchAll(/border-radius:\s*([^;"]+)/g)].map(([, value]) => `radius ${value.trim()}`);
   const shapes = [...body.matchAll(/<(rect|circle|ellipse|path|polygon|line)\b/g)].map(([, kind]) => `shape ${kind}`);
 
   // Transforms, because geometry is appearance too. The knob pointer pointed the wrong way for
@@ -111,6 +119,8 @@ function paintSummary(rawBody) {
     ...tally(strokes),
     ...tally(fills),
     ...tally(backgrounds),
+    ...tally(cssBorders),
+    ...tally(cssRadii),
     ...tally(transforms),
     ...tally(origins),
   ].join('\n');
