@@ -49,8 +49,64 @@ test('the legacy spelling is read the way the renderer reads it', () => {
   // No `solidEnabled` anywhere: `Background.mode` decides, and `mode: 'none'` means the OVERLAY
   // layer, not "nothing". Guessing here paints an opaque rectangle over a transparent control.
   assert.equal(whyFillNotPlainCSS(bg({ colour: 'FF3A3A3A' }, null, 'solid')), null);
-  assert.equal(whyFillNotPlainCSS(bg({ colour: 'FF3A3A3A' }, null, 'none')), 'overlay fill layer');
-  assert.equal(whyFillNotPlainCSS(bg({ colour: 'FF3A3A3A' }, null, 'gradient')), 'gradient layer with no gradient');
+  // Both of these select a layer that has nothing to paint with, and the renderer emits no
+  // element for either — so neither is "one visible layer" here.
+  assert.equal(whyFillNotPlainCSS(bg({ colour: 'FF3A3A3A' }, null, 'none')), 'nothing painting');
+  assert.equal(whyFillNotPlainCSS(bg({ colour: 'FF3A3A3A' }, null, 'gradient')), 'nothing painting');
+});
+
+test('a layer with no source to paint with is not a visible layer', () => {
+  // BackgroundRenderer gates on fill.imageSrc / fill.overlaySrc / fill.colour / fill.gradient
+  // before it emits anything. Counting an empty layer as the visible one would absorb a broken
+  // url onto a control the live renderer leaves blank.
+  assert.equal(whyFillNotPlainCSS(bg({ solidEnabled: false, imageEnabled: true })), 'nothing painting');
+  assert.equal(whyFillNotPlainCSS(bg({ solidEnabled: false, overlayEnabled: true, overlaySrc: '' })), 'nothing painting');
+  assert.equal(whyFillNotPlainCSS(bg({ solidEnabled: true, colour: '' })), 'nothing painting');
+  // ...and an enabled-but-empty second layer does not make it "2 fill layers" either.
+  assert.equal(whyFillNotPlainCSS(bg({ colour: 'FF3A3A3A', solidEnabled: true, imageEnabled: true })), null);
+});
+
+/* ------------------------------------------------------- the image layer */
+
+// The 154 fill layers left on the GAIA panel after the flat colours were absorbed are all of this
+// shape: the baked static art of a custom component (utils/staticPartBaking.js), a data URL under
+// an image layer at every other default.
+const BAKED = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=';
+const baked = (over = {}) => bg({
+  colour: '00000000', solidEnabled: false, imageEnabled: true, imageSrc: BAKED, imageFit: 'fill', ...over,
+});
+
+test('a baked image layer is background-image and nothing else', () => {
+  const style = css(baked());
+  assert.equal(whyFillNotPlainCSS(baked()), null);
+  assert.equal(decl(style, 'background-size'), 'cover');
+  assert.equal(decl(style, 'background-repeat'), 'no-repeat');
+  // The whole data URL, unbroken. `data:image/svg+xml;base64,...` carries a semicolon inside its
+  // own mime type, so a naive split on ';' truncates every baked image on the panel.
+  assert.ok(String(style).includes(BAKED), 'the data URL did not survive intact');
+  assert.equal(decl(style, 'opacity'), null);
+  assert.equal(decl(style, 'mix-blend-mode'), null);
+});
+
+test('an image that needs more than a background keeps its own element', () => {
+  // Each of these makes buildLayerStyle emit a property that would apply to the control's text,
+  // its parts and its border as well as to the picture.
+  const cases = [
+    ['imageOpacity', 50], ['imageBlur', 4], ['imageRotation', 90], ['imageFlipH', true],
+    ['imageOffsetX', 10], ['imageGrayscale', true], ['imageSaturation', 50], ['imageTint', 'FF0000'],
+  ];
+  for (const [key, value] of cases) {
+    assert.equal(whyFillNotPlainCSS(baked({ [key]: value })), 'image needs more than a background', key);
+    assert.equal(plainFillCSS(baked({ [key]: value }), 100, 60), null, key);
+  }
+  // A blend is caught one check earlier, by the rule that covers every layer kind, and says so.
+  assert.equal(whyFillNotPlainCSS(baked({ imageBlend: 'multiply' })), 'image blend mode "multiply"');
+});
+
+test('a stored image path is refused, because resolving it needs a store', () => {
+  // plainFillCSS is pure. A path resolves through fileCache, and guessing at it would paint the
+  // previous panel's artwork.
+  assert.equal(whyFillNotPlainCSS(baked({ imageSrc: 'assets/panel.png' })), 'image source is a stored file');
 });
 
 /* ------------------------------------------------------------------ refused */
@@ -59,9 +115,9 @@ test('refusals name what one declaration cannot say', () => {
   const gradient = { type: 'linear', angle: 90, stops: [{ color: 'FF0000', position: 0 }] };
   const cases = [
     [bg({ solidEnabled: false }), 'nothing painting'],
-    [bg({ solidEnabled: true, gradientEnabled: true, gradient }), '2 fill layers'],
-    [bg({ solidEnabled: false, imageEnabled: true, imageSrc: 'x.png' }), 'image fill layer'],
-    [bg({ solidEnabled: false, overlayEnabled: true, overlaySrc: 'x.png' }), 'overlay fill layer'],
+    [bg({ colour: 'FF3A3A3A', solidEnabled: true, gradientEnabled: true, gradient }), '2 fill layers'],
+    [bg({ solidEnabled: false, imageEnabled: true, imageSrc: 'x.png' }), 'image source is a stored file'],
+    [bg({ solidEnabled: false, overlayEnabled: true, overlaySrc: 'x.png' }), 'overlay source is a stored file'],
     [solid({ solidBlend: 'multiply' }), 'solid blend mode "multiply"'],
     [solid({ solidClipMode: 'border-inner' }), 'solid clip mode "border-inner"'],
     [solid({ colour: 'nonsense' }), 'unreadable fill colour'],

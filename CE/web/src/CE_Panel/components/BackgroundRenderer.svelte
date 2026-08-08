@@ -1,6 +1,5 @@
 <script>
   import { gradientToCSS } from '../../CE_Application/utils/gradientCSS.js';
-  import { buildLayerStyle } from '../../CE_Application/utils/backgroundCSS.js';
   import { normalizeCorner } from '../../CE_Application/utils/cornerNormalization.js';
   import { buildInsetFillClipPath } from '../../CE_Application/utils/cornerPaths.js';
   import { gradientCoords } from '../../CE_Application/utils/gradientGeometry.js';
@@ -8,7 +7,7 @@
   import { plainBorderCSS } from '../../CE_Application/utils/plainBorderCSS.js';
   import { fileCache, loadFile } from '../../CE_Application/stores/fileCache.js';
   import { resolveStroke } from '../../CE_Application/utils/strokeResolver.js';
-  import { fillShapeCSS } from '../../CE_Application/utils/plainFillCSS.js';
+  import { fillShapeCSS, imageLayerStyle } from '../../CE_Application/utils/plainFillCSS.js';
 
   // `absorbFill` — the caller has already painted this fill as `background` on an element it was
   // going to render anyway (utils/plainFillCSS.js), so drawing it here as well would double it.
@@ -68,32 +67,9 @@
     return `background: #${hex.slice(-6)}; mix-blend-mode: ${blend};`;
   }
 
-  function buildImageFillStyle(layerId, src) {
-    const isImage = layerId === 'image';
-    const pseudoPanel = {
-      width,
-      height,
-      [`bg${isImage ? 'Image' : 'Texture'}Enabled`]: true,
-      [`bg${isImage ? 'Image' : 'Texture'}`]: src,
-      [`bg${isImage ? 'Image' : 'Texture'}Fit`]: fill?.[`${isImage ? 'image' : 'overlay'}Fit`] ?? (isImage ? 'fill' : 'tile'),
-      [`bg${isImage ? 'Image' : 'Texture'}Align`]: fill?.[`${isImage ? 'image' : 'overlay'}Align`] ?? 'center',
-      [`bg${isImage ? 'Image' : 'Texture'}OffsetX`]: fill?.[`${isImage ? 'image' : 'overlay'}OffsetX`] ?? 0,
-      [`bg${isImage ? 'Image' : 'Texture'}OffsetY`]: fill?.[`${isImage ? 'image' : 'overlay'}OffsetY`] ?? 0,
-      [`bg${isImage ? 'Image' : 'Texture'}Blend`]: fill?.[`${isImage ? 'image' : 'overlay'}Blend`] ?? 'normal',
-      [`bg${isImage ? 'Image' : 'Texture'}Opacity`]: fill?.[`${isImage ? 'image' : 'overlay'}Opacity`] ?? 100,
-      [`bg${isImage ? 'Image' : 'Texture'}Blur`]: fill?.[`${isImage ? 'image' : 'overlay'}Blur`] ?? 0,
-      [`bg${isImage ? 'Image' : 'Texture'}Tint`]: fill?.[`${isImage ? 'image' : 'overlay'}Tint`] ?? 'FFFFFF',
-      [`bg${isImage ? 'Image' : 'Texture'}FlipH`]: fill?.[`${isImage ? 'image' : 'overlay'}FlipH`] ?? false,
-      [`bg${isImage ? 'Image' : 'Texture'}FlipV`]: fill?.[`${isImage ? 'image' : 'overlay'}FlipV`] ?? false,
-      [`bg${isImage ? 'Image' : 'Texture'}Rotation`]: fill?.[`${isImage ? 'image' : 'overlay'}Rotation`] ?? 0,
-      [`bg${isImage ? 'Image' : 'Texture'}Grayscale`]: fill?.[`${isImage ? 'image' : 'overlay'}Grayscale`] ?? false,
-      [`bg${isImage ? 'Image' : 'Texture'}Saturation`]: fill?.[`${isImage ? 'image' : 'overlay'}Saturation`] ?? 100,
-      [`bg${isImage ? 'Image' : 'Texture'}Brightness`]: fill?.[`${isImage ? 'image' : 'overlay'}Brightness`] ?? 100,
-      [`bg${isImage ? 'Image' : 'Texture'}Contrast`]: fill?.[`${isImage ? 'image' : 'overlay'}Contrast`] ?? 100,
-      [`bg${isImage ? 'Image' : 'Texture'}TileScale`]: fill?.[`${isImage ? 'image' : 'overlay'}TileScale`] ?? 1.0,
-    };
-    return buildLayerStyle(pseudoPanel, isImage ? 'Image' : 'Texture', src);
-  }
+  // The pseudo-panel translation lives in utils/plainFillCSS.js so the layered path and the
+  // absorbed one build the same style from the same fields — see fillShapeCSS for the same reason.
+  const buildImageFillStyle = (layerId, src) => imageLayerStyle(fill, layerId, src, width, height);
 
   function resolvedFillSource(src) {
     if (!src) return null;
