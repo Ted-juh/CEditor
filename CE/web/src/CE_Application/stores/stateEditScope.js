@@ -1,4 +1,5 @@
-import { writable, derived } from 'svelte/store';
+import { derived } from 'svelte/store';
+import { equalityWritable } from '../utils/equalityStore.js';
 import { panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, keyObjectId } from './panels.js';
 import { getSection } from '../models/componentTypes.js';
 import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
@@ -8,7 +9,11 @@ const DEFAULT_SCOPE = {
   stateName: '',
 };
 
-export const stateEditScope = writable({ ...DEFAULT_SCOPE });
+// The scope is an OBJECT, so a plain writable notifies on every set whether or not anything
+// changed — see utils/equalityStore.js. It is read by `selectedScopedEditingControl` below, which
+// derives from the whole `panels` store, so a pointless notification re-derives the selected
+// control and everything the properties panel builds from it.
+export const stateEditScope = equalityWritable({ ...DEFAULT_SCOPE }, sameScope);
 
 function sameScope(left, right) {
   return (left?.mode ?? 'base') === (right?.mode ?? 'base')
@@ -16,9 +21,7 @@ function sameScope(left, right) {
 }
 
 export function setStateEditScopeBase() {
-  stateEditScope.update((current) => (
-    sameScope(current, DEFAULT_SCOPE) ? current : { ...DEFAULT_SCOPE }
-  ));
+  stateEditScope.set({ ...DEFAULT_SCOPE });
 }
 
 export function setStateEditScopeState(stateName = '') {
@@ -32,9 +35,7 @@ export function setStateEditScopeState(stateName = '') {
     stateName: String(stateName),
   };
 
-  stateEditScope.update((current) => (
-    sameScope(current, nextScope) ? current : nextScope
-  ));
+  stateEditScope.set(nextScope);
 }
 
 export const availableStateEditNames = derived(
