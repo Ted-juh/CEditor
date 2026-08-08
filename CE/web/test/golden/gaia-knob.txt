@@ -20,7 +20,7 @@
 1x fill url(#g12)
 1x fill url(#g13)
 1x fill url(#g14)
-1x bg #F6FAFD
+1x bg #F6FAFDFF
 1x radius 2px 2px 2px 2px
 1x transform rotate(-135deg)
 1x origin 50% 125%

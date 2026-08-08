@@ -6,6 +6,7 @@
   import { containerDropTargetId } from '../stores/containerDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { anchoredPositions, axisIsDerived, fitSettings, fitsAnyAxis, fittedSizeDeep } from '../utils/containerFit.js';
+  import { plainFillCSS } from '../utils/plainFillCSS.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import { bakeStaticPartEntries } from '../utils/staticPartBaking.js';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
@@ -1134,6 +1135,16 @@
   let shadowCSS = $derived(buildShadowCSS(effects));
   let blendCSS  = $derived(buildBlendCSS(effects));
   let filterCSS = $derived(buildFilterCSS(effects));
+
+  // A flat colour or a single gradient paints on `.control-content` itself instead of on a child
+  // div. That element is `inset: 0` — the control's whole box — and an element's background paints
+  // below every one of its children, which is exactly where the fill layer sat as the first of
+  // them. See utils/plainFillCSS.js for what is refused and why.
+  //
+  // The one thing this does move: `.control-content` carries `overflow: hidden`, so a rounded fill
+  // now rounds the clip as well as the paint. Content in the corner of a rounded control used to
+  // be drawn outside its own visible shape; it is cut to it instead.
+  let absorbedFillCSS = $derived(background ? plainFillCSS(background, displayW, displayH) : null);
 
   function textShapeMaskId(kind = 'block') {
     return `text-shape-mask-${svgIdSeed}-${kind}`;
@@ -2802,9 +2813,9 @@
   aria-valuemax={previewInteractive ? previewAriaValueMax : undefined}
   aria-valuetext={previewInteractive ? previewAriaValueText : undefined}
 >
-  <div bind:this={controlContentElement} class="control-content" style="{filterCSS}">
+  <div bind:this={controlContentElement} class="control-content" style="{filterCSS} {absorbedFillCSS ?? ''}">
     {#if background}
-      <BackgroundRenderer {background} width={displayW} height={displayH} />
+      <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} />
     {/if}
 
     {#if isLcdDisplay}

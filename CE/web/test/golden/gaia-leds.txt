@@ -26,7 +26,7 @@
 3x fill #120A0A
 1x fill #171C20
 10x fill #D3DCE4
-2x bg #3A1E1C
-1x bg #FF3B30
+2x bg #3A1E1CFF
+1x bg #FF3B30FF
 3x radius 999px 999px 999px 999px
 3x transform none

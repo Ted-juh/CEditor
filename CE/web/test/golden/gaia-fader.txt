@@ -27,9 +27,9 @@
 1x fill #0C0F11
 16x fill #5C666F
 6x fill #9AA6B0
-1x bg #000000
-1x bg #3D4C57
-1x bg #E7ECF0
+1x bg #00000055
+1x bg #3D4C57FF
+1x bg #E7ECF0FF
 1x border 1px solid #FFFFFF
 2x radius 2px 2px 2px 2px
 1x radius 3px 3px 3px 3px

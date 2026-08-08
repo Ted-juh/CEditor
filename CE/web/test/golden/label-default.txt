@@ -1,2 +1,2 @@
-1x bg #3A3A3A
+1x bg #3A3A3AFF
 1x border 2px solid #FFFFFFFF
