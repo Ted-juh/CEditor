@@ -44,10 +44,16 @@ export function applyParameterAdoption(set, controlType, parameter) {
     const displayMax = Number(parameter?.display?.max);
     const remapped = Number.isFinite(displayMin) && Number.isFinite(displayMax)
       && (displayMin !== min || displayMax !== max);
+    // EVERY adopted field is written on every adoption, including the ones this parameter has no
+    // opinion about. Adoption is a REBIND, not a merge: writing only what the new parameter
+    // provides leaves the old one's readout behind. Bind a knob to patchTempo (unit "BPM") and then
+    // to patchLevel (no unit) and it still read "64 BPM"; bind to any of the GAIA's 142 bipolar
+    // parameters and then to a plain 0..127 one and it still read "+64". displayMin/displayMax were
+    // already cleared for exactly this reason — these two were the same rule, half applied.
     set('Behavior.displayMin', remapped ? displayMin : null);
     set('Behavior.displayMax', remapped ? displayMax : null);
-    if (parameter?.display?.unit) set('Behavior.unit', String(parameter.display.unit));
-    if (remapped && displayMin < 0) set('Behavior.showSign', true);
+    set('Behavior.unit', parameter?.display?.unit ? String(parameter.display.unit) : '');
+    set('Behavior.showSign', remapped && displayMin < 0);
   }
 
   if (parameter?.type === 'choice' && Array.isArray(parameter?.choices)) {

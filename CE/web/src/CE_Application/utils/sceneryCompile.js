@@ -30,6 +30,7 @@
 import { boxElement, svgToDataUrl, whyBackgroundNotDrawable } from './partsToSvg.js';
 import { anchoredPositions, fitSettings, fitsAnyAxis, fittedSizeDeep } from './containerFit.js';
 import { getChildControls, contentOrigin } from './containment.js';
+import { sortControlsForRender } from './controlOrder.js';
 import { numberOr } from './primitives.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 
@@ -157,7 +158,11 @@ function controlElements(control, offsetX, offsetY, defs, keySeed, position = nu
     opacity: transform.opacity,
   }, children.Background?._children, defs, keySeed);
 
-  const kids = getChildControls(control);
+  // IN PAINT ORDER, which for nested children is not document order. CanvasControl renders
+  // sortControlsForRender(getChildControls(control)) — Core.zIndex, then position. The caller sorts
+  // the TOP level and this used to recurse over the raw list, so two overlapping children of a
+  // folded container swapped the moment the layer locked.
+  const kids = sortControlsForRender(getChildControls(control));
   if (kids.length === 0) return self;
 
   // A CONTAINER'S ROTATION AND OPACITY BELONG TO ITS WHOLE SUBTREE, and this is the one place that
@@ -279,18 +284,20 @@ function foldControl(h, control) {
   h = fold(fold(fold(h, border.enabled === true ? 1 : 0), border.thickness ?? 0), border.colour ?? '');
   h = fold(h, bg.Corners?.radius ?? 0);
 
-  const kids = getChildControls(control);
-  if (kids.length) {
-    const c = children.Children ?? {};
-    // Fit and clip are read by the emitter now, so a change to either has to change the key. The
-    // painful version of this bug: switch a section to fit-contents, watch nothing happen, and
-    // have no invalidation to reach for because the key never moved.
+  // The Children section is folded whether or not there ARE children, because the emitter measures
+  // every control the same way: fitsAnyAxis / fittedSizeDeep run before the child list is even
+  // looked at, so an EMPTY fitted container's drawn size comes from minWidth/minHeight and its
+  // padding alone. Guarding this block on `kids.length` meant editing any of those on an empty
+  // section returned the cached image unchanged — the box stayed its old size until something
+  // unrelated on the layer happened to move.
+  const c = children.Children ?? {};
+  if (children.Children) {
     for (const key of [
       'padding', 'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom',
       'fitWidth', 'fitHeight', 'minWidth', 'minHeight', 'clip',
     ]) h = fold(h, c[key] ?? '');
-    for (const child of kids) h = foldControl(h, child);
   }
+  for (const child of sortControlsForRender(getChildControls(control))) h = foldControl(h, child);
   return fold(h, ']');
 }
 

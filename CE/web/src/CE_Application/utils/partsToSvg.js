@@ -87,9 +87,20 @@ function fillIsPlain(fill, mode) {
     if (blend !== 'normal') return `${layer} blend mode "${blend}"`;
   }
   if (fill.gradientEnabled === true) {
-    const type = String(fill.gradient?.type ?? '');
+    const gradient = fill.gradient ?? {};
+    const type = String(gradient.type ?? '');
     if (type !== 'linear' && type !== 'radial') return `gradient type "${type}"`;
     if (num(fill.gradientOpacity, 100) !== 100) return 'gradient opacity';
+    // Two features the CSS renderer has and gradientElement below does not, so accepting them
+    // would bake a different picture rather than the same one:
+    //   `edge` — gradientCSS.buildStops splits every stop into a flat band, so an edged gradient
+    //     is hard colour steps live and a smooth ramp compiled.
+    //   an ELLIPTICAL radial — CSS takes radiusX and radiusY separately; <radialGradient> here
+    //     emits one `r`, so a 30x70 ellipse compiles as a circle of 70.
+    if (num(gradient.edge, 0) !== 0) return 'gradient edge hardness';
+    if (type === 'radial' && num(gradient.radiusX, 50) !== num(gradient.radiusY, 50)) {
+      return 'elliptical radial gradient';
+    }
   }
   return null;
 }

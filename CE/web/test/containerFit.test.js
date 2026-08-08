@@ -252,3 +252,32 @@ test('a section title is just a Label, with everything a Label has', () => {
   assert.ok(tab._children.Text._children.Font, 'a Label brings its own font');
   assert.ok(tab._children.Effects, 'and its own effects');
 });
+
+/* ------------------------------------------------------------------ one origin, everywhere */
+
+test('every consumer of the content origin agrees about per-side padding', () => {
+  // THE BUG THIS PINS. CanvasControl positioned the children-origin div with the SHARED
+  // `Children.padding` alone, while contentOrigin — which controlPanelRect, panelToLocalPoint,
+  // contentExtent, fittedSize and the scenery compiler all go through — prefers paddingLeft and
+  // paddingTop. They agreed only while the two were equal. Nothing could write a per-side value
+  // until the Children editor shipped, and the moment one did, the drawn position of every child
+  // and its modelled position differed by exactly that much: marquee selection, alignment guides
+  // and drag-to-reparent all aiming at a box 20px from what was on screen, and a scenery layer
+  // sliding its contents the instant it locked.
+  //
+  // There is no assertion here about the DOM — the canvas is a component. What this pins is the
+  // single source: fitSettings().padding and contentOrigin() must answer the same question the
+  // same way, because CanvasControl now reads the first and everything else reads the second.
+  const group = section('g', { padding: 4, paddingLeft: 24, paddingTop: 8 });
+  const origin = contentOrigin(group);
+  const pad = fitSettings(group).padding;
+
+  assert.deepEqual(origin, { x: 24, y: 8 }, 'per-side wins over the shared value');
+  assert.equal(pad.left, origin.x, 'the canvas offsets by pad.left; the model reads contentOrigin.x');
+  assert.equal(pad.top, origin.y, 'and the same for the vertical');
+
+  // And an unset side still falls back to the shared number, in both.
+  const partial = section('g2', { padding: 6, paddingLeft: 20 });
+  assert.deepEqual(contentOrigin(partial), { x: 20, y: 6 });
+  assert.equal(fitSettings(partial).padding.top, 6);
+});

@@ -523,13 +523,30 @@
   let childrenSection = $derived(getSection(control, 'Children'));
   let isContainer = $derived(!!childrenSection);
   let childControls = $derived(isContainer ? sortControlsForRender(getChildControls(control)) : []);
-  let childrenPadding = $derived(Number(childrenSection?.padding ?? 0));
+  // WHERE A CHILD'S 0,0 IS. Everything else in the app answers this with containment.contentOrigin
+  // — hit-testing, controlPanelRect, the fit measurement, the scenery compiler — and that function
+  // prefers paddingLeft/paddingTop over the shared `padding`. This component used the shared number
+  // alone, which agreed with it only while the two were the same. The moment a per-side value
+  // differed, the drawn position of every child and its MODELLED position disagreed by that
+  // difference: marquee selection, alignment guides and drag-to-reparent all targeting a box that
+  // is not where the child is on screen, and a scenery layer visibly sliding its contents on lock.
+  // Nothing could write a per-side value before the Children editor existed, which is why it went
+  // unnoticed; the same reason it had to be fixed alongside it.
+  let childrenPad = $derived(fitSettings(control).padding);
   let childrenGap = $derived(Number(childrenSection?.gap ?? 0));
   let childrenClip = $derived(childrenSection?.clip === true);
+  // The container's own corner radius, so a clip follows the curve rather than the border box.
+  // Clamped to half the shorter side exactly as boxElement clamps it, so the two never disagree.
+  let childrenClipRadius = $derived(Math.min(
+    Number(getSection(control, 'Background')?._children?.Corners?.radius ?? 0) || 0,
+    Math.min(displayW, displayH) / 2,
+  ));
   let childrenLayoutMode = $derived(String(childrenSection?.layout ?? 'none'));
   let childFlowPositions = $derived(
     childrenLayoutMode !== 'none' && childControls.length
-      ? computeFlowLayout(childControls, displayW, childrenGap, childrenPadding)
+      // The row width a flow layout wraps at is the CONTENT width, so it comes off the same
+      // per-side padding rather than doubling the shared one.
+      ? computeFlowLayout(childControls, displayW - childrenPad.left - childrenPad.right, childrenGap, 0)
       : null
   );
   // Anchored children, resolved against this container's CONTENT box. A child cannot do this
@@ -538,15 +555,16 @@
   // `layoutPosition` prop flow layout already uses.
   let childAnchoredPositions = $derived.by(() => {
     if (!childControls.length) return null;
-    const pad = fitSettings(control).padding;
-    return anchoredPositions(childControls, displayW - pad.left - pad.right, displayH - pad.top - pad.bottom);
+    return anchoredPositions(childControls,
+      displayW - childrenPad.left - childrenPad.right,
+      displayH - childrenPad.top - childrenPad.bottom);
   });
   // Flow layout wins where both apply: it is an explicit "the container places everything" mode,
   // and an anchor inside it would be a control opting out of the layout it was put in.
   let childPositions = $derived(childFlowPositions ?? childAnchoredPositions);
   let childParentOffset = $derived({
-    x: parentOffset.x + displayX + childrenPadding,
-    y: parentOffset.y + displayY + childrenPadding,
+    x: parentOffset.x + displayX + childrenPad.left,
+    y: parentOffset.y + displayY + childrenPad.top,
   });
   let childParentChainIds = $derived([...parentChainIds, core?.id].filter(Boolean));
   let myGridSection = $derived(getSection(control, 'Grid') ?? null);
@@ -3490,8 +3508,9 @@
     <!-- Nested children: DOM nesting makes their Transform.x/y parent-relative
          for free. The clip/origin layers carry no pointer events; children
          re-enable their own. -->
-    <div class="children-clip" class:clipped={childrenClip} class:children-interactive={mouseChildrenTakePointer}>
-      <div class="children-origin" style="left:{childrenPadding}px; top:{childrenPadding}px;">
+    <div class="children-clip" class:clipped={childrenClip} class:children-interactive={mouseChildrenTakePointer}
+      style={childrenClip && childrenClipRadius ? `border-radius:${childrenClipRadius}px;` : ''}>
+      <div class="children-origin" style="left:{childrenPad.left}px; top:{childrenPad.top}px;">
         {#each childControls as child (child._children?.Core?.id)}
           <CanvasControlNested
             control={child}
@@ -3580,6 +3599,12 @@
   }
   .children-clip.clipped {
     overflow: hidden;
+    /* Rounded with the container it is clipping to. `overflow: hidden` on its own clips to the
+       BORDER BOX, which is square — so a child overhanging a rounded corner stayed visible in the
+       little triangle outside the curve, while the scenery compiler's <clipPath> (which rebuilds
+       the same radius) cut it away. The two disagreed on exactly the pixels a corner radius is
+       for, and a scenery layer locking made the difference appear. The radius is set inline
+       alongside this, from the container's own Corners. */
   }
   .children-origin {
     position: absolute;

@@ -244,3 +244,23 @@ test('every other coercion that yields zero is refused too', () => {
   assert.deepEqual(displayScale({ displayMin: '-3', displayMax: '3' }, 61, 67),
     { min: 61, max: 67, displayMin: -3, displayMax: 3 }, 'a numeric string still counts');
 });
+
+test('adoption is a REBIND: every field it owns is written, not just the ones the parameter has', () => {
+  // displayMin/displayMax were already cleared on re-bind; unit and showSign were not, so they were
+  // whatever the PREVIOUS parameter left behind. Bind a knob to the GAIA's patchTempo and then to
+  // patchLevel and the readout still said "64 BPM"; bind to one of its 142 bipolar parameters and
+  // then to a plain 0..127 one and it still said "+64" on a range that never goes negative.
+  const bipolarWithUnit = parameterAdoptionPatches('Knob', {
+    type: 'integer', range: { min: 61, max: 67 }, default: 64,
+    display: { mode: 'number', min: -3, max: 3, unit: 'BPM' },
+  });
+  assert.equal(bipolarWithUnit['Behavior.unit'], 'BPM');
+  assert.equal(bipolarWithUnit['Behavior.showSign'], true);
+
+  const plain = parameterAdoptionPatches('Knob', {
+    type: 'integer', range: { min: 0, max: 127 }, default: 0, display: { mode: 'number' },
+  });
+  assert.equal(plain['Behavior.unit'], '', 'a parameter with no unit must CLEAR the old one');
+  assert.equal(plain['Behavior.showSign'], false, 'and a unipolar range must clear the plus sign');
+  assert.equal(plain['Behavior.displayMin'], null);
+});

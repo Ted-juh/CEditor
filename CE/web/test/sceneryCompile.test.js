@@ -497,3 +497,47 @@ test('the compiled image is base64, like every other data URL in the app', () =>
   // browser silently fails to decode — see partsToSvg.js.
   assert.match(compileScenery([box('a')], 400, 300).url, /^data:image\/svg\+xml;base64,/);
 });
+
+test('nested children fold in PAINT order, not document order', () => {
+  // CanvasControl renders sortControlsForRender(getChildControls(control)) — Core.zIndex first. The
+  // caller sorts the top level and the compiler used to recurse over the raw list, so two
+  // overlapping children of a folded container swapped the instant the layer locked.
+  const parent = createControl('Container', {
+    Core: { id: 'p', name: 'p', layer: 'Scenery' },
+    Transform: { x: 0, y: 0, width: 200, height: 200 },
+    Children: { padding: 0 },
+  });
+  const back = box('back', { Core: { zIndex: 1 }, Transform: { x: 0, y: 0, width: 50, height: 50 } });
+  const front = box('front', { Core: { zIndex: 5 }, Transform: { x: 1, y: 1, width: 50, height: 50 } });
+  // Stored front-first, which is what makes document order the wrong answer.
+  parent._children.Children._children = { front, back };
+
+  const drawn = rects(svgOf(compileScenery([parent], 400, 400)));
+  const backAt = drawn.findIndex((r) => r.includes('x="0" y="0" width="50"'));
+  const frontAt = drawn.findIndex((r) => r.includes('x="1" y="1" width="50"'));
+  assert.ok(backAt >= 0 && frontAt >= 0, `both children should be drawn: ${JSON.stringify(drawn)}`);
+  assert.ok(backAt < frontAt, 'the lower zIndex must be painted first, so the higher one covers it');
+});
+
+test('an EMPTY fitted container re-compiles when its own size fields change', () => {
+  // The digest folded the Children section only when there were children to walk. But the emitter
+  // measures every control the same way, so an empty fitted container's size comes from minWidth /
+  // minHeight and its padding alone — none of which reached the key. Editing them returned the
+  // cached image and the box kept its old size until something unrelated moved.
+  const make = (minWidth) => {
+    const c = createControl('Container', {
+      Core: { id: 'empty', name: 'empty', layer: 'Scenery' },
+      Transform: { x: 0, y: 0, width: 10, height: 40 },
+      Children: { padding: 0, fitWidth: 'contents', minWidth, minHeight: 40 },
+    });
+    c._children.Background._children.Border.enabled = false;
+    return c;
+  };
+
+  clearSceneryCache();
+  const first = svgOf(compileScenery([make(100)], 400, 400));
+  const second = svgOf(compileScenery([make(200)], 400, 400));
+  assert.notEqual(first, second, 'changing minWidth on an empty fitted section must re-compile');
+  assert.match(first, /width="100"/);
+  assert.match(second, /width="200"/);
+});

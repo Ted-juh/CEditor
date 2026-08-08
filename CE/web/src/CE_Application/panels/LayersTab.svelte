@@ -96,7 +96,30 @@
     setLayerColour(name, colour);
     swatchesFor = null;
   }
+
+  // AN OPEN POPOVER HAS TO BE DISMISSIBLE, and this one was not: it closed only by picking a
+  // colour, clicking the same chip again, or starting a rename. It is positioned `top: 100%` with
+  // a 2px offset and rows are 2px apart, so it begins exactly at the next row's top edge and covers
+  // that row's eye, lock, scenery and colour buttons. Changing your mind and clicking the row below
+  // therefore hit a swatch and committed an undoable colour change to the layer ABOVE it — a wrong
+  // edit produced by a click aimed somewhere else entirely.
+  //
+  // Capture phase, so the dismissal is decided before the click reaches whatever it landed on; the
+  // swatch buttons stop propagation themselves so picking one still works.
+  function onWindowPointerDown(event) {
+    if (swatchesFor == null) return;
+    if (!(event.target instanceof Element) || !event.target.closest('.swatches, .chip')) swatchesFor = null;
+  }
+
+  function onWindowKeyDown(event) {
+    if (event.key === 'Escape' && swatchesFor != null) {
+      swatchesFor = null;
+      event.stopPropagation();
+    }
+  }
 </script>
+
+<svelte:window onpointerdowncapture={onWindowPointerDown} onkeydown={onWindowKeyDown} />
 
 <div class="layers-tab">
   <div class="toolbar">
@@ -223,7 +246,7 @@
         </button>
 
         {#if swatchesFor === layer.name}
-          <span class="swatches">
+          <span class="swatches" role="listbox" tabindex="-1" aria-label="Layer colour">
             {#each LAYER_COLOURS as option}
               <button class="swatch" class:on={colour === option} style="background:{option};"
                       title={option} onclick={() => pickColour(layer.name, option)}></button>
