@@ -29,4 +29,11 @@
 2x bg #3A1E1CFF
 1x bg #FF3B30FF
 3x radius 999px 999px 999px 999px
+3x font-family Arial
+3x font-size 9px
+3x font-style normal
+3x font-weight 600
+3x line-height 1
+3x text-align center
+3x white-space nowrap
 3x transform none

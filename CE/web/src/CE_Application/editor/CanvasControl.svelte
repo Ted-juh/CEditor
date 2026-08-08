@@ -2264,23 +2264,33 @@
     return blockTextLineEntryFor(index)?.fillWidthApplied === true;
   }
 
-  function blockLineDomStyleFor(index) {
-    if (usesCustomTextFlow) return '';
-
+  /**
+   * The declarations a line needs wherever it is drawn: how it sits in its box and how its glyphs
+   * are spaced. Split out from the element's own `display` because a line folded into the span
+   * must NOT bring that with it — the span is an inline-block, and blockifying it would change how
+   * the line box around it is built for a saving of nothing.
+   */
+  function blockLinePaintStyles(index) {
     const styles = [
-      'display:block',
       'white-space:pre',
       `text-align:${blockLineFillWidthApplied(index) ? 'left' : blockLineEffectiveAlign(index)}`,
       `letter-spacing:${blockLineLetterSpacingFor(index)}px`,
       `word-spacing:${blockLineWordSpacingFor(index)}px`,
     ];
-
-    if (blockTextLayout.lineBoxWidth > 0) {
-      styles.push(`width:${blockTextLayout.lineBoxWidth}px`);
-    }
-
-    return styles.join('; ');
+    if (blockTextLayout.lineBoxWidth > 0) styles.push(`width:${blockTextLayout.lineBoxWidth}px`);
+    return styles;
   }
+
+  function blockLineDomStyleFor(index) {
+    if (usesCustomTextFlow) return '';
+    return ['display:block', ...blockLinePaintStyles(index)].join('; ');
+  }
+
+  // A caption is usually one line, and one line needs no box of its own: alignment and spacing say
+  // the same thing on the span that carries the face. Two or more do need their own, because each
+  // can hold its own alignment and its own justification spacing.
+  let foldsSoleLine = $derived(!usesCustomTextFlow && svgTextLines.length === 1);
+  let soleLineStyle = $derived(foldsSoleLine ? `${blockLinePaintStyles(0).join('; ')};` : '');
 
   function blockLineDomText(line) {
     return line === '' ? '\u200B' : line;
@@ -3322,17 +3332,31 @@
     {#if hasText && !usesCustomTextFlow && (!shouldUseNativeTextPreview || !nativePreviewData || showBlockTextVisual)}
       <div class="text-content" style={textStyle}>
         <div class="text-anchor" style={textAnchorStyle}>
-          <span class="text-span" style={textSpanStyle}>
-            <span
-              bind:this={textGlyphElement}
-              class="text-glyphs"
-              class:hidden-glyphs={(shouldUseNativeTextPreview && nativePreviewData) || showBlockTextVisual}
-              style={textGlyphStyle}
-            >
+          <!--
+            The font carrier and the glyph box are ONE element. They were two: an inline-block
+            holding the face, and a block inside it holding the mirror, the small-caps and the
+            text-shadow. Nothing sat between them, they shared a box exactly — no padding, no
+            border, the inner one filling the outer's content width — so the two transforms
+            composed about the same point and can be written in the same order on one element.
+            225 labels on the GAIA panel is 225 elements for a nesting nobody could see.
+
+            A LINE IS FOLDED IN TOO when there is only one of it, which is most captions. The
+            per-line styles are alignment and spacing, and on a single line they are the same
+            declarations one level up.
+          -->
+          <span
+            bind:this={textGlyphElement}
+            class="text-span"
+            class:hidden-glyphs={(shouldUseNativeTextPreview && nativePreviewData) || showBlockTextVisual}
+            style="{textSpanStyle} {textGlyphStyle} {soleLineStyle}"
+          >
+            {#if foldsSoleLine}
+              {blockLineDomText(svgTextLines[0])}
+            {:else}
               {#each svgTextLines as line, index}
                 <span class="text-line" style={blockLineDomStyleFor(index)}>{blockLineDomText(line)}</span>
               {/each}
-            </span>
+            {/if}
           </span>
         </div>
       </div>
@@ -3910,16 +3934,12 @@
     word-break: break-word;
   }
 
-  .text-glyphs {
-    display: block;
-  }
-
   .text-line {
     display: block;
     min-width: 0;
   }
 
-  .text-glyphs.hidden-glyphs {
+  .text-span.hidden-glyphs {
     color: transparent !important;
     -webkit-text-fill-color: transparent;
     -webkit-text-stroke-width: 0 !important;

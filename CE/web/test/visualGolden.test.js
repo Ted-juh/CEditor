@@ -91,6 +91,15 @@ function paintSummary(rawBody) {
   // blinded it once already, which is what inlineBakedSvg exists to undo.
   const cssBorders = [...body.matchAll(/(?:^|[;"\s])border:\s*([^;"]+)/g)].map(([, value]) => `border ${value.trim()}`);
   const cssRadii = [...body.matchAll(/border-radius:\s*([^;"]+)/g)].map(([, value]) => `radius ${value.trim()}`);
+
+  // How the glyphs are set, which is appearance in the same way a stroke width is. The block-text
+  // stack is five nested elements carrying font, mirror, spacing and alignment between them, and
+  // this gate could not see ANY of it — a caption that lost its letter-spacing, changed face, or
+  // stopped being centred read as no change at all. Collapsing that stack is the sort of edit that
+  // needs a witness, and "the summary captured colour and forgot geometry" is already the reason
+  // this file exists.
+  const typography = [...body.matchAll(/(font-family|font-size|font-weight|font-style|letter-spacing|word-spacing|text-align|line-height|white-space|font-variant-caps):\s*([^;"]+)/g)]
+    .map(([, prop, value]) => `${prop} ${value.trim()}`);
   const shapes = [...body.matchAll(/<(rect|circle|ellipse|path|polygon|line)\b/g)].map(([, kind]) => `shape ${kind}`);
 
   // Transforms, because geometry is appearance too. The knob pointer pointed the wrong way for
@@ -121,6 +130,7 @@ function paintSummary(rawBody) {
     ...tally(backgrounds),
     ...tally(cssBorders),
     ...tally(cssRadii),
+    ...tally(typography),
     ...tally(transforms),
     ...tally(origins),
   ].join('\n');
@@ -251,6 +261,29 @@ test('the arpeggio grid draws its steps, rows and blocks', () => {
   assert.match(body, /\bC4\b/, 'no note labels — the piano-roll rows did not materialize');
   assert.match(body, /\b32\b/, 'no step 32 on the ruler — the step count did not reach the grid');
   assert.ok(body.length > 20000, `arpeggio grid rendered thin (${body.length} bytes) — rows or blocks are missing`);
+});
+
+test('a caption that loses its letter-spacing fails the gate', () => {
+  // The block-text stack collapsed from five nested elements to one, and nothing in this summary
+  // could see the difference — every declaration that decides how a caption is SET lived in it.
+  // Proven here rather than asserted, like every other clause above.
+  const control = SPECIMENS['label-default']();
+  const before = paintSummary(renderControl(control));
+
+  control._children.Text._children.Font.letterSpacing = 3;
+  const after = paintSummary(renderControl(control));
+
+  assert.notEqual(after, before, 'changing a caption\'s letter-spacing changed nothing in the paint summary');
+});
+
+test('a caption that loses its alignment fails the gate', () => {
+  const control = SPECIMENS['label-default']();
+  const before = paintSummary(renderControl(control));
+
+  control._children.Text._children.Position.justification = 'left';
+  const after = paintSummary(renderControl(control));
+
+  assert.notEqual(after, before, 'moving a caption\'s justification changed nothing in the paint summary');
 });
 
 test('a specimen that loses its alpha fails the gate', () => {

@@ -1,2 +1,12 @@
 1x bg #3A3A3AFF
 1x border 2px solid #FFFFFFFF
+1x font-family 'Arial'
+1x font-size 12px
+1x font-style normal
+1x font-variant-caps normal
+1x font-weight 400
+1x letter-spacing 0px
+1x line-height 14.399999999999999px
+1x text-align center
+1x white-space pre
+1x word-spacing 0px
