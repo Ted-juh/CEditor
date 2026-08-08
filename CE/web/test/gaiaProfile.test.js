@@ -19,6 +19,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { readText } from './support/readText.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -227,7 +228,7 @@ test('the arpeggio pattern is sixteen lanes of thirty-two steps, at the manual\'
 });
 
 test('the committed profile matches the generator', () => {
-  const committed = readFileSync(path.join(REPO, 'CE/profiles/test/roland-gaia-sh01.ceditor-device.json'), 'utf8');
+  const committed = readText(path.join(REPO, 'CE/profiles/test/roland-gaia-sh01.ceditor-device.json'));
   assert.equal(committed, `${JSON.stringify(profile, null, 2)}\n`,
     'CE/profiles/test/roland-gaia-sh01.ceditor-device.json is stale — run: node tools/scripts/qa/roland-gaia/make-gaia-profile.mjs');
 });

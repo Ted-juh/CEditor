@@ -87,7 +87,10 @@ export function formatChannelValue(channel, raw) {
   const prefix = String(format.prefix ?? '');
   const suffix = String(format.suffix ?? '');
   const unit = String(format.unit ?? '');
-  const text = shown.toLocaleString(undefined, { minimumFractionDigits: precision, maximumFractionDigits: precision });
+  // Fixed point, no grouping — the same reason as formatSliderNumericValue: a channel readout is a
+  // number a person types back, and toLocaleString on a comma-decimal locale made the two directions
+  // disagree by a factor of a thousand.
+  const text = shown.toFixed(precision);
   return `${prefix}${text}${suffix}${unit ? ` ${unit}` : ''}`.trim();
 }
 

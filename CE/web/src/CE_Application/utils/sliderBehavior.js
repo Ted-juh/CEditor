@@ -345,17 +345,23 @@ export function formatSliderNumericValue(behavior = null, value = 0) {
   const prefix = String(behavior?.prefix ?? '');
   const suffix = String(behavior?.suffix ?? '');
   const unit = String(behavior?.unit ?? '');
-  // No trailing-zero strip. There used to be a `.replace(/\.?0+$/, precision === 0 ? '' : '$&')`
-  // here, and it did exactly one thing: eat trailing zeros off INTEGERS. `0` formatted as "", `10`
-  // as "1", `100` as "1". The `'$&'` branch replaced the match with itself, so at any precision
-  // above zero the call was a no-op — the only reachable behaviour was the wrong one. toLocaleString
-  // with maximumFractionDigits already emits no fraction at precision 0, so there is nothing left
-  // for it to have been for.
-  const localized = Number(shown).toLocaleString(undefined, {
-    minimumFractionDigits: precision,
-    maximumFractionDigits: precision,
-  });
-  return `${prefix}${showSign ? '+' : ''}${localized}${suffix}${unit ? ` ${unit}` : ''}`.trim();
+  // A FIXED decimal point and NO grouping, deliberately — see the note on parseSliderInputValue.
+  //
+  // This used to be toLocaleString(undefined, ...), which is locale-dependent, and the parser below
+  // strips commas as thousands separators. On any comma-decimal locale that pair is not an inverse,
+  // it is data corruption: a GAIA MFX parameter at 12768 displayed as "12.768" in nl-NL, and typing
+  // that back set 12.768 — out by a factor of a thousand. Grouping is the same hazard in reverse,
+  // since "1,234" is 1234 in one locale and 1.234 in another.
+  //
+  // A parameter readout is a number you type back, not prose. Every audio plugin makes this trade.
+  //
+  // There is also no trailing-zero strip any more. There used to be a
+  // `.replace(/\.?0+$/, precision === 0 ? '' : '$&')`, and it did exactly one thing: eat trailing
+  // zeros off INTEGERS. `0` formatted as "", `10` as "1", `100` as "1". The `'$&'` branch replaced
+  // the match with itself, so above precision 0 the call was a no-op — the only reachable behaviour
+  // was the wrong one.
+  const text = Number(shown).toFixed(precision);
+  return `${prefix}${showSign ? '+' : ''}${text}${suffix}${unit ? ` ${unit}` : ''}`.trim();
 }
 
 export function formatSliderReadout(behavior = null, session = null) {
@@ -399,7 +405,11 @@ export function parseSliderInputValue(behavior = null, input = '') {
   if (prefix && normalized.startsWith(prefix)) normalized = normalized.slice(prefix.length).trim();
   if (suffix && normalized.endsWith(suffix)) normalized = normalized.slice(0, normalized.length - suffix.length).trim();
   if (unit && normalized.endsWith(unit)) normalized = normalized.slice(0, normalized.length - unit.length).trim();
-  normalized = normalized.replace(/,/g, '');
+  // A comma is accepted as a DECIMAL separator, not stripped as a thousands separator. Stripping
+  // was the other half of the locale bug above: it turned "64,5" into 645. Nothing formats with
+  // grouping any more, so a comma in the input can only have come from a person typing their own
+  // decimal separator, and reading it as one is what they meant.
+  normalized = normalized.replace(',', '.');
 
   const parsed = Number(normalized);
   if (!Number.isFinite(parsed)) return null;

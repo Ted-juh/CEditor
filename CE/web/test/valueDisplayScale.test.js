@@ -151,6 +151,29 @@ test('a custom component channel reads the printed value too', () => {
   assert.equal(formatChannelValue(channel({ format: { displayMin: -3, displayMax: 3 } }), 61), '-3');
 });
 
+test('formatting is locale-independent, in both directions', () => {
+  // Found by running this suite on a Dutch Windows machine, where the readout said "64,0" and this
+  // file expected "64.0". The formatter used toLocaleString and the parser stripped commas as
+  // THOUSANDS separators, so on any comma-decimal locale the pair was not an inverse — it was data
+  // corruption. A GAIA MFX parameter at 12768 displayed as "12.768" and typed back as 12.768, out by
+  // a factor of a thousand. Grouping is the same hazard in reverse: "1,234" is 1234 in one locale
+  // and 1.234 in another.
+  //
+  // So: a fixed decimal point, no grouping, and a comma read as a decimal separator on the way in.
+  const wide = { ...slider(), min: 0, max: 60000, step: 1, valueType: 'int' };
+  assert.equal(formatSliderNumericValue(wide, 12768), '12768', 'no grouping separator, ever');
+  assert.equal(parseSliderInputValue(wide, '12768'), 12768);
+
+  const fine = { ...slider(), min: 0, max: 10, step: 0.1, valueType: 'float', precision: 1 };
+  assert.equal(formatSliderNumericValue(fine, 6.5), '6.5', 'a full stop, whatever the locale');
+  assert.equal(parseSliderInputValue(fine, '6.5'), 6.5);
+  assert.equal(parseSliderInputValue(fine, '6,5'), 6.5,
+    'someone typing their own decimal comma means 6.5, not 65');
+
+  assert.equal(formatChannelValue(channel({ type: 'float', min: 0, max: 60000, format: { precision: 1 } }), 12768),
+    '12768.0');
+});
+
 test('a channel with no display range still gets its own formatting', () => {
   assert.equal(formatChannelValue(channel({ format: { unit: 'ms', precision: 1 } }), 64), '64.0 ms');
 });

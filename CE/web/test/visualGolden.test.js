@@ -34,6 +34,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readText } from './support/readText.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -181,7 +182,7 @@ for (const [name, build] of Object.entries(SPECIMENS)) {
 
     let baseline;
     try {
-      baseline = readFileSync(file, 'utf8').trimEnd();
+      baseline = readText(file).trimEnd();
     } catch {
       assert.fail(`no baseline for "${name}" — run: UPDATE_GOLDEN=1 npm test, then read the diff before committing it`);
     }
