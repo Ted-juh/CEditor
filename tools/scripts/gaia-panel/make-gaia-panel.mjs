@@ -626,7 +626,12 @@ function main() {
 
   if (check) {
     let current = null;
-    try { current = readFileSync(out, 'utf8'); } catch { /* missing counts as stale */ }
+    // Line endings folded, for the same reason the test that guards this file folds them: the
+    // generator writes LF and git checks the committed panel out as CRLF on Windows, so a bare
+    // comparison reports a stale panel on a clone where nothing is stale. Without this the gate and
+    // its own test disagreed about the same file — the test passing while the command it tells you
+    // to run said the panel needed regenerating.
+    try { current = readFileSync(out, 'utf8').replace(/\r\n/g, '\n'); } catch { /* missing counts as stale */ }
     if (current === json) { console.log('GAIA panel is up to date.'); return; }
     console.error(`Stale: ${path.relative(REPO, out)} — run: node tools/scripts/gaia-panel/make-gaia-panel.mjs`);
     process.exitCode = 1;

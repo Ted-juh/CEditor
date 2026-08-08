@@ -65,7 +65,7 @@ import {
 } from './panelApi.js';
 import { extensionSource } from './extensionModules.js';
 import { panelPreviewSessions, previewModeEnabled, updatePanelPreviewSession } from '../stores/interactionPreview.js';
-import { isLiveValuePath, hasLiveValue, liveValuePatch, readLiveValue } from './liveValue.js';
+import { isLiveValuePath, hasLiveValue, liveValuePatch, readLiveValue, readsLiveValue } from './liveValue.js';
 import {
   setPreviewRehearsalEnabled, isRehearsing, keepAllInRehearsal, keepPropertyInRehearsal,
 } from '../stores/previewRehearsal.js';
@@ -210,8 +210,27 @@ function walkCaseInsensitive(node, segments) {
 function channelizePath(control, path) {
   if (!path) return path;
   const node = valueAtPath(control, path);
-  if (node && typeof node === 'object' && !Array.isArray(node) && 'currentValue' in node) {
+  // A channel is recognised by its `_type`, not by already holding a value. Testing for
+  // `'currentValue' in node` meant a channel NOBODY HAS WRITTEN YET was not channelized — the key
+  // only appears once something sets it — so a script reading a fresh channel got the channel
+  // OBJECT back instead of its value. The GAIA's arpPattern is exactly that: populated by the
+  // session on the first grid edit, absent from the document until then.
+  if (node && typeof node === 'object' && !Array.isArray(node)
+    && (node._type === 'ValueChannel' || 'currentValue' in node)) {
     return `${path}.currentValue`;
+  }
+
+  // `value` is a SHORTHAND, and it wins over any real key — which on a custom component pointed it
+  // at `Value.value`, a section that type does not have. So get("distortion.type") and
+  // get("distortion.type.value") both resolved to nothing, silently, on a control whose value is
+  // sitting in ValueChannels one step away. Every LED column and every custom knob on the GAIA
+  // panel reads that way, so a script asking one of them what it was set to got undefined.
+  //
+  // Only when the shorthand landed nowhere: a control that genuinely has the section keeps it.
+  if (node === undefined && path === SHORTHANDS.value) {
+    const channels = control?._children?.ValueChannels?._children;
+    const main = channels && (channels.value ? 'value' : (channels.mainValue ? 'mainValue' : null));
+    if (main) return `ValueChannels._children.${main}.currentValue`;
   }
   return path;
 }
@@ -556,8 +575,8 @@ function getValue(path, form = '') {
     raw = host.readValue(control, modelPath);
   } else {
     // Same order the player's host reads in: the session first, the document behind it.
-    raw = isLiveValuePath(modelPath) && hasLiveValue(control)
-      ? readLiveValue(get(panelPreviewSessions), control)
+    raw = readsLiveValue(control, modelPath)
+      ? readLiveValue(get(panelPreviewSessions), control, modelPath)
       : undefined;
     if (raw === undefined) raw = valueAtPath(control, modelPath);
   }

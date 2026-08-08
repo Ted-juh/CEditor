@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 import { ARP_LANES, arpBridgeScript, blocksToLanes } from '../../../tools/scripts/gaia-panel/arp-bridge.mjs';
 import { buildGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
+import { controlNamed, drawPattern, loadScript, mountPanel } from './support/gaiaScriptHarness.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const shape = { lanes: ARP_LANES, steps: 32 };
@@ -174,7 +175,7 @@ function runBridge(gridName = 'arp_pattern_grid') {
   let watcher = null;
 
   const scope = {
-    get: (path) => (path === `${gridName}.designer.arpeggiator.blocks` ? blocks : undefined),
+    get: (path) => (path === `${gridName}.arpPattern` ? blocks : undefined),
     watch: (path, fn) => { watcher = { path, fn }; },
     after: (ms, fn) => { scheduled = { ms, fn }; },
     log: (message) => logs.push(String(message)),
@@ -260,4 +261,86 @@ test('the seventeenth note is reported to the console', () => {
   const blocks = Array.from({ length: 17 }, (unused, i) => at(48 + i, i));
   const { logs } = bridge.edit(blocks);
   assert.ok(logs.some((line) => line.includes('64')), `no note was named: ${logs.join(' | ')}`);
+});
+
+/* ------------------------------------------------------------------ against the REAL runtime */
+//
+// Everything above drives the script with fake host verbs, which is the right way to test the
+// transform — and is exactly why the bridge shipped dead. The stubs answered whatever the test
+// asked for, so a watch on a path the runtime never writes looked identical to a watch that works.
+// These four go through panelRuntime itself, with the panel in the store and the pattern moved the
+// way resolveCustomInteractionPatch moves it.
+
+test('the shipped script reaches the synth when a block is DRAWN, not just when the document changes', () => {
+  const built = buildGaiaPanel();
+  mountPanel(built);
+  const grid = controlNamed(built, 'arp_pattern_grid');
+  const script = (built.scripts ?? []).find((s) => s.id === 'gaia_arp_pattern_bridge' || /arp/i.test(s.name ?? ''));
+  assert.ok(script, 'the panel should carry the bridge');
+
+  const run = loadScript(script.source);
+  run.onPanelLoad();
+
+  drawPattern(grid, [{ id: 'b1', note: 60, step: 0, length: 4, velocity: 100 }]);
+  run.settle();
+
+  assert.equal(run.writes.length, 528, 'the first pattern writes every address once');
+  assert.deepEqual(run.writes[0], ['arpPattern.note1.originalNote', 60]);
+  assert.deepEqual(run.writes[1], ['arpPattern.note1.step1Data', 100], 'the velocity');
+  assert.deepEqual(run.writes[2], ['arpPattern.note1.step2Data', 128], 'and then ties, not retriggers');
+});
+
+test('moving one block sends a handful of addresses, not all 528', () => {
+  const built = buildGaiaPanel();
+  mountPanel(built);
+  const grid = controlNamed(built, 'arp_pattern_grid');
+  const run = loadScript((built.scripts ?? []).find((s) => s.id === 'gaia_arp_pattern_bridge').source);
+  run.onPanelLoad();
+
+  drawPattern(grid, [{ id: 'b1', note: 60, step: 0, length: 4, velocity: 100 }]);
+  run.settle();
+  run.writes.length = 0;
+
+  drawPattern(grid, [{ id: 'b1', note: 60, step: 1, length: 4, velocity: 100 }]);
+  run.settle();
+
+  assert.ok(run.writes.length > 0, 'the move must reach the synth at all');
+  assert.ok(run.writes.length <= 8, `a one-step move wrote ${run.writes.length} addresses`);
+  assert.deepEqual(run.writes, [
+    ['arpPattern.note1.step1Data', 0],       // the step it left
+    ['arpPattern.note1.step2Data', 100],     // where the velocity is now
+    ['arpPattern.note1.step5Data', 128],     // and the tie that follows it
+  ]);
+});
+
+test('redrawing the identical pattern writes nothing', () => {
+  const built = buildGaiaPanel();
+  mountPanel(built);
+  const grid = controlNamed(built, 'arp_pattern_grid');
+  const run = loadScript((built.scripts ?? []).find((s) => s.id === 'gaia_arp_pattern_bridge').source);
+  run.onPanelLoad();
+
+  const blocks = [{ id: 'b1', note: 60, step: 2, length: 3, velocity: 90 }];
+  drawPattern(grid, blocks);
+  run.settle();
+  run.writes.length = 0;
+
+  drawPattern(grid, blocks.map((b) => ({ ...b })));
+  run.settle();
+  assert.equal(run.writes.length, 0, 'a drag that ends where it started must not re-send the pattern');
+});
+
+test('a seventeenth note is reported through the real runtime, not silently dropped', () => {
+  const built = buildGaiaPanel();
+  mountPanel(built);
+  const grid = controlNamed(built, 'arp_pattern_grid');
+  const run = loadScript((built.scripts ?? []).find((s) => s.id === 'gaia_arp_pattern_bridge').source);
+  run.onPanelLoad();
+
+  drawPattern(grid, Array.from({ length: 17 }, (unused, i) => (
+    { id: `b${i}`, note: 50 + i, step: 0, length: 1, velocity: 100 })));
+  run.settle();
+
+  assert.ok(run.logs.some((line) => /past the GAIA's 16 lanes/.test(line)),
+    `expected a dropped-note report, got: ${JSON.stringify(run.logs)}`);
 });

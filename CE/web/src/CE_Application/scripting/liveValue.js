@@ -25,6 +25,7 @@
 // nothing is what this module is fixing, so it must not introduce a second one.
 
 import { resolveInteractionContext } from '../utils/interactionRuntime.js';
+import { constrainCustomValues } from '../utils/customComponentInteraction.js';
 
 /**
  * Is this resolved model path a control's live value?
@@ -49,6 +50,43 @@ export function hasLiveValue(control) {
   return control?._children?.Behavior != null;
 }
 
+/**
+ * The value channel a model path addresses on a custom component, or null.
+ *
+ * A CustomComponent has no `Behavior`; it keeps its values in `ValueChannels`, one per named
+ * channel, and `channelizePath` already rewrites a path landing on one to end in `.currentValue`.
+ * So `ValueChannels._children.arpPattern.currentValue` -> `arpPattern`.
+ */
+export function customChannelOfPath(control, modelPath) {
+  const channels = control?._children?.ValueChannels?._children;
+  if (!channels) return null;
+
+  // BOTH spellings, because the runtime produces both. walkCaseInsensitive joins only the key names
+  // it walked ("ValueChannels.arpPattern.currentValue") while a path written out by hand or by the
+  // shorthand fallback carries the `_children` hop. valueAtPath accepts either, so this has to as
+  // well — matching only one of them is a bug that shows up on exactly half the channels.
+  const parts = String(modelPath ?? '').split('.').filter((seg) => seg !== '_children');
+  if (parts.length !== 3) return null;
+  const [section, name, leaf] = parts;
+  if (section !== 'ValueChannels' || leaf !== 'currentValue') return null;
+  return name in channels ? name : null;
+}
+
+/**
+ * Does a READ of this path have somewhere live to read from?
+ *
+ * Deliberately separate from hasLiveValue, which the WRITE paths use. A custom component's channel
+ * is live to read — the session holds what the screen is showing — but writing one is not the same
+ * operation as writing a native control's value: liveValuePatch sets `valueOverride`, a single
+ * unnamed value, which for a named channel would move the wrong thing. Widening the shared
+ * predicate would have quietly rerouted every set() on a custom component into that. So reads widen
+ * and writes do not, and the write side keeps going through the document exactly as it did.
+ */
+export function readsLiveValue(control, modelPath) {
+  if (isLiveValuePath(modelPath) && hasLiveValue(control)) return true;
+  return customChannelOfPath(control, modelPath) != null;
+}
+
 /** The session patch that moves a control to `value`. Both handles, as the player has always written. */
 export function liveValuePatch(value) {
   return {
@@ -67,8 +105,21 @@ export function liveValuePatch(value) {
  * control set to". Both runtimes used to answer `undefined` for a control nobody had touched yet,
  * because they read the document at a path that holds nothing.
  */
-export function readLiveValue(sessions, control) {
+export function readLiveValue(sessions, control, modelPath = null) {
   const session = sessions?.[String(control?._children?.Core?.id ?? '')];
+
+  // A named channel on a custom component answers for ITSELF, not for the component's main value.
+  // The resolution order is interactionRuntime's own — the session's customValues, then the
+  // channel's currentValue, then its default — so a script and the screen cannot disagree about
+  // what the channel holds. constrainCustomValues is what turns raw session state into that,
+  // including the arpeggiator's derived channels.
+  const channelName = customChannelOfPath(control, modelPath);
+  if (channelName) {
+    const declared = control._children.ValueChannels._children[channelName];
+    const values = constrainCustomValues(control, session?.customValues ?? {});
+    return values?.[channelName] ?? declared?.currentValue ?? declared?.defaultValue;
+  }
+
   if (session?.valueOverrideEnabled) return session.valueOverride;
   if (session && 'currentValueOverride' in session && session.currentValueOverrideEnabled) {
     return session.currentValueOverride;

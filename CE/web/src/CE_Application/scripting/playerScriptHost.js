@@ -14,7 +14,7 @@ import { panelPreviewSessions, updatePanelPreviewSession } from '../stores/inter
 import { valueAtPath } from '../stores/controlTreeUtils.js';
 import { collectPanelExportScripts } from './scriptPanelExport.js';
 import { isSourceScript } from './scriptModel.js';
-import { isLiveValuePath, hasLiveValue, liveValuePatch, readLiveValue } from './liveValue.js';
+import { isLiveValuePath, hasLiveValue, liveValuePatch, readLiveValue, readsLiveValue } from './liveValue.js';
 
 function controlId(control) {
   return String(control?._children?.Core?.id ?? '');
@@ -56,8 +56,8 @@ export function createPlayerHost(panel) {
     scripts: collectPanelExportScripts(panel).filter(isSourceScript),
 
     readValue(control, modelPath) {
-      if (isLiveValuePath(modelPath) && hasLiveValue(control)) {
-        const live = readLiveValue(get(panelPreviewSessions), control);
+      if (readsLiveValue(control, modelPath)) {
+        const live = readLiveValue(get(panelPreviewSessions), control, modelPath);
         if (live !== undefined) return live;
       }
       return valueAtPath(control, modelPath);

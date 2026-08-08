@@ -6,6 +6,19 @@
 // 528 addresses, all of them in the profile — were never written, so the grid edited a pattern and
 // not a synth. This is the bridge that was said to have "somewhere to land"; it lands here.
 //
+// WHERE IT READS THE PATTERN FROM, which is the part that was wrong for a whole release. The first
+// version watched `<grid>.designer.arpeggiator.blocks`. That path exists — the component design
+// surface writes it — but a user DRAWING on the grid does not go anywhere near it: an interactive
+// edit lands in the preview session as `customValues.__arpeggiator`, and `syncCustomArpeggiatorValues`
+// republishes it through the `arpPattern` value channel. The document's Designer blocks never move,
+// so the watcher never fired, not one address was written, and nothing said so.
+//
+// It now watches `<grid>.arpPattern` — the channel a real grid edit actually publishes. That needed
+// the script runtime to be able to read a custom component's channel at all (scripting/liveValue.js);
+// before that, every read of one fell through to the document. The lesson worth keeping: a test that
+// hands the script a fake `get` proves the script asks for the right thing, not that the right thing
+// answers. gaiaArpBridge.test.js now drives the real runtime for exactly that reason.
+//
 // ONE SOURCE, TWO PLACES. `blocksToLanes` is a plain function with no imports and no closure. It is
 // tested in Node like any other pure function, and its SOURCE TEXT is inlined verbatim into the
 // panel's script by `arpBridgeScript()` below. Writing the transform twice — once testable, once
@@ -98,6 +111,25 @@ export function blocksToLanes(blocks, shape) {
  * DEBOUNCED, because a drag fires `watch` on every pointer move. The delay is short enough to feel
  * immediate and long enough that a drag sends once at the end rather than forty times through it.
  */
+/**
+ * blocksToLanes as source text, with its line endings normalized.
+ *
+ * Function.prototype.toString() hands back the function's RAW SOURCE SLICE as it sits on disk. On a
+ * Windows checkout that is CRLF — and this string is then embedded in a panel script and
+ * JSON.stringify'd, which escapes each "\r\n" as the four-character `\\r\\n` instead of the
+ * two-character `\\n`. So the generated .cepanel came out 104 characters longer on Windows than on
+ * Linux, from the same source.
+ *
+ * That one is worse than an ordinary line-ending mismatch, and worth being precise about. The CR
+ * ends up ESCAPED INSIDE A JSON STRING, so there is no raw CR byte left in the file: .gitattributes
+ * cannot normalize it, reading the file through readText cannot fold it, and the freshness gate's
+ * "identical apart from line endings" hint never fires. It reads as a genuinely stale panel — and
+ * the obvious response, regenerating and committing, writes the corruption in for everybody.
+ *
+ * So the fold happens HERE, at the only point where the checkout can leak into generated output.
+ */
+const inlinedTransform = () => blocksToLanes.toString().replace(/\r\n/g, '\n');
+
 export function arpBridgeScript(gridControlName, { debounceMs = 120, lanes = 16, steps = 32 } = {}) {
   return `// Arpeggio pattern -> the GAIA's 528 Patch Arpeggio Pattern addresses.
 //
@@ -105,7 +137,7 @@ export function arpBridgeScript(gridControlName, { debounceMs = 120, lanes = 16,
 // blocksToLanes, inlined verbatim rather than rewritten, so the version under test and the version
 // that runs are the same text.
 
-${blocksToLanes.toString()}
+${inlinedTransform()}
 
 var LANES = ${lanes};
 var STEPS = ${steps};
@@ -119,8 +151,8 @@ function laneParam(lane, key) {
 
 function pushPattern() {
   pending = false;
-  var blocks = get("${gridControlName}.designer.arpeggiator.blocks");
-  if (!blocks) return;
+  var blocks = get("${gridControlName}.arpPattern");
+  if (!blocks || !blocks.length) return;
 
   var built = blocksToLanes(blocks, { lanes: LANES, steps: STEPS });
   var writes = 0;
@@ -153,7 +185,7 @@ function pushPattern() {
 function onPanelLoad() {
   // A drag fires this on every pointer move, so coalesce: one send at the end of a gesture rather
   // than forty through it.
-  watch("${gridControlName}.designer.arpeggiator.blocks", function () {
+  watch("${gridControlName}.arpPattern", function () {
     if (pending) return;
     pending = true;
     after(${debounceMs}, pushPattern);

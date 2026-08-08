@@ -24,6 +24,8 @@ import {
   effectParameterLabel, genericParameterLabel,
 } from '../../../tools/scripts/gaia-panel/effect-parameters.mjs';
 import { buildGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
+import { controlNamed, idOf, loadScript, mountPanel, moveChannel } from './support/gaiaScriptHarness.mjs';
+import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -196,4 +198,59 @@ test('the effect boxes print the caveat, and the captions are addressable', () =
   const caveats = panel.controls.filter((c) =>
     String(c._children?.Text?.content ?? '').includes('meaning depends on TYPE'));
   assert.equal(caveats.length, 4, 'each effect box should carry the caveat');
+});
+
+/* ------------------------------------------------------------------ against the REAL runtime */
+//
+// The tests above run the script with fake verbs, and that is why it shipped broken: the stub's
+// `get` answered from a map keyed by control id, so a script reading a path the real runtime
+// resolves to nothing looked exactly like one that works. `${effect}.type` is a CustomComponent —
+// no `Value` section at all — and `value` is a shorthand that pointed straight at it.
+//
+// These drive panelRuntime itself, against the real generated panel.
+
+test('the script relabels the REAL panel when a type is selected', () => {
+  const built = buildGaiaPanel();
+  const view = mountPanel(built);
+  const typeControl = controlNamed(built, 'distortion.type');
+  const captionIds = [1, 2, 3, 4].map((i) => idOf(controlNamed(built, `distortion.parameter${i}.caption`)));
+
+  const source = effectLabelScript({
+    distortion: { captionIds, typeControlId: idOf(typeControl), labelByValue: { 0: 'OFF', 1: 'DIST', 2: 'FUZZ' } },
+  }, filled);
+  assert.ok(source, 'a filled table should emit a script');
+
+  const captions = () => captionIds.map((id) =>
+    view.controls().find((c) => c._children?.Core?.id === id)?._children?.Text?.content);
+
+  // A panel opens on a saved patch, so the type is already selected before the script loads.
+  moveChannel(idOf(typeControl), { value: 1 });
+  const run = loadScript(source);
+  run.onPanelLoad();
+  assert.deepEqual(captions(), ['DRIVE', 'TONE', 'PARAM 3', 'LEVEL'],
+    'onPanelLoad must name the knobs for the type already selected');
+
+  moveChannel(idOf(typeControl), { value: 2 });
+  run.settle();
+  assert.deepEqual(captions(), ['PARAM 1', 'PARAM 2', 'PARAM 3', 'PARAM 4'],
+    'FUZZ has no names, so its knobs go generic rather than keeping DIST\'s');
+
+  moveChannel(idOf(typeControl), { value: 1 });
+  run.settle();
+  assert.deepEqual(captions(), ['DRIVE', 'TONE', 'PARAM 3', 'LEVEL'], 'and back again');
+});
+
+test('the type selector is READABLE at all — the read that used to answer undefined', () => {
+  // The narrowest statement of the bug, so a regression names itself rather than showing up as
+  // captions that are merely wrong.
+  const built = buildGaiaPanel();
+  mountPanel(built);
+  const typeControl = controlNamed(built, 'distortion.type');
+  const api = scriptApiForTesting('', 'fx-read');
+
+  assert.notEqual(api.get(idOf(typeControl)), undefined,
+    'get(id) on an LED column must not be undefined — every caption depends on it');
+  moveChannel(idOf(typeControl), { value: 3 });
+  assert.equal(api.get(idOf(typeControl)), 3);
+  assert.equal(api.get(`${idOf(typeControl)}.value`), 3, 'and by the explicit spelling too');
 });
