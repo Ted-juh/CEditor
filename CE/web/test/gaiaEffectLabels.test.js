@@ -24,6 +24,7 @@ import {
   effectParameterLabel, genericParameterLabel,
 } from '../../../tools/scripts/gaia-panel/effect-parameters.mjs';
 import { buildGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
+import { KNOB_GESTURES, effectProbeScript } from '../../../tools/scripts/gaia-panel/effect-probe.mjs';
 import { controlNamed, idOf, loadScript, mountPanel, moveChannel } from './support/gaiaScriptHarness.mjs';
 import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 
@@ -253,4 +254,73 @@ test('the type selector is READABLE at all — the read that used to answer unde
   moveChannel(idOf(typeControl), { value: 3 });
   assert.equal(api.get(idOf(typeControl)), 3);
   assert.equal(api.get(`${idOf(typeControl)}.value`), 3, 'and by the explicit spelling too');
+});
+
+/* ------------------------------------------------------------------ the probe */
+//
+// The other half of the missing table. The MIDI implementation gives 32 slots per effect block, all
+// called "MFX Parameter n"; which SLOT each knob drives is a fact about the hardware, and asking the
+// hardware is more trustworthy than a transcription. What the manual is still needed for is the
+// NAMES — the probe narrows the question, it does not answer it.
+
+test('the probe ships DISABLED, because it is a diagnostic and not a feature', () => {
+  const panel = buildGaiaPanel();
+  const probe = (panel.scripts ?? []).find((s) => s.id === 'gaia_effect_probe');
+  assert.ok(probe, 'the panel should carry the probe');
+  assert.equal(probe.enabled, false, 'a panel must not run three console actions on every load');
+  assert.equal(probe.event, 'onPanelLoad');
+});
+
+test('the probe knows the GAIA reaches four parameters with two knobs', () => {
+  // The thing a procedure written from the address map alone gets wrong. There is no CONTROL 2
+  // knob: it is SHIFT held down on CONTROL 1. Telling someone to "turn CONTROL 2" sends them
+  // looking for a control the instrument does not have.
+  assert.deepEqual(KNOB_GESTURES.map((g) => g.label), ['CONTROL 1', 'CONTROL 2', 'CONTROL 3', 'LEVEL']);
+  assert.match(KNOB_GESTURES[1].how, /SHIFT.*CONTROL 1/);
+  assert.match(KNOB_GESTURES[2].how, /SHIFT.*LEVEL/);
+  assert.equal(KNOB_GESTURES[0].how, 'turn the CONTROL 1 knob');
+  assert.equal(KNOB_GESTURES[3].how, 'turn the LEVEL knob');
+});
+
+test('the probe reads the WHOLE block, not just the four the panel shows', () => {
+  // The assumption it exists to test. layout.mjs displays MFX Parameter 1..4 on the belief that
+  // those are the four the knobs drive, and nothing establishes that. A probe that only looked at
+  // the first four could not tell "this knob drives slot 17" from "this knob does nothing".
+  const source = effectProbeScript({
+    distortion: { requestId: 'requestDistortion', parameterPrefix: 'distortion.parameter', slots: 32 },
+  });
+  assert.match(source, /"slots": 32/);
+  assert.match(source, /OUTSIDE the four the panel shows/,
+    'and it has to SAY so when a knob lands outside them');
+});
+
+test('the probe addresses the profile\'s real request and parameter ids', () => {
+  const profile = JSON.parse(readFileSync(
+    path.join(REPO, 'CE/profiles/test/roland-gaia-sh01.ceditor-device.json'), 'utf8'));
+  const requests = new Set(profile.requests.map((r) => r.id));
+  const parameters = new Set(profile.parameters.map((p) => p.id));
+
+  const panel = buildGaiaPanel();
+  const source = (panel.scripts ?? []).find((s) => s.id === 'gaia_effect_probe').source;
+  const table = JSON.parse(source.match(/var BLOCKS = (\{[\s\S]*?\n\});/)[1]);
+
+  for (const [effect, block] of Object.entries(table)) {
+    assert.ok(requests.has(block.request), `${effect}: no request called ${block.request}`);
+    assert.ok(block.slots > 0, `${effect}: no slot count`);
+    for (let slot = 1; slot <= block.slots; slot += 1) {
+      assert.ok(parameters.has(`${block.prefix}${slot}`),
+        `${effect}: the profile has no ${block.prefix}${slot}`);
+    }
+  }
+  assert.deepEqual(Object.keys(table), ['distortion', 'flanger', 'delay', 'reverb']);
+  // Counted from the profile, not assumed: distortion is 32 slots and the other three are 20. A
+  // hardcoded 32 would have the probe reading twelve addresses the flanger does not have.
+  assert.deepEqual(Object.fromEntries(Object.entries(table).map(([k, v]) => [k, v.slots])),
+    { distortion: 32, flanger: 20, delay: 20, reverb: 20 });
+});
+
+test('the generated probe is valid JavaScript', () => {
+  const panel = buildGaiaPanel();
+  const source = (panel.scripts ?? []).find((s) => s.id === 'gaia_effect_probe').source;
+  assert.doesNotThrow(() => new Function(source));
 });

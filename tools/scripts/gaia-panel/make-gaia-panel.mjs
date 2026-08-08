@@ -22,7 +22,8 @@ import { createScript } from '../../../CE/web/src/CE_Application/scripting/scrip
 import { ARP_STRIP, COMMON_STRIP, EFFECTS_STRIP, PANEL_WIDTH, SKIN, TONE_STRIP } from './layout.mjs';
 import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from './components.mjs';
 import { ARP_LANES, arpBridgeScript } from './arp-bridge.mjs';
-import { effectLabelScript } from './effect-parameters.mjs';
+import { EFFECT_PARAMETER_NAMES, effectLabelScript } from './effect-parameters.mjs';
+import { effectProbeScript } from './effect-probe.mjs';
 import { readCommitted } from '../readCommitted.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -608,6 +609,28 @@ export function buildGaiaPanel() {
       source: relabel,
     }));
   }
+
+  // And the probe that fills that table in, for whoever has the instrument. DISABLED: it is a
+  // diagnostic with three console actions, not something a panel should be running. The names it
+  // helps establish are the last thing standing between the effect knobs and real captions, and
+  // the MIDI implementation cannot supply them — but the hardware can, one knob at a time.
+  panel.scripts.push(createScript({
+    id: 'gaia_effect_probe',
+    name: 'Effect probe (diagnostic)',
+    language: 'javascript',
+    scope: 'panel',
+    event: 'onPanelLoad',
+    target: '*',
+    enabled: false,
+    description: 'Asks the GAIA which MFX Parameter each effect knob drives. Enable, run '
+      + 'fxProbe/fxMark/fxReport from the console, then disable again.',
+    source: effectProbeScript(Object.fromEntries(Object.keys(EFFECT_PARAMETER_NAMES).map((effect) => [effect, {
+      requestId: `request${effect[0].toUpperCase()}${effect.slice(1)}`,
+      parameterPrefix: `${effect}.parameter`,
+      // Counted from the profile rather than assumed: distortion has 32 slots, the other three 20.
+      slots: profile.parameters.filter((p) => p.id.startsWith(`${effect}.parameter`)).length,
+    }]))),
+  }));
   panel.panelGuid = 'a1a7c3e0-5f21-4b8e-9d44-6ca0f2b71e93';
   panel.scriptId = 'roland_gaia_sh01';
   panel.filePath = null;
