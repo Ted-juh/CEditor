@@ -11,7 +11,7 @@
 // Sibling of tools/scripts/nativeHandlers/make-selftest-panel.mjs, which does the same job for the
 // seven script languages. If you are adding a sheet, add it to SHEETS and to CE/qa/README.md.
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,6 +19,7 @@ import { serializePanel } from '../../../CE/web/src/CE_Application/stores/panelM
 import { buildComponentsSheet } from './sheets/components.mjs';
 import { buildGaiaSheet } from './sheets/gaia.mjs';
 import { buildPropertiesSheet } from './sheets/properties.mjs';
+import { readCommitted } from '../readCommitted.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -79,9 +80,7 @@ function main() {
 
     if (check) {
       if (!sheet.commit) continue;
-      let current = null;
-      try { current = readFileSync(target, 'utf8'); } catch { /* missing counts as stale */ }
-      if (current !== json) stale.push(sheet.file);
+      if (readCommitted(target) !== json) stale.push(sheet.file);
       continue;
     }
 

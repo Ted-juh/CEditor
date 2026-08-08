@@ -23,6 +23,7 @@ import { ARP_STRIP, COMMON_STRIP, EFFECTS_STRIP, PANEL_WIDTH, SKIN, TONE_STRIP }
 import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from './components.mjs';
 import { ARP_LANES, arpBridgeScript } from './arp-bridge.mjs';
 import { effectLabelScript } from './effect-parameters.mjs';
+import { readCommitted } from '../readCommitted.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -625,14 +626,7 @@ function main() {
   const json = serializeGaiaPanel();
 
   if (check) {
-    let current = null;
-    // Line endings folded, for the same reason the test that guards this file folds them: the
-    // generator writes LF and git checks the committed panel out as CRLF on Windows, so a bare
-    // comparison reports a stale panel on a clone where nothing is stale. Without this the gate and
-    // its own test disagreed about the same file — the test passing while the command it tells you
-    // to run said the panel needed regenerating.
-    try { current = readFileSync(out, 'utf8').replace(/\r\n/g, '\n'); } catch { /* missing counts as stale */ }
-    if (current === json) { console.log('GAIA panel is up to date.'); return; }
+    if (readCommitted(out) === json) { console.log('GAIA panel is up to date.'); return; }
     console.error(`Stale: ${path.relative(REPO, out)} — run: node tools/scripts/gaia-panel/make-gaia-panel.mjs`);
     process.exitCode = 1;
     return;
