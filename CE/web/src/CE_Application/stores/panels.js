@@ -23,6 +23,7 @@ import {
   restoreUnsavedWork,
 } from './runtimePreferences.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
+import { runWhenIdle } from '../utils/runWhenIdle.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { createPanel, deserializePanel, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
 import {
@@ -281,8 +282,16 @@ function scheduleUnsavedSessionAutosave() {
   }
 
   autosaveTimer = setTimeout(() => {
-    persistUnsavedSessionSnapshot();
     autosaveTimer = null;
+    // WHEN THE BROWSER IS FREE, not when the timer happens to fire. Serialising the document is
+    // measured in hundreds of milliseconds on a large panel, and a bare setTimeout drops that on
+    // whatever the author is doing five seconds after an edit — which is a freeze in the middle of
+    // a drag with no visible cause. requestIdleCallback waits for a gap instead, and its `timeout`
+    // guarantees the snapshot still happens on a busy editor rather than being starved.
+    //
+    // flushUnsavedSessionSnapshot stays synchronous: it runs before destructive actions and on the
+    // way out, where the point is that the write has finished.
+    runWhenIdle(persistUnsavedSessionSnapshot, 2000);
   }, Math.max(5, get(autosaveIntervalSeconds)) * 1000);
 }
 
