@@ -31,6 +31,7 @@
 // stays live there too.
 
 import { numberOr } from './primitives.js';
+import { normalizeCorner } from './cornerNormalization.js';
 
 /** `FFB9C4CD` (AARRGGBB) -> `{ hex: '#B9C4CD', alpha: 1 }`. */
 function argb(raw, fallbackHex = '#000000') {
@@ -55,10 +56,31 @@ function layoutIsPlain(layout) {
   return null;
 }
 
-function fillIsPlain(fill) {
+/**
+ * Is the solid fill layer painting?
+ *
+ * BackgroundRenderer's own rule (CE_Panel/components/BackgroundRenderer.svelte), which is a
+ * tri-state and not a boolean: an explicit `solidEnabled` wins, and only when it is ABSENT does the
+ * legacy `Background.mode` decide. `mode` lives on the section rather than in its `_children`, so
+ * callers that have only the children pass nothing and get the modern reading — which is why
+ * fillIsPlain refuses the legacy case outright rather than guessing at it.
+ */
+export const solidFillIsOn = (fill, mode) => (fill?.solidEnabled !== undefined
+  ? fill.solidEnabled !== false
+  : (mode === 'none' ? 'overlay' : (mode || 'solid')) === 'solid');
+
+function fillIsPlain(fill, mode) {
   if (!fill) return null;
   if (fill.imageEnabled === true || fill.overlayEnabled === true) return 'image or overlay fill';
   if (fill.soloLayer) return 'solo fill layer';
+  // A frame with nothing inside it — border on, solid layer off — is a normal thing to draw, and
+  // boxElement now omits the fill rect for it. What cannot be read from the children alone is the
+  // LEGACY spelling, where `solidEnabled` is absent and `Background.mode` decides; a caller that
+  // knows the mode passes it, and one that does not gets a refusal rather than an opaque rectangle
+  // painted over a control that renders transparent.
+  if (fill.solidEnabled === undefined && mode !== undefined && !solidFillIsOn(fill, mode)) {
+    return `legacy fill mode "${mode}"`;
+  }
   for (const layer of ['solid', 'gradient', 'image', 'overlay']) {
     if (fill[`${layer}Muted`] === true) return `muted ${layer} layer`;
     const blend = String(fill[`${layer}Blend`] ?? 'normal');
@@ -80,8 +102,19 @@ function borderIsPlain(border) {
   return null;
 }
 
-function cornersArePlain(corners) {
+function cornersArePlain(corners, border) {
   if (!corners) return null;
+
+  // A corner whose border is switched off is a GAP in the outline: borderSegments.js draws four
+  // detached sides and simply omits that corner's arc, so the live control has a hole where this
+  // emitter would put a continuous stroked rect. Checked before the radius short-circuit and
+  // independently of it, because isCornerOn() does not consult the radius either — and only when a
+  // border is actually being drawn, since with no border there is no outline to break.
+  if (border?.enabled === true) {
+    const off = ['tl', 'tr', 'br', 'bl'].filter((pos) => normalizeCorner(corners, pos).borderEnabled === false);
+    if (off.length) return `corner border off (${off.join(', ')})`;
+  }
+
   if (num(corners.radius, 0) === 0) return null;            // square: nothing to disagree about
   if (corners.linked === false) return 'per-corner radii';
   if (String(corners.style ?? 'rounded') !== 'rounded') return `corner style "${corners.style}"`;
@@ -112,7 +145,9 @@ export function whyNotBakeable(part) {
 
   const background = children.Background?._children;
   if (!background) return 'no background to draw';
-  return fillIsPlain(background.Fill) ?? borderIsPlain(background.Border) ?? cornersArePlain(background.Corners);
+  return fillIsPlain(background.Fill, children.Background.mode)
+    ?? borderIsPlain(background.Border)
+    ?? cornersArePlain(background.Corners, background.Border);
 }
 
 export const isBakeable = (part) => whyNotBakeable(part) === null;
@@ -127,7 +162,9 @@ export const isBakeable = (part) => whyNotBakeable(part) === null;
 export function whyBackgroundNotDrawable(background) {
   const children = background?._children;
   if (!children) return 'no background to draw';
-  return fillIsPlain(children.Fill) ?? borderIsPlain(children.Border) ?? cornersArePlain(children.Corners);
+  return fillIsPlain(children.Fill, background.mode)
+    ?? borderIsPlain(children.Border)
+    ?? cornersArePlain(children.Corners, children.Border);
 }
 
 const escapeText = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -178,13 +215,21 @@ export function boxElement(geometry, background, defs, key) {
   const border = background?.Border ?? {};
   const radius = Math.min(num(background?.Corners?.radius, 0), Math.min(width, height) / 2);
 
-  let paint;
+  // The gradient layer paints over the solid one, so a gradient is drawn whether or not the solid
+  // layer is on. With BOTH off there is nothing to fill with — a frame with nothing inside it —
+  // and the box must emit its border alone rather than a rectangle of whatever colour the disabled
+  // solid layer still happens to hold. (The legacy `Background.mode` spelling of the same state is
+  // refused upstream by fillIsPlain, which is the only reading that needs the section.)
+  const gradientOn = fill.gradientEnabled === true && fill.gradient;
+  const solidOn = fill.solidEnabled !== false;
+
+  let paint = null;
   let opacity = num(geometry.opacity, 1);
-  if (fill.gradientEnabled === true && fill.gradient) {
+  if (gradientOn) {
     const id = `g${key}`;
     defs.push(gradientElement(fill.gradient, id));
     paint = `url(#${id})`;
-  } else {
+  } else if (solidOn) {
     const colour = argb(fill.colour, '#000000');
     paint = colour.hex;
     opacity *= colour.alpha;
@@ -203,7 +248,7 @@ export function boxElement(geometry, background, defs, key) {
 
   const rounded = (r) => (r > 0 ? ` rx="${r}" ry="${r}"` : '');
 
-  let out = `<rect x="${x}" y="${y}" width="${width}" height="${height}"${rounded(radius)}`
+  let out = paint === null ? '' : `<rect x="${x}" y="${y}" width="${width}" height="${height}"${rounded(radius)}`
     + ` fill="${escapeText(paint)}" fill-opacity="${opacity.toFixed(3)}"${transform}/>`;
 
   const thickness = border.enabled === true ? Math.max(0, num(border.thickness, 0)) : 0;

@@ -118,20 +118,34 @@ export function normalizePanelLayers(layers, controls) {
 /**
  * Which layer a newly-drawn control lands on.
  *
- * TOTAL, and deliberately conservative at both ends. `wanted` is UI state that outlives the panel it
- * was chosen in — switch tabs and the name may mean nothing here — and a layer can be locked after
- * being chosen. Either way the answer is the default layer, which is exactly where every control
- * landed before this existed.
+ * TOTAL, and it must answer with a layer that EXISTS. `wanted` is UI state that outlives the panel
+ * it was chosen in — switch tabs and the name may mean nothing here — and a layer can be locked
+ * after being chosen.
  *
- * `wanted == null` short-circuits rather than falling through the lookup, so a panel with no "Main"
- * keeps its old behaviour (a control claiming an unlisted layer causes that layer to be appended)
- * instead of quietly acquiring a different one.
+ * The first draft returned DEFAULT_LAYER_NAME for every miss, on the reasoning that Main is where
+ * everything landed before layers existed. That is wrong for a panel that has no layer called Main:
+ * the control gets stamped with a name matching nothing, normalizePanelLayers appends a brand-new
+ * front-most "Main" to hold it, and the dock highlights no row while claiming new controls go to a
+ * layer the author never made. So Main is a PREFERENCE among the layers actually present, not an
+ * answer of last resort.
+ *
+ * Locked layers are skipped at every step: a control you cannot then select is a trap. The genuine
+ * last resort — every layer locked — is the one case that still names Main and lets it be created,
+ * because the alternative is dropping the control somewhere it cannot be reached.
  */
 export function resolveActiveLayer(layers, wanted) {
-  if (wanted == null) return DEFAULT_LAYER_NAME;
-  const found = findLayer(layers, wanted);
-  if (!found || found.locked === true) return DEFAULT_LAYER_NAME;
-  return found.name;
+  const list = Array.isArray(layers) ? layers : [];
+  const usable = (layer) => layer != null && layer.locked !== true;
+
+  if (wanted != null) {
+    const found = findLayer(list, wanted);
+    if (usable(found)) return found.name;
+  }
+
+  const preferred = findLayer(list, DEFAULT_LAYER_NAME);
+  if (usable(preferred)) return preferred.name;
+
+  return list.find(usable)?.name ?? DEFAULT_LAYER_NAME;
 }
 
 /** Names in paint order — what sortControlsForRender wants. */

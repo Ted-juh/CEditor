@@ -18,8 +18,33 @@
 //
 // ABSENT BY DEFAULT. No displayMin/displayMax means no scale, which means every existing control
 // formats exactly as it did — this cannot change a panel that never opted in.
+//
+// AND `null` IS ABSENT. This is not a nicety, it is the whole correctness of the paragraph above.
+// Both writers store a cleared bound as literal `null` — parameterAdoptionRules on every ordinary
+// parameter it adopts, and the slider's "Remap readout" toggle when you turn it off. `Number(null)`
+// is a finite `0`, so a naive coercion accepts that as a real bound and builds displayMin=0,
+// displayMax=0: a scale that maps EVERY wire value to 0. The readout then reads 0.00 at every
+// position and typing a number into it sets the wire minimum, silently, with the editor's own
+// toggle still showing "Off". 591 controls on the committed QA-06 sheet were in that state.
 
 import { numberOr } from './primitives.js';
+
+/**
+ * A display bound, or NaN for "there isn't one".
+ *
+ * Deliberately stricter than Number(). Every JavaScript coercion that turns a non-number into 0 is
+ * a way for this scale to silently become the constant-zero map: `null` (a cleared bound), `''` (an
+ * emptied number field), `[]`, `false`. A bound is a number, or a string holding one because it came
+ * back through JSON or out of a hand-edited .cepanel. Nothing else.
+ */
+function bound(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  }
+  return NaN;
+}
 
 /**
  * The display scale on a Behavior or a ValueChannel's `format`, or null.
@@ -30,8 +55,8 @@ import { numberOr } from './primitives.js';
  */
 export function displayScale(spec, wireMin, wireMax) {
   if (!spec) return null;
-  const displayMin = Number(spec.displayMin);
-  const displayMax = Number(spec.displayMax);
+  const displayMin = bound(spec.displayMin);
+  const displayMax = bound(spec.displayMax);
   if (!Number.isFinite(displayMin) || !Number.isFinite(displayMax)) return null;
 
   const min = numberOr(wireMin, 0);

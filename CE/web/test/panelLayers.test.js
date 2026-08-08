@@ -217,15 +217,22 @@ test('hiding a layer is a flag, not a deletion', () => {
 // at document state: the name outlives the panel it was chosen in, and the layer it names can be
 // locked or deleted underneath it. Every one of those has to land somewhere real.
 
-test('unset means exactly what happened before this existed', () => {
-  // Not "the frontmost layer" — a panel with no Main must keep appending one, because that is what
-  // a control carrying the default Core.layer has always caused.
-  assert.equal(resolveActiveLayer([createLayer('Scenery')], null), 'Main');
+test('unset prefers Main, but only among the layers that are actually there', () => {
+  // This test used to assert that a panel with no Main resolved to "Main" anyway, on the reasoning
+  // that appending one is what an unlayered control had always caused. That was backwards: the
+  // control gets stamped with a name matching nothing, normalizePanelLayers appends a front-most
+  // "Main" to hold it, and the author who made one layer called Scenery now has two — one of which
+  // they never asked for, sitting in front of their artwork. Drawing on a panel must not invent a
+  // layer. Main is a preference among what exists, not a name conjured when it does not.
   assert.equal(resolveActiveLayer([createLayer('Main'), createLayer('Scenery')], null), 'Main');
+  assert.equal(resolveActiveLayer([createLayer('Scenery')], null), 'Scenery');
+  assert.equal(resolveActiveLayer([createLayer('Scenery'), createLayer('Trim')], null), 'Scenery',
+    'with no Main at all, the first layer takes it');
 });
 
 test('a name from another panel falls back rather than inventing a layer', () => {
   assert.equal(resolveActiveLayer([createLayer('Main')], 'Mod Matrix'), 'Main');
+  assert.equal(resolveActiveLayer([createLayer('Chassis')], 'Mod Matrix'), 'Chassis');
 });
 
 test('a locked layer never receives new controls', () => {
@@ -234,6 +241,19 @@ test('a locked layer never receives new controls', () => {
   const layers = [createLayer('Main'), createLayer('Scenery', { locked: true })];
   assert.equal(resolveActiveLayer(layers, 'Scenery'), 'Main');
   assert.equal(resolveActiveLayer([createLayer('Main'), createLayer('Scenery')], 'Scenery'), 'Scenery');
+});
+
+test('locked layers are skipped on the way down the fallback, not just at the first step', () => {
+  // Preferring Main is worth nothing if Main is the locked one — the whole point of the fallback is
+  // to find somewhere the control can still be selected.
+  assert.equal(resolveActiveLayer(
+    [createLayer('Main', { locked: true }), createLayer('Chassis')], null), 'Chassis');
+  assert.equal(resolveActiveLayer(
+    [createLayer('Main', { locked: true }), createLayer('Chassis')], 'Nowhere'), 'Chassis');
+  // Every layer locked is the one case with no good answer; naming Main and letting it be created
+  // beats putting the control somewhere it cannot be reached.
+  assert.equal(resolveActiveLayer([createLayer('Chassis', { locked: true })], null), 'Main');
+  assert.equal(resolveActiveLayer([], null), 'Main');
 });
 
 test('setActiveLayer refuses a locked layer, and addControl follows the target', () => {
@@ -246,6 +266,42 @@ test('setActiveLayer refuses a locked layer, and addControl follows the target',
   setActiveLayer('Scenery');
   assert.equal(addControl('Label')._children.Core.layer, 'Main', 'a locked layer took a new control');
   assert.equal(readPanel(id).controls.length, 3);
+  activeLayerName.set(null);
+});
+
+test('renaming the layer you are drawing on keeps you drawing on it', () => {
+  // The bug this pins: renameLayer moved the layer and every control on it, but activeLayerName
+  // still held the old name. resolveActiveLayer is total, so it quietly fell back — and the next
+  // control you drew landed on Main while the dock still showed Chassis as the target. Nothing on
+  // screen said otherwise; you found out when you tried to hide the layer and the control stayed.
+  livePanel('rename-active', [on('A', 'Scenery')], [createLayer('Main'), createLayer('Scenery')]);
+  setActiveLayer('Scenery');
+  renameLayer('Scenery', 'Chassis');
+
+  assert.equal(get(activeLayerName), 'Chassis', 'the target followed the rename');
+  assert.equal(addControl('Label')._children.Core.layer, 'Chassis');
+  activeLayerName.set(null);
+});
+
+test('deleting the layer you are drawing on follows its controls to the survivor', () => {
+  // Same rule, other verb: removeLayer already moves the controls somewhere deliberate ("the layer
+  // below, or above if it was at the bottom"), so new controls should join them rather than being
+  // scattered to Main.
+  livePanel('remove-active', [on('A', 'Main'), on('B', 'Trim')],
+    [createLayer('Main'), createLayer('Scenery'), createLayer('Trim')]);
+  setActiveLayer('Trim');
+  removeLayer('Trim');
+
+  assert.equal(get(activeLayerName), 'Scenery');
+  assert.equal(addControl('Label')._children.Core.layer, 'Scenery');
+  activeLayerName.set(null);
+});
+
+test('renaming a layer you are NOT drawing on leaves the target alone', () => {
+  livePanel('rename-other', [on('A', 'Main')], [createLayer('Main'), createLayer('Scenery')]);
+  setActiveLayer('Main');
+  renameLayer('Scenery', 'Backdrop');
+  assert.equal(get(activeLayerName), 'Main');
   activeLayerName.set(null);
 });
 

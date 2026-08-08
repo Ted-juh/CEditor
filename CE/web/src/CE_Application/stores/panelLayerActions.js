@@ -37,6 +37,12 @@ export function activeLayers() {
  * `assign` maps an old layer name to a new one. Controls are only cloned when their layer actually
  * changes, so moving one layer's worth of controls does not replace the whole tree — the history
  * snapshot shares everything it did not touch, and that is only true if we do not touch it.
+ *
+ * It rewrites the ACTIVE layer too, and that is not a detail. `activeLayerName` holds a name, so a
+ * rename that moves every control and leaves the store pointing at the old one means the layer you
+ * are visibly working on stops being the layer you draw on — silently, because resolveActiveLayer
+ * is total and simply falls back. The same applies to deleting the active layer: its controls go to
+ * the survivor, so new ones should follow them rather than landing somewhere else entirely.
  */
 function commit(mutate, assign = null) {
   const panelId = get(resolvedActivePanelId);
@@ -63,6 +69,18 @@ function commit(mutate, assign = null) {
 
     return { ...panel, layers, controls, modified: true };
   }));
+
+  // The active layer follows the same mapping the controls did. Only when it was explicitly chosen:
+  // a null store means "no preference", and resolving that afresh each time is what keeps switching
+  // panels from dropping controls somewhere invisible.
+  if (assign) {
+    const current = get(activeLayerName);
+    if (current != null) {
+      const next = assign(normalizeLayerName(current), null);
+      if (next != null && next !== current) activeLayerName.set(next);
+    }
+  }
+
   pushSnapshot();
 }
 

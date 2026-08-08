@@ -31,6 +31,7 @@ import { boxElement, svgToDataUrl, whyBackgroundNotDrawable } from './partsToSvg
 import { anchoredPositions, fitSettings, fitsAnyAxis, fittedSizeDeep } from './containerFit.js';
 import { getChildControls, contentOrigin } from './containment.js';
 import { numberOr } from './primitives.js';
+import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 
 export const SCENERY_KIND = 'scenery';
 export const LAYER_KINDS = ['controls', SCENERY_KIND];
@@ -52,15 +53,33 @@ const num = (value, fallback = 0) => numberOr(value, fallback);
 // refusing every control that merely has the section would refuse the Background type itself.
 const SCENERY_SECTIONS = new Set(['Core', 'Transform', 'Background', 'Effects', 'Grid', 'Children']);
 
-/** Does this Effects section actually draw anything? Its defaults are all off. */
+/**
+ * Does this Effects section actually draw anything? Its defaults are all off.
+ *
+ * The filter test compares each key against ITS OWN default, taken from the model rather than
+ * retyped here. The first draft asked `value !== 0 && value !== 100`, on the loose reasoning that
+ * filters sit at one or the other when idle. They do not sit at both: blur idles at 0 and saturation
+ * at 100, so that test called `saturation: 0` inert (a control drained to greyscale), and
+ * `grayscale: 100`, and `invert: 100`, and `brightness: 0` — every one of them a filter at its most
+ * extreme, folded into the image with the effect silently dropped.
+ *
+ * Blend was not consulted at all, so any `mix-blend-mode` other than normal folded the same way.
+ */
 function effectsAreOn(effects) {
   const children = effects?._children;
   if (!children) return false;
   if (children.Bevel?.enabled === true) return true;
   if ((children.Shadows?.items ?? []).some((item) => item?.enabled === true)) return true;
+
+  const blend = String(children.Blend?.mode ?? 'normal');
+  if (blend !== 'normal') return true;
+
+  const defaults = SECTION_DEFAULTS.Effects?._children?.Filters ?? {};
   const filters = children.Filters ?? {};
-  return Object.entries(filters).some(([key, value]) =>
-    key !== '_type' && typeof value === 'number' && value !== 0 && value !== 100);
+  return Object.entries(filters).some(([key, value]) => key !== '_type'
+    && typeof value === 'number'
+    && typeof defaults[key] === 'number'
+    && value !== defaults[key]);
 }
 
 /**
@@ -141,6 +160,26 @@ function controlElements(control, offsetX, offsetY, defs, keySeed, position = nu
   const kids = getChildControls(control);
   if (kids.length === 0) return self;
 
+  // A CONTAINER'S ROTATION AND OPACITY BELONG TO ITS WHOLE SUBTREE, and this is the one place that
+  // can say so. On the canvas both are CSS properties of the container's element, so every nested
+  // child inherits them: `opacity` composites the group as a unit, `transform: rotate()` turns the
+  // contents with the box. Emitting the descendants as SIBLING rects — which is what this function
+  // does, because SVG has no nesting to inherit through — applies each control's own values and
+  // nothing else. A faded group's children stayed fully opaque and a rotated group's children stayed
+  // axis-aligned, so locking a scenery layer visibly tore rotated groups apart.
+  //
+  // One <g> fixes both, and it must wrap only `inner`: `self` already carries its own opacity as
+  // fill-opacity and its own rotation as a transform, so including it would apply both twice.
+  const rotation = num(transform.rotation, 0);
+  const groupOpacity = num(transform.opacity, 1);
+  let wrap = '';
+  if (rotation) {
+    const cx = (x + width / 2).toFixed(3);
+    const cy = (y + height / 2).toFixed(3);
+    wrap += ` transform="rotate(${rotation} ${cx} ${cy})"`;
+  }
+  if (groupOpacity !== 1) wrap += ` opacity="${groupOpacity.toFixed(3)}"`;
+
   // Children are positioned inside the parent's CONTENT box, so the padding has to be added before
   // recursing — the same origin containment.contentOrigin hands the canvas. Anchored children are
   // resolved against the content box for the same reason: an anchor is only meaningful once the
@@ -157,16 +196,25 @@ function controlElements(control, offsetX, offsetY, defs, keySeed, position = nu
     );
   });
 
-  if (children.Children?.clip !== true) return self + inner;
+  let body = inner;
 
-  // Clipping. A <clipPath> holding the same rounded rect the box drew, so a child that overhangs
-  // is cut exactly where the container's own edge is — including its corner radius, which is why
-  // the rect is rebuilt here rather than a plain rectangle being good enough.
-  const id = `clip${keySeed}`;
-  const radius = Math.min(num(children.Background?._children?.Corners?.radius, 0), Math.min(width, height) / 2);
-  defs.push(`<clipPath id="${id}"><rect x="${x}" y="${y}" width="${width}" height="${height}"`
-    + (radius > 0 ? ` rx="${radius}" ry="${radius}"` : '') + '/></clipPath>');
-  return `${self}<g clip-path="url(#${id})">${inner}</g>`;
+  if (children.Children?.clip === true) {
+    // Clipping. A <clipPath> holding the same rounded rect the box drew, so a child that overhangs
+    // is cut exactly where the container's own edge is — including its corner radius, which is why
+    // the rect is rebuilt here rather than a plain rectangle being good enough.
+    //
+    // The rect is NOT rotated, and must not be: a clipPath resolves in the user space of whatever
+    // references it, and the reference sits inside the rotation group below. So the unrotated rect
+    // is carried round by the same transform its contents are — which is what a rotated clipping
+    // container does on the canvas, where the clip is `overflow: hidden` on the rotated element.
+    const id = `clip${keySeed}`;
+    const radius = Math.min(num(children.Background?._children?.Corners?.radius, 0), Math.min(width, height) / 2);
+    defs.push(`<clipPath id="${id}"><rect x="${x}" y="${y}" width="${width}" height="${height}"`
+      + (radius > 0 ? ` rx="${radius}" ry="${radius}"` : '') + '/></clipPath>');
+    body = `<g clip-path="url(#${id})">${body}</g>`;
+  }
+
+  return wrap ? `${self}<g${wrap}>${body}</g>` : self + body;
 }
 
 /**

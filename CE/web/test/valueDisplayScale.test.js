@@ -210,3 +210,37 @@ test('adopting an ordinary parameter clears the display range rather than leavin
   assert.equal(patches['Behavior.displayMin'], null);
   assert.equal(patches['Behavior.displayMax'], null);
 });
+
+test('a CLEARED bound is no scale — the two halves of the feature agree about what null means', () => {
+  // The defect this exists for, and it was live on 591 controls of the committed QA-06 sheet.
+  //
+  // Both writers spell "no remapping" as literal null: the test above pins parameterAdoptionRules
+  // doing it on every ordinary parameter, and SliderEditor's "Remap readout" toggle does it when
+  // switched off. displayScale validated with Number(), and Number(null) is a finite 0 — so a
+  // cleared control got displayMin=0/displayMax=0, a scale mapping EVERY wire value to 0. Patch
+  // Tempo read "0.00" at every position and typing 150 into it set the wire minimum, 5.
+  //
+  // Silent in the worst way: the editor's own displayScaleOff uses `== null` and so read the same
+  // control as "Off" while the runtime was applying the degenerate map.
+  assert.equal(displayScale({ displayMin: null, displayMax: null }, 5, 300), null);
+  assert.equal(displayScale({ displayMin: null, displayMax: 3 }, 61, 67), null,
+    'half a range is not a range');
+  assert.equal(formatChannelValue(
+    channel({ type: 'int', min: 5, max: 300, format: { displayMin: null, displayMax: null } }), 150), '150');
+
+  const cleared = { ...slider(), min: 5, max: 300, displayMin: null, displayMax: null };
+  assert.equal(formatSliderNumericValue(cleared, 150), '150', 'a cleared slider reads its wire value');
+  assert.equal(parseSliderInputValue(cleared, '150'), 150, 'and typing it back is the identity');
+});
+
+test('every other coercion that yields zero is refused too', () => {
+  // null was the one that shipped, but Number() turns '', '  ', false and [] into a finite 0 just
+  // as happily, and an emptied NumberInput is a genuinely reachable ''. A bound is a number — or a
+  // string holding one, because that is what survives a hand-edited .cepanel.
+  for (const empty of [undefined, null, '', '   ', false, true, [], {}, [5], NaN, Infinity]) {
+    assert.equal(displayScale({ displayMin: empty, displayMax: empty }, 61, 67), null,
+      `${JSON.stringify(empty) ?? String(empty)} is not a display bound`);
+  }
+  assert.deepEqual(displayScale({ displayMin: '-3', displayMax: '3' }, 61, 67),
+    { min: 61, max: 67, displayMin: -3, displayMax: 3 }, 'a numeric string still counts');
+});

@@ -62,6 +62,95 @@ test('the border is inset by half its thickness, because CSS draws it inside the
   assert.match(svg, /stroke-width="4"/);
 });
 
+test('a container\'s opacity reaches its children, because on the canvas it is a group opacity', () => {
+  // Descendants are emitted as SIBLING rects — SVG gives no nesting to inherit through — so each one
+  // used to carry only its own opacity. A group faded to 50% kept fully opaque contents, and locking
+  // the layer made every child of it jump to full strength.
+  const parent = createControl('Container', {
+    Core: { id: 'group', name: 'group', layer: 'Scenery' },
+    Transform: { x: 10, y: 20, width: 100, height: 50, opacity: 0.5 },
+    Children: { padding: 0 },
+  });
+  parent._children.Children._children = { kid: box('kid', { Transform: { x: 5, y: 5, width: 20, height: 20 } }) };
+
+  const svg = svgOf(compileScenery([parent], 400, 300));
+  assert.match(svg, /<g opacity="0\.500">/, 'the subtree should be wrapped in a group opacity');
+  // And not applied twice: the parent's own rect keeps carrying it as fill-opacity, outside the group.
+  assert.equal(svg.indexOf('<g opacity') > svg.indexOf('fill-opacity="0.500"'), true,
+    'the parent rect comes first, outside the group');
+});
+
+test('a container\'s rotation turns its children with it, and its clip', () => {
+  const parent = createControl('Container', {
+    Core: { id: 'turned', name: 'turned', layer: 'Scenery' },
+    Transform: { x: 10, y: 20, width: 100, height: 50, rotation: 45 },
+    Children: { padding: 0, clip: true },
+  });
+  parent._children.Children._children = { kid: box('kid', { Transform: { x: 5, y: 5, width: 20, height: 20 } }) };
+
+  const svg = svgOf(compileScenery([parent], 400, 300));
+  // The container is 100x50 at 10,20, so its centre is 60,45 — the same pivot boxElement uses.
+  assert.match(svg, /<g transform="rotate\(45 60\.000 45\.000\)">/);
+  // The clip group sits INSIDE the rotation, so the clip rect is carried round by it rather than
+  // cutting the children in the unrotated frame.
+  const rotateAt = svg.indexOf('<g transform="rotate(45');
+  const clipAt = svg.indexOf('<g clip-path=');
+  assert.ok(rotateAt >= 0 && clipAt > rotateAt, 'the clip group must be nested inside the rotation');
+  assert.match(svg, /<clipPath id="clip[^"]*"><rect x="10" y="20"/, 'the clip rect itself stays unrotated');
+});
+
+test('an unrotated, fully opaque container emits no wrapper at all', () => {
+  // The common case must not gain a <g> per container — that is one element per group in every
+  // compiled image, for nothing.
+  const parent = createControl('Container', {
+    Core: { id: 'plain', name: 'plain', layer: 'Scenery' },
+    Transform: { x: 10, y: 20, width: 100, height: 50 },
+    Children: { padding: 0 },
+  });
+  parent._children.Children._children = { kid: box('kid', { Transform: { x: 5, y: 5, width: 20, height: 20 } }) };
+  const svg = svgOf(compileScenery([parent], 400, 300));
+  assert.ok(!svg.includes('<g '), `expected no group wrapper, got: ${svg}`);
+});
+
+test('a frame with nothing inside it draws its border and no fill', () => {
+  // Border on, solid layer off — the standard chassis idiom, and one boxElement used to get exactly
+  // backwards: it painted Fill.colour unconditionally, so a control that renders transparent folded
+  // into an opaque rectangle sitting over the panel background.
+  const control = box('frame');
+  Object.assign(control._children.Background._children.Border, { enabled: true, thickness: 2, colour: 'FFFFFFFF' });
+  control._children.Background._children.Fill.solidEnabled = false;
+
+  const svg = svgOf(compileScenery([control], 400, 300));
+  const drawn = rects(svg);
+  assert.equal(drawn.length, 1, 'only the border rect should be emitted');
+  assert.match(drawn[0], /fill="none"/);
+  assert.match(drawn[0], /stroke-width="2"/);
+});
+
+test('a gradient still paints when the solid layer beneath it is off', () => {
+  // The two are separate layers and the gradient sits on top, so switching the solid one off must
+  // not take the gradient with it.
+  const control = box('grad');
+  Object.assign(control._children.Background._children.Fill, {
+    solidEnabled: false,
+    gradientEnabled: true,
+    gradient: { type: 'linear', angle: 90, stops: [{ color: 'FF0000', position: 0 }, { color: '0000FF', position: 100 }] },
+  });
+  const svg = svgOf(compileScenery([control], 400, 300));
+  assert.match(svg, /<linearGradient/);
+  assert.match(svg, /fill="url\(#g\d+\)"/);
+});
+
+test('the legacy spelling of a switched-off fill is refused rather than guessed at', () => {
+  // Before `solidEnabled` existed, Background.mode carried it. That lives on the section rather than
+  // in its children, so the emitter cannot see it — and an opaque rectangle over a transparent
+  // control is a worse answer than declining to fold.
+  const control = box('legacy');
+  delete control._children.Background._children.Fill.solidEnabled;
+  control._children.Background.mode = 'gradient';
+  assert.equal(whyControlNotScenery(control), 'legacy fill mode "gradient"');
+});
+
 test('a box with no border is not inset at all', () => {
   // The inset must not creep into the ordinary case — every scenery box would drift a pixel.
   assert.match(svgOf(compileScenery([box('c')], 400, 300)), /x="10" y="20"/);
@@ -100,6 +189,7 @@ test('nothing foldable means nothing changes', () => {
 
 test('every construct it does not fully understand is refused by name', () => {
   const withBackground = (mutate) => { const c = box('x'); mutate(c._children.Background._children); return c; };
+  const withEffects = (mutate) => { const c = box('x'); mutate(c._children.Effects._children); return c; };
 
   const cases = [
     ["carries text (an <img> cannot see the page's fonts)",
@@ -119,6 +209,36 @@ test('every construct it does not fully understand is refused by name', () => {
     ['per-side border', () => withBackground((bg) => Object.assign(bg.Border, { enabled: true, linked: false }))],
     ['border style "dashed"', () => withBackground((bg) => Object.assign(bg.Border, { enabled: true, style: 'dashed' }))],
     ['corner style "chamfer"', () => withBackground((bg) => Object.assign(bg.Corners, { radius: 4, style: 'chamfer' }))],
+
+    // Every filter at ITS OWN extreme. The first gate asked `value !== 0 && value !== 100`, which
+    // made exactly these inert: a control drained to greyscale, inverted, or blacked out folded
+    // into the image with the effect dropped and nothing said.
+    ['effects are enabled', () => withEffects((fx) => { fx.Filters.saturation = 0; })],
+    ['effects are enabled', () => withEffects((fx) => { fx.Filters.grayscale = 100; })],
+    ['effects are enabled', () => withEffects((fx) => { fx.Filters.invert = 100; })],
+    ['effects are enabled', () => withEffects((fx) => { fx.Filters.sepia = 100; })],
+    ['effects are enabled', () => withEffects((fx) => { fx.Filters.brightness = 0; })],
+    ['effects are enabled', () => withEffects((fx) => { fx.Filters.contrast = 0; })],
+    ['effects are enabled', () => withEffects((fx) => { fx.Filters.blur = 100; })],
+    ['effects are enabled', () => withEffects((fx) => { fx.Filters.hueRotate = 100; })],
+    // Blend was not consulted at all, so a multiplied control folded as an opaque one.
+    ['effects are enabled', () => withEffects((fx) => { fx.Blend.mode = 'multiply'; })],
+
+    // A corner border switched off is a GAP in the outline — borderSegments.js omits that corner's
+    // arc and leaves the four sides detached — where boxElement draws one closed stroked rect.
+    // Linked corners share one object, so switching it off opens all four.
+    ['corner border off (tl, tr, br, bl)', () => withBackground((bg) => {
+      bg.Border.enabled = true;
+      bg.Corners.radius = 8;
+      bg.Corners.borderEnabled = false;
+    })],
+    // Unlinked, and at radius 0 — where the old gate short-circuited before looking at anything.
+    ['corner border off (tl, br)', () => withBackground((bg) => {
+      bg.Border.enabled = true;
+      bg.Corners.linked = false;
+      bg.Corners.topLeft = { borderEnabled: false };
+      bg.Corners.bottomRight = { borderEnabled: false };
+    })],
   ];
 
   for (const [expected, build] of cases) {
