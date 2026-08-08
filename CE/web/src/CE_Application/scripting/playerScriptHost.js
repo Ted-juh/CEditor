@@ -14,7 +14,10 @@ import { panelPreviewSessions, updatePanelPreviewSession } from '../stores/inter
 import { valueAtPath } from '../stores/controlTreeUtils.js';
 import { collectPanelExportScripts } from './scriptPanelExport.js';
 import { isSourceScript } from './scriptModel.js';
-import { isLiveValuePath, hasLiveValue, liveValuePatch, readLiveValue, readsLiveValue } from './liveValue.js';
+import {
+  customChannelOfPath, customChannelPatch, hasLiveValue, isLiveValuePath, liveValuePatch,
+  readLiveValue, readsLiveValue, whyChannelNotWritable,
+} from './liveValue.js';
 
 function controlId(control) {
   return String(control?._children?.Core?.id ?? '');
@@ -68,6 +71,15 @@ export function createPlayerHost(panel) {
     writeValue(control, modelPath, value) {
       const id = controlId(control);
       if (!id) return false;
+      // A named channel is written where it is read — the session — leaving its siblings alone.
+      // Writing the document instead would be invisible to every subsequent get(), because the
+      // player seeds a session for every control before this host is installed.
+      const channelName = customChannelOfPath(control, modelPath);
+      if (channelName) {
+        if (whyChannelNotWritable(control, channelName)) return false;
+        updatePanelPreviewSession(id, customChannelPatch(control, channelName, value, get(panelPreviewSessions)));
+        return true;
+      }
       if (isLiveValuePath(modelPath) && hasLiveValue(control)) {
         // Same path the player uses for incoming MIDI: move the on-screen control AND let the
         // host-parameter sync pick it up (panelPreviewSessions subscriber in Player.svelte).

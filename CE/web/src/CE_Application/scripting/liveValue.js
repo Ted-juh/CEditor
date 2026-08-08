@@ -75,16 +75,48 @@ export function customChannelOfPath(control, modelPath) {
 /**
  * Does a READ of this path have somewhere live to read from?
  *
- * Deliberately separate from hasLiveValue, which the WRITE paths use. A custom component's channel
- * is live to read — the session holds what the screen is showing — but writing one is not the same
- * operation as writing a native control's value: liveValuePatch sets `valueOverride`, a single
- * unnamed value, which for a named channel would move the wrong thing. Widening the shared
- * predicate would have quietly rerouted every set() on a custom component into that. So reads widen
- * and writes do not, and the write side keeps going through the document exactly as it did.
+ * Wider than hasLiveValue, which stays as it was: a custom component's channel is live, but it is
+ * NOT reachable by liveValuePatch, which sets `valueOverride` — one unnamed value standing in for
+ * whichever channel was named. Channels get their own write instead (customChannelPatch below).
  */
 export function readsLiveValue(control, modelPath) {
   if (isLiveValuePath(modelPath) && hasLiveValue(control)) return true;
   return customChannelOfPath(control, modelPath) != null;
+}
+
+// Channels syncCustomArpeggiatorValues republishes from the grid on every edit. A script cannot be
+// their source: the value would sit in the session until the next grid edit recomputed it, so the
+// pattern the synth received and the pattern on screen would disagree with nothing saying so. The
+// component's own note calls this out — "a channel write racing a grid edit has no clean
+// precedence" — so a write here is refused by name rather than half-performed.
+const ARP_DERIVED = new Set(['arpPattern', 'arpCurrentStep', 'arpStepCount', 'arpGate', 'arpNote', 'arpVelocity']);
+
+/** Why this channel cannot be written, or null. */
+export function whyChannelNotWritable(control, channelName) {
+  if (!ARP_DERIVED.has(channelName)) return null;
+  if (control?._children?.Designer?.arpeggiator?.enabled !== true) return null;
+  return `"${channelName}" is published by the arpeggiator grid, which is its only source — `
+    + 'draw on the grid, or turn the arpeggiator off to drive the channel directly';
+}
+
+/**
+ * The session patch that moves ONE named channel, leaving its siblings alone.
+ *
+ * THE REASON THIS EXISTS. Reads resolve a channel from the session; if writes kept going to the
+ * document the two would answer differently the moment a session exists — and in the exported
+ * player one ALWAYS exists, because Player.svelte seeds every control before installing the host.
+ * So set() landed in the document, get() kept reading the session, and the write was invisible:
+ * silently on every custom-component channel in the panel. Worse downstream, compute() re-reads
+ * through the same getter, so a formula on a channel could never converge and the settle pass
+ * accused the author of a circular formula that did not exist.
+ *
+ * Constrained on the way in, so a scripted value is clamped exactly as a dragged one is.
+ */
+export function customChannelPatch(control, channelName, value, sessions) {
+  const session = sessions?.[String(control?._children?.Core?.id ?? '')];
+  return {
+    customValues: constrainCustomValues(control, { ...(session?.customValues ?? {}), [channelName]: value }),
+  };
 }
 
 /** The session patch that moves a control to `value`. Both handles, as the player has always written. */

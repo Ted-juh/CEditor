@@ -65,7 +65,10 @@ import {
 } from './panelApi.js';
 import { extensionSource } from './extensionModules.js';
 import { panelPreviewSessions, previewModeEnabled, updatePanelPreviewSession } from '../stores/interactionPreview.js';
-import { isLiveValuePath, hasLiveValue, liveValuePatch, readLiveValue, readsLiveValue } from './liveValue.js';
+import {
+  customChannelOfPath, customChannelPatch, hasLiveValue, isLiveValuePath, liveValuePatch,
+  readLiveValue, readsLiveValue, whyChannelNotWritable,
+} from './liveValue.js';
 import {
   setPreviewRehearsalEnabled, isRehearsing, keepAllInRehearsal, keepPropertyInRehearsal,
 } from '../stores/previewRehearsal.js';
@@ -496,14 +499,27 @@ function setValue(path, value, formOrOpts = '') {
   // has always done this through its host; the editor used to fall through to a document write at
   // `Value.value`, a path Knob and Slider do not have — so the headline call of the whole API moved
   // the knob in the shipped plugin and did nothing in the preview the author was testing in.
-  const live = isLiveValuePath(modelPath) && hasLiveValue(control);
+  // A custom component's channel is live too, and has to be WRITTEN where it is READ. Its own patch
+  // rather than liveValuePatch, which sets one unnamed `valueOverride` — see liveValue.js.
+  const channelName = customChannelOfPath(control, modelPath);
+  if (channelName) {
+    const refusal = whyChannelNotWritable(control, channelName);
+    if (refusal) {
+      addScriptTrace('error', '', `set("${path}"): ${refusal}.`);
+      return;
+    }
+  }
+
+  const live = (isLiveValuePath(modelPath) && hasLiveValue(control)) || channelName != null;
   const liveId = live ? String(control?._children?.Core?.id ?? '') : '';
 
   let wrote = true;
   if (host) {
     wrote = host.writeValue(control, modelPath, value) !== false;
   } else if (live && liveId) {
-    updatePanelPreviewSession(liveId, liveValuePatch(value));
+    updatePanelPreviewSession(liveId, channelName
+      ? customChannelPatch(control, channelName, value, get(panelPreviewSessions))
+      : liveValuePatch(value));
     wrote = true;
   } else {
     wrote = shape.writes;

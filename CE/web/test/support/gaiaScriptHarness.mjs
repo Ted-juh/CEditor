@@ -70,11 +70,17 @@ export function moveChannel(controlId, values) {
 }
 
 /**
- * Draw an arpeggio pattern, through the same function a pointer edit goes through.
+ * Draw an arpeggio pattern, by building the patch the way a pointer edit builds it.
  *
- * resolveCustomInteractionPatch builds its session patch with syncCustomArpeggiatorValues over the
- * seed values; using that here rather than writing `arpPattern` directly is the point — it proves
- * the channel the script watches is one that real grid edits actually publish.
+ * PRECISELY WHAT THIS DOES AND DOES NOT PROVE, because the first version of this comment overclaimed
+ * and that is the exact mistake these tests exist to catch. It calls syncCustomArpeggiatorValues —
+ * the function resolveCustomInteractionPatch calls to turn an arpeggiator edit into a session patch
+ * (customComponentInteraction.js) — over the same seed values. So it proves the SHAPE of a real
+ * edit's patch, not the pointer arithmetic that decides which block was drawn.
+ *
+ * What connects the two is pinned separately, in the test named "a real pointer edit publishes the
+ * channel the bridge watches", which goes through resolveCustomInteractionPatch itself. Without that
+ * link this helper would be manufacturing the very channel it then asserts the script reads.
  */
 export function drawPattern(control, blocks, { stepCount = 32 } = {}) {
   const values = syncCustomArpeggiatorValues(control, {

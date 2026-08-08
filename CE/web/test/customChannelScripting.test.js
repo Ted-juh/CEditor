@@ -34,7 +34,9 @@ import { panels, addPanel, setActivePanel } from '../src/CE_Application/stores/p
 import { panelPreviewSessions, updatePanelPreviewSession }
   from '../src/CE_Application/stores/interactionPreview.js';
 import { customChannelOfPath, readsLiveValue } from '../src/CE_Application/scripting/liveValue.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import * as rt from '../src/CE_Application/scripting/panelRuntime.js';
+import { createPlayerHost } from '../src/CE_Application/scripting/playerScriptHost.js';
 
 /** A custom component carrying the named channels, on a live active panel. */
 function componentPanel(channels, { id = 'comp', name = 'comp' } = {}) {
@@ -201,44 +203,100 @@ test('watch on an array channel compares CONTENT, so moving one block fires once
   assert.deepEqual(seen, [1, 1], 'two real changes, and the identical re-write between them ignored');
 });
 
-/* ------------------------------------------------------------------ writes are unchanged */
+/* ------------------------------------------------------------------ writing a channel */
+//
+// A CHANNEL IS WRITTEN WHERE IT IS READ. The first version of this fix widened reads and
+// deliberately left writes on the document path, reasoning that liveValuePatch (one unnamed
+// `valueOverride`) could not express a named channel. That reasoning was right and the conclusion
+// was wrong: a read that comes from the session and a write that goes to the document simply
+// disagree. The tests below are the three ways that showed up, all of which the first version's
+// tests missed because they ran with NO SESSION for the control — a state the exported player never
+// reaches, since Player.svelte seeds one for every control before installing the host.
 
-test('readsLiveValue widens READS only — the write predicate is untouched', () => {
-  // Widening hasLiveValue would have rerouted every set() on a custom component into
-  // liveValuePatch, which sets `valueOverride`: a single unnamed value standing in for whichever
-  // channel was named. Silently the wrong control state.
+test('set() then get() round-trips even when a session already exists', () => {
+  // The regression, at its narrowest. With a session present — always, in the player — set() landed
+  // in the document while get() kept reading the session, so the write was simply invisible.
   const control = componentPanel({ cutoff: { defaultValue: 40 } });
-  assert.equal(readsLiveValue(control, 'ValueChannels.cutoff.currentValue'), true);
-  const { hasLiveValue } = rt.__liveValueForTesting ?? {};
-  assert.equal(typeof hasLiveValue, 'undefined', 'this test reads the predicate through liveValue.js');
+  updatePanelPreviewSession(control._children.Core.id, { customValues: { cutoff: 40 } });
+
+  api().set('comp.cutoff', 61);
+  assert.equal(api().get('comp.cutoff'), 61, 'a script must be able to read back what it just wrote');
 });
 
-test('set() on a channel still writes the document, exactly as before', () => {
+test('a channel write does not warn about a fixed-shape section', () => {
+  // probeNestedWrite sees a ValueChannel's string `_type` and calls the write a fresh key on a typed
+  // node, so every channel write printed "It was written, but nothing reads it — check the
+  // spelling." The advice was false in both halves: it IS read, and the spelling was right.
   const control = componentPanel({ cutoff: { defaultValue: 40 } });
+  clearScriptTrace();
   api().set('comp.cutoff', 61);
-  const channel = get(panels).find((p) => p.id === 'p')
-    .controls[0]._children.ValueChannels._children.cutoff;
-  assert.equal(channel.currentValue, 61, 'the write should land on the channel in the document');
-  // And with nothing in the session, the read agrees with it.
+  assert.deepEqual(get(scriptTrace).map((t) => t.message), []);
+});
+
+test('compute() on a channel converges instead of accusing the author of a loop', () => {
+  // The downstream cost of the same split. compute() writes through set() and re-reads through
+  // readWatch, so with the two pointing at different places a formula could never settle: eight
+  // passes, then "two formulas are feeding each other" — on every settle, for the life of the panel.
+  const control = componentPanel({ cutoff: { defaultValue: 0 } });
+  updatePanelPreviewSession(control._children.Core.id, { customValues: { cutoff: 0 } });
+
+  clearScriptTrace();
+  api().compute('comp.cutoff', () => 50);
+  rt.runReactiveForTesting();
+
+  assert.equal(api().get('comp.cutoff'), 50);
+  assert.deepEqual(get(scriptTrace).filter((t) => /still changing/.test(t.message ?? '')), []);
+});
+
+test('writing one channel leaves its siblings where they were', () => {
+  // The reason a channel needs its own patch rather than liveValuePatch: `valueOverride` is one
+  // unnamed value, so writing `cutoff` through it would stand in for `resonance` as well.
+  const control = componentPanel({ cutoff: { defaultValue: 40 }, resonance: { defaultValue: 5 } });
+  updatePanelPreviewSession(control._children.Core.id, { customValues: { cutoff: 40, resonance: 5 } });
+
+  api().set('comp.cutoff', 61);
   assert.equal(api().get('comp.cutoff'), 61);
+  assert.equal(api().get('comp.resonance'), 5);
+  assert.notEqual(get(panelPreviewSessions)[control._children.Core.id].valueOverrideEnabled, true,
+    'a channel write must never become an unnamed valueOverride');
 });
 
-test('the session still wins over a document write, because it is what is on screen', () => {
-  const control = componentPanel({ cutoff: { defaultValue: 40 } });
-  api().set('comp.cutoff', 61);
-  updatePanelPreviewSession(control._children.Core.id, { customValues: { cutoff: 12 } });
-  assert.equal(api().get('comp.cutoff'), 12);
-  assert.equal(get(panelPreviewSessions)[control._children.Core.id].customValues.cutoff, 12);
+test('a scripted value is clamped exactly as a dragged one is', () => {
+  const control = componentPanel({ cutoff: { defaultValue: 40, min: 0, max: 127 } });
+  api().set('comp.cutoff', 999);
+  assert.equal(api().get('comp.cutoff'), 127);
+});
+
+test('a channel the arpeggiator publishes refuses the write, and says why', () => {
+  // Half-performing this one is worse than refusing it: the value would sit in the session until the
+  // next grid edit recomputed it, so the pattern sent to the synth and the pattern on screen would
+  // disagree with nothing saying so.
+  const control = componentPanel({ arpPattern: { type: 'array', size: 8, defaultValue: 0 } });
+  control._children.Designer = { _type: 'Designer', arpeggiator: { enabled: true, blocks: [] } };
+
+  clearScriptTrace();
+  api().set('comp.arpPattern', [{ note: 60, step: 0 }]);
+  const messages = get(scriptTrace).map((t) => t.message);
+  assert.equal(messages.length, 1, `expected one refusal, got ${JSON.stringify(messages)}`);
+  assert.match(messages[0], /published by the arpeggiator grid/);
+  assert.match(messages[0], /draw on the grid/, 'a refusal has to say what to do instead');
+});
+
+test('the same channel name is writable when there is no arpeggiator behind it', () => {
+  // The refusal is about the grid being the source, not about the name.
+  const control = componentPanel({ arpPattern: { type: 'array', size: 8, defaultValue: 0 } });
+  clearScriptTrace();
+  api().set('comp.arpPattern', [{ note: 60, step: 0 }]);
+  assert.deepEqual(get(scriptTrace).map((t) => t.message), []);
 });
 
 /* ------------------------------------------------------------------ the exported player */
 
-test('the PLAYER host reads a channel the same way the editor does', async () => {
+test('the PLAYER host reads a channel the same way the editor does', () => {
   // This is the claim that matters. The GAIA panel exists to drive hardware, and a fix that only
   // works in the editor preview is worth nothing — the arp bridge would still be inert in the
   // shipped plugin. The player reuses PanelPreviewSurface, so grid edits land in the same session
   // store; what had to change was its host's readValue.
-  const { createPlayerHost } = await import('../src/CE_Application/scripting/playerScriptHost.js');
   const control = componentPanel({ cutoff: { defaultValue: 40 } });
   const panel = { id: 'p', controls: [control], scripts: [], scripting: { enabled: true, runOnExport: true } };
   const host = createPlayerHost(panel);
@@ -248,9 +306,13 @@ test('the PLAYER host reads a channel the same way the editor does', async () =>
   assert.equal(host.readValue(control, 'ValueChannels.cutoff.currentValue'), 88, 'and the live value once it does');
 });
 
-test('the player host still writes a channel to the document, not to a value override', () => {
+test('the player host writes a channel where it reads one', () => {
   const control = componentPanel({ cutoff: { defaultValue: 40 } });
-  api().set('comp.cutoff', 12);
-  assert.equal(get(panelPreviewSessions)[control._children.Core.id]?.valueOverrideEnabled, undefined,
-    'a channel write must never become an unnamed valueOverride');
+  const host = createPlayerHost({ id: 'p', controls: [control], scripts: [] });
+  updatePanelPreviewSession(control._children.Core.id, { customValues: { cutoff: 40 } });
+
+  assert.equal(host.writeValue(control, 'ValueChannels.cutoff.currentValue', 61), true);
+  assert.equal(host.readValue(control, 'ValueChannels.cutoff.currentValue'), 61,
+    'the player must round-trip too — it is the runtime the panel actually ships on');
+  assert.notEqual(get(panelPreviewSessions)[control._children.Core.id].valueOverrideEnabled, true);
 });

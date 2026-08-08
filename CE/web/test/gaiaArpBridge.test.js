@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { ARP_LANES, arpBridgeScript, blocksToLanes } from '../../../tools/scripts/gaia-panel/arp-bridge.mjs';
 import { buildGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
 import { controlNamed, drawPattern, loadScript, mountPanel } from './support/gaiaScriptHarness.mjs';
+import { resolveCustomInteractionPatch, seedCustomValues } from '../src/CE_Application/utils/customComponentInteraction.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const shape = { lanes: ARP_LANES, steps: 32 };
@@ -343,4 +344,28 @@ test('a seventeenth note is reported through the real runtime, not silently drop
 
   assert.ok(run.logs.some((line) => /past the GAIA's 16 lanes/.test(line)),
     `expected a dropped-note report, got: ${JSON.stringify(run.logs)}`);
+});
+
+test('a real pointer edit publishes the channel the bridge watches', () => {
+  // The link the harness's drawPattern does NOT prove on its own: that resolveCustomInteractionPatch
+  // — the function an actual pointer drag goes through — puts `arpPattern` in the session patch. If
+  // it ever stopped doing that, every test above would keep passing while the bridge went dead
+  // again, because they build their patch with the same helper the patch builder uses rather than
+  // with the patch builder.
+  const built = buildGaiaPanel();
+  mountPanel(built);
+  const grid = controlNamed(built, 'arp_pattern_grid');
+
+  const rect = { left: 0, top: 0, width: 900, height: 260 };
+  const zone = { name: 'draw', zone: { action: 'arpeggiatorDraw' } };
+  const patch = resolveCustomInteractionPatch(grid, { customValues: seedCustomValues(grid) }, zone, {
+    rect, clientX: rect.left + 200, clientY: rect.top + 120,
+  });
+
+  assert.ok(patch, 'a draw on the grid should produce a session patch');
+  assert.ok(Array.isArray(patch.customValues?.arpPattern),
+    `the patch must carry arpPattern — got ${JSON.stringify(Object.keys(patch.customValues ?? {}))}`);
+  assert.ok(patch.customValues.arpPattern.length > 0, 'and it must hold the blocks that were drawn');
+  // And the runtime key the grid itself reads from, so the two stay in step.
+  assert.ok(patch.customValues.__arpeggiator, 'the grid reads __arpeggiator; both must be published');
 });
