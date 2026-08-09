@@ -653,7 +653,11 @@
           {/if}
         {:else if def.type === 'cornerRadial'}
           {@const stops = gradStops(def.data)}
-          {@const R = def.geom.R}
+          <!-- The band's own centreline radius, which is R - thickness/2 for an
+               outward corner and R for an inward one — not R in both cases. The
+               ramp has to bracket the band the arc actually paints, or the stops
+               land off the stroke. -->
+          {@const R = def.geom.arcR ?? def.geom.R}
           {@const t = def.geom.thickness}
           {@const innerR = Math.max(0.01, R - t / 2)}
           {@const outerR = R + t / 2}

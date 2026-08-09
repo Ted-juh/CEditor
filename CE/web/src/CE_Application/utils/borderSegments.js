@@ -112,10 +112,15 @@ function getCornerStrokes(border, corners, pos) {
 }
 
 // Distance from the corner anchor where the side path must START.
-// - rounded outward / chamfer / notch / straight: side inset by R. The
-//   outward arc has horizontal tangent where it meets the top side, so the
-//   stroke flows continuously from arc into side; aligning at the centerline
-//   endpoint (R + tt/2 with the 1-px overlap → R) is enough.
+// - rounded outward: the arc's centreline ends at R along the box edge (its
+//   outer edge is the R-radius round the fill also paints), and the tangent
+//   there is horizontal, so the stroke flows continuously from arc into side.
+//   Solving `sideStart = tlG + t - tlOv = R` gives tlG = R - tt/2 + 1; using
+//   R - tt/2 keeps the 1-px overlap convention the other shapes use. This used
+//   to return R, which paired with the old arc that ended at R + tt/2 — both
+//   were half a thickness out, so the join looked right while the corner was
+//   rounder than the box it belonged to.
+// - chamfer / notch / straight: side inset by R.
 // - rounded inward: the arc has a *vertical* tangent at its top endpoint,
 //   so the arc's butt cap is a horizontal segment at y = tt/2 spanning
 //   x ∈ [R, R + tt]. The arc band itself only exists at y ≥ tt/2 — there is
@@ -150,6 +155,13 @@ function sideInset(on, _cn, r, tt) {
   if (cornerStyle === 'notch') {
     return r;
   }
+  // Rounded OUTWARD only. An inward corner's arc still meets the side at
+  // R + tt/2 (it is anchored at the box corner, not inset from it), so pulling
+  // its sides back would open a gap the width of the border between the side's
+  // end and the arc's leg.
+  if (cornerStyle === 'rounded' && (_cn?.direction || 'outward') !== 'inward') {
+    return Math.max(0, r - tt / 2);
+  }
   return r;
 }
 
@@ -181,16 +193,16 @@ function computeCornerGradientGeom(pos, cnStyle, cnDir, R, t, W, H) {
   const e = R + t;
 
   if (cnStyle === 'rounded') {
-    let tangentialAxis;
-    switch (pos) {
-      case 'tl': tangentialAxis = { x1: t,     y1: e,     x2: e,     y2: t };     break;
-      case 'tr': tangentialAxis = { x1: W - e, y1: t,     x2: W - t, y2: e };     break;
-      case 'br': tangentialAxis = { x1: W - t, y1: H - e, x2: W - e, y2: H - t }; break;
-      case 'bl': tangentialAxis = { x1: e,     y1: H - t, x2: t,     y2: H - e }; break;
-    }
-
     if (cnDir === 'inward') {
-      // Inward: radial centered at the inset point near the anchor.
+      // Inward: arc anchored at the box corner — centred at the inset point,
+      // running between the (R + t) marks on the two edges.
+      let tangentialAxis;
+      switch (pos) {
+        case 'tl': tangentialAxis = { x1: t,     y1: e,     x2: e,     y2: t };     break;
+        case 'tr': tangentialAxis = { x1: W - e, y1: t,     x2: W - t, y2: e };     break;
+        case 'br': tangentialAxis = { x1: W - t, y1: H - e, x2: W - e, y2: H - t }; break;
+        case 'bl': tangentialAxis = { x1: e,     y1: H - t, x2: t,     y2: H - e }; break;
+      }
       let arcCx, arcCy;
       switch (pos) {
         case 'tl': arcCx = t;     arcCy = t;     break;
@@ -201,23 +213,35 @@ function computeCornerGradientGeom(pos, cnStyle, cnDir, R, t, W, H) {
       return {
         cornerShape: 'rounded',
         isInward: true,
-        arcCx, arcCy,
+        arcCx, arcCy, arcR: R,
         radialAxis: null,
         tangentialAxis,
       };
     }
-    // Outward: radial centered at the arc circle center.
+
+    // Outward: the arc's centreline circle is radius R - t about (R, R), so its
+    // endpoints sit at R along each edge and its outer edge lands on R — the
+    // radius the fill underneath is rounded to. Both the tangential axis (which
+    // runs endpoint to endpoint) and the radial centre follow from that; they
+    // used to be written in terms of R + t, matching the old oversized arc.
+    let tangentialAxis;
+    switch (pos) {
+      case 'tl': tangentialAxis = { x1: t,     y1: R,     x2: R,     y2: t };     break;
+      case 'tr': tangentialAxis = { x1: W - R, y1: t,     x2: W - t, y2: R };     break;
+      case 'br': tangentialAxis = { x1: W - t, y1: H - R, x2: W - R, y2: H - t }; break;
+      case 'bl': tangentialAxis = { x1: R,     y1: H - t, x2: t,     y2: H - R }; break;
+    }
     let arcCx, arcCy;
     switch (pos) {
-      case 'tl': arcCx = R + t;     arcCy = R + t;     break;
-      case 'tr': arcCx = W - R - t; arcCy = R + t;     break;
-      case 'br': arcCx = W - R - t; arcCy = H - R - t; break;
-      case 'bl': arcCx = R + t;     arcCy = H - R - t; break;
+      case 'tl': arcCx = R;     arcCy = R;     break;
+      case 'tr': arcCx = W - R; arcCy = R;     break;
+      case 'br': arcCx = W - R; arcCy = H - R; break;
+      case 'bl': arcCx = R;     arcCy = H - R; break;
     }
     return {
       cornerShape: 'rounded',
       isInward: false,
-      arcCx, arcCy,
+      arcCx, arcCy, arcR: Math.max(0, R - t),
       radialAxis: null,
       tangentialAxis,
     };
@@ -536,7 +560,7 @@ export function buildBorderSegments(W, H, border, corners) {
             tangentialAxis: piece.tangentialAxis,
             cornerPart: partIdx,
             cornerPartSide: piece.sideKey,
-            geom: { ...cornerGeom[pos], R, thickness: tt, arcCx: grad.arcCx, arcCy: grad.arcCy },
+            geom: { ...cornerGeom[pos], R, thickness: tt, arcCx: grad.arcCx, arcCy: grad.arcCy, arcR: grad.arcR },
           });
         });
       } else {
@@ -549,7 +573,7 @@ export function buildBorderSegments(W, H, border, corners) {
           radialIsInward: grad.isInward,
           radialAxis: grad.radialAxis,
           tangentialAxis: grad.tangentialAxis,
-          geom: { ...cornerGeom[pos], R, thickness: tt, arcCx: grad.arcCx, arcCy: grad.arcCy },
+          geom: { ...cornerGeom[pos], R, thickness: tt, arcCx: grad.arcCx, arcCy: grad.arcCy, arcR: grad.arcR },
         });
       }
     }

@@ -36,9 +36,21 @@ export function buildCornerPath(cn, pos, R, inset, tBase, W, H) {
     }
   }
 
-  if (style === 'rounded') {
-    const ro = Math.max(0, e - i);
-    if (ro <= 0) {
+  if (style === 'rounded' && dir === 'inward') {
+    // An inward corner is a bite taken OUT of the box, so its arc is anchored at
+    // the box corner: centred on (i, i) at radius e - i. Unlike the outward case
+    // below, R here is the radius of the bite rather than of the box's own
+    // outline, and the sides are inset to match (see sideInset).
+    //
+    // Reserved for a future "smooth inward" mode (cubic Bezier whose endpoint
+    // tangents are parallel to the adjacent sides, so the stroke caps merge
+    // without any L-step). Wire it up via a corner direction value like
+    // `inward-smooth` when the UI exposes it:
+    //
+    //   const k = ri * 0.552284749831;
+    //   case 'tl': return `M ${i} ${e} C ${i} ${e + k} ${e + k} ${i} ${e} ${i}`;
+    const ri = Math.max(0, e - i);
+    if (ri <= 0) {
       switch (pos) {
         case 'tl': return `M ${i} ${i}`;
         case 'tr': return `M ${W - i} ${i}`;
@@ -46,38 +58,51 @@ export function buildCornerPath(cn, pos, R, inset, tBase, W, H) {
         case 'bl': return `M ${i} ${H - i}`;
       }
     }
+    // Extend each arc endpoint to the box edge with a line leg. The arc's butt
+    // cap at each endpoint is perpendicular to the tangent (horizontal at the
+    // side endpoint, vertical at the top endpoint), so it only covers half the
+    // stroke width toward the box edge. The line legs fill that gap.
+    switch (pos) {
+      case 'tl': return `M 0 ${e} L ${i} ${e} A ${ri} ${ri} 0 0 0 ${e} ${i} L ${e} 0`;
+      case 'tr': return `M ${W - e} 0 L ${W - e} ${i} A ${ri} ${ri} 0 0 0 ${W - i} ${e} L ${W} ${e}`;
+      case 'br': return `M ${W} ${H - e} L ${W - i} ${H - e} A ${ri} ${ri} 0 0 0 ${W - e} ${H - i} L ${W - e} ${H}`;
+      case 'bl': return `M ${e} ${H} L ${e} ${H - i} A ${ri} ${ri} 0 0 0 ${i} ${H - e} L 0 ${H - e}`;
+    }
+  }
 
-    // Inward and outward both use a circular arc — the geometric quarter
-    // circle, centered at (i, i) for inward and (R+i, R+i) for outward. Sides
-    // are inset to butt against the arc cap (see sideInset in borderSegments.js).
+  if (style === 'rounded') {
+    // R is the OUTER radius — the same thing `border-radius: Rpx` means to the
+    // fill underneath (see buildFillClipPath, and the border-radius shorthand in
+    // BackgroundRenderer). A stroke centred on a circle of radius `ro` paints a
+    // band from `ro - i` to `ro + i`, so for the band's outer edge to land on R
+    // the centreline circle is radius `R - i`, centred at (R, R).
     //
-    // Reserved for a future "smooth inward" mode (cubic Bezier whose endpoint
-    // tangents are parallel to the adjacent sides, so the stroke caps merge
-    // without any L-step). Wire it up via a corner direction value like
-    // `inward-smooth` when the UI exposes it:
-    //
-    //   const k = ro * 0.552284749831;
-    //   case 'tl': return `M ${i} ${ro + i} C ${i} ${ro + i + k} ${ro + i + k} ${i} ${ro + i} ${i}`;
-    //   case 'tr': return `M ${W - ro - i} ${i} C ${W - ro - i - k} ${i} ${W - i} ${ro + i + k} ${W - i} ${ro + i}`;
-    //   case 'br': return `M ${W - i} ${H - ro - i} C ${W - i} ${H - ro - i - k} ${W - ro - i - k} ${H - i} ${W - ro - i} ${H - i}`;
-    //   case 'bl': return `M ${ro + i} ${H - i} C ${ro + i + k} ${H - i} ${i} ${H - ro - i - k} ${i} ${H - ro - i}`;
-    if (dir === 'inward') {
-      // Extend each arc endpoint to the box edge with a line leg. The arc's
-      // butt cap at each endpoint is perpendicular to the tangent (horizontal
-      // at the side endpoint, vertical at the top endpoint), so it only covers
-      // half the stroke width toward the box edge. The line legs fill that gap.
+    // It used to be radius `R + tBase - i` centred at (R + tBase, R + tBase),
+    // putting the outer edge at R + tBase — half a thickness too round. The
+    // corner the fill painted then poked out past its own border along the
+    // diagonal, and the straight run of each side started half a thickness late.
+    // buildCornerGeom already described the corrected arc (its arcStart/arcEnd
+    // sit at R on the box edge), which is how the two disagreed for so long.
+    const ro = Math.max(0, R - i);
+    if (ro <= 0) {
+      // Radius smaller than the layer's own inset: no circle can carry a band
+      // that thick inside R. CSS squares the inner corner off in this case; the
+      // nearest a single centreline stroke gets is the square corner, which at
+      // these radii is what it looks like anyway. Drawing nothing — which is
+      // what the old `ro <= 0` branch did — would leave a notch at the outer
+      // corner instead, since the sides stop short of it.
       switch (pos) {
-        case 'tl': return `M 0 ${ro + i} L ${i} ${ro + i} A ${ro} ${ro} 0 0 0 ${ro + i} ${i} L ${ro + i} 0`;
-        case 'tr': return `M ${W - ro - i} 0 L ${W - ro - i} ${i} A ${ro} ${ro} 0 0 0 ${W - i} ${ro + i} L ${W} ${ro + i}`;
-        case 'br': return `M ${W} ${H - ro - i} L ${W - i} ${H - ro - i} A ${ro} ${ro} 0 0 0 ${W - ro - i} ${H - i} L ${W - ro - i} ${H}`;
-        case 'bl': return `M ${ro + i} ${H} L ${ro + i} ${H - i} A ${ro} ${ro} 0 0 0 ${i} ${H - ro - i} L 0 ${H - ro - i}`;
+        case 'tl': return `M ${i} ${e} L ${i} ${i} L ${e} ${i}`;
+        case 'tr': return `M ${W - e} ${i} L ${W - i} ${i} L ${W - i} ${e}`;
+        case 'br': return `M ${W - i} ${H - e} L ${W - i} ${H - i} L ${W - e} ${H - i}`;
+        case 'bl': return `M ${e} ${H - i} L ${i} ${H - i} L ${i} ${H - e}`;
       }
     }
     switch (pos) {
-      case 'tl': return `M ${i} ${ro + i} A ${ro} ${ro} 0 0 1 ${ro + i} ${i}`;
-      case 'tr': return `M ${W - ro - i} ${i} A ${ro} ${ro} 0 0 1 ${W - i} ${ro + i}`;
-      case 'br': return `M ${W - i} ${H - ro - i} A ${ro} ${ro} 0 0 1 ${W - ro - i} ${H - i}`;
-      case 'bl': return `M ${ro + i} ${H - i} A ${ro} ${ro} 0 0 1 ${i} ${H - ro - i}`;
+      case 'tl': return `M ${i} ${R} A ${ro} ${ro} 0 0 1 ${R} ${i}`;
+      case 'tr': return `M ${W - R} ${i} A ${ro} ${ro} 0 0 1 ${W - i} ${R}`;
+      case 'br': return `M ${W - i} ${H - R} A ${ro} ${ro} 0 0 1 ${W - R} ${H - i}`;
+      case 'bl': return `M ${R} ${H - i} A ${ro} ${ro} 0 0 1 ${i} ${H - R}`;
     }
   }
 
