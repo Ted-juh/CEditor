@@ -179,6 +179,16 @@ section('legacy emit — device-agnostic');
   ok(gaia.messageRecipes.some((r) => r.id === 'cc7' && r.controller === 7), 'GAIA cc7 recipe (per-controller)');
   eq(gaia.parameters.find((p) => p.id === 'master.volume').messageRecipe, 'cc7', 'master.volume -> cc7 recipe');
   eq(gaia.parameters.find((p) => p.id === 'filter.cutoff').address, '10 00 01 0C', 'GAIA cutoff address unchanged');
+  // rxLive — the message the instrument SENDS when its own knob moves. The GAIA writes cutoff as a
+  // DT1 and transmits it as CC 102, so nothing derived from the write path can recognise the knob.
+  // This emitter resolved the wire and then dropped it, which is why the Player carried a
+  // hand-written CC map beside the profile it already had.
+  eq(JSON.stringify(gaia.parameters.find((p) => p.id === 'filter.cutoff').inbound),
+    JSON.stringify([{ kind: 'cc', controller: 102 }]), 'GAIA cutoff declares the CC its knob sends');
+  ok(!gaia.parameters.find((p) => p.id === 'master.volume').inbound,
+    'a parameter whose rxLive IS its write wire declares nothing extra');
+  ok(!gaia.parameters.find((p) => p.id === 'filter.resonance').inbound,
+    'a parameter with no CC rxLive declares nothing');
 
   // A synthetic non-Roland device must derive EVERYTHING from its own profile — nothing GAIA-specific.
   const lib = {

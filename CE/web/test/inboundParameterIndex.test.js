@@ -25,8 +25,10 @@ import { fileURLToPath } from 'node:url';
 import {
   buildInboundIndex,
   bytesFromHex,
+  decodeInbound,
   fingerprintParameter,
   inboundLookupMaps,
+  inboundReadTargets,
   inboundValueBytes,
   matchInbound,
 } from '../src/CE_Application/utils/inboundParameterIndex.js';
@@ -47,7 +49,31 @@ test('a CC parameter is identified by its status and controller', () => {
 test('a sysex parameter is identified by its header and address', () => {
   const print = fingerprintParameter(GAIA, 'tone1.filter.cutoff');
   // F0 41 <deviceId> 00 00 41 12 then the four address bytes; the value and checksum come after.
-  assert.deepEqual(print.prefix, [0xf0, 0x41, 0x10, 0x00, 0x00, 0x41, 0x12, 0x10, 0x00, 0x01, 0x0c]);
+  // The device id byte is masked to 0x80 — any 7-bit value matches — because it says which
+  // instrument, not which parameter, and a GAIA set to 17 sends the same edit as one set to 16.
+  assert.deepEqual(print.prefix, [0xf0, 0x41, 0x00, 0x00, 0x00, 0x41, 0x12, 0x10, 0x00, 0x01, 0x0c]);
+  assert.deepEqual(print.mask, [0xff, 0xff, 0x80, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+});
+
+test('the device id does not have to match', () => {
+  // The parser this replaces skipped byte 2 of a DT1 outright. Same tolerance, derived rather than
+  // hardcoded — and it has to hold, or the panel silently stops following any instrument whose
+  // device id is not the profile's default.
+  const index = buildInboundIndex(GAIA);
+  for (const id of ['00', '10', '11', '7F']) {
+    assert.equal(matchInbound(index, `F0 41 ${id} 00 00 41 12 10 00 01 0C 05 34 F7`)?.parameterId,
+      'tone1.filter.cutoff', `device id ${id} did not resolve`);
+  }
+});
+
+test('a CC matches on any channel, but only as a CC', () => {
+  // Derived from the same masking: compiling under channel 1 and channel 16 leaves the status byte
+  // agreeing only in its high nibble. A whole-byte wildcard would have been easier and wrong — it
+  // would let a note-on with the same second byte resolve to a CC parameter.
+  const index = buildInboundIndex(CC);
+  assert.equal(matchInbound(index, 'B0 4A 5A')?.parameterId, 'filter.cutoff');
+  assert.equal(matchInbound(index, 'BF 4A 5A')?.parameterId, 'filter.cutoff', 'channel 16 is the same knob');
+  assert.equal(matchInbound(index, '9A 4A 5A'), null, 'a note-on is not a CC');
 });
 
 test('every parameter of both profiles round-trips to itself', () => {
@@ -69,9 +95,13 @@ test('every parameter of both profiles round-trips to itself', () => {
   }
 });
 
-test('the GAIA indexes all 793 of its parameters, not the 40 the hand map covers', () => {
+test('the GAIA indexes all 793 of its parameters, not the 39 the hand map covers', () => {
   const index = buildInboundIndex(GAIA);
-  assert.equal(index.size, 793);
+  // 793 compiled, plus the three CCs the tone cutoffs declare as inbound — a knob can arrive on
+  // more than one message, so entries outnumber parameters.
+  assert.equal(index.size, 796);
+  assert.equal(index.unresolved.length, 0);
+  assert.deepEqual(index.collisions, []);
 });
 
 test('a message whose value is encoded differently still resolves', () => {
@@ -90,12 +120,65 @@ test('a message whose value is encoded differently still resolves', () => {
   assert.equal(matchInbound(index, fromDevice)?.parameterId, 'tone1.filter.cutoff');
 });
 
-test('the bytes after the head are handed back undecoded', () => {
-  // Decoding needs the value encoder, which is the half the two engines disagree about. Bytes are
-  // the honest answer; a caller that knows the encoding can say what they mean.
+test('the value bytes stop where the value stops', () => {
+  // Exactly as many bytes as this parameter's encoder occupies, so the checksum and the F7 that
+  // trail a DT1 are not mistaken for part of the value.
   const index = buildInboundIndex(GAIA);
-  assert.deepEqual(inboundValueBytes(index, 'F0 41 10 00 00 41 12 10 00 01 0C 05 0A 34 F7'), [5, 10, 0x34, 0xf7]);
+  assert.deepEqual(inboundValueBytes(index, 'F0 41 10 00 00 41 12 10 00 01 0C 05 34 F7'), [5],
+    'tone1.filter.cutoff is a u7: one byte, not the checksum and terminator too');
   assert.deepEqual(inboundValueBytes(index, 'B0 4A 5A'), [], 'a message that matches nothing has no value');
+});
+
+test('a value is decoded with the encoder its parameter declares', () => {
+  // The reason the width matters. A nibbled parameter read as one byte gives its top nibble — a
+  // plausible number, and the wrong one, from a message that matched. 4095 is 0x0FFF: four nibbles
+  // 0, 15, 15, 15. Reading one byte would say 0.
+  const index = buildInboundIndex(GAIA);
+  assert.deepEqual(decodeInbound(index, 'F0 41 10 00 00 41 12 10 00 04 01 00 0F 0F 0F 3E F7'),
+    { parameterId: 'distortion.parameter1', value: 4095 });
+  assert.deepEqual(decodeInbound(index, 'F0 41 10 00 00 41 12 10 00 01 0C 05 34 F7'),
+    { parameterId: 'tone1.filter.cutoff', value: 5 });
+  assert.equal(decodeInbound(index, 'F0 41 10 00 00 41 12 10 00 04 01 00 0F'), null,
+    'a message too short to hold its own value decodes to nothing');
+});
+
+test('every parameter decodes back to the value it was compiled from', () => {
+  // The round trip that matters for a bidirectional panel: encode a value, hand the bytes back, get
+  // the same number. Run across all 793 rather than a sample, because the encodings differ per
+  // parameter and a width bug shows up in one family at a time.
+  const index = buildInboundIndex(GAIA);
+  const failures = [];
+  for (const parameter of GAIA.parameters) {
+    const value = Math.min(Number(parameter?.range?.max ?? 1), 100);
+    if (!Number.isFinite(value)) continue;
+    const compiled = localCompileParameter(GAIA, { parameterId: parameter.id, value });
+    if (!compiled?.ok) continue;
+    const back = decodeInbound(index, compiled.hex);
+    if (back?.parameterId !== parameter.id || back?.value !== value) {
+      failures.push(`${parameter.id}: sent ${value}, read ${JSON.stringify(back)}`);
+    }
+  }
+  assert.deepEqual(failures.slice(0, 5), []);
+});
+
+test('a four-nibble value is not swallowed by the address', () => {
+  // A bug this file caught while being written. Probing values 0..127 on a four-nibble parameter
+  // leaves its top two bytes at zero every time, so they looked as fixed as the address, the prefix
+  // absorbed them, and the value was then read two bytes late. Probes now span the declared range.
+  const print = fingerprintParameter(GAIA, 'distortion.parameter1');
+  assert.equal(print.valueLength, 4);
+  assert.equal(print.prefix.length, 11, 'the prefix is the header and the four address bytes, nothing more');
+  assert.equal(print.valueStart, 11);
+});
+
+test('the read-back asks for the right number of bytes', () => {
+  // An RQ1 names a size. The Player hardcoded one byte for everything, which is right for a u7 and
+  // short for all 622 nibbled parameters and every 14-bit one.
+  const targets = Object.fromEntries(inboundReadTargets(buildInboundIndex(GAIA)).map((t) => [t.parameterId, t]));
+  assert.equal(targets['tone1.filter.cutoff'].valueLength, 1);
+  assert.equal(targets['distortion.parameter1'].valueLength, 4);
+  assert.equal(targets['tone1.filter.cutoff'].address, '10 00 01 0C');
+  assert.ok(!targets['master.volume'], 'a CC is not something an RQ1 can request');
 });
 
 test('an unknown message resolves to nothing rather than to something', () => {
@@ -132,23 +215,37 @@ test('the lookup maps come out in the shape the Player already reads', () => {
   assert.equal(maps.sysexIn['10 00 01 0C'], 'tone1.filter.cutoff');
   assert.equal(maps.sysexIn['10 00 00 0C'], 'common.patchLevel');
   assert.equal(Object.keys(maps.sysexIn).length, 792);
-  assert.deepEqual(maps.ccIn, { 7: 'master.volume' }, 'the profile declares exactly one CC recipe');
+  assert.deepEqual(maps.ccIn, {
+    7: 'master.volume',                 // the one CC the profile writes
+    102: 'tone1.filter.cutoff',         // and the three its knobs transmit, declared as inbound
+    103: 'tone2.filter.cutoff',
+    104: 'tone3.filter.cutoff',
+  });
 });
 
-test('the derived map agrees with the hand-written one wherever the ids still exist', () => {
+test('the derived map covers the hand-written one it replaces', () => {
   // Two independent derivations of the same thing, which is the strongest check available without
-  // hardware. Where they disagree it is the HAND map that is stale: it names twelve parameters that
-  // are no longer in the profile — tone1.filter.envAttack, since renamed envAttackTime — so those
-  // twelve inbound addresses currently resolve to nothing the panel binds.
+  // hardware. The hand map is what the Player used to read; this asserts the index says the same
+  // about every entry of it that is still real, INCLUDING the three CCs — those come from the
+  // profile's inbound declaration, and before it existed they were the one thing the hand map knew
+  // that the profile could not be asked.
+  //
+  // Where the two disagree it is the hand map that is stale: it names twelve parameters no longer
+  // in the profile — tone1.filter.envAttack, since renamed envAttackTime — so those twelve
+  // addresses resolved to nothing the panel binds, which is part of why it is being replaced.
   const runtime = JSON.parse(readText(fileURLToPath(
     new URL('../src/CE_Application/generated/roland.gaia.runtime.json', import.meta.url))));
-  const derived = inboundLookupMaps(buildInboundIndex(GAIA)).sysexIn;
+  const derived = inboundLookupMaps(buildInboundIndex(GAIA));
   const known = new Set(GAIA.parameters.map((p) => p.id));
 
   const stale = [];
   for (const [address, id] of Object.entries(runtime.sysexIn ?? {})) {
     if (!known.has(id)) { stale.push(id); continue; }
-    assert.equal(derived[address], id, `the two maps disagree about ${address}`);
+    assert.equal(derived.sysexIn[address], id, `the two maps disagree about ${address}`);
   }
   assert.equal(stale.length, 12, 'the hand map names parameters the profile no longer has');
+
+  for (const [cc, id] of Object.entries(runtime.ccIn ?? {})) {
+    assert.equal(derived.ccIn[cc], id, `the derived map lost CC ${cc}, which the hand map had`);
+  }
 });

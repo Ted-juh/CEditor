@@ -12,7 +12,7 @@
     "qa:panels": "node ../../tools/scripts/qa/make-qa-panels.mjs",
     "docs:manual": "node scripts/generate-scripting-manual.mjs",
     "test:all": "npm test && npm run test:script-exports",
-    "test:browser": "vite build --config browser-checks/vite.config.mjs && node browser-checks/run.mjs && node browser-checks/textPlacement.mjs"
+    "test:browser": "vite build --config browser-checks/vite.config.mjs && node browser-checks/run.mjs && node browser-checks/textPlacement.mjs && node browser-checks/playerInbound.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",

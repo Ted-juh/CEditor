@@ -2052,6 +2052,12 @@
         "source": "singleParameter"
       },
       "messageRecipe": "dt1",
+      "inbound": [
+        {
+          "kind": "cc",
+          "controller": 102
+        }
+      ],
       "ui": {
         "preferredComponent": "Knob"
       },
@@ -4159,6 +4165,12 @@
         "source": "singleParameter"
       },
       "messageRecipe": "dt1",
+      "inbound": [
+        {
+          "kind": "cc",
+          "controller": 103
+        }
+      ],
       "ui": {
         "preferredComponent": "Knob"
       },
@@ -6266,6 +6278,12 @@
         "source": "singleParameter"
       },
       "messageRecipe": "dt1",
+      "inbound": [
+        {
+          "kind": "cc",
+          "controller": 104
+        }
+      ],
       "ui": {
         "preferredComponent": "Knob"
       },

@@ -93,7 +93,76 @@ function recipeNumber(value, variables = {}, fallback = 0) {
  * outside what the nibble count can carry is refused rather than truncated — a silently wrapped
  * parameter is worse than one that does not send.
  */
-function encodeParameterValue(parameter, value) {
+/** 14-bit encoder names, spelled every way the profiles in this repo spell them. */
+const isU14 = (encoding) =>
+  encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb' || encoding === 'u14-lsb-msb';
+
+/**
+ * How many nibbles this parameter's value occupies, or an error.
+ *
+ * Absent means two, and 1-8 is a hard bound rather than a clamp — both straight from C++. Not
+ * pedantry: clamping an absent count would silently pick ONE nibble where the engine picks two,
+ * which is the same shape of quiet disagreement the nibbled encoder exists to end.
+ */
+function nibbleCount(parameter) {
+  const declared = parameter?.encoding?.nibbles;
+  const nibbles = declared === undefined || declared === null ? 2 : Math.round(Number(declared));
+  if (!Number.isFinite(nibbles) || nibbles <= 0 || nibbles > 8) {
+    return { error: `Nibbled encoder requires 1-8 nibbles for ${parameter?.id ?? ''}` };
+  }
+  return { nibbles };
+}
+
+/**
+ * How many bytes this parameter's value occupies on the wire.
+ *
+ * Needed by anything reading MESSAGES rather than building them — the inbound index, which must know
+ * where a value ends, and the RQ1 read-back, which has to ask for the right number of bytes. Both
+ * previously assumed one, which is right for a u7 and wrong for the 622 nibbled parameters and every
+ * 14-bit one.
+ */
+export function parameterValueWidth(parameter) {
+  const encoding = String(parameter?.encoding?.type ?? 'u7');
+  if (isU14(encoding)) return 2;
+  if (encoding === 'nibbled') return nibbleCount(parameter).nibbles ?? 0;
+  return 1;
+}
+
+/**
+ * The inverse of the encoder: wire bytes back to a value.
+ *
+ * MIRRORS the dump decoder in DeviceProfileEngine.cpp, which is the only place C++ reads a value out
+ * of a message — same encoder names, same nibble order, same 7-bit masking. Returns null when the
+ * bytes cannot be a value of this shape, so a caller can ignore a message rather than move a control
+ * to a number it invented.
+ */
+export function decodeParameterValue(parameter, bytes) {
+  const encoding = String(parameter?.encoding?.type ?? 'u7');
+  const list = Array.isArray(bytes) ? bytes.map((b) => Number(b)) : [];
+  if (list.some((b) => !Number.isFinite(b))) return null;
+  if (list.length < parameterValueWidth(parameter)) return null;
+
+  if (encoding === 'boolean-u7') return (list[0] & 0x7f) === 0 ? 0 : 1;
+  if (encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb') {
+    return ((list[0] & 0x7f) << 7) | (list[1] & 0x7f);
+  }
+  if (encoding === 'u14-lsb-msb') return ((list[1] & 0x7f) << 7) | (list[0] & 0x7f);
+  if (encoding === 'nibbled') {
+    const { nibbles, error } = nibbleCount(parameter);
+    if (error) return null;
+    let number = 0;
+    for (let i = 0; i < nibbles; i++) number = (number << 4) | (list[i] & 0x0f);
+    return number;
+  }
+  if (encoding === 'u8') return list[0] & 0xff;
+  if (encoding === 's7') {
+    const signedOffset = Number(parameter?.encoding?.signedOffset ?? 64);
+    return (list[0] & 0x7f) - (Number.isFinite(signedOffset) ? signedOffset : 64);
+  }
+  return list[0] & 0x7f;
+}
+
+export function encodeParameterValue(parameter, value) {
   const encoding = String(parameter?.encoding?.type ?? 'u7');
   if (encoding === 'boolean-u7') {
     const on = value === true || ['true', 'on', 'yes', '1'].includes(String(value).toLowerCase());
@@ -104,14 +173,8 @@ function encodeParameterValue(parameter, value) {
     return { bytes: [(number >> 7) & 0x7f, number & 0x7f], number, normalized: number / 16383, displayed: String(number) };
   }
   if (encoding === 'nibbled') {
-    // Absent means two, and 1-8 is a hard bound rather than a clamp — both straight from C++. Not
-    // pedantry: clamping an absent count would silently pick ONE nibble where the engine picks two,
-    // which is the same shape of quiet disagreement this branch exists to end.
-    const declared = parameter?.encoding?.nibbles;
-    const nibbles = declared === undefined || declared === null ? 2 : Math.round(Number(declared));
-    if (!Number.isFinite(nibbles) || nibbles <= 0 || nibbles > 8) {
-      return { error: `Nibbled encoder requires 1-8 nibbles for ${parameter?.id ?? ''}` };
-    }
+    const { nibbles, error } = nibbleCount(parameter);
+    if (error) return { error };
     const max = 16 ** nibbles;
     const number = Math.round(Number(value) || 0);
     if (number < 0 || number >= max) {

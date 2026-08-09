@@ -23,7 +23,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 
-import { localCompileParameter } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
+import {
+  decodeParameterValue,
+  localCompileParameter,
+  parameterValueWidth,
+} from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 import { readText } from './support/readText.mjs';
 
 const GAIA = JSON.parse(readText(fileURLToPath(
@@ -115,6 +119,36 @@ test('every parameter in the profile compiles', () => {
   }
   assert.deepEqual(failures, []);
   assert.equal(GAIA.parameters.length, 793);
+});
+
+test('the decoder reads back what each encoder writes', () => {
+  // The inverse direction, added when the panel learned to FOLLOW the instrument rather than only
+  // drive it. It mirrors the dump decoder in DeviceProfileEngine.cpp, so the branches the GAIA never
+  // exercises — u8, s7, lsb-first 14-bit — are checked here rather than left to a device that has
+  // one. Width comes first because everything downstream slices by it: read a four-nibble value as
+  // one byte and you get its top nibble, which is a plausible number and the wrong one.
+  const cases = [
+    [{ type: 'u7' }, 1, [0x5a], 90],
+    [{ type: 'u8' }, 1, [0xc8], 200],
+    [{ type: 's7' }, 1, [0x00], -64],
+    [{ type: 's7', signedOffset: 64 }, 1, [0x7f], 63],
+    [{ type: 'u14-msb-lsb' }, 2, [0x01, 0x00], 128],
+    [{ type: 'u14-lsb-msb' }, 2, [0x00, 0x01], 128],
+    [{ type: 'nibbled', nibbles: 2 }, 2, [0x0f, 0x0f], 255],
+    [{ type: 'nibbled', nibbles: 4 }, 4, [0x00, 0x0f, 0x0f, 0x0f], 4095],
+    [{ type: 'nibbled' }, 2, [0x01, 0x0a], 26],
+    [{ type: 'boolean-u7' }, 1, [127], 1],
+  ];
+  for (const [encoding, width, bytes, expected] of cases) {
+    const parameter = { id: 'p', encoding };
+    assert.equal(parameterValueWidth(parameter), width, `${encoding.type}: wrong width`);
+    assert.equal(decodeParameterValue(parameter, bytes), expected, `${encoding.type}: wrong value`);
+  }
+
+  assert.equal(decodeParameterValue({ encoding: { type: 'nibbled', nibbles: 4 } }, [0x00, 0x0f]), null,
+    'too few bytes decodes to nothing rather than to a partial value');
+  assert.equal(decodeParameterValue({ encoding: { type: 'nibbled', nibbles: 9 } }, [1, 2]), null,
+    'an encoder the sender would refuse does not silently decode');
 });
 
 test('the checksum covers the nibbles that are actually sent', () => {

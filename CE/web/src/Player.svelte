@@ -15,9 +15,11 @@
   import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState, requestProfileSource } from './CE_Application/stores/deviceProfiles.js';
   import { profileSources, latestPresetListScan } from './CE_Application/stores/deviceProfileStores.js';
   import { injectPresetRowsIntoPanel } from './CE_Application/utils/presetChoiceRows.js';
+  import { buildInboundIndex, decodeInbound, inboundReadTargets } from './CE_Application/utils/inboundParameterIndex.js';
   import { getDeviceSessionState } from './CE_Application/bridge/bridge.js';
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, listProfileParameters, onMidiInputMessage, onSysexInputMessage, triggerRawMidiAction } from './CE_Application/bridge/bridge.js';
-  // Inbound decode maps are generated from the DPD device profile (CE/dpd), not hardcoded.
+  // The GAIA-specific inbound maps this used to decode with. Now only a fallback for the window
+  // before the profile source arrives — see the index below, which covers any profile.
   import deviceRuntime from './CE_Application/generated/roland.gaia.runtime.json';
   import { DEFAULT_DEVICE_ROLE } from './CE_Application/stores/deviceConstants.js';
 
@@ -40,18 +42,31 @@
   let currentSession = {};
 
   // --- Incoming MIDI (bidirectional): the panel follows the synth ---
-  // The GAIA's filter knob transmits CC 102/103/104 (Tone 1/2/3 cutoff). Map the CCs we
-  // mirror on-screen to device parameters. First pass — later sourced from the device profile.
-  // INBOUND_CC (cc -> paramId) and INBOUND_SYSEX (DT1 address -> paramId) are DERIVED from the
-  // DPD runtime map (CE/dpd/tools/emit-runtime.mjs) — the "maps -> profile" generalization, no
-  // hardcoding. This slim panel binds Tone 1 with flat ids ('filter.cutoff'), so resolved
-  // 'tone1.*' ids map back to flat; 'tone2/3.*' entries stay scoped (unbound here -> ignored).
-  const flatId = (rid) => rid.replace(/^tone1\./, '');
-  const INBOUND_CC = Object.fromEntries(Object.entries(deviceRuntime.ccIn ?? {}).map(([cc, rid]) => [Number(cc), flatId(rid)]));
-  const INBOUND_SYSEX = Object.fromEntries(Object.entries(deviceRuntime.sysexIn ?? {}).map(([addr, rid]) => [addr, flatId(rid)]));
+  // Built from the loaded device profile by compiling each parameter and keeping the bytes that do
+  // not move — see utils/inboundParameterIndex.js. It replaces a hand-emitted map that covered 39
+  // of the GAIA's 793 parameters and named 12 the profile no longer has, so turning a knob on the
+  // instrument moved the matching control for 39 of them and silently did nothing for the rest.
+  let inboundIndex = $state(null);
+
+  // Until the profile source arrives (it is fetched over the bridge, asynchronously) fall back to
+  // the generated map, so inbound never goes backwards from where it was. Both are the same shape
+  // of answer; the index is the one that covers the whole instrument.
+  const FALLBACK_CC = Object.fromEntries(Object.entries(deviceRuntime.ccIn ?? {}).map(([cc, id]) => [Number(cc), id]));
+  const FALLBACK_SYSEX = { ...(deviceRuntime.sysexIn ?? {}) };
+
   let paramControlMap = {};  // parameterId -> controlId, rebuilt from the loaded panel's bindings
   let paramPortMap = {};     // parameterId -> binding port (value | brightness | backlight | text | …)
   let paramRows = {};        // parameterId -> Value.rows (choice controls), for numeric -> id mapping
+
+  // The generated GAIA panel binds scoped ids ('tone1.filter.cutoff'); the slim demo panel binds
+  // Tone 1 flat ('filter.cutoff'). Try the id the profile gave, then the flat form, so a panel
+  // written either way binds — 'tone2/3.*' simply find no control in a flat panel and are ignored.
+  const flatId = (id) => String(id).replace(/^tone1\./, '');
+  function panelKeyFor(parameterId) {
+    if (paramControlMap[parameterId]) return parameterId;
+    const flat = flatId(parameterId);
+    return paramControlMap[flat] ? flat : null;
+  }
 
   // Coalesce high-rate incoming CC to ONE DOM update per animation frame. The GAIA streams
   // CC 102/103/104 on every knob tick (hundreds/sec); applying each immediately floods
@@ -198,9 +213,10 @@
   // Queue a decoded device value for the next frame (shared by the CC and SysEx decoders).
   // For choice controls (radio/combobox) the device sends a NUMERIC value, but the control keys
   // on the row's id — so map number -> row.internalValue here; sliders keep the numeric value.
-  function queueControlValue(parameterId, value) {
+  function queueControlValue(rawParameterId, value) {
+    const parameterId = panelKeyFor(rawParameterId);
+    if (!parameterId) return;
     const controlId = paramControlMap[parameterId];
-    if (!controlId) return;
     const rows = paramRows[parameterId];
     let v;
     if (rows && rows.length) {
@@ -219,9 +235,10 @@
   // Incoming CC (GAIA knob with Tx Edit Data OFF -> CC 102/103/104).
   function applyIncomingMidi(payload) {
     if (!payload || payload.messageType !== 'cc' || !payload.hex) return;
+    if (inboundIndex) { applyDecoded(payload.hex); return; }
     const b = String(payload.hex).trim().split(/\s+/).map((h) => parseInt(h, 16));
     if (b.length < 3 || (b[0] & 0xf0) !== 0xb0) return;  // CC status nibble 0xB
-    const parameterId = INBOUND_CC[b[1]];
+    const parameterId = FALLBACK_CC[b[1]];
     if (parameterId) queueControlValue(parameterId, b[2]);
   }
 
@@ -229,12 +246,21 @@
   // F0 41 <dev> 00 00 41 12 <a0 a1 a2 a3> <data...> <checksum> F7
   function applyIncomingSysex(payload) {
     if (!payload || !payload.hex) return;
+    if (inboundIndex) { applyDecoded(payload.hex); return; }
     const b = String(payload.hex).trim().split(/\s+/).map((h) => parseInt(h, 16));
     if (b.length < 14 || b[0] !== 0xF0 || b[1] !== 0x41 || b[6] !== 0x12) return;  // Roland DT1
     if (b[3] !== 0x00 || b[4] !== 0x00 || b[5] !== 0x41) return;                   // model 00 00 41
     const addr = b.slice(7, 11).map((x) => x.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-    const parameterId = INBOUND_SYSEX[addr];
+    const parameterId = FALLBACK_SYSEX[addr];
     if (parameterId) queueControlValue(parameterId, b[11]);  // 1-byte value (cutoff/resonance 0-127)
+  }
+
+  // Both paths, once the index is up: it recognises the message and decodes the value with the
+  // parameter's own encoder, which is what makes a nibbled parameter read as its whole value rather
+  // than as its top nibble. An unknown or ambiguous message returns null and is ignored.
+  function applyDecoded(hex) {
+    const hit = decodeInbound(inboundIndex, hex);
+    if (hit) queueControlValue(hit.parameterId, hit.value);
   }
 
   // --- SysEx read-back (RQ1): ask the synth for the current value of each bound parameter.
@@ -245,17 +271,24 @@
     for (const v of bytes) sum = (sum + v) & 0x7f;
     return (128 - sum) & 0x7f;
   }
+  // What to ask for, and how many bytes each answer is. The size mattered and was wrong: this asked
+  // for one byte for every parameter, which is right for a u7 and short for every nibbled and
+  // 14-bit one — the instrument would have answered with a message longer than the request implied.
+  function readTargets() {
+    if (inboundIndex) return inboundReadTargets(inboundIndex);
+    return Object.entries(FALLBACK_SYSEX).map(([address, parameterId]) => ({ parameterId, address, valueLength: 1 }));
+  }
+
   function syncFromSynth() {
     if (!hasBridge) return;
-    for (const addr in INBOUND_SYSEX) {
-      const parameterId = INBOUND_SYSEX[addr];
-      if (!paramControlMap[parameterId]) continue;       // only request params present on this panel
-      const addrBytes = addr.split(/\s+/).map((h) => parseInt(h, 16));
-      const size = [0x00, 0x00, 0x00, 0x01];             // 1-byte params (cutoff/resonance)
+    for (const target of readTargets()) {
+      if (!panelKeyFor(target.parameterId)) continue;    // only request params present on this panel
+      const addrBytes = target.address.split(/\s+/).map((h) => parseInt(h, 16));
+      const size = [0x00, 0x00, 0x00, target.valueLength & 0x7f];
       const body = [0xF0, 0x41, 0x7F, 0x00, 0x00, 0x41, 0x11, ...addrBytes, ...size,
         rolandChecksum([...addrBytes, ...size]), 0xF7];
       const message = body.map((v) => v.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-      triggerRawMidiAction({ deviceRole: DEFAULT_DEVICE_ROLE, actionId: `rq1_${parameterId}`, message, dryRun: false });
+      triggerRawMidiAction({ deviceRole: DEFAULT_DEVICE_ROLE, actionId: `rq1_${target.parameterId}`, message, dryRun: false });
     }
   }
 
@@ -366,6 +399,21 @@
     try { profile = JSON.parse(source); } catch { return; }
     const result = injectPresetRowsIntoPanel(panel, profile, scan);
     if (result.updated && result.panel !== panel) panel = result.panel;
+  });
+
+  // Build the inbound index from the same profile source. Once per profile, not per message: it
+  // compiles every parameter five times, measured at ~87ms for the GAIA's 793, which would be
+  // absurd on a CC stream (a matched message costs ~4us, a wholly unrecognised one ~9us). Kept
+  // deliberately independent of `panel` — the index describes the instrument, not the layout, so
+  // loading a different panel against the same synth does not rebuild it.
+  let indexedProfileId = '';
+  $effect(() => {
+    const source = $profileSources?.[profileId]?.source;
+    if (!source || indexedProfileId === profileId) return;
+    let profile = null;
+    try { profile = JSON.parse(source); } catch { return; }
+    indexedProfileId = profileId;
+    inboundIndex = buildInboundIndex(profile);
   });
 
   // Fit the panel inside the viewport (whole panel visible), capped at 1x.

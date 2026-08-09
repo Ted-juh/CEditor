@@ -121,7 +121,24 @@ function preferredComponent(entry) {
   return /Env |Level$|Time$/.test(entry.name) ? 'Slider' : 'Knob';
 }
 
-function buildParameter(entry, { idPrefix, group, blockOffset }) {
+/**
+ * The messages the GAIA SENDS that the editor never sends to it.
+ *
+ * A synth's own panel does not have to echo the editor's write path. Everything here is written as
+ * a DT1 to an address, but turning the physical CUTOFF knob transmits a CC — 102, 103 and 104 for
+ * tones 1, 2 and 3 — and nothing derived from the write path can recognise those. So the profile
+ * has to say it, and this is the only place that knows.
+ *
+ * Not a new idea: the DPD authoring schema has always had an `rxLive` wire direction, and
+ * `CE/dpd/library/roland.gaia.json` declares exactly this as {msg:'cc', cc:102, ccStride:1}. This
+ * profile is generated from the address map rather than from DPD, so it needs its own statement of
+ * the same fact. Keyed by section.leaf, applied per tone.
+ */
+const TONE_INBOUND = {
+  'filter.cutoff': (tone) => [{ kind: 'cc', controller: 101 + tone }],
+};
+
+function buildParameter(entry, { idPrefix, group, blockOffset, inbound }) {
   const { section, leaf } = splitName(entry.name);
   const id = [idPrefix, section, leaf].filter(Boolean).join('.');
   const address = addressFor(blockOffset, entry.offset);
@@ -133,6 +150,7 @@ function buildParameter(entry, { idPrefix, group, blockOffset }) {
     address,
     access: { canRead: true, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
     messageRecipe: 'dt1',
+    ...(inbound?.length ? { inbound } : {}),
     ui: { preferredComponent: preferredComponent(entry) },
   };
 
@@ -272,7 +290,7 @@ export function buildProfile() {
 
   for (const tone of [1, 2, 3]) {
     for (const entry of PATCH_TONE) {
-      const { section } = splitName(entry.name);
+      const { section, leaf } = splitName(entry.name);
       const SECTION_LABEL = { osc: 'OSC', filter: 'Filter', amp: 'Amp', lfo: 'LFO', modLfo: 'Mod LFO' };
       parameters.push(buildParameter(entry, {
         idPrefix: `tone${tone}`,
@@ -280,6 +298,7 @@ export function buildProfile() {
         // without inspecting parameter ids.
         group: `Tone ${tone} · ${SECTION_LABEL[section] ?? 'Misc'}`,
         blockOffset: BLOCKS[`tone${tone}`],
+        inbound: TONE_INBOUND[`${section}.${leaf}`]?.(tone),
       }));
     }
   }

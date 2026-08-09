@@ -131,6 +131,15 @@ function legacyParam(p) {
   out.messageRecipe = p.wires?.write?.msg === 'cc' ? ('cc' + p.wires.write.cc)
     : p.wires?.write?.msg === 'nrpn' ? ('nrpn' + String(p.wires.write.nrpn ?? '').replace(/\s+/g, ''))
     : (p.wires?.write?.msg ?? 'dt1');
+  // An rxLive wire is the message the instrument SENDS when its own control moves, which need not be
+  // the one the editor writes: a GAIA's filter knob is written as a DT1 to an address and transmitted
+  // as CC 102/103/104. Nothing derived from the write path can recognise those, so the inbound index
+  // needs it declared. This was resolved per instance and then dropped on the floor here, which is
+  // why the Player still carried a hand-written CC map. Only emitted when it differs from the write
+  // wire — when they are the same, the write path already describes the message.
+  const rx = p.wires?.rxLive;
+  const writeCc = p.wires?.write?.msg === 'cc' ? p.wires.write.cc : null;
+  if (rx?.msg === 'cc' && rx.cc != null && rx.cc !== writeCc) out.inbound = [{ kind: 'cc', controller: rx.cc }];
   out.ui = p.ui ?? { preferredComponent: p.valueType === 'enum' ? 'RadioButtonGroup' : 'Slider' };
   return out;
 }
