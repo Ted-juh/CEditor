@@ -638,6 +638,9 @@
 
     // Start drag
     isDragging = true;
+    // The document and the selection are fixed for the length of the gesture, so the drop targets
+    // are worked out here rather than on every move. Cleared in handleDragEnd.
+    dropCandidates = buildDropCandidates();
     dragStartMouse = { x: e.clientX, y: e.clientY };
     dragStartPos = { x: transform?.x ?? 0, y: transform?.y ?? 0 };
     transientX = dragStartPos.x;
@@ -786,7 +789,20 @@
   // The container currently under the pointer that this drag could drop into —
   // deepest container whose panel-space AABB contains the point, excluding the
   // dragged subtree(s) and any locked/hidden container (or one under one).
-  function dropCandidateAt(panelX, panelY) {
+  /**
+   * The containers this drag could drop into, as flat rects — computed ONCE per gesture.
+   *
+   * Everything here is a property of the document and the selection, and a drag changes neither:
+   * the move handler only writes transientX/transientY, and the document is not patched until
+   * mouseup. Only the pointer moves, and the pointer is the query, not the data.
+   *
+   * It used to be rebuilt on every mousemove: buildControlIndex over the whole tree,
+   * flatControlsWithPanelRects shallow-copying all 413 controls with a fresh Transform each, and
+   * a getAncestorIds walk per candidate. Roughly twelve hundred objects allocated per mouse move,
+   * sixty times a second — which is most of the garbage collector time in a drag profile, and it
+   * bought an answer that could not have changed since the drag began.
+   */
+  function buildDropCandidates() {
     const ids = get(selectedComponentIds);
     const movingRoots = ids.size > 1 && ids.has(core?.id) ? selectionRoots(panelControls, ids) : [core?.id];
     const excluded = new Set();
@@ -794,10 +810,11 @@
       const rootControl = findControlById(panelControls, rootId);
       if (rootControl) for (const subId of collectSubtreeIds(rootControl)) excluded.add(subId);
     }
+
     const index = buildControlIndex(panelControls);
-    let best = null;
-    // Consider every container in the tree (panel-space rects), so a component
-    // can be dropped into a nested container, not just a top-level one.
+    const candidates = [];
+    // Every container in the tree, in panel space, so a component can be dropped into a nested
+    // container and not just a top-level one.
     for (const entry of flatControlsWithPanelRects(panelControls)) {
       const entryCore = entry._children?.Core;
       const entryTransform = entry._children?.Transform;
@@ -808,10 +825,28 @@
         const ancestorCore = index.get(ancestorId)?.control?._children?.Core;
         return ancestorCore?.locked === true || ancestorCore?.visible === false;
       })) continue;
-      if (panelX < entryTransform.x || panelX > entryTransform.x + entryTransform.width) continue;
-      if (panelY < entryTransform.y || panelY > entryTransform.y + entryTransform.height) continue;
-      const depth = index.get(entryCore.id)?.depth ?? 0;
-      if (!best || depth >= best.depth) best = { id: entryCore.id, depth };
+      candidates.push({
+        id: entryCore.id,
+        depth: index.get(entryCore.id)?.depth ?? 0,
+        x: entryTransform.x,
+        y: entryTransform.y,
+        right: entryTransform.x + entryTransform.width,
+        bottom: entryTransform.y + entryTransform.height,
+      });
+    }
+    return candidates;
+  }
+
+  // Held for the length of one gesture; null whenever no gesture is in flight.
+  let dropCandidates = null;
+
+  function dropCandidateAt(panelX, panelY) {
+    const candidates = dropCandidates ?? buildDropCandidates();
+    let best = null;
+    for (const entry of candidates) {
+      if (panelX < entry.x || panelX > entry.right) continue;
+      if (panelY < entry.y || panelY > entry.bottom) continue;
+      if (!best || entry.depth >= best.depth) best = entry;
     }
     return best?.id ?? null;
   }
@@ -925,6 +960,7 @@
     multiDragDelta.set({ x: 0, y: 0, active: false });
 
     isDragging = false;
+    dropCandidates = null;
     transientX = null;
     transientY = null;
     snapGuides = [];
