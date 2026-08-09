@@ -20,10 +20,17 @@ export async function resolve(specifier, context, nextResolve) {
   try {
     return await nextResolve(specifier, context);
   } catch (error) {
-    // Vite resolves extensionless TypeScript imports (`from './dragScrub'`);
-    // Node does not, so retry the bare specifier with the extension added.
+    // Vite resolves extensionless imports; Node does not, so retry with an extension. `.ts` first,
+    // because that is what this project's own source means by it (`from './dragScrub'`). `.js`
+    // second, because a published package can do the same — lucide-svelte's Icon.svelte imports
+    // './defaultAttributes' and ships it as .js, which made every component using an icon
+    // impossible to render in a test at all.
     if (error?.code === 'ERR_MODULE_NOT_FOUND' && !/\.[a-z]+$/i.test(specifier)) {
-      return nextResolve(`${specifier}.ts`, context);
+      for (const ext of ['.ts', '.js']) {
+        try {
+          return await nextResolve(`${specifier}${ext}`, context);
+        } catch { /* try the next extension, then give up with the original error */ }
+      }
     }
     throw error;
   }

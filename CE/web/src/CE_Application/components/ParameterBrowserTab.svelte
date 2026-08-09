@@ -43,6 +43,7 @@
   import dpdRuntime from '../generated/roland.gaia.runtime.json';
   import dpdProfileMap from '../generated/dpdProfileMap.json';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
+  import { listMidiDestinations, listMidiInputs } from '../bridge/bridge.js';
 
   let query = $state('');
   let showAllIssues = $state(false);
@@ -156,6 +157,12 @@
   onMount(() => {
     refreshDeviceProfiles();
     refreshProfileParameters(selectedProfileId);
+    // Ask C++ what ports exist. initDeviceProfileBridge registers the listener for the reply but
+    // never sends the request, and only Player.svelte ever did — so in the editor these two
+    // dropdowns sat on their defaults ("Preview Only", "No MIDI Input") even on a desktop build
+    // with hardware attached. Nothing was broken down in the C++; nobody had asked it anything.
+    listMidiDestinations();
+    listMidiInputs();
   });
 
   $effect(() => {
@@ -958,17 +965,22 @@
 
 <div class="parameter-browser">
   <div class="toolbar">
-    <select value={selectedProfileId} onchange={(e) => handleProfileChange(e.target.value)}>
+    <!--
+      Three anonymous dropdowns read as decoration. They are the profile and the two MIDI ports, and
+      being unable to tell which is which is most of why people conclude the app has no MIDI at all.
+      The direction toggle beside them was already labelled; these now are too.
+    -->
+    <select aria-label="Device profile" title="Device profile" value={selectedProfileId} onchange={(e) => handleProfileChange(e.target.value)}>
       {#each $deviceProfiles as profile (profile.id)}
         <option value={profile.id}>{profile.name || profile.id}</option>
       {/each}
     </select>
-    <select value={selectedDestinationId} onchange={(e) => handleDestinationChange(e.target.value)}>
+    <select aria-label="MIDI output" title="MIDI output — where control values are sent" value={selectedDestinationId} onchange={(e) => handleDestinationChange(e.target.value)}>
       {#each $midiDestinations as destination (destination.id)}
         <option value={destination.id}>{destination.name || destination.id}</option>
       {/each}
     </select>
-    <select value={selectedInputId} onchange={(e) => handleInputChange(e.target.value)}>
+    <select aria-label="MIDI input" title="MIDI input — where values are read back from" value={selectedInputId} onchange={(e) => handleInputChange(e.target.value)}>
       {#each $midiInputs as input (input.id)}
         <option value={input.id}>{input.name || input.id}</option>
       {/each}
