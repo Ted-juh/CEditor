@@ -2,7 +2,11 @@
    EVERY selector is prefixed with `.dpd-app` so these generic class names (.btn, .stage,
    .toolbar, .screen, table…) never collide with the rest of the editor. Imported once by
    DeviceProfileDesignerV2.svelte; all DPD subcomponents render inside .dpd-app and share it. */
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* The web faces are NOT imported here. A stylesheet @import is render-blocking, and Vite hoists
+   it to the top of the bundle, so this one — needed by a single screen — held up the whole
+   editor's first paint until the network answered: 12.5 s of blank window on a machine that
+   cannot reach fonts.googleapis.com. They are fetched after mount instead, off the critical
+   path, by utils/webFonts.js. Every rule below already names a fallback. */
 
 .dpd-app{
   --bg:#0c0e12;--bg-2:#13161c;--panel:#171b22;--panel-2:#1c2129;
