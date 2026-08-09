@@ -127,6 +127,36 @@ test('a radius smaller than the border still closes its corner', () => {
   }
 });
 
+test('a corner with no shape emits no segment', () => {
+  // A square corner has nothing to draw, and buildCornerPath said so with the bare moveto to its
+  // anchor — which SVG does not stroke, so every square-cornered control with a border was paying
+  // for four <path> elements that rendered blank. The four sides are still there.
+  const border = { enabled: true, linked: true, style: 'solid', thickness: 2, colour: 'FF102030' };
+  const segments = buildBorderSegments(120, 32, border,
+    { linked: true, radius: 0, style: 'rounded', borderEnabled: true });
+
+  assert.equal(segments.filter((s) => s.kind === 'side').length, 4, 'the sides should be unaffected');
+  assert.deepEqual(segments.filter((s) => s.kind === 'corner'), [], 'a square corner emitted a segment');
+});
+
+test('every segment emitted has something to draw', () => {
+  // The general form, across the shapes and the awkward radii, so a future degenerate case cannot
+  // quietly start emitting blanks again.
+  const border = { enabled: true, linked: true, style: 'solid', thickness: 6, colour: 'FF102030' };
+  for (const style of ['rounded', 'chamfer', 'notch', 'straight']) {
+    for (const direction of ['outward', 'inward']) {
+      for (const radius of [0, 1, 2, 6, 40, 999]) {
+        const segments = buildBorderSegments(60, 60, border,
+          { linked: true, radius, style, direction, borderEnabled: true });
+        for (const seg of segments) {
+          assert.match(seg.d, /[LlHhVvCcSsQqTtAaZz]/,
+            `${style}/${direction}/r${radius} emitted "${seg.d}", which SVG will not stroke`);
+        }
+      }
+    }
+  }
+});
+
 test('corner radius is clamped to half the box (no oversized border arcs)', () => {
   const border = { enabled: true, linked: true, style: 'solid', thickness: 2, colour: 'FFFFFFFF' };
   // Round shapes (circle/ring/capsule) store radius: 999 to mean "fully round".

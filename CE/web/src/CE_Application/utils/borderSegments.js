@@ -355,6 +355,32 @@ function cornerLineJoin(style) {
   return style === 'rounded' ? 'round' : 'miter';
 }
 
+/**
+ * Does this path have anything to stroke?
+ *
+ * A corner with no radius, or one whose arc has collapsed, has no shape to draw, and buildCornerPath
+ * says so by returning the bare moveto to its anchor. SVG will not stroke that: "a subpath
+ * consisting of a single moveto shall not be stroked" (SVG 1.1 §11.4), which holds for round and
+ * square linecaps too — those revive a zero-length *subpath* like `M 1 1 L 1 1`, not a lone moveto.
+ *
+ * So emitting one costs a <path> element, a Svelte keyed block and a gradient lookup to paint
+ * nothing. Every square-cornered control with a border was emitting four of them — a Label at
+ * defaults is exactly that, and so is anything else that takes a border without rounding it.
+ *
+ * Worth being accurate about the size of this: the GAIA panel saves nothing, because all 163 of its
+ * bordered controls are rounded. The four-per-control is real but it is a tax on square borders,
+ * not a panel-wide win, and it is not where the 413-control open time goes.
+ *
+ * NOT fixed by dropping them, because they never painted it either: at a square corner the two
+ * sides meet at their centerlines and leave (thickness/2 - 1)px of the outer corner uncovered — 0px
+ * at the 1-2px borders nearly everything uses, 2px at 6. Closing it means letting the sides run to
+ * the box edge when there is no corner shape, which is a change to what borders look like rather
+ * than to how many nodes they cost, so it is not smuggled in here.
+ */
+function isDrawn(d) {
+  return /[LlHhVvCcSsQqTtAaZz]/.test(String(d ?? ''));
+}
+
 function acrossAxisForSide(side, x, y, t) {
   switch (side) {
     case 'top':    return { x1: x,     y1: y + t, x2: x,     y2: y - t };
@@ -564,6 +590,9 @@ export function buildBorderSegments(W, H, border, corners) {
           });
         });
       } else {
+        // A corner that draws nothing does not need a segment. The linear-piece branch above always
+        // has legs to draw, so only this one can degenerate.
+        if (!isDrawn(d)) continue;
         result.push({
           kind: 'corner', key, pos, d,
           thick: l.thick, colour: l.colour, dasharray: l.dasharray, linecap: l.linecap,
