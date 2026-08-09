@@ -326,7 +326,7 @@ section('Universal bulk dumps (assemble / parse / round-trip)');
   const mp = Object.fromEntries(ld.mappings.map((m) => [m.parameter, m]));
   ok(!mp.cutoff.codec, 'emit: u7 mapping carries no codec (engine default)');
   eq(mp.pitch.codec?.type, 'u14-msb-lsb', 'emit: u14 -> engine u14-msb-lsb');
-  ok(mp.level.codec?.type === 'nibbled' && mp.level.codec.bytes === 2, 'emit: nibbles -> engine nibbled(bytes:2)');
+  ok(mp.level.codec?.type === 'nibbled' && mp.level.codec.nibbles === 2, 'emit: nibbles -> engine nibbled, count under the key the engine reads');
   ok(mp.patchName.codec?.type === 'text-ascii' && mp.patchName.codec.length === 1 && mp.patchName.codec.pad === 32, 'emit: text-ascii name mapping');
   ok(mp.tune.codec?.type === 's7' && mp.tune.codec.signedOffset === 64, 'emit: s7 ships a signed dump codec (engine decodes the sign)');
   ok(!emit.notes.some((n) => /s7/.test(n)), 'emit: no s7 degrade note (engine supports it)');
@@ -334,6 +334,15 @@ section('Universal bulk dumps (assemble / parse / round-trip)');
   // emitted into a full legacy profile; the Korg payload-pack is now SHIPPED (the C++ engine unpacks it)
   const legacy = buildLegacyProfile({ ...dev, label: 'Syn', dumps: [dump] }, {});
   ok(Array.isArray(legacy.dumpDefinitions) && legacy.dumpDefinitions.length === 1, 'buildLegacyProfile carries dumpDefinitions');
+  // The single-parameter SEND encoder, which is a different code path from the dump codec above and
+  // had no coverage. The engine matches this name as an exact string and fails the send on anything
+  // it does not know, so a parameter emitted with the DPD word is a control that silently does
+  // nothing. Assert the word AND the count key: a right-named encoder reading a missing count just
+  // defaults to two nibbles, which is the same wrong value with no error.
+  const lp = Object.fromEntries((legacy.parameters ?? []).map((p) => [p.id, p]));
+  const levelEnc = lp.level?.encoding;
+  ok(levelEnc?.type === 'nibbled' && levelEnc.nibbles === 2, 'emit: parameter encoder is the engine word, with its count');
+  ok(!Object.values(lp).some((p) => p.encoding?.type === 'nibbles'), 'emit: no DPD-only encoder name reaches a runtime profile');
   const kEmit = buildDumpDefinitions({ ...korg, dumps: [korgDump] });
   ok(kEmit.dumpDefinitions[0].payload?.pack?.type === 'packed8to7' && kEmit.dumpDefinitions[0].engineSupported !== false, 'emit: Korg payload-pack shipped (engine unpacks it, no longer flagged)');
   ok(!kEmit.notes.some((n) => /block-packing/.test(n)), 'emit: no block-packing gap note (engine supports it)');

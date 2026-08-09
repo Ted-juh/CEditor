@@ -168,7 +168,15 @@ function buildParameter(entry, { idPrefix, group, blockOffset }) {
       ...(bipolar ? { min: entry.displayMin, max: entry.displayMax } : {}),
     },
     normalization: { mode: 'linear' },
-    encoding: entry.nibbles ? { type: 'nibbles', count: entry.nibbles } : { type: 'u7' },
+    // `nibbled` with a `nibbles` count, which is what BOTH engines read — DeviceProfileEngine.cpp
+    // matches the string "nibbled" and calls propInt(encoding, "nibbles"), and the JS engine now
+    // mirrors it. This emitted the DPD schema's authoring vocabulary instead, {type: 'nibbles',
+    // count: N}, which matches no branch in either: C++ fell through to "Unsupported numeric
+    // encoder" and refused to send, and JS fell through to a single u7 byte. 622 of this
+    // profile's parameters — the whole envelope, LFO and filter section — could not be sent at
+    // all on the desktop build. roland-sh-201 already used the runtime vocabulary; this profile
+    // was the outlier.
+    encoding: entry.nibbles ? { type: 'nibbled', nibbles: entry.nibbles } : { type: 'u7' },
     sendPolicy: continuous
       ? { mode: 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true }
       : { mode: 'onCommit', coalesce: true },

@@ -14,10 +14,9 @@
 //
 //   It matches on the PREFIX, not the whole message. What identifies a message comes first — a CC's
 //   status and controller, a DT1's header and address — and what varies comes after. So matching
-//   needs nothing to be true about the value encoding, which matters because the two engines
-//   currently disagree about exactly that: the GAIA profile says `{type: "nibbles"}` for 622 of its
-//   parameters, C++ matches the string "nibbled" and refuses anything else, and the JS engine falls
-//   through to a single u7 byte. Same head, different tail. The head is what is indexed.
+//   needs nothing to be true about the value encoding, and that independence has already paid: this
+//   was written while the two engines disagreed about the tail of 622 of the GAIA's messages (the
+//   nibbled encoder, since fixed — see nibbledEncoding.test.js) and the index was right throughout.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -76,10 +75,11 @@ test('the GAIA indexes all 793 of its parameters, not the 40 the hand map covers
 });
 
 test('a message whose value is encoded differently still resolves', () => {
-  // THE test for prefix matching. The local engine writes this parameter's value as one u7 byte;
-  // a real GAIA sends two nibbles and a checksum, so the message is a different length with a
-  // different tail. Same head. Resolving one and not the other would make the whole index useless
-  // against real hardware while passing every round-trip above.
+  // THE test for prefix matching. This parameter is u7, so the engine writes its value as one byte;
+  // the message below carries two and a checksum, so it is a different length with a different tail.
+  // Same head. Resolving one and not the other would make the index useless against any device whose
+  // real value width differs from what its profile claims — which is exactly the bug that produced
+  // nibbledEncoding.test.js — while still passing every round-trip above.
   const index = buildInboundIndex(GAIA);
   const fromEngine = localCompileParameter(GAIA, { parameterId: 'tone1.filter.cutoff', value: 90 }).hex;
   const fromDevice = 'F0 41 10 00 00 41 12 10 00 01 0C 05 0A 34 F7';

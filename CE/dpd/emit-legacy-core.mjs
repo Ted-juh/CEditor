@@ -22,7 +22,11 @@ function legacyDumpCodec(codec, note) {
     case 's7': return { type: 's7', signedOffset: codec.signedOffset ?? 64 };
     case 'u14': return { type: 'u14-msb-lsb' };
     case 'u14-lsb': return { type: 'u14-lsb-msb' };
-    case 'nibbles': return { type: 'nibbled', bytes: codec.bytes ?? 2 };
+    // The engine's dump decoder reads the nibble count from a property called `nibbles`
+    // (propInt (encoding, "nibbles", 2)). Emitting it as `bytes` left the count unread, so every
+    // field wider than two nibbles silently decoded as two — the top byte of the value, and nothing
+    // else. Same key on both sides of the boundary now.
+    case 'nibbles': return { type: 'nibbled', nibbles: codec.bytes ?? 2 };
     case 'text-ascii': return { type: 'text-ascii', length: codec.length, pad: codec.pad ?? 32 };
     case 'text-nibbled-ascii': return { type: 'text-nibbled-ascii', length: codec.length, pad: codec.pad ?? 32 };
     case 'packed8to7': note?.(`packed8to7 per-field unsupported by the engine dump decoder`); return undefined;
@@ -107,13 +111,20 @@ function legacyParam(p) {
   out.normalization = { mode: p.valueType === 'enum' ? 'choiceIndex' : 'linear' };
   // DPD value-codec type -> the engine's single-parameter encoder vocabulary. s7 degrades to u7 (the
   // engine's send path has no signed encoder; profiles use raw wire ranges instead); u14 maps to the
-  // engine's canonical 'u14-msb-lsb' (and u14-lsb to 'u14-lsb-msb'), which it both sends and decodes.
+  // engine's canonical 'u14-msb-lsb' (and u14-lsb to 'u14-lsb-msb'), which it both sends and decodes;
+  // DPD's 'nibbles' is the engine's 'nibbled', with its count in the property the engine reads.
+  // That last one is not hypothetical tidying: the engine matches the encoder name as an exact
+  // string, so a parameter emitted as 'nibbles' fails its send with "Unsupported numeric encoder"
+  // and the knob does nothing. The GAIA profile reached 622 such parameters before this was found.
   const encType = p.valueType === 'enum' ? 'enum'
     : p.encoding?.type === 's7' ? 'u7'
     : p.encoding?.type === 'u14' ? 'u14-msb-lsb'
     : p.encoding?.type === 'u14-lsb' ? 'u14-lsb-msb'
+    : p.encoding?.type === 'nibbles' ? 'nibbled'
     : (p.encoding?.type ?? 'u7');
-  out.encoding = { type: encType };
+  out.encoding = encType === 'nibbled'
+    ? { type: 'nibbled', nibbles: p.encoding?.bytes ?? 2 }
+    : { type: encType };
   out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: true, source: 'singleParameter' };
   out.sendPolicy = { mode: p.valueType === 'enum' ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true };
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.

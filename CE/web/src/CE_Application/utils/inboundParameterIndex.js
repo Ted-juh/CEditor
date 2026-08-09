@@ -22,10 +22,12 @@
  * PREFIXES, NOT WHOLE MESSAGES, and that is load-bearing rather than tidy. What identifies a message
  * always comes first — a CC's status and controller, a DT1's header and address — and what varies
  * always comes after. Matching on a prefix therefore needs nothing to be true about how the VALUE is
- * encoded, which matters here more than it should: the GAIA profile declares `{type: "nibbles"}` for
- * 622 of its parameters, the C++ encoder matches the string "nibbled" and refuses anything else, and
- * the JS engine quietly falls through to a single u7 byte. Those two disagree about the tail of
- * every one of those messages. They agree exactly about the head, so the head is what is indexed.
+ * encoded, and that independence has already earned itself once. This was written while the GAIA
+ * profile declared `{type: "nibbles"}` for 622 of its parameters, a word the C++ encoder refuses and
+ * the JS engine did not implement at all — the two engines disagreed about the tail of every one of
+ * those messages, and the index was correct throughout, because they agreed exactly about the head.
+ * That bug is fixed (see nibbledEncoding.test.js); the property that made it survivable is not an
+ * accident to be tidied away. Value widths are the part of a profile that gets got wrong.
  */
 
 import { localCompileParameter } from '../stores/deviceProfileLocalEngine.js';

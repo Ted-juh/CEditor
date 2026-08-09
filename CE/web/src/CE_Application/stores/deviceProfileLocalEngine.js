@@ -74,15 +74,52 @@ function recipeNumber(value, variables = {}, fallback = 0) {
   return Number(value ?? fallback);
 }
 
+/**
+ * A value, as the bytes that go on the wire.
+ *
+ * MIRRORS DeviceProfileEngine.cpp. That is not a nicety here — this engine runs whenever the JUCE
+ * bridge is absent or a draft is being edited, so a disagreement means the DPD preview shows a
+ * different message from the one the export sends, and someone "fixes" a working profile to match a
+ * broken picture of it. The file already carries a comment listing four such divergences in the
+ * sysex FRAMING. This is the same class, one level down, in the value ENCODING:
+ *
+ *   `nibbled` did not exist here at all. Every nibbled parameter fell through to the u7 default and
+ *   was emitted as ONE byte where the device expects two, three or four. The GAIA declares 622 of
+ *   them — its whole envelope, LFO and filter section — so the fallback engine was building a
+ *   short, malformed DT1 for most of the instrument, silently, and the reverse index derived from
+ *   it inherited the wrong lengths.
+ *
+ * The nibble split is C++'s exactly: most significant nibble first, four bits at a time, and a value
+ * outside what the nibble count can carry is refused rather than truncated — a silently wrapped
+ * parameter is worse than one that does not send.
+ */
 function encodeParameterValue(parameter, value) {
   const encoding = String(parameter?.encoding?.type ?? 'u7');
   if (encoding === 'boolean-u7') {
     const on = value === true || ['true', 'on', 'yes', '1'].includes(String(value).toLowerCase());
     return { bytes: [on ? 127 : 0], number: on ? 127 : 0, normalized: on ? 1 : 0, displayed: on ? 'On' : 'Off' };
   }
-  if (encoding === 'u14' || encoding === '14bit') {
+  if (encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb') {
     const number = clampInt(value, 0, 16383);
     return { bytes: [(number >> 7) & 0x7f, number & 0x7f], number, normalized: number / 16383, displayed: String(number) };
+  }
+  if (encoding === 'nibbled') {
+    // Absent means two, and 1-8 is a hard bound rather than a clamp — both straight from C++. Not
+    // pedantry: clamping an absent count would silently pick ONE nibble where the engine picks two,
+    // which is the same shape of quiet disagreement this branch exists to end.
+    const declared = parameter?.encoding?.nibbles;
+    const nibbles = declared === undefined || declared === null ? 2 : Math.round(Number(declared));
+    if (!Number.isFinite(nibbles) || nibbles <= 0 || nibbles > 8) {
+      return { error: `Nibbled encoder requires 1-8 nibbles for ${parameter?.id ?? ''}` };
+    }
+    const max = 16 ** nibbles;
+    const number = Math.round(Number(value) || 0);
+    if (number < 0 || number >= max) {
+      return { error: `Nibbled value outside 0-${max - 1} for ${parameter?.id ?? ''}` };
+    }
+    const bytes = [];
+    for (let shift = (nibbles - 1) * 4; shift >= 0; shift -= 4) bytes.push((number >> shift) & 0x0f);
+    return { bytes, number, normalized: max > 1 ? number / (max - 1) : 0, displayed: String(number) };
   }
   const number = clampInt(value, 0, 127);
   return { bytes: [number], number, normalized: number / 127, displayed: String(number) };
@@ -99,6 +136,7 @@ export function localCompileParameter(profile, request = {}) {
 
   const variables = { channel: 1, deviceId: 16, ...(profile.variables ?? {}), ...(request.variables ?? {}) };
   const encoded = encodeParameterValue(parameter, request.value);
+  if (encoded.error) return { ok: false, error: encoded.error };
   const channel = clampInt(recipeNumber(recipe.channel, variables, variables.channel ?? 1), 1, 16);
   const status = 0xb0 + channel - 1;
   const kind = String(recipe.kind ?? 'cc');

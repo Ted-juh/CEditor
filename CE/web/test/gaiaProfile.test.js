@@ -91,8 +91,11 @@ test('the effect parameter banks are 4-nibble and bipolar', () => {
   // Getting either half wrong sends a plausible number to the wrong place.
   for (const parameter of profile.parameters) {
     if (!/^(distortion|flanger|delay|reverb)\.parameter\d+$/.test(parameter.id)) continue;
-    assert.equal(parameter.encoding.type, 'nibbles', `${parameter.id}: effect parameters are nibble-encoded`);
-    assert.equal(parameter.encoding.count, 4, `${parameter.id}: four nibbles, not ${parameter.encoding.count}`);
+    // `nibbled` with a `nibbles` count is the vocabulary BOTH engines read. This said
+    // {type: 'nibbles', count: N} — the DPD authoring schema's words — which matched no branch in
+    // either: C++ refused with "Unsupported numeric encoder" and JS emitted one u7 byte.
+    assert.equal(parameter.encoding.type, 'nibbled', `${parameter.id}: effect parameters are nibble-encoded`);
+    assert.equal(parameter.encoding.nibbles, 4, `${parameter.id}: four nibbles, not ${parameter.encoding.nibbles}`);
     assert.equal(parameter.type, 'bipolar');
     assert.equal(parameter.display.min, -20000);
     assert.equal(parameter.display.max, 20000);
@@ -222,8 +225,8 @@ test('the arpeggio pattern is sixteen lanes of thirty-two steps, at the manual\'
   // Every value in the block is two nibbles wide — a step holds 0..128, which does not fit in the
   // 0..127 a single 7-bit byte carries. Encoding one as u7 would truncate a tie to a rest.
   for (const parameter of pattern) {
-    assert.equal(parameter.encoding.type, 'nibbles', `${parameter.id}: not nibble-encoded`);
-    assert.equal(parameter.encoding.count, 2, `${parameter.id}: wrong nibble count`);
+    assert.equal(parameter.encoding.type, 'nibbled', `${parameter.id}: not nibble-encoded`);
+    assert.equal(parameter.encoding.nibbles, 2, `${parameter.id}: wrong nibble count`);
     assert.equal(parameter.range.max, 128, `${parameter.id}: a step tops out at 128 (tie), not ${parameter.range.max}`);
   }
 });
