@@ -12,6 +12,7 @@
   import StickyNote from 'lucide-svelte/icons/sticky-note';
   import SwatchBook from 'lucide-svelte/icons/swatch-book';
   import Terminal from 'lucide-svelte/icons/terminal';
+  import Activity from 'lucide-svelte/icons/activity';
   import ColorChooser from '../components/ColorChooser.svelte';
   import ColorSettings from '../components/ColorSettings.svelte';
   import GradientMiniPreview from '../components/GradientMiniPreview.svelte';
@@ -30,12 +31,13 @@
 
   const DISPLAY_TAB_STORAGE_KEY = 'ce.displayPanel.activeTab';
   const DEFAULT_DISPLAY_TAB = 'colors';
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'notepad', 'viewer', 'align', 'device', 'preview', 'console']);
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'notepad', 'viewer', 'align', 'device', 'midi', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
     notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
     viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
     align: () => import('../components/AlignmentPanel.svelte').then((module) => ({ default: module.default })),
     device: () => import('../components/ParameterBrowserTab.svelte').then((module) => ({ default: module.default })),
+    midi: () => import('../components/MidiMonitorTab.svelte').then((module) => ({ default: module.default })),
     preview: () => import('../components/InteractionPreviewTab.svelte').then((module) => ({ default: module.default })),
     console: async () => {
       const [debugModule, consoleModule] = await Promise.all([
@@ -412,6 +414,7 @@
     { id: 'viewer',   label: 'Viewer',   icon: Image },
     { id: 'align',    label: 'Align',    icon: AlignCenter },
     { id: 'device',   label: 'Device',   icon: Cable },
+    { id: 'midi',     label: 'MIDI',     icon: Activity },
     { id: 'preview',  label: 'Preview',  icon: Play },
     { id: 'console',  label: 'Console',  icon: Terminal },
   ];
@@ -525,6 +528,11 @@
       {@const ParameterBrowserTab = activeTabComponent.default}
       <div class="tab-pane">
         <ParameterBrowserTab />
+      </div>
+    {:else if activeTab === 'midi' && activeTabComponent?.default}
+      {@const MidiMonitorTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <MidiMonitorTab />
       </div>
     {:else if activeTab === 'preview' && activeTabComponent?.default}
       {@const PreviewTabComponent = activeTabComponent.default}
