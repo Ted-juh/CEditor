@@ -139,6 +139,24 @@ test('a corner with no shape emits no segment', () => {
   assert.deepEqual(segments.filter((s) => s.kind === 'corner'), [], 'a square corner emitted a segment');
 });
 
+/**
+ * Would SVG put ink on the page for this path?
+ *
+ * Two ways to fail, and the first version of this check only caught one. A path with no drawing
+ * command is a lone moveto, which is never stroked. A path whose drawing commands go nowhere —
+ * `M 3 3 L 3 3` — is a zero-length subpath, stroked only under a round or square linecap, and the
+ * corners use butt. A straight corner at radius 0 emitted two of those per corner and sailed
+ * through a check that only asked whether an `L` was present.
+ */
+function drawsInk(d) {
+  const s = String(d ?? '');
+  if (!/[LlHhVvCcSsQqTtAaZz]/.test(s)) return false;
+  const points = [...s.matchAll(/[ML] ([\d.-]+) ([\d.-]+)/g)].map(([, x, y]) => `${x},${y}`);
+  // Only judge pure polylines this way; an arc's parameters do not parse as points.
+  if (!/[AaCcSsQqTt]/.test(s) && points.length > 1) return new Set(points).size > 1;
+  return true;
+}
+
 test('every segment emitted has something to draw', () => {
   // The general form, across the shapes and the awkward radii, so a future degenerate case cannot
   // quietly start emitting blanks again.
@@ -149,9 +167,41 @@ test('every segment emitted has something to draw', () => {
         const segments = buildBorderSegments(60, 60, border,
           { linked: true, radius, style, direction, borderEnabled: true });
         for (const seg of segments) {
-          assert.match(seg.d, /[LlHhVvCcSsQqTtAaZz]/,
+          assert.ok(drawsInk(seg.d),
             `${style}/${direction}/r${radius} emitted "${seg.d}", which SVG will not stroke`);
         }
+      }
+    }
+  }
+});
+
+test('a square corner is covered, however thick the border', () => {
+  // With no corner segment to draw it, the two sides have to close the corner between them. At the
+  // 1px junction overlap they only meet at their centerlines, leaving the outer (thickness/2 - 1)px
+  // of the corner square bare — invisible on a 1-2px border, a 2px chip of fill colour out of each
+  // corner at 6. Each side now runs to the box edge instead.
+  const covers = (seg, x, y) => {
+    const m = /^M ([\d.-]+) ([\d.-]+) L ([\d.-]+) ([\d.-]+)$/.exec(seg.d);
+    if (!m) return false;
+    const [, x1, y1, x2, y2] = m.map(Number);
+    const h = seg.thick / 2;
+    if (y1 === y2) return x >= Math.min(x1, x2) && x <= Math.max(x1, x2) && Math.abs(y - y1) <= h;
+    if (x1 === x2) return y >= Math.min(y1, y2) && y <= Math.max(y1, y2) && Math.abs(x - x1) <= h;
+    return false;
+  };
+
+  for (const thickness of [1, 2, 4, 6, 8]) {
+    const border = { enabled: true, linked: true, style: 'solid', thickness, colour: 'FF102030' };
+    const W = 120, H = 32;
+    const segments = buildBorderSegments(W, H, border,
+      { linked: true, radius: 0, style: 'rounded', borderEnabled: true });
+
+    // Walk the diagonal out of each corner, across the full band.
+    for (const [cx, cy, dx, dy] of [[0, 0, 1, 1], [W, 0, -1, 1], [W, H, -1, -1], [0, H, 1, -1]]) {
+      for (let p = 0.125; p < thickness; p += 0.25) {
+        const x = cx + dx * p, y = cy + dy * p;
+        assert.ok(segments.some((s) => covers(s, x, y)),
+          `a ${thickness}px square border leaves (${x}, ${y}) bare — ${p}px into the corner`);
       }
     }
   }

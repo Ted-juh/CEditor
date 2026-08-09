@@ -356,29 +356,39 @@ function cornerLineJoin(style) {
 }
 
 /**
- * Does this path have anything to stroke?
+ * Will SVG put ink on the page for this path, given the cap it is stroked with?
  *
- * A corner with no radius, or one whose arc has collapsed, has no shape to draw, and buildCornerPath
- * says so by returning the bare moveto to its anchor. SVG will not stroke that: "a subpath
- * consisting of a single moveto shall not be stroked" (SVG 1.1 §11.4), which holds for round and
- * square linecaps too — those revive a zero-length *subpath* like `M 1 1 L 1 1`, not a lone moveto.
+ * Two ways for a segment to be born blank, and the geometry produces both:
  *
- * So emitting one costs a <path> element, a Svelte keyed block and a gradient lookup to paint
- * nothing. Every square-cornered control with a border was emitting four of them — a Label at
- * defaults is exactly that, and so is anything else that takes a border without rounding it.
+ *   - A lone moveto. A corner with no radius has no shape to draw and buildCornerPath says so by
+ *     returning the moveto to its anchor. "A subpath consisting of a single moveto shall not be
+ *     stroked" (SVG 1.1 §11.4) — unconditionally, whatever the cap.
+ *   - A zero-length subpath, `M 3 3 L 3 3`. A straight corner at radius 0 makes two per corner, and
+ *     a chamfer whose radius has been clamped to half the box makes four *sides*, because the
+ *     chamfers meet at the midpoint of each edge and leave no straight run between them. These are
+ *     stroked under a round or square cap, which is how a dotted border paints its dots, so the cap
+ *     decides and it is passed in rather than assumed.
+ *
+ * Emitting one costs a <path> element, a Svelte keyed block and a gradient lookup to paint nothing.
+ * Four per square-cornered control with a border — a Label at defaults is exactly that.
  *
  * Worth being accurate about the size of this: the GAIA panel saves nothing, because all 163 of its
- * bordered controls are rounded. The four-per-control is real but it is a tax on square borders,
- * not a panel-wide win, and it is not where the 413-control open time goes.
+ * bordered controls are rounded. It is a tax on square and fully-chamfered borders, not a panel-wide
+ * win, and it is not where the 413-control open time goes.
  *
- * NOT fixed by dropping them, because they never painted it either: at a square corner the two
- * sides meet at their centerlines and leave (thickness/2 - 1)px of the outer corner uncovered — 0px
- * at the 1-2px borders nearly everything uses, 2px at 6. Closing it means letting the sides run to
- * the box edge when there is no corner shape, which is a change to what borders look like rather
- * than to how many nodes they cost, so it is not smuggled in here.
+ * Dropping the corner blanks is safe only because the sides close a square corner themselves — see
+ * overlapAt, which runs each side to the box edge when there is no corner shape to meet.
  */
-function isDrawn(d) {
-  return /[LlHhVvCcSsQqTtAaZz]/.test(String(d ?? ''));
+function paintsInk(d, linecap) {
+  const s = String(d ?? '');
+  if (!/[LlHhVvCcSsQqTtAaZz]/.test(s)) return false;
+  if (linecap === 'round' || linecap === 'square') return true;
+  // Only straight runs can be measured this cheaply; an arc's parameters do not parse as points,
+  // and none of the arcs built here are degenerate (the collapsed cases return an elbow or a
+  // moveto, both caught above).
+  if (/[AaCcSsQqTt]/.test(s)) return true;
+  const points = [...s.matchAll(/[ML] (-?[\d.]+) (-?[\d.]+)/g)].map(([, x, y]) => `${x},${y}`);
+  return points.length < 2 || new Set(points).size > 1;
 }
 
 function acrossAxisForSide(side, x, y, t) {
@@ -455,12 +465,21 @@ export function buildBorderSegments(W, H, border, corners) {
   const brOn = isCornerOn(corners, 'br');
   const blOn = isCornerOn(corners, 'bl');
 
-  // 1px overlap where the side meets an enabled corner — eliminates
-  // anti-aliasing gaps at the junction point.
-  const tlOv = tlOn ? 1 : 0;
-  const trOv = trOn ? 1 : 0;
-  const brOv = brOn ? 1 : 0;
-  const blOv = blOn ? 1 : 0;
+  // How far past its nominal start each side runs, which depends on whether there is a corner there
+  // to run into:
+  //
+  //   - a corner with a shape: 1px, to eliminate anti-aliasing gaps at the junction point.
+  //   - a corner with no radius: the side's own half-thickness, which puts its end on the box edge.
+  //     There is no corner segment at a square corner (nothing to draw, see isDrawn), so the two
+  //     sides have to close it between them. At 1px they meet at their centerlines and cover only
+  //     the inner part of the corner square, leaving the outer (thickness/2 - 1)px bare — 0px at the
+  //     1-2px borders nearly everything uses, 2px at 6, showing as a chip of fill colour bitten out
+  //     of each corner of a thick square border. Run both to the edge and their bands overlap across
+  //     the whole corner square.
+  //   - no corner at all: 0, and sideInset holds the sides out of the space it would have filled.
+  //
+  // The half-thickness is per side, so this is resolved inside each side's own block below.
+  const overlapAt = (on, R, t) => (on ? (R > 0 ? 1 : t) : 0);
 
   // --- Sides ---
   if (isSideOn(border, 'top')) {
@@ -468,14 +487,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const t = tt / 2;
     const tlG = sideInset(tlOn, tl, tlR, tt);
     const trG = sideInset(trOn, tr, trR, tt);
+    const tlOv = overlapAt(tlOn, tlR, t);
+    const trOv = overlapAt(trOn, trR, t);
     for (const l of ll) {
       const y = t + l.offset;
       const x1 = tlG + t - tlOv;
       const x2 = W - trG - t + trOv;
+      const d = `M ${x1} ${y} L ${x2} ${y}`;
+      if (!paintsInk(d, l.linecap)) continue;
       result.push({
         kind: 'side',
         key: 'top',
-        d: `M ${x1} ${y} L ${x2} ${y}`,
+        d,
         thick: l.thick,
         colour: l.colour,
         dasharray: l.dasharray,
@@ -489,14 +512,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const t = tt / 2;
     const trG = sideInset(trOn, tr, trR, tt);
     const brG = sideInset(brOn, br, brR, tt);
+    const trOv = overlapAt(trOn, trR, t);
+    const brOv = overlapAt(brOn, brR, t);
     for (const l of ll) {
       const x = W - t - l.offset;
       const y1 = trG + t - trOv;
       const y2 = H - brG - t + brOv;
+      const d = `M ${x} ${y1} L ${x} ${y2}`;
+      if (!paintsInk(d, l.linecap)) continue;
       result.push({
         kind: 'side',
         key: 'right',
-        d: `M ${x} ${y1} L ${x} ${y2}`,
+        d,
         thick: l.thick,
         colour: l.colour,
         dasharray: l.dasharray,
@@ -510,14 +537,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const t = tt / 2;
     const brG = sideInset(brOn, br, brR, tt);
     const blG = sideInset(blOn, bl, blR, tt);
+    const brOv = overlapAt(brOn, brR, t);
+    const blOv = overlapAt(blOn, blR, t);
     for (const l of ll) {
       const y = H - t - l.offset;
       const x1 = W - brG - t + brOv;
       const x2 = blG + t - blOv;
+      const d = `M ${x1} ${y} L ${x2} ${y}`;
+      if (!paintsInk(d, l.linecap)) continue;
       result.push({
         kind: 'side',
         key: 'bottom',
-        d: `M ${x1} ${y} L ${x2} ${y}`,
+        d,
         thick: l.thick,
         colour: l.colour,
         dasharray: l.dasharray,
@@ -531,14 +562,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const t = tt / 2;
     const blG = sideInset(blOn, bl, blR, tt);
     const tlG = sideInset(tlOn, tl, tlR, tt);
+    const blOv = overlapAt(blOn, blR, t);
+    const tlOv = overlapAt(tlOn, tlR, t);
     for (const l of ll) {
       const x = t + l.offset;
       const y1 = H - blG - t + blOv;
       const y2 = tlG + t - tlOv;
+      const d = `M ${x} ${y1} L ${x} ${y2}`;
+      if (!paintsInk(d, l.linecap)) continue;
       result.push({
         kind: 'side',
         key: 'left',
-        d: `M ${x} ${y1} L ${x} ${y2}`,
+        d,
         thick: l.thick,
         colour: l.colour,
         dasharray: l.dasharray,
@@ -574,6 +609,7 @@ export function buildBorderSegments(W, H, border, corners) {
       const pieces = buildLinearCornerPieces(cnStyle, pos, inset, e, t, W, H);
       if (pieces?.length) {
         pieces.forEach((piece, partIdx) => {
+          if (!paintsInk(piece.d, l.linecap)) return;
           const radialAxis = cnDir === 'inward' ? reverseAxis(piece.radialAxis) : piece.radialAxis;
           result.push({
             kind: 'corner', key, pos, d: piece.d,
@@ -590,9 +626,7 @@ export function buildBorderSegments(W, H, border, corners) {
           });
         });
       } else {
-        // A corner that draws nothing does not need a segment. The linear-piece branch above always
-        // has legs to draw, so only this one can degenerate.
-        if (!isDrawn(d)) continue;
+        if (!paintsInk(d, l.linecap)) continue;
         result.push({
           kind: 'corner', key, pos, d,
           thick: l.thick, colour: l.colour, dasharray: l.dasharray, linecap: l.linecap,
