@@ -32,6 +32,23 @@
 
   // Flattened display rows: depth-first, siblings front-to-back (top of list =
   // front/highest z), respecting collapsed containers.
+  // Row objects are REUSED for controls that have not changed, and that is a performance
+  // contract rather than tidiness. These rows feed a keyed `{#each}`: Svelte matches by key and
+  // then writes each matched item's value signal, skipping the write when the value is unchanged.
+  // Building a fresh row every rebuild defeats that skip, so every one of the 413 rows counts as
+  // changed and every write walks the reaction graph — for a drag that moved one control.
+  //
+  // Controls are immutable (an edit replaces the control), so identity is the right key. Depth and
+  // container-ness are part of the row, so a cached row is only reused while both still hold.
+  const rowCache = new WeakMap();
+  const rowFor = (ctrl, id, depth, container) => {
+    const cached = rowCache.get(ctrl);
+    if (cached !== undefined && cached.depth === depth && cached.container === container) return cached;
+    const row = { ctrl, id, depth, container };
+    rowCache.set(ctrl, row);
+    return row;
+  };
+
   let rows = $derived.by(() => {
     if (!$activePanel) return [];
     const out = [];
@@ -39,7 +56,7 @@
       for (const ctrl of [...sortControlsForRender(controls)].reverse()) {
         const id = getControlId(ctrl);
         const container = isContainerControl(ctrl);
-        out.push({ ctrl, id, depth, container });
+        out.push(rowFor(ctrl, id, depth, container));
         if (container && !collapsedIds.has(id)) {
           visit(getChildControls(ctrl), depth + 1);
         }

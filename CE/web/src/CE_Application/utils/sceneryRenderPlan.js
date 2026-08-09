@@ -14,6 +14,41 @@ import { sortControlsForRender } from './controlOrder.js';
 import { layerNames, normalizeLayerName, normalizePanelLayers } from './panelLayers.js';
 import { compileScenery, sceneryLayerIsCompiled } from './sceneryCompile.js';
 
+// THE ITEM WRAPPERS ARE REUSED, and this is a performance contract rather than tidiness.
+//
+// The plan feeds a keyed `{#each}`. Svelte matches items by key — the control id, which is stable
+// — and then writes each matched item's value signal, skipping the write when the value is
+// unchanged. Minting `{ type: 'control', control }` afresh every rebuild defeats that skip: every
+// wrapper is a new object, so every one of the 413 items counts as changed and every write walks
+// the reaction graph. Measured on the GAIA panel, one drag commit did 840 such writes; only one
+// control had actually moved.
+//
+// Controls are immutable — an edit replaces the control rather than mutating it — so identity is
+// exactly the right key. A WeakMap means an unchanged control hands back the same wrapper and a
+// replaced one gets a fresh wrapper, with no bookkeeping and nothing to clean up.
+const controlItems = new WeakMap();
+
+function controlItem(control) {
+  let item = controlItems.get(control);
+  if (item === undefined) {
+    item = { type: 'control', control };
+    controlItems.set(control, item);
+  }
+  return item;
+}
+
+// Same idea for a compiled layer, keyed by layer name because that is what identifies it across
+// rebuilds; the entry is replaced when the image changes. Bounded by the number of layers.
+const sceneryItems = new Map();
+
+function sceneryItem(layer, url) {
+  const previous = sceneryItems.get(layer);
+  if (previous !== undefined && previous.url === url) return previous;
+  const item = { type: 'scenery', layer, url };
+  sceneryItems.set(layer, item);
+  return item;
+}
+
 /**
  * @param panel the panel document
  * @param preview true in preview/export, where scenery compiles whether or not the layer is locked
@@ -43,17 +78,17 @@ export function buildSceneryRenderPlan(panel, { preview = false } = {}) {
     if (controls.length === 0) continue;
 
     if (!sceneryLayerIsCompiled(layer, { preview })) {
-      for (const control of controls) items.push({ type: 'control', control });
+      for (const control of controls) items.push(controlItem(control));
       continue;
     }
 
     const result = compileScenery(controls, panel?.width ?? 0, panel?.height ?? 0);
     scenery.set(layer.name, { folded: result.folded, refusals: result.refusals });
-    if (result.url) items.push({ type: 'scenery', layer: layer.name, url: result.url });
+    if (result.url) items.push(sceneryItem(layer.name, result.url));
     // Whatever the compiler refused still renders, in its own order, on top of the image it could
     // not join. Their z-order relative to each other is preserved; relative to the folded ones it
     // is not, which is the one thing declaring a layer scenery buys at a cost.
-    for (const control of result.live) items.push({ type: 'control', control });
+    for (const control of result.live) items.push(controlItem(control));
   }
 
   return { items, scenery };
