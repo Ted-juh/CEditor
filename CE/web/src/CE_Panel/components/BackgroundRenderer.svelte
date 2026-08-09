@@ -145,6 +145,15 @@
     return styles;
   });
 
+  // Only the layers that actually draw something, in paint order.
+  //
+  // The template used to walk all four layer slots and put an `{#if}` inside the loop, which meant
+  // a control with one solid fill — or none at all, because the caller absorbed it onto its own
+  // wrapper — still cost an each-block, four keyed items and four branch effects. Measured across
+  // the GAIA panel: 826 BackgroundRenderer instances at nine effects each, ~7,400 effects to draw
+  // nothing. Filtering here leaves one effect per layer that exists, and one for the loop.
+  let visibleFillLayers = $derived(fillLayerOrder().filter((layerId) => fillLayerStyles[layerId]));
+
   // ============ BORDER (SVG) ============
 
   let hasBorder = $derived(border?.enabled && width > 0 && height > 0);
@@ -575,11 +584,9 @@
 
 </script>
 
-<!-- Fill -->
-{#each fillLayerOrder() as layerId (layerId)}
-  {#if fillLayerStyles[layerId]}
-    <div class="bg-fill-layer" style={fillLayerStyles[layerId]}></div>
-  {/if}
+<!-- Fill. Only the layers that draw — see `visibleFillLayers`. -->
+{#each visibleFillLayers as layerId (layerId)}
+  <div class="bg-fill-layer" style={fillLayerStyles[layerId]}></div>
 {/each}
 
 <!-- Border (CSS) — the plain case, one element instead of eleven -->

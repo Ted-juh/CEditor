@@ -15,6 +15,7 @@
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
   import { buildSceneryRenderPlan } from '../utils/sceneryRenderPlan.js';
+  import { initialMountCount, nextMountCount, mountIncomplete, scheduleNextSlice } from '../utils/progressiveMount.js';
 
   let {
     panel,
@@ -52,6 +53,26 @@
   );
   let scopedEditingControlId = $derived(scopedEditingControl?._children?.Core?.id ?? null);
 
+  // A large panel is mounted in slices so the editor appears before the last control is built —
+  // see utils/progressiveMount.js. Below its threshold `mountedCount` is simply the whole list and
+  // none of this runs.
+  let mountedCount = $state(0);
+  // Reset on a new panel, not on every edit: the identity that matters is which panel is open, and
+  // rebuilding from the first slice on each keystroke would be a flicker, not a speed-up.
+  let panelIdentity = $derived(panel?.id ?? null);
+  $effect(() => {
+    panelIdentity;
+    mountedCount = initialMountCount(plan.items.length);
+  });
+  $effect(() => {
+    const total = plan.items.length;
+    if (!mountIncomplete(mountedCount, total)) return;
+    return scheduleNextSlice(() => { mountedCount = nextMountCount(mountedCount, total); });
+  });
+  let renderItems = $derived(
+    mountedCount >= plan.items.length ? plan.items : plan.items.slice(0, mountedCount)
+  );
+
   function bindSurface(node) {
     surfaceRef = node;
 
@@ -88,7 +109,7 @@
     <GuideLines {scale} panelWidth={panel.width} panelHeight={panel.height} />
   {/if}
 
-  {#each plan.items as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.control._children?.Core?.id)}
+  {#each renderItems as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.control._children?.Core?.id)}
     {#if item.type === 'scenery'}
       <!-- A whole locked scenery layer, as one element. Not interactive by construction: unlock
            the layer to get the controls back. -->
