@@ -1,3 +1,5 @@
+import { observeElementMetrics, scheduleElementMetrics } from './batchedElementMetrics.js';
+
 /**
  * Track a scrollable viewport element's scroll offset, client size, and the
  * offset of an inner content element (panel surface) within that viewport.
@@ -24,11 +26,20 @@ export function trackViewportMetrics(state, getViewport, getContent) {
   const el = getViewport();
   if (!el) return () => {};
 
-  const sync = () => {
-    state.scrollLeft = el.scrollLeft;
-    state.scrollTop = el.scrollTop;
-    state.width = el.clientWidth;
-    state.height = el.clientHeight;
+  // Reads only — see utils/batchedElementMetrics.js. This used to run straight off the
+  // ResizeObserver, which fires on every size change while a panel mounts: opening the GAIA panel
+  // resized the content hundreds of times, and each delivery did two getBoundingClientRect calls
+  // interleaved with the mounting DOM writes. 135 ms of a 1.8 s panel load, for a measurement whose
+  // answer only has to be right once per frame.
+  const measure = () => {
+    const next = {
+      scrollLeft: el.scrollLeft,
+      scrollTop: el.scrollTop,
+      width: el.clientWidth,
+      height: el.clientHeight,
+      contentLeft: state.contentLeft,
+      contentTop: state.contentTop,
+    };
     const c = getContent?.();
     if (c) {
       // Measure the content's real rendered offset from the viewport, then
@@ -42,21 +53,36 @@ export function trackViewportMetrics(state, getViewport, getContent) {
       // getBoundingClientRect reflects the true position and is collapse-immune.
       const cr = c.getBoundingClientRect();
       const er = el.getBoundingClientRect();
-      state.contentLeft = cr.left - er.left + el.scrollLeft;
-      state.contentTop = cr.top - er.top + el.scrollTop;
+      next.contentLeft = cr.left - er.left + el.scrollLeft;
+      next.contentTop = cr.top - er.top + el.scrollTop;
     }
+    return next;
   };
 
-  const ro = new ResizeObserver(sync);
-  el.addEventListener('scroll', sync, { passive: true });
-  ro.observe(el);
-  const c = getContent?.();
-  if (c) ro.observe(c);
+  // Writes only.
+  const commit = (next) => {
+    state.scrollLeft = next.scrollLeft;
+    state.scrollTop = next.scrollTop;
+    state.width = next.width;
+    state.height = next.height;
+    state.contentLeft = next.contentLeft;
+    state.contentTop = next.contentTop;
+  };
 
-  sync();
+  const content = getContent?.();
+  const stop = observeElementMetrics({
+    targets: content ? [el, content] : [el],
+    measure,
+    commit,
+  });
+
+  // Scrolling is frame-paced anyway, so joining the same batch costs nothing visible and keeps a
+  // fast scroll from measuring more often than it can be drawn.
+  const onScroll = () => scheduleElementMetrics(el);
+  el.addEventListener('scroll', onScroll, { passive: true });
 
   return () => {
-    el.removeEventListener('scroll', sync);
-    ro.disconnect();
+    el.removeEventListener('scroll', onScroll);
+    stop();
   };
 }

@@ -7,6 +7,7 @@
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { anchoredPositions, axisIsDerived, fitSettings, fitsAnyAxis, fittedSizeDeep } from '../utils/containerFit.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
+  import { observeElementMetrics } from '../utils/batchedElementMetrics.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import { bakeStaticPartEntries } from '../utils/staticPartBaking.js';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
@@ -2444,18 +2445,15 @@
 
     if (!textGlyphElement || !controlContentElement) return;
 
-    const syncMetrics = () => {
-      domTextGlyphSize = {
+    // Reads only. Every control's measure runs before any control's commit — see
+    // utils/batchedElementMetrics.js for why that matters at 413 controls.
+    const measure = () => {
+      const size = {
         width: textGlyphElement.offsetWidth ?? 0,
         height: textGlyphElement.offsetHeight ?? 0,
       };
 
-      if (!showBlockLineDecorations) {
-        if (domGlyphCharacterRects.length > 0) {
-          domGlyphCharacterRects = [];
-        }
-        return;
-      }
+      if (!showBlockLineDecorations) return { size, rects: null };
 
       const range = document.createRange();
       const nextRects = [];
@@ -2487,20 +2485,26 @@
         textNode = walker.nextNode();
       }
 
-      domGlyphCharacterRects = nextRects;
+      return { size, rects: nextRects };
     };
 
-    const frame = requestAnimationFrame(syncMetrics);
-    const observer = new ResizeObserver(() => syncMetrics());
-    observer.observe(textGlyphElement);
-    if (showBlockLineDecorations) {
-      observer.observe(controlContentElement);
-    }
-
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
+    // Writes only.
+    const commit = ({ size, rects }) => {
+      domTextGlyphSize = size;
+      if (rects === null) {
+        if (domGlyphCharacterRects.length > 0) domGlyphCharacterRects = [];
+        return;
+      }
+      domGlyphCharacterRects = rects;
     };
+
+    // No separate requestAnimationFrame: observing an element delivers an initial callback, which
+    // is the first measurement. The old code did both, so every control measured twice on mount.
+    return observeElementMetrics({
+      targets: showBlockLineDecorations ? [textGlyphElement, controlContentElement] : [textGlyphElement],
+      measure,
+      commit,
+    });
   });
   $effect(() => {
     hasText;
