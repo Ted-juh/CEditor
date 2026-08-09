@@ -26,6 +26,20 @@ const REPO = path.resolve(HERE, '../../..');
 const PROFILE = path.join(REPO, 'CE/profiles/test/roland-gaia-sh01.ceditor-device.json');
 const DEFAULT_OUT = path.join(REPO, 'CE/panels/Roland GAIA SH-01.cepanel');
 
+/**
+ * What this panel calls the instrument it drives.
+ *
+ * A device is identified by its name — bindings name one, sends name one, and the MIDI settings map
+ * that name to a port. So the name has to be one a person would recognise in a list of their gear.
+ *
+ * This said `primary` by accident, which was worse than ugly: nothing in the app could configure a
+ * device by that name, so all 183 bindings resolved no mapping and failed with "Not sent: unresolved
+ * profile for primary" whichever port was chosen. Naming it after the instrument means the device
+ * shows up in Settings already called the right thing, and anyone who calls their GAIA something
+ * else can rename it there — which rewrites these bindings to match.
+ */
+const DEVICE_NAME = 'Roland GAIA SH-01';
+
 /** Which port a bound control exposes. */
 /**
  * Every box reserves this much for its header tab before its first control.
@@ -139,7 +153,7 @@ function bound(parameter, type, box, overrides = {}, make = null) {
       bindings: [{
         kind: 'deviceParameter',
         port: PORT_FOR[type] ?? 'value',
-        deviceRole: 'primary',
+        deviceRole: DEVICE_NAME,
         parameterId: parameter.id,
         parameterType: parameter.type,
         adoptMetadata: true,
@@ -175,7 +189,7 @@ function boundCustom(parameter, build, box) {
     bindings: [{
       kind: 'deviceParameter',
       port: 'value',
-      deviceRole: 'primary',
+      deviceRole: DEVICE_NAME,
       parameterId: parameter.id,
       parameterType: parameter.type,
       adoptMetadata: true,
@@ -510,7 +524,7 @@ export function buildGaiaPanel() {
   panel.gridEnabled = false;
   panel.snapToGrid = false;
   panel.description = 'Roland GAIA SH-01 — all three tones, laid out like the instrument';
-  panel.requiredProfiles = [{ role: 'primary', profileId: profile.id, version: '*' }];
+  panel.requiredProfiles = [{ role: DEVICE_NAME, profileId: profile.id, version: '*' }];
   panel.notepad = { activeNoteIndex: 0, notes: [{ name: 'About this panel', content: NOTES }] };
   panel.panelGuid = 'a1a7c3e0-5f21-4b8e-9d44-6ca0f2b71e93';
   panel.scriptId = 'roland_gaia_sh01';

@@ -44,7 +44,7 @@
   } from '../stores/deviceProfiles.js';
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, isJuceAvailable } from '../bridge/bridge.js';
   import { panels, updatePanel } from '../stores/panels.js';
-  import { deviceRoleRows, renameRoleInControls } from '../utils/deviceRoles.js';
+  import { deviceRoleRows, renameRoleInPanel } from '../utils/deviceRoles.js';
 
   let hasBackend = $state(false);
   let refreshedAt = $state(null);
@@ -103,7 +103,9 @@
    * Rename a device, and every control that names it.
    *
    * The name is the identity, so this is not cosmetic — leave the bindings alone and 183 controls go
-   * on asking for a device that no longer exists.
+   * on asking for a device that no longer exists. The panel's exportParameters name the device too,
+   * and those are what an exported plugin binds to, so they move with it or the export breaks
+   * somewhere the editor never shows.
    */
   function rename(row, event) {
     const next = event.currentTarget.value.trim();
@@ -111,8 +113,13 @@
     if (rows.some((other) => other.role === next)) { event.currentTarget.value = row.role; return; }
 
     for (const panel of $panels ?? []) {
-      const controls = renameRoleInControls(panel.controls, row.role, next);
-      if (controls !== panel.controls) updatePanel(panel.id, { controls });
+      const renamed = renameRoleInPanel(panel, row.role, next);
+      if (renamed === panel) continue;
+      updatePanel(panel.id, {
+        controls: renamed.controls,
+        exportParameters: renamed.exportParameters,
+        requiredProfiles: renamed.requiredProfiles,
+      });
     }
     if (row.mapping) {
       mapDeviceRole(next, row.mapping.profileId, {

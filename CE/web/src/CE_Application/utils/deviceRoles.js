@@ -97,6 +97,43 @@ export function renameRoleInControls(controls, from, to) {
 }
 
 /**
+ * Rename a device everywhere in a panel, not only in its controls.
+ *
+ * `exportParameters` names devices too — one per exported parameter, 197 of them on the GAIA panel —
+ * and they are what an exported plugin binds to. Renaming the controls alone leaves those pointing
+ * at a device that no longer exists, which would not show up anywhere in the editor and would fail
+ * at export instead.
+ *
+ * NOT renamed: the `role` fields inside a custom component's Parts. Those are part roles — `cap`,
+ * `fill`, `pointer` — and share nothing with devices but the word. There are thousands of them in
+ * this one panel, so a rename that went looking for `role` rather than `deviceRole` would rewrite
+ * the artwork.
+ *
+ * Returns the same panel object when nothing referred to the old name, so callers can skip writing.
+ */
+export function renameRoleInPanel(panel, from, to) {
+  if (!panel) return panel;
+  const before = String(from ?? '');
+  const after = String(to ?? '');
+  if (!before || !after || before === after) return panel;
+
+  const controls = renameRoleInControls(panel.controls, before, after);
+
+  const exports_ = panel.exportParameters;
+  const nextExports = Array.isArray(exports_) && exports_.some((entry) => entry?.deviceRole === before)
+    ? exports_.map((entry) => (entry?.deviceRole === before ? { ...entry, deviceRole: after } : entry))
+    : exports_;
+
+  const required = panel.requiredProfiles;
+  const nextRequired = Array.isArray(required) && required.some((entry) => entry?.role === before)
+    ? required.map((entry) => (entry?.role === before ? { ...entry, role: after } : entry))
+    : required;
+
+  if (controls === panel.controls && nextExports === exports_ && nextRequired === required) return panel;
+  return { ...panel, controls, exportParameters: nextExports, requiredProfiles: nextRequired };
+}
+
+/**
  * The rows a device settings page should show.
  *
  * Configured devices first, in their existing order, then any device a panel asks for that nothing
