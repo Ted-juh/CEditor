@@ -1,4 +1,12 @@
 8x shape path
+1x path M 0.5 4 A 3.5 3.5 0 0 1 4 0.5
+1x path M 0.5 50 L 0.5 3
+1x path M 3 0.5 L 93 0.5
+1x path M 4 52.5 A 3.5 3.5 0 0 1 0.5 49
+1x path M 92 0.5 A 3.5 3.5 0 0 1 95.5 4
+1x path M 93 52.5 L 3 52.5
+1x path M 95.5 3 L 95.5 50
+1x path M 95.5 49 A 3.5 3.5 0 0 1 92 52.5
 8x stroke #00000055 @ 1
 3x bg #120A0A
 1x bg #171C20

@@ -1,4 +1,20 @@
 16x shape path
+1x path M 0.5 12 L 0.5 1
+1x path M 0.5 2 A 1.5 1.5 0 0 1 2 0.5
+1x path M 0.5 4 A 3.5 3.5 0 0 1 4 0.5
+1x path M 0.5 93 L 0.5 3
+1x path M 1 0.5 L 25 0.5
+1x path M 2 12.5 A 1.5 1.5 0 0 1 0.5 11
+1x path M 24 0.5 A 1.5 1.5 0 0 1 25.5 2
+1x path M 25 12.5 L 1 12.5
+1x path M 25.5 1 L 25.5 12
+1x path M 25.5 11 A 1.5 1.5 0 0 1 24 12.5
+1x path M 3 0.5 L 5 0.5
+1x path M 4 0.5 A 3.5 3.5 0 0 1 7.5 4
+1x path M 4 95.5 A 3.5 3.5 0 0 1 0.5 92
+1x path M 5 95.5 L 3 95.5
+1x path M 7.5 3 L 7.5 93
+1x path M 7.5 92 A 3.5 3.5 0 0 1 4 95.5
 8x stroke #00000066 @ 1
 8x stroke #FFFFFF @ 1
 1x bg #000000
