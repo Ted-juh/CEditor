@@ -2691,6 +2691,7 @@
 <div
   bind:this={rootElement}
   class="canvas-control"
+  data-control-id={core?.id}
   class:selected={editorInteractionEnabled && isSelected && !panelLocked}
   class:key-object={editorInteractionEnabled && isKeyObject && !panelLocked}
   class:hidden-component={!isVisible}

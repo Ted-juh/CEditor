@@ -21,6 +21,8 @@
     setPreviewInspectedControlId,
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
+  import { planSceneryFold, panelAllowsFold, sceneryHoldSet } from '../utils/sceneryModel.js';
+  import SceneryGround from './SceneryGround.svelte';
   import { flatControls } from '../utils/containment.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
   import {
@@ -258,6 +260,29 @@
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
 
   let orderedControls = $derived(sortControlsForRender(panel?.controls ?? []));
+
+  /**
+   * Scenery folded out of the render loop.
+   *
+   * Preview is where this is unambiguously safe: a folded control is inert here by definition, and
+   * nothing in preview can select or drag it. The one thing preview does do to a scenery control is
+   * ring it when it is the inspected one, so that control is held live — which is exactly what
+   * keepLive exists for, and cheaper than teaching the ground about a highlight that changes.
+   *
+   * A panel carrying scripts folds nothing; see panelAllowsFold.
+   */
+  let sceneryFold = $derived(
+    panelAllowsFold(panel) ? planSceneryFold(orderedControls) : { ground: [], live: orderedControls },
+  );
+  let groundControls = $derived(sceneryFold.ground);
+  let liveControls = $derived(sceneryFold.live);
+
+  // The inspected control is drawn live over the ground so it can carry the inspect ring, which is
+  // the one thing preview does to a scenery control that the ground cannot show.
+  let sceneryHeld = $derived(sceneryHoldSet(
+    groundControls,
+    (c) => getControlId(c) === $previewInspectedControlId,
+  ));
   /**
    * Id -> control, over the WHOLE tree.
    *
@@ -5701,6 +5726,9 @@
   }
 
   function removeWindowListeners() {
+    // Server-rendered, onDestroy still runs when the render closes and there is no window to detach
+    // from — which made this component impossible to render in a test at all.
+    if (typeof window === 'undefined') return;
     window.removeEventListener('pointermove', handleWindowPointerMove);
     window.removeEventListener('pointerup', handleWindowPointerUp);
     rangeScrub?.end();
@@ -6780,7 +6808,19 @@
     <GuideLines {scale} panelWidth={panel.width} panelHeight={panel.height} />
   {/if}
 
-  {#each orderedControls as control (control._children?.Core?.id)}
+  {#if groundControls.length}
+    <SceneryGround
+      controls={groundControls}
+      allControls={orderedControls}
+      panelControls={panel.controls}
+      panelWidth={panel.width}
+      panelHeight={panel.height}
+      {scale}
+      hiddenIds={sceneryHeld.heldIds}
+    />
+  {/if}
+
+  {#each [...sceneryHeld.held, ...liveControls] as control (control._children?.Core?.id)}
     <CanvasControl
       {control}
       {scale}
