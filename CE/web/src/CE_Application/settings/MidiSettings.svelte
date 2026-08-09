@@ -41,10 +41,15 @@
     mapDeviceRole,
     forgetDeviceRole,
     initDeviceProfileBridge,
+    startDeviceSync,
+    latestDeviceIdentityReply,
+    latestDeviceRequestTimedOut,
+    latestDeviceSyncResult,
   } from '../stores/deviceProfiles.js';
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, isJuceAvailable } from '../bridge/bridge.js';
   import { panels, updatePanel } from '../stores/panels.js';
   import { deviceRoleRows, renameRoleInPanel } from '../utils/deviceRoles.js';
+  import { identityEventMatches, identityOutcome } from '../utils/deviceIdentity.js';
 
   let hasBackend = $state(false);
   let refreshedAt = $state(null);
@@ -134,6 +139,42 @@
   function remove(row) {
     if (row.usedBy > 0) return;                  // still named by controls; removing would orphan them
     forgetDeviceRole(row.role);
+  }
+
+  /**
+   * Ask the instrument who it is.
+   *
+   * A Universal Device Inquiry — MIDI's own handshake, which any compliant synth answers with its
+   * manufacturer, family, model and firmware. It is the only thing here that proves the whole chain
+   * end to end: the port is open, the cable is in, the instrument is listening and something came
+   * back. Everything else on this page is a claim about what SHOULD happen.
+   *
+   * The reply arrives asynchronously on a store, so what is kept per device is only which test is
+   * outstanding; the outcome is derived from whichever event names that device next.
+   */
+  let testing = $state({});                      // device name -> { at }
+
+  function test(row) {
+    testing = { ...testing, [row.role]: { at: Date.now() } };
+    startDeviceSync({
+      correlationId: `identity_${row.role}_${Date.now()}`,
+      deviceRole: row.role,
+      profileId: row.mapping?.profileId ?? $selectedDeviceProfileId,
+      request: 'identityRequest',
+      dryRun: false,
+    });
+  }
+
+  /** The outcome for a device, from whichever of the three replies named it most recently. */
+  function outcomeFor(row) {
+    if (!testing[row.role]) return null;
+    const reply = identityEventMatches($latestDeviceIdentityReply, row.role) ? $latestDeviceIdentityReply : null;
+    const timedOut = identityEventMatches($latestDeviceRequestTimedOut, row.role);
+    // A sync that never sent — "Profile has no identity declaration" — reports itself here rather
+    // than looking like silence from the instrument.
+    const failed = $latestDeviceSyncResult;
+    const error = failed && failed.deviceRole === row.role && failed.ok === false ? String(failed.error ?? '') : '';
+    return identityOutcome({ reply, timedOut, error });
   }
 </script>
 
@@ -227,6 +268,13 @@
             <button
               type="button"
               class="remove"
+              aria-label="Test device"
+              title="Ask the instrument to identify itself"
+              onclick={() => test(row)}
+            >Test</button>
+            <button
+              type="button"
+              class="remove"
               aria-label="Remove device"
               disabled={row.usedBy > 0}
               title={row.usedBy > 0 ? 'Controls still name this device' : 'Remove this device'}
@@ -234,6 +282,22 @@
             >Remove</button>
           </div>
         </div>
+
+        {#if outcomeFor(row)}
+          {@const result = outcomeFor(row)}
+          <div class="setting-row identity" class:good={result.ok}>
+            <div class="setting-copy">
+              <strong>
+                {#if result.outcome === 'replied'}Instrument answered
+                {:else if result.outcome === 'mismatch'}Wrong instrument
+                {:else if result.outcome === 'timeout'}No answer
+                {:else if result.outcome === 'refused'}Could not ask
+                {:else}Asking…{/if}
+              </strong>
+              <span>{result.detail}</span>
+            </div>
+          </div>
+        {/if}
 
         {#if !row.configured && row.usedBy > 0}
           <!--
@@ -456,6 +520,18 @@
     border: 1px solid #4A3A1E;
     border-radius: 10px;
     background: rgba(196, 145, 46, 0.09);
+  }
+
+  .identity {
+    background: rgba(216, 166, 87, 0.07);
+  }
+
+  .identity.good {
+    background: rgba(111, 207, 151, 0.08);
+  }
+
+  .identity.good .setting-copy strong {
+    color: #6FCF97;
   }
 
   .settings-card.unconfigured {

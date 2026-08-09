@@ -43,4 +43,11 @@ if (new URLSearchParams(location.search).get('ports') === '1') {
     return panel.controls.find((c) => c._children.Core.id === id)?._children.DeviceBindings.bindings[0].deviceRole;
   };
 }
+// Stand in for the instrument answering, so the three outcomes can be seen without hardware.
+import { latestDeviceIdentityReply, latestDeviceRequestTimedOut } from '../src/CE_Application/stores/deviceProfiles.js';
+window.__answer = {
+  ok: (role) => latestDeviceIdentityReply.set({ deviceRole: role, matched: true, manufacturerId: '41', familyCode: '00 41', modelNumber: '02 00', revision: '00 01 00 00' }),
+  wrong: (role) => latestDeviceIdentityReply.set({ deviceRole: role, matched: false, manufacturerId: '00 20 29' }),
+  silence: (role) => latestDeviceRequestTimedOut.set({ deviceRole: role }),
+};
 mount(MidiHarness, { target: document.getElementById('host') });
