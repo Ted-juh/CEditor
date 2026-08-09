@@ -527,7 +527,7 @@
     {:else if activeTab === 'device' && activeTabComponent?.default}
       {@const ParameterBrowserTab = activeTabComponent.default}
       <div class="tab-pane">
-        <ParameterBrowserTab />
+        <ParameterBrowserTab onopentab={handleTabClick} />
       </div>
     {:else if activeTab === 'midi' && activeTabComponent?.default}
       {@const MidiMonitorTab = activeTabComponent.default}
