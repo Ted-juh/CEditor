@@ -24,6 +24,7 @@ import {
 } from './runtimePreferences.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 import { runWhenIdle } from '../utils/runWhenIdle.js';
+import { equalityWritable } from '../utils/equalityStore.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { createPanel, deserializePanel, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
 import {
@@ -375,8 +376,19 @@ export function isSelected(id) {
   return get(selectedComponentIds).has(id);
 }
 
-/** Active multi-drag delta — applied visually to all selected components during drag */
-export const multiDragDelta = writable({ x: 0, y: 0, active: false });
+/**
+ * Active multi-drag delta — applied visually to all selected components during drag.
+ *
+ * Object-valued, and set to the idle value at the end of EVERY drag whether or not a multi-drag
+ * happened — which a plain writable turns into a notification, because safe_not_equal cannot see
+ * that two objects hold the same numbers. The same defect that made selecting a control cost
+ * 200 ms (utils/equalityStore.js); here it is worth a single callback, and it is fixed because it
+ * is the same bug rather than because the measurement demanded it.
+ */
+export const multiDragDelta = equalityWritable(
+  { x: 0, y: 0, active: false },
+  (a, b) => a?.x === b?.x && a?.y === b?.y && a?.active === b?.active,
+);
 
 /** Editor zoom state */
 export const editorZoom = writable(100);
