@@ -1936,6 +1936,29 @@
       height,
     };
   });
+  /**
+   * Where the text block sits. Emitted onto `.text-span` alongside textSpanStyle.
+   *
+   * These were two elements: an absolutely positioned `.text-anchor` div wrapping a
+   * `position:relative; display:inline-block` `.text-span`. That is one DOM node per text-bearing
+   * control — 225 on the GAIA panel — and it also placed the text wrong. An inline-block sits on a
+   * line box and is aligned by BASELINE, so when the span was shorter than the strut of the div
+   * around it, it was pushed down inside its own anchor. Short single-line text rendered ~2px low;
+   * text of two lines or more grew past the strut, dominated the line box, and came out right. That
+   * is the "Top/Center/Bottom drifts and flips" this used to warn about: not the anchor arithmetic,
+   * which was correct, but an inline-block quietly moving underneath it, by an amount that depended
+   * on the font and the line-height.
+   *
+   * One absolutely positioned element has no line box to be aligned within, so it lands where it is
+   * put. browser-checks/textPlacement.mjs measures all nine justifications across eleven variants
+   * against the rule this code claims to implement — top edge at the top padding, centred in the
+   * padded box, bottom edge at the bottom padding. The old structure fails twelve of those; this one
+   * passes all of them.
+   *
+   * Underline/overline/strike still live in their own layers and must never be folded back into this
+   * placement — they are decoration around the glyphs, and including them would put the block where
+   * the decoration is rather than where the text is.
+   */
   let textAnchorStyle = $derived.by(() => {
     if (!hasText || !textPlacement || usesCustomTextFlow) return '';
     const anchorMaxWidth = Math.max(0, Math.max(textMeasureMaxWidth, blockTextLayout.lineBoxWidth || 0));
@@ -1946,10 +1969,7 @@
       `max-width:${anchorMaxWidth}px`,
     ].join('; ');
   });
-  // Stay off this anchor math unless the text-position system is being redesigned.
-  // Label->Text->Position must stay locked to glyph bounds only.
-  // Underline/overline/strike live in their own layers and must never be folded
-  // back into this placement, or Top/Center/Bottom drifts and flips again.
+  // Label->Text->Position stays locked to glyph bounds only.
   let textAxisCenter = $derived.by(() => {
     const baseLeft = textPlacement?.left ?? effectiveTextPaddingLeft;
     const baseTop = textPlacement?.top ?? effectiveTextPaddingTop;
@@ -3241,20 +3261,18 @@
 
     {#if hasText && !usesCustomTextFlow && (!shouldUseNativeTextPreview || !nativePreviewData || showBlockTextVisual)}
       <div class="text-content" style={textStyle}>
-        <div class="text-anchor" style={textAnchorStyle}>
-          <span class="text-span" style={textSpanStyle}>
-            <span
-              bind:this={textGlyphElement}
-              class="text-glyphs"
-              class:hidden-glyphs={(shouldUseNativeTextPreview && nativePreviewData) || showBlockTextVisual}
-              style={textGlyphStyle}
-            >
-              {#each svgTextLines as line, index}
-                <span class="text-line" style={blockLineDomStyleFor(index)}>{blockLineDomText(line)}</span>
-              {/each}
-            </span>
+        <span class="text-span" style="{textAnchorStyle}; {textSpanStyle}">
+          <span
+            bind:this={textGlyphElement}
+            class="text-glyphs"
+            class:hidden-glyphs={(shouldUseNativeTextPreview && nativePreviewData) || showBlockTextVisual}
+            style={textGlyphStyle}
+          >
+            {#each svgTextLines as line, index}
+              <span class="text-line" style={blockLineDomStyleFor(index)}>{blockLineDomText(line)}</span>
+            {/each}
           </span>
-        </div>
+        </span>
       </div>
     {/if}
 
@@ -3687,12 +3705,6 @@
     line-height: 1;
   }
 
-  .text-anchor {
-    position: absolute;
-    max-width: 100%;
-    min-width: 0;
-  }
-
   .radio-group-content {
     position: absolute;
     inset: 0;
@@ -3815,10 +3827,21 @@
     display: block;
   }
 
+  /*
+   * Was two elements: `.text-anchor` positioned the block, `.text-span` was the inline-block the
+   * glyphs and their transforms lived in. `display:inline-block` is kept because `transform` and
+   * `transform-origin: center center` in textSpanStyle are relative to this box — but note that
+   * `position:absolute` blockifies it, which is the point: an inline-block is baseline-aligned
+   * inside its parent's line box, and that is what used to push short text down. Absolute
+   * positioning removes the line box, so the element lands exactly where left/top put it.
+   *
+   * `max-width` is no longer set here; it comes in through textAnchorStyle as a pixel value, which
+   * would beat any percentage written at this level anyway.
+   */
   .text-span {
-    position: relative;
+    position: absolute;
     display: inline-block;
-    max-width: 100%;
+    min-width: 0;
     white-space: pre-wrap;
     word-break: break-word;
   }
