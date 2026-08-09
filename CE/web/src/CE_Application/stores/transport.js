@@ -49,6 +49,15 @@ let running = false;
 let beats = 0;
 let lastPublishAt = 0;
 let clockOut = false;
+/**
+ * Which device receives clock, start, stop and song position.
+ *
+ * Resolved by the preview surface from the Transport control's `clockDevice` and the panel's own
+ * devices; see resolveClockDevice. Empty means nothing is sent, which is the honest outcome when
+ * nobody said where — this used to be the literal string 'mainSynth' in six places, so a panel whose
+ * controls named any other device had its transport messages dropped and no way to find out.
+ */
+let clockDevice = '';
 let lastPulseBeats = 0;
 let beatsPerBar = 4;
 // Swing belongs on the clock, not on each follower: two sequencers at "the same"
@@ -124,9 +133,20 @@ function publish(force = false) {
   });
 }
 
+/**
+ * Every transport message goes through here, so "no device chosen" is decided once rather than in
+ * six places. Returns false when nothing was sent, which the callers do not need to care about —
+ * the point is that no message is ever addressed to a guessed name.
+ */
+function sendTransport(actionId, message) {
+  if (!clockDevice) return false;
+  triggerRawMidiAction({ deviceRole: clockDevice, actionId, message, dryRun: false });
+  return true;
+}
+
 function sendClockBytes(count) {
   for (let i = 0; i < count; i += 1) {
-    triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_clock', message: 'F8', dryRun: false });
+    sendTransport('midi_clock', 'F8');
   }
 }
 
@@ -179,11 +199,11 @@ export function startTransport(atBeat = null) {
 function sendStartOrContinue() {
   const hex = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join('');
   if (beats <= 0) {
-    triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_start', message: 'FA', dryRun: false });
+    sendTransport('midi_start', 'FA');
     return;
   }
-  triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_spp', message: hex(songPositionBytes(beats)), dryRun: false });
-  triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_continue', message: 'FB', dryRun: false });
+  sendTransport('midi_spp', hex(songPositionBytes(beats)));
+  sendTransport('midi_continue', 'FB');
 }
 // Tell followers where we moved to. Only meaningful while stopped — song
 // position is a stopped-state message, and a sequencer receiving one mid-run
@@ -192,14 +212,14 @@ function sendSongPosition() {
   if (!clockOut || source !== 'internal' || running) return;
   const bytes = songPositionBytes(beats);
   const hex = bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join('');
-  triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_spp', message: hex, dryRun: false });
+  sendTransport('midi_spp', hex);
 }
 export function stopTransport() {
   running = false;
   countingIn = false;
   stopTimer();
   if (clockOut && source === 'internal') {
-    triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_stop', message: 'FC', dryRun: false });
+    sendTransport('midi_stop', 'FC');
   }
   publish(true);
 }
@@ -236,6 +256,9 @@ export function setTransportSource(next) {
   publish(true);
 }
 export function setTransportClockOut(enabled) { clockOut = enabled === true; }
+export function setTransportClockDevice(name) { clockDevice = String(name ?? ''); }
+/** Exposed so the Transport editor can say whether the clock has anywhere to go. */
+export function transportClockDevice() { return clockDevice; }
 // The meter. Components that loop in BARS need it; nothing else does, which is
 // why it lives here rather than being read off whichever Transport control the
 // follower happens to find first.
@@ -462,7 +485,7 @@ export function feedTransportMidiForTest(hex) {
 export function resetTransportForTest() {
   running = false; stopTimer(); beats = 0; externalBeats = 0; bpm = 120;
   source = 'internal'; pulseTimes = []; lastPulseAt = 0; externalBpm = null;
-  clockOut = false; startedAt = 0; lastPulseBeats = 0; beatsPerBar = 4; swing = 0;
+  clockOut = false; clockDevice = ''; startedAt = 0; lastPulseBeats = 0; beatsPerBar = 4; swing = 0;
   hostAvailable = false; hostPlaying = false; hostAnchorBeats = 0; hostAnchorAt = 0; hostBpm = null;
   jumpSeq = 0;
   loopEnabled = false; loopStartBeats = 0; loopLengthBeats = 16; lastLoopCycle = null;

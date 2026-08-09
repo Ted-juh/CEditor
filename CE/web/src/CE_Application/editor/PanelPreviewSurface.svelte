@@ -22,6 +22,7 @@
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { planSceneryFold, panelAllowsFold, sceneryHoldSet } from '../utils/sceneryModel.js';
+  import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
   import SceneryGround from './SceneryGround.svelte';
   import { flatControls } from '../utils/containment.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
@@ -171,7 +172,7 @@
   } from '../utils/transportLayout.js';
   import {
     transport, startTransport, stopTransport, toggleTransport,
-    setTransportBpm, setTransportSource, setTransportClockOut, transportSwingNow, setTransportSwing,
+    setTransportBpm, setTransportSource, setTransportClockOut, setTransportClockDevice, transportSwingNow, setTransportSwing,
     transportBeatsNow, isTransportRunning, transportBpmNow,
     setTransportSignature, transportBeatsPerBar, transportJumpSeq,
     setTransportLoop, startTransportWithCountIn, isCountingIn, countInBeatsLeft,
@@ -4105,13 +4106,17 @@
     const base = resolved?.control ?? control;
     const cfg = base?._children?.Transport;
     if (!cfg) return resolved;
+    // Which device the clock goes to is part of the signature: renaming a device or opening a panel
+    // that names a different one has to re-address the transport, not keep clocking the old one.
+    const clockTarget = resolveClockDevice(cfg.clockDevice, countRolesInPanels([panel]).keys());
     const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}|${cfg.beatsPerBar}`
-      + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}|${cfg.swing}`;
+      + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}|${cfg.swing}|${clockTarget}`;
     if (transportConfigured !== signature) {
       transportConfigured = signature;
       setTransportSource(tpSource(base));
       if (!transportIsFollowing(tpSource(base))) setTransportBpm(numberOr(cfg.bpm, 120));
       setTransportClockOut(cfg.clockOut === true);
+      setTransportClockDevice(clockTarget);
       // Swing lives on the clock so every synced follower shuffles together.
       setTransportSwing(numberOr(cfg.swing, 0));
       // The meter has to reach the store, not just the readout: the components

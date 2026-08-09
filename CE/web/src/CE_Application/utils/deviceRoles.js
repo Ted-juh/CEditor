@@ -162,3 +162,22 @@ export function deviceRoleRows(roleMappings, panels, alwaysInclude = []) {
 
   return rows;
 }
+
+/**
+ * Which device the transport's clock, start, stop and song-position should go to.
+ *
+ * `configured` is the Transport control's own choice, and wins. Empty means nobody chose, and the
+ * useful default is the panel's own device — if a panel names exactly one, clocking anything else
+ * would be surprising. Two or more, and there is no right answer to guess at, so nothing is sent
+ * and the Transport editor says which devices it could not choose between.
+ *
+ * Never falls back to a fixed name. That is precisely the bug: the transport sent to `mainSynth`
+ * whatever the panel called its device, so the GAIA panel's clock went to a device that does not
+ * exist and was dropped in silence.
+ */
+export function resolveClockDevice(configured, panelRoles) {
+  const chosen = String(configured ?? '').trim();
+  if (chosen) return chosen;
+  const roles = [...(panelRoles ?? [])];
+  return roles.length === 1 ? roles[0] : '';
+}

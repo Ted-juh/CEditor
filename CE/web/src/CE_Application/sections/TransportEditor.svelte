@@ -7,11 +7,18 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import { activePanel } from '../stores/panels.js';
+  import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
 
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
   let t = $derived(getSection(control, 'Transport'));
+
+  // The devices this panel's controls actually name — the only sensible things to clock.
+  let panelDevices = $derived([...countRolesInPanels([$activePanel]).keys()].sort());
+  let autoTarget = $derived(resolveClockDevice('', panelDevices));
+  let resolvedTarget = $derived(resolveClockDevice(t?.clockDevice, panelDevices));
 
   function set(prop, value) {
     if (!core?.id) return;
@@ -62,8 +69,28 @@
     <PropertyCell label="Clock out" span={1} hint="Send MIDI clock so hardware follows this panel — 24 messages per quarter note.">
       <PropertyToggle value={t.clockOut === true} onchange={() => set('clockOut', !(t.clockOut === true))} />
     </PropertyCell>
+    <PropertyCell label="Clock to" span={3} hint="Which device receives the clock, start, stop and song position. Auto uses the panel's own device when it names exactly one.">
+      <select class="val" value={t.clockDevice ?? ''} onchange={(e) => set('clockDevice', e.target.value)}>
+        <option value="">Auto{autoTarget ? ` — ${autoTarget}` : ''}</option>
+        {#each panelDevices as name (name)}
+          <option value={name}>{name}</option>
+        {/each}
+      </select>
+    </PropertyCell>
     <PropertyCell label="" span={4} hint="Every synced component follows this one clock.">
       <div class="note">{isHost ? 'Following the DAW playhead' : external ? 'Following MIDI clock in' : 'Master clock'}{t.clockOut === true && !external ? ' · sending clock' : ''}</div>
+      <!--
+        Clock used to go to a hardcoded device name whatever the panel called its own, so a panel like
+        the GAIA's had every transport message dropped without a word. Nothing is guessed now, which
+        means the one case with no answer — several devices and no choice made — has to say so.
+      -->
+      {#if t.clockOut === true && !external && !resolvedTarget}
+        <div class="note warn">
+          {panelDevices.length === 0
+            ? 'Nothing to clock: no control on this panel names a device.'
+            : `Pick a device — this panel names ${panelDevices.length} (${panelDevices.join(', ')}), so Auto cannot choose.`}
+        </div>
+      {/if}
     </PropertyCell>
   </PropertySection>
 
@@ -123,4 +150,5 @@
   .val:disabled { opacity: 0.5; cursor: not-allowed; }
   .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .note { font-size: 11px; color: #8a8a94; }
+  .note.warn { color: #d8a657; margin-top: 3px; }
 </style>
