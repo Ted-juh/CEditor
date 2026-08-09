@@ -1,77 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { loadWebFonts, resetWebFontsForTest, webFontCssUrl } from '../src/CE_Application/utils/webFonts.js';
+const WEB = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const SRC = path.join(WEB, 'src');
+const FONT_DIR = path.join(SRC, 'assets', 'fonts');
+const SHEET = path.join(FONT_DIR, 'webFonts.css');
 
-const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src');
-
-/** A document just real enough to see what was appended to <head>. */
-function fakeDocument() {
-  const head = { children: [], appendChild(node) { this.children.push(node); } };
-  globalThis.document = {
-    head,
-    createElement: () => ({
-      listeners: {},
-      addEventListener(type, fn) { this.listeners[type] = fn; },
-      dispatch(type) { this.listeners[type]?.(); },
-    }),
-  };
-  return head;
-}
-
-test.beforeEach(() => { resetWebFontsForTest(); });
-test.afterEach(() => { delete globalThis.document; });
-
-test('the font sheet is appended as print media, so it cannot block painting', () => {
-  // THE WHOLE POINT. A render-blocking stylesheet stops the first paint until it resolves, and
-  // resolving includes failing — 12.5 s of blank window on a machine that cannot reach the CDN.
-  // `media="print"` is fetched but never considered relevant to the screen, so it is off the
-  // critical path.
-  const head = fakeDocument();
-  const link = loadWebFonts();
-  assert.equal(head.children.length, 1);
-  assert.equal(link.rel, 'stylesheet');
-  assert.equal(link.media, 'print');
-  assert.equal(link.href, webFontCssUrl);
-});
-
-test('once it loads, the media switches so the faces actually apply', () => {
-  fakeDocument();
-  const link = loadWebFonts();
-  assert.equal(link.media, 'print');
-  link.dispatch('load');
-  assert.equal(link.media, 'all');
-});
-
-test('a sheet that never loads leaves the media alone and nothing else happens', () => {
-  // Offline is not an error path here: the fallback faces are already in use, so failing to load
-  // means the editor looks slightly different and works.
-  fakeDocument();
-  const link = loadWebFonts();
-  assert.equal(link.media, 'print');
-  assert.doesNotThrow(() => link.dispatch('error'));
-  assert.equal(link.media, 'print');
-});
-
-test('calling it twice does not request twice', () => {
-  const head = fakeDocument();
-  loadWebFonts();
-  loadWebFonts();
-  loadWebFonts();
-  assert.equal(head.children.length, 1);
-});
-
-test('it does nothing without a document', () => {
-  assert.equal(loadWebFonts(), null);
-});
+const sheet = () => readFileSync(SHEET, 'utf8');
 
 test('no stylesheet in the source tree imports a remote font', () => {
-  // The regression that matters is someone adding `@import url(https://…)` back to a stylesheet:
-  // Vite hoists it to the top of whatever bundle it lands in, so a sheet needed by ONE screen
-  // silently becomes render-blocking for the entire application.
+  // THE REGRESSION THAT MATTERS. A stylesheet `@import url(https://…)` is render-blocking, and
+  // "resolves" includes "fails" — so on a machine with no route to the CDN nothing paints until
+  // the network gives up. Measured on the one that used to be here: 12.5 s to
+  // ERR_CONNECTION_RESET, during which the app ran 187 ms of script and painted nothing.
+  //
+  // Worse, Vite hoists a CSS @import to the top of whatever bundle it lands in, so a sheet needed
+  // by ONE screen silently gates the whole application's startup. It also keeps working perfectly
+  // on a fast connection, which is why this needs a test rather than a code review.
+  //
+  // Deliberately a plain text match, comments included. A false positive is loud and fixed by
+  // rewording; a false negative is a twelve-second blank window nobody can explain.
   const REMOTE_IMPORT = /@import\s+(?:url\()?\s*['"]?(?:https?:)?\/\/[^'")\s;]+/g;
   const offenders = [];
   const walk = (dir) => {
@@ -86,4 +37,70 @@ test('no stylesheet in the source tree imports a remote font', () => {
   };
   walk(SRC);
   assert.deepEqual(offenders, [], `remote @import found — it will block first paint:\n${offenders.join('\n')}`);
+});
+
+test('the shipped font sheet asks the network for nothing', () => {
+  // Same point one level down: an @font-face pointing at fonts.gstatic.com would not block the
+  // first paint, but it would still leave the editor's own chrome dependent on a third party.
+  const remote = [...sheet().matchAll(/url\(\s*['"]?((?:https?:)?\/\/[^'")\s]+)/g)].map((m) => m[1]);
+  assert.deepEqual(remote, [], `webFonts.css still points off-machine:\n${remote.join('\n')}`);
+});
+
+test('every face the sheet declares is actually on disk', () => {
+  // A typo'd filename produces no error anywhere: the browser fails the request, falls back, and
+  // the editor just looks wrong.
+  const missing = [];
+  for (const m of sheet().matchAll(/url\(\s*['"]?([^'")\s]+)/g)) {
+    const file = path.resolve(FONT_DIR, m[1]);
+    if (!existsSync(file)) missing.push(m[1]);
+  }
+  assert.deepEqual(missing, [], `webFonts.css references files that do not exist:\n${missing.join('\n')}`);
+});
+
+test('both families are declared, across the weight range the editor uses', () => {
+  const css = sheet();
+  // The old remote request was `Archivo:wght@400;500;600;700;800` and
+  // `JetBrains Mono:wght@400;500;600`. These are the variable cuts that replace them, so the
+  // declared ranges have to still cover every weight the stylesheets ask for.
+  assert.match(css, /font-family:\s*'Archivo'/);
+  assert.match(css, /font-family:\s*'JetBrains Mono'/);
+  for (const block of css.split('@font-face').slice(1)) {
+    const range = block.match(/font-weight:\s*(\d+)\s+(\d+)/);
+    assert.ok(range, `an @font-face block declares no variable weight range:\n${block.slice(0, 200)}`);
+    const family = block.match(/font-family:\s*'([^']+)'/)?.[1];
+    const [, lo, hi] = range.map(Number);
+    if (family === 'Archivo') assert.ok(lo <= 400 && hi >= 800, `Archivo range ${lo}-${hi} misses 400-800`);
+    else assert.ok(lo <= 400 && hi >= 600, `${family} range ${lo}-${hi} misses 400-600`);
+  }
+});
+
+test('every face swaps rather than blocking on the font file', () => {
+  // Without `font-display: swap` the browser hides the text for up to three seconds waiting for
+  // the face. Local files are fast, but they are still separate requests.
+  const blocks = sheet().split('@font-face').slice(1);
+  assert.ok(blocks.length >= 4);
+  for (const block of blocks) assert.match(block, /font-display:\s*swap/);
+});
+
+test('each face is scoped by unicode-range so only the needed subsets load', () => {
+  // This is what makes shipping nine files free at runtime: an English UI fetches the two latin
+  // subsets and ignores the rest, while a Cyrillic panel name still renders offline.
+  for (const block of sheet().split('@font-face').slice(1)) {
+    assert.match(block, /unicode-range:\s*U\+/);
+  }
+});
+
+test('the licence texts ship beside the fonts', () => {
+  // Both faces are SIL OFL 1.1, which requires the licence to travel with the font.
+  for (const name of ['OFL-Archivo.txt', 'OFL-JetBrainsMono.txt']) {
+    const text = readFileSync(path.join(FONT_DIR, name), 'utf8');
+    assert.match(text, /SIL Open Font License, Version 1\.1/);
+  }
+});
+
+test('the editor entry point loads the sheet', () => {
+  // player.js deliberately does not: the exported plugin uses none of these faces, and should not
+  // carry 180 KB it never draws with.
+  assert.match(readFileSync(path.join(SRC, 'main.js'), 'utf8'), /assets\/fonts\/webFonts\.css/);
+  assert.doesNotMatch(readFileSync(path.join(SRC, 'player.js'), 'utf8'), /webFonts\.css/);
 });

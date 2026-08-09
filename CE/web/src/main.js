@@ -1,13 +1,12 @@
 import { mount } from 'svelte';
+// The editor's two faces, shipped with the app rather than fetched from a CDN. See the header of
+// assets/fonts/webFonts.css for why: as a remote @import this cost 12.5 s of blank window on a
+// machine that could not reach fonts.googleapis.com.
+import './assets/fonts/webFonts.css';
 import App from './App.svelte';
-import { loadWebFonts } from './CE_Application/utils/webFonts.js';
 
 const app = mount(App, {
   target: document.getElementById('app'),
 });
-
-// After mount, never before: these faces are a refinement, and the editor must not wait on a
-// third party to show itself. See utils/webFonts.js.
-loadWebFonts();
 
 export default app;
