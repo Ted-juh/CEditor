@@ -15,13 +15,17 @@
    * through mapDeviceRole exactly as the Device tab's dropdowns do, so the two stay in agreement and
    * the choice persists through the existing device-session settings rather than a second store.
    *
-   * MORE THAN ONE SYNTH. Everything below the UI is already keyed by device role — bindings carry
-   * one, sends carry one, deviceRoleMappings is a map of them — but every mapDeviceRole call in the
-   * UI passed the DEFAULT_DEVICE_ROLE constant, so only `mainSynth` was ever reachable. Meanwhile
-   * the GAIA panel binds 365 controls to a role called `primary`, which no settings path could
-   * configure; sending one of those resolves no mapping and gives up with "Not sent: unresolved
-   * profile for primary". So this lists a card per device, and seeds the list from the roles the
-   * open panels actually ask for rather than making anyone guess the name.
+   * AS MANY SYNTHS AS YOU LIKE. Everything below the UI is already keyed by a device name —
+   * bindings carry one, sends carry one, the mappings are a map of them — but every mapDeviceRole
+   * call in the UI passed one hardcoded constant, `mainSynth`, so that was the only device anything
+   * could configure. Meanwhile the GAIA panel's 183 bindings all name a device called `primary`,
+   * which no settings path could reach; sending one resolves no mapping and gives up with "Not sent:
+   * unresolved profile for primary".
+   *
+   * There are no slots here and no fixed number of them. A device is whatever the user called it,
+   * and that name is the identity — no hidden id underneath, because a second identifier is a second
+   * thing to keep in sync and a second thing to show by mistake. Renaming therefore rewrites the
+   * bindings that referred to the old name, so the controls keep pointing at the same instrument.
    */
   import { onMount } from 'svelte';
   import Plug from 'lucide-svelte/icons/plug';
@@ -35,12 +39,12 @@
     selectedMidiDestinationId,
     selectedMidiInputId,
     mapDeviceRole,
+    forgetDeviceRole,
     initDeviceProfileBridge,
   } from '../stores/deviceProfiles.js';
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, isJuceAvailable } from '../bridge/bridge.js';
-  import { panels } from '../stores/panels.js';
-  import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
-  import { deviceRoleRows } from '../utils/deviceRoles.js';
+  import { panels, updatePanel } from '../stores/panels.js';
+  import { deviceRoleRows, renameRoleInControls } from '../utils/deviceRoles.js';
 
   let hasBackend = $state(false);
   let refreshedAt = $state(null);
@@ -51,7 +55,7 @@
 
   // One row per device: what is already configured, plus whatever the open panels bind to. The
   // second half is the point — an unconfigured role is exactly the one that fails to send.
-  let rows = $derived(deviceRoleRows($deviceRoleMappings ?? {}, $panels ?? [], [DEFAULT_DEVICE_ROLE]));
+  let rows = $derived(deviceRoleRows($deviceRoleMappings ?? {}, $panels ?? []));
 
   // "Preview Only" and "Disabled"/"No MIDI Input" are always present — they are how you say "do not
   // send anywhere". Real hardware is anything else, and it is the only thing that answers the
@@ -89,10 +93,40 @@
   }
 
   function addDevice() {
-    const role = newRoleName.trim();
-    if (!role || rows.some((row) => row.role === role)) return;
-    mapDeviceRole(role, $selectedDeviceProfileId, { midiDestination: PREVIEW_ONLY, midiInput: NO_INPUT });
+    const name = newRoleName.trim();
+    if (!name || rows.some((row) => row.role === name)) return;
+    mapDeviceRole(name, $selectedDeviceProfileId, { midiDestination: PREVIEW_ONLY, midiInput: NO_INPUT });
     newRoleName = '';
+  }
+
+  /**
+   * Rename a device, and every control that names it.
+   *
+   * The name is the identity, so this is not cosmetic — leave the bindings alone and 183 controls go
+   * on asking for a device that no longer exists.
+   */
+  function rename(row, event) {
+    const next = event.currentTarget.value.trim();
+    if (!next || next === row.role) { event.currentTarget.value = row.role; return; }
+    if (rows.some((other) => other.role === next)) { event.currentTarget.value = row.role; return; }
+
+    for (const panel of $panels ?? []) {
+      const controls = renameRoleInControls(panel.controls, row.role, next);
+      if (controls !== panel.controls) updatePanel(panel.id, { controls });
+    }
+    if (row.mapping) {
+      mapDeviceRole(next, row.mapping.profileId, {
+        midiDestination: row.mapping.midiDestination,
+        midiInput: row.mapping.midiInput,
+        syncDirection: row.mapping.syncDirection,
+      });
+      forgetDeviceRole(row.role);
+    }
+  }
+
+  function remove(row) {
+    if (row.usedBy > 0) return;                  // still named by controls; removing would orphan them
+    forgetDeviceRole(row.role);
   }
 </script>
 
@@ -156,27 +190,42 @@
     {#each rows as row (row.role)}
       <section class="settings-card" class:unconfigured={!row.configured && row.usedBy > 0}>
         <div class="card-head device-head">
-          <div>
-            <h2>{row.role}</h2>
+          <div class="device-name">
+            <input
+              class="name-input"
+              aria-label="Device name"
+              value={row.role}
+              onchange={(event) => rename(row, event)}
+              onblur={(event) => rename(row, event)}
+            />
             <p>
               {#if row.usedBy > 0}
-                Bound by {row.usedBy} control{row.usedBy === 1 ? '' : 's'} in the open panels.
-              {:else if row.role === DEFAULT_DEVICE_ROLE}
-                Where a control with no device of its own sends.
+                Named by {row.usedBy} control{row.usedBy === 1 ? '' : 's'} in the open panels.
+                Renaming it renames them too.
               {:else}
                 Not used by any open panel.
               {/if}
             </p>
           </div>
-          <span class="pill" class:live={sendsHardware(row)}>
-            {#if sendsHardware(row)}
-              {outFor(row)?.name}
-            {:else if !row.configured}
-              Not set up
-            {:else}
-              Preview only
-            {/if}
-          </span>
+          <div class="device-actions">
+            <span class="pill" class:live={sendsHardware(row)}>
+              {#if sendsHardware(row)}
+                {outFor(row)?.name}
+              {:else if !row.configured}
+                Not set up
+              {:else}
+                Preview only
+              {/if}
+            </span>
+            <button
+              type="button"
+              class="remove"
+              aria-label="Remove device"
+              disabled={row.usedBy > 0}
+              title={row.usedBy > 0 ? 'Controls still name this device' : 'Remove this device'}
+              onclick={() => remove(row)}
+            >Remove</button>
+          </div>
         </div>
 
         {#if !row.configured && row.usedBy > 0}
@@ -190,8 +239,8 @@
             <strong>This device has no ports assigned.</strong>
             <span>
               {row.usedBy} control{row.usedBy === 1 ? '' : 's'} send to <code>{row.role}</code>, and
-              nothing has told the app where that is — so those sends are dropped. Pick a profile and
-              an output below.
+              nothing has told the app where that is — so those sends are dropped. Pick an output
+              below, and rename it to whatever you call the instrument.
             </span>
           </div>
         {/if}
@@ -260,8 +309,8 @@
         <div class="setting-copy">
           <strong>Add A Device</strong>
           <span>
-            Use the same name your controls bind to. Panels that already name a device appear above
-            on their own, so this is only for setting one up ahead of the panel that will use it.
+            Call it whatever you call the instrument. Devices your panels already name appear above
+            on their own, so this is only for setting one up before the panel that will use it.
           </span>
         </div>
         <div class="add-device">
@@ -413,9 +462,63 @@
     gap: 12px;
   }
 
-  .device-head h2 {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  .device-name {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .name-input {
+    width: 100%;
+    max-width: 280px;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: #F4F4F4;
+    font-family: inherit;
     font-size: 15px;
+    font-weight: 650;
+  }
+
+  .name-input:hover {
+    border-color: #3A3A3A;
+    background: #1B1B1B;
+  }
+
+  .name-input:focus {
+    outline: none;
+    border-color: #0B6EB5;
+    background: #1B1B1B;
+  }
+
+  .device-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  .remove {
+    height: 26px;
+    padding: 0 10px;
+    border: 1px solid #3A3A3A;
+    border-radius: 7px;
+    background: #232323;
+    color: #C9C9C9;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .remove:hover:not(:disabled) {
+    border-color: #6B3030;
+    color: #E8A0A0;
+  }
+
+  .remove:disabled {
+    opacity: 0.35;
+    cursor: default;
   }
 
   .pill {

@@ -50,12 +50,58 @@ export function countRolesInPanels(panels) {
 }
 
 /**
+ * Rename a device everywhere the controls refer to it.
+ *
+ * The device's name IS its identity — there is no hidden id underneath and deliberately so, because
+ * a second identifier is a second thing to keep in sync and a second thing to show by mistake. The
+ * cost of that choice is this function: renaming has to rewrite the bindings, or the controls would
+ * go on asking for a name nothing answers to.
+ *
+ * Returns the same array when nothing referred to the old name, so callers can skip writing a panel
+ * they did not change.
+ */
+export function renameRoleInControls(controls, from, to) {
+  const before = String(from ?? '');
+  const after = String(to ?? '');
+  if (!before || !after || before === after) return controls ?? [];
+
+  let touched = false;
+  const rewrite = (control) => {
+    const bindings = control?._children?.DeviceBindings?.bindings;
+    const kids = control?._children?.Children?._children;
+
+    const nextBindings = Array.isArray(bindings) && bindings.some((b) => b?.deviceRole === before)
+      ? bindings.map((b) => (b?.deviceRole === before ? { ...b, deviceRole: after } : b))
+      : null;
+
+    let nextKids = null;
+    if (kids && typeof kids === 'object') {
+      const entries = Object.entries(kids).map(([key, child]) => [key, child?._children ? rewrite(child) : child]);
+      if (entries.some(([key, child]) => child !== kids[key])) nextKids = Object.fromEntries(entries);
+    }
+
+    if (!nextBindings && !nextKids) return control;
+    touched = true;
+    return {
+      ...control,
+      _children: {
+        ...control._children,
+        ...(nextBindings ? { DeviceBindings: { ...control._children.DeviceBindings, bindings: nextBindings } } : {}),
+        ...(nextKids ? { Children: { ...control._children.Children, _children: nextKids } } : {}),
+      },
+    };
+  };
+
+  const next = (controls ?? []).map(rewrite);
+  return touched ? next : (controls ?? []);
+}
+
+/**
  * The rows a device settings page should show.
  *
- * Configured roles come first in their existing order, then roles some panel asks for that nothing
- * has configured yet — those are the ones that silently fail to send, so they are the whole reason
- * this list is assembled rather than just reading the mappings. `alwaysInclude` keeps the default
- * role present even on a session that has never touched it, because it is where an unbound send goes.
+ * Configured devices first, in their existing order, then any device a panel asks for that nothing
+ * has set up — those are the ones that silently fail to send, and they are the whole reason this is
+ * assembled from both sides rather than just read off the mappings.
  */
 export function deviceRoleRows(roleMappings, panels, alwaysInclude = []) {
   const used = countRolesInPanels(panels);

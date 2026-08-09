@@ -62,7 +62,7 @@ import {
   queueDeviceParameterPanelPreviewSync,
   syncDeviceRuntimeStateToPanelPreview,
 } from '../utils/deviceBindingSync.js';
-import { appSettings, replaceDeviceSessionSettings, updateDeviceSessionSettings } from './appSettings.js';
+import { appSettings, removeDeviceSessionRole, replaceDeviceSessionSettings, updateDeviceSessionSettings } from './appSettings.js';
 import {
   createProjectDeviceSessionSnapshot,
   mergeProjectDeviceRoleMapping,
@@ -811,6 +811,27 @@ export function requestProfileSource(profileId) {
     profileSourceFallbackRequests.set(requestId, { profileId, filePath });
     requestFileData(requestId, filePath);
   }
+}
+
+/**
+ * Forget a device: remove its mapping from the store and from the saved session.
+ *
+ * The counterpart to mapDeviceRole, needed once devices are named by the user rather than picked
+ * from a fixed set — a name you can create is a name you have to be able to get rid of, and a
+ * rename is a create followed by one of these.
+ */
+export function forgetDeviceRole(role) {
+  const name = String(role ?? '');
+  if (!name) return;
+
+  deviceRoleMappings.update((mappings) => {
+    if (!(name in (mappings ?? {}))) return mappings;
+    const { [name]: _gone, ...rest } = mappings;
+    return rest;
+  });
+
+  removeDeviceSessionRole(name);
+  getDeviceDiagnostics();
 }
 
 export function mapDeviceRole(role, profileId, options = {}) {

@@ -871,6 +871,29 @@ export function updateGeneralSettings(updates) {
   persistSettings();
 }
 
+/**
+ * Drop a device from the saved session.
+ *
+ * updateDeviceSessionSettings MERGES roleMappings, which is right for editing one and useless for
+ * removing one — the old key survives the merge. This replaces the map instead. Normalization will
+ * re-seed the default device if that leaves none at all, since the transport still needs somewhere
+ * to send a clock.
+ */
+export function removeDeviceSessionRole(role) {
+  const name = String(role ?? '');
+  if (!name) return;
+
+  appSettings.update((current) => {
+    const existing = current.deviceSession?.roleMappings ?? {};
+    if (!(name in existing)) return current;
+    const { [name]: _removed, ...rest } = existing;
+    return {
+      ...current,
+      deviceSession: normalizeDeviceSession({ ...(current.deviceSession ?? {}), roleMappings: rest }),
+    };
+  });
+}
+
 export function updateDeviceSessionSettings(updates) {
   if (!updates || typeof updates !== 'object') return;
 

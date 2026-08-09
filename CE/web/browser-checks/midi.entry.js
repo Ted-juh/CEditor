@@ -2,6 +2,7 @@ import { mount } from 'svelte';
 import MidiHarness from './MidiHarness.svelte';
 import { midiDestinations, midiInputs, deviceProfiles, deviceRoleMappings } from '../src/CE_Application/stores/deviceProfiles.js';
 import { panels } from '../src/CE_Application/stores/panels.js';
+import { get } from 'svelte/store';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 
 // Stand in for the JUCE backend so the populated state can be seen. The real one answers
@@ -34,6 +35,12 @@ if (new URLSearchParams(location.search).get('ports') === '1') {
   knob._children.DeviceBindings.bindings = [{ deviceRole: 'primary', parameterId: 'osc.pitch', port: 'value' }];
   const knob2 = createControl('Knob', { Core: { id: 'k2' } });
   knob2._children.DeviceBindings.bindings = [{ deviceRole: 'primary', parameterId: 'osc.wave', port: 'value' }];
-  panels.set([{ name: 'GAIA', controls: [knob, knob2] }]);
+  const knob3 = createControl('Knob', { Core: { id: 'k3' } });
+  knob3._children.DeviceBindings.bindings = [{ deviceRole: 'drums', parameterId: 'kick.tune', port: 'value' }];
+  panels.set([{ id: 'p1', name: 'GAIA', controls: [knob, knob2, knob3] }]);
+  window.__roleOf = (id) => {
+    const panel = get(panels)[0];
+    return panel.controls.find((c) => c._children.Core.id === id)?._children.DeviceBindings.bindings[0].deviceRole;
+  };
 }
 mount(MidiHarness, { target: document.getElementById('host') });
