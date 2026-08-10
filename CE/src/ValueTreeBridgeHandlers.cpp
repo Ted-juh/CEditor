@@ -714,28 +714,45 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 file.loadFileAsData (mb);
                 auto readDurationMs = juce::Time::getMillisecondCounterHiRes() - readStartMs;
 
-                auto encodeStartMs = juce::Time::getMillisecondCounterHiRes();
-                auto base64 = juce::Base64::toBase64 (mb.getData(), mb.getSize());
-                auto encodeDurationMs = juce::Time::getMillisecondCounterHiRes() - encodeStartMs;
-
                 auto ext = file.getFileExtension().toLowerCase();
                 juce::String mimeType = "image/png";
+                auto isText = false;
                 if (ext == ".jpg" || ext == ".jpeg") mimeType = "image/jpeg";
                 else if (ext == ".gif") mimeType = "image/gif";
                 else if (ext == ".bmp") mimeType = "image/bmp";
-                else if (ext == ".svg") mimeType = "image/svg+xml";
                 else if (ext == ".webp") mimeType = "image/webp";
-                else if (ext == ".json" || ext == ".cepanel") mimeType = "application/json";
                 else if (ext == ".ttf") mimeType = "font/ttf";
                 else if (ext == ".otf") mimeType = "font/otf";
                 else if (ext == ".woff") mimeType = "font/woff";
                 else if (ext == ".woff2") mimeType = "font/woff2";
+                else if (ext == ".svg") mimeType = "image/svg+xml";   // text, but the frontend uses it as an <img> src
+                else if (ext == ".json" || ext == ".cepanel") { mimeType = "application/json"; isText = true; }
 
                 auto* obj = new juce::DynamicObject();
                 obj->setProperty ("requestId", requestId);
-                obj->setProperty ("data", "data:" + mimeType + ";base64," + base64);
                 obj->setProperty ("mimeType", mimeType);
                 obj->setProperty ("byteSize", (juce::int64) mb.getSize());
+
+                // Text goes over as text. Base64 is the right shape for a PNG or a font and pure
+                // waste for the two biggest things this app loads — a .cepanel and a device profile,
+                // both JSON. The waste is not small: a 43.6 MB panel became a 58 MB base64 String,
+                // concatenated again for the "data:...;base64," prefix, then escaped again into the
+                // JSON that carries it to the WebView. About 250 MB of allocation and copying, on
+                // the message thread, which is the thread Windows asks whether the window is still
+                // alive — and while this ran the answer was no, so the title bar read
+                // "(Not Responding)". The frontend then spent an atob and a per-byte loop over 43.6
+                // million bytes undoing it before a single control was drawn.
+                //
+                // `data` is still sent for bytes, and the frontend still reads it, so a mismatched
+                // pair of halves keeps working in both directions.
+                auto encodeStartMs = juce::Time::getMillisecondCounterHiRes();
+                if (isText)
+                    obj->setProperty ("text", mb.toString());
+                else
+                    obj->setProperty ("data", "data:" + mimeType + ";base64,"
+                                              + juce::Base64::toBase64 (mb.getData(), mb.getSize()));
+                auto encodeDurationMs = juce::Time::getMillisecondCounterHiRes() - encodeStartMs;
+
                 obj->setProperty ("readMs", readDurationMs);
                 obj->setProperty ("encodeMs", encodeDurationMs);
 

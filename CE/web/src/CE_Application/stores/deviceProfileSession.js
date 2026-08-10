@@ -57,6 +57,7 @@ import {
   getBulkDumpSends,
   requestFileData,
 } from '../bridge/bridge.js';
+import { fileDataText } from '../utils/fileDataPayload.js';
 import { midiCiPropertiesToProfile } from '../generated/dpd/import-midici.mjs';
 import {
   queueDeviceParameterPanelPreviewSync,
@@ -165,28 +166,6 @@ function fallbackPreviewDestination() {
 
 function fallbackMidiInput() {
   return { type: 'none', id: 'none', name: 'No MIDI Input' };
-}
-
-function decodeDataUrlText(dataUrl = '') {
-  const commaIndex = String(dataUrl).indexOf(',');
-  if (commaIndex < 0) return '';
-
-  const meta = dataUrl.slice(0, commaIndex).toLowerCase();
-  const payload = dataUrl.slice(commaIndex + 1);
-  if (!meta.includes(';base64')) {
-    try {
-      return decodeURIComponent(payload);
-    } catch {
-      return payload;
-    }
-  }
-
-  const binary = atob(payload);
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  if (typeof TextDecoder !== 'undefined') {
-    return new TextDecoder('utf-8').decode(bytes);
-  }
-  return Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
 }
 
 function destinationId(destination) {
@@ -392,7 +371,7 @@ export function initDeviceProfileBridge() {
         [request.profileId]: {
         profileId: request.profileId,
         filePath: request.filePath,
-        source: decodeDataUrlText(payload?.data ?? ''),
+        source: fileDataText(payload),
         lastModified: '',
         fallback: true,
       },
