@@ -16,6 +16,7 @@
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
   import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel } from './CE_Application/stores/panels.js';
+  import { isTextEntryTarget } from './CE_Application/utils/textEntry.js';
   import { initScriptWorkspaceBridge } from './CE_Application/stores/scriptWorkspace.js';
   import { initAppSettingsBridge } from './CE_Application/stores/appSettings.js';
   import { initConsoleBridge } from './CE_Application/stores/console.js';
@@ -91,6 +92,9 @@
       openSettingsTab();
       return;
     }
+    // Undo/redo only — the shortcuts above have no text-field meaning, but these do: while typing,
+    // Ctrl+Z belongs to the field. Taking it would undo a panel edit and leave the typing intact.
+    if (isTextEntryTarget(e.target)) return;
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
       e.preventDefault();
       undo();

@@ -22,6 +22,7 @@
   import DeviceProfileDesignerV2 from './DeviceProfileDesignerV2.svelte';
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
+  import { isTextEntryTarget } from '../utils/textEntry.js';
   import BehaviorDesigner from './BehaviorDesigner.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
@@ -330,6 +331,10 @@
 
   function handleEditorKeyDown(e) {
     if (componentSurfaceWorkspaceActive) return;
+    // The Settings view renders INSIDE this wrapper, so every keystroke in a settings text box
+    // arrives here too. Without this, Backspace in a field never reached the field — and if a
+    // control happened to be selected, deleted it. Ctrl+A/C/X/V/D were swallowed the same way.
+    if (isTextEntryTarget(e.target)) return;
 
     if ($previewModeEnabled) {
       handlePreviewShortcut(e);

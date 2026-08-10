@@ -9,6 +9,8 @@
 // only cure, so it sends the standard silence set rather than trusting our own
 // bookkeeping.
 
+import { isTextEntryTarget } from './textEntry.js';
+
 function num(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -208,11 +210,6 @@ export function panicShortcutWarnings(shortcut) {
   return out;
 }
 
-function isEditableTarget(target) {
-  const tag = String(target?.tagName ?? '').toUpperCase();
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable === true;
-}
-
 // Should this keypress fire the emergency stop?
 //
 // The default, Escape, is already the cancel key for four in-place editors (a
@@ -233,7 +230,7 @@ export function isPanicShortcut(event, { shortcut = DEFAULT_PANIC_SHORTCUT, lcdE
   if (!eventMatchesShortcut(event, binding)) return false;
   if (event.defaultPrevented === true) return false;
   if (lcdEditing) return false;
-  if (!shortcutHasModifier(binding) && isEditableTarget(event.target)) return false;
+  if (!shortcutHasModifier(binding) && isTextEntryTarget(event.target)) return false;
   return true;
 }
 
