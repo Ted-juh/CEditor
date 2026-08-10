@@ -391,6 +391,68 @@ int runProfileCacheTests()
     return 0;
 }
 
+/**
+ * Clear has to clear the copy that matters.
+ *
+ * The monitor log lives here, and every message pushes the WHOLE of it to the UI. So a Clear button
+ * that emptied only the browser's list looked like it worked, right up until the next slider move
+ * arrived carrying all five hundred old events back with it. Nothing was broken on the UI side; the
+ * list it cleared was never the list.
+ *
+ * The third assertion is the bug: not that clearing empties the log, but that what comes after a
+ * clear contains only what came after it.
+ */
+int runMonitorClearTests()
+{
+    ceditor::device::DeviceProfileService service;
+
+    const auto ingest = [&service] (const juce::String& hex)
+    {
+        auto* incoming = new juce::DynamicObject();
+        incoming->setProperty ("deviceRole", "mainSynth");
+        incoming->setProperty ("hex", hex);
+        service.ingestIncomingMidiMessage (juce::var (incoming));
+    };
+
+    const auto monitorCount = [&service]
+    {
+        auto events = service.getMonitorEvents();
+        auto* array = events.getArray();
+        return array != nullptr ? array->size() : -1;
+    };
+
+    for (int i = 0; i < 5; ++i)
+        ingest ("B0 4A " + juce::String::toHexString (i).paddedLeft ('0', 2));
+
+    const auto before = monitorCount();
+    if (before <= 0)
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: inbound MIDI did not reach the monitor log (got "
+                  << before << ") — the rest of this test would pass by having nothing to clear\n";
+        return 1;
+    }
+
+    service.clearMonitorEvents();
+    if (monitorCount() != 0)
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: clearMonitorEvents left " << monitorCount()
+                  << " event(s) behind\n";
+        return 1;
+    }
+
+    ingest ("B0 4A 7F");
+    const auto after = monitorCount();
+    if (after != 1)
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: the first message after a clear brought back the old log ("
+                  << after << " events, expected 1) — this is what Clear looked like from the UI\n";
+        return 1;
+    }
+
+    std::cout << "[PASS] DeviceProfileService :: clearing the monitor log stays cleared\n";
+    return 0;
+}
+
 int runServiceRequestTests()
 {
     ceditor::device::DeviceProfileService service;
@@ -1285,6 +1347,7 @@ int main()
     failures += runNrpnTimingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
+    failures += runMonitorClearTests();
     failures += runServiceRequestTests();
     failures += runMidiCiTests();
     failures += runChecksumTableTests();

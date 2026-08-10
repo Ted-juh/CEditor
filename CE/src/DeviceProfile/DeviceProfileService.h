@@ -59,6 +59,8 @@ public:
     juce::var runProfileTests (const juce::var& payload);
     juce::var getRuntimeState() const;
     juce::var getMonitorEvents() const;
+    /** Forget the monitor log. The engine owns it, so clearing only the UI's copy does nothing. */
+    void clearMonitorEvents();
     juce::var getDiagnostics() const;
     void setEventCallback (EventCallback callback);
 

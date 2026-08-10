@@ -16,7 +16,7 @@
    */
   import MidiLearnChips from './MidiLearnChips.svelte';
   import { midiMonitorEvents, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
-  import { isJuceAvailable } from '../bridge/bridge.js';
+  import { clearMidiMonitorEvents, isJuceAvailable } from '../bridge/bridge.js';
   import {
     MONITOR_DIRECTIONS,
     filterMonitorEvents,
@@ -47,7 +47,12 @@
     paused = !paused;
   }
 
+  // Clearing the local store alone looked like it worked and wasn't: the engine keeps the last 500
+  // events and pushes the whole list on every message, so the next slider move brought them all
+  // back. The engine owns the log, so it has to do the forgetting; the local clear stays for the
+  // instant feedback, and for dev mode in a plain browser where there is no engine to ask.
   function clear() {
+    clearMidiMonitorEvents();
     midiMonitorEvents.set([]);
     frozen = [];
   }

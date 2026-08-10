@@ -475,6 +475,19 @@ juce::var DeviceProfileService::getMonitorEvents() const
     return juce::var (monitorEvents);
 }
 
+/**
+ * Forget the monitor log.
+ *
+ * The engine owns this list, and every inbound and outbound message pushes the WHOLE of it to the
+ * UI — so a Clear that emptied only the browser's copy looked like it worked and was undone by the
+ * next slider move, which arrived carrying all 500 old events again. Clearing has to happen here or
+ * it does not happen.
+ */
+void DeviceProfileService::clearMonitorEvents()
+{
+    monitorEvents.clear();
+}
+
 juce::var DeviceProfileService::getDiagnostics() const
 {
     juce::Array<juce::var> issues;
