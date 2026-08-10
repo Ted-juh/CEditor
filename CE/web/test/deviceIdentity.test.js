@@ -56,6 +56,33 @@ test('silence is a timeout, and says what to check', () => {
   assert.match(result.detail, /ports/);
 });
 
+test('the UI losing patience is not the instrument being silent', () => {
+  // Found by testing, on hardware. The card gives up after 4s so "Asking…" is never a resting state,
+  // and it reported that as a timeout — "No answer. Check the output and input ports, the cable…" —
+  // for a GAIA that had answered correctly a build earlier. The real cause was the backend blocking
+  // the message thread. Checking a cable would never have found it, and the wording sent us there.
+  const result = identityOutcome({ gaveUp: true });
+  assert.equal(result.outcome, 'stalled');
+  assert.equal(result.ok, false);
+  assert.doesNotMatch(result.detail, /cable/, 'this outcome knows nothing about the cable');
+  assert.match(result.detail, /monitor/, 'point at the one place that shows what actually happened');
+});
+
+test('a real timeout outranks the UI giving up', () => {
+  // Both can be true at once — the backend times out at 1s, the card at 4s. The backend's verdict is
+  // the one with evidence behind it: the request went out and the window closed with nothing back.
+  const result = identityOutcome({ timedOut: true, gaveUp: true });
+  assert.equal(result.outcome, 'timeout');
+});
+
+test('an answer outranks both, however late it is', () => {
+  // The backstop must not lock out a reply that arrives after it fires, or a slow instrument would
+  // be permanently reported as absent.
+  const result = identityOutcome({ reply: reply(), timedOut: true, gaveUp: true });
+  assert.equal(result.outcome, 'replied');
+  assert.equal(result.ok, true);
+});
+
 test('a request that never went out says so', () => {
   // compileIdentityRequest refuses a profile with no identity block. That is not the instrument
   // being quiet — nothing was ever sent, and no amount of cable-checking would help.

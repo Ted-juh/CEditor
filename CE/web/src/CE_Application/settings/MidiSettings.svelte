@@ -191,7 +191,11 @@
     const failed = $latestDeviceSyncResult;
     const mine = failed && (failed.requestId === session.correlationId || failed.deviceRole === row.role);
     const error = mine && failed.ok === false ? String(failed.error ?? '') : '';
-    return identityOutcome({ reply, timedOut: timedOut || session.expired === true, error });
+    // Kept apart deliberately. `timedOut` is the backend's own verdict: the request went out, the
+    // profile's timeout elapsed, the instrument said nothing. `gaveUp` is only this card losing
+    // patience, which is a fact about the app — reporting it as silence from the instrument sends
+    // someone to check a cable that is fine.
+    return identityOutcome({ reply, timedOut, gaveUp: session.expired === true, error });
   }
 </script>
 
@@ -308,6 +312,7 @@
                 {#if result.outcome === 'replied'}Instrument answered
                 {:else if result.outcome === 'mismatch'}Wrong instrument
                 {:else if result.outcome === 'timeout'}No answer
+                {:else if result.outcome === 'stalled'}Still nothing
                 {:else if result.outcome === 'refused'}Could not ask
                 {:else}Asking…{/if}
               </strong>

@@ -49,11 +49,16 @@ export function describeIdentity(reply) {
  *   replied   — the right instrument answered. The chain works, end to end.
  *   mismatch  — something answered, but not what the profile expects. The cable is fine and the
  *               profile is wrong, which is the opposite of what silence would suggest.
- *   timeout   — nothing answered. Cable, port, or the synth ignores inquiries.
+ *   timeout   — the backend waited out the profile's own timeout and nothing answered. Cable, port,
+ *               or the synth ignores inquiries.
+ *   stalled   — the UI gave up first: no reply, no timeout, no error, nothing at all came back. That
+ *               is a statement about US, not about the instrument, and it must not be dressed up as
+ *               one. It cost a real afternoon of checking a cable that was fine while the backend
+ *               was busy re-parsing every profile on disk for each inbound MIDI message.
  *   refused   — the request never went out; the profile has no identity block to build it from.
  *   waiting   — sent, still listening.
  */
-export function identityOutcome({ reply = null, timedOut = false, error = '' } = {}) {
+export function identityOutcome({ reply = null, timedOut = false, gaveUp = false, error = '' } = {}) {
   if (error) return { outcome: 'refused', ok: false, detail: error };
 
   if (reply) {
@@ -81,6 +86,15 @@ export function identityOutcome({ reply = null, timedOut = false, error = '' } =
       outcome: 'timeout',
       ok: false,
       detail: 'No answer. Check the output and input ports, the cable, and that the instrument replies to identity requests.',
+    };
+  }
+
+  // Checked after timedOut, so a real backend timeout always outranks the UI's own patience.
+  if (gaveUp) {
+    return {
+      outcome: 'stalled',
+      ok: false,
+      detail: 'Gave up waiting. Nothing came back — not even a timeout — so this says nothing about the instrument yet. Check the MIDI monitor, and try again.',
     };
   }
 

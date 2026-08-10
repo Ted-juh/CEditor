@@ -74,7 +74,7 @@ juce::var DeviceProfileService::setDeviceRoleMapping (const juce::var& payload)
     if (profileId.isEmpty())
         return errorResponse ({}, "profileId is required");
 
-    loadInternalTestProfiles();
+    loadInternalTestProfiles (true);   // never reject a profile id for being newer than the last scan
     if (profiles.find (profileId) == profiles.end())
         return errorResponse ({}, "Unknown profileId: " + profileId);
 

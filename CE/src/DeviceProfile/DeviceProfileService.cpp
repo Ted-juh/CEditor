@@ -37,7 +37,7 @@ void DeviceProfileService::setEventCallback (EventCallback callback)
 
 juce::var DeviceProfileService::listProfiles()
 {
-    loadInternalTestProfiles();
+    loadInternalTestProfiles (true);   // the dropdown must show a profile generated a moment ago
 
     juce::Array<juce::var> items;
     for (const auto& [profileId, loaded] : profiles)
@@ -526,8 +526,41 @@ juce::var DeviceProfileService::getDiagnostics() const
     return juce::var (response);
 }
 
-void DeviceProfileService::loadInternalTestProfiles()
+/**
+ * Load the shipped profiles, and — the point of this function — do almost nothing when they are
+ * already loaded.
+ *
+ * It reads as a one-time startup step, and it was written as one, but resolveEngine() calls it on
+ * every resolve: every knob move (compileParameterMessage), every request, every parsed dump, and
+ * every single inbound MIDI message (processIncomingMidiMessage). Unconditionally it re-read and
+ * re-parsed the whole directory each time — 1.9 MB of JSON across nine files, ~1,600 parameters
+ * recompiled, on the message thread, which is the thread that draws the UI.
+ *
+ * The result is exactly what it sounds like: a knob sweep on the instrument sends a CC stream, each
+ * CC queues a full reparse, the message thread never catches up and Windows paints the window
+ * "(Not Responding)". A startup pull is worse: the full GAIA's startup.sync is ten RQ1s, each reply a
+ * large dump that pays for the reload again on arrival and again when it is parsed. An identity reply
+ * queued behind all that arrives seconds late, long past the profile's 1000ms timeout, so a synth
+ * that answered correctly is reported as "No answer".
+ *
+ * LoadedProfile has carried a `lastModificationTime` since it was written and nothing ever read it.
+ * This reads it: a file already loaded, and unchanged on disk since, is skipped. Editing a profile
+ * still takes effect — findChildFiles + one stat per file is the whole cost of noticing — but that
+ * is still disk I/O per inbound byte, so the directory itself is only rescanned once a second unless
+ * a caller asks for a fresh look. A profile written a moment ago therefore appears within a second
+ * everywhere, and immediately in the places where someone is waiting to see it.
+ */
+void DeviceProfileService::loadInternalTestProfiles (bool force)
 {
+    // Long enough that a MIDI stream cannot make this touch the disk more than once per second;
+    // short enough that regenerating a profile and switching to the app picks it up on arrival.
+    static constexpr double rescanIntervalMs = 1000.0;
+
+    auto now = nowMs();
+    if (! force && lastProfileScanMs > 0.0 && now - lastProfileScanMs < rescanIntervalMs)
+        return;
+    lastProfileScanMs = now;
+
     auto directory = sourceRoot()
         .getChildFile ("CE")
         .getChildFile ("profiles")
@@ -539,9 +572,34 @@ void DeviceProfileService::loadInternalTestProfiles()
     auto files = directory.findChildFiles (juce::File::findFiles, false, "*.ceditor-device.json");
     for (const auto& file : files)
     {
+        if (isLoadedProfileCurrent (file))
+            continue;
+
+        // A file the engine refuses is not in `profiles`, so without this it would be re-parsed on
+        // every scan forever — the same unbounded rework, just for the broken profile instead of all
+        // of them. Remember the exact copy we refused; a corrected one has a new modification time.
+        auto path = file.getFullPathName();
+        auto modified = file.getLastModificationTime();
+        auto refused = refusedProfiles.find (path);
+        if (refused != refusedProfiles.end() && refused->second == modified)
+            continue;
+
         juce::String error;
-        loadProfileFile (file, error);
+        if (loadProfileFile (file, error))
+            refusedProfiles.erase (path);
+        else
+            refusedProfiles[path] = modified;
     }
+}
+
+/** Is this file already loaded, from the same bytes that are on disk now? */
+bool DeviceProfileService::isLoadedProfileCurrent (const juce::File& file) const
+{
+    for (const auto& entry : profiles)
+        if (entry.second.file == file)
+            return entry.second.lastModificationTime == file.getLastModificationTime();
+
+    return false;
 }
 
 bool DeviceProfileService::loadProfileFile (const juce::File& file, juce::String& error)

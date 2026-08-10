@@ -269,6 +269,128 @@ int runDumpShapeAndCodecTests (const juce::File& file)
     return 0;
 }
 
+/**
+ * Handling a MIDI message must not cost a reload of every profile on disk.
+ *
+ * loadInternalTestProfiles() reads as a startup step, but resolveEngine() calls it — so it ran for
+ * every knob move, every request, every parsed dump and every inbound MIDI message, re-reading and
+ * re-parsing 1.9 MB of JSON and recompiling ~1,600 parameters each time, on the thread that draws
+ * the UI. A knob sweep on the instrument is a CC stream; each CC queued a full reparse; the window
+ * went "(Not Responding)". An identity reply queued behind that arrived past its 1000ms timeout, so
+ * a synth that answered correctly reported "No answer".
+ *
+ * Timed rather than counted because the cost is the point, and the margin is enormous: with the
+ * reload back, fifty messages cost fifty cold loads. The budget is one cold load for all fifty, so a
+ * regression fails by ~50x — far outside anything a slow or loaded machine could account for.
+ */
+int runProfileCacheTests()
+{
+    // The cold load: a fresh service reads and compiles every shipped profile once. This is the unit
+    // the budget below is expressed in, so the test carries its own scale and needs no magic number.
+    auto coldStart = juce::Time::getMillisecondCounterHiRes();
+    ceditor::device::DeviceProfileService service;
+    auto coldLoadMs = juce::Time::getMillisecondCounterHiRes() - coldStart;
+
+    auto* mapping = new juce::DynamicObject();
+    mapping->setProperty ("role", "mainSynth");
+    mapping->setProperty ("profileId", "roland-gaia-sh01");     // the big one: 793 parameters
+    auto* destination = new juce::DynamicObject();
+    destination->setProperty ("type", "previewOnly");
+    destination->setProperty ("id", "previewOnly");
+    destination->setProperty ("name", "Preview Only");
+    mapping->setProperty ("midiDestination", juce::var (destination));
+    service.setDeviceRoleMapping (juce::var (mapping));
+
+    constexpr int messageCount = 50;
+    auto start = juce::Time::getMillisecondCounterHiRes();
+    for (int index = 0; index < messageCount; ++index)
+    {
+        auto* incoming = new juce::DynamicObject();
+        incoming->setProperty ("deviceRole", "mainSynth");
+        incoming->setProperty ("hex", "B0 66 " + juce::String::toHexString (index % 128).paddedLeft ('0', 2));
+        service.ingestIncomingMidiMessage (juce::var (incoming));
+    }
+    auto streamMs = juce::Time::getMillisecondCounterHiRes() - start;
+
+    if (coldLoadMs < 5.0)
+    {
+        // Nothing was loaded, so the comparison below would pass without measuring anything. That is
+        // a broken test run, not a passing one.
+        std::cerr << "[FAIL] DeviceProfileService :: constructing the service took " << coldLoadMs
+                  << "ms — the profile directory was not found, so this test proves nothing\n";
+        return 1;
+    }
+
+    if (streamMs > coldLoadMs)
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: " << messageCount << " inbound MIDI messages took "
+                  << streamMs << "ms, more than one cold load of every profile (" << coldLoadMs
+                  << "ms) — resolveEngine is reloading the profile directory per message\n";
+        return 1;
+    }
+
+    std::cout << "[PASS] DeviceProfileService :: inbound MIDI does not reload the profile directory ("
+              << messageCount << " messages in " << streamMs << "ms, cold load " << coldLoadMs << "ms)\n";
+
+    // The other half: caching must not mean going stale. An edited profile still has to be picked up,
+    // which is what made the reload unconditional in the first place.
+    auto scratch = profileRoot().getChildFile ("_cache-reload-check.ceditor-device.json");
+    struct ScopedFile
+    {
+        juce::File file;
+        ~ScopedFile() { file.deleteFile(); }
+    } scoped { scratch };
+    juce::ignoreUnused (scoped);
+
+    const auto profileJson = [] (const juce::String& name)
+    {
+        return juce::String (R"({"schemaVersion":1,"id":"_cache-reload-check","name":")") + name
+             + R"(","messageRecipes":[{"id":"r","kind":"cc","channel":"$channel","controller":1,"value":"$encodedValue"}],)"
+             + R"("parameters":[{"id":"p","name":"P","type":"bipolar","range":{"min":0,"max":127},)"
+             + R"("default":64,"encoding":{"type":"u7"},"messageRecipe":"r"}]})";
+    };
+
+    if (! scratch.replaceWithText (profileJson ("before")))
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: could not write the reload-check profile\n";
+        return 1;
+    }
+
+    const auto loadedName = [&service] () -> juce::String
+    {
+        // Held in a named local: the temporary would be gone before the loop reached its array.
+        auto listed = service.listProfiles();
+        if (auto* items = listed.getArray())
+            for (const auto& item : *items)
+                if (auto* object = item.getDynamicObject())
+                    if (object->getProperty ("id").toString() == "_cache-reload-check")
+                        return object->getProperty ("name").toString();
+        return {};
+    };
+
+    if (loadedName() != "before")
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: a new profile file was not picked up (got \""
+                  << loadedName() << "\")\n";
+        return 1;
+    }
+
+    // Stamped explicitly rather than relying on the write: two writes in the same millisecond can
+    // land on the same modification time, and then the test would be asking the wrong question.
+    scratch.replaceWithText (profileJson ("after"));
+    scratch.setLastModificationTime (juce::Time::getCurrentTime() + juce::RelativeTime::seconds (2));
+
+    if (loadedName() != "after")
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: an edited profile was not reloaded (still \""
+                  << loadedName() << "\") — the modification-time check is not catching edits\n";
+        return 1;
+    }
+
+    std::cout << "[PASS] DeviceProfileService :: an edited profile is still reloaded\n";
+    return 0;
+}
+
 int runServiceRequestTests()
 {
     ceditor::device::DeviceProfileService service;
@@ -1162,6 +1284,7 @@ int main()
     failures += runPolicyTests (root.getChildFile ("test-cc-synth.ceditor-device.json"));
     failures += runNrpnTimingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
+    failures += runProfileCacheTests();
     failures += runServiceRequestTests();
     failures += runMidiCiTests();
     failures += runChecksumTableTests();
