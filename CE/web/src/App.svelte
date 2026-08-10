@@ -34,7 +34,7 @@
   import { gradientTarget } from './CE_Application/stores/gradientTarget.js';
   import { displayTabRequest } from './CE_Application/stores/displayTab.js';
   import { readStoredBool, readStoredNumber, writeStoredJson } from './CE_Application/utils/localStorageState.js';
-  import { syncPerfDebugToNative } from './CE_Application/utils/perfDebug.js';
+  import { startPerfDebugStallWatch, syncPerfDebugToNative } from './CE_Application/utils/perfDebug.js';
   import { createCustomComponentStressPanel, createCustomComponentStressTest } from './CE_Application/utils/customComponentStressTest.js';
   import { resolveWorkspaceChrome } from './CE_Application/utils/workspaceChrome.js';
 
@@ -69,6 +69,7 @@
     initScriptModules();   // installed ce.ext.* modules, before any script can reach for one
     initPanelRuntime();
     syncPerfDebugToNative();
+    startPerfDebugStallWatch();   // both sides watch, so a frozen window says which side froze
     initAppSettingsBridge();
     initHistory();
     initPresetChoiceSync(); // preset-sourced selector rows follow scans + profile sources

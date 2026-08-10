@@ -97,6 +97,49 @@ void ValueTreeBridge::emitScriptModules() const
 
 
 /**
+ * Is the message thread still answering?
+ *
+ * Every other timer in this file measures work we already suspected — a file read, a base64 encode,
+ * a panel decode. That only ever finds the freeze if the freeze is somewhere we thought to look, and
+ * twice now it has not been: a startup with no panels to load, seventy-seven milliseconds of logged
+ * work, and then a window that stops responding when the user clicks a menu.
+ *
+ * So this measures the thread rather than the work. A timer that should fire four times a second
+ * cannot fire while something else holds the message thread, and the gap it comes back to is exactly
+ * how long that something held it. Nothing needs to be instrumented, or even suspected, to show up
+ * here — and if the gaps never appear while the window is visibly frozen, that is the answer too:
+ * the message thread was fine and the WebView renderer was not.
+ *
+ * Only alive while perf logging is on, so it costs nothing in normal use.
+ */
+class MessageThreadStallWatch final : public juce::Timer
+{
+public:
+    explicit MessageThreadStallWatch (std::function<void (double)> reportStall)
+        : report (std::move (reportStall))
+    {
+        lastTickMs = juce::Time::getMillisecondCounterHiRes();
+        startTimerHz (4);
+    }
+
+private:
+    void timerCallback() override
+    {
+        auto now = juce::Time::getMillisecondCounterHiRes();
+        auto gap = now - lastTickMs;
+        lastTickMs = now;
+
+        // Well above the 250ms period and any ordinary scheduling jitter, so a report means a stall
+        // a person would notice rather than a busy moment.
+        if (gap > 1000.0 && report != nullptr)
+            report (gap);
+    }
+
+    std::function<void (double)> report;
+    double lastTickMs = 0.0;
+};
+
+/**
  * Runs the VST3 exporter (tools/scripts/export-panel-vst3.mjs) as a child process, polled on the
  * message thread so the UI stays responsive. Each stdout/stderr line is emitted to JS as
  * "buildProgress" { line }; a terminal "buildComplete" { ok, code, message, path } closes it out.
@@ -964,6 +1007,17 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
             {
                 perfDebugEnabled = (bool) payload;
                 emitPerfDebug (juce::String ("native perf logging ") + (perfDebugEnabled ? "enabled" : "disabled"));
+
+                // The freeze this exists to find is invisible to every timer above: they all measure
+                // work we already suspected. This measures the thread instead. Whatever is blocking
+                // it does not have to be instrumented, or even known, to show up here.
+                if (perfDebugEnabled)
+                    stallWatch = std::make_unique<MessageThreadStallWatch> ([this] (double gapMs)
+                    {
+                        emitPerfDebug ("message thread stalled " + juce::String (gapMs, 0) + "ms");
+                    });
+                else
+                    stallWatch.reset();
             });
         })
         /* --- third-party scripting modules (ce.ext.*) -------------------------------------

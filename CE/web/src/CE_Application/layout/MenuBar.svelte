@@ -12,6 +12,7 @@
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles, selectedDeviceProfileId } from '../stores/deviceProfiles.js';
   import { buildInfo, buildLabel } from '../buildInfo.js';
+  import { createPerfDebugTimer } from '../utils/perfDebug.js';
 
   function newCustomComponent() {
     const document = createComponentDocument();
@@ -165,13 +166,21 @@
   const menuNames = Object.keys(menus);
   let openMenu = $state(null);
 
+  // Timed because this is the click a frozen window was reported on, twice, and nothing in here
+  // looks capable of it: opening a menu sets one variable and renders a dozen buttons. If these
+  // timings come back small while the window is visibly stuck, the freeze is not the click handler
+  // and the stall watch will say which thread it is instead.
   function toggleMenu(name) {
+    const stop = createPerfDebugTimer(`menu toggle ${name}`);
     openMenu = openMenu === name ? null : name;
+    stop();
   }
 
   function handleItemClick(item) {
+    const stop = createPerfDebugTimer(`menu action ${item.label}`);
     if (item.action) item.action();
     openMenu = null;
+    stop();
   }
 
   function handleWindowClick(e) {
