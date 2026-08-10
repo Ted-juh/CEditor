@@ -152,29 +152,46 @@
    * The reply arrives asynchronously on a store, so what is kept per device is only which test is
    * outstanding; the outcome is derived from whichever event names that device next.
    */
-  let testing = $state({});                      // device name -> { at }
+  let testing = $state({});                      // device name -> { at, correlationId, expired }
+
+  // A backstop for "Asking…", which must never be a resting state. C++ times an identity request out
+  // after the profile's own timeoutMs (1000ms for the GAIA) and emits deviceRequestTimedOut — but a
+  // request that never went OUT is never made pending, so nothing times it out, and a failure result
+  // carries no deviceRole to match on. Either way the card would wait forever. This ends it.
+  const TEST_GIVE_UP_MS = 4000;
 
   function test(row) {
-    testing = { ...testing, [row.role]: { at: Date.now() } };
+    const correlationId = `identity_${row.role}_${Date.now()}`;
+    testing = { ...testing, [row.role]: { at: Date.now(), correlationId, expired: false } };
     startDeviceSync({
-      correlationId: `identity_${row.role}_${Date.now()}`,
+      correlationId,
       deviceRole: row.role,
       profileId: row.mapping?.profileId ?? $selectedDeviceProfileId,
       request: 'identityRequest',
       dryRun: false,
     });
+    setTimeout(() => {
+      const current = testing[row.role];
+      if (current?.correlationId !== correlationId) return;      // a newer Test replaced this one
+      testing = { ...testing, [row.role]: { ...current, expired: true } };
+    }, TEST_GIVE_UP_MS);
   }
 
-  /** The outcome for a device, from whichever of the three replies named it most recently. */
+  /** The outcome for a device, from whichever of the replies named it most recently. */
   function outcomeFor(row) {
-    if (!testing[row.role]) return null;
+    const session = testing[row.role];
+    if (!session) return null;
     const reply = identityEventMatches($latestDeviceIdentityReply, row.role) ? $latestDeviceIdentityReply : null;
     const timedOut = identityEventMatches($latestDeviceRequestTimedOut, row.role);
-    // A sync that never sent — "Profile has no identity declaration" — reports itself here rather
-    // than looking like silence from the instrument.
+    // A sync that never sent — "Profile has no identity declaration", no output port, a compile
+    // error — reports itself here rather than looking like silence from the instrument. Matched on
+    // the correlation id, NOT on deviceRole: the engine's error response carries only
+    // { ok, requestId, error }, so a deviceRole match silently never fired and the card sat on
+    // "Asking…" through every one of those failures.
     const failed = $latestDeviceSyncResult;
-    const error = failed && failed.deviceRole === row.role && failed.ok === false ? String(failed.error ?? '') : '';
-    return identityOutcome({ reply, timedOut, error });
+    const mine = failed && (failed.requestId === session.correlationId || failed.deviceRole === row.role);
+    const error = mine && failed.ok === false ? String(failed.error ?? '') : '';
+    return identityOutcome({ reply, timedOut: timedOut || session.expired === true, error });
   }
 </script>
 
