@@ -655,6 +655,9 @@
       ? midiControlBindingFrom({
         message: payload.message,
         controller: payload.controller,
+        parameterMsb: payload.parameterMsb,
+        parameterLsb: payload.parameterLsb,
+        valueResolution: payload.valueResolution,
         port: compatibility.port.id,
         deviceRole: payload.deviceRole || DEFAULT_DEVICE_ROLE,
       })

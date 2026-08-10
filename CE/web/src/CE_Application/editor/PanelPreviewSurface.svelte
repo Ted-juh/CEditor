@@ -184,7 +184,9 @@
     activeMidiControlBindings,
     matchesMidiControl,
     midiControlMessage,
+    midiControlValue,
   } from '../utils/midiControlBindings.js';
+  import { EMPTY_NRPN_STATE, applyNrpnEvents } from '../utils/nrpn.js';
   import { expressionEventsFromHex } from '../utils/midiNoteInput.js';
   import { latestMidiInputMessage } from '../stores/deviceProfileStores.js';
   import {
@@ -5133,17 +5135,24 @@
   // $effect flushes once per microtask, so two controllers moved in the same tick would collapse
   // into one and the other would never reach its control.
   let lastInboundPayload = null;
+  let nrpnState = EMPTY_NRPN_STATE;
   $effect(() => {
     const stop = latestMidiInputMessage.subscribe((payload) => {
       if (!payload?.hex || payload === lastInboundPayload) return;
       lastInboundPayload = payload;
+      // The assembler runs even with nothing bound, so its channel selections stay in step with the
+      // stream; an NRPN begun before a binding existed still resolves once one does.
+      const assembly = applyNrpnEvents(nrpnState, expressionEventsFromHex(payload.hex));
+      nrpnState = assembly.state;
       const bound = midiControlBoundControls;
       if (!bound.length) return;
-      for (const event of expressionEventsFromHex(payload.hex)) {
+      for (const event of [...assembly.passthrough, ...assembly.assembled]) {
         for (const [controlId, bindings] of bound) {
           for (const binding of bindings) {
             if (binding?.feedback?.receiveUpdates === false) continue;
-            if (matchesMidiControl(binding, event)) applyMidiControlValue(controlId, binding, event.value);
+            if (matchesMidiControl(binding, event)) {
+              applyMidiControlValue(controlId, binding, midiControlValue(binding, event));
+            }
           }
         }
       }

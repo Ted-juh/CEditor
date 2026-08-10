@@ -25,14 +25,19 @@
  * chip that just appeared. Span and message count are still shown, as evidence.
  */
 
-import { EMPTY_LEARN_STATE, applyLearnHex, learnCandidateLabel, learnCandidates } from './midiNoteInput.js';
+import {
+  EMPTY_LEARN_STATE, applyLearnEvent, expressionEventsFromHex, learnCandidateLabel, learnCandidates,
+} from './midiNoteInput.js';
 import { decodeInbound } from './inboundParameterIndex.js';
 import { MIDI_CONTROL_MESSAGES, midiControlParameterShape } from './midiControlBindings.js';
+import { EMPTY_NRPN_STATE, applyNrpnEvents } from './nrpn.js';
 
 /** Candidate kinds a chip can hand to a raw binding, from the binding module's own table. */
 const LEARNABLE = new Map(MIDI_CONTROL_MESSAGES.filter((m) => m.learnable).map((m) => [m.eventKind, m.id]));
 
-export const EMPTY_CHIP_STATE = Object.freeze({ learn: EMPTY_LEARN_STATE, sysex: {}, seen: {}, seq: 0 });
+export const EMPTY_CHIP_STATE = Object.freeze({
+  learn: EMPTY_LEARN_STATE, sysex: {}, nrpn: {}, nrpnState: EMPTY_NRPN_STATE, seen: {}, seq: 0,
+});
 
 /** How many chips the strip keeps. Enough to cover a section of a panel, few enough to scan. */
 export const CHIP_LIMIT = 12;
@@ -70,17 +75,46 @@ export function applyChipHex(state, hex, index = null) {
     };
   }
 
-  const learn = applyLearnHex(current.learn, hex);
-  if (learn === current.learn) return current;
+  // Reassemble NRPNs before anything else looks at the CCs. Turning one NRPN knob sends four
+  // ordinary CCs — 99, 98, 6, 38 — and without this the strip would offer four meaningless
+  // controllers for it and no way to bind the thing that actually moved. `passthrough` is what was
+  // NOT NRPN plumbing, so a device using CC 6 on its own still shows up as CC 6.
+  const { state: nrpnState, assembled, passthrough } =
+    applyNrpnEvents(current.nrpnState, expressionEventsFromHex(hex));
 
-  // Stamp only the keys this message actually touched, so one CC arriving does not reorder the rest.
+  let learn = current.learn;
+  for (const event of passthrough) learn = applyLearnEvent(learn, event);
+
+  const nrpn = { ...current.nrpn };
   const seen = { ...current.seen };
   let seq = current.seq;
+
+  for (const event of assembled) {
+    const key = `nrpn:${event.channel}:${event.parameterMsb}:${event.parameterLsb}`;
+    const previous = nrpn[key];
+    // Both readings are kept because the wire cannot say which the device meant; the binding's
+    // declared resolution decides, and the chip shows the 14-bit one as the more informative.
+    nrpn[key] = previous
+      ? {
+        ...previous,
+        min: Math.min(previous.min, event.value14), max: Math.max(previous.max, event.value14),
+        count: previous.count + 1, last: event.value14, last7: event.value7,
+      }
+      : {
+        channel: event.channel, parameterMsb: event.parameterMsb, parameterLsb: event.parameterLsb,
+        min: event.value14, max: event.value14, count: 1, last: event.value14, last7: event.value7,
+      };
+    seen[key] = ++seq;
+  }
+
+  if (learn === current.learn && !assembled.length && nrpnState === current.nrpnState) return current;
+
+  // Stamp only the keys this message actually touched, so one CC arriving does not reorder the rest.
   for (const candidate of learnCandidates(learn)) {
     const previous = current.learn.candidates[candidate.key];
     if (!previous || previous.count !== candidate.count) seen[candidate.key] = ++seq;
   }
-  return { ...current, learn, seen, seq };
+  return { ...current, learn, nrpn, nrpnState, seen, seq };
 }
 
 /** A CC candidate as the message that would have produced it, so the index can be asked about it. */
@@ -120,6 +154,25 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
       last: isNumeric(parameter) ? entry.last : null,
       seen: current.seen[`param:${parameterId}`] ?? 0,
       reason: parameter ? '' : 'not in the loaded profile',
+    });
+  }
+
+  for (const [key, entry] of Object.entries(current.nrpn ?? {})) {
+    const message = 'nrpn';
+    chips.push({
+      key,
+      origin: 'nrpn',
+      parameterId: null,
+      parameter: null,
+      label: `NRPN ${entry.parameterMsb}:${entry.parameterLsb}`,
+      detail: `ch ${entry.channel}`,
+      controller: null,
+      nrpn: { parameterMsb: entry.parameterMsb, parameterLsb: entry.parameterLsb },
+      span: entry.max - entry.min,
+      count: entry.count,
+      last: entry.last,
+      seen: current.seen[key] ?? 0,
+      reason: `binds as ${message.toUpperCase()}`,
     });
   }
 
@@ -170,15 +223,20 @@ export function chipDragPayload(chip, deviceRole) {
     return { kind: 'ceditor.deviceParameter', parameter: chip.parameter, deviceRole: role };
   }
   const message = LEARNABLE.get(String(chip?.origin ?? ''));
-  if (message && (message !== 'cc' || Number.isFinite(Number(chip?.controller)))) {
-    const controller = Number(chip?.controller) || 0;
-    return {
-      kind: 'ceditor.midiControl',
-      message,
-      controller,
-      parameter: midiControlParameterShape({ message, controller }),
-      deviceRole: role,
-    };
-  }
-  return null;
+  if (!message) return null;
+  if (message === 'cc' && !Number.isFinite(Number(chip?.controller))) return null;
+  if (message === 'nrpn' && !chip?.nrpn) return null;
+  const descriptor = {
+    message,
+    controller: Number(chip?.controller) || 0,
+    // 14-bit by default: it is what a device sending CC 38 means, and a 7-bit device simply never
+    // moves the low byte, so reading wide costs a 7-bit parameter nothing but a x128 range.
+    ...(chip?.nrpn ? { ...chip.nrpn, valueResolution: 14 } : {}),
+  };
+  return {
+    kind: 'ceditor.midiControl',
+    ...descriptor,
+    parameter: midiControlParameterShape(descriptor),
+    deviceRole: role,
+  };
 }

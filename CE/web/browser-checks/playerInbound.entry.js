@@ -72,6 +72,20 @@ function pressureKnob(id, y) {
   return control;
 }
 
+// A 14-bit NRPN binding, the only kind whose inbound side needs the assembler: the four CCs arrive
+// as four separate bridge callbacks, so the state has to survive between them.
+function nrpnKnob(id, y) {
+  const control = createControl('Knob', { Core: { id, name: id }, Transform: { x: 220, y, width: 60, height: 60 } });
+  control._children.DeviceBindings = {
+    bindings: [{
+      kind: 'midiControl', port: 'value', deviceRole: 'Roland GAIA SH-01',
+      message: 'nrpn', parameterMsb: 1, parameterLsb: 32, valueResolution: 14,
+      channel: 0, dryRun: true, feedback: { receiveUpdates: true },
+    }],
+  };
+  return control;
+}
+
 const panelDocument = {
   name: 'inbound check',
   width: 400,
@@ -81,6 +95,7 @@ const panelDocument = {
     knob('tempo', 'common.patchTempo', 100),            // 3 nibbles, 10 00 00 0D
     knob('cutoff', 'tone1.filter.cutoff', 180),         // u7, 10 00 01 0C, also CC 102
     pressureKnob('pressure', 20),
+    nrpnKnob('nrpn', 100),
   ],
 };
 

@@ -17,7 +17,8 @@
   import { injectPresetRowsIntoPanel } from './CE_Application/utils/presetChoiceRows.js';
   import { decodeInbound, inboundReadTargets } from './CE_Application/utils/inboundParameterIndex.js';
   import { inboundIndexFor } from './CE_Application/stores/inboundIndexCache.js';
-  import { activeMidiControlBindings, matchesMidiControl } from './CE_Application/utils/midiControlBindings.js';
+  import { activeMidiControlBindings, matchesMidiControl, midiControlValue } from './CE_Application/utils/midiControlBindings.js';
+  import { EMPTY_NRPN_STATE, applyNrpnEvents } from './CE_Application/utils/nrpn.js';
   import { expressionEventsFromHex } from './CE_Application/utils/midiNoteInput.js';
   import { getDeviceSessionState } from './CE_Application/bridge/bridge.js';
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, listProfileParameters, onMidiInputMessage, onSysexInputMessage, triggerRawMidiAction } from './CE_Application/bridge/bridge.js';
@@ -60,7 +61,8 @@
   let paramControlMap = {};  // parameterId -> controlId, rebuilt from the loaded panel's bindings
   let paramPortMap = {};     // parameterId -> binding port (value | brightness | backlight | text | …)
   let paramRows = {};        // parameterId -> Value.rows (choice controls), for numeric -> id mapping
-  let midiControlBindings = [];  // [controlId, binding] for raw CC bindings — no parameter to key on
+  let midiControlBindings = [];  // [controlId, binding] for raw MIDI bindings — no parameter to key on
+  let nrpnState = EMPTY_NRPN_STATE;  // an NRPN is four CCs, so reading one needs memory
 
   // The generated GAIA panel binds scoped ids ('tone1.filter.cutoff'); the slim demo panel binds
   // Tone 1 flat ('filter.cutoff'). Try the id the profile gave, then the flat form, so a panel
@@ -291,10 +293,16 @@
   // legitimately do both — one panel binding it by name, another by number. matchesMidiControl does
   // the kind check, so aftertouch, velocity, poly pressure and bend all land here too.
   function applyMidiControlBindings(hex) {
+    // The assembler runs unconditionally so its per-channel selections track the stream even while
+    // no panel is loaded; an NRPN whose 99/98 arrived first still resolves when the 6 lands.
+    const assembly = applyNrpnEvents(nrpnState, expressionEventsFromHex(hex));
+    nrpnState = assembly.state;
     if (!midiControlBindings.length) return;
-    for (const event of expressionEventsFromHex(hex)) {
+    for (const event of [...assembly.passthrough, ...assembly.assembled]) {
       for (const [controlId, binding] of midiControlBindings) {
-        if (matchesMidiControl(binding, event)) queueSessionValue(controlId, binding.port, event.value);
+        if (matchesMidiControl(binding, event)) {
+          queueSessionValue(controlId, binding.port, midiControlValue(binding, event));
+        }
       }
     }
   }

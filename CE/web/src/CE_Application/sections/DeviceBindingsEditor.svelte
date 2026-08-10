@@ -95,6 +95,9 @@
     const next = midiControlBindingFrom({
       message,
       controller: selectedBinding.controller ?? 0,
+      parameterMsb: selectedBinding.parameterMsb ?? 0,
+      parameterLsb: selectedBinding.parameterLsb ?? 0,
+      valueResolution: selectedBinding.valueResolution ?? 7,
       port: selectedBinding.port ?? 'value',
       deviceRole: selectedBinding.deviceRole ?? DEFAULT_DEVICE_ROLE,
     });
@@ -194,6 +197,22 @@
         {#if selectedBinding?.message === 'cc' || !selectedBinding?.message}
           <PropertyCell label="Controller" span={2} hint="CC number, 0-127. The control both sends this and follows it.">
             <input class="val" type="number" min="0" max="127" value={selectedBinding?.controller ?? 0} onchange={(e) => setBindingProp('controller', Math.max(0, Math.min(127, Math.round(Number(e.target.value) || 0))))} />
+          </PropertyCell>
+        {:else if selectedBinding?.message === 'nrpn'}
+          <PropertyCell label="NRPN MSB" span={1} hint="Parameter number, high half (CC 99). Manuals print NRPNs as MSB:LSB.">
+            <input class="val" type="number" min="0" max="127" value={selectedBinding?.parameterMsb ?? 0} onchange={(e) => setBindingProp('parameterMsb', Math.max(0, Math.min(127, Math.round(Number(e.target.value) || 0))))} />
+          </PropertyCell>
+          <PropertyCell label="NRPN LSB" span={1} hint="Parameter number, low half (CC 98).">
+            <input class="val" type="number" min="0" max="127" value={selectedBinding?.parameterLsb ?? 0} onchange={(e) => setBindingProp('parameterLsb', Math.max(0, Math.min(127, Math.round(Number(e.target.value) || 0))))} />
+          </PropertyCell>
+          <PropertyCell label="Resolution" span={1} hint="7-bit sends Data Entry MSB only (0-127). 14-bit adds the LSB (0-16383). The wire cannot say which the device means.">
+            <select class="val" value={selectedBinding?.valueResolution ?? 7} onchange={(e) => setBindingProp('valueResolution', Number(e.target.value) === 14 ? 14 : 7)}>
+              <option value={7}>7-bit</option>
+              <option value={14}>14-bit</option>
+            </select>
+          </PropertyCell>
+          <PropertyCell label="Null after" span={1} hint="Deselect the parameter after sending (CC 99/98 = 127), so a later Data Entry cannot land on it.">
+            <PropertyToggle value={selectedBinding?.nullAfterSend === true} onchange={() => setBindingProp('nullAfterSend', !(selectedBinding?.nullAfterSend === true))} />
           </PropertyCell>
         {/if}
         <PropertyCell label="Channel" span={2} hint="0 listens on any channel and sends on 1. 1-16 is exact both ways.">

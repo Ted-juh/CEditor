@@ -117,6 +117,23 @@ try {
   });
   assert.equal(notPressure, 90, 'poly pressure moved a channel-pressure binding');
 
+  // An NRPN, delivered as four SEPARATE bridge callbacks — which is how it really arrives, and the
+  // reason its inbound side needs state at all. A per-message decoder would see four unrelated CCs.
+  const nrpn = await page.evaluate(async () => {
+    for (const hex of ['B0 63 01', 'B0 62 20', 'B0 06 02', 'B0 26 40']) window.__player.channelMidi(hex);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return window.__player.value('nrpn');
+  });
+  assert.equal(nrpn, 320, `a 14-bit NRPN did not reassemble across callbacks (got ${nrpn})`);
+
+  // A different parameter number on the same channel must not drive it.
+  const otherNrpn = await page.evaluate(async () => {
+    for (const hex of ['B0 63 01', 'B0 62 21', 'B0 06 7F', 'B0 26 7F']) window.__player.channelMidi(hex);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return window.__player.value('nrpn');
+  });
+  assert.equal(otherNrpn, 320, 'NRPN 1:33 moved a control bound to NRPN 1:32');
+
   // A message for nothing in this profile must move nothing.
   const before = await page.evaluate((id) => window.__player.value(id), DISTORTION);
   const after = await page.evaluate(async (id) => {
@@ -128,7 +145,7 @@ try {
   assert.equal(after, before, 'a message from another manufacturer moved a control');
 
   assert.deepEqual(errors, [], `the page logged errors: ${errors.join(' | ')}`);
-  console.log('player inbound: ok (nibbled 3 and 4 wide, device id tolerated, declared CC on any channel, raw aftertouch bound, unknown ignored)');
+  console.log('player inbound: ok (nibbled 3 and 4 wide, device id tolerated, declared CC on any channel, raw aftertouch bound, NRPN reassembled across callbacks, unknown ignored)');
 } catch (error) {
   failed = true;
   console.error('player inbound: FAILED\n', error.message);

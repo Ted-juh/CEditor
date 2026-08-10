@@ -48,16 +48,19 @@ try {
     window.__chips.sysex('F0 41 10 00 00 41 12 10 00 04 01 00 0F 0F 0F 3E F7');
     window.__chips.cc('B0 4A 60');    // CC 74 — not in this profile, binds as a raw CC
     window.__chips.cc('D0 70');       // channel pressure — binds by message, with no CC number
+    // One NRPN knob, as four separate arrivals. It must become ONE chip, not four.
+    for (const hex of ['B0 63 01', 'B0 62 20', 'B0 06 02', 'B0 26 40']) window.__chips.cc(hex);
   });
-  // Three chips from three messages sent in ONE tick — the case that caught a real bug: read as
+  // Four chips from seven messages sent in ONE tick — the case that caught a real bug: read as
   // $latestMidiInputMessage, an $effect flushes once per microtask and the earlier messages are
   // never folded, so moving two knobs at once loses one of them.
-  await page.waitForFunction(() => window.__chips.rendered().length === 3, null, { timeout: 10000 });
+  await page.waitForFunction(() => window.__chips.rendered().length === 4, null, { timeout: 10000 });
 
   const rendered = await page.evaluate(() => window.__chips.rendered());
   const named = rendered.find((chip) => chip.label.includes('MFX') || chip.detail === 'SysEx');
   const rawCc = rendered.find((chip) => /CC 74/.test(chip.label));
   const pressure = rendered.find((chip) => /Aftertouch/.test(chip.label));
+  const nrpnChip = rendered.find((chip) => /NRPN/.test(chip.label));
 
   assert.ok(named?.draggable, 'a sysex edit should resolve to a named, draggable parameter');
   assert.equal(named.value, '4095', `the four-nibble value did not reach the chip (${named.value})`);
@@ -69,6 +72,11 @@ try {
   assert.equal(pressure.draggable, true, 'aftertouch has a binding kind now — it was the last inert chip');
   assert.equal(rendered.every((chip) => chip.draggable), true,
     'every kind the learn reducer produces should now have somewhere to go');
+  assert.ok(nrpnChip, 'four NRPN CCs should have become one chip');
+  assert.equal(nrpnChip.label, 'NRPN 1:32');
+  assert.equal(nrpnChip.value, '320', 'the 14-bit reading');
+  assert.equal(rendered.filter((chip) => /^CC (99|98|6|38) /.test(chip.label)).length, 0,
+    'the NRPN plumbing CCs must not be offered as controllers of their own');
 
   // THE point of the feature: what a dragstart hands to CanvasControl's drop handler.
   const drag = await page.evaluate((label) => window.__chips.drag(label), named.label);
@@ -93,6 +101,13 @@ try {
   assert.equal(rawPayload.parameter.type, 'integer', 'the drop target judges compatibility on this');
   await page.evaluate((label) => window.__chips.dragEnd(label), rawCc.label);
 
+  const nrpnDrag = await page.evaluate((label) => window.__chips.drag(label), nrpnChip.label);
+  const nrpnPayload = JSON.parse(nrpnDrag.payload);
+  assert.equal(nrpnPayload.message, 'nrpn');
+  assert.deepEqual([nrpnPayload.parameterMsb, nrpnPayload.parameterLsb], [1, 32]);
+  assert.equal(nrpnPayload.parameter.range.max, 16383, 'a learned NRPN is read wide');
+  await page.evaluate((label) => window.__chips.dragEnd(label), nrpnChip.label);
+
   // Channel pressure carries no controller number, and binds by message alone.
   const pressureDrag = await page.evaluate((label) => window.__chips.drag(label), pressure.label);
   const pressurePayload = JSON.parse(pressureDrag.payload);
@@ -102,7 +117,7 @@ try {
   await page.evaluate((label) => window.__chips.dragEnd(label), pressure.label);
 
   assert.deepEqual(errors, [], `the page logged errors: ${errors.join(' | ')}`);
-  console.log('learn chips: ok (sysex named and valued, raw CC and aftertouch bind as messages, dragstart feeds the drop path)');
+  console.log('learn chips: ok (sysex named and valued, raw CC and aftertouch bind as messages, NRPN folded to one chip, dragstart feeds the drop path)');
 } catch (error) {
   failed = true;
   console.error('learn chips: FAILED\n', error.message);

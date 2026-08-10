@@ -34,7 +34,9 @@ import {
   midiControlLabel,
   midiControlMessage,
   midiControlParameterShape,
+  midiControlValue,
 } from '../src/CE_Application/utils/midiControlBindings.js';
+import { EMPTY_NRPN_STATE, applyNrpnEvents } from '../src/CE_Application/utils/nrpn.js';
 import { getBindingCompatibility } from '../src/CE_Application/models/componentPorts.js';
 import { expressionEventsFromHex } from '../src/CE_Application/utils/midiNoteInput.js';
 
@@ -48,8 +50,10 @@ test('a binding is only usable when it can actually name a message', () => {
   assert.equal(isMidiControlBinding({ ...binding(), controller: 128 }), false, 'a CC is 0-127');
   assert.equal(isMidiControlBinding({ ...binding(), controller: -1 }), false);
   assert.equal(isMidiControlBinding({ ...binding(), controller: undefined }), false);
-  assert.equal(isMidiControlBinding({ ...binding(), message: 'nrpn' }), false,
+  assert.equal(isMidiControlBinding({ ...binding(), message: 'rpn' }), false,
     'an unimplemented message must be refused, not half-handled');
+  assert.equal(isMidiControlBinding({ ...binding(), message: 'nrpn' }), false,
+    'a CC binding relabelled as an NRPN has a controller but no parameter number');
   assert.equal(isMidiControlBinding({ kind: 'deviceParameter', parameterId: 'filter.cutoff' }), false);
   assert.equal(isMidiControlBinding(null), false);
 });
@@ -121,8 +125,8 @@ test('every message the learn reducer can produce is bindable', () => {
   // The gap this closes. Aftertouch, velocity and poly pressure were candidates the chips could see
   // and nothing could accept; a keyboard's pressure and dynamics had no way to reach a control.
   const learnable = MIDI_CONTROL_MESSAGES.filter((m) => m.learnable).map((m) => m.eventKind);
-  assert.deepEqual(learnable.sort(), ['aftertouch', 'cc', 'polyAftertouch', 'velocity'],
-    'these are exactly the kinds learnKey() in midiNoteInput.js produces');
+  assert.deepEqual(learnable.sort(), ['aftertouch', 'cc', 'nrpn', 'polyAftertouch', 'velocity'],
+    'the kinds learnKey() produces, plus nrpn which midiLearnChips reassembles for itself');
 });
 
 test('each message matches its own kind and no other', () => {
@@ -200,10 +204,80 @@ test('a learned binding keeps the controller and forgets the channel', () => {
   assert.equal(midiControlBindingFrom({ controller: 300 }), null);
 });
 
+const nrpn = (over = {}) => ({
+  ...midiControlBindingFrom({ message: 'nrpn', parameterMsb: 1, parameterLsb: 32 }), ...over,
+});
+const assemble = (hex) => applyNrpnEvents(EMPTY_NRPN_STATE, expressionEventsFromHex(hex)).assembled.at(-1);
+
+test('an NRPN binding needs its parameter number, in both halves', () => {
+  assert.equal(isMidiControlBinding(nrpn()), true);
+  assert.equal(isMidiControlBinding({ ...nrpn(), parameterLsb: undefined }), false,
+    'half a parameter number would bind to a parameter nobody selected');
+  assert.equal(isMidiControlBinding({ ...nrpn(), parameterMsb: 128 }), false);
+  assert.equal(midiControlBindingFrom({ message: 'nrpn', parameterMsb: 1 }), null);
+  assert.equal(nrpn().controller, undefined, 'an NRPN has no controller number');
+});
+
+test('an NRPN matches its own parameter number and no other', () => {
+  const event = assemble('B0 63 01 B0 62 20 B0 06 02 B0 26 40');
+  assert.equal(matchesMidiControl(nrpn(), event), true);
+  assert.equal(matchesMidiControl(nrpn({ parameterLsb: 33 }), event), false);
+  assert.equal(matchesMidiControl(nrpn({ parameterMsb: 2 }), event), false);
+  assert.equal(matchesMidiControl(binding(), event), false, 'a CC binding must not take an NRPN');
+  assert.equal(matchesMidiControl(nrpn({ channel: 2 }), event), false, 'wrong channel');
+  assert.equal(matchesMidiControl(nrpn({ channel: 1 }), event), true);
+});
+
+test('the binding decides the resolution, because the wire cannot', () => {
+  // A 7-bit and a 14-bit NRPN are byte-identical up to the optional CC 38, so the same reassembled
+  // event has to serve both. Getting this backwards is a value 128x out.
+  const event = assemble('B0 63 01 B0 62 20 B0 06 02 B0 26 40');
+  assert.equal(midiControlValue(nrpn(), event), 2, 'default is 7-bit, mirroring the C++ recipe');
+  assert.equal(midiControlValue(nrpn({ valueResolution: 14 }), event), 320);
+  assert.equal(midiControlValue(binding(), { value: 90 }), 90, 'every other kind is just its value');
+});
+
+test('an NRPN sends the four CCs the engine sends, in that order', () => {
+  // Mirrors DeviceProfileEngine.cpp's recipe builder: 99, 98, then 6 (+38 when 14-bit). C++ splits a
+  // multi-message run on the way out, so one hex string is what the send path expects.
+  assert.equal(midiControlMessage(nrpn(), 64), 'B0 63 01 B0 62 20 B0 06 40');
+  assert.equal(midiControlMessage(nrpn({ valueResolution: 14 }), 320),
+    'B0 63 01 B0 62 20 B0 06 02 B0 26 40');
+  assert.equal(midiControlMessage(nrpn({ valueResolution: 14, channel: 3 }), 320),
+    'B2 63 01 B2 62 20 B2 06 02 B2 26 40');
+});
+
+test('a 14-bit NRPN clamps at 16383, a 7-bit one at 127', () => {
+  assert.equal(midiControlMessage(nrpn({ valueResolution: 14 }), 99999), 'B0 63 01 B0 62 20 B0 06 7F B0 26 7F');
+  assert.equal(midiControlMessage(nrpn(), 99999), 'B0 63 01 B0 62 20 B0 06 7F');
+});
+
+test('null-after-send deselects the parameter, when asked', () => {
+  // The optional tail C++ writes for nullAfterSend, so a later Data Entry from anything else cannot
+  // land on this parameter. Off by default, because most gear does not need it and it doubles the
+  // traffic of a knob sweep.
+  assert.equal(midiControlMessage(nrpn({ nullAfterSend: true }), 64),
+    'B0 63 01 B0 62 20 B0 06 40 B0 63 7F B0 62 7F');
+  assert.equal(nrpn().nullAfterSend, undefined);
+});
+
+test('an NRPN round-trips: what a control sends, a control can read', () => {
+  // The property that matters most and is easiest to get subtly wrong — the sender and the reader
+  // were written from the same C++ source but not from each other.
+  for (const [resolution, value] of [[7, 100], [14, 9001], [14, 0], [7, 0], [14, 16383]]) {
+    const b = nrpn({ valueResolution: resolution });
+    const event = assemble(midiControlMessage(b, value));
+    assert.equal(matchesMidiControl(b, event), true, `${resolution}-bit ${value} did not match itself`);
+    assert.equal(midiControlValue(b, event), value, `${resolution}-bit ${value} read back wrong`);
+  }
+});
+
 test('the label reads the way a synth manual writes it', () => {
   assert.equal(midiControlLabel(binding()), 'CC 74');
   assert.equal(midiControlLabel(binding({ channel: 3 })), 'CC 74 · ch 3');
   assert.equal(midiControlLabel(midiControlBindingFrom({ message: 'aftertouch' })), 'Aftertouch');
   assert.equal(midiControlLabel(midiControlBindingFrom({ message: 'velocity', port: 'value' })), 'Note velocity');
+  assert.equal(midiControlLabel(nrpn()), 'NRPN 1:32', 'MSB:LSB, as manuals print it');
+  assert.equal(midiControlLabel(nrpn({ channel: 3 })), 'NRPN 1:32 · ch 3');
   assert.equal(midiControlLabel({ kind: 'deviceParameter' }), '');
 });

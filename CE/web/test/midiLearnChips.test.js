@@ -103,6 +103,33 @@ test('a keyboard\'s pressure and dynamics bind too', () => {
   }
 });
 
+test('one NRPN knob is one chip, not four junk controllers', () => {
+  // Turning an NRPN knob sends CC 99, 98, 6 and 38. Without reassembly the strip would offer four
+  // meaningless controllers and no way to bind the thing that actually moved.
+  const chips = chipList(fold(['B0 63 01 B0 62 20 B0 06 02 B0 26 40']), opts);
+  assert.equal(chips.length, 1);
+  assert.equal(chips[0].origin, 'nrpn');
+  assert.equal(chips[0].label, 'NRPN 1:32');
+  assert.equal(chips[0].last, 320, 'the 14-bit reading, as the more informative of the two');
+
+  const payload = chipDragPayload(chips[0], 'Fader box');
+  assert.equal(payload.kind, 'ceditor.midiControl');
+  assert.equal(payload.message, 'nrpn');
+  assert.equal(payload.parameterMsb, 1);
+  assert.equal(payload.parameterLsb, 32);
+  assert.equal(payload.valueResolution, 14, 'a learned NRPN reads wide — a 7-bit device just never moves the low byte');
+  assert.equal(payload.parameter.range.max, 16383, 'so the control it lands on is sized for it');
+});
+
+test('a Data Entry with no NRPN selected is still an ordinary controller', () => {
+  // The reassembler must not swallow CC 6 on the chance it might be NRPN plumbing: some gear uses it
+  // on its own, and a real controller vanishing from the strip is worse than an extra chip.
+  const chips = chipList(fold(['B0 06 20', 'B0 06 60']), opts);
+  assert.equal(chips.length, 1);
+  assert.equal(chips[0].origin, 'cc');
+  assert.equal(chips[0].controller, 6);
+});
+
 test('the newest chip comes first', () => {
   // The whole interaction: wiggle the one you want, take the chip that just appeared. Ranking by
   // span — what the one-shot session does — would bury it under whatever moved furthest earlier.
