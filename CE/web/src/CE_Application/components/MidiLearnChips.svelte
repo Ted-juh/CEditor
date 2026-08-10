@@ -9,10 +9,11 @@
    * whole `deviceParameterDrag` store) turned out to have no drag source in the app at all. This is
    * that source, so a complete subsystem stops being unreachable.
    *
-   * A chip the profile cannot name is still draggable when it is a CC: it binds as the message
-   * rather than as a name (midiControlBindings.js), which is what a generic fader box needs. What
-   * stays inert is aftertouch, velocity and poly pressure — no binding kind covers those yet — and
-   * those chips say so rather than looking broken.
+   * A chip the profile cannot name is still draggable: it binds as the message rather than as a name
+   * (midiControlBindings.js), which is what a generic fader box needs — and, since the binding kinds
+   * were widened, what a keyboard's pressure and dynamics need too. Every kind the learn reducer can
+   * produce now has somewhere to go, so no chip is inert; one still says when the profile could not
+   * name it, because binding by number and binding by name are different promises.
    */
   import { Eraser, Radio } from 'lucide-svelte';
   import {

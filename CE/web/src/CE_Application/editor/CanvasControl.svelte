@@ -653,6 +653,7 @@
     const rawControl = payload.kind === 'ceditor.midiControl';
     const nextBinding = rawControl
       ? midiControlBindingFrom({
+        message: payload.message,
         controller: payload.controller,
         port: compatibility.port.id,
         deviceRole: payload.deviceRole || DEFAULT_DEVICE_ROLE,

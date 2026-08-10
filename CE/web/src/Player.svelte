@@ -250,10 +250,14 @@
     if (!incomingRaf) incomingRaf = requestAnimationFrame(flushIncoming);
   }
 
-  // Incoming CC (GAIA knob with Tx Edit Data OFF -> CC 102/103/104).
+  // Incoming channel MIDI (GAIA knob with Tx Edit Data OFF -> CC 102/103/104).
   function applyIncomingMidi(payload) {
-    if (!payload || payload.messageType !== 'cc' || !payload.hex) return;
+    if (!payload?.hex) return;
+    // Raw bindings first, and BEFORE the messageType gate: C++ labels a message "cc" only for 0xB0
+    // and "midi"/"raw" for everything else, so aftertouch, velocity, poly pressure and bend all
+    // arrive unlabelled. Gating them out here is what would make those binding kinds dead.
     applyMidiControlBindings(payload.hex);
+    if (payload.messageType !== 'cc') return;
     if (inboundIndex) { applyDecoded(payload.hex); return; }
     const b = String(payload.hex).trim().split(/\s+/).map((h) => parseInt(h, 16));
     if (b.length < 3 || (b[0] & 0xf0) !== 0xb0) return;  // CC status nibble 0xB
@@ -282,13 +286,13 @@
     if (hit) queueControlValue(hit.parameterId, hit.value);
   }
 
-  // Raw CC bindings, which run alongside the index rather than instead of it: a controller the
+  // Raw MIDI bindings, which run alongside the index rather than instead of it: a controller the
   // profile does not describe drives its control by message, and a CC the profile DOES describe can
-  // legitimately do both — one panel binding it by name, another by number.
+  // legitimately do both — one panel binding it by name, another by number. matchesMidiControl does
+  // the kind check, so aftertouch, velocity, poly pressure and bend all land here too.
   function applyMidiControlBindings(hex) {
     if (!midiControlBindings.length) return;
     for (const event of expressionEventsFromHex(hex)) {
-      if (event.kind !== 'cc') continue;
       for (const [controlId, binding] of midiControlBindings) {
         if (matchesMidiControl(binding, event)) queueSessionValue(controlId, binding.port, event.value);
       }

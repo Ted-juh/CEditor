@@ -47,7 +47,7 @@ try {
   await page.evaluate(() => {
     window.__chips.sysex('F0 41 10 00 00 41 12 10 00 04 01 00 0F 0F 0F 3E F7');
     window.__chips.cc('B0 4A 60');    // CC 74 — not in this profile, binds as a raw CC
-    window.__chips.cc('D0 70');       // aftertouch — no binding kind covers it
+    window.__chips.cc('D0 70');       // channel pressure — binds by message, with no CC number
   });
   // Three chips from three messages sent in ONE tick — the case that caught a real bug: read as
   // $latestMidiInputMessage, an $effect flushes once per microtask and the earlier messages are
@@ -57,7 +57,7 @@ try {
   const rendered = await page.evaluate(() => window.__chips.rendered());
   const named = rendered.find((chip) => chip.label.includes('MFX') || chip.detail === 'SysEx');
   const rawCc = rendered.find((chip) => /CC 74/.test(chip.label));
-  const inert = rendered.find((chip) => /Aftertouch/.test(chip.label));
+  const pressure = rendered.find((chip) => /Aftertouch/.test(chip.label));
 
   assert.ok(named?.draggable, 'a sysex edit should resolve to a named, draggable parameter');
   assert.equal(named.value, '4095', `the four-nibble value did not reach the chip (${named.value})`);
@@ -65,9 +65,10 @@ try {
   assert.ok(rawCc, 'an unresolvable CC should still be shown');
   assert.equal(rawCc.draggable, true, 'a raw CC is bindable as a message — that is the whole point');
   assert.match(rawCc.title, /binds as a raw CC/, 'and should say what it will bind as');
-  assert.ok(inert, 'aftertouch should be shown');
-  assert.equal(inert.draggable, false, 'no binding kind covers aftertouch');
-  assert.match(inert.title, /no binding kind yet/, 'an inert chip must say why');
+  assert.ok(pressure, 'aftertouch should be shown');
+  assert.equal(pressure.draggable, true, 'aftertouch has a binding kind now — it was the last inert chip');
+  assert.equal(rendered.every((chip) => chip.draggable), true,
+    'every kind the learn reducer produces should now have somewhere to go');
 
   // THE point of the feature: what a dragstart hands to CanvasControl's drop handler.
   const drag = await page.evaluate((label) => window.__chips.drag(label), named.label);
@@ -92,14 +93,16 @@ try {
   assert.equal(rawPayload.parameter.type, 'integer', 'the drop target judges compatibility on this');
   await page.evaluate((label) => window.__chips.dragEnd(label), rawCc.label);
 
-  // An inert chip must not start a drag at all, or the surface would light up for something that
-  // can never be dropped.
-  const refused = await page.evaluate((label) => window.__chips.drag(label), inert.label);
-  assert.equal(refused.started, false, 'an unbindable chip started a drag');
-  assert.equal(refused.store, null);
+  // Channel pressure carries no controller number, and binds by message alone.
+  const pressureDrag = await page.evaluate((label) => window.__chips.drag(label), pressure.label);
+  const pressurePayload = JSON.parse(pressureDrag.payload);
+  assert.equal(pressurePayload.kind, 'ceditor.midiControl');
+  assert.equal(pressurePayload.message, 'aftertouch');
+  assert.equal(pressurePayload.parameter.id, 'aftertouch', 'not a cc<n> id — there is no number');
+  await page.evaluate((label) => window.__chips.dragEnd(label), pressure.label);
 
   assert.deepEqual(errors, [], `the page logged errors: ${errors.join(' | ')}`);
-  console.log('learn chips: ok (sysex named and valued, raw CC binds as a message, aftertouch inert, dragstart feeds the drop path)');
+  console.log('learn chips: ok (sysex named and valued, raw CC and aftertouch bind as messages, dragstart feeds the drop path)');
 } catch (error) {
   failed = true;
   console.error('learn chips: FAILED\n', error.message);

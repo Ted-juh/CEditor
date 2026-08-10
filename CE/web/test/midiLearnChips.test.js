@@ -14,8 +14,8 @@
 //   this app is built around. It also needs no heuristic: the address names the parameter exactly.
 //
 //   THE NAME. A chip carries a profile parameter when the profile can name it. One that cannot is
-//   still draggable if it is a CC — it binds as the message instead (see midiControlBindings.js).
-//   What is left inert is aftertouch and velocity, which no binding kind covers.
+//   still draggable — it binds as the message instead (see midiControlBindings.js), which now covers
+//   every kind the learn reducer produces.
 //
 //   THE ORDER. Newest first, not most-moved. The one-shot session ranks by span because it must
 //   pick a winner from a window; a strip is read by wiggling the thing you want and taking the chip
@@ -85,14 +85,22 @@ test('a controller the profile has no parameter for still binds, as a raw CC', (
   assert.equal(payload.parameter.type, 'integer', 'so the drop target can judge compatibility');
 });
 
-test('aftertouch is a chip, and is honest that nothing can be bound to it', () => {
-  // The gap that is left. midiControl covers CC only, so a performance controller still has no
-  // binding kind — worth stating on the chip rather than leaving the knob looking broken.
-  const chips = chipList(fold(['D0 20', 'D0 70']), opts);
-  assert.equal(chips[0].origin, 'aftertouch');
-  assert.equal(chips[0].parameter, null);
-  assert.match(chips[0].reason, /aftertouch and velocity have no binding kind yet/);
-  assert.equal(chipDragPayload(chips[0], 'GAIA'), null, 'and so it cannot start a drag');
+test('a keyboard\'s pressure and dynamics bind too', () => {
+  // These were the chips left inert when only CC had a binding kind: a candidate the strip could
+  // see and nothing could accept. Every kind the learn reducer produces now has somewhere to go.
+  for (const [hexes, message, origin] of [
+    [['D0 20', 'D0 70'], 'aftertouch', 'aftertouch'],
+    [['90 3C 20', '90 3C 70'], 'velocity', 'velocity'],
+    [['A0 3C 20', 'A0 3C 70'], 'polyAftertouch', 'polyAftertouch'],
+  ]) {
+    const chip = chipList(fold(hexes), opts)[0];
+    assert.equal(chip.origin, origin);
+    assert.equal(chip.parameter, null, 'no profile parameter arrives on these');
+    const payload = chipDragPayload(chip, 'Keyboard');
+    assert.equal(payload?.kind, 'ceditor.midiControl', `${origin} did not offer a binding`);
+    assert.equal(payload.message, message);
+    assert.equal(payload.parameter.type, 'integer', 'so a knob will accept it');
+  }
 });
 
 test('the newest chip comes first', () => {

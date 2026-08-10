@@ -6,7 +6,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
-  import { MIDI_CONTROL_KIND, midiControlBindingFrom, midiControlLabel } from '../utils/midiControlBindings.js';
+  import { MIDI_CONTROL_KIND, MIDI_CONTROL_MESSAGES, midiControlBindingFrom, midiControlLabel } from '../utils/midiControlBindings.js';
 
   let { control = null } = $props();
 
@@ -86,6 +86,22 @@
   function bindingSummary(binding) {
     if (binding?.kind === MIDI_CONTROL_KIND) return midiControlLabel(binding) || 'CC ?';
     return binding?.parameterId || 'unassigned';
+  }
+
+  // Same reason as setBindingKind: a binding left carrying a controller number after switching to
+  // aftertouch reads as though the number still means something.
+  function setBindingMessage(message) {
+    if (!selectedBinding) return;
+    const next = midiControlBindingFrom({
+      message,
+      controller: selectedBinding.controller ?? 0,
+      port: selectedBinding.port ?? 'value',
+      deviceRole: selectedBinding.deviceRole ?? DEFAULT_DEVICE_ROLE,
+    });
+    if (!next) return;
+    writeBindings(bindings.map((binding, index) => (index === selectedIndex
+      ? { ...next, channel: selectedBinding.channel ?? 0, dryRun: selectedBinding.dryRun !== false }
+      : binding)));
   }
 
   // Switching kind rewrites the binding rather than leaving both sets of fields on it: a binding
@@ -168,9 +184,18 @@
         </select>
       </PropertyCell>
       {#if isMidiControl}
-        <PropertyCell label="Controller" span={2} hint="CC number, 0-127. The control both sends this and follows it.">
-          <input class="val" type="number" min="0" max="127" value={selectedBinding?.controller ?? 0} onchange={(e) => setBindingProp('controller', Math.max(0, Math.min(127, Math.round(Number(e.target.value) || 0))))} />
+        <PropertyCell label="Message" span={2} hint="Which MIDI message. CC and aftertouch are two-way; velocity, poly pressure and bend can only be followed.">
+          <select class="val" value={selectedBinding?.message ?? 'cc'} onchange={(e) => setBindingMessage(e.target.value)}>
+            {#each MIDI_CONTROL_MESSAGES as message}
+              <option value={message.id}>{message.label}{message.sends ? '' : ' (in only)'}</option>
+            {/each}
+          </select>
         </PropertyCell>
+        {#if selectedBinding?.message === 'cc' || !selectedBinding?.message}
+          <PropertyCell label="Controller" span={2} hint="CC number, 0-127. The control both sends this and follows it.">
+            <input class="val" type="number" min="0" max="127" value={selectedBinding?.controller ?? 0} onchange={(e) => setBindingProp('controller', Math.max(0, Math.min(127, Math.round(Number(e.target.value) || 0))))} />
+          </PropertyCell>
+        {/if}
         <PropertyCell label="Channel" span={2} hint="0 listens on any channel and sends on 1. 1-16 is exact both ways.">
           <input class="val" type="number" min="0" max="16" value={selectedBinding?.channel ?? 0} onchange={(e) => setBindingProp('channel', Math.max(0, Math.min(16, Math.round(Number(e.target.value) || 0))))} />
         </PropertyCell>

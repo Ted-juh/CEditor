@@ -4,13 +4,14 @@
 // engine into whatever bytes that instrument wants. Right for an editor built around device
 // profiles, and with one hard edge — a controller the profile does not describe could not be bound
 // to anything at all. The learn chips made that edge visible by having to grey half of themselves
-// out: a generic fader box, or any CC a profile author never mapped, could be SEEN moving and had
-// nowhere to go.
+// out: a generic fader box, any CC a profile author never mapped, and a keyboard's own pressure and
+// dynamics could all be SEEN moving and had nowhere to go.
 //
 // What is pinned here is the contract that makes the second kind safe to have:
 //
-//   MATCHING, which decides whether an arriving CC belongs to a binding. Too loose and one knob
-//   drives two controls; too tight and a controller moved to another channel goes silently dead.
+//   MATCHING, which decides whether an arriving message belongs to a binding. Too loose and one
+//   knob drives two controls, or a note-on is mistaken for pressure; too tight and a controller
+//   moved to another channel goes silently dead.
 //
 //   NO SCALING. A CC carries 0-127 and the control receives 0-127, which is exactly what
 //   deviceParameter bindings already do. Two binding kinds that mapped values differently would be
@@ -24,7 +25,9 @@ import assert from 'node:assert/strict';
 
 import {
   MIDI_CONTROL_KIND,
+  MIDI_CONTROL_MESSAGES,
   activeMidiControlBindings,
+  canSendMidiControl,
   isMidiControlBinding,
   matchesMidiControl,
   midiControlBindingFrom,
@@ -46,7 +49,7 @@ test('a binding is only usable when it can actually name a message', () => {
   assert.equal(isMidiControlBinding({ ...binding(), controller: -1 }), false);
   assert.equal(isMidiControlBinding({ ...binding(), controller: undefined }), false);
   assert.equal(isMidiControlBinding({ ...binding(), message: 'nrpn' }), false,
-    'only cc is implemented — an unimplemented message must be refused, not half-handled');
+    'an unimplemented message must be refused, not half-handled');
   assert.equal(isMidiControlBinding({ kind: 'deviceParameter', parameterId: 'filter.cutoff' }), false);
   assert.equal(isMidiControlBinding(null), false);
 });
@@ -114,12 +117,73 @@ test('bindings are read off a control the same way device parameters are', () =>
   assert.deepEqual(activeMidiControlBindings({}), []);
 });
 
+test('every message the learn reducer can produce is bindable', () => {
+  // The gap this closes. Aftertouch, velocity and poly pressure were candidates the chips could see
+  // and nothing could accept; a keyboard's pressure and dynamics had no way to reach a control.
+  const learnable = MIDI_CONTROL_MESSAGES.filter((m) => m.learnable).map((m) => m.eventKind);
+  assert.deepEqual(learnable.sort(), ['aftertouch', 'cc', 'polyAftertouch', 'velocity'],
+    'these are exactly the kinds learnKey() in midiNoteInput.js produces');
+});
+
+test('each message matches its own kind and no other', () => {
+  // The bytes that would confuse a looser check: channel pressure D0 and poly pressure A0 both
+  // carry a level, and a note-on carries a velocity that is not either of them.
+  const cases = [
+    ['aftertouch', 'D0 40', 64],
+    ['velocity', '90 3C 5A', 90],
+    ['polyAftertouch', 'A0 3C 20', 32],
+    ['bend', 'E0 00 40', 64],
+  ];
+  for (const [message, hex, value] of cases) {
+    const b = midiControlBindingFrom({ message });
+    const event = ccEvent(hex);
+    assert.equal(matchesMidiControl(b, event), true, `${message} did not match its own message`);
+    assert.equal(event.value, value, `${message} decoded to ${event.value}`);
+    for (const [other] of cases) {
+      if (other === message) continue;
+      assert.equal(matchesMidiControl(midiControlBindingFrom({ message: other }), event), false,
+        `a ${other} binding matched a ${message} message`);
+    }
+    assert.equal(matchesMidiControl(binding(), event), false, `a CC binding matched a ${message} message`);
+  }
+});
+
+test('a binding with no controller is fine unless it is a CC', () => {
+  // A controller number identifies a CC and means nothing for the rest. Requiring it everywhere
+  // would refuse a perfectly good aftertouch binding for lacking a field it has no use for.
+  assert.equal(isMidiControlBinding(midiControlBindingFrom({ message: 'aftertouch' })), true);
+  assert.equal(midiControlBindingFrom({ message: 'aftertouch' }).controller, undefined,
+    'and the field should not be there at all, rather than sitting at a meaningless 0');
+  assert.equal(midiControlBindingFrom({ message: 'velocity' }).controller, undefined);
+  assert.equal(midiControlBindingFrom({ message: 'cc' }), null, 'a CC still needs its number');
+  assert.equal(midiControlBindingFrom({ message: 'nrpn', controller: 1 }), null, 'unimplemented is refused');
+});
+
+test('only the messages a control could honestly send are sendable', () => {
+  // The asymmetry is real, not unfinished. Velocity belongs to a note and poly pressure needs a note
+  // number — a fader emitting note-ons to move either would be a surprising thing. Bend is 14 bits
+  // centred at 8192, so a 0-127 control could never sit exactly at no-bend.
+  assert.equal(midiControlMessage(binding(), 90), 'B0 4A 5A');
+  assert.equal(midiControlMessage(midiControlBindingFrom({ message: 'aftertouch' }), 90), 'D0 5A',
+    'channel pressure is two bytes, not three');
+  assert.equal(midiControlMessage(midiControlBindingFrom({ message: 'aftertouch', channel: 3 }), 90), 'D0 5A');
+
+  for (const message of ['velocity', 'polyAftertouch', 'bend']) {
+    const b = midiControlBindingFrom({ message });
+    assert.equal(canSendMidiControl(b), false, `${message} should be inbound-only`);
+    assert.equal(midiControlMessage(b, 90), null, `${message} produced bytes it has no business sending`);
+  }
+});
+
 test('a CC describes itself to the binding-compatibility check', () => {
   // getBindingCompatibility decides whether a control accepts a drop and drives the highlight on
   // every control during a drag. It reads type and range, so a CC has to answer in those terms —
   // which it can, honestly: it is a 0-127 integer.
-  const shape = midiControlParameterShape(74);
+  const shape = midiControlParameterShape({ message: 'cc', controller: 74 });
   assert.deepEqual(shape, { id: 'cc74', name: 'CC 74', type: 'integer', range: { min: 0, max: 127 } });
+  assert.deepEqual(midiControlParameterShape({ message: 'aftertouch' }),
+    { id: 'aftertouch', name: 'Aftertouch', type: 'integer', range: { min: 0, max: 127 } },
+    'the others are 0-127 too, so a knob takes them the same way');
   const knob = getBindingCompatibility('Knob', shape);
   assert.notEqual(knob.status, 'incompatible');
   assert.equal(knob.port.id, 'value');
@@ -139,5 +203,7 @@ test('a learned binding keeps the controller and forgets the channel', () => {
 test('the label reads the way a synth manual writes it', () => {
   assert.equal(midiControlLabel(binding()), 'CC 74');
   assert.equal(midiControlLabel(binding({ channel: 3 })), 'CC 74 · ch 3');
+  assert.equal(midiControlLabel(midiControlBindingFrom({ message: 'aftertouch' })), 'Aftertouch');
+  assert.equal(midiControlLabel(midiControlBindingFrom({ message: 'velocity', port: 'value' })), 'Note velocity');
   assert.equal(midiControlLabel({ kind: 'deviceParameter' }), '');
 });

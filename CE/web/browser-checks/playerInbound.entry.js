@@ -58,6 +58,20 @@ function knob(id, parameterId, y) {
   return control;
 }
 
+// A raw MIDI binding: no profile parameter, matched by message. Channel pressure specifically,
+// because the bridge labels it "midi" rather than "cc" — the Player used to drop everything that
+// was not labelled "cc", which would have made these binding kinds dead on arrival.
+function pressureKnob(id, y) {
+  const control = createControl('Knob', { Core: { id, name: id }, Transform: { x: 120, y, width: 60, height: 60 } });
+  control._children.DeviceBindings = {
+    bindings: [{
+      kind: 'midiControl', port: 'value', deviceRole: 'Roland GAIA SH-01',
+      message: 'aftertouch', channel: 0, dryRun: true, feedback: { receiveUpdates: true },
+    }],
+  };
+  return control;
+}
+
 const panelDocument = {
   name: 'inbound check',
   width: 400,
@@ -66,6 +80,7 @@ const panelDocument = {
     knob('distortion1', 'distortion.parameter1', 20),   // 4 nibbles, 10 00 04 01
     knob('tempo', 'common.patchTempo', 100),            // 3 nibbles, 10 00 00 0D
     knob('cutoff', 'tone1.filter.cutoff', 180),         // u7, 10 00 01 0C, also CC 102
+    pressureKnob('pressure', 20),
   ],
 };
 
@@ -79,6 +94,8 @@ mount(Player, { target: document.getElementById('host') });
 window.__player = {
   load: () => fire('loadPanel', { panel: panelDocument }),
   cc: (hex) => fire('midiInputMessage', { messageType: 'cc', hex }),
+  // As the bridge labels anything that is not 0xB0: "midi", not "cc".
+  channelMidi: (hex) => fire('midiInputMessage', { messageType: 'midi', hex }),
   sysex: (hex) => fire('sysexInputMessage', { hex }),
   value: (controlId) => get(panelPreviewSessions)?.[controlId]?.valueOverride,
   bound: () => Object.keys(get(panelPreviewSessions) ?? {}).length,

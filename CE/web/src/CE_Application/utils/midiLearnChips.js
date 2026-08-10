@@ -27,7 +27,10 @@
 
 import { EMPTY_LEARN_STATE, applyLearnHex, learnCandidateLabel, learnCandidates } from './midiNoteInput.js';
 import { decodeInbound } from './inboundParameterIndex.js';
-import { midiControlParameterShape } from './midiControlBindings.js';
+import { MIDI_CONTROL_MESSAGES, midiControlParameterShape } from './midiControlBindings.js';
+
+/** Candidate kinds a chip can hand to a raw binding, from the binding module's own table. */
+const LEARNABLE = new Map(MIDI_CONTROL_MESSAGES.filter((m) => m.learnable).map((m) => [m.eventKind, m.id]));
 
 export const EMPTY_CHIP_STATE = Object.freeze({ learn: EMPTY_LEARN_STATE, sysex: {}, seen: {}, seq: 0 });
 
@@ -91,10 +94,10 @@ function candidateHex(candidate) {
 /**
  * The chips, newest first.
  *
- * A chip carries a `parameter` when the profile can name it. One that does not is still bindable if
- * it is a CC, as the message rather than as a name — see midiControlBindings.js. What is left over
- * is aftertouch, velocity and poly pressure, which no binding kind covers; those are listed anyway,
- * with the reason, because a controller that appears dead teaches nothing.
+ * A chip carries a `parameter` when the profile can name it. One that does not is still bindable as
+ * the message itself — see midiControlBindings.js, which covers every kind the learn reducer can
+ * produce. A chip that can offer neither is still listed, with the reason, because a controller that
+ * appears dead teaches nothing.
  */
 export function chipList(state, { index = null, parameterById = {} } = {}) {
   const current = state ?? EMPTY_CHIP_STATE;
@@ -136,11 +139,11 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
       count: candidate.count,
       last: candidate.last,
       seen: current.seen[candidate.key] ?? 0,
-      // A raw CC is bindable now — as the message rather than as a name — so the only chips left
-      // with nothing to offer are the ones no binding kind covers.
-      reason: parameter ? '' : (candidate.kind === 'cc'
-        ? 'not in this profile — binds as a raw CC'
-        : 'aftertouch and velocity have no binding kind yet'),
+      // Everything the learn reducer can produce is bindable now — as the message rather than as a
+      // name — so the only reason left is that the profile could not name it.
+      reason: parameter ? '' : (LEARNABLE.has(candidate.kind)
+        ? `not in this profile — binds as ${candidate.kind === 'cc' ? 'a raw CC' : 'a raw MIDI message'}`
+        : 'no binding kind covers this message'),
     });
   }
 
@@ -166,11 +169,14 @@ export function chipDragPayload(chip, deviceRole) {
   if (chip?.parameter?.id) {
     return { kind: 'ceditor.deviceParameter', parameter: chip.parameter, deviceRole: role };
   }
-  if (chip?.origin === 'cc' && Number.isFinite(Number(chip?.controller))) {
+  const message = LEARNABLE.get(String(chip?.origin ?? ''));
+  if (message && (message !== 'cc' || Number.isFinite(Number(chip?.controller)))) {
+    const controller = Number(chip?.controller) || 0;
     return {
       kind: 'ceditor.midiControl',
-      controller: Number(chip.controller),
-      parameter: midiControlParameterShape(chip.controller),
+      message,
+      controller,
+      parameter: midiControlParameterShape({ message, controller }),
       deviceRole: role,
     };
   }

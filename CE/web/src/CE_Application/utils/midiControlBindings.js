@@ -23,14 +23,51 @@
  * arrived on some channel, and that a controller was set to channel 3 today does not mean binding it
  * to channel 3 forever is what anyone meant. Sending needs one number, so channel 0 sends on 1.
  *
- * `message` is a discriminator with one value today. NRPN, notes and bend are all bindable in
- * principle and none of them is implemented; a field is cheaper than a third kind later.
+ * `message` says WHICH message. CC, channel aftertouch, note velocity, poly pressure and pitch bend
+ * are implemented; the table below records which of them a control can send as well as follow, and
+ * why the other three are inbound-only. NRPN is the obvious next one and is not here.
  */
 
 export const MIDI_CONTROL_KIND = 'midiControl';
 
-/** The only message type implemented. Anything else is refused rather than half-handled. */
-const SUPPORTED = new Set(['cc']);
+/**
+ * The message types, and which way each one can go.
+ *
+ * The asymmetry is real rather than unfinished. A CC and channel pressure are both a controller
+ * position, so a control can send one as easily as follow one. The other three cannot be sent:
+ *
+ *   velocity belongs to a note — there is no "send a velocity" without deciding which note to play,
+ *   and a control that silently emitted note-ons would be a surprising thing for a fader to do.
+ *
+ *   polyAftertouch needs a note number for the same reason.
+ *
+ *   bend is 14 bits centred at 8192, and expanding a 0-127 control back into it puts centre at
+ *   63.5 — not representable, so a control could never sit exactly at no-bend. Following a wheel is
+ *   useful and honest; driving one from a 7-bit value is not.
+ *
+ * `learnable` marks the ones a chip can offer. Bend is authorable but not learnable, because the
+ * learn reducer in midiNoteInput.js produces no bend candidate and is shared with the Router, whose
+ * source list has no bend either — widening it there to serve this would break routerSettingsForLearned.
+ */
+export const MIDI_CONTROL_MESSAGES = [
+  { id: 'cc', label: 'CC', eventKind: 'cc', sends: true, learnable: true },
+  { id: 'aftertouch', label: 'Aftertouch', eventKind: 'aftertouch', sends: true, learnable: true },
+  { id: 'velocity', label: 'Note velocity', eventKind: 'velocity', sends: false, learnable: true },
+  { id: 'polyAftertouch', label: 'Poly pressure', eventKind: 'polyAftertouch', sends: false, learnable: true },
+  { id: 'bend', label: 'Pitch bend', eventKind: 'bend', sends: false, learnable: false },
+];
+
+const BY_ID = new Map(MIDI_CONTROL_MESSAGES.map((m) => [m.id, m]));
+
+/** The message spec a binding names, or null when it names one that is not implemented. */
+export function midiControlMessageSpec(binding) {
+  return BY_ID.get(String(binding?.message ?? 'cc')) ?? null;
+}
+
+/** Can moving the control send this? False for the three that are inbound-only. */
+export function canSendMidiControl(binding) {
+  return isMidiControlBinding(binding) && midiControlMessageSpec(binding)?.sends === true;
+}
 
 const int = (value, fallback = 0) => {
   const n = Math.round(Number(value));
@@ -38,10 +75,14 @@ const int = (value, fallback = 0) => {
 };
 
 export function isMidiControlBinding(binding) {
-  return binding?.kind === MIDI_CONTROL_KIND
-    && SUPPORTED.has(String(binding?.message ?? 'cc'))
-    && int(binding?.controller, -1) >= 0
-    && int(binding?.controller, -1) <= 127;
+  if (binding?.kind !== MIDI_CONTROL_KIND) return false;
+  const spec = midiControlMessageSpec(binding);
+  if (!spec) return false;
+  // A controller number identifies a CC and means nothing for the others — requiring it everywhere
+  // would refuse a perfectly good aftertouch binding for lacking a field it has no use for.
+  if (spec.id !== 'cc') return true;
+  const controller = int(binding?.controller, -1);
+  return controller >= 0 && controller <= 127;
 }
 
 /**
@@ -51,27 +92,38 @@ export function isMidiControlBinding(binding) {
  * channel 1-16 — so nothing here re-parses MIDI.
  */
 export function matchesMidiControl(binding, event) {
-  if (!isMidiControlBinding(binding) || event?.kind !== 'cc') return false;
-  if (int(event.cc, -1) !== int(binding.controller, -1)) return false;
+  if (!isMidiControlBinding(binding)) return false;
+  const spec = midiControlMessageSpec(binding);
+  if (!spec || event?.kind !== spec.eventKind) return false;
+  if (spec.id === 'cc' && int(event.cc, -1) !== int(binding.controller, -1)) return false;
   const wanted = int(binding.channel, 0);
   return wanted === 0 || wanted === int(event.channel, 0);
 }
 
-/** The bytes a control sends when it moves. Null when the binding or the value cannot make one. */
+/**
+ * The bytes a control sends when it moves. Null when the binding cannot send at all, or when the
+ * value is not a number — there is no honest byte for that.
+ */
 export function midiControlMessage(binding, value) {
-  if (!isMidiControlBinding(binding)) return null;
+  if (!canSendMidiControl(binding)) return null;
   const number = Math.round(Number(value));
   if (!Number.isFinite(number)) return null;
   const channel = Math.min(16, Math.max(1, int(binding.channel, 0) || 1));
   const byte = (n) => (n & 0xff).toString(16).toUpperCase().padStart(2, '0');
-  return `${byte(0xb0 + channel - 1)} ${byte(int(binding.controller, 0) & 0x7f)} ${byte(Math.min(127, Math.max(0, number)))}`;
+  const data = byte(Math.min(127, Math.max(0, number)));
+  if (midiControlMessageSpec(binding).id === 'aftertouch') {
+    return `${byte(0xd0 + channel - 1)} ${data}`;    // channel pressure carries one data byte
+  }
+  return `${byte(0xb0 + channel - 1)} ${byte(int(binding.controller, 0) & 0x7f)} ${data}`;
 }
 
-/** "CC 74" / "CC 74 · ch 3" — what the binding is, in the words a synth manual uses. */
+/** "CC 74" / "Aftertouch · ch 3" — what the binding is, in the words a synth manual uses. */
 export function midiControlLabel(binding) {
   if (!isMidiControlBinding(binding)) return '';
+  const spec = midiControlMessageSpec(binding);
   const channel = int(binding.channel, 0);
-  return `CC ${int(binding.controller, 0)}${channel ? ` · ch ${channel}` : ''}`;
+  const head = spec.id === 'cc' ? `CC ${int(binding.controller, 0)}` : spec.label;
+  return `${head}${channel ? ` · ch ${channel}` : ''}`;
 }
 
 /**
@@ -93,15 +145,17 @@ export function activeMidiControlBindings(control) {
  * Channel is dropped on purpose — see the note above. `dryRun` follows the drag-to-bind default for
  * device parameters, which is to compile and monitor rather than send until someone says otherwise.
  */
-export function midiControlBindingFrom({ controller, port = 'value', deviceRole = '' }) {
+export function midiControlBindingFrom({ message = 'cc', controller, port = 'value', deviceRole = '' }) {
+  const spec = BY_ID.get(String(message));
+  if (!spec) return null;
   const cc = int(controller, -1);
-  if (cc < 0 || cc > 127) return null;
+  if (spec.id === 'cc' && (cc < 0 || cc > 127)) return null;
   return {
     kind: MIDI_CONTROL_KIND,
     port: String(port || 'value'),
     deviceRole: String(deviceRole ?? ''),
-    message: 'cc',
-    controller: cc,
+    message: spec.id,
+    ...(spec.id === 'cc' ? { controller: cc } : {}),
     channel: 0,
     dryRun: true,
     feedback: { receiveUpdates: true },
@@ -116,7 +170,10 @@ export function midiControlBindingFrom({ controller, port = 'value', deviceRole 
  * 0-127 integer, so this is not a stand-in for a parameter so much as an honest description of one
  * that happens not to come from a profile.
  */
-export function midiControlParameterShape(controller) {
+export function midiControlParameterShape({ message = 'cc', controller = 0 } = {}) {
+  const spec = BY_ID.get(String(message)) ?? BY_ID.get('cc');
   const cc = int(controller, 0);
-  return { id: `cc${cc}`, name: `CC ${cc}`, type: 'integer', range: { min: 0, max: 127 } };
+  const id = spec.id === 'cc' ? `cc${cc}` : spec.id;
+  const name = spec.id === 'cc' ? `CC ${cc}` : spec.label;
+  return { id, name, type: 'integer', range: { min: 0, max: 127 } };
 }

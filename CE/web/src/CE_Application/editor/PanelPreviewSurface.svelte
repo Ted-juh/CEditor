@@ -185,6 +185,8 @@
     matchesMidiControl,
     midiControlMessage,
   } from '../utils/midiControlBindings.js';
+  import { expressionEventsFromHex } from '../utils/midiNoteInput.js';
+  import { latestMidiInputMessage } from '../stores/deviceProfileStores.js';
   import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
@@ -5122,37 +5124,41 @@
     }
   }
 
-  // Hardware CC -> control. The counterpart of the block above, and the reason the binding kind
-  // exists: a controller the profile does not describe can now drive something on screen.
-  // midiRouteEvents is the existing decoded stream (startNoteInputListener already feeds it), so
-  // nothing here re-parses MIDI or opens a second listener.
-  let lastRouteSeq = 0;
+  // Hardware -> control. The counterpart of the block above, and the reason the binding kind exists:
+  // a controller the profile does not describe can now drive something on screen.
+  //
+  // Read off latestMidiInputMessage rather than midiRouteEvents, for two reasons. That stream
+  // deliberately excludes note velocity — "a run of notes never wakes a controller consumer" — and
+  // velocity is one of the things bindable here. And a store subscription fires per message where an
+  // $effect flushes once per microtask, so two controllers moved in the same tick would collapse
+  // into one and the other would never reach its control.
+  let lastInboundPayload = null;
   $effect(() => {
-    const bound = midiControlBoundControls;
-    const batch = $midiRouteEvents;
-    if (!batch?.seq || batch.seq === lastRouteSeq) return;
-    lastRouteSeq = batch.seq;
-    for (const [controlId, bindings] of bound) {
-      for (const binding of bindings) {
-        if (binding?.feedback?.receiveUpdates === false) continue;
-        for (const event of batch.events ?? []) {
-          if (!matchesMidiControl(binding, event)) continue;
-          applyMidiControlValue(controlId, binding, event.value);
+    const stop = latestMidiInputMessage.subscribe((payload) => {
+      if (!payload?.hex || payload === lastInboundPayload) return;
+      lastInboundPayload = payload;
+      const bound = midiControlBoundControls;
+      if (!bound.length) return;
+      for (const event of expressionEventsFromHex(payload.hex)) {
+        for (const [controlId, bindings] of bound) {
+          for (const binding of bindings) {
+            if (binding?.feedback?.receiveUpdates === false) continue;
+            if (matchesMidiControl(binding, event)) applyMidiControlValue(controlId, binding, event.value);
+          }
         }
       }
-    }
+    });
+    return stop;
   });
 
   // Only the controls that actually have one, recomputed when the panel changes rather than per
   // message: a CC stream is hundreds a second and this panel can hold hundreds of controls.
-  // Starting the listener is conditional on there being something to listen for.
   let midiControlBoundControls = $derived.by(() => {
     const out = [];
     for (const [controlId, control] of controlsById) {
       const bindings = activeMidiControlBindings(control);
       if (bindings.length && controlId) out.push([controlId, bindings]);
     }
-    if (out.length) ensureNoteInput();
     return out;
   });
 

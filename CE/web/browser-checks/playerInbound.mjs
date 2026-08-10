@@ -100,6 +100,23 @@ try {
   }, CUTOFF);
   assert.equal(ccOtherChannel, 32, `CC 102 on channel 8 was not recognised (got ${ccOtherChannel})`);
 
+  // A raw MIDI binding, on a message the bridge does not label "cc". The Player gated on that label
+  // before, which would have made aftertouch, velocity, poly pressure and bend bindings dead.
+  const pressure = await page.evaluate(async () => {
+    window.__player.channelMidi('D0 5A');
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return window.__player.value('pressure');
+  });
+  assert.equal(pressure, 90, `channel pressure did not reach its raw binding (got ${pressure})`);
+
+  // And it must not answer to a message that merely looks like it.
+  const notPressure = await page.evaluate(async () => {
+    window.__player.channelMidi('A0 3C 10');   // poly pressure, a different binding kind
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return window.__player.value('pressure');
+  });
+  assert.equal(notPressure, 90, 'poly pressure moved a channel-pressure binding');
+
   // A message for nothing in this profile must move nothing.
   const before = await page.evaluate((id) => window.__player.value(id), DISTORTION);
   const after = await page.evaluate(async (id) => {
@@ -111,7 +128,7 @@ try {
   assert.equal(after, before, 'a message from another manufacturer moved a control');
 
   assert.deepEqual(errors, [], `the page logged errors: ${errors.join(' | ')}`);
-  console.log('player inbound: ok (nibbled 3 and 4 wide, device id tolerated, declared CC on any channel, unknown ignored)');
+  console.log('player inbound: ok (nibbled 3 and 4 wide, device id tolerated, declared CC on any channel, raw aftertouch bound, unknown ignored)');
 } catch (error) {
   failed = true;
   console.error('player inbound: FAILED\n', error.message);
