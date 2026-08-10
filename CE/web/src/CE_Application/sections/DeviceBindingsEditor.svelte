@@ -198,14 +198,14 @@
           <PropertyCell label="Controller" span={2} hint="CC number, 0-127. The control both sends this and follows it.">
             <input class="val" type="number" min="0" max="127" value={selectedBinding?.controller ?? 0} onchange={(e) => setBindingProp('controller', Math.max(0, Math.min(127, Math.round(Number(e.target.value) || 0))))} />
           </PropertyCell>
-        {:else if selectedBinding?.message === 'nrpn'}
-          <PropertyCell label="NRPN MSB" span={1} hint="Parameter number, high half (CC 99). Manuals print NRPNs as MSB:LSB.">
+        {:else if selectedBinding?.message === 'nrpn' || selectedBinding?.message === 'rpn'}
+          <PropertyCell label="Number MSB" span={1} hint="Parameter number, high half — CC 99 for an NRPN, CC 101 for an RPN. Manuals print these as MSB:LSB.">
             <input class="val" type="number" min="0" max="127" value={selectedBinding?.parameterMsb ?? 0} onchange={(e) => setBindingProp('parameterMsb', Math.max(0, Math.min(127, Math.round(Number(e.target.value) || 0))))} />
           </PropertyCell>
-          <PropertyCell label="NRPN LSB" span={1} hint="Parameter number, low half (CC 98).">
+          <PropertyCell label="Number LSB" span={1} hint="Parameter number, low half — CC 98 for an NRPN, CC 100 for an RPN.">
             <input class="val" type="number" min="0" max="127" value={selectedBinding?.parameterLsb ?? 0} onchange={(e) => setBindingProp('parameterLsb', Math.max(0, Math.min(127, Math.round(Number(e.target.value) || 0))))} />
           </PropertyCell>
-          <PropertyCell label="Resolution" span={1} hint="7-bit sends Data Entry MSB only (0-127). 14-bit adds the LSB (0-16383). The wire cannot say which the device means.">
+          <PropertyCell label="Resolution" span={1} hint="7-bit sends Data Entry MSB only (0-127). 14-bit adds the LSB (0-16383). The wire cannot say which the device means — and for RPN 0:0 the two bytes are semitones and cents, not one number.">
             <select class="val" value={selectedBinding?.valueResolution ?? 7} onchange={(e) => setBindingProp('valueResolution', Number(e.target.value) === 14 ? 14 : 7)}>
               <option value={7}>7-bit</option>
               <option value={14}>14-bit</option>

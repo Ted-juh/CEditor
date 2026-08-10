@@ -134,6 +134,16 @@ try {
   });
   assert.equal(otherNrpn, 320, 'NRPN 1:33 moved a control bound to NRPN 1:32');
 
+  // An RPN, whose Data Entry bytes are the SAME CCs the NRPN uses. Selecting it must take the NRPN
+  // out of scope: two independent trackers would have both knobs move on every Data Entry.
+  const rpn = await page.evaluate(async () => {
+    for (const hex of ['B0 65 00', 'B0 64 00', 'B0 06 02']) window.__player.channelMidi(hex);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return { rpn: window.__player.value('rpn'), nrpn: window.__player.value('nrpn') };
+  });
+  assert.equal(rpn.rpn, 2, `RPN 0:0 did not reach its control (got ${rpn.rpn})`);
+  assert.equal(rpn.nrpn, 320, 'the RPN Data Entry also moved the NRPN-bound control');
+
   // A message for nothing in this profile must move nothing.
   const before = await page.evaluate((id) => window.__player.value(id), DISTORTION);
   const after = await page.evaluate(async (id) => {
@@ -145,7 +155,7 @@ try {
   assert.equal(after, before, 'a message from another manufacturer moved a control');
 
   assert.deepEqual(errors, [], `the page logged errors: ${errors.join(' | ')}`);
-  console.log('player inbound: ok (nibbled 3 and 4 wide, device id tolerated, declared CC on any channel, raw aftertouch bound, NRPN reassembled across callbacks, unknown ignored)');
+  console.log('player inbound: ok (nibbled 3 and 4 wide, device id tolerated, declared CC on any channel, raw aftertouch bound, NRPN and RPN reassembled and kept apart, unknown ignored)');
 } catch (error) {
   failed = true;
   console.error('player inbound: FAILED\n', error.message);

@@ -1,5 +1,5 @@
 /**
- * Reassembling an NRPN from the CCs it is made of.
+ * Reassembling an NRPN — or an RPN — from the CCs it is made of.
  *
  * Every other message this app binds is self-describing: a CC says which controller and what value
  * in three bytes. An NRPN does not exist as a message at all. It is a convention over four ordinary
@@ -12,14 +12,25 @@
  * CC 38 = value LSB when the recipe asks for 14 bits. Reading has to accept exactly what writing
  * produces or a panel could not follow its own output.
  *
- * Three details that are corrections rather than choices:
+ * RPN IS THE SAME MACHINE with 101/100 as the selector instead of 99/98, which is why it lives here
+ * rather than in a parallel module. Crucially it is not a SECOND selection: both flavours are set
+ * by CC pairs and read by the same Data Entry bytes, so a channel has exactly one selection at a
+ * time and the most recent selector wins. Two independent trackers would both claim the next CC 6.
+ *
+ * Four details that are corrections rather than choices:
  *
  *   DATA ENTRY MSB ZEROES THE LSB. Sending CC 6 conventionally resets the fine byte, so a 14-bit
  *   reader that kept the previous LSB would briefly report a value mixing two different settings.
  *
- *   AN RPN SELECTION CANCELS THE NRPN. CC 101/100 select a *registered* parameter — pitch bend
- *   range, tuning — and the Data Entry that follows belongs to that, not to whatever NRPN was
- *   selected earlier. Without this, setting a synth's bend range would drive an NRPN-bound control.
+ *   A SELECTION OF EITHER FLAVOUR REPLACES THE OTHER. CC 101/100 select a *registered* parameter —
+ *   pitch bend range, tuning — and the Data Entry that follows belongs to that, not to whatever
+ *   NRPN was selected earlier. Without this, setting a synth's bend range drives an NRPN-bound
+ *   control. Switching flavour also drops the half-selection: an RPN MSB after an NRPN MSB must not
+ *   inherit the NRPN's LSB.
+ *
+ *   127:127 IS NULL, NOT A PARAMETER. Both flavours reserve it for "nothing selected", and it is
+ *   what this app's own sender writes when a binding asks for nullAfterSend. Treating it as a
+ *   parameter would attribute every later stray Data Entry to it.
  *
  * Reset All Controllers (CC 121) should clear the selection for the same reason and does not:
  * expressionEvent() in midiNoteInput.js drops every controller from 120 up, so it never arrives
@@ -27,10 +38,9 @@
  * this — but a device that resets controllers mid-stream will leave a stale selection, and a Data
  * Entry after it would be read against the old parameter.
  *
- * RPN itself is not reassembled. It would be the same machine with 101/100, and nothing binds it.
  */
 
-/** Per channel: which parameter is selected, and the value bytes seen for it. */
+/** Per channel: which parameter is selected, of which flavour, and the value bytes seen for it. */
 export const EMPTY_NRPN_STATE = Object.freeze({ channels: {} });
 
 const NRPN_MSB = 99;
@@ -40,8 +50,11 @@ const RPN_LSB = 100;
 const DATA_MSB = 6;
 const DATA_LSB = 38;
 
-/** The CC numbers that are NRPN plumbing rather than controllers in their own right. */
-export const NRPN_CONTROLLERS = new Set([NRPN_MSB, NRPN_LSB, DATA_MSB, DATA_LSB]);
+/** The CC numbers that are selector/data plumbing rather than controllers in their own right. */
+export const NRPN_CONTROLLERS = new Set([NRPN_MSB, NRPN_LSB, RPN_MSB, RPN_LSB, DATA_MSB, DATA_LSB]);
+
+/** 127:127 is the reserved "nothing selected" pair, for both flavours. */
+const isNull = (selection) => selection?.msb === 127 && selection?.lsb === 127;
 
 /**
  * Fold one CC event into the assembler.
@@ -72,21 +85,22 @@ export function applyNrpnEvent(state, event) {
     consumed: true,
   });
 
-  if (cc === NRPN_MSB) return write({ ...(selection ?? {}), msb: value, dataLsb: 0 });
-  if (cc === NRPN_LSB) return write({ ...(selection ?? {}), lsb: value, dataLsb: 0 });
-
-  // An RPN selection takes the NRPN out of scope. Not consumed: CC 101/100 are a selection in their
-  // own right and a caller may want to see them.
-  if (cc === RPN_MSB || cc === RPN_LSB) {
-    if (!selection) return unchanged;
-    const channels = { ...current.channels };
-    delete channels[channel];
-    return { state: { ...current, channels }, nrpn: null, consumed: false };
-  }
+  // A selector byte. Keep the other half only when the flavour is unchanged — an RPN MSB arriving
+  // after an NRPN MSB must not inherit the NRPN's LSB and address a parameter nobody selected.
+  const select = (flavour, half) => {
+    const base = selection?.kind === flavour ? selection : {};
+    return write({ ...base, kind: flavour, [half]: value, dataLsb: 0 });
+  };
+  if (cc === NRPN_MSB) return select('nrpn', 'msb');
+  if (cc === NRPN_LSB) return select('nrpn', 'lsb');
+  if (cc === RPN_MSB) return select('rpn', 'msb');
+  if (cc === RPN_LSB) return select('rpn', 'lsb');
 
   if (cc !== DATA_MSB && cc !== DATA_LSB) return unchanged;
-  // Data Entry with nothing selected is an ordinary controller as far as this machine knows.
+  // Data Entry with nothing selected is an ordinary controller as far as this machine knows, and
+  // the null pair counts as nothing selected.
   if (!selection || selection.msb === undefined || selection.lsb === undefined) return unchanged;
+  if (isNull(selection)) return { state: current, nrpn: null, consumed: true };
 
   const dataMsb = cc === DATA_MSB ? value : (selection.dataMsb ?? 0);
   const dataLsb = cc === DATA_MSB ? 0 : value;   // a coarse write zeroes the fine byte
@@ -95,7 +109,7 @@ export function applyNrpnEvent(state, event) {
   return {
     state: { ...current, channels: { ...current.channels, [channel]: next } },
     nrpn: {
-      kind: 'nrpn',
+      kind: selection.kind,
       channel,
       parameterMsb: selection.msb,
       parameterLsb: selection.lsb,

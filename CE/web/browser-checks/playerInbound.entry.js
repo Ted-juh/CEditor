@@ -86,6 +86,22 @@ function nrpnKnob(id, y) {
   return control;
 }
 
+// An RPN 0:0 — pitch bend range — bound 7-bit, because for that parameter the Data Entry MSB is
+// semitones and the LSB is cents. Its selector CCs are 101/100, so it shares the Data Entry bytes
+// with the NRPN knob above: only one of the two can be selected at a time, which is the property
+// this check exists to exercise.
+function rpnKnob(id, y) {
+  const control = createControl('Knob', { Core: { id, name: id }, Transform: { x: 320, y, width: 60, height: 60 } });
+  control._children.DeviceBindings = {
+    bindings: [{
+      kind: 'midiControl', port: 'value', deviceRole: 'Roland GAIA SH-01',
+      message: 'rpn', parameterMsb: 0, parameterLsb: 0, valueResolution: 7,
+      channel: 0, dryRun: true, feedback: { receiveUpdates: true },
+    }],
+  };
+  return control;
+}
+
 const panelDocument = {
   name: 'inbound check',
   width: 400,
@@ -96,6 +112,7 @@ const panelDocument = {
     knob('cutoff', 'tone1.filter.cutoff', 180),         // u7, 10 00 01 0C, also CC 102
     pressureKnob('pressure', 20),
     nrpnKnob('nrpn', 100),
+    rpnKnob('rpn', 180),
   ],
 };
 

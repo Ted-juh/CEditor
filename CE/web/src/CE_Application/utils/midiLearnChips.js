@@ -75,10 +75,10 @@ export function applyChipHex(state, hex, index = null) {
     };
   }
 
-  // Reassemble NRPNs before anything else looks at the CCs. Turning one NRPN knob sends four
-  // ordinary CCs — 99, 98, 6, 38 — and without this the strip would offer four meaningless
-  // controllers for it and no way to bind the thing that actually moved. `passthrough` is what was
-  // NOT NRPN plumbing, so a device using CC 6 on its own still shows up as CC 6.
+  // Reassemble NRPNs and RPNs before anything else looks at the CCs. Turning one such knob sends
+  // four ordinary CCs — a selector pair then Data Entry — and without this the strip would offer
+  // four meaningless controllers for it and no way to bind the thing that actually moved.
+  // `passthrough` is what was NOT plumbing, so a device using CC 6 on its own still shows as CC 6.
   const { state: nrpnState, assembled, passthrough } =
     applyNrpnEvents(current.nrpnState, expressionEventsFromHex(hex));
 
@@ -90,7 +90,8 @@ export function applyChipHex(state, hex, index = null) {
   let seq = current.seq;
 
   for (const event of assembled) {
-    const key = `nrpn:${event.channel}:${event.parameterMsb}:${event.parameterLsb}`;
+    // Keyed by flavour as well as number: an RPN 0:0 and an NRPN 0:0 are different parameters.
+    const key = `${event.kind}:${event.channel}:${event.parameterMsb}:${event.parameterLsb}`;
     const previous = nrpn[key];
     // Both readings are kept because the wire cannot say which the device meant; the binding's
     // declared resolution decides, and the chip shows the 14-bit one as the more informative.
@@ -101,7 +102,8 @@ export function applyChipHex(state, hex, index = null) {
         count: previous.count + 1, last: event.value14, last7: event.value7,
       }
       : {
-        channel: event.channel, parameterMsb: event.parameterMsb, parameterLsb: event.parameterLsb,
+        kind: event.kind, channel: event.channel,
+        parameterMsb: event.parameterMsb, parameterLsb: event.parameterLsb,
         min: event.value14, max: event.value14, count: 1, last: event.value14, last7: event.value7,
       };
     seen[key] = ++seq;
@@ -158,21 +160,28 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
   }
 
   for (const [key, entry] of Object.entries(current.nrpn ?? {})) {
-    const message = 'nrpn';
+    const descriptor = {
+      message: entry.kind,
+      parameterMsb: entry.parameterMsb,
+      parameterLsb: entry.parameterLsb,
+      // 14-bit by default: it is what a device sending CC 38 means, and a 7-bit device simply never
+      // moves the low byte, so reading wide costs a 7-bit parameter nothing but a x128 range.
+      valueResolution: 14,
+    };
     chips.push({
       key,
-      origin: 'nrpn',
+      origin: entry.kind,
       parameterId: null,
       parameter: null,
-      label: `NRPN ${entry.parameterMsb}:${entry.parameterLsb}`,
+      label: midiControlParameterShape(descriptor).name,
       detail: `ch ${entry.channel}`,
       controller: null,
-      nrpn: { parameterMsb: entry.parameterMsb, parameterLsb: entry.parameterLsb },
+      numbered: descriptor,
       span: entry.max - entry.min,
       count: entry.count,
       last: entry.last,
       seen: current.seen[key] ?? 0,
-      reason: `binds as ${message.toUpperCase()}`,
+      reason: `binds as ${entry.kind.toUpperCase()}`,
     });
   }
 
@@ -225,13 +234,11 @@ export function chipDragPayload(chip, deviceRole) {
   const message = LEARNABLE.get(String(chip?.origin ?? ''));
   if (!message) return null;
   if (message === 'cc' && !Number.isFinite(Number(chip?.controller))) return null;
-  if (message === 'nrpn' && !chip?.nrpn) return null;
+  if ((message === 'nrpn' || message === 'rpn') && !chip?.numbered) return null;
   const descriptor = {
     message,
     controller: Number(chip?.controller) || 0,
-    // 14-bit by default: it is what a device sending CC 38 means, and a 7-bit device simply never
-    // moves the low byte, so reading wide costs a 7-bit parameter nothing but a x128 range.
-    ...(chip?.nrpn ? { ...chip.nrpn, valueResolution: 14 } : {}),
+    ...(chip?.numbered ?? {}),
   };
   return {
     kind: 'ceditor.midiControl',

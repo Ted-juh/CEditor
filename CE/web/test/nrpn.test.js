@@ -9,9 +9,11 @@
 // The reading has to accept exactly what the writing produces, so this is checked against the
 // byte order DeviceProfileEngine.cpp's NRPN recipe builder emits, not against a reading of the spec.
 //
-// Three of these are corrections rather than choices, and each is a wrong number on screen if it is
-// got wrong: Data Entry MSB zeroes the LSB; an RPN selection cancels the NRPN; and Data Entry with
-// nothing selected is an ordinary controller rather than something to swallow.
+// RPN is the same machine with 101/100 as the selector, and deliberately NOT a second tracker: both
+// flavours are read by the same Data Entry bytes, so a channel has one selection and the most recent
+// selector wins. Four of these are corrections rather than choices, and each is a wrong number on
+// screen: Data Entry MSB zeroes the LSB; a selection of either flavour replaces the other; 127:127
+// is null rather than a parameter; and Data Entry with nothing selected is an ordinary controller.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -60,7 +62,8 @@ test('the plumbing CCs are consumed and everything else passes through', () => {
   assert.equal(assembled.length, 2);
   assert.deepEqual(passthrough.map((e) => e.kind), ['cc', 'aftertouch']);
   assert.equal(passthrough[0].cc, 74, 'an unrelated CC must survive');
-  assert.deepEqual([...NRPN_CONTROLLERS].sort((a, b) => a - b), [6, 38, 98, 99]);
+  assert.deepEqual([...NRPN_CONTROLLERS].sort((a, b) => a - b), [6, 38, 98, 99, 100, 101],
+    'both selector pairs and both data bytes are plumbing');
 });
 
 test('Data Entry with nothing selected is an ordinary controller', () => {
@@ -71,14 +74,51 @@ test('Data Entry with nothing selected is an ordinary controller', () => {
   assert.equal(passthrough.length, 2, 'neither byte should have been consumed');
 });
 
-test('an RPN selection cancels the NRPN', () => {
-  // THE correctness case. CC 101/100 select a registered parameter — pitch bend range, tuning — and
-  // the Data Entry that follows belongs to that. Without this, setting a synth's bend range would
-  // drive whatever NRPN happened to be selected earlier.
-  const selected = feed(`${SELECT}`);
+test('an RPN selection replaces the NRPN rather than joining it', () => {
+  // THE correctness case, and the reason both flavours share one machine. CC 101/100 select a
+  // registered parameter — pitch bend range, tuning — and the Data Entry that follows belongs to
+  // that. Two independent trackers would both claim the CC 6 and the NRPN-bound control would move.
+  const selected = feed(SELECT);
   const after = feed('B0 65 00 B0 64 00 B0 06 02', selected.state);
-  assert.deepEqual(after.assembled, [], 'a bend-range RPN was read as an NRPN value');
-  assert.equal(after.passthrough.length, 3, 'and none of it should have been swallowed');
+  assert.equal(after.assembled.length, 1);
+  assert.deepEqual(after.assembled[0], {
+    kind: 'rpn', channel: 1, parameterMsb: 0, parameterLsb: 0, value7: 2, value14: 256,
+  }, 'a bend-range RPN was read as an NRPN value');
+});
+
+test('switching flavour drops the half-selection', () => {
+  // An RPN MSB after an NRPN MSB must not inherit the NRPN's LSB — that would address a parameter
+  // nobody selected, with a number assembled from two different requests.
+  const { assembled } = feed('B0 63 01 B0 62 20 B0 65 00 B0 06 02');
+  assert.deepEqual(assembled, [], 'the RPN LSB never arrived, so nothing is selected');
+});
+
+test('RPN 0:0 is pitch bend sensitivity, and its two bytes are not one number', () => {
+  // Worth stating because it is the one place the 14-bit reading is actively misleading: for bend
+  // range the MSB is semitones and the LSB is cents, so a binding wanting semitones asks for 7-bit.
+  // Nothing here can know that — it is a property of the parameter, not of the transport.
+  const { assembled } = feed('B0 65 00 B0 64 00 B0 06 02 B0 26 32');
+  assert.equal(assembled.at(-1).value7, 2, '2 semitones');
+  assert.equal(assembled.at(-1).value14, 306, 'and the 14-bit reading is not 2.5 anything');
+});
+
+test('the null pair selects nothing, so a stray Data Entry lands nowhere', () => {
+  // 127:127 is reserved for "deselect", and it is exactly what this app's own sender writes when a
+  // binding asks for nullAfterSend. Reading it as a parameter would attribute every later Data
+  // Entry to it.
+  for (const selector of ['B0 63 7F B0 62 7F', 'B0 65 7F B0 64 7F']) {
+    const { assembled, passthrough } = feed(`${selector} B0 06 40`);
+    assert.deepEqual(assembled, [], `${selector} was treated as a real parameter`);
+    assert.deepEqual(passthrough, [], 'but the bytes are still plumbing, not controllers');
+  }
+});
+
+test('a null after a send stops the next Data Entry reaching the parameter', () => {
+  // The full sequence a nullAfterSend binding emits, then an unrelated Data Entry.
+  const sent = feed(`${SELECT} B0 06 40 B0 63 7F B0 62 7F`);
+  assert.equal(sent.assembled.length, 1, 'the real write still landed');
+  const after = feed('B0 06 10', sent.state);
+  assert.deepEqual(after.assembled, [], 'a later Data Entry was attributed to the closed parameter');
 });
 
 test('reset all controllers does NOT clear the selection, and that is a known gap', () => {

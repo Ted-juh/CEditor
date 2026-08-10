@@ -121,6 +121,18 @@ test('one NRPN knob is one chip, not four junk controllers', () => {
   assert.equal(payload.parameter.range.max, 16383, 'so the control it lands on is sized for it');
 });
 
+test('an RPN is its own chip, named where the spec names it', () => {
+  // Same reassembly, different selector pair, and a different identity: an RPN 0:0 and an NRPN 0:0
+  // are different parameters on the same instrument, so they must not share a chip.
+  const chips = chipList(fold(['B0 65 00 B0 64 00 B0 06 02 B0 26 32', 'B0 63 00 B0 62 00 B0 06 40']), opts);
+  assert.equal(chips.length, 2, 'RPN 0:0 and NRPN 0:0 collapsed into one chip');
+  const rpnChip = chips.find((c) => c.origin === 'rpn');
+  assert.equal(rpnChip.label, 'RPN 0:0 · Pitch bend range');
+  const payload = chipDragPayload(rpnChip, 'Keyboard');
+  assert.equal(payload.message, 'rpn');
+  assert.deepEqual([payload.parameterMsb, payload.parameterLsb], [0, 0]);
+});
+
 test('a Data Entry with no NRPN selected is still an ordinary controller', () => {
   // The reassembler must not swallow CC 6 on the chance it might be NRPN plumbing: some gear uses it
   // on its own, and a real controller vanishing from the strip is worse than an extra chip.

@@ -23,13 +23,16 @@
  * arrived on some channel, and that a controller was set to channel 3 today does not mean binding it
  * to channel 3 forever is what anyone meant. Sending needs one number, so channel 0 sends on 1.
  *
- * `message` says WHICH message. CC, channel aftertouch, note velocity, poly pressure, pitch bend and
- * NRPN are implemented; the table below records which of them a control can send as well as follow,
- * and why three of them are inbound-only.
+ * `message` says WHICH message. CC, channel aftertouch, note velocity, poly pressure, pitch bend,
+ * NRPN and RPN are implemented; the table below records which of them a control can send as well as
+ * follow, and why three of them are inbound-only.
  *
- * NRPN is the odd one and worth reading nrpn.js for: it is not a message at all but a convention
- * over four CCs, so it is the only kind whose inbound side needs a state machine rather than a
- * predicate. Its value is 7- or 14-bit by declaration, because the wire cannot tell you which.
+ * NRPN and RPN are the odd ones and worth reading nrpn.js for: neither is a message at all, both are
+ * a convention over four CCs, so they are the only kinds whose inbound side needs a state machine
+ * rather than a predicate. `numbered` marks them — they are addressed by a parameter number in two
+ * halves rather than by a controller, and their value is 7- or 14-bit by declaration because the
+ * wire cannot tell you which. RPN is the registered variant: same bytes, 101/100 selecting instead
+ * of 99/98, and a handful of parameter numbers the spec itself names.
  */
 
 export const MIDI_CONTROL_KIND = 'midiControl';
@@ -59,8 +62,22 @@ export const MIDI_CONTROL_MESSAGES = [
   { id: 'velocity', label: 'Note velocity', eventKind: 'velocity', sends: false, learnable: true },
   { id: 'polyAftertouch', label: 'Poly pressure', eventKind: 'polyAftertouch', sends: false, learnable: true },
   { id: 'bend', label: 'Pitch bend', eventKind: 'bend', sends: false, learnable: false },
-  { id: 'nrpn', label: 'NRPN', eventKind: 'nrpn', sends: true, learnable: true },
+  { id: 'nrpn', label: 'NRPN', eventKind: 'nrpn', sends: true, learnable: true, numbered: true },
+  { id: 'rpn', label: 'RPN', eventKind: 'rpn', sends: true, learnable: true, numbered: true },
 ];
+
+/**
+ * The RPNs the MIDI spec names. Only a label — the value semantics are the parameter's own business
+ * and this cannot know them. Worth having because a manual says "set RPN 0:0" and means bend range.
+ */
+const RPN_NAMES = new Map([
+  ['0:0', 'Pitch bend range'],
+  ['0:1', 'Fine tuning'],
+  ['0:2', 'Coarse tuning'],
+  ['0:3', 'Tuning program'],
+  ['0:4', 'Tuning bank'],
+  ['0:5', 'Modulation depth range'],
+]);
 
 const BY_ID = new Map(MIDI_CONTROL_MESSAGES.map((m) => [m.id, m]));
 
@@ -85,9 +102,9 @@ export function isMidiControlBinding(binding) {
   if (binding?.kind !== MIDI_CONTROL_KIND) return false;
   const spec = midiControlMessageSpec(binding);
   if (!spec) return false;
-  // An NRPN is identified by a parameter number in two 7-bit halves, exactly as
+  // NRPN and RPN are identified by a parameter number in two 7-bit halves, exactly as
   // DeviceProfileEngine.cpp's recipe writes it and as a synth manual prints it.
-  if (spec.id === 'nrpn') {
+  if (spec.numbered) {
     return isDataByte(int(binding?.parameterMsb, -1)) && isDataByte(int(binding?.parameterLsb, -1));
   }
   // A controller number identifies a CC and means nothing for the others — requiring it everywhere
@@ -112,7 +129,7 @@ export function matchesMidiControl(binding, event) {
   const spec = midiControlMessageSpec(binding);
   if (!spec || event?.kind !== spec.eventKind) return false;
   if (spec.id === 'cc' && int(event.cc, -1) !== int(binding.controller, -1)) return false;
-  if (spec.id === 'nrpn'
+  if (spec.numbered
     && (int(event.parameterMsb, -1) !== int(binding.parameterMsb, -1)
       || int(event.parameterLsb, -1) !== int(binding.parameterLsb, -1))) return false;
   const wanted = int(binding.channel, 0);
@@ -126,7 +143,7 @@ export function matchesMidiControl(binding, event) {
  * reading, and nothing on the wire says which one the device meant. Everything else is one byte.
  */
 export function midiControlValue(binding, event) {
-  if (midiControlMessageSpec(binding)?.id !== 'nrpn') return event?.value;
+  if (!midiControlMessageSpec(binding)?.numbered) return event?.value;
   return midiControlResolution(binding) === 14 ? event?.value14 : event?.value7;
 }
 
@@ -147,26 +164,35 @@ export function midiControlMessage(binding, value) {
     return `${byte(0xd0 + channel - 1)} ${byte(Math.min(127, Math.max(0, number)))}`;   // one data byte
   }
 
-  // An NRPN is four CCs, in the order DeviceProfileEngine.cpp's recipe builder emits them. C++ splits
-  // a multi-message stream on the way out (PluginProcessor: "bytes may be a multi-message stream —
-  // e.g. NRPN = 4 CCs"), so returning them as one hex run is what the send path already expects.
-  if (spec.id === 'nrpn') {
+  // Four CCs, in the order DeviceProfileEngine.cpp's recipe builder emits them, with the selector
+  // pair that matches the flavour: 99/98 for an NRPN, 101/100 for an RPN. C++ splits a multi-message
+  // stream on the way out (PluginProcessor: "bytes may be a multi-message stream — e.g. NRPN = 4
+  // CCs"), so returning them as one hex run is what the send path already expects.
+  if (spec.numbered) {
+    const [selMsb, selLsb] = spec.id === 'rpn' ? [101, 100] : [99, 98];
     const wide = midiControlResolution(binding) === 14;
     const value = Math.min(wide ? 16383 : 127, Math.max(0, number));
     const parts = [
-      `${status} ${byte(99)} ${byte(int(binding.parameterMsb, 0))}`,
-      `${status} ${byte(98)} ${byte(int(binding.parameterLsb, 0))}`,
+      `${status} ${byte(selMsb)} ${byte(int(binding.parameterMsb, 0))}`,
+      `${status} ${byte(selLsb)} ${byte(int(binding.parameterLsb, 0))}`,
       `${status} ${byte(6)} ${byte(wide ? (value >> 7) & 0x7f : value)}`,
     ];
     if (wide) parts.push(`${status} ${byte(38)} ${byte(value & 0x7f)}`);
     // The null selection C++ writes when a recipe asks for it, so a following Data Entry from
     // anything else cannot land on this parameter.
-    if (binding.nullAfterSend === true) parts.push(`${status} ${byte(99)} 7F`, `${status} ${byte(98)} 7F`);
+    if (binding.nullAfterSend === true) parts.push(`${status} ${byte(selMsb)} 7F`, `${status} ${byte(selLsb)} 7F`);
     return parts.join(' ');
   }
 
   const data = byte(Math.min(127, Math.max(0, number)));
   return `${status} ${byte(int(binding.controller, 0) & 0x7f)} ${data}`;
+}
+
+/** "NRPN 1:32" / "RPN 0:0 · Pitch bend range" — the way a manual prints it, named where it is named. */
+function numberedLabel(spec, msb, lsb) {
+  const pair = `${int(msb, 0)}:${int(lsb, 0)}`;
+  const known = spec.id === 'rpn' ? RPN_NAMES.get(pair) : null;
+  return `${spec.label} ${pair}${known ? ` · ${known}` : ''}`;
 }
 
 /** "CC 74" / "Aftertouch · ch 3" — what the binding is, in the words a synth manual uses. */
@@ -175,7 +201,7 @@ export function midiControlLabel(binding) {
   const spec = midiControlMessageSpec(binding);
   const channel = int(binding.channel, 0);
   const head = spec.id === 'cc' ? `CC ${int(binding.controller, 0)}`
-    : spec.id === 'nrpn' ? `NRPN ${int(binding.parameterMsb, 0)}:${int(binding.parameterLsb, 0)}`
+    : spec.numbered ? numberedLabel(spec, binding.parameterMsb, binding.parameterLsb)
     : spec.label;
   return `${head}${channel ? ` · ch ${channel}` : ''}`;
 }
@@ -209,14 +235,14 @@ export function midiControlBindingFrom({
   if (spec.id === 'cc' && !isDataByte(cc)) return null;
   const msb = int(parameterMsb, -1);
   const lsb = int(parameterLsb, -1);
-  if (spec.id === 'nrpn' && (!isDataByte(msb) || !isDataByte(lsb))) return null;
+  if (spec.numbered && (!isDataByte(msb) || !isDataByte(lsb))) return null;
   return {
     kind: MIDI_CONTROL_KIND,
     port: String(port || 'value'),
     deviceRole: String(deviceRole ?? ''),
     message: spec.id,
     ...(spec.id === 'cc' ? { controller: cc } : {}),
-    ...(spec.id === 'nrpn'
+    ...(spec.numbered
       ? { parameterMsb: msb, parameterLsb: lsb, valueResolution: int(valueResolution, 7) === 14 ? 14 : 7 }
       : {}),
     channel: 0,
@@ -238,11 +264,11 @@ export function midiControlParameterShape({
 } = {}) {
   const spec = BY_ID.get(String(message)) ?? BY_ID.get('cc');
   const cc = int(controller, 0);
-  if (spec.id === 'nrpn') {
+  if (spec.numbered) {
     const wide = int(valueResolution, 7) === 14;
     return {
-      id: `nrpn${int(parameterMsb, 0)}_${int(parameterLsb, 0)}`,
-      name: `NRPN ${int(parameterMsb, 0)}:${int(parameterLsb, 0)}`,
+      id: `${spec.id}${int(parameterMsb, 0)}_${int(parameterLsb, 0)}`,
+      name: numberedLabel(spec, parameterMsb, parameterLsb),
       type: 'integer',
       range: { min: 0, max: wide ? 16383 : 127 },
     };

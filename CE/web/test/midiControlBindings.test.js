@@ -125,8 +125,8 @@ test('every message the learn reducer can produce is bindable', () => {
   // The gap this closes. Aftertouch, velocity and poly pressure were candidates the chips could see
   // and nothing could accept; a keyboard's pressure and dynamics had no way to reach a control.
   const learnable = MIDI_CONTROL_MESSAGES.filter((m) => m.learnable).map((m) => m.eventKind);
-  assert.deepEqual(learnable.sort(), ['aftertouch', 'cc', 'nrpn', 'polyAftertouch', 'velocity'],
-    'the kinds learnKey() produces, plus nrpn which midiLearnChips reassembles for itself');
+  assert.deepEqual(learnable.sort(), ['aftertouch', 'cc', 'nrpn', 'polyAftertouch', 'rpn', 'velocity'],
+    'the kinds learnKey() produces, plus the two midiLearnChips reassembles for itself');
 });
 
 test('each message matches its own kind and no other', () => {
@@ -270,6 +270,46 @@ test('an NRPN round-trips: what a control sends, a control can read', () => {
     assert.equal(matchesMidiControl(b, event), true, `${resolution}-bit ${value} did not match itself`);
     assert.equal(midiControlValue(b, event), value, `${resolution}-bit ${value} read back wrong`);
   }
+});
+
+const rpn = (over = {}) => ({
+  ...midiControlBindingFrom({ message: 'rpn', parameterMsb: 0, parameterLsb: 0 }), ...over,
+});
+
+test('an RPN is the same machine with the other selector pair', () => {
+  // 101/100 instead of 99/98, and everything downstream is shared. What must NOT be shared is the
+  // identity: an RPN 0:0 and an NRPN 0:0 are different parameters on the same instrument.
+  assert.equal(midiControlMessage(rpn(), 2), 'B0 65 00 B0 64 00 B0 06 02');
+  assert.equal(midiControlMessage(rpn({ valueResolution: 14 }), 306),
+    'B0 65 00 B0 64 00 B0 06 02 B0 26 32');
+  assert.equal(midiControlMessage(rpn({ nullAfterSend: true }), 2),
+    'B0 65 00 B0 64 00 B0 06 02 B0 65 7F B0 64 7F', 'the null uses the RPN selectors too');
+
+  const rpnEvent = assemble('B0 65 00 B0 64 00 B0 06 02');
+  const nrpnEvent = assemble('B0 63 00 B0 62 00 B0 06 02');
+  assert.equal(matchesMidiControl(rpn(), rpnEvent), true);
+  assert.equal(matchesMidiControl(rpn(), nrpnEvent), false, 'NRPN 0:0 is not RPN 0:0');
+  assert.equal(matchesMidiControl(nrpn({ parameterMsb: 0, parameterLsb: 0 }), rpnEvent), false);
+});
+
+test('an RPN round-trips too', () => {
+  for (const [resolution, value] of [[7, 12], [14, 1550], [7, 0], [14, 16383]]) {
+    const b = rpn({ valueResolution: resolution });
+    const event = assemble(midiControlMessage(b, value));
+    assert.equal(matchesMidiControl(b, event), true, `${resolution}-bit ${value} did not match itself`);
+    assert.equal(midiControlValue(b, event), value, `${resolution}-bit ${value} read back wrong`);
+  }
+});
+
+test('the RPNs the spec names are named', () => {
+  // A manual says "set RPN 0:0" and means pitch bend range. Only a label — the value semantics are
+  // the parameter's own business and nothing here can know them.
+  assert.equal(midiControlLabel(rpn()), 'RPN 0:0 · Pitch bend range');
+  assert.equal(midiControlLabel(rpn({ parameterLsb: 5 })), 'RPN 0:5 · Modulation depth range');
+  assert.equal(midiControlLabel(rpn({ parameterMsb: 12, parameterLsb: 9 })), 'RPN 12:9',
+    'an unnamed one is just its number');
+  assert.equal(midiControlLabel(nrpn({ parameterMsb: 0, parameterLsb: 0 })), 'NRPN 0:0',
+    'the names are RPN-only — an NRPN 0:0 means whatever the instrument says');
 });
 
 test('the label reads the way a synth manual writes it', () => {
