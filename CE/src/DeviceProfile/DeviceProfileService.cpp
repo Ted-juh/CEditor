@@ -77,6 +77,28 @@ juce::var DeviceProfileService::loadProfileFromFile (const juce::File& file)
     return juce::var (response);
 }
 
+/**
+ * A profile's text, in the only shape this bridge can carry cheaply.
+ *
+ * WebBrowserComponent::emitEvent embeds the payload in a JavaScript source string, escaping it with
+ *     objectAsString.replace ("\\", "\\\\").replace ("'", "\\'")
+ * and juce::String::replace is O(occurrences x length) — it re-walks from the start of the string
+ * and reallocates the whole thing per hit. JSON::toString turns every quote in the source into \",
+ * so a profile's own punctuation decides the cost: the 790 KB GAIA profile has 77,554 quotes, and
+ * that first replace then runs 77,554 times over 790 KB. 61.3 billion character operations, measured
+ * at 55,298 ms with the window unresponsive throughout — for one profile, opened once.
+ *
+ * Base64 has no backslash and no apostrophe, so both replaces find nothing and return after a single
+ * scan. The encode costs a fraction of a millisecond. Until the escape upstream is fixed, no large
+ * text may cross this bridge unencoded.
+ */
+static juce::String profileSourceForBridge (const juce::File& file)
+{
+    juce::MemoryBlock raw;
+    file.loadFileAsData (raw);
+    return juce::Base64::toBase64 (raw.getData(), raw.getSize());
+}
+
 juce::var DeviceProfileService::getProfileSource (const juce::var& payload)
 {
     auto* obj = payload.getDynamicObject();
@@ -96,7 +118,7 @@ juce::var DeviceProfileService::getProfileSource (const juce::var& payload)
     response->setProperty ("requestId", requestId);
     response->setProperty ("profileId", profileId);
     response->setProperty ("filePath", file.getFullPathName());
-    response->setProperty ("source", file.loadFileAsString());
+    response->setProperty ("sourceBase64", profileSourceForBridge (file));
     response->setProperty ("lastModified", file.getLastModificationTime().toISO8601 (true));
     return juce::var (response);
 }
@@ -166,7 +188,7 @@ juce::var DeviceProfileService::saveProfileSource (const juce::var& payload)
     response->setProperty ("profileId", newProfileId);
     response->setProperty ("name", probe.getProfileName());
     response->setProperty ("filePath", file.getFullPathName());
-    response->setProperty ("source", source);
+    response->setProperty ("sourceBase64", juce::Base64::toBase64 (source.toRawUTF8(), source.getNumBytesAsUTF8()));
     response->setProperty ("lastModified", file.getLastModificationTime().toISO8601 (true));
     response->setProperty ("savedBytes", static_cast<int> (source.getNumBytesAsUTF8()));
     response->setProperty ("validation", validationMessagesToVar (probe.getValidationMessages()));

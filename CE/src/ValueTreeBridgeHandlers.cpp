@@ -759,7 +759,6 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
 
                 auto ext = file.getFileExtension().toLowerCase();
                 juce::String mimeType = "image/png";
-                auto isText = false;
                 if (ext == ".jpg" || ext == ".jpeg") mimeType = "image/jpeg";
                 else if (ext == ".gif") mimeType = "image/gif";
                 else if (ext == ".bmp") mimeType = "image/bmp";
@@ -768,32 +767,36 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 else if (ext == ".otf") mimeType = "font/otf";
                 else if (ext == ".woff") mimeType = "font/woff";
                 else if (ext == ".woff2") mimeType = "font/woff2";
-                else if (ext == ".svg") mimeType = "image/svg+xml";   // text, but the frontend uses it as an <img> src
-                else if (ext == ".json" || ext == ".cepanel") { mimeType = "application/json"; isText = true; }
+                else if (ext == ".svg") mimeType = "image/svg+xml";
+                else if (ext == ".json" || ext == ".cepanel") mimeType = "application/json";
 
                 auto* obj = new juce::DynamicObject();
                 obj->setProperty ("requestId", requestId);
                 obj->setProperty ("mimeType", mimeType);
                 obj->setProperty ("byteSize", (juce::int64) mb.getSize());
 
-                // Text goes over as text. Base64 is the right shape for a PNG or a font and pure
-                // waste for the two biggest things this app loads — a .cepanel and a device profile,
-                // both JSON. The waste is not small: a 43.6 MB panel became a 58 MB base64 String,
-                // concatenated again for the "data:...;base64," prefix, then escaped again into the
-                // JSON that carries it to the WebView. About 250 MB of allocation and copying, on
-                // the message thread, which is the thread Windows asks whether the window is still
-                // alive — and while this ran the answer was no, so the title bar read
-                // "(Not Responding)". The frontend then spent an atob and a per-byte loop over 43.6
-                // million bytes undoing it before a single control was drawn.
+                // Base64 for everything, text included — and NOT because base64 is cheap.
                 //
-                // `data` is still sent for bytes, and the frontend still reads it, so a mismatched
-                // pair of halves keeps working in both directions.
+                // Sending text as text is the obvious improvement: no encode, no decode, a third
+                // fewer bytes. It was measured on the 790 KB GAIA profile and cost 55,298 ms in the
+                // emit below, with the window unresponsive for two minutes at a stretch.
+                //
+                // WebBrowserComponent::emitEvent embeds the payload in a JavaScript source string,
+                // so it escapes the JSON with
+                //     objectAsString.replace ("\\", "\\\\").replace ("'", "\\'")
+                // and juce::String::replace is O(occurrences x length): it re-walks from the start
+                // of the string and reallocates the whole thing for every hit. JSON::toString turns
+                // each of that profile's 77,554 quotes into \", so the first replace runs 77,554
+                // times over 790 KB — 61.3 billion character operations, which is the 55 seconds.
+                //
+                // Base64 contains no backslash and no apostrophe. Both replaces find nothing and
+                // return after a single scan, so the encode buys back far more than it costs. The
+                // real fix is upstream in that escape; until then this transport has a constraint —
+                // a payload must not carry characters that need escaping — and base64 is what
+                // satisfies it. Do not "optimise" this away again without re-measuring the emit.
                 auto encodeStartMs = juce::Time::getMillisecondCounterHiRes();
-                if (isText)
-                    obj->setProperty ("text", mb.toString());
-                else
-                    obj->setProperty ("data", "data:" + mimeType + ";base64,"
-                                              + juce::Base64::toBase64 (mb.getData(), mb.getSize()));
+                obj->setProperty ("data", "data:" + mimeType + ";base64,"
+                                          + juce::Base64::toBase64 (mb.getData(), mb.getSize()));
                 auto encodeDurationMs = juce::Time::getMillisecondCounterHiRes() - encodeStartMs;
 
                 obj->setProperty ("readMs", readDurationMs);

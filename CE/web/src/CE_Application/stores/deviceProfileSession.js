@@ -57,7 +57,7 @@ import {
   getBulkDumpSends,
   requestFileData,
 } from '../bridge/bridge.js';
-import { fileDataText } from '../utils/fileDataPayload.js';
+import { fileDataText, profileSourceText } from '../utils/fileDataPayload.js';
 import { midiCiPropertiesToProfile } from '../generated/dpd/import-midici.mjs';
 import {
   queueDeviceParameterPanelPreviewSync,
@@ -343,13 +343,15 @@ export function initDeviceProfileBridge() {
 
   onDeviceProfileSource((payload) => {
     if (payload?.ok !== true || !payload?.profileId) return;
+    // The engine answered, so the armed fallback has nothing left to fall back to.
+    clearProfileSourceRequest(payload.profileId);
     profileSourceFallbackRequests.delete(`profile_source_file_${payload.profileId}`);
     profileSources.update((sources) => ({
       ...sources,
       [payload.profileId]: {
         profileId: payload.profileId,
         filePath: payload.filePath,
-        source: String(payload.source ?? ''),
+        source: profileSourceText(payload),
         lastModified: payload.lastModified ?? '',
         native: true,
         fallback: false,
@@ -393,7 +395,7 @@ export function initDeviceProfileBridge() {
         [payload.profileId]: {
           profileId: payload.profileId,
           filePath: payload.filePath,
-          source: String(payload.source ?? ''),
+          source: profileSourceText(payload),
           lastModified: payload.lastModified ?? '',
           native: true,
           fallback: false,
@@ -781,20 +783,52 @@ export function restoreProjectDeviceSession(session, options = {}) {
 
 registerProjectDeviceSessionRestoreHandler(restoreProjectDeviceSession);
 
-export function requestProfileSource(profileId) {
-  initDeviceProfileBridge();
-  getDeviceProfileSource({
-    requestId: `profile_source_${profileId}`,
-    profileId,
-  });
+/**
+ * Ask for a profile's source text, once.
+ *
+ * Two things here used to make one screen cost minutes of frozen window, and both were invisible
+ * because each looked harmless on its own.
+ *
+ * The file read was called a fallback and behaved like a duplicate: it fired alongside every native
+ * request, and the handler for it then threw the result away whenever the native source had already
+ * arrived — which is nearly always. For the 790 KB GAIA profile that discarded copy cost 55 seconds
+ * of blocked message thread, on top of the 55 the native one cost.
+ *
+ * And nothing tracked that a request was outstanding. presetProfileForRole asks for a source it does
+ * not have and returns null, on every sync — so a source slow to arrive was requested again, and
+ * again, each repeat stalling the app for as long as the last. The log reads as one stall per fetch,
+ * forever.
+ */
+const PROFILE_SOURCE_FALLBACK_MS = 2000;
+const profileSourceRequestsInFlight = new Map();   // profileId -> fallback timer
 
-  const profile = get(deviceProfiles).find((item) => String(item?.id ?? '') === String(profileId));
-  const filePath = profile?.filePath;
-  if (filePath) {
-    const requestId = `profile_source_file_${profileId}`;
-    profileSourceFallbackRequests.set(requestId, { profileId, filePath });
+function clearProfileSourceRequest(profileId) {
+  const id = String(profileId ?? '');
+  const timer = profileSourceRequestsInFlight.get(id);
+  if (timer !== undefined) clearTimeout(timer);
+  profileSourceRequestsInFlight.delete(id);
+}
+
+export function requestProfileSource(profileId) {
+  const id = String(profileId ?? '');
+  if (!id) return;
+
+  initDeviceProfileBridge();
+  if (profileSourceRequestsInFlight.has(id)) return;   // already asking; asking louder does not help
+
+  getDeviceProfileSource({ requestId: `profile_source_${id}`, profileId: id });
+
+  // Armed, not fired. If the engine answers — the normal case — the timer is cleared before this
+  // runs and the file is never read at all.
+  const filePath = get(deviceProfiles).find((item) => String(item?.id ?? '') === id)?.filePath;
+  profileSourceRequestsInFlight.set(id, setTimeout(() => {
+    profileSourceRequestsInFlight.delete(id);
+    if (!filePath || get(profileSources)?.[id]?.source) return;
+
+    const requestId = `profile_source_file_${id}`;
+    profileSourceFallbackRequests.set(requestId, { profileId: id, filePath });
     requestFileData(requestId, filePath);
-  }
+  }, PROFILE_SOURCE_FALLBACK_MS));
 }
 
 /**
