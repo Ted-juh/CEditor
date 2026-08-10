@@ -15,7 +15,8 @@
   import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState, requestProfileSource } from './CE_Application/stores/deviceProfiles.js';
   import { profileSources, latestPresetListScan } from './CE_Application/stores/deviceProfileStores.js';
   import { injectPresetRowsIntoPanel } from './CE_Application/utils/presetChoiceRows.js';
-  import { buildInboundIndex, decodeInbound, inboundReadTargets } from './CE_Application/utils/inboundParameterIndex.js';
+  import { decodeInbound, inboundReadTargets } from './CE_Application/utils/inboundParameterIndex.js';
+  import { inboundIndexFor } from './CE_Application/stores/inboundIndexCache.js';
   import { getDeviceSessionState } from './CE_Application/bridge/bridge.js';
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, listProfileParameters, onMidiInputMessage, onSysexInputMessage, triggerRawMidiAction } from './CE_Application/bridge/bridge.js';
   // The GAIA-specific inbound maps this used to decode with. Now only a fallback for the window
@@ -401,19 +402,13 @@
     if (result.updated && result.panel !== panel) panel = result.panel;
   });
 
-  // Build the inbound index from the same profile source. Once per profile, not per message: it
+  // The inbound index for this profile, from the shared cache — built once per profile because it
   // compiles every parameter five times, measured at ~87ms for the GAIA's 793, which would be
-  // absurd on a CC stream (a matched message costs ~4us, a wholly unrecognised one ~9us). Kept
-  // deliberately independent of `panel` — the index describes the instrument, not the layout, so
-  // loading a different panel against the same synth does not rebuild it.
-  let indexedProfileId = '';
+  // absurd on a CC stream (a matched message costs ~4us, a wholly unrecognised one ~9us). The MIDI
+  // tab reads the same cache, so the two cannot disagree about what a message means. Deliberately
+  // independent of `panel`: the index describes the instrument, not the layout.
   $effect(() => {
-    const source = $profileSources?.[profileId]?.source;
-    if (!source || indexedProfileId === profileId) return;
-    let profile = null;
-    try { profile = JSON.parse(source); } catch { return; }
-    indexedProfileId = profileId;
-    inboundIndex = buildInboundIndex(profile);
+    inboundIndex = inboundIndexFor(profileId, $profileSources?.[profileId]?.source)?.index ?? null;
   });
 
   // Fit the panel inside the viewport (whole panel visible), capped at 1x.

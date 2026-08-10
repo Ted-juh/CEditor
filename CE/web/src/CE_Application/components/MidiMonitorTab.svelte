@@ -14,6 +14,7 @@
    * moves under the pointer exactly when someone is trying to read the line that just appeared.
    * Pause keeps a snapshot; nothing is lost, because C++ goes on collecting either way.
    */
+  import MidiLearnChips from './MidiLearnChips.svelte';
   import { midiMonitorEvents, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
   import { isJuceAvailable } from '../bridge/bridge.js';
   import {
@@ -65,6 +66,9 @@
 </script>
 
 <div class="midi-monitor">
+  <!-- Above the log, because it is read the other way round: the log answers "what happened", this
+       answers "what do I do with it". Same events, one step further on. -->
+  <MidiLearnChips />
   <div class="toolbar">
     <select aria-label="Direction" bind:value={direction}>
       <option value="">Both ways</option>
