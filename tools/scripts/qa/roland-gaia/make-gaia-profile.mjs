@@ -393,7 +393,14 @@ export function buildProfile() {
       manufacturerId: [MODEL.manufacturer],
       familyCode: ['41', '02'],
       modelNumber: ['00', '00'],
-      revision: ['00', '03', '00', '00'],
+      // NO revision, deliberately. DeviceProfileEngine compares revision byte-for-byte when the
+      // profile declares one, and reports it either way — so declaring it turns a firmware version
+      // into part of the instrument's identity. A real SH-01 answered
+      //   F0 7E 10 06 02 41 41 02 00 00 00 03 00 01 F7
+      // whose manufacturer, family and model match this profile exactly and whose revision is
+      // 00 03 00 01. Pinning 00 03 00 00 made that unit "the wrong instrument". Manufacturer,
+      // family and model say WHICH synth; revision says which firmware, and an editor that refuses
+      // to talk to a synth for having been updated is wrong about what identity means.
       timeoutMs: 1000,
       retries: 0,
     },

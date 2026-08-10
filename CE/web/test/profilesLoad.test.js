@@ -105,6 +105,21 @@ test('the full GAIA is among them, with its requests intact', () => {
   }
 });
 
+test('a profile identifies an instrument, not a firmware version', () => {
+  // A real SH-01 answered F0 7E 10 06 02 41 41 02 00 00 00 03 00 01 F7 — manufacturer, family and
+  // model matching this profile exactly, revision 00 03 00 01 where the profile said 00 03 00 00.
+  // The engine compares revision byte-for-byte WHEN DECLARED, so that one byte made a genuine GAIA
+  // report as "Wrong instrument". Manufacturer, family and model say which synth; revision says
+  // which firmware, and refusing to talk to a synth for having been updated is wrong about identity.
+  // The engine still reports the actual revision either way, so nothing is lost by not pinning it.
+  const gaia = JSON.parse(readText(`${DIRECTORY}roland-gaia-sh01.ceditor-device.json`));
+  assert.deepEqual(gaia.identity.manufacturerId, ['41']);
+  assert.deepEqual(gaia.identity.familyCode, ['41', '02']);
+  assert.deepEqual(gaia.identity.modelNumber, ['00', '00']);
+  assert.equal(gaia.identity.revision, undefined,
+    'pinning a revision makes every firmware update look like a different instrument');
+});
+
 test('an RQ1 template carries the checksum the synth will expect', () => {
   // The template is literal bytes, so its checksum is baked in rather than computed at send time.
   // Wrong here means the instrument ignores the request and the panel never fills in.
