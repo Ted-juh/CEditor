@@ -9,12 +9,11 @@
    * whole `deviceParameterDrag` store) turned out to have no drag source in the app at all. This is
    * that source, so a complete subsystem stops being unreachable.
    *
-   * Chips that name nothing are still shown, greyed, with the reason. A knob that appears dead
-   * teaches nothing; "this sends CC 74 and the profile has no CC 74" is the answer someone needs.
-   * They are not draggable because they cannot be: `deviceParameter` is the only binding kind there
-   * is, so there is nothing for a raw controller to bind TO. That is a real gap, not a UI decision.
+   * A chip the profile cannot name is still draggable when it is a CC: it binds as the message
+   * rather than as a name (midiControlBindings.js), which is what a generic fader box needs. What
+   * stays inert is aftertouch, velocity and poly pressure — no binding kind covers those yet — and
+   * those chips say so rather than looking broken.
    */
-  import { untrack } from 'svelte';
   import { Eraser, Radio } from 'lucide-svelte';
   import {
     deviceRoleMappings,
@@ -50,19 +49,25 @@
       ?? DEFAULT_DEVICE_ROLE
   );
 
-  // untrack: the fold reads the state it writes, which would otherwise be a self-dependency. The
-  // per-payload guards are what stop a re-run (the index arriving, say) folding a message twice.
+  // Subscribed rather than read as $latestMidiInputMessage, and that is not a style choice: an
+  // $effect flushes once per microtask, so two messages arriving in the same tick collapse and the
+  // earlier one is never folded — move two knobs at once and one of them never gets a chip. A store
+  // subscription fires per set. startNoteInputListener subscribes for the same reason.
+  //
+  // The effect body reads nothing reactive, so it subscribes once; the index is read at message
+  // time, which is also what lets the CC side work before the profile source has arrived.
   $effect(() => {
-    const payload = $latestMidiInputMessage;
-    if (!payload || payload === lastInbound) return;
-    lastInbound = payload;
-    state = applyChipHex(untrack(() => state), payload.hex, indexed?.index ?? null);
-  });
-  $effect(() => {
-    const payload = $latestSysexInputMessage;
-    if (!payload || payload === lastSysex) return;
-    lastSysex = payload;
-    state = applyChipHex(untrack(() => state), payload.hex, indexed?.index ?? null);
+    const stopInbound = latestMidiInputMessage.subscribe((payload) => {
+      if (!payload?.hex || payload === lastInbound) return;
+      lastInbound = payload;
+      state = applyChipHex(state, payload.hex, indexed?.index ?? null);
+    });
+    const stopSysex = latestSysexInputMessage.subscribe((payload) => {
+      if (!payload?.hex || payload === lastSysex) return;
+      lastSysex = payload;
+      state = applyChipHex(state, payload.hex, indexed?.index ?? null);
+    });
+    return () => { stopInbound(); stopSysex(); };
   });
 
   let chips = $derived(chipList(state, { index: indexed?.index ?? null, parameterById: indexed?.parameterById ?? {} }));
@@ -82,7 +87,7 @@
     <strong>Moved on the input</strong>
     <span class="hint">
       {#if chips.length}
-        Drag a named one onto a control to bind it.
+        Drag one onto a control to bind it.
       {:else}
         Turn a knob on the instrument and it appears here.
       {/if}
@@ -103,9 +108,11 @@
 
   <ul>
     {#each chips as chip (chip.key)}
+      {@const draggable = !!chipDragPayload(chip, deviceRole)}
       <li
-        class:bindable={!!chip.parameter}
-        draggable={!!chip.parameter}
+        class:bindable={draggable}
+        class:named={!!chip.parameter}
+        {draggable}
         ondragstart={(event) => onDragStart(event, chip)}
         ondragend={clearDeviceParameterDrag}
         title={chip.parameter
@@ -140,8 +147,11 @@
     border: 1px solid #383838; border-radius: 10px; padding: 2px 8px;
     background: #202020; color: #666; font-size: 11px; cursor: default;
   }
-  /* Only a chip that names a parameter can be dragged, so only that one looks like it can. */
-  li.bindable { background: #263041; border-color: #3d5578; color: #dce6f5; cursor: grab; }
+  /* Only a chip that can be dragged looks like it can. Named and raw are distinguished, because
+     binding by name and binding by CC number are different promises: the first survives a profile
+     that renumbers its controllers, the second does not. */
+  li.bindable { background: #2b2b22; border-color: #5c5637; color: #ece6cd; cursor: grab; }
+  li.bindable.named { background: #263041; border-color: #3d5578; color: #dce6f5; }
   li.bindable:active { cursor: grabbing; }
   .name { font-weight: 600; }
   .meta { color: inherit; opacity: 0.65; font-size: 10px; }

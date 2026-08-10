@@ -68,6 +68,7 @@
   import { segmentEditScope } from '../stores/segmentEditScope.js';
   import { normalizeSegmentTargetIds } from '../utils/segmentTargets.js';
   import { getBindingCompatibility } from '../models/componentPorts.js';
+  import { midiControlBindingFrom } from '../utils/midiControlBindings.js';
   import { deviceParameterDrag } from '../stores/deviceParameterDrag.js';
   import { numberOr } from '../utils/primitives.js';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
@@ -597,7 +598,11 @@
 
     try {
       const payload = JSON.parse(raw);
-      if (payload?.kind !== 'ceditor.deviceParameter' || !payload?.parameter?.id) return null;
+      // Two kinds over one MIME type: a named profile parameter, or a raw CC described as the
+      // 0-127 integer it is. Both carry `parameter`, so everything downstream that only asks about
+      // compatibility — the accept check, the drag highlight — needs no branch.
+      const known = payload?.kind === 'ceditor.deviceParameter' || payload?.kind === 'ceditor.midiControl';
+      if (!known || !payload?.parameter?.id) return null;
       return payload;
     } catch {
       return null;
@@ -642,20 +647,31 @@
     const existing = deviceBindings?.bindings;
     const nextBindings = Array.isArray(existing) ? [...existing] : [];
     const bindingIndex = nextBindings.findIndex((binding) => binding.port === compatibility.port.id);
-    const nextBinding = {
-      kind: 'deviceParameter',
-      port: compatibility.port.id,
-      deviceRole: payload.deviceRole || DEFAULT_DEVICE_ROLE,
-      parameterId: parameter.id,
-      parameterType: parameter.type,
-      adoptMetadata: true,
-      dryRun: true,
-      feedback: {
-        receiveUpdates: true,
-        ignoreOwnEchoes: true,
-        echoWindowMs: 250,
-      },
-    };
+    // A raw CC binds to the MESSAGE; there is no profile parameter to name, no metadata to adopt
+    // and no required profile to record, because the whole point is that the profile does not
+    // describe this controller.
+    const rawControl = payload.kind === 'ceditor.midiControl';
+    const nextBinding = rawControl
+      ? midiControlBindingFrom({
+        controller: payload.controller,
+        port: compatibility.port.id,
+        deviceRole: payload.deviceRole || DEFAULT_DEVICE_ROLE,
+      })
+      : {
+        kind: 'deviceParameter',
+        port: compatibility.port.id,
+        deviceRole: payload.deviceRole || DEFAULT_DEVICE_ROLE,
+        parameterId: parameter.id,
+        parameterType: parameter.type,
+        adoptMetadata: true,
+        dryRun: true,
+        feedback: {
+          receiveUpdates: true,
+          ignoreOwnEchoes: true,
+          echoWindowMs: 250,
+        },
+      };
+    if (!nextBinding) return;
 
     if (bindingIndex >= 0) nextBindings[bindingIndex] = nextBinding;
     else nextBindings.push(nextBinding);
@@ -671,6 +687,7 @@
       });
     }
 
+    if (rawControl) return;
     adoptParameterMetadata(core.id, core.controlType, parameter);
     persistDroppedPanelDeviceReference(payload);
   }

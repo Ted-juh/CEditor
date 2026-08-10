@@ -181,6 +181,11 @@
   import { heldNotes as inputHeldNotes, heldNoteEntries as inputHeldEntries } from '../utils/midiNoteInput.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
   import {
+    activeMidiControlBindings,
+    matchesMidiControl,
+    midiControlMessage,
+  } from '../utils/midiControlBindings.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -5100,6 +5105,66 @@
         dryRun: binding.dryRun !== false,
       });
     }
+    // Raw CC bindings go out as bytes rather than through the profile engine, because there is no
+    // parameter for it to compile. Same door as everything else outbound, so a script's
+    // ce.midi.interceptOut still sees them.
+    for (const binding of activeMidiControlBindings(control)) {
+      const value = bindingValueForPatch(binding, patch, control);
+      if (value === undefined) continue;
+      const message = midiControlMessage(binding, value);
+      if (!message) continue;
+      triggerRawMidiAction({
+        deviceRole: binding.deviceRole || DEFAULT_DEVICE_ROLE,
+        actionId: `panel_preview_cc_${controlId || 'control'}_${binding.controller}`,
+        message,
+        dryRun: binding.dryRun !== false,
+      });
+    }
+  }
+
+  // Hardware CC -> control. The counterpart of the block above, and the reason the binding kind
+  // exists: a controller the profile does not describe can now drive something on screen.
+  // midiRouteEvents is the existing decoded stream (startNoteInputListener already feeds it), so
+  // nothing here re-parses MIDI or opens a second listener.
+  let lastRouteSeq = 0;
+  $effect(() => {
+    const bound = midiControlBoundControls;
+    const batch = $midiRouteEvents;
+    if (!batch?.seq || batch.seq === lastRouteSeq) return;
+    lastRouteSeq = batch.seq;
+    for (const [controlId, bindings] of bound) {
+      for (const binding of bindings) {
+        if (binding?.feedback?.receiveUpdates === false) continue;
+        for (const event of batch.events ?? []) {
+          if (!matchesMidiControl(binding, event)) continue;
+          applyMidiControlValue(controlId, binding, event.value);
+        }
+      }
+    }
+  });
+
+  // Only the controls that actually have one, recomputed when the panel changes rather than per
+  // message: a CC stream is hundreds a second and this panel can hold hundreds of controls.
+  // Starting the listener is conditional on there being something to listen for.
+  let midiControlBoundControls = $derived.by(() => {
+    const out = [];
+    for (const [controlId, control] of controlsById) {
+      const bindings = activeMidiControlBindings(control);
+      if (bindings.length && controlId) out.push([controlId, bindings]);
+    }
+    if (out.length) ensureNoteInput();
+    return out;
+  });
+
+  function applyMidiControlValue(controlId, binding, value) {
+    const port = String(binding?.port ?? 'value');
+    // Written straight into the preview session, like an inbound device parameter — not through the
+    // interaction path, so the panel following the hardware cannot echo back out and fight it.
+    if (port === 'state') updatePanelPreviewSession(controlId, { checked: value >= 64, mixed: false, valueOverrideEnabled: false });
+    else if (port === 'brightness') updatePanelPreviewSession(controlId, { brightnessOverride: Math.round((value / 127) * 100) });
+    else if (port === 'backlight') updatePanelPreviewSession(controlId, { backlightOverride: value >= 64 });
+    else if (port === 'text') updatePanelPreviewSession(controlId, { textOverride: String(value) });
+    else updatePanelPreviewSession(controlId, { valueOverrideEnabled: true, valueOverride: value });
   }
 
   function commitSelectActionAndEmit(control, options = {}) {

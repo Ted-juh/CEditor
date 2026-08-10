@@ -46,20 +46,28 @@ try {
   // profile has no parameter for. The first is the case the learn reducer cannot see at all.
   await page.evaluate(() => {
     window.__chips.sysex('F0 41 10 00 00 41 12 10 00 04 01 00 0F 0F 0F 3E F7');
-    window.__chips.cc('B0 4A 60');
+    window.__chips.cc('B0 4A 60');    // CC 74 — not in this profile, binds as a raw CC
+    window.__chips.cc('D0 70');       // aftertouch — no binding kind covers it
   });
-  await page.waitForFunction(() => window.__chips.rendered().length === 2, null, { timeout: 10000 });
+  // Three chips from three messages sent in ONE tick — the case that caught a real bug: read as
+  // $latestMidiInputMessage, an $effect flushes once per microtask and the earlier messages are
+  // never folded, so moving two knobs at once loses one of them.
+  await page.waitForFunction(() => window.__chips.rendered().length === 3, null, { timeout: 10000 });
 
   const rendered = await page.evaluate(() => window.__chips.rendered());
-  const named = rendered.find((chip) => chip.draggable);
-  const unnamed = rendered.find((chip) => !chip.draggable);
+  const named = rendered.find((chip) => chip.label.includes('MFX') || chip.detail === 'SysEx');
+  const rawCc = rendered.find((chip) => /CC 74/.test(chip.label));
+  const inert = rendered.find((chip) => /Aftertouch/.test(chip.label));
 
-  assert.ok(named, 'no chip was draggable — a sysex edit should resolve to a named parameter');
+  assert.ok(named?.draggable, 'a sysex edit should resolve to a named, draggable parameter');
   assert.equal(named.value, '4095', `the four-nibble value did not reach the chip (${named.value})`);
   assert.equal(named.detail, 'SysEx');
-  assert.ok(unnamed, 'an unresolvable CC should still be shown');
-  assert.match(unnamed.label, /CC 74/, `expected the raw CC label, got ${unnamed.label}`);
-  assert.match(unnamed.title, /no parameter in this profile/, 'an unbindable chip must say why');
+  assert.ok(rawCc, 'an unresolvable CC should still be shown');
+  assert.equal(rawCc.draggable, true, 'a raw CC is bindable as a message — that is the whole point');
+  assert.match(rawCc.title, /binds as a raw CC/, 'and should say what it will bind as');
+  assert.ok(inert, 'aftertouch should be shown');
+  assert.equal(inert.draggable, false, 'no binding kind covers aftertouch');
+  assert.match(inert.title, /no binding kind yet/, 'an inert chip must say why');
 
   // THE point of the feature: what a dragstart hands to CanvasControl's drop handler.
   const drag = await page.evaluate((label) => window.__chips.drag(label), named.label);
@@ -76,14 +84,22 @@ try {
   const afterEnd = await page.evaluate((label) => window.__chips.dragEnd(label), named.label);
   assert.equal(afterEnd, null, 'the drag store was left set, so every control would stay highlighted');
 
-  // An unbindable chip must not start a drag at all, or the surface would light up for something
-  // that can never be dropped.
-  const refused = await page.evaluate((label) => window.__chips.drag(label), unnamed.label);
+  // A raw CC drags as the OTHER payload kind, carrying the message instead of a name.
+  const rawDrag = await page.evaluate((label) => window.__chips.drag(label), rawCc.label);
+  const rawPayload = JSON.parse(rawDrag.payload);
+  assert.equal(rawPayload.kind, 'ceditor.midiControl');
+  assert.equal(rawPayload.controller, 74);
+  assert.equal(rawPayload.parameter.type, 'integer', 'the drop target judges compatibility on this');
+  await page.evaluate((label) => window.__chips.dragEnd(label), rawCc.label);
+
+  // An inert chip must not start a drag at all, or the surface would light up for something that
+  // can never be dropped.
+  const refused = await page.evaluate((label) => window.__chips.drag(label), inert.label);
   assert.equal(refused.started, false, 'an unbindable chip started a drag');
   assert.equal(refused.store, null);
 
   assert.deepEqual(errors, [], `the page logged errors: ${errors.join(' | ')}`);
-  console.log('learn chips: ok (sysex named and valued, raw CC explained, dragstart feeds the drop path)');
+  console.log('learn chips: ok (sysex named and valued, raw CC binds as a message, aftertouch inert, dragstart feeds the drop path)');
 } catch (error) {
   failed = true;
   console.error('learn chips: FAILED\n', error.message);

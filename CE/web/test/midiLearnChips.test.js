@@ -13,8 +13,9 @@
 //   envelope, filter and LFO — sends a DT1. A strip without sysex would be blank for the instrument
 //   this app is built around. It also needs no heuristic: the address names the parameter exactly.
 //
-//   THE NAME. A chip carries a profile parameter or it carries nothing, and that is exactly the
-//   condition for being draggable, because `deviceParameter` is the only binding kind there is.
+//   THE NAME. A chip carries a profile parameter when the profile can name it. One that cannot is
+//   still draggable if it is a CC — it binds as the message instead (see midiControlBindings.js).
+//   What is left inert is aftertouch and velocity, which no binding kind covers.
 //
 //   THE ORDER. Newest first, not most-moved. The one-shot session ranks by span because it must
 //   pick a winner from a window; a strip is read by wiggling the thing you want and taking the chip
@@ -69,23 +70,29 @@ test('a CC the profile declares is named, not left as a number', () => {
   assert.equal(chips[0].last, 90);
 });
 
-test('a controller the profile has no parameter for is shown, and says why', () => {
-  // Not hidden. A knob that appears dead teaches nothing; "this profile has nothing on that CC" is
-  // the answer someone needs, and it is also the honest reason it cannot be dragged.
+test('a controller the profile has no parameter for still binds, as a raw CC', () => {
+  // This chip used to be inert, and that was the gap the raw binding kind closes: a generic fader
+  // box, or any CC a profile author never mapped, could be seen moving and had nowhere to go.
   const chips = chipList(fold(['B0 4A 10', 'B0 4A 60']), opts);
   assert.equal(chips.length, 1);
-  assert.equal(chips[0].parameter, null);
-  assert.match(chips[0].reason, /no parameter in this profile arrives on that CC/);
-  assert.equal(chipDragPayload(chips[0], 'GAIA'), null, 'an unnamed chip cannot start a drag');
+  assert.equal(chips[0].parameter, null, 'the profile still cannot name it');
+  assert.equal(chips[0].controller, 74);
+  assert.match(chips[0].reason, /binds as a raw CC/);
+
+  const payload = chipDragPayload(chips[0], 'Fader box');
+  assert.equal(payload.kind, 'ceditor.midiControl');
+  assert.equal(payload.controller, 74);
+  assert.equal(payload.parameter.type, 'integer', 'so the drop target can judge compatibility');
 });
 
 test('aftertouch is a chip, and is honest that nothing can be bound to it', () => {
-  // deviceParameter is the only binding kind in the app, so a performance controller has nothing to
-  // bind TO. That is a real gap rather than a display choice, and the chip says so.
+  // The gap that is left. midiControl covers CC only, so a performance controller still has no
+  // binding kind — worth stating on the chip rather than leaving the knob looking broken.
   const chips = chipList(fold(['D0 20', 'D0 70']), opts);
   assert.equal(chips[0].origin, 'aftertouch');
   assert.equal(chips[0].parameter, null);
-  assert.match(chips[0].reason, /only device parameters can be bound/);
+  assert.match(chips[0].reason, /aftertouch and velocity have no binding kind yet/);
+  assert.equal(chipDragPayload(chips[0], 'GAIA'), null, 'and so it cannot start a drag');
 });
 
 test('the newest chip comes first', () => {

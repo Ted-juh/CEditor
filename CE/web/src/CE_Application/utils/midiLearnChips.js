@@ -27,6 +27,7 @@
 
 import { EMPTY_LEARN_STATE, applyLearnHex, learnCandidateLabel, learnCandidates } from './midiNoteInput.js';
 import { decodeInbound } from './inboundParameterIndex.js';
+import { midiControlParameterShape } from './midiControlBindings.js';
 
 export const EMPTY_CHIP_STATE = Object.freeze({ learn: EMPTY_LEARN_STATE, sysex: {}, seen: {}, seq: 0 });
 
@@ -90,11 +91,10 @@ function candidateHex(candidate) {
 /**
  * The chips, newest first.
  *
- * A chip carries a `parameter` when the profile can name it, and that is exactly the condition for
- * being draggable: the only binding kind this app has is `deviceParameter`, so a controller the
- * profile does not describe has nothing to bind TO. Those are still listed — knowing that a knob
- * sends CC 74 and that this profile has no CC 74 is worth more than the knob appearing dead — just
- * marked with why.
+ * A chip carries a `parameter` when the profile can name it. One that does not is still bindable if
+ * it is a CC, as the message rather than as a name — see midiControlBindings.js. What is left over
+ * is aftertouch, velocity and poly pressure, which no binding kind covers; those are listed anyway,
+ * with the reason, because a controller that appears dead teaches nothing.
  */
 export function chipList(state, { index = null, parameterById = {} } = {}) {
   const current = state ?? EMPTY_CHIP_STATE;
@@ -131,13 +131,16 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
       parameter,
       label: parameter?.name || raw,
       detail: parameter ? raw : `ch ${candidate.channel}`,
+      controller: candidate.kind === 'cc' ? candidate.cc : null,
       span: candidate.span,
       count: candidate.count,
       last: candidate.last,
       seen: current.seen[candidate.key] ?? 0,
+      // A raw CC is bindable now — as the message rather than as a name — so the only chips left
+      // with nothing to offer are the ones no binding kind covers.
       reason: parameter ? '' : (candidate.kind === 'cc'
-        ? 'no parameter in this profile arrives on that CC'
-        : 'only device parameters can be bound'),
+        ? 'not in this profile — binds as a raw CC'
+        : 'aftertouch and velocity have no binding kind yet'),
     });
   }
 
@@ -145,13 +148,31 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
 }
 
 /**
- * The payload the drop path in CanvasControl already expects.
+ * The payload the drop path in CanvasControl expects.
  *
- * Its shape is not a choice made here — parseDeviceParameterDrag checks `kind` and `parameter.id`,
- * and getBindingCompatibility reads the parameter's own type. Returns null for a chip that names
- * nothing, which is what stops an unbindable chip from starting a drag the surface would refuse.
+ * Two shapes over one MIME type, because a drop target should not need to know which it is getting
+ * until it commits: both carry a `parameter` that getBindingCompatibility can read, so the accept
+ * check and the drag highlight are the same code for both.
+ *
+ *   ceditor.deviceParameter — a named parameter from the profile.
+ *   ceditor.midiControl     — a raw CC, described as the 0-127 integer it is.
+ *
+ * Null only for the things that genuinely cannot be bound: aftertouch, velocity and poly pressure
+ * have no binding kind at all, so a chip for one stays inert rather than starting a drag the
+ * surface would refuse.
  */
 export function chipDragPayload(chip, deviceRole) {
-  if (!chip?.parameter?.id) return null;
-  return { kind: 'ceditor.deviceParameter', parameter: chip.parameter, deviceRole: String(deviceRole ?? '') };
+  const role = String(deviceRole ?? '');
+  if (chip?.parameter?.id) {
+    return { kind: 'ceditor.deviceParameter', parameter: chip.parameter, deviceRole: role };
+  }
+  if (chip?.origin === 'cc' && Number.isFinite(Number(chip?.controller))) {
+    return {
+      kind: 'ceditor.midiControl',
+      controller: Number(chip.controller),
+      parameter: midiControlParameterShape(chip.controller),
+      deviceRole: role,
+    };
+  }
+  return null;
 }

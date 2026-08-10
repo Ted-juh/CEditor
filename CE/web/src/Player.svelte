@@ -17,6 +17,8 @@
   import { injectPresetRowsIntoPanel } from './CE_Application/utils/presetChoiceRows.js';
   import { decodeInbound, inboundReadTargets } from './CE_Application/utils/inboundParameterIndex.js';
   import { inboundIndexFor } from './CE_Application/stores/inboundIndexCache.js';
+  import { activeMidiControlBindings, matchesMidiControl } from './CE_Application/utils/midiControlBindings.js';
+  import { expressionEventsFromHex } from './CE_Application/utils/midiNoteInput.js';
   import { getDeviceSessionState } from './CE_Application/bridge/bridge.js';
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, listProfileParameters, onMidiInputMessage, onSysexInputMessage, triggerRawMidiAction } from './CE_Application/bridge/bridge.js';
   // The GAIA-specific inbound maps this used to decode with. Now only a fallback for the window
@@ -58,6 +60,7 @@
   let paramControlMap = {};  // parameterId -> controlId, rebuilt from the loaded panel's bindings
   let paramPortMap = {};     // parameterId -> binding port (value | brightness | backlight | text | …)
   let paramRows = {};        // parameterId -> Value.rows (choice controls), for numeric -> id mapping
+  let midiControlBindings = [];  // [controlId, binding] for raw CC bindings — no parameter to key on
 
   // The generated GAIA panel binds scoped ids ('tone1.filter.cutoff'); the slim demo panel binds
   // Tone 1 flat ('filter.cutoff'). Try the id the profile gave, then the flat form, so a panel
@@ -80,6 +83,7 @@
     const map = {};
     const rows = {};
     const ports = {};
+    const raw = [];
     for (const c of controls ?? []) {
       const id = c?._children?.Core?.id;
       if (!id) continue;
@@ -90,10 +94,16 @@
           ports[b.parameterId] = String(b.port ?? 'value');
           if (Array.isArray(valueRows) && valueRows.length) rows[b.parameterId] = valueRows;
         }
+      // Raw CC bindings are keyed by control, not by parameter id — they have no parameter.
+      for (const b of activeMidiControlBindings(c)) {
+        if (b?.feedback?.receiveUpdates === false) continue;
+        raw.push([id, b]);
+      }
     }
     paramControlMap = map;
     paramPortMap = ports;
     paramRows = rows;
+    midiControlBindings = raw;
     lastAppliedValue = {};
   }
 
@@ -229,13 +239,21 @@
       if (!Number.isFinite(value)) return;    // sliders: numeric only
       v = value;
     }
-    (pendingIncoming ??= {})[controlId] = { v, port: paramPortMap[parameterId] ?? 'value' };
+    queueSessionValue(controlId, paramPortMap[parameterId] ?? 'value', v);
+  }
+
+  // The same queue, addressed by control instead of by parameter — what a raw CC binding needs,
+  // since it has no parameter id to go through.
+  function queueSessionValue(controlId, port, value) {
+    if (!controlId) return;
+    (pendingIncoming ??= {})[controlId] = { v: value, port: String(port ?? 'value') };
     if (!incomingRaf) incomingRaf = requestAnimationFrame(flushIncoming);
   }
 
   // Incoming CC (GAIA knob with Tx Edit Data OFF -> CC 102/103/104).
   function applyIncomingMidi(payload) {
     if (!payload || payload.messageType !== 'cc' || !payload.hex) return;
+    applyMidiControlBindings(payload.hex);
     if (inboundIndex) { applyDecoded(payload.hex); return; }
     const b = String(payload.hex).trim().split(/\s+/).map((h) => parseInt(h, 16));
     if (b.length < 3 || (b[0] & 0xf0) !== 0xb0) return;  // CC status nibble 0xB
@@ -262,6 +280,19 @@
   function applyDecoded(hex) {
     const hit = decodeInbound(inboundIndex, hex);
     if (hit) queueControlValue(hit.parameterId, hit.value);
+  }
+
+  // Raw CC bindings, which run alongside the index rather than instead of it: a controller the
+  // profile does not describe drives its control by message, and a CC the profile DOES describe can
+  // legitimately do both — one panel binding it by name, another by number.
+  function applyMidiControlBindings(hex) {
+    if (!midiControlBindings.length) return;
+    for (const event of expressionEventsFromHex(hex)) {
+      if (event.kind !== 'cc') continue;
+      for (const [controlId, binding] of midiControlBindings) {
+        if (matchesMidiControl(binding, event)) queueSessionValue(controlId, binding.port, event.value);
+      }
+    }
   }
 
   // --- SysEx read-back (RQ1): ask the synth for the current value of each bound parameter.
