@@ -230,6 +230,31 @@ function rolandChecksum(bytes) {
   return (128 - (sum % 128)) % 128;
 }
 
+/**
+ * An RQ1 read as a device-request TEMPLATE.
+ *
+ * A device request is not a message recipe, and that is the whole point of this function. The
+ * engine's compileDeviceRequest walks a flat token list where every token is either a literal hex
+ * byte or a `$variable` worth exactly one byte — there is no $address, no $size, no $checksum, and
+ * no messageRecipe. These nine requests referenced `messageRecipe: 'rq1'` and carried address/size
+ * fields instead, which the engine cannot use: its validator rejects a request with no template as
+ * an ERROR, loadFromJson refuses the whole profile, and loadInternalTestProfiles discards the
+ * message — so the entire 793-parameter profile vanished from the device list with nothing said.
+ * It was the only profile of the nine that failed, and therefore the only one nobody could pick.
+ *
+ * Address and size are constants per request, so the checksum is a constant too and is baked in
+ * here by the same arithmetic the runtime uses.
+ */
+function rq1Template(address, size) {
+  const body = [...parseBytes(address), ...parseBytes(size)];
+  return [
+    'F0', MODEL.manufacturer, '$deviceId', ...MODEL.modelId, MODEL.rq1,
+    ...formatBytes(body).split(' '),
+    formatBytes([rolandChecksum(body)]),
+    'F7',
+  ];
+}
+
 /** An RQ1 read, as the exact bytes that should appear on the wire. */
 function rq1Hex(deviceId, address, size) {
   const body = [...parseBytes(address), ...parseBytes(size)];
@@ -437,7 +462,7 @@ export function buildProfile() {
           id: `request${block[0].toUpperCase()}${block.slice(1)}`,
           name: `Request ${block}`,
           kind: 'sysex',
-          messageRecipe: 'rq1',
+          template: rq1Template(addressFor(BLOCKS[block], '00 00'), BLOCK_SIZES[sizeKey]),
           address: addressFor(BLOCKS[block], '00 00'),
           size: BLOCK_SIZES[sizeKey],
           response: { kind: 'dt1', address: addressFor(BLOCKS[block], '00 00') },
