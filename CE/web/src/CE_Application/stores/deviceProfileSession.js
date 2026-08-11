@@ -58,6 +58,8 @@ import {
   requestFileData,
 } from '../bridge/bridge.js';
 import { fileDataText, profileSourceText } from '../utils/fileDataPayload.js';
+import { decodeInbound } from '../utils/inboundParameterIndex.js';
+import { inboundIndexFor } from './inboundIndexCache.js';
 import { midiCiPropertiesToProfile } from '../generated/dpd/import-midici.mjs';
 import {
   queueDeviceParameterPanelPreviewSync,
@@ -153,6 +155,47 @@ function echoWindowMsForRole(deviceRole) {
   }
   echoWindowCache.set(profileId, { source: sourceText, ms });
   return ms;
+}
+
+/**
+ * Make the editor's panel follow the instrument.
+ *
+ * The reverse index was built, tested and then wired into the Player only — so the exported plugin
+ * followed the synth and the editor, where every panel is actually built and tried, did not. Turning
+ * a knob showed the CC arriving in the monitor and moved nothing, which reads exactly like a broken
+ * binding and is not one.
+ *
+ * Everything else that moves a control in the editor comes from C++: a parsed dump, a runtime state
+ * push, the echo of our own send. None of those fire for a live CC or a single-parameter SysEx,
+ * because the engine has no notion of a profile's `inbound` declaration — that mapping exists only
+ * here. So this is the one path from "the instrument sent something" to "the panel shows it".
+ *
+ * Per role, because two synths can be mapped at once and a message arriving on one must not move
+ * the other's controls. Echo-suppressed, or our own send comes back a few milliseconds later and
+ * fights the hand that is still turning the knob.
+ */
+export function followInboundMessage(payload) {
+  const hex = String(payload?.hex ?? '');
+  if (!hex) return;
+
+  const role = String(payload?.deviceRole ?? DEFAULT_DEVICE_ROLE);
+  const profileId = String(get(deviceRoleMappings)?.[role]?.profileId ?? '');
+  if (!profileId) return;
+
+  const indexed = inboundIndexFor(profileId, get(profileSources)?.[profileId]?.source ?? '');
+  if (!indexed?.index) return;   // the source has not arrived yet; ordinary, not an error
+
+  const hit = decodeInbound(indexed.index, hex);
+  if (!hit) return;
+
+  if (shouldSuppressEcho(role, hit.parameterId, hit.value)) return;
+  markRuntimeOrigin(role, hit.parameterId, 'deviceInbound');
+  recordRuntimeConflict(role, hit.parameterId, hit.value, { source: 'inbound' });
+  deviceRuntimeState.update((state) => ({
+    ...state,
+    [role]: { ...(state?.[role] ?? {}), [hit.parameterId]: hit.value },
+  }));
+  queueDeviceParameterPanelPreviewSync(role, hit.parameterId, hit.value);
 }
 
 let initialized = false;
@@ -433,10 +476,12 @@ export function initDeviceProfileBridge() {
     const filtered = filterInboundMidi(payload ?? null);
     if (filtered === null || filtered === undefined) return;   // a filter swallowed it
     latestMidiInputMessage.set(filtered);
+    followInboundMessage(filtered);
   });
 
   onSysexInputMessage((payload) => {
     latestSysexInputMessage.set(payload ?? null);
+    followInboundMessage(payload);
   });
 
   onDeviceSyncStarted((payload) => {
