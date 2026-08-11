@@ -200,8 +200,21 @@ test('a learned binding keeps the controller and forgets the channel', () => {
   assert.equal(learned.channel, 0, 'learn should not pin a channel it merely observed');
   assert.equal(learned.port, 'value');
   assert.equal(learned.deviceRole, 'Fader box');
-  assert.equal(learned.dryRun, true, 'same default as a dropped device parameter');
   assert.equal(midiControlBindingFrom({ controller: 300 }), null);
+});
+
+test('a learned binding sends, because that is what learning it was for', () => {
+  // This defaulted to a dry run, in both this helper and the device-parameter drop beside it, and
+  // the two agreeing with each other was the whole reason it survived review. On hardware it read
+  // as "it looks like it does it but it doesn't link": the binding is created, appears in the
+  // properties panel, compiles its message into the monitor — and never reaches the synth.
+  //
+  // Dry run is a real mode with its own toggle. It is not what someone means by dragging a chip
+  // onto a fader, and a default that makes a gesture silently do nothing is the wrong one.
+  assert.equal(midiControlBindingFrom({ controller: 74 }).dryRun, false,
+    'same default as a dropped device parameter — both send');
+  assert.equal(midiControlBindingFrom({ message: 'nrpn', parameterMsb: 1, parameterLsb: 32 }).dryRun, false);
+  assert.equal(midiControlBindingFrom({ message: 'aftertouch' }).dryRun, false);
 });
 
 const nrpn = (over = {}) => ({

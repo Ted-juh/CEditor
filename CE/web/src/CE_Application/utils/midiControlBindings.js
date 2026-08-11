@@ -222,8 +222,14 @@ export function activeMidiControlBindings(control) {
 /**
  * A binding built from a learn chip.
  *
- * Channel is dropped on purpose — see the note above. `dryRun` follows the drag-to-bind default for
- * device parameters, which is to compile and monitor rather than send until someone says otherwise.
+ * Channel is dropped on purpose — see the note above.
+ *
+ * `dryRun` is false, matching drag-to-bind for device parameters, and both were true until someone
+ * tried it on hardware: you drag a chip onto a fader, the binding appears in the properties panel,
+ * and moving the fader does nothing at all. Dry run compiles the message and shows it in the
+ * monitor without sending, which is a useful mode and a terrible default for a gesture whose entire
+ * meaning is "make this control drive that". Reported as "it looks like it does it but it doesn't
+ * link" — which is exactly right, and the binding was there the whole time.
  */
 export function midiControlBindingFrom({
   message = 'cc', controller, parameterMsb, parameterLsb, valueResolution,
@@ -246,7 +252,7 @@ export function midiControlBindingFrom({
       ? { parameterMsb: msb, parameterLsb: lsb, valueResolution: int(valueResolution, 7) === 14 ? 14 : 7 }
       : {}),
     channel: 0,
-    dryRun: true,
+    dryRun: false,
     feedback: { receiveUpdates: true },
   };
 }

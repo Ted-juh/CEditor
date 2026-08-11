@@ -668,7 +668,11 @@
         parameterId: parameter.id,
         parameterType: parameter.type,
         adoptMetadata: true,
-        dryRun: true,
+        // Not a dry run. This was true, and dropping a parameter onto a fader then produced a
+        // binding that compiled its message, showed it in the monitor and never sent it — so the
+        // gesture looked like it worked and the fader did nothing. Dry run is a real mode with a
+        // toggle in the properties panel; it is not what someone means by dragging.
+        dryRun: false,
         feedback: {
           receiveUpdates: true,
           ignoreOwnEchoes: true,

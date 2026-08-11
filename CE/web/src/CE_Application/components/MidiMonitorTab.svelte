@@ -15,7 +15,7 @@
    * Pause keeps a snapshot; nothing is lost, because C++ goes on collecting either way.
    */
   import MidiLearnChips from './MidiLearnChips.svelte';
-  import { midiMonitorEvents, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
+  import { latestMidiPreview, midiMonitorEvents, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
   import { clearMidiMonitorEvents, isJuceAvailable } from '../bridge/bridge.js';
   import {
     MONITOR_DIRECTIONS,
@@ -37,6 +37,9 @@
   let copyStatus = $state('');
 
   let live = $derived($midiMonitorEvents ?? []);
+  // Only while it is the LAST thing that happened: once a send succeeds the store carries a
+  // transaction instead, and a stale banner would accuse a panel that is now working.
+  let notSent = $derived($latestMidiPreview?.ok === false ? String($latestMidiPreview.error ?? '') : '');
   let events = $derived(paused ? frozen : live);
   let facets = $derived(monitorFacets(events));
   let counts = $derived(monitorCounts(events));
@@ -124,6 +127,22 @@
       <button type="button" class="link" onclick={refreshDeviceProfiles}>Refresh</button>
     {/if}
   </div>
+
+  <!--
+    A send that never happened leaves no event, so the log has nothing to show and the honest read of
+    an empty monitor is "the control is not wired up" — which is exactly the wrong conclusion when
+    the truth is "this panel's device has no profile yet".
+
+    resolveParameterSend already works this out and words it well, and then set it on a store whose
+    only reader is a preview box in the Parameter Browser. Someone moving a fader and watching the
+    monitor never saw it. It belongs here, where they are looking.
+  -->
+  {#if notSent}
+    <div class="not-sent">
+      <strong>Nothing was sent</strong>
+      <span>{notSent}</span>
+    </div>
+  {/if}
 
   <div class="rows" role="log" aria-label="MIDI events">
     {#each rows as event, index (`${event.timestamp}_${index}`)}
@@ -216,6 +235,19 @@
 
   .summary .dim { color: #6E6E6E; }
   .warn { color: #D8A657; }
+
+  .not-sent {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 7px 8px;
+    border-bottom: 1px solid #2B2B2B;
+    background: #2A2114;
+    color: #E7C88A;
+  }
+
+  .not-sent strong { color: #F0D9A8; }
 
   .link {
     margin-left: auto;
