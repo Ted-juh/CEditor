@@ -1,9 +1,10 @@
 <script>
-  import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, addPanel, closePanel, setActiveEditorTab, closeSettingsTab, closeDeviceProfileTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
+  import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, setActiveEditorTab, closeSettingsTab, closeDeviceProfileTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
   import { closeComponentDocument, createComponentDocument, createComponentDocumentFromLibraryEntry } from '../stores/componentWorkspace.js';
   import { closeScriptWorkspaceDocument, createScriptWorkspaceDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
+  import { openNewPanelDialog } from '../stores/newPanelDialog.js';
 
   let tabList = $derived($editorTabs);
   let activeTab = $derived($activeEditorTab);
@@ -74,7 +75,7 @@
   function handlePanelTarget() {
     closePicker();
     if (createMode) {
-      addPanel();
+      openNewPanelDialog();
       return;
     }
     openPanelFromFile();

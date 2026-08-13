@@ -29,6 +29,8 @@
   import { initScriptModules } from './CE_Application/stores/scriptModules.js';
   import ScriptNotifications from './CE_Application/layout/ScriptNotifications.svelte';
   import ScriptDialog from './CE_Application/layout/ScriptDialog.svelte';
+  import NewPanelDialog from './CE_Application/layout/NewPanelDialog.svelte';
+  import { openNewPanelDialog } from './CE_Application/stores/newPanelDialog.js';
   import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
   import { initPresetChoiceSync } from './CE_Application/stores/presetChoiceSync.js';
@@ -99,7 +101,7 @@
         case 'toggle-shortcuts': showShortcuts = !showShortcuts; break;
         case 'save': saveActiveTab(); break;
         case 'save-as': saveActiveTab({ saveAs: true }); break;
-        case 'new-panel': addPanel(); break;
+        case 'new-panel': openNewPanelDialog(); break;
         case 'open-panel': openPanelFromFile(); break;
         case 'close-tab': closeActiveEditorTab(); break;
         case 'open-settings': openSettingsTab(); break;
@@ -391,6 +393,8 @@
   <!-- ce.ui.dialog() modals. Root-mounted for the same reason, and above everything: a question
        that can be scrolled out of view is a script left waiting for an answer. -->
   <ScriptDialog />
+
+  <NewPanelDialog />
 
   {#if showShortcuts}
     <ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />

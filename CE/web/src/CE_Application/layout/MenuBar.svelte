@@ -1,7 +1,8 @@
 <script>
   import { get } from 'svelte/store';
-  import { addPanel, closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, buildActivePanelVst3 } from '../stores/panels.js';
+  import { closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, buildActivePanelVst3 } from '../stores/panels.js';
   import { INSERT_CATEGORIES } from '../models/insertCatalog.js';
+  import { openNewPanelDialog } from '../stores/newPanelDialog.js';
   import { addControl } from '../stores/controls.js';
   import { closeApplication } from '../bridge/bridge.js';
   import { undo, redo } from '../stores/history.js';
@@ -61,7 +62,7 @@
 
   const menus = {
     File: [
-      { label: 'New Panel',  shortcut: 'Ctrl+N', action: () => addPanel() },
+      { label: 'New Panel',  shortcut: 'Ctrl+N', action: () => openNewPanelDialog() },
       { label: 'Open Panel', shortcut: 'Ctrl+O', action: () => openPanelFromFile() },
       { type: 'separator' },
       { label: 'New Custom Component', action: () => newCustomComponent() },

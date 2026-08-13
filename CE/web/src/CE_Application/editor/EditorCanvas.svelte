@@ -1,5 +1,5 @@
 <script>
-  import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, addPanel, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel } from '../stores/panels.js';
+  import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel } from '../stores/panels.js';
   import { addControl, addCustomComponentPackage, getSection, removeControl, duplicateControl, updateControlProperty, selectedControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { enumerateLeafPaths } from '../stores/controlTreeUtils.js';
@@ -40,6 +40,7 @@
   import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
   import { createScriptWorkspaceDocument, scriptDocuments, updateScriptDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { isSourceScript } from '../scripting/scriptModel.js';
+  import { openNewPanelDialog } from '../stores/newPanelDialog.js';
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
@@ -805,7 +806,7 @@
           <strong>No document open</strong>
           <span>Each opens in its own workspace.</span>
           <div class="workspace-empty-actions">
-            <button type="button" onclick={() => addPanel()}>New Panel</button>
+            <button type="button" onclick={() => openNewPanelDialog()}>New Panel</button>
             <button type="button" onclick={openPanelFromFile}>Open Panel</button>
             <button type="button" onclick={createStandaloneComponent}>New Custom Component</button>
             <button type="button" onclick={createStandaloneDeviceProfile}>New Device Profile</button>

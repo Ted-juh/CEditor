@@ -26,6 +26,8 @@
   import { syncExternalTarget } from '../utils/targetSync.js';
   import { splitColourAlpha, alphaToHex } from '../utils/colorMath.js';
   import { flatControls } from '../utils/containment.js';
+  import { collectDocumentColours } from '../utils/documentColours.js';
+  import { recentColours, recordRecentColour } from '../stores/recentColours.js';
 
   let props = $props();
   let onTabChange = $derived(props.onTabChange);
@@ -260,6 +262,25 @@
     return { ...currentGradient, stops: newStops };
   })());
 
+  // --- Document + recent colours (Colors tab chip rows) ---
+  // "Panel" = the colours this panel already uses, harvested live;
+  // "Recent" = the user's settled picks, persisted. One drag = one recent
+  // entry (debounced), not sixty.
+  let documentColours = $derived(activeTab === 'colors' ? collectDocumentColours($activePanel) : []);
+  let recentColourTimer = null;
+
+  function noteRecentColour(rgb) {
+    if (recentColourTimer) clearTimeout(recentColourTimer);
+    recentColourTimer = setTimeout(() => {
+      recentColourTimer = null;
+      recordRecentColour(rgb);
+    }, 600);
+  }
+
+  function applyChipColour(rgb) {
+    handleColorChange(alphaToHex(userPickedAlpha) + rgb);
+  }
+
   // --- Color change handler ---
   // Routes a new color to the right destination based on current editing
   // mode. Gradient-stop and notepad-pick modes defer the write (their
@@ -272,6 +293,7 @@
       userPickedAlpha = 1;
       userPickedColor = hex.slice(0, 6);
     }
+    noteRecentColour(userPickedColor);
 
     // Deferred modes — preview only, commit happens on "back to X"
     if (editingGradientStop !== null || pickingNotepadColor) return;
@@ -606,6 +628,26 @@
                 onApplyColor={handleColorChange}
               />
             </div>
+            {#if documentColours.length || $recentColours.length}
+              <div class="colour-rows">
+                {#if documentColours.length}
+                  <div class="colour-row">
+                    <span class="colour-row-label" title="Colours this panel already uses">Panel</span>
+                    {#each documentColours as rgb (rgb)}
+                      <button class="colour-chip" style="background:#{rgb}" title="#{rgb}" aria-label="Use #{rgb}" onclick={() => applyChipColour(rgb)}></button>
+                    {/each}
+                  </div>
+                {/if}
+                {#if $recentColours.length}
+                  <div class="colour-row">
+                    <span class="colour-row-label" title="Recently picked colours">Recent</span>
+                    {#each $recentColours as rgb (rgb)}
+                      <button class="colour-chip" style="background:#{rgb}" title="#{rgb}" aria-label="Use #{rgb}" onclick={() => applyChipColour(rgb)}></button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {/if}
             <SwatchGrid
               {swatches}
               onclick={handleSwatchClick}
@@ -907,6 +949,46 @@
   .sidebar-settings {
     flex: 3;
     overflow: auto;
+  }
+
+  /* Document ("Panel") + Recent colour chip rows */
+  .colour-rows {
+    flex-shrink: 0;
+    padding: 4px 8px 2px;
+    border-top: 1px solid #2A2A2A;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .colour-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .colour-row-label {
+    width: 38px;
+    flex-shrink: 0;
+    color: #777;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .colour-chip {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .colour-chip:hover {
+    border-color: #5B9BD5;
   }
 
   .placeholder {
