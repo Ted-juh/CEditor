@@ -92,10 +92,10 @@
     />
   {/each}
 
-  {#if marquee.isActive && marqueeRect.w > 1}
+  {#if marquee.isActive && (marqueeRect.w > 1 || marqueeRect.h > 1)}
     <div
       class="marquee"
-      style="left:{marqueeRect.x}px; top:{marqueeRect.y}px; width:{marqueeRect.w}px; height:{marqueeRect.h}px;"
+      style="left:{marqueeRect.x}px; top:{marqueeRect.y}px; width:{marqueeRect.w}px; height:{marqueeRect.h}px; border-width:{1 / (scale || 1)}px;"
     ></div>
   {/if}
 </div>
@@ -145,9 +145,12 @@
     z-index: 0;
   }
 
+  /* Border width is set inline (1px / scale) so the marquee reads as a hairline
+     at every zoom; a purely-vertical drag must render too, hence the w OR h gate. */
   .marquee {
     position: absolute;
-    border: 1px solid #5B9BD5;
+    border-style: solid;
+    border-color: #5B9BD5;
     background: rgba(91, 155, 213, 0.1);
     pointer-events: none;
     z-index: 200;

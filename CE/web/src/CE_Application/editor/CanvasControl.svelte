@@ -456,6 +456,11 @@
   let isDragging = $state(false);
   let dragStartMouse = $state({ x: 0, y: 0 });
   let dragStartPos = $state({ x: 0, y: 0 });
+  // A drag only engages after the pointer travels a few SCREEN pixels.
+  // Without the threshold, the hand jitter inside an ordinary click moves the
+  // control — by whole panel units when zoomed out — and dirties the document.
+  const DRAG_ENGAGE_SCREEN_PX = 4;
+  let dragEngaged = $state(false);
   let rootElement = $state(null);
 
   // --- Resize state ---
@@ -533,6 +538,8 @@
     const align = findAlignmentSnap(
       { x, y, w, h }, core?.id, allControls, $guides, getSection,
       { width: panelWidth, height: panelHeight },
+      // 5 screen px of stickiness at every zoom level.
+      5 / (scale || 1),
     );
     // Publish the live guides so the panel rulers can mirror them (parity with
     // the component editor). Cleared on drag/resize end.
@@ -581,6 +588,7 @@
 
     // Start drag
     isDragging = true;
+    dragEngaged = false;
     dragStartMouse = { x: e.clientX, y: e.clientY };
     dragStartPos = { x: transform?.x ?? 0, y: transform?.y ?? 0 };
     transientX = dragStartPos.x;
@@ -761,6 +769,11 @@
 
   function handleDragMove(e) {
     if (!isDragging) return;
+    if (!dragEngaged) {
+      const screenDist = Math.hypot(e.clientX - dragStartMouse.x, e.clientY - dragStartMouse.y);
+      if (screenDist < DRAG_ENGAGE_SCREEN_PX) return;
+      dragEngaged = true;
+    }
     const dx = (e.clientX - dragStartMouse.x) / scale;
     const dy = (e.clientY - dragStartMouse.y) / scale;
 
@@ -868,6 +881,7 @@
     multiDragDelta.set({ x: 0, y: 0, active: false });
 
     isDragging = false;
+    dragEngaged = false;
     transientX = null;
     transientY = null;
     snapGuides = [];
@@ -1058,7 +1072,9 @@
     { id: 'br', cursor: 'nwse-resize' },
   ];
 
-  const handleStyle = resizeHandleStyle;
+  // Screen-constant handles: the overlay lives inside the scaled surface, so
+  // sizes are pre-divided by the zoom scale (see resizeHandleStyle).
+  let handleStyle = $derived((id) => resizeHandleStyle(id, 1 / (scale || 1)));
 
   // --- Effects CSS (applied to .canvas-control and .control-content) ---
   let shadowCSS = $derived(buildShadowCSS(effects));
@@ -2707,7 +2723,7 @@
   class:device-drop-incompatible={deviceDropStatus === 'incompatible'}
   class:mouse-transparent={mouseBlocksPointer}
   class:mouse-focus-outline={mouseFocusOutline}
-  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
+  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; --inv-scale:{1 / (scale || 1)}; {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
   ondragover={editorInteractionEnabled ? handleDeviceParameterDragOver : undefined}
   ondrop={editorInteractionEnabled ? handleDeviceParameterDrop : undefined}
@@ -3546,8 +3562,8 @@
 
   /* Container highlighted as the live drop target during a canvas drag. */
   .canvas-control.drop-target {
-    outline: 2px dashed #5B9BD5;
-    outline-offset: 1px;
+    outline: calc(2px * var(--inv-scale, 1)) dashed #5B9BD5;
+    outline-offset: calc(1px * var(--inv-scale, 1));
     background: rgba(91, 155, 213, 0.10);
   }
 
@@ -3861,8 +3877,10 @@
     pointer-events: none;
   }
 
+  /* Selection/hover/drop outlines are screen-space UI drawn inside the scaled
+     surface — widths ride --inv-scale so they read the same at every zoom. */
   .canvas-control:hover:not(.locked) {
-    outline: 1px solid rgba(91, 155, 213, 0.4);
+    outline: calc(1px * var(--inv-scale, 1)) solid rgba(91, 155, 213, 0.4);
   }
 
   .canvas-control.preview-surface:hover:not(.locked) {
@@ -3912,8 +3930,8 @@
   }
 
   .canvas-control.selected {
-    outline: 2px solid #5B9BD5;
-    outline-offset: -1px;
+    outline: calc(2px * var(--inv-scale, 1)) solid #5B9BD5;
+    outline-offset: calc(-1px * var(--inv-scale, 1));
   }
 
   .canvas-control.selected.key-object {
@@ -3922,7 +3940,7 @@
 
   .canvas-control.hidden-component {
     opacity: 0.25 !important;
-    outline: 1px dashed #666;
+    outline: calc(1px * var(--inv-scale, 1)) dashed #666;
   }
 
   /* A custom component with no visible background renders transparent, so in

@@ -273,8 +273,11 @@
     getScale: () => scale,
     isBlocked: () => pan.spaceHeld,
     onSelect: (rect) => {
-      // Only select if the marquee has a meaningful size (not just a click)
-      if (rect.w < 3 && rect.h < 3) { clearSelection(); return; }
+      // Only select if the marquee has a meaningful size (not just a click).
+      // rect is in panel units — compare against SCREEN pixels so a click
+      // doesn't count as a marquee at 25% zoom, nor a real 10px drag at 400%.
+      const clickSize = 3 / (scale || 1);
+      if (rect.w < clickSize && rect.h < clickSize) { clearSelection(); return; }
       const ids = canvasPanel ? findControlsInRect(canvasPanel.controls, rect, getSection) : new Set();
       selectedComponentIds.set(ids);
     },
