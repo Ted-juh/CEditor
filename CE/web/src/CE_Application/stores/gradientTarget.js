@@ -1,4 +1,5 @@
 import { writable, get } from 'svelte/store';
+import { resolvedActivePanelId, selectedComponentIds } from './panels.js';
 import { updateControlProperty } from './controls.js';
 
 /**
@@ -69,6 +70,21 @@ export function applyGradientToTarget(newGradient) {
 export function clearGradientTarget() {
   gradientTarget.set(null);
 }
+
+// --- Target lifecycle: mirror colorTarget.js — a gradient target must not
+// outlive the selection or panel it was created for, or later edits write to
+// an object the user has moved on from.
+let selectionSeen = false;
+selectedComponentIds.subscribe(() => {
+  if (!selectionSeen) { selectionSeen = true; return; }
+  if (get(gradientTarget)) gradientTarget.set(null);
+});
+
+let panelSeen = false;
+resolvedActivePanelId.subscribe(() => {
+  if (!panelSeen) { panelSeen = true; return; }
+  if (get(gradientTarget)) gradientTarget.set(null);
+});
 
 /**
  * Shared seed helper for the fill editors (Background / Text / custom-surface —

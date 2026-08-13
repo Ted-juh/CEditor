@@ -22,11 +22,14 @@
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { deepClone } from '../utils/deepClone.js';
-  import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
+  import { readStoredJson, readStoredNumber, writeStoredJson } from '../utils/localStorageState.js';
   import { syncExternalTarget } from '../utils/targetSync.js';
+  import { splitColourAlpha, alphaToHex } from '../utils/colorMath.js';
+  import { flatControls } from '../utils/containment.js';
 
   let props = $props();
   let onTabChange = $derived(props.onTabChange);
+  let visible = $derived(props.visible ?? true);
 
   const DISPLAY_TAB_STORAGE_KEY = 'ce.displayPanel.activeTab';
   const DEFAULT_DISPLAY_TAB = 'colors';
@@ -148,8 +151,11 @@
   });
 
   // --- Central color state ---
-  let userPickedColor = $state($activePanel?.bgColour ?? '333333');
-  let userPickedAlpha = $state(1);
+  // Panel colours are stored AARRGGBB — splitColourAlpha keeps the alpha out
+  // of the RGB channels (feeding 'FF333333' to a 6-char consumer shows red).
+  const initialPanelColour = splitColourAlpha($activePanel?.bgColour);
+  let userPickedColor = $state(initialPanelColour.color);
+  let userPickedAlpha = $state(initialPanelColour.alpha);
 
   // --- Color target: switch to Colors tab and set color when a swatch activates a target ---
   // Plain variable (not $state) so it doesn't become a reactive dependency of the effect.
@@ -161,10 +167,32 @@
       userPickedAlpha = t._initialAlpha ?? 1;
     });
   });
-  let stepSize = $state(10);
+  // Drag quantisation for the colour bands. 0 = smooth (no design tool ships
+  // a snapping colour picker by default); persisted so a chosen step sticks.
+  const STEP_SIZE_STORAGE_KEY = 'ce.displayPanel.stepSize';
+  let stepSize = $state(readStoredNumber(STEP_SIZE_STORAGE_KEY, 0));
+  $effect(() => { writeStoredJson(STEP_SIZE_STORAGE_KEY, stepSize); });
 
   // --- Shared swatches (used by Colors / Gradient / Notepad tabs) ---
-  let swatches = $state(Array(24).fill(null));
+  // Persisted: a swatch library that evaporates on reload is not a library.
+  const SWATCHES_STORAGE_KEY = 'ce.displayPanel.swatches';
+  function readStoredSlots(key) {
+    const stored = readStoredJson(key, null);
+    const slots = Array(24).fill(null);
+    if (Array.isArray(stored)) {
+      for (let i = 0; i < Math.min(24, stored.length); i++) slots[i] = stored[i] ?? null;
+    }
+    return slots;
+  }
+  let swatches = $state(readStoredSlots(SWATCHES_STORAGE_KEY));
+  $effect(() => { writeStoredJson(SWATCHES_STORAGE_KEY, $state.snapshot(swatches)); });
+
+  // --- Gradient presets (Gradient tab) ---
+  // Owned here, not by GradientTab: the tab unmounts on every tab switch —
+  // and the stop-colour flow forces a switch — which used to wipe all 24.
+  const GRADIENT_PRESETS_STORAGE_KEY = 'ce.displayPanel.gradientPresets';
+  let gradientPresets = $state(readStoredSlots(GRADIENT_PRESETS_STORAGE_KEY));
+  $effect(() => { writeStoredJson(GRADIENT_PRESETS_STORAGE_KEY, $state.snapshot(gradientPresets)); });
 
   const defaultGradient = {
     type: 'linear', angle: 90, centerX: 50, centerY: 50,
@@ -187,13 +215,20 @@
   // can call `applyTextColor(hex, range)` on it.
   let notepadTabRef = $state(null);
 
-  // Sync from store when active panel changes (panel switch)
+  // Sync from store when active panel changes (panel switch). Any in-flight
+  // editing mode belonged to the previous panel and ends here.
   let lastPanelId = $state(null);
   $effect(() => {
     const panel = $activePanel;
     if (panel && panel.id !== lastPanelId) {
       lastPanelId = panel.id;
       currentGradient = panel.bgGradient ? deepClone(panel.bgGradient) : deepClone(defaultGradient);
+      editingGradientStop = null;
+      pickingNotepadColor = false;
+      savedNotepadSelection = null;
+      const parsed = splitColourAlpha(panel.bgColour);
+      userPickedColor = parsed.color;
+      userPickedAlpha = parsed.alpha;
       panelResetKey++;
     }
   });
@@ -244,9 +279,11 @@
     // External color target (swatch binding) — route to target
     if ($colorTarget) { applyColorToTarget(hex); return; }
 
-    // Default — write to panel bgColour
+    // Default — write to panel bgColour. Full AARRGGBB, matching how the
+    // panel stores it — the old 6-char write silently dropped the alpha and
+    // left the stored format flip-flopping between the two write paths.
     const panel = $activePanel;
-    if (panel) updatePanel(panel.id, { bgColour: userPickedColor, modified: true });
+    if (panel) updatePanel(panel.id, { bgColour: alphaToHex(userPickedAlpha) + userPickedColor, modified: true });
   }
 
   // --- Viewer eyedropper: save picked color to first empty swatch ---
@@ -302,11 +339,7 @@
   // --- Back from gradient stop editing ---
   function handleBackToGradient() {
     commitStopColor();
-    const panel = $activePanel;
-    if (panel) {
-      userPickedColor = panel.bgColour;
-      userPickedAlpha = 1;
-    }
+    resetUserColor();
     editingGradientStop = null;
     activeTab = 'gradient';
     if (onTabChange) onTabChange('gradient');
@@ -348,7 +381,11 @@
   // chooser/gradient to the panel defaults.
   function resetUserColor() {
     const p = $activePanel;
-    if (p) { userPickedColor = p.bgColour; userPickedAlpha = 1; }
+    if (p) {
+      const parsed = splitColourAlpha(p.bgColour);
+      userPickedColor = parsed.color;
+      userPickedAlpha = parsed.alpha;
+    }
   }
 
   function resetGradientFromPanel() {
@@ -357,6 +394,97 @@
       currentGradient = p.bgGradient
         ? deepClone(p.bgGradient)
         : deepClone(defaultGradient);
+    }
+  }
+
+  // Targets can now be cleared from outside (selection change, panel switch —
+  // see colorTarget.js/gradientTarget.js). When that happens the chooser must
+  // fall back to panel defaults instead of keeping the orphaned colour.
+  let hadColorTarget = false;
+  $effect(() => {
+    const t = $colorTarget;
+    if (!t && hadColorTarget) resetUserColor();
+    hadColorTarget = !!t;
+  });
+  let hadGradientTarget = false;
+  $effect(() => {
+    const t = $gradientTarget;
+    if (!t && hadGradientTarget) resetGradientFromPanel();
+    hadGradientTarget = !!t;
+  });
+
+  // Closing the dock ends every in-flight editing mode. The dock stays
+  // mounted while hidden (App keeps it alive with display:none), so without
+  // this a target armed before closing kept writing after reopening.
+  let wasVisible = true;
+  $effect(() => {
+    const v = visible;
+    if (wasVisible && !v) {
+      if (editingGradientStop !== null) {
+        commitStopColor();
+        editingGradientStop = null;
+      }
+      savedNotepadSelection = null;
+      pickingNotepadColor = false;
+      if ($colorTarget) clearColorTarget();
+      if ($gradientTarget) clearGradientTarget();
+      resetUserColor();
+      resetGradientFromPanel();
+    }
+    wasVisible = v;
+  });
+
+  // --- Context header: what is this dock editing right now? ---
+  const PANEL_PROP_LABELS = {
+    bgColour: 'Panel background',
+    gridColour: 'Panel grid colour',
+  };
+
+  function friendlyPath(path) {
+    return String(path ?? '')
+      .replace(/\.(colour|color)$/i, '')
+      .split('.')
+      .map((seg) => seg.replace(/([a-z0-9])([A-Z])/g, '$1 $2'))
+      .join(' › ');
+  }
+
+  function controlLabel(controlId) {
+    const control = flatControls($activePanel?.controls ?? [])
+      .find((c) => c._children?.Core?.id === controlId);
+    return control?._children?.Core?.name ?? 'control';
+  }
+
+  function describeTarget(target) {
+    if (!target) return null;
+    if (target.label) return target.label;
+    if (target.type === 'control') return `${controlLabel(target.controlId)} — ${friendlyPath(target.path)}`;
+    if (target.type === 'panel') return PANEL_PROP_LABELS[target.prop] ?? friendlyPath(target.prop);
+    return 'selection';
+  }
+
+  let colorContextLabel = $derived.by(() => {
+    if (editingGradientStop !== null) return `Gradient stop ${editingGradientStop + 1}`;
+    if (pickingNotepadColor) return 'Notepad text colour';
+    return describeTarget($colorTarget) ?? 'Panel background';
+  });
+  let colorContextActive = $derived(editingGradientStop !== null || pickingNotepadColor || !!$colorTarget);
+
+  let gradientContextLabel = $derived(describeTarget($gradientTarget) ?? 'Panel background gradient');
+  let gradientContextActive = $derived(!!$gradientTarget);
+
+  function handleColorDone() {
+    if (editingGradientStop !== null) { handleBackToGradient(); return; }
+    if (pickingNotepadColor) { handleBackToNotepad(); return; }
+    if ($colorTarget) {
+      clearColorTarget();
+      resetUserColor();
+    }
+  }
+
+  function handleGradientDone() {
+    if ($gradientTarget) {
+      clearGradientTarget();
+      resetGradientFromPanel();
     }
   }
 
@@ -436,6 +564,12 @@
   <div class="studio-content">
     {#if activeTab === 'colors'}
       <div class="tab-pane">
+        <div class="context-bar" class:active={colorContextActive}>
+          <span class="context-label">Editing: <strong>{colorContextLabel}</strong></span>
+          {#if colorContextActive}
+            <button class="context-done" onclick={handleColorDone}>Done</button>
+          {/if}
+        </div>
         <div class="colors-layout">
           <div class="colors-preview" class:split={editingGradientStop !== null || pickingNotepadColor}>
             <ColorChooser
@@ -483,16 +617,25 @@
       </div>
     {:else if activeTab === 'gradient'}
       <div class="tab-pane">
-        <GradientTab
-          gradient={currentGradient}
-          shape={gradientShape}
-          {swatches}
-          onchange={handleGradientChange}
-          oneditstopcolor={handleEditStopColor}
-          onshapechange={(shape) => gradientShape = shape}
-          onswatchdblclick={handleSwatchDblClick}
-          onswatchrightclick={handleSwatchRightClick}
-        />
+        <div class="context-bar" class:active={gradientContextActive}>
+          <span class="context-label">Editing: <strong>{gradientContextLabel}</strong></span>
+          {#if gradientContextActive}
+            <button class="context-done" onclick={handleGradientDone}>Done</button>
+          {/if}
+        </div>
+        <div class="context-content">
+          <GradientTab
+            gradient={currentGradient}
+            shape={gradientShape}
+            {swatches}
+            {gradientPresets}
+            onchange={handleGradientChange}
+            oneditstopcolor={handleEditStopColor}
+            onshapechange={(shape) => gradientShape = shape}
+            onswatchdblclick={handleSwatchDblClick}
+            onswatchrightclick={handleSwatchRightClick}
+          />
+        </div>
       </div>
     {:else if activeTab === 'notepad' && activeTabComponent?.default}
       {@const NotepadTab = activeTabComponent.default}
@@ -634,12 +777,63 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Slim "what am I editing" strip above the Colors / Gradient editors. */
+  .context-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: 22px;
+    padding: 0 8px;
+    background: #1A1A1A;
+    border-bottom: 1px solid #2A2A2A;
+    font-size: 10px;
+    color: #777;
+  }
+
+  .context-bar.active {
+    background: #102436;
+    border-bottom-color: #274a68;
+    color: #9EC1DF;
+  }
+
+  .context-label strong {
+    font-weight: 600;
+    color: inherit;
+  }
+
+  .context-done {
+    background: #094771;
+    border: 1px solid #5B9BD5;
+    color: #EEE;
+    font-size: 10px;
+    line-height: 1;
+    padding: 2px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .context-done:hover {
+    background: #5B9BD5;
+    color: #FFF;
+  }
+
+  .context-content {
+    flex: 1;
+    min-height: 0;
   }
 
   /* Colors layout */
   .colors-layout {
     display: flex;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
   }
 
   .colors-preview {

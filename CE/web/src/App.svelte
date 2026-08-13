@@ -373,7 +373,7 @@
       <div class="display-resize-handle" role="separator" aria-orientation="horizontal" class:active={isResizingDisplay} use:dragScrub={displayResizeScrub} style="display: {effectiveShowDisplayPanel ? 'block' : 'none'}"></div>
       <div class="display-panel-area" style="flex: 0 0 {displayPanelBasis}; display: {effectiveShowDisplayPanel ? 'block' : 'none'}">
         <ErrorBoundary label="The display panel">
-          <DisplayPanel onTabChange={handleDisplayTabChange} />
+          <DisplayPanel onTabChange={handleDisplayTabChange} visible={effectiveShowDisplayPanel} />
         </ErrorBoundary>
       </div>
     </div>

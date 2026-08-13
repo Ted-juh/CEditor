@@ -16,7 +16,9 @@
 
   let {
     gradient,                   // current gradient (parent-owned)
+    shape = 'rectangle',        // preview shape (parent-owned — this tab unmounts on tab switch)
     swatches = [],              // shared color swatches (parent-owned)
+    gradientPresets = [],       // saved gradients (parent-owned + persisted, for the same reason)
     onchange = null,            // (newGradient) => void
     oneditstopcolor = null,     // (stopIndex) => void — triggers cross-tab flow
     onshapechange = null,       // (shape) => void — sync shape to parent
@@ -26,8 +28,6 @@
 
   // Tab-local state — not shared with any other tab.
   let selectedStop = $state(0);
-  let shape = $state('rectangle');
-  let gradientPresets = $state(Array(24).fill(null));
 
   // Swatch click: filled cell → apply that color to the currently selected
   // gradient stop. Empty cell → store the selected stop's color into the
@@ -83,10 +83,7 @@
         onchange={(g) => onchange?.(g)}
         onSelectStop={(i) => selectedStop = i}
         onEditStopColor={(i) => oneditstopcolor?.(i)}
-        onShapeChange={(s) => {
-          shape = s;
-          onshapechange?.(s);
-        }}
+        onShapeChange={(s) => onshapechange?.(s)}
         gradientSwatches={gradientPresets}
         onGradientPresetClick={handlePresetClick}
         onGradientPresetDblClick={handlePresetDblClick}

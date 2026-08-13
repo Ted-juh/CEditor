@@ -1,5 +1,5 @@
 import { writable, get } from 'svelte/store';
-import { resolvedActivePanelId, updatePanel } from './panels.js';
+import { resolvedActivePanelId, selectedComponentIds, updatePanel } from './panels.js';
 import { updateControlProperty } from './controls.js';
 
 /**
@@ -73,3 +73,20 @@ export function applyColorToTarget(hex) {
 export function clearColorTarget() {
   colorTarget.set(null);
 }
+
+// --- Target lifecycle -------------------------------------------------------
+// A target is a live write-route into a specific property. It must not outlive
+// the moment it was created for: changing the selection or switching panels
+// used to leave the target armed, so reopening the dock and dragging a band
+// silently repainted an object the user had long moved on from.
+let selectionSeen = false;
+selectedComponentIds.subscribe(() => {
+  if (!selectionSeen) { selectionSeen = true; return; }
+  if (get(colorTarget)) colorTarget.set(null);
+});
+
+let panelSeen = false;
+resolvedActivePanelId.subscribe(() => {
+  if (!panelSeen) { panelSeen = true; return; }
+  if (get(colorTarget)) colorTarget.set(null);
+});

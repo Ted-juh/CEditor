@@ -128,13 +128,14 @@
   <div class="section">
     <div class="section-label">Step</div>
     <div class="step-row">
-      {#each [1, 5, 10, 20, 25] as val}
+      {#each [0, 1, 5, 10, 20, 25] as val}
         <button
           class="step-btn"
           class:active={stepSize === val}
           onclick={() => stepSize = val}
+          title={val === 0 ? 'Smooth — no quantisation while dragging' : `Quantise drags to ${val}% steps`}
         >
-          {val}%
+          {val === 0 ? 'Off' : `${val}%`}
         </button>
       {/each}
     </div>

@@ -19,6 +19,20 @@ export function hexToRgb(hex) {
   ];
 }
 
+/**
+ * Split a stored colour — AARRGGBB or RRGGBB, optional leading # — into a
+ * 6-char RRGGBB and a 0-1 alpha. Panel/control colours are stored AARRGGBB;
+ * feeding one to a 6-char consumer without this reads AA RR GG as the colour
+ * (the "default panel shows bright red" bug).
+ */
+export function splitColourAlpha(hex, fallback = '333333') {
+  const h = String(hex ?? fallback).replace(/^#/, '');
+  if (h.length >= 8) {
+    return { color: h.slice(2, 8).toUpperCase(), alpha: parseInt(h.slice(0, 2), 16) / 255 };
+  }
+  return { color: h.slice(0, 6).toUpperCase().padEnd(6, '0'), alpha: 1 };
+}
+
 /** Uppercase RRGGBB, with clamp + round so fractional/out-of-range inputs are safe. */
 export function rgbToHex(r, g, b) {
   const c = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0').toUpperCase();
