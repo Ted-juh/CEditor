@@ -2,6 +2,7 @@ import { derived, get } from 'svelte/store';
 import { panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, keyObjectId } from './panels.js';
 import { createControl as createControlFromType, getSection, hasSection } from '../models/componentTypes.js';
 import { insertOffset, duplicateOffset } from './runtimePreferences.js';
+import { viewportPanelCenter } from './editorView.js';
 import { stateEditScope } from './stateEditScope.js';
 import { deepClone } from '../utils/deepClone.js';
 import {
@@ -150,7 +151,48 @@ export function updateSelectedProperty(path, value) {
 }
 
 /**
- * Add a new control to the active panel.
+ * Where a new control of size w×h should land: centred on the visible part
+ * of the canvas (falling back to the panel centre), clamped inside the panel,
+ * stepped off anything already sitting at that exact spot so repeated inserts
+ * don't stack invisibly. The old behaviour — a blind +offset cascade from the
+ * origin — walked new controls straight off the panel around the 20th insert.
+ */
+function resolveInsertPosition(panel, w, h) {
+  const panelW = panel.width ?? 600;
+  const panelH = panel.height ?? 400;
+  const center = get(viewportPanelCenter);
+  const clampX = (v) => Math.max(0, Math.min(v, Math.max(0, panelW - w)));
+  const clampY = (v) => Math.max(0, Math.min(v, Math.max(0, panelH - h)));
+  let x = clampX(Math.round((center?.x ?? panelW / 2) - w / 2));
+  let y = clampY(Math.round((center?.y ?? panelH / 2) - h / 2));
+
+  const occupiedAt = (px, py) => panel.controls.some((c) => {
+    const t = c._children?.Transform;
+    return t && Math.abs(t.x - px) < 2 && Math.abs(t.y - py) < 2;
+  });
+  const step = Math.max(4, get(insertOffset) || 16);
+  for (let i = 0; i < 20 && occupiedAt(x, y); i++) {
+    const nx = clampX(x + step);
+    const ny = clampY(y + step);
+    if (nx === x && ny === y) break;
+    x = nx;
+    y = ny;
+  }
+  return { x, y };
+}
+
+/** Exactly one selected container → new controls insert into it. */
+function selectedContainerParentId(panel) {
+  const sel = get(selectedComponentIds);
+  if (sel.size !== 1) return null;
+  const selId = [...sel][0];
+  const selected = findControlById(panel.controls, selId);
+  return selected && isContainerControl(selected) ? selId : null;
+}
+
+/**
+ * Add a new control to the active panel — centred in the current view, and
+ * into the selected container when there is one.
  * @param {string} type - Component type (e.g., 'Background', 'Label', 'Button')
  * @param {object} overrides - Optional per-section property overrides
  * @returns {object|null} The created control, or null if no panel is active
@@ -159,21 +201,38 @@ export function addControl(type, overrides = {}) {
   const panelId = get(resolvedActivePanelId);
   if (panelId == null) return null;
 
-  // Stagger position so new controls don't stack at 0,0
   const panel = get(panels).find(p => p.id === panelId);
-  if (panel && !overrides.Transform) {
-    const baseOffset = get(insertOffset);
-    const offset = panel.controls.length * baseOffset;
-    overrides = { ...overrides, Transform: { x: baseOffset + offset, y: baseOffset + offset } };
-  }
-
   const control = createControlFromType(type, overrides);
   const id = control._children.Core.id;
+
+  let parentId = null;
+  if (panel && !overrides.Transform && control._children.Transform) {
+    const t = control._children.Transform;
+    const w = t.width ?? 100;
+    const h = t.height ?? 40;
+    const pos = resolveInsertPosition(panel, w, h);
+
+    parentId = selectedContainerParentId(panel);
+    if (parentId) {
+      const parent = findControlById(panel.controls, parentId);
+      const parentW = parent?._children?.Transform?.width ?? w;
+      const parentH = parent?._children?.Transform?.height ?? h;
+      const local = panelToLocalPoint(panel.controls, parentId, pos.x, pos.y);
+      t.x = Math.max(0, Math.min(Math.round(local.x), Math.max(0, parentW - w)));
+      t.y = Math.max(0, Math.min(Math.round(local.y), Math.max(0, parentH - h)));
+    } else {
+      t.x = pos.x;
+      t.y = pos.y;
+    }
+  }
 
   panels.update(list =>
     list.map(p => {
       if (p.id !== panelId) return p;
-      return { ...p, controls: [...p.controls, control], modified: true };
+      const controls = parentId
+        ? insertControlIntoTree(p.controls, parentId, control)
+        : [...p.controls, control];
+      return { ...p, controls, modified: true };
     })
   );
 
@@ -190,9 +249,9 @@ export function addCustomComponentPackage(value, overrides = {}) {
   const nextId = `ctrl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   let transformOverrides = overrides.Transform ?? overrides.transform ?? null;
   if (panel && !transformOverrides) {
-    const baseOffset = get(insertOffset);
-    const offset = panel.controls.length * baseOffset;
-    transformOverrides = { x: baseOffset + offset, y: baseOffset + offset };
+    // The package's own size isn't known until instantiation — assume a
+    // typical footprint for centring; the clamp keeps it on the panel.
+    transformOverrides = resolveInsertPosition(panel, 120, 120);
   }
 
   const control = instantiateCustomComponentPackageControl(value, {

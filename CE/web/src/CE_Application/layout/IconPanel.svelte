@@ -1,4 +1,5 @@
 <script>
+  import { INSERT_CATEGORIES } from '../models/insertCatalog.js';
   import BadgeCheck from 'lucide-svelte/icons/badge-check';
   import CircleDot from 'lucide-svelte/icons/circle-dot';
   import Container from 'lucide-svelte/icons/container';
@@ -109,91 +110,77 @@
   });
 
   // One button per category; the components live in a flyout beside it, so
-  // the column stays short as the palette grows.
-  const insertCategories = [
-    {
-      id: 'layout',
-      label: 'Layout & Display',
-      icon: Monitor,
-      items: [
-        { type: 'Background',      icon: Square,             label: 'Insert Background' },
-        { type: 'Label',           icon: Type,               label: 'Insert Label' },
-        { type: 'TextInput',       icon: TextCursorInput,    label: 'Insert Text Input' },
-        { type: 'Container',       icon: Container,          label: 'Insert Container' },
-        { type: 'Group',           icon: Container,          label: 'Insert Group / Frame' },
-        { type: 'Image',           icon: Square,             label: 'Insert Image' },
-        { type: 'LcdDisplay',      icon: Monitor,            label: 'Insert LCD Display' },
-        { type: 'PixelDisplay',    icon: Grid3x3,            label: 'Insert Pixel Display' },
-        { type: 'Meter',           icon: Gauge,              label: 'Insert Meter' },
-      ],
-    },
-    {
-      id: 'buttons',
-      label: 'Buttons & Choices',
-      icon: ToggleLeft,
-      items: [
-        { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },
-        { type: 'ToggleButton',    icon: ToggleLeft,          label: 'Insert Toggle Button' },
-        { type: 'RadioButtonGroup', icon: CircleDot,          label: 'Insert Radio Button Group' },
-        { type: 'CyclicButton',    icon: RefreshCw,           label: 'Insert Cyclic Button' },
-        { type: 'Combobox',        icon: ListCollapse,        label: 'Insert Combobox' },
-        { type: 'Listbox',         icon: List,                label: 'Insert Listbox' },
-        { type: 'TimedButton',     icon: TimerReset,          label: 'Insert Timed Button' },
-        { type: 'OneShotButton',   icon: BadgeCheck,          label: 'Insert One-Shot Button' },
-      ],
-    },
-    {
-      id: 'values',
-      label: 'Values & Sliders',
-      icon: SlidersVertical,
-      items: [
-        { type: 'Slider',          icon: SlidersVertical,     label: 'Insert Slider' },
-        { type: 'Knob',            icon: CircleDot,           label: 'Insert Knob' },
-        { type: 'Range',           icon: SlidersHorizontal,   label: 'Insert Range' },
-        { type: 'Number',          icon: RectangleHorizontal, label: 'Insert Number' },
-        { type: 'Crossfader',      icon: ArrowLeftRight,     label: 'Insert Crossfader' },
-        { type: 'Ribbon',          icon: SlidersVertical,    label: 'Insert Ribbon / Wheel' },
-        { type: 'Macro',           icon: CircleDashed,       label: 'Insert Macro' },
-        { type: 'VectorJoystick',  icon: Crosshair,          label: 'Insert Vector Joystick' },
-        { type: 'CustomComponent', icon: Container,           label: 'Insert Custom Component' },
-      ],
-    },
-    {
-      id: 'modulation',
-      label: 'Modulation & Routing',
-      icon: Orbit,
-      items: [
-        { type: 'Envelope',        icon: Spline,             label: 'Insert Envelope' },
-        { type: 'Matrix',          icon: Grid2x2,            label: 'Insert Mod Matrix' },
-        { type: 'Orbit',           icon: Orbit,              label: 'Insert Orbit Modulator' },
-        { type: 'Looper',          icon: AudioWaveform,      label: 'Insert Gesture Looper' },
-        { type: 'Router',          icon: Waypoints,          label: 'Insert Expression Router' },
-        { type: 'Timbre',          icon: Palette,            label: 'Insert Timbre Space' },
-        { type: 'Turing',          icon: BarChart3,          label: 'Insert Turing Modulator' },
-        { type: 'Kinetic',         icon: Circle,             label: 'Insert Kinetic Modulator' },
-        { type: 'Constellation',   icon: Sparkle,            label: 'Insert Preset Constellation' },
-        { type: 'Constraint',      icon: Link2,              label: 'Insert Constraint Cell' },
-      ],
-    },
-    {
-      id: 'music',
-      label: 'Music & Performance',
-      icon: Music,
-      items: [
-        { type: 'ChordPad',        icon: Music,              label: 'Insert Chord Pad' },
-        { type: 'Arp',             icon: ListMusic,          label: 'Insert Arpeggiator' },
-        { type: 'NoteRibbon',      icon: Piano,              label: 'Insert Ribbon Keyboard' },
-        { type: 'DrumPads',        icon: LayoutGrid,         label: 'Insert Drum Pads' },
-        { type: 'Phrase',          icon: Grid2x2Check,       label: 'Insert Phrase Sequencer (note grid)' },
-        { type: 'Recorder',        icon: Disc3,              label: 'Insert Phrase Recorder (record + loop notes)' },
-        { type: 'Harmoniser',      icon: Layers,             label: 'Insert Harmoniser (one finger, full chord)' },
-        { type: 'SplitZone',       icon: SplitSquareHorizontal, label: 'Insert Zone Splitter (keyboard split)' },
-        { type: 'Setlist',         icon: ListOrdered,        label: 'Insert Setlist (scenes on a footswitch)' },
-        { type: 'Transport',       icon: Timer,              label: 'Insert Transport (master clock)' },
-        { type: 'Panic',           icon: OctagonAlert,       label: 'Insert Panic button' },
-      ],
-    },
-  ];
+  // the column stays short as the palette grows. The category/type list is
+  // shared with the menu bar (models/insertCatalog.js) — only the icons are
+  // this rail's own.
+  const CATEGORY_ICONS = {
+    layout: Monitor,
+    buttons: ToggleLeft,
+    values: SlidersVertical,
+    modulation: Orbit,
+    music: Music,
+  };
+
+  const TYPE_ICONS = {
+    Background: Square,
+    Label: Type,
+    TextInput: TextCursorInput,
+    Container: Container,
+    Group: Container,
+    Image: Square,
+    LcdDisplay: Monitor,
+    PixelDisplay: Grid3x3,
+    Meter: Gauge,
+    MomentaryButton: RectangleHorizontal,
+    ToggleButton: ToggleLeft,
+    RadioButtonGroup: CircleDot,
+    CyclicButton: RefreshCw,
+    Combobox: ListCollapse,
+    Listbox: List,
+    TimedButton: TimerReset,
+    OneShotButton: BadgeCheck,
+    Slider: SlidersVertical,
+    Knob: CircleDot,
+    Range: SlidersHorizontal,
+    Number: RectangleHorizontal,
+    Crossfader: ArrowLeftRight,
+    Ribbon: SlidersVertical,
+    Macro: CircleDashed,
+    VectorJoystick: Crosshair,
+    CustomComponent: Container,
+    Envelope: Spline,
+    Matrix: Grid2x2,
+    Orbit: Orbit,
+    Looper: AudioWaveform,
+    Router: Waypoints,
+    Timbre: Palette,
+    Turing: BarChart3,
+    Kinetic: Circle,
+    Constellation: Sparkle,
+    Constraint: Link2,
+    ChordPad: Music,
+    Arp: ListMusic,
+    NoteRibbon: Piano,
+    DrumPads: LayoutGrid,
+    Phrase: Grid2x2Check,
+    Recorder: Disc3,
+    Harmoniser: Layers,
+    SplitZone: SplitSquareHorizontal,
+    Setlist: ListOrdered,
+    Transport: Timer,
+    Panic: OctagonAlert,
+  };
+
+  const insertCategories = INSERT_CATEGORIES.map((category) => ({
+    id: category.id,
+    label: category.label,
+    icon: CATEGORY_ICONS[category.id] ?? Square,
+    items: category.items.map((item) => ({
+      type: item.type,
+      icon: TYPE_ICONS[item.type] ?? Square,
+      label: `Insert ${item.label}`,
+    })),
+  }));
 
   function itemName(item) {
     return item.label.replace(/^Insert /, '');

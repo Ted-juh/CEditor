@@ -29,7 +29,7 @@
   import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
   import { fitToWindowSignal, zoomStepSignal, zoomToSelectionSignal } from '../stores/editorCommands.js';
   import { isEditableTarget } from '../utils/globalShortcuts.js';
-  import { showRulers } from '../stores/editorView.js';
+  import { showRulers, viewportPanelCenter } from '../stores/editorView.js';
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
   import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
@@ -121,6 +121,19 @@
   // --- Ruler scroll/size tracking ---
   let metrics = $state({ scrollLeft: 0, scrollTop: 0, width: 0, height: 0, contentLeft: 40, contentTop: 40 });
   $effect(() => trackViewportMetrics(metrics, () => viewportEl, () => zoomContainerEl));
+
+  // Publish the panel-space point at the viewport centre — new controls
+  // insert there (stores/controls.js) instead of cascading from the origin.
+  $effect(() => {
+    if (!canvasPanel || !viewportEl) {
+      viewportPanelCenter.set(null);
+      return;
+    }
+    viewportPanelCenter.set({
+      x: (metrics.scrollLeft + metrics.width / 2 - metrics.contentLeft) / scale,
+      y: (metrics.scrollTop + metrics.height / 2 - metrics.contentTop) / scale,
+    });
+  });
 
   // Re-measure panel-surface offset when zoom or panel size changes — the
   // panel surface uses a CSS transform so its layout box doesn't resize, so

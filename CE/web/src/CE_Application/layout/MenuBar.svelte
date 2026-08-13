@@ -1,6 +1,7 @@
 <script>
   import { get } from 'svelte/store';
   import { addPanel, closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, buildActivePanelVst3 } from '../stores/panels.js';
+  import { INSERT_CATEGORIES } from '../models/insertCatalog.js';
   import { addControl } from '../stores/controls.js';
   import { closeApplication } from '../bridge/bridge.js';
   import { undo, redo } from '../stores/history.js';
@@ -110,34 +111,18 @@
       { label: 'Toggle Grid', action: () => { const p = get(activePanel); if (p) updatePanel(p.id, { gridEnabled: !p.gridEnabled }); } },
       { label: 'Toggle Snap', action: () => { const p = get(activePanel); if (p) updatePanel(p.id, { snapToGrid: !p.snapToGrid }); } },
     ],
-    Insert: [
-      { label: 'Background', action: () => addControl('Background') },
-      { label: 'Label',      action: () => addControl('Label') },
-      { label: 'Momentary Button', action: () => addControl('MomentaryButton') },
-      { label: 'Toggle Button', action: () => addControl('ToggleButton') },
-      { label: 'Radio Button Group', action: () => addControl('RadioButtonGroup') },
-      { label: 'Cyclic Button', action: () => addControl('CyclicButton') },
-      { label: 'Combobox', action: () => addControl('Combobox') },
-      { label: 'Timed Button', action: () => addControl('TimedButton') },
-      { label: 'One-Shot Button', action: () => addControl('OneShotButton') },
-      { label: 'Container',  action: () => addControl('Container') },
-      { type: 'separator' },
-      { label: 'TestBox',    action: () => addControl('TestBox') },
-    ],
-    Panel: [
-      { label: 'Panel Properties...', action: () => {} },
-      { label: 'Export Settings...',   action: () => {} },
-    ],
+    // Every insertable type, from the same catalog the icon rail uses —
+    // the hand-written copy here knew 11 of the 47 types and had neither
+    // Slider nor Knob.
+    Insert: INSERT_CATEGORIES.flatMap((category) => [
+      { type: 'header', label: category.label },
+      ...category.items.map((item) => ({
+        label: item.label,
+        action: () => addControl(item.type),
+      })),
+    ]),
     Build: [
-      { label: 'Build VST3',       action: () => buildActivePanelVst3() },
-      { label: 'Build Standalone',  action: () => {} },
-      { type: 'separator' },
-      { label: 'Build Settings...', action: () => {} },
-    ],
-    Debug: [
-      { label: 'New Script Workspace', action: () => newScriptWorkspace() },
-      { label: 'Open Expert Script Mode', action: () => newScriptWorkspace() },
-      { label: 'Validate Active Script', action: () => {} },
+      { label: 'Build VST3', action: () => buildActivePanelVst3() },
     ],
     Help: [
       { label: 'Keyboard Shortcuts', shortcut: 'F1', action: () => {
@@ -191,6 +176,8 @@
           {#each menus[name] as item}
             {#if item.type === 'separator'}
               <div class="dropdown-separator"></div>
+            {:else if item.type === 'header'}
+              <div class="dropdown-header">{item.label}</div>
             {:else}
               <button class="dropdown-item" onclick={() => handleItemClick(item)}>
                 <span class="item-label">{item.label}</span>
@@ -254,12 +241,26 @@
     top: 100%;
     left: 0;
     min-width: 200px;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
     background: #2D2D2D;
     border: 1px solid #444;
     border-radius: 4px;
     padding: 4px 0;
     box-shadow: 0 4px 16px rgba(0,0,0,0.5);
     z-index: 200;
+  }
+
+  .dropdown::-webkit-scrollbar { width: 6px; }
+  .dropdown::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+  .dropdown-header {
+    padding: 6px 12px 3px;
+    font-size: 10px;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    user-select: none;
   }
 
   .dropdown-item {
