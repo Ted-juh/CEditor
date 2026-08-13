@@ -3530,7 +3530,7 @@
   {/if}
 
   <CanvasControlSelectionOverlay
-    showHandles={editorInteractionEnabled && isSelected && !isEditorLocked}
+    showHandles={editorInteractionEnabled && isSelected && !isEditorLocked && $selectedComponentIds.size <= 1}
     {handles}
     {handleStyle}
     onResizeStart={handleResizeStart}

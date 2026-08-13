@@ -10,6 +10,7 @@
    */
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
+  import SelectionBoundsOverlay from './SelectionBoundsOverlay.svelte';
   import { showGuides } from '../stores/editorView.js';
   import { deviceParameterDrag } from '../stores/deviceParameterDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
@@ -91,6 +92,8 @@
       panelHeight={panel.height}
     />
   {/each}
+
+  <SelectionBoundsOverlay {panel} {scale} {panelLocked} />
 
   {#if marquee.isActive && (marqueeRect.w > 1 || marqueeRect.h > 1)}
     <div
