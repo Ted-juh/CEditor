@@ -1,56 +1,16 @@
 <script>
-  import { INSERT_CATEGORIES } from '../models/insertCatalog.js';
-  import BadgeCheck from 'lucide-svelte/icons/badge-check';
-  import CircleDot from 'lucide-svelte/icons/circle-dot';
   import Container from 'lucide-svelte/icons/container';
-  import ArrowLeftRight from 'lucide-svelte/icons/arrow-left-right';
-  import CircleDashed from 'lucide-svelte/icons/circle-dashed';
-  import Orbit from 'lucide-svelte/icons/orbit';
-  import AudioWaveform from 'lucide-svelte/icons/audio-waveform';
-  import Waypoints from 'lucide-svelte/icons/waypoints';
-  import Palette from 'lucide-svelte/icons/palette';
-  import BarChart3 from 'lucide-svelte/icons/bar-chart-3';
-  import Circle from 'lucide-svelte/icons/circle';
-  import Sparkle from 'lucide-svelte/icons/sparkle';
-  import Link2 from 'lucide-svelte/icons/link-2';
-  import Music from 'lucide-svelte/icons/music';
-  import ListMusic from 'lucide-svelte/icons/list-music';
-  import Piano from 'lucide-svelte/icons/piano';
-  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
-  import OctagonAlert from 'lucide-svelte/icons/octagon-alert';
-  import SplitSquareHorizontal from 'lucide-svelte/icons/split-square-horizontal';
-  import Grid2x2Check from 'lucide-svelte/icons/grid-2x2-check';
-  import Disc3 from 'lucide-svelte/icons/disc-3';
-  import Layers from 'lucide-svelte/icons/layers';
-  import ListOrdered from 'lucide-svelte/icons/list-ordered';
-  import Timer from 'lucide-svelte/icons/timer';
-  import Gauge from 'lucide-svelte/icons/gauge';
-  import Spline from 'lucide-svelte/icons/spline';
-  import Grid2x2 from 'lucide-svelte/icons/grid-2x2';
-  import Crosshair from 'lucide-svelte/icons/crosshair';
-  import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
   import Library from 'lucide-svelte/icons/library';
-  import Monitor from 'lucide-svelte/icons/monitor';
   import Pin from 'lucide-svelte/icons/pin';
   import Plus from 'lucide-svelte/icons/plus';
   import Search from 'lucide-svelte/icons/search';
-  import RectangleHorizontal from 'lucide-svelte/icons/rectangle-horizontal';
-  import RefreshCw from 'lucide-svelte/icons/refresh-cw';
-  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
-  import SlidersVertical from 'lucide-svelte/icons/sliders-vertical';
-  import Square from 'lucide-svelte/icons/square';
-  import ListCollapse from 'lucide-svelte/icons/list-collapse';
-  import List from 'lucide-svelte/icons/list';
-  import TextCursorInput from 'lucide-svelte/icons/text-cursor-input';
-  import TimerReset from 'lucide-svelte/icons/timer-reset';
-  import ToggleLeft from 'lucide-svelte/icons/toggle-left';
-  import Type from 'lucide-svelte/icons/type';
   import PanelBottom from 'lucide-svelte/icons/panel-bottom';
   import PanelRight from 'lucide-svelte/icons/panel-right';
   import PanelLeftClose from 'lucide-svelte/icons/panel-left-close';
-  import { addControl, addCustomComponentPackage } from '../stores/controls.js';
+  import { addCustomComponentPackage } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
+  import InsertPanel from './InsertPanel.svelte';
 
   let {
     showDisplayPanel = true,
@@ -109,131 +69,27 @@
       .slice(0, 3);
   });
 
-  // One button per category; the components live in a flyout beside it, so
-  // the column stays short as the palette grows. The category/type list is
-  // shared with the menu bar (models/insertCatalog.js) — only the icons are
-  // this rail's own.
-  const CATEGORY_ICONS = {
-    layout: Monitor,
-    buttons: ToggleLeft,
-    values: SlidersVertical,
-    modulation: Orbit,
-    music: Music,
-  };
-
-  const TYPE_ICONS = {
-    Background: Square,
-    Label: Type,
-    TextInput: TextCursorInput,
-    Container: Container,
-    Group: Container,
-    Image: Square,
-    LcdDisplay: Monitor,
-    PixelDisplay: Grid3x3,
-    Meter: Gauge,
-    MomentaryButton: RectangleHorizontal,
-    ToggleButton: ToggleLeft,
-    RadioButtonGroup: CircleDot,
-    CyclicButton: RefreshCw,
-    Combobox: ListCollapse,
-    Listbox: List,
-    TimedButton: TimerReset,
-    OneShotButton: BadgeCheck,
-    Slider: SlidersVertical,
-    Knob: CircleDot,
-    Range: SlidersHorizontal,
-    Number: RectangleHorizontal,
-    Crossfader: ArrowLeftRight,
-    Ribbon: SlidersVertical,
-    Macro: CircleDashed,
-    VectorJoystick: Crosshair,
-    CustomComponent: Container,
-    Envelope: Spline,
-    Matrix: Grid2x2,
-    Orbit: Orbit,
-    Looper: AudioWaveform,
-    Router: Waypoints,
-    Timbre: Palette,
-    Turing: BarChart3,
-    Kinetic: Circle,
-    Constellation: Sparkle,
-    Constraint: Link2,
-    ChordPad: Music,
-    Arp: ListMusic,
-    NoteRibbon: Piano,
-    DrumPads: LayoutGrid,
-    Phrase: Grid2x2Check,
-    Recorder: Disc3,
-    Harmoniser: Layers,
-    SplitZone: SplitSquareHorizontal,
-    Setlist: ListOrdered,
-    Transport: Timer,
-    Panic: OctagonAlert,
-  };
-
-  const insertCategories = INSERT_CATEGORIES.map((category) => ({
-    id: category.id,
-    label: category.label,
-    icon: CATEGORY_ICONS[category.id] ?? Square,
-    items: category.items.map((item) => ({
-      type: item.type,
-      icon: TYPE_ICONS[item.type] ?? Square,
-      label: `Insert ${item.label}`,
-    })),
-  }));
-
-  function itemName(item) {
-    return item.label.replace(/^Insert /, '');
-  }
-
   const customLibraryKinds = ['all', 'button', 'slider', 'multi', 'grid', 'piano', 'filmstrip', 'linked'];
 
-  let openCategoryId = $state('');
-  let flyoutTop = $state(0);
+  // One + button opens the Insert panel — the searchable, categorised,
+  // drag-enabled palette (layout/InsertPanel.svelte). It replaces the five
+  // per-category hover flyouts. Only one drawer at a time.
+  let insertPanelOpen = $state(false);
 
-  function toggleCategory(category, event) {
-    if (openCategoryId === category.id) {
-      openCategoryId = '';
-      return;
-    }
-    openCategoryId = category.id;
-    positionFlyout(event);
+  function toggleInsertPanel() {
+    insertPanelOpen = !insertPanelOpen;
+    if (insertPanelOpen) customLibraryOpen = false;
   }
 
-  function switchCategoryOnHover(category, event) {
-    // Menubar feel: once one flyout is open, hovering a sibling switches to it.
-    if (!openCategoryId || openCategoryId === category.id) return;
-    openCategoryId = category.id;
-    positionFlyout(event);
-  }
-
-  function positionFlyout(event) {
-    const rect = event?.currentTarget?.getBoundingClientRect?.();
-    const top = rect ? rect.top : 48;
-    // Keep the tallest flyout on screen; it scrolls internally past 60vh.
-    flyoutTop = Math.max(8, Math.min(top, window.innerHeight * 0.4));
-  }
-
-  function closeCategory() {
-    openCategoryId = '';
-  }
-
-  function handleWindowPointerDown(event) {
-    if (!openCategoryId) return;
-    if (event.target?.closest?.('.category-flyout, .category-btn')) return;
-    closeCategory();
+  function openLibraryFromInsert() {
+    insertPanelOpen = false;
+    customLibraryOpen = true;
   }
 
   function handleWindowKeydown(event) {
-    if (event.key === 'Escape' && openCategoryId) closeCategory();
-  }
-
-  let openCategory = $derived(insertCategories.find((category) => category.id === openCategoryId) ?? null);
-
-  function handleInsert(type) {
-    if (!hasActivePanel) return;
-    addControl(type);
-    closeCategory();
+    if (event.key !== 'Escape') return;
+    if (insertPanelOpen) insertPanelOpen = false;
+    else if (customLibraryOpen) customLibraryOpen = false;
   }
 
   function handleInsertPackage(entry) {
@@ -244,6 +100,7 @@
 
   function toggleCustomLibrary() {
     customLibraryOpen = !customLibraryOpen;
+    if (customLibraryOpen) insertPanelOpen = false;
   }
 
   function thumbnailPartStyle(part) {
@@ -293,24 +150,20 @@
   }
 </script>
 
-<svelte:window onpointerdown={handleWindowPointerDown} onkeydown={handleWindowKeydown} />
+<svelte:window onkeydown={handleWindowKeydown} />
 
 <div class="icon-panel">
   <div class="insert-section">
-    {#each insertCategories as category (category.id)}
-      <button
-        class="icon-btn category-btn"
-        class:active={openCategoryId === category.id}
-        title={category.label}
-        aria-haspopup="menu"
-        aria-expanded={openCategoryId === category.id}
-        onclick={(event) => toggleCategory(category, event)}
-        onmouseenter={(event) => switchCategoryOnHover(category, event)}
-      >
-        <category.icon size={18} strokeWidth={1.5} />
-        <i class="flyout-marker" aria-hidden="true"></i>
-      </button>
-    {/each}
+    <button
+      class="icon-btn insert-btn"
+      class:active={insertPanelOpen}
+      title="Insert a component (search, browse, drag to place)"
+      aria-haspopup="dialog"
+      aria-expanded={insertPanelOpen}
+      onclick={toggleInsertPanel}
+    >
+      <Plus size={20} strokeWidth={1.8} />
+    </button>
   </div>
 
   {#if ($customComponentLibrary ?? []).length}
@@ -372,22 +225,12 @@
   </div>
 </div>
 
-{#if openCategory}
-  <div class="category-flyout" role="menu" aria-label={openCategory.label} style={`top:${flyoutTop}px;`}>
-    <div class="flyout-title">{openCategory.label}</div>
-    {#each openCategory.items as item (item.type)}
-      <button
-        class="flyout-item"
-        role="menuitem"
-        title={hasActivePanel ? item.label : `${item.label} (open a panel first)`}
-        onclick={() => handleInsert(item.type)}
-        disabled={!hasActivePanel}
-      >
-        <item.icon size={16} strokeWidth={1.5} />
-        <span>{itemName(item)}</span>
-      </button>
-    {/each}
-  </div>
+{#if insertPanelOpen}
+  <InsertPanel
+    {hasActivePanel}
+    onclose={() => insertPanelOpen = false}
+    onopenlibrary={openLibraryFromInsert}
+  />
 {/if}
 
 {#if customLibraryOpen}
@@ -600,66 +443,8 @@
     color: #D9A58A;
   }
 
-  .flyout-marker {
-    position: absolute;
-    right: 3px;
-    bottom: 3px;
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-bottom: 4px solid currentColor;
-    opacity: 0.55;
-  }
-
-  .category-flyout {
-    position: fixed;
-    left: 46px;
-    z-index: 90;
-    min-width: 180px;
-    max-height: 60vh;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    padding: 6px;
-    background: #242424;
-    border: 1px solid #3A3A3A;
-    border-radius: 6px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  }
-
-  .flyout-title {
-    padding: 4px 8px 6px;
-    color: #9A9A9A;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .flyout-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    background: none;
-    border: none;
-    border-radius: 4px;
-    color: #CCC;
-    font-size: 11px;
-    text-align: left;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .flyout-item:hover:not(:disabled) {
-    background: #094771;
-    color: #FFF;
-  }
-
-  .flyout-item:disabled {
-    color: #5A5A5A;
-    cursor: not-allowed;
+  .insert-btn {
+    color: #8FB8DC;
   }
 
   .custom-library-drawer {

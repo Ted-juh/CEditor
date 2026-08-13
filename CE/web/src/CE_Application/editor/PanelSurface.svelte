@@ -30,6 +30,8 @@
     onmousedown = null,
     onclick = null,
     oncontextmenu = null,
+    ondragover = null,   // Insert-panel drag-to-place
+    ondrop = null,
     surfaceRef = $bindable(null),
   } = $props();
 
@@ -59,6 +61,8 @@
   onclick={onclick}
   onmousedown={onmousedown}
   oncontextmenu={oncontextmenu}
+  ondragover={ondragover}
+  ondrop={ondrop}
 >
   {#each panel.bgLayerOrder ?? DEFAULT_LAYER_ORDER as layerId}
     {#if bgLayers[layerId]}

@@ -1,6 +1,7 @@
 <script>
   import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, addPanel, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel } from '../stores/panels.js';
-  import { getSection, removeControl, duplicateControl, updateControlProperty, selectedControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
+  import { addControl, addCustomComponentPackage, getSection, removeControl, duplicateControl, updateControlProperty, selectedControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
+  import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { enumerateLeafPaths } from '../stores/controlTreeUtils.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../utils/backgroundCSS.js';
@@ -437,6 +438,47 @@
     ctxMenu = { screenX, screenY, panelX, panelY };
   }
 
+  // --- Insert-panel drag-to-place ---
+  // The Insert panel writes a payload on dragstart; dropping on the panel
+  // surface lands the component centred on the drop point.
+  const INSERT_DRAG_MIME = 'application/x-ceditor-insert';
+
+  function handleInsertDragOver(e) {
+    if (!Array.from(e.dataTransfer?.types ?? []).includes(INSERT_DRAG_MIME)) return;
+    if ($previewModeEnabled || panelLocked) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }
+
+  function handleInsertDrop(e) {
+    const raw = e.dataTransfer?.getData(INSERT_DRAG_MIME);
+    if (!raw || $previewModeEnabled || panelLocked || !panelSurfaceEl) return;
+
+    let payload = null;
+    try { payload = JSON.parse(raw); } catch { return; }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = panelSurfaceEl.getBoundingClientRect();
+    const at = {
+      x: (e.clientX - rect.left) / scale,
+      y: (e.clientY - rect.top) / scale,
+    };
+
+    if (payload.kind === 'type' && payload.type) {
+      addControl(payload.type, {}, { at });
+      return;
+    }
+    if (payload.kind === 'package' && payload.id) {
+      const entry = ($customComponentLibrary ?? []).find((candidate) => candidate.id === payload.id);
+      if (entry?.envelope) {
+        addCustomComponentPackage(entry.envelope, { Transform: { x: Math.round(at.x - 60), y: Math.round(at.y - 60) } });
+        customComponentLibrary.markUsed(entry.id);
+      }
+    }
+  }
+
   function buildEditorSplitStyle(split, deviceFirst, designerSize, panelSize) {
     const orientation = split?.orientation === 'horizontal' ? 'horizontal' : 'vertical';
     const designerFr = `${Math.round(designerSize * 1000) / 1000}fr`;
@@ -642,6 +684,8 @@
                       onclick={handleCanvasClick}
                       onmousedown={marqueeCtrl.handleMouseDown}
                       oncontextmenu={handleContextMenu}
+                      ondragover={handleInsertDragOver}
+                      ondrop={handleInsertDrop}
                     />
                   {/if}
                   {#if $previewModeEnabled}
@@ -734,6 +778,8 @@
                   onclick={handleCanvasClick}
                   onmousedown={marqueeCtrl.handleMouseDown}
                   oncontextmenu={handleContextMenu}
+                  ondragover={handleInsertDragOver}
+                  ondrop={handleInsertDrop}
                 />
               {/if}
               {#if $previewModeEnabled}

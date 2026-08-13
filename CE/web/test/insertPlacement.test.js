@@ -66,3 +66,23 @@ test('with a single container selected, the new control inserts into it', () => 
   activeEditorTab.set({ type: 'panel', id: null });
   viewportPanelCenter.set(null);
 });
+
+test('an explicit drop point centres the control there, clamped to the panel', () => {
+  const panel = freshPanel('Drop Panel');  // 600×400
+  viewportPanelCenter.set({ x: 300, y: 200 });  // must be ignored when `at` is given
+
+  const dropped = addControl('Label', {}, { at: { x: 100, y: 80 } });
+  const t = dropped._children.Transform;
+  assert.equal(t.x, Math.round(100 - t.width / 2));
+  assert.equal(t.y, Math.round(80 - t.height / 2));
+
+  // Drop near the edge clamps inside.
+  const edge = addControl('Label', {}, { at: { x: panel.width + 50, y: -50 } });
+  const et = edge._children.Transform;
+  assert.equal(et.x, panel.width - et.width);
+  assert.equal(et.y, 0);
+
+  panels.set([]);
+  activeEditorTab.set({ type: 'panel', id: null });
+  viewportPanelCenter.set(null);
+});

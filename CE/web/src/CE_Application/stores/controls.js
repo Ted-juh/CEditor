@@ -3,6 +3,7 @@ import { panels, resolvedActivePanelId, selectedComponentId, selectedComponentId
 import { createControl as createControlFromType, getSection, hasSection } from '../models/componentTypes.js';
 import { insertOffset, duplicateOffset } from './runtimePreferences.js';
 import { viewportPanelCenter } from './editorView.js';
+import { recordInsertUse } from './insertRecents.js';
 import { stateEditScope } from './stateEditScope.js';
 import { deepClone } from '../utils/deepClone.js';
 import {
@@ -191,13 +192,16 @@ function selectedContainerParentId(panel) {
 }
 
 /**
- * Add a new control to the active panel — centred in the current view, and
- * into the selected container when there is one.
+ * Add a new control to the active panel — centred in the current view (or on
+ * an explicit drop point), and into the selected container when there is one.
  * @param {string} type - Component type (e.g., 'Background', 'Label', 'Button')
  * @param {object} overrides - Optional per-section property overrides
+ * @param {object} options - { at: {x, y} } — panel-space point to centre the
+ *   new control on (drag-and-drop from the Insert panel); skips the stagger
+ *   and the selected-container targeting, the drop point is the intent.
  * @returns {object|null} The created control, or null if no panel is active
  */
-export function addControl(type, overrides = {}) {
+export function addControl(type, overrides = {}, { at = null } = {}) {
   const panelId = get(resolvedActivePanelId);
   if (panelId == null) return null;
 
@@ -210,21 +214,30 @@ export function addControl(type, overrides = {}) {
     const t = control._children.Transform;
     const w = t.width ?? 100;
     const h = t.height ?? 40;
-    const pos = resolveInsertPosition(panel, w, h);
 
-    parentId = selectedContainerParentId(panel);
-    if (parentId) {
-      const parent = findControlById(panel.controls, parentId);
-      const parentW = parent?._children?.Transform?.width ?? w;
-      const parentH = parent?._children?.Transform?.height ?? h;
-      const local = panelToLocalPoint(panel.controls, parentId, pos.x, pos.y);
-      t.x = Math.max(0, Math.min(Math.round(local.x), Math.max(0, parentW - w)));
-      t.y = Math.max(0, Math.min(Math.round(local.y), Math.max(0, parentH - h)));
+    if (at) {
+      const panelW = panel.width ?? 600;
+      const panelH = panel.height ?? 400;
+      t.x = Math.max(0, Math.min(Math.round(at.x - w / 2), Math.max(0, panelW - w)));
+      t.y = Math.max(0, Math.min(Math.round(at.y - h / 2), Math.max(0, panelH - h)));
     } else {
-      t.x = pos.x;
-      t.y = pos.y;
+      const pos = resolveInsertPosition(panel, w, h);
+
+      parentId = selectedContainerParentId(panel);
+      if (parentId) {
+        const parent = findControlById(panel.controls, parentId);
+        const parentW = parent?._children?.Transform?.width ?? w;
+        const parentH = parent?._children?.Transform?.height ?? h;
+        const local = panelToLocalPoint(panel.controls, parentId, pos.x, pos.y);
+        t.x = Math.max(0, Math.min(Math.round(local.x), Math.max(0, parentW - w)));
+        t.y = Math.max(0, Math.min(Math.round(local.y), Math.max(0, parentH - h)));
+      } else {
+        t.x = pos.x;
+        t.y = pos.y;
+      }
     }
   }
+  recordInsertUse(type);
 
   panels.update(list =>
     list.map(p => {
