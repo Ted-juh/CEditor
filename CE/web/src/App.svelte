@@ -192,7 +192,6 @@
   let componentDesignerWorkspaceActive = $derived(workspaceChrome.workspaceKind === 'component');
   let scriptWorkspaceActive = $derived(workspaceChrome.workspaceKind === 'script');
   let chromeWorkspaceActive = $derived(workspaceChrome.chromeWorkspaceActive);
-  let workspaceOwnsChrome = $derived(workspaceChrome.ownsChrome);
   let effectiveShowPropertiesPanel = $derived(workspaceChrome.showPropertiesPanel);
   let effectiveShowTreePanel = $derived(workspaceChrome.showTreePanel);
   let effectiveShowDisplayPanel = $derived(workspaceChrome.showDisplayPanel);
@@ -320,22 +319,22 @@
     </div>
 
     <div class="icon-panel-area">
-      {#if !workspaceOwnsChrome && !workspaceChrome.compactPanel}
-        <IconPanel
-          {showDisplayPanel}
-          {showPropertiesPanel}
-          {showTreePanel}
-          onToggleDisplay={() => {
-            showDisplayPanel = !showDisplayPanel;
-          }}
-          onToggleProperties={() => {
-            showPropertiesPanel = !showPropertiesPanel;
-          }}
-          onToggleTree={() => {
-            showTreePanel = !showTreePanel;
-          }}
-        />
-      {/if}
+      <IconPanel
+        {showDisplayPanel}
+        {showPropertiesPanel}
+        {showTreePanel}
+        togglesEnabled={workspaceChrome.railTogglesEnabled}
+        insertEnabled={workspaceChrome.railInsertEnabled}
+        onToggleDisplay={() => {
+          showDisplayPanel = !showDisplayPanel;
+        }}
+        onToggleProperties={() => {
+          showPropertiesPanel = !showPropertiesPanel;
+        }}
+        onToggleTree={() => {
+          showTreePanel = !showTreePanel;
+        }}
+      />
     </div>
 
     <div class="center-area">

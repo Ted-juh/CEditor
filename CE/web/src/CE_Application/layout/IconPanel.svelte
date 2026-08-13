@@ -16,12 +16,28 @@
     showDisplayPanel = true,
     showPropertiesPanel = true,
     showTreePanel = true,
+    // The rail is part of the persistent shell — it renders in every
+    // workspace. These gates say what it may DO there (workspaceChrome.js).
+    togglesEnabled = true,
+    insertEnabled = true,
     onToggleDisplay = () => {},
     onToggleProperties = () => {},
     onToggleTree = () => {},
   } = $props();
 
-  let hasActivePanel = $derived(!!$activePanel);
+  // Insertion needs an open panel AND a workspace whose canvas is that
+  // panel — the component/script/device workspaces sit over a hidden panel
+  // that must not silently receive controls.
+  let hasActivePanel = $derived(!!$activePanel && insertEnabled);
+
+  // Close the drawers when leaving the panel workspace: their click-to-insert
+  // items would be dead there.
+  $effect(() => {
+    if (!insertEnabled) {
+      insertPanelOpen = false;
+      customLibraryOpen = false;
+    }
+  });
   let customLibraryOpen = $state(false);
   let customLibraryQuery = $state('');
   let customLibraryKind = $state('all');
@@ -200,24 +216,27 @@
   <div class="panel-toggles">
     <button
       class="icon-btn"
-      class:active={showDisplayPanel}
-      title="Toggle Display Panel"
+      class:active={togglesEnabled && showDisplayPanel}
+      title={togglesEnabled ? 'Toggle Display Panel' : 'Panels are unavailable in this workspace'}
+      disabled={!togglesEnabled}
       onclick={onToggleDisplay}
     >
       <PanelBottom size={18} strokeWidth={1.5} />
     </button>
     <button
       class="icon-btn"
-      class:active={showTreePanel}
-      title="Toggle Component Tree"
+      class:active={togglesEnabled && showTreePanel}
+      title={togglesEnabled ? 'Toggle Component Tree' : 'Panels are unavailable in this workspace'}
+      disabled={!togglesEnabled}
       onclick={onToggleTree}
     >
       <PanelLeftClose size={18} strokeWidth={1.5} />
     </button>
     <button
       class="icon-btn"
-      class:active={showPropertiesPanel}
-      title="Toggle Properties Panel"
+      class:active={togglesEnabled && showPropertiesPanel}
+      title={togglesEnabled ? 'Toggle Properties Panel' : 'Panels are unavailable in this workspace'}
+      disabled={!togglesEnabled}
       onclick={onToggleProperties}
     >
       <PanelRight size={18} strokeWidth={1.5} />

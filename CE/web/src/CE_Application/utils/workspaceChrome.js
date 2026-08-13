@@ -47,6 +47,16 @@ export function resolveWorkspaceChrome({
     showPropertiesPanel: workspaceKind === 'component'
       ? true
       : (!ownsChrome && !compactPanel && showPropertiesPanel),
-    iconWidth: ownsChrome || compactPanel ? 0 : 48,
+    // The icon rail is part of the persistent shell: it stays at every
+    // workspace and width, so switching tabs no longer tears the whole
+    // frame down — and the panel toggles can't vanish along with the
+    // panels they restore (the old sub-920px trap). What varies is what
+    // the rail may DO:
+    iconWidth: 48,
+    // Panel toggles only operate where the panels themselves are allowed.
+    railTogglesEnabled: !ownsChrome && !compactPanel,
+    // Insertion only targets the panel canvas — never a hidden panel
+    // behind the component/script/device workspaces.
+    railInsertEnabled: workspaceKind === 'panel',
   };
 }
