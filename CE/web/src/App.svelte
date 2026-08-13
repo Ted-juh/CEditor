@@ -15,7 +15,15 @@
   import ZoomBar from './CE_Application/layout/ZoomBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
-  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel } from './CE_Application/stores/panels.js';
+  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, closeActiveEditorTab, editorZoom, editorZoomIncrement, openPanelFromFile, saveActivePanel, saveActivePanelAs, selectedComponentIds } from './CE_Application/stores/panels.js';
+  import { get } from 'svelte/store';
+  import { duplicateControl, groupSelectionIntoContainer, removeControl, ungroupContainer, updateControlProperty } from './CE_Application/stores/controls.js';
+  import { copySelection, cutSelection, pasteSelection, selectAll } from './CE_Application/stores/clipboard.js';
+  import { deleteSelectedGuide } from './CE_Application/stores/guides.js';
+  import { previewModeEnabled } from './CE_Application/stores/interactionPreview.js';
+  import { saveActiveScriptWorkspace, saveActiveScriptWorkspaceAs } from './CE_Application/stores/scriptWorkspace.js';
+  import { handleEditorShortcut } from './CE_Application/utils/editorShortcuts.js';
+  import { isEditableTarget, resolveGlobalShortcut } from './CE_Application/utils/globalShortcuts.js';
   import { initScriptWorkspaceBridge } from './CE_Application/stores/scriptWorkspace.js';
   import { initAppSettingsBridge } from './CE_Application/stores/appSettings.js';
   import { initConsoleBridge } from './CE_Application/stores/console.js';
@@ -27,7 +35,7 @@
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
   import { initPresetChoiceSync } from './CE_Application/stores/presetChoiceSync.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
-  import { requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
+  import { requestFitToWindow, requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
   import { componentWorkspaceMode } from './CE_Application/stores/componentWorkspace.js';
   import { colorTarget } from './CE_Application/stores/colorTarget.js';
   import { gradientTarget } from './CE_Application/stores/gradientTarget.js';
@@ -73,31 +81,62 @@
     initPresetChoiceSync(); // preset-sourced selector rows follow scans + profile sources
   }
 
+  function saveActiveTab({ saveAs = false } = {}) {
+    if (get(activeEditorTab)?.type === 'script') {
+      if (saveAs) saveActiveScriptWorkspaceAs(); else saveActiveScriptWorkspace();
+      return;
+    }
+    if (saveAs) saveActivePanelAs(); else saveActivePanel();
+  }
+
   function handleGlobalKeyDown(e) {
     if (isCutoutDebug || isBehaviorDebug) return;
 
-    if (e.key === 'F1') {
+    const editableTarget = isEditableTarget(e.target);
+    const command = resolveGlobalShortcut(e, { editableTarget });
+
+    if (command) {
       e.preventDefault();
-      showShortcuts = !showShortcuts;
+      switch (command) {
+        case 'toggle-shortcuts': showShortcuts = !showShortcuts; break;
+        case 'save': saveActiveTab(); break;
+        case 'save-as': saveActiveTab({ saveAs: true }); break;
+        case 'new-panel': addPanel(); break;
+        case 'open-panel': openPanelFromFile(); break;
+        case 'close-tab': closeActiveEditorTab(); break;
+        case 'open-settings': openSettingsTab(); break;
+        case 'zoom-to-selection': requestZoomToSelection(); break;
+        case 'undo': undo(); break;
+        case 'redo': redo(); break;
+      }
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
-      e.preventDefault();
-      requestZoomToSelection();
-      return;
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === ',') {
-      e.preventDefault();
-      openSettingsTab();
-      return;
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-      e.preventDefault();
-      undo();
-    } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-      e.preventDefault();
-      redo();
-    }
+
+    // Fallback for the canvas editing shortcuts (Delete, Ctrl+D/C/X/V/A/G,
+    // arrows). EditorCanvas dispatches these itself while focus sits inside
+    // the canvas wrapper; the moment focus wanders (tree click, toolbar
+    // click, marquee mousedown that suppressed the focus transfer) the
+    // wrapper handler goes silent and this window-level pass keeps the
+    // selection editable. Skipped when the wrapper already handled the key
+    // (defaultPrevented), while typing, and in workspaces without a canvas.
+    if (e.defaultPrevented || editableTarget) return;
+    if ($previewModeEnabled || $componentWorkspaceMode === 'surface') return;
+    const panel = get(activePanel);
+    if (!panel) return;
+
+    handleEditorShortcut(e, {
+      panel,
+      panelLocked: panel.locked ?? false,
+      gridSize: panel.gridSize ?? 10,
+      editorZoom,
+      editorZoomIncrement: get(editorZoomIncrement),
+      selectedComponentIds: get(selectedComponentIds),
+      fitToWindow: requestFitToWindow,
+      zoomToSelection: requestZoomToSelection,
+      selectAll, pasteSelection, copySelection, cutSelection, duplicateControl,
+      removeControl, updateControlProperty, deleteSelectedGuide,
+      groupSelectionIntoContainer, ungroupContainer,
+    });
   }
 
   const MIN_PROPERTIES_PANEL_WIDTH = 600;

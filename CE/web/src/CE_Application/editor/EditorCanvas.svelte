@@ -27,7 +27,8 @@
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
   import { activePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
-  import { zoomToSelectionSignal } from '../stores/editorCommands.js';
+  import { fitToWindowSignal, zoomToSelectionSignal } from '../stores/editorCommands.js';
+  import { isEditableTarget } from '../utils/globalShortcuts.js';
   import { showRulers } from '../stores/editorView.js';
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
@@ -297,6 +298,14 @@
     if (sig > lastZoomSignal) { lastZoomSignal = sig; zoomCtrl.zoomToSelection(); }
   });
 
+  // React to global fit-to-window requests (menu, zoom bar, shortcuts) — this
+  // controller owns the only fit implementation.
+  let lastFitSignal = 0;
+  $effect(() => {
+    const sig = $fitToWindowSignal;
+    if (sig > lastFitSignal) { lastFitSignal = sig; zoomCtrl.fitToWindow(); }
+  });
+
   function handlePreviewShortcut(e) {
     if (e.defaultPrevented) return;
 
@@ -330,6 +339,9 @@
 
   function handleEditorKeyDown(e) {
     if (componentSurfaceWorkspaceActive) return;
+    // Text fields inside the canvas chrome (tab pickers, future inline
+    // editors) keep their keys — Delete in an input must never delete controls.
+    if (isEditableTarget(e.target)) return;
 
     if ($previewModeEnabled) {
       handlePreviewShortcut(e);

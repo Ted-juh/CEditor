@@ -9,7 +9,8 @@
       ['File menu', 'New/Open Device Profile'],
       ['Ctrl+S', 'Save'],
       ['Ctrl+Shift+S', 'Save As'],
-      ['Ctrl+W', 'Close Panel'],
+      ['Ctrl+W', 'Close Tab'],
+      ['Ctrl+,', 'Settings'],
     ]},
     { title: 'Edit', shortcuts: [
       ['Ctrl+Z', 'Undo'],
@@ -19,6 +20,8 @@
       ['Ctrl+V', 'Paste'],
       ['Ctrl+A', 'Select All'],
       ['Ctrl+D', 'Duplicate'],
+      ['Ctrl+G', 'Group into container'],
+      ['Ctrl+Shift+G', 'Ungroup container'],
       ['Delete', 'Delete selected'],
     ]},
     { title: 'View', shortcuts: [

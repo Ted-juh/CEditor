@@ -7,6 +7,7 @@ import { instantiateCustomComponentPackageControl } from '../utils/customCompone
 import { customComponentLibrary } from './customComponentLibrary.js';
 
 import { deepClone } from '../utils/deepClone.js';
+import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
 export const componentWorkspaceMode = writable('panel');
 export const componentDocuments = writable([]);
 export const activeComponentDocumentId = writable(null);
@@ -82,6 +83,10 @@ export function setActiveComponentDocument(id) {
 }
 
 export function closeComponentDocument(id) {
+  const closing = get(componentDocuments).find((document) => document.id === id);
+  // Aborted close: report the tab as still current so callers re-activate it.
+  if (closing?.modified && !confirmDiscardUnsaved(closing.name)) return id;
+
   componentDocuments.update((documents) => documents.filter((document) => document.id !== id));
   if (get(activeComponentDocumentId) !== id) return get(activeComponentDocumentId);
 

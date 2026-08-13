@@ -18,7 +18,7 @@
 // else. Bind nothing panelApi.js doesn't declare, and declare nothing you don't bind.
 
 import { get } from 'svelte/store';
-import { panels, resolvedActivePanelId, updatePanel } from '../stores/panels.js';
+import { panels, scriptRuntimePanelId, updatePanel } from '../stores/panels.js';
 import { updateControlProperty, removeControlNode } from '../stores/controls.js';
 import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
@@ -163,7 +163,7 @@ export function setRuntimeHost(h) {
 
 function activePanel() {
   if (host) return host.panel ?? null;
-  return get(panels).find((p) => p.id === get(resolvedActivePanelId)) ?? null;
+  return get(panels).find((p) => p.id === get(scriptRuntimePanelId)) ?? null;
 }
 
 /** Find a control in the active panel by its friendly name (case-insensitive), id fallback. */
@@ -3029,7 +3029,7 @@ export function runReactiveForTesting() { runReactive(); }
 export function runPreviewSessionsForTesting(sessions = null) {
   // initPanelRuntime normally sets these off the stores; a test that never started the runtime
   // would otherwise diff against no active panel, and every event would be addressed by raw id.
-  live.activePanelId = get(resolvedActivePanelId);
+  live.activePanelId = get(scriptRuntimePanelId);
   live.enabledGlobal = true;
   return onPreviewSessionsChanged(sessions ?? get(panelPreviewSessions));
 }
@@ -7327,7 +7327,7 @@ export async function runScript(script, hook = null, payload = undefined) {
 const live = {
   enabledGlobal: true,     // master switch (the editor's "Live" toggle)
   inited: false,
-  activePanelId: null,     // follows resolvedActivePanelId
+  activePanelId: null,     // follows scriptRuntimePanelId (script tabs: the doc's bound panel)
   editOverride: null,      // { panelId, scripts } pushed by an open BehaviorDesigner
   last: new Map(),         // panels store: controlId -> value signature
   sessionLast: new Map(),  // preview overlay: controlId -> { value, pressed, hover }
@@ -7852,11 +7852,11 @@ function onDeviceRuntimeStateChanged(state) {
 export function initPanelRuntime() {
   if (live.inited) return;
   live.inited = true;
-  live.activePanelId = get(resolvedActivePanelId);
+  live.activePanelId = get(scriptRuntimePanelId);
   live.prevPreviewOn = get(previewModeEnabled) === true;
   snapshotValues();
   seedSessionSnapshot();
-  live.unsubs.push(resolvedActivePanelId.subscribe((id) => {
+  live.unsubs.push(scriptRuntimePanelId.subscribe((id) => {
     // Destroy BEFORE the id moves. A handler restoring the synth reads and writes through the
     // ACTIVE panel, so telling it goodbye after the switch would have it writing into the panel
     // that just arrived. The guard also makes the subscriber's immediate first call a no-op.

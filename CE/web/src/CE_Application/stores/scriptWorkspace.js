@@ -18,6 +18,7 @@ import {
   scriptWorkspaceFilename,
   serializeScriptWorkspaceDocument,
 } from '../scripting/scriptDocumentModel.js';
+import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
 
 const SCRIPT_WORKSPACE_STORAGE_KEY = 'ce.scriptWorkspaces.v1';
 let bridgeInitialized = false;
@@ -119,6 +120,10 @@ export function setActiveScriptDocument(id) {
 }
 
 export function closeScriptWorkspaceDocument(id) {
+  const closing = get(scriptDocuments).find((document) => document.id === id);
+  // Aborted close: report the tab as still current so callers re-activate it.
+  if (closing?.modified && !confirmDiscardUnsaved(closing.name)) return id;
+
   let nextId = null;
   scriptDocuments.update((documents) => {
     const index = documents.findIndex((document) => document.id === id);

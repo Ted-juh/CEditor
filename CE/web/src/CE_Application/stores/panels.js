@@ -23,6 +23,7 @@ import {
   restoreUnsavedWork,
 } from './runtimePreferences.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
+import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { createPanel, deserializePanel, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
 import {
@@ -414,6 +415,23 @@ export const resolvedActivePanelId = derived(
     resolvePanelSelection($panels, $activePanelId, $activeEditorTab)?.id ?? null
 );
 
+/** Panel targeted by the script RUNTIME. On a script tab this is the script
+ *  document's bound panel — an explicit binding, not "whatever panel tab sits
+ *  behind the workspace". Everywhere else it matches resolvedActivePanelId.
+ *  Panel-editing commands (undo, paste, insert) must keep using
+ *  resolvedActivePanelId, which is null on script tabs. */
+export const scriptRuntimePanelId = derived(
+  [panels, activePanelId, activeEditorTab, scriptDocuments],
+  ([$panels, $activePanelId, $tab, $scriptDocuments]) => {
+    if ($tab?.type === 'script') {
+      const doc = $scriptDocuments.find((d) => d.id === $tab.id);
+      const boundId = doc?.panelId ?? null;
+      return $panels.find((p) => String(p.id) === String(boundId))?.id ?? null;
+    }
+    return resolvePanelSelection($panels, $activePanelId, $tab)?.id ?? null;
+  }
+);
+
 /** All editor tabs shown in the top tab bar */
 export const editorTabs = derived(
   [panels, settingsTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments],
@@ -470,6 +488,10 @@ function resolvePanelSelection(list, activeId, tab) {
   if (tab?.type === 'settings') return null;
   if (tab?.type === 'component') return null;
   if (tab?.type === 'deviceProfile') return null;
+  // Script tabs edit script documents, not panels. Falling through here made
+  // every panel-scoped command (undo, paste, insert) silently hit an
+  // off-screen panel while a script workspace was in front.
+  if (tab?.type === 'script') return null;
 
   const panelFromTab = tab?.type === 'panel'
     ? list.find((panel) => panel.id === tab.id) ?? null
@@ -772,8 +794,12 @@ function normalizeEditorTabDescriptor(tab) {
   };
 }
 
-/** Close a panel by id */
+/** Close a panel by id. Prompts when the panel has unsaved changes; returns
+ *  false when the user keeps the panel open. */
 export function closePanel(id) {
+  const closing = get(panels).find((p) => p.id === id);
+  if (closing?.modified && !confirmDiscardUnsaved(closing.name)) return false;
+
   panelDesignerSplits.update((splits) => {
     if (!splits || !(id in splits)) return splits;
     const next = { ...splits };
@@ -815,6 +841,7 @@ export function closePanel(id) {
   // Update persisted open panel paths
   persistOpenPanelPaths();
   flushUnsavedSessionSnapshot();
+  return true;
 }
 
 /** Switch to a panel by id */

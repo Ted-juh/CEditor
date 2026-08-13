@@ -9,7 +9,8 @@ import {
 } from '../src/CE_Application/scripting/scriptDocumentModel.js';
 import { createScript } from '../src/CE_Application/scripting/scriptModel.js';
 import { createPanel, deserializePanel, serializePanel } from '../src/CE_Application/stores/panelModel.js';
-import { activeEditorTab, activePanel, activePanelId, panels } from '../src/CE_Application/stores/panels.js';
+import { activeEditorTab, activePanel, activePanelId, panels, scriptRuntimePanelId } from '../src/CE_Application/stores/panels.js';
+import { createScriptWorkspaceDocument, getOrCreateScriptDocForPanel } from '../src/CE_Application/stores/scriptWorkspace.js';
 import { panelPreviewSessions } from '../src/CE_Application/stores/interactionPreview.js';
 import {
   latestMidiPreview,
@@ -63,13 +64,24 @@ test('panel serialization preserves attached scripts', () => {
   assert.match(restored.scripts[0].source, /function onValueChanged/);
 });
 
-test('script workspace keeps the last active panel while script tab is focused', () => {
+test('script tab blocks panel-editing commands but keeps the runtime bound to its panel', () => {
   const panel = createPanel('Context Panel');
   panels.set([panel]);
   activePanelId.set(panel.id);
-  activeEditorTab.set({ type: 'script', id: 'script_doc' });
+  const doc = getOrCreateScriptDocForPanel(panel.id, panel.name);
+  activeEditorTab.set({ type: 'script', id: doc.id });
 
-  assert.equal(get(activePanel)?.id, panel.id);
+  // Panel-scoped editing commands (undo, paste, insert) resolve to nothing —
+  // they must never hit a panel that isn't on screen.
+  assert.equal(get(activePanel), null);
+  // The script RUNTIME still knows which panel this workspace edits, through
+  // the document's explicit panelId binding.
+  assert.equal(get(scriptRuntimePanelId), panel.id);
+
+  // A script document bound to no panel leaves the runtime unbound too.
+  const unbound = createScriptWorkspaceDocument({ name: 'Unbound' });
+  activeEditorTab.set({ type: 'script', id: unbound.id });
+  assert.equal(get(scriptRuntimePanelId), null);
 });
 
 test('script workspace documents serialize and restore with file metadata', () => {
