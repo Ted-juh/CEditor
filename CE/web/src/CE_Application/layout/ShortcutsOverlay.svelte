@@ -29,7 +29,9 @@
       ['Ctrl+-', 'Zoom Out'],
       ['Ctrl+0', 'Fit to Window'],
       ['Ctrl+Shift+P', 'Zoom to Selection'],
-      ['Ctrl+Scroll', 'Mouse wheel zoom'],
+      ['Scroll', 'Scroll canvas'],
+      ['Shift+Scroll', 'Scroll sideways'],
+      ['Ctrl+Scroll', 'Zoom at cursor'],
     ]},
     { title: 'Canvas', shortcuts: [
       ['Space+Drag', 'Pan canvas'],

@@ -6,7 +6,7 @@
   import { undo, redo } from '../stores/history.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { editorZoom, editorZoomIncrement, activePanel, updatePanel } from '../stores/panels.js';
-  import { requestZoomToSelection } from '../stores/editorCommands.js';
+  import { requestFitToWindow, requestZoomStep, requestZoomToSelection } from '../stores/editorCommands.js';
   import { createComponentDocument, createComponentDocumentFromLibraryEntry } from '../stores/componentWorkspace.js';
   import { createScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile, saveActiveScriptWorkspace, saveActiveScriptWorkspaceAs } from '../stores/scriptWorkspace.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
@@ -101,17 +101,10 @@
       { label: 'Select All', shortcut: 'Ctrl+A', action: () => selectAll() },
     ],
     View: [
-      { label: 'Zoom In',  shortcut: 'Ctrl++', action: () => editorZoom.update(z => Math.min(400, z + get(editorZoomIncrement))) },
-      { label: 'Zoom Out', shortcut: 'Ctrl+-', action: () => editorZoom.update(z => Math.max(10, z - get(editorZoomIncrement))) },
+      { label: 'Zoom In',  shortcut: 'Ctrl++', action: () => requestZoomStep(1) },
+      { label: 'Zoom Out', shortcut: 'Ctrl+-', action: () => requestZoomStep(-1) },
       { label: 'Reset Zoom', action: () => editorZoom.set(100) },
-      { label: 'Fit to Window', shortcut: 'Ctrl+0', action: () => {
-        const p = get(activePanel);
-        if (!p) return;
-        const vp = document.querySelector('.canvas-viewport');
-        if (!vp) return;
-        const fitScale = Math.min((vp.clientWidth - 80) / p.width, (vp.clientHeight - 80) / p.height);
-        editorZoom.set(Math.max(10, Math.min(400, Math.round(fitScale * 100))));
-      }},
+      { label: 'Fit to Window', shortcut: 'Ctrl+0', action: () => requestFitToWindow() },
       { label: 'Zoom to Selection', shortcut: 'Ctrl+Shift+P', action: () => requestZoomToSelection() },
       { type: 'separator' },
       { label: 'Toggle Grid', action: () => { const p = get(activePanel); if (p) updatePanel(p.id, { gridEnabled: !p.gridEnabled }); } },

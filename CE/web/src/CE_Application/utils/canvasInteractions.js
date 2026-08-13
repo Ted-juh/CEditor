@@ -236,35 +236,49 @@ export function computeZoomToSelection(panel, viewportEl, ids, padding = 60) {
 }
 
 /**
- * Compute the result of a wheel zoom that targets the hovered panel point.
- * The hovered panel point stays under the cursor after zooming, even when the
- * panel re-centers because it becomes smaller than the viewport.
+ * Compute a zoom to `targetZoom` that keeps the viewport point
+ * (anchorVpX, anchorVpY) visually stable — the shared math behind wheel zoom
+ * (anchor = cursor) and button/keyboard zoom (anchor = viewport centre, so
+ * the view no longer drifts toward the top-left corner on every step).
  * Returns { zoom, scrollLeft, scrollTop } or null if no change.
  */
-export function computeWheelZoom(viewportEl, e, currentZoom, panel, step = 10, baseView = null) {
+export function computeAnchoredZoom(viewportEl, currentZoom, panel, targetZoom, anchorVpX, anchorVpY, baseView = null) {
   if (!viewportEl || !panel) return null;
-  const rect = viewportEl.getBoundingClientRect();
   const effectiveZoom = baseView?.zoom ?? currentZoom;
   const effectiveScrollLeft = baseView?.scrollLeft ?? viewportEl.scrollLeft;
   const effectiveScrollTop = baseView?.scrollTop ?? viewportEl.scrollTop;
   const oldScale = effectiveZoom / 100;
   const oldOff = contentOffsets(panel, viewportEl, oldScale);
 
-  const cursorVpX = e.clientX - rect.left;
-  const cursorVpY = e.clientY - rect.top;
-  // Cursor in panel coordinates
-  const panelX = (cursorVpX + effectiveScrollLeft - oldOff.left) / oldScale;
-  const panelY = (cursorVpY + effectiveScrollTop - oldOff.top) / oldScale;
+  // Anchor in panel coordinates
+  const panelX = (anchorVpX + effectiveScrollLeft - oldOff.left) / oldScale;
+  const panelY = (anchorVpY + effectiveScrollTop - oldOff.top) / oldScale;
 
-  const delta = e.deltaY < 0 ? step : -step;
-  const newZoom = clampZoom(effectiveZoom + delta);
+  const newZoom = clampZoom(Math.round(targetZoom));
   if (newZoom === effectiveZoom) return null;
   const newScale = newZoom / 100;
   const newOff = contentOffsets(panel, viewportEl, newScale);
 
   return {
     zoom: newZoom,
-    scrollLeft: panelX * newScale + newOff.left - cursorVpX,
-    scrollTop: panelY * newScale + newOff.top - cursorVpY,
+    scrollLeft: panelX * newScale + newOff.left - anchorVpX,
+    scrollTop: panelY * newScale + newOff.top - anchorVpY,
   };
+}
+
+/**
+ * Compute the result of a wheel zoom that targets the hovered panel point.
+ * Multiplicative steps (default ×1.1): 10%→11% and 300%→330% feel the same,
+ * where the old additive ±10 doubled the scale at the bottom of the range and
+ * barely moved it at the top.
+ */
+export function computeWheelZoom(viewportEl, e, currentZoom, panel, factor = 1.1, baseView = null) {
+  if (!viewportEl || !panel) return null;
+  const rect = viewportEl.getBoundingClientRect();
+  const effectiveZoom = baseView?.zoom ?? currentZoom;
+  const targetZoom = e.deltaY < 0 ? effectiveZoom * factor : effectiveZoom / factor;
+  return computeAnchoredZoom(
+    viewportEl, currentZoom, panel, targetZoom,
+    e.clientX - rect.left, e.clientY - rect.top, baseView,
+  );
 }

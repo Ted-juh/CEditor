@@ -27,7 +27,7 @@
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
   import { activePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
-  import { fitToWindowSignal, zoomToSelectionSignal } from '../stores/editorCommands.js';
+  import { fitToWindowSignal, zoomStepSignal, zoomToSelectionSignal } from '../stores/editorCommands.js';
   import { isEditableTarget } from '../utils/globalShortcuts.js';
   import { showRulers } from '../stores/editorView.js';
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
@@ -291,8 +291,16 @@
     getPanel: () => canvasPanel,
     getSelection: () => $selectedComponentIds,
     getZoom: () => $editorZoom,
+    getZoomIncrement: () => $editorZoomIncrement,
     editorZoom,
   });
+
+  // Wheel must be non-passive so Ctrl+wheel zoom can suppress the host's own
+  // ctrl-zoom; plain wheel is left alone and scrolls the viewport natively.
+  function nonPassiveWheel(node, handler) {
+    node.addEventListener('wheel', handler, { passive: false });
+    return { destroy() { node.removeEventListener('wheel', handler); } };
+  }
 
   // React to global zoom-to-selection signal (from Ctrl+Shift+P in App.svelte)
   let lastZoomSignal = 0;
@@ -309,6 +317,13 @@
     if (sig > lastFitSignal) { lastFitSignal = sig; zoomCtrl.fitToWindow(); }
   });
 
+  // React to global zoom-step requests (menu, zoom bar, keyboard fallback).
+  let lastZoomStepSignal = 0;
+  $effect(() => {
+    const sig = $zoomStepSignal;
+    if (sig.n > lastZoomStepSignal) { lastZoomStepSignal = sig.n; zoomCtrl.zoomStep(sig.direction); }
+  });
+
   function handlePreviewShortcut(e) {
     if (e.defaultPrevented) return;
 
@@ -321,12 +336,12 @@
 
     if (mod && (e.key === '=' || e.key === '+')) {
       e.preventDefault();
-      editorZoom.update((value) => Math.min(400, value + $editorZoomIncrement));
+      zoomCtrl.zoomStep(1);
       return;
     }
     if (mod && e.key === '-') {
       e.preventDefault();
-      editorZoom.update((value) => Math.max(10, value - $editorZoomIncrement));
+      zoomCtrl.zoomStep(-1);
       return;
     }
     if (mod && e.key === '0') {
@@ -354,8 +369,9 @@
     panCtrl.handleKeyDown(e);
     handleEditorShortcut(e, {
       panel: canvasPanel, panelLocked, gridSize,
-      editorZoom, editorZoomIncrement: $editorZoomIncrement,
       selectedComponentIds: $selectedComponentIds,
+      zoomIn: () => zoomCtrl.zoomStep(1),
+      zoomOut: () => zoomCtrl.zoomStep(-1),
       fitToWindow: zoomCtrl.fitToWindow,
       zoomToSelection: zoomCtrl.zoomToSelection,
       selectAll, pasteSelection, copySelection, cutSelection, duplicateControl,
@@ -573,7 +589,7 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div class="canvas-viewport designer-split-viewport" class:with-rulers={$showRulers} use:bindViewport class:panel-active={canvasPanel}
                  onclick={handleCanvasClick} oncontextmenu={handleContextMenu}
-                 onmousedown={panCtrl.handleMouseDown} onwheel={zoomCtrl.handleWheel}>
+                 onmousedown={panCtrl.handleMouseDown} use:nonPassiveWheel={zoomCtrl.handleWheel}>
               <div class="canvas-stage">
                 <div
                   class="zoom-container"
@@ -665,7 +681,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="canvas-viewport" class:with-rulers={$showRulers} use:bindViewport class:panel-active={canvasPanel}
              onclick={handleCanvasClick} oncontextmenu={handleContextMenu}
-             onmousedown={panCtrl.handleMouseDown} onwheel={zoomCtrl.handleWheel}>
+             onmousedown={panCtrl.handleMouseDown} use:nonPassiveWheel={zoomCtrl.handleWheel}>
           <div class="canvas-stage">
             <div
               class="zoom-container"

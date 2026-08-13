@@ -16,3 +16,11 @@ export const fitToWindowSignal = writable(0);
 export function requestFitToWindow() {
   fitToWindowSignal.update(n => n + 1);
 }
+
+/** Centre-anchored zoom step request (direction +1 / -1) — same ownership
+ *  story as fit-to-window: EditorCanvas's zoom controller executes it. */
+export const zoomStepSignal = writable({ n: 0, direction: 0 });
+
+export function requestZoomStep(direction) {
+  zoomStepSignal.update(({ n }) => ({ n: n + 1, direction }));
+}

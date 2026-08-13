@@ -3,7 +3,8 @@
   import Ruler from 'lucide-svelte/icons/ruler';
   import Columns3 from 'lucide-svelte/icons/columns-3';
   import MoveHorizontal from 'lucide-svelte/icons/move-horizontal';
-  import { editorZoom, editorZoomIncrement, activePanel } from '../stores/panels.js';
+  import { editorZoom, editorZoomIncrement } from '../stores/panels.js';
+  import { requestFitToWindow, requestZoomStep } from '../stores/editorCommands.js';
   import { showRulers, showGuides, showDistances } from '../stores/editorView.js';
 
   let isEditing = $state(false);
@@ -11,15 +12,11 @@
 
   let zoom = $derived($editorZoom);
   let increment = $derived($editorZoomIncrement);
-  let panel = $derived($activePanel);
 
-  function zoomIn() {
-    editorZoom.update(z => Math.min(400, z + $editorZoomIncrement));
-  }
-
-  function zoomOut() {
-    editorZoom.update(z => Math.max(10, z - $editorZoomIncrement));
-  }
+  // Centre-anchored steps and the single fit implementation both live in
+  // EditorCanvas's zoom controller — this bar only sends the request.
+  function zoomIn() { requestZoomStep(1); }
+  function zoomOut() { requestZoomStep(-1); }
 
   function resetZoom() {
     editorZoom.set(100);
@@ -53,26 +50,11 @@
     }
   }
 
-  function fitToWindow() {
-    if (!panel) return;
-    // Get the canvas viewport dimensions from the DOM
-    const viewport = document.querySelector('.canvas-viewport');
-    if (!viewport) { editorZoom.set(100); return; }
-
-    const availW = viewport.clientWidth - 40; // padding
-    const availH = viewport.clientHeight - 40;
-    const scaleW = availW / panel.width;
-    const scaleH = availH / panel.height;
-    const fitScale = Math.min(scaleW, scaleH);
-    const fitZoom = Math.max(10, Math.min(400, Math.round(fitScale * 100)));
-    editorZoom.set(fitZoom);
-  }
+  function fitToWindow() { requestFitToWindow(); }
 </script>
 
 <div class="zoom-bar">
-  <div class="scrollbar-area">
-    <!-- Horizontal scrollbar placeholder -->
-  </div>
+  <div class="spacer"></div>
 
   <div class="zoom-controls">
     <button class="zoom-btn" onclick={zoomOut} title="Zoom out">−</button>
@@ -131,11 +113,10 @@
     gap: 8px;
   }
 
-  .scrollbar-area {
+  /* Plain spacer — the previous element here was styled like a horizontal
+     scrollbar but did nothing, which read as a broken control. */
+  .spacer {
     flex: 1;
-    height: 6px;
-    background: #1A1A1A;
-    border-radius: 3px;
   }
 
   .zoom-controls {

@@ -12,8 +12,8 @@ import { flatControls, isContainerControl } from './containment.js';
 export function handleEditorShortcut(e, ctx) {
   const {
     panel, panelLocked, gridSize,
-    editorZoom, editorZoomIncrement, selectedComponentIds,
-    fitToWindow, zoomToSelection,
+    selectedComponentIds,
+    zoomIn, zoomOut, fitToWindow, zoomToSelection,
     selectAll, pasteSelection, copySelection, cutSelection, duplicateControl,
     removeControl, updateControlProperty, deleteSelectedGuide,
     groupSelectionIntoContainer, ungroupContainer,
@@ -26,12 +26,12 @@ export function handleEditorShortcut(e, ctx) {
   // --- Zoom shortcuts (work regardless of selection) ---
   if (mod && (e.key === '=' || e.key === '+')) {
     e.preventDefault();
-    editorZoom.update(z => Math.min(400, z + editorZoomIncrement));
+    zoomIn?.();
     return;
   }
   if (mod && e.key === '-') {
     e.preventDefault();
-    editorZoom.update(z => Math.max(10, z - editorZoomIncrement));
+    zoomOut?.();
     return;
   }
   if (mod && e.key === '0') {

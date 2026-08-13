@@ -15,7 +15,7 @@
   import ZoomBar from './CE_Application/layout/ZoomBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
-  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, closeActiveEditorTab, editorZoom, editorZoomIncrement, openPanelFromFile, saveActivePanel, saveActivePanelAs, selectedComponentIds } from './CE_Application/stores/panels.js';
+  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, closeActiveEditorTab, openPanelFromFile, saveActivePanel, saveActivePanelAs, selectedComponentIds } from './CE_Application/stores/panels.js';
   import { get } from 'svelte/store';
   import { duplicateControl, groupSelectionIntoContainer, removeControl, ungroupContainer, updateControlProperty } from './CE_Application/stores/controls.js';
   import { copySelection, cutSelection, pasteSelection, selectAll } from './CE_Application/stores/clipboard.js';
@@ -35,7 +35,7 @@
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
   import { initPresetChoiceSync } from './CE_Application/stores/presetChoiceSync.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
-  import { requestFitToWindow, requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
+  import { requestFitToWindow, requestZoomStep, requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
   import { componentWorkspaceMode } from './CE_Application/stores/componentWorkspace.js';
   import { colorTarget } from './CE_Application/stores/colorTarget.js';
   import { gradientTarget } from './CE_Application/stores/gradientTarget.js';
@@ -128,9 +128,9 @@
       panel,
       panelLocked: panel.locked ?? false,
       gridSize: panel.gridSize ?? 10,
-      editorZoom,
-      editorZoomIncrement: get(editorZoomIncrement),
       selectedComponentIds: get(selectedComponentIds),
+      zoomIn: () => requestZoomStep(1),
+      zoomOut: () => requestZoomStep(-1),
       fitToWindow: requestFitToWindow,
       zoomToSelection: requestZoomToSelection,
       selectAll, pasteSelection, copySelection, cutSelection, duplicateControl,
