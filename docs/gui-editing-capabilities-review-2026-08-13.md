@@ -10,13 +10,24 @@
 > (A6/A7/F6–F10), view-centred insertion + one insert catalog + dead-menu
 > removal (D4/D5/F6), the multi-select bounding box with group resize
 > (A8/F11), and the live status bar (D7).
-> Still open, in rough priority order: anchored colour/gradient popovers
-> (the dock still hosts them, now with a labelled context bar), inline canvas
-> text editing (E5), bar consolidation (S5), rotation-aware resize/hit-testing
-> or hiding rotation (A4), edge-handle clipping at panel edges (A2),
-> paste/duplicate unification + name uniqueness (E2), guides
-> persistence/undo (F14), menu enabled/checked states (D3), and a format
-> painter (E3).
+> **Second round (same branch):** the structural restructure followed —
+> colour/gradient editing stays in the display panel by owner decision
+> (labelled context bar + target lifecycle instead of popovers); the
+> AppearanceBar/FunctionBar/ZoomBar stack became one adaptive ContextBar
+> with zoom/view controls in the status bar (S5); the rail's flyouts became
+> one searchable Insert panel with drag-to-place and persisted recents; the
+> insert catalog got one-icon-per-meaning with eleven custom lucide-style
+> glyphs; rotation was finished (rotated resize/hit-testing/marquee, angle
+> HUD) rather than hidden (A4); edge handles unclipped (A2); double-click
+> drills into containers with Esc step-out and inline canvas text editing
+> (A9/E5); the shell (rail included) persists across workspaces and the
+> DPD's fake title bar and dead nav items are gone (E4); and New Panel is a
+> template dialog with size presets, plus Panel/Recent colour rows in the
+> Colors tab (E6).
+> Still open: paste/duplicate unification + name uniqueness (E2), guides
+> persistence/undo (F14), menu enabled/checked states (D3), a format
+> painter (E3), and the properties-panel round (including ~130 native
+> colour inputs in sections/* that should route through the display panel).
 
 Scope: the whole editing GUI — canvas, display panel, component tree, menu bar, the four
 bars (Appearance / Function / Zoom / Icon rail), tab strip, status bar, shortcuts, and the
