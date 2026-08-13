@@ -10,9 +10,7 @@
   import StatusBar from './CE_Application/layout/StatusBar.svelte';
   import ComponentTree from './CE_Application/panels/ComponentTree.svelte';
   import ShortcutsOverlay from './CE_Application/layout/ShortcutsOverlay.svelte';
-  import AppearanceBar from './CE_Application/layout/AppearanceBar.svelte';
-  import FunctionBar from './CE_Application/layout/FunctionBar.svelte';
-  import ZoomBar from './CE_Application/layout/ZoomBar.svelte';
+  import ContextBar from './CE_Application/layout/ContextBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
   import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, closeActiveEditorTab, openPanelFromFile, saveActivePanel, saveActivePanelAs, selectedComponentIds } from './CE_Application/stores/panels.js';
@@ -343,8 +341,8 @@
       <div class="editor-top-row">
         <div class="editor-canvas-col">
           {#if !isSettingsTab && !chromeWorkspaceActive}
-            <div class="look-bar-area">
-              <AppearanceBar />
+            <div class="context-bar-area">
+              <ContextBar />
             </div>
           {/if}
           <div class="editor-canvas-area">
@@ -352,14 +350,6 @@
               <EditorCanvas />
             </ErrorBoundary>
           </div>
-          {#if !isSettingsTab && !chromeWorkspaceActive}
-            <div class="common-bar-area">
-              <FunctionBar />
-            </div>
-            <div class="zoom-bar-area">
-              <ZoomBar />
-            </div>
-          {/if}
         </div>
         {#if effectiveShowTreePanel}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -486,18 +476,12 @@
     min-height: 0;
     overflow: hidden;
   }
-  .look-bar-area {
-    flex: 0 0 60px;
+  /* One context bar replaces the old Look (60px) + Function (56px) + Zoom
+     (24px) stack — auto height (~64px, less with nothing selected), giving
+     the canvas the difference. Zoom and view toggles live in the status bar. */
+  .context-bar-area {
+    flex: 0 0 auto;
     border-bottom: 1px solid #333;
-  }
-  .common-bar-area {
-    flex: 0 0 56px;
-    border-top: 1px solid #333;
-  }
-
-  .zoom-bar-area {
-    flex: 0 0 24px;
-    border-top: 1px solid #2A2A2A;
   }
   .display-panel-area {
     border-top: 1px solid #333;

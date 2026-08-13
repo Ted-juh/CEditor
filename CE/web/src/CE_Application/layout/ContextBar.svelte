@@ -1,14 +1,19 @@
 <script>
   /**
-   * Appearance ("Look") bar — top of the editor canvas.
+   * Context bar — the single selection toolbar above the canvas, replacing
+   * the old AppearanceBar ("Look", 60px) + FunctionBar (56px) + ZoomBar
+   * (24px) stack. Zoom and view toggles now live in the status bar, so the
+   * canvas gets ~80px back and there is one place to look for "controls
+   * about the selection".
    *
-   * Shows ONE appearance facet's quick controls at a time (Text / Fill / Box),
-   * chosen by the activeFacet store. The facet auto-focuses to the first
-   * applicable facet for the selection, and can be switched manually via the
-   * facet tabs (or externally — e.g. a right-click "Edit colour" sets 'fill').
+   *   Row 1 — what it is: name + type, behavior subtype, appearance facet tabs
+   *   Row 2 — the details: the active facet's quick controls, then state /
+   *            input / value-row groups when the control has behavior.
    *
    * Every control writes the same dot-paths the PropertiesPanel uses, so this
-   * is a faster door into the same model, not a separate one.
+   * is a faster door into the same model, not a separate one. Colours edit
+   * through the display panel's Colors tab (activateColorTarget) — swatches
+   * here only open and label the target.
    */
   import Bold from 'lucide-svelte/icons/bold';
   import Italic from 'lucide-svelte/icons/italic';
@@ -24,11 +29,13 @@
   import Image from 'lucide-svelte/icons/image';
   import { selectedControl, getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
+  import { componentWorkspaceMode } from '../stores/componentWorkspace.js';
   import { availableFonts, availableIcons } from '../stores/appSettings.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { activeFacet, setFacet, APPEARANCE_FACET_ORDER } from '../stores/editorFacet.js';
   import DeviceInsight from './DeviceInsight.svelte';
   import ScriptInsight from './ScriptInsight.svelte';
+  import DisplayToolbar from '../components/DisplayToolbar.svelte';
 
   let control = $derived($selectedControl);
   let core = $derived(getSection(control, 'Core'));
@@ -43,11 +50,60 @@
   let backgroundCorners = $derived(background?._children?.Corners ?? null);
   let effects = $derived(getSection(control, 'Effects'));
   let icon = $derived(getSection(control, 'Icon'));
+  let behavior = $derived(getSection(control, 'Behavior'));
+  let valueSection = $derived(getSection(control, 'Value'));
+  let selectedStates = $derived(getSection(control, 'States'));
 
   let hasSelection = $derived($selectedComponentIds.size > 0);
   let multiSelect = $derived($selectedComponentIds.size > 1);
+  let controlType = $derived(String(core?.controlType ?? ''));
 
-  // Which facets apply to the current selection, in display order.
+  // --- Behavior groups (from the old FunctionBar) ---
+  const SUBTYPE_OPTIONS = {
+    momentary: ['action', 'repeating', 'press_to_talk'],
+    toggle: ['toggle', 'sticky'],
+    cyclic: ['cycle', 'tri_state'],
+    timed: ['hold_to_confirm', 'double_click'],
+    one_shot: ['single_use'],
+  };
+
+  let buttonType = $derived(String(behavior?.buttonType ?? inferButtonType(controlType)));
+  let subtypeOptions = $derived(SUBTYPE_OPTIONS[buttonType] ?? null);
+  let showSubtypeSelector = $derived(!!behavior && !!subtypeOptions);
+  let rowCount = $derived(Array.isArray(valueSection?.rows) ? valueSection.rows.length : 0);
+
+  let showStateToolbar = $derived(
+    String(behavior?.buttonType ?? '').trim().length > 0
+    && Object.keys(selectedStates?._children ?? {}).length > 0
+  );
+  let showSegmentToolbar = $derived(buttonType === 'radio' && Array.isArray(valueSection?.rows) && valueSection.rows.length > 0);
+  let showStateGroup = $derived(showStateToolbar || showSegmentToolbar);
+  let showInputGroup = $derived(
+    !!behavior && (hasBehaviorPath('wheelEnabled') || hasBehaviorPath('reverseMouseDirection') || hasBehaviorPath('keyboardEnabled'))
+  );
+
+  let componentDesignerActive = $derived(
+    $componentWorkspaceMode === 'surface'
+    && controlType === 'CustomComponent'
+  );
+
+  function inferButtonType(type = '') {
+    switch (String(type ?? '')) {
+      case 'ToggleButton': return 'toggle';
+      case 'RadioButtonGroup': return 'radio';
+      case 'CyclicButton': return 'cyclic';
+      case 'Combobox': return 'combobox';
+      case 'TimedButton': return 'timed';
+      case 'OneShotButton': return 'one_shot';
+      default: return 'momentary';
+    }
+  }
+
+  function hasBehaviorPath(path) {
+    return Object.prototype.hasOwnProperty.call(behavior ?? {}, path);
+  }
+
+  // --- Appearance facets (from the old AppearanceBar) ---
   const FACET_META = {
     text: { label: 'Text', icon: Type },
     fill: { label: 'Fill', icon: PaintBucket },
@@ -67,8 +123,6 @@
     return list;
   });
 
-  // The facet actually shown: the user's chosen facet if it applies, otherwise
-  // the first applicable facet in priority order.
   let shownFacet = $derived.by(() => {
     if (facets.includes($activeFacet)) return $activeFacet;
     for (const facet of APPEARANCE_FACET_ORDER) {
@@ -112,9 +166,7 @@
   }
 
   // Every colour edits through the display panel's Colors tab — clicking a
-  // swatch activates a target there. The bar previously also offered the
-  // native OS colour dialog beside each swatch: a second, different picker
-  // for the same property, and one that could never touch the alpha byte.
+  // swatch activates a labelled target there.
   function openColour(path, previous, label = 'Colour') {
     if (!core?.id) return;
     if (multiSelect) {
@@ -195,31 +247,60 @@
   }
 </script>
 
-<div class="look-bar">
-  <div class="look-main">
-  {#if !hasSelection}
-    <div class="look-row"><span class="empty-state">No selection</span></div>
-  {:else if facets.length === 0}
-    <div class="look-row"><span class="empty-state">No appearance controls for this selection</span></div>
+<div class="context-bar">
+  <div class="ctx-main">
+  {#if componentDesignerActive}
+    <div class="ctx-row"><span class="empty-state designer-state">Designer controls are active in the component workspace</span></div>
+  {:else if !hasSelection}
+    <div class="ctx-row"><span class="empty-state">No selection</span></div>
   {:else}
-    <div class="look-row facet-row">
-      <div class="facet-tabs">
-        {#each facets as facet (facet)}
-          {@const meta = FACET_META[facet]}
-          <button
-            class="facet-tab"
-            class:active={facet === shownFacet}
-            title={meta.label}
-            onclick={() => setFacet(facet)}
-          >
-            <meta.icon size={12} strokeWidth={2} />
-            <span>{meta.label}</span>
-          </button>
-        {/each}
-      </div>
+    <!-- Row 1 — what it is + which facet -->
+    <div class="ctx-row">
+      <input
+        class="name-field"
+        type="text"
+        value={core?.name ?? ''}
+        placeholder="Name"
+        disabled={multiSelect}
+        title={multiSelect ? 'Name editing is single-selection only' : 'Component name'}
+        onfocus={(event) => event.target.select()}
+        onchange={(event) => set('Core.name', event.target.value)}
+      />
+      {#if controlType}
+        <span class="type-badge" title="Control type">{multiSelect ? `${$selectedComponentIds.size} selected` : controlType}</span>
+      {/if}
+
+      {#if showSubtypeSelector}
+        <div class="divider"></div>
+        <span class="type-badge ghost" title="Button type">{buttonType}</span>
+        <select class="val-select" value={behavior?.subtype ?? subtypeOptions[0]} title="Behavior subtype" onchange={(event) => set('Behavior.subtype', event.target.value)}>
+          {#each subtypeOptions as option}
+            <option value={option}>{option}</option>
+          {/each}
+        </select>
+      {/if}
+
+      {#if facets.length > 0}
+        <div class="divider"></div>
+        <div class="facet-tabs">
+          {#each facets as facet (facet)}
+            {@const meta = FACET_META[facet]}
+            <button
+              class="facet-tab"
+              class:active={facet === shownFacet}
+              title={meta.label}
+              onclick={() => setFacet(facet)}
+            >
+              <meta.icon size={12} strokeWidth={2} />
+              <span>{meta.label}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
     </div>
 
-    <div class="look-row control-row">
+    <!-- Row 2 — the active facet's controls, then behavior groups -->
+    <div class="ctx-row">
       {#if shownFacet === 'text'}
       <div class="prop-group">
         <button
@@ -272,7 +353,7 @@
           <AlignRight size={12} strokeWidth={2} />
         </button>
       </div>
-    {:else if shownFacet === 'fill'}
+      {:else if shownFacet === 'fill'}
       <div class="prop-group">
         <button
           class="color-swatch"
@@ -282,7 +363,7 @@
           onclick={() => openColour('Background.Fill.colour', backgroundFill?.colour, 'Fill colour')}
         ></button>
       </div>
-    {:else if shownFacet === 'border'}
+      {:else if shownFacet === 'border'}
       <div class="prop-group">
         {#if backgroundBorder}
           <span class="mini-label">C</span>
@@ -308,8 +389,12 @@
           />
         {/if}
       </div>
-    {:else if shownFacet === 'box'}
+      {:else if shownFacet === 'box'}
       <div class="prop-group">
+        <span class="mini-label">X</span>
+        <input class="number-field" type="number" step="1" value={transform?.x ?? 0} title="X position" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.x', event.target.value, transform?.x ?? 0)} />
+        <span class="mini-label">Y</span>
+        <input class="number-field" type="number" step="1" value={transform?.y ?? 0} title="Y position" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.y', event.target.value, transform?.y ?? 0)} />
         <span class="mini-label">W</span>
         <input class="number-field" type="number" min="1" step="1" value={transform?.width ?? 0} title="Width" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.width', event.target.value, transform?.width ?? 0, 1)} />
         <span class="mini-label">H</span>
@@ -319,7 +404,7 @@
         <span class="mini-label">O</span>
         <input class="number-field opacity-field" type="number" min="0" max="1" step="0.05" value={transform?.opacity ?? 1} title="Opacity" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.opacity', event.target.value, transform?.opacity ?? 1, 0, 1)} />
       </div>
-    {:else if shownFacet === 'effects'}
+      {:else if shownFacet === 'effects'}
       <div class="prop-group toggle-group">
         <button class="text-toggle" class:active={shadowEnabled} title="Drop shadow" onclick={() => set('Effects.Shadows.items.0.enabled', !shadowEnabled)}>Shadow</button>
       </div>
@@ -336,7 +421,7 @@
           {/each}
         </select>
       </div>
-    {:else if shownFacet === 'icon'}
+      {:else if shownFacet === 'icon'}
       <div class="prop-group">
         <select class="font-select" value={icon?.assetId ?? ''} title="Icon" onchange={setIconAsset}>
           <option value="">No icon</option>
@@ -361,6 +446,35 @@
         <input class="number-field" type="number" step="1" value={icon?.rotation ?? 0} title="Icon rotation" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Icon.rotation', event.target.value, icon?.rotation ?? 0)} />
       </div>
       {/if}
+
+      {#if showStateGroup}
+        <div class="divider"></div>
+        <span class="section-chip">State</span>
+        <div class="toolbar-slot">
+          <DisplayToolbar />
+        </div>
+      {/if}
+
+      {#if showInputGroup}
+        <div class="divider"></div>
+        <span class="section-chip">Input</span>
+        <div class="prop-group toggle-group">
+          {#if hasBehaviorPath('wheelEnabled')}
+            <button class="text-toggle" class:active={behavior?.wheelEnabled === true} title="Mouse wheel input" onclick={() => set('Behavior.wheelEnabled', !(behavior?.wheelEnabled === true))}>Wheel</button>
+          {/if}
+          {#if hasBehaviorPath('reverseMouseDirection')}
+            <button class="text-toggle" class:active={behavior?.reverseMouseDirection === true} title="Reverse mouse direction" onclick={() => set('Behavior.reverseMouseDirection', !(behavior?.reverseMouseDirection === true))}>Reverse</button>
+          {/if}
+          {#if hasBehaviorPath('keyboardEnabled')}
+            <button class="text-toggle" class:active={behavior?.keyboardEnabled !== false} title="Keyboard input" onclick={() => set('Behavior.keyboardEnabled', !(behavior?.keyboardEnabled !== false))}>Keys</button>
+          {/if}
+        </div>
+      {/if}
+
+      {#if rowCount > 0}
+        <div class="divider"></div>
+        <span class="readout" title="Value rows defined on this control">Rows <strong>{rowCount}</strong></span>
+      {/if}
     </div>
   {/if}
   </div>
@@ -370,31 +484,36 @@
 </div>
 
 <style>
-  .look-bar {
+  .context-bar {
     display: flex;
     flex-direction: row;
     align-items: stretch;
     gap: 0;
-    height: 100%;
     padding: 4px 10px;
     background: #272727;
     font-size: 11px;
   }
 
-  .look-main {
-    flex: 0 0 auto;
-    width: 374px;
+  .ctx-main {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
     gap: 5px;
   }
 
-  .look-row {
+  .ctx-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 22px;
+    min-height: 24px;
+    flex-wrap: wrap;
+  }
+
+  .designer-state {
+    color: #8DBFE5;
+    font-weight: 700;
   }
 
   .facet-tabs {
@@ -452,8 +571,37 @@
     border-color: #5B9BD5;
   }
 
-  .font-select,
-  .number-field {
+  .section-chip {
+    flex: 0 0 auto;
+    color: #8F8F8F;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .name-field {
+    height: 22px;
+    width: 130px;
+    background: #1E1E1E;
+    color: #DDD;
+    border: 1px solid #3A3A3A;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: inherit;
+    padding: 0 6px;
+    outline: none;
+  }
+
+  .name-field:focus {
+    border-color: #5B9BD5;
+  }
+
+  .name-field:disabled {
+    opacity: 0.5;
+  }
+
+  .val-select,
+  .font-select {
     height: 22px;
     background: #1E1E1E;
     color: #DDD;
@@ -461,18 +609,44 @@
     border-radius: 3px;
     font-size: 11px;
     font-family: inherit;
+    padding: 0 6px;
     outline: none;
   }
 
   .font-select {
-    width: 118px;
+    max-width: 130px;
+  }
+
+  .type-badge {
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
     padding: 0 6px;
+    border-radius: 3px;
+    border: 1px solid #3A3A3A;
+    background: #1A1A1A;
+    color: #9FB6C9;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .type-badge.ghost {
+    color: #8F8F8F;
   }
 
   .number-field {
-    width: 48px;
+    height: 22px;
+    width: 52px;
+    background: #1E1E1E;
+    color: #DDD;
+    border: 1px solid #3A3A3A;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: inherit;
     padding: 0 4px;
-    text-align: center;
+    outline: none;
+    appearance: textfield;
     -moz-appearance: textfield;
   }
 
@@ -482,18 +656,34 @@
     margin: 0;
   }
 
-  .size-field {
-    width: 42px;
+  .number-field:focus {
+    border-color: #5B9BD5;
   }
 
-  .opacity-field {
-    width: 44px;
-  }
+  .size-field { width: 44px; }
+  .opacity-field { width: 44px; }
 
   .mini-label {
-    color: #8A8A8A;
+    color: #8F8F8F;
     font-size: 10px;
     font-weight: 700;
+  }
+
+  .readout {
+    color: #8A8A8A;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .readout strong {
+    color: #CFCFCF;
+    margin-left: 2px;
+  }
+
+  .divider {
+    width: 1px;
+    height: 16px;
+    background: #3A3A3A;
   }
 
   .toggle-group {
@@ -501,14 +691,14 @@
   }
 
   .toggle-btn {
+    height: 22px;
+    min-width: 24px;
+    padding: 0 6px;
     background: #333;
     border: 1px solid #444;
     color: #999;
-    width: 22px;
-    height: 22px;
-    font-size: 11px;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     font-family: inherit;
@@ -557,5 +747,11 @@
   .empty-state {
     color: #777;
     font-size: 11px;
+  }
+
+  .toolbar-slot {
+    min-width: 0;
+    display: flex;
+    align-items: center;
   }
 </style>
