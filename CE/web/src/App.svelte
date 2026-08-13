@@ -13,7 +13,7 @@
   import ContextBar from './CE_Application/layout/ContextBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
-  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, closeActiveEditorTab, openPanelFromFile, saveActivePanel, saveActivePanelAs, selectedComponentIds } from './CE_Application/stores/panels.js';
+  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, clearSelection, closeActiveEditorTab, openPanelFromFile, saveActivePanel, saveActivePanelAs, selectComponent, selectedComponentIds } from './CE_Application/stores/panels.js';
   import { get } from 'svelte/store';
   import { duplicateControl, groupSelectionIntoContainer, removeControl, ungroupContainer, updateControlProperty } from './CE_Application/stores/controls.js';
   import { copySelection, cutSelection, pasteSelection, selectAll } from './CE_Application/stores/clipboard.js';
@@ -134,6 +134,7 @@
       selectAll, pasteSelection, copySelection, cutSelection, duplicateControl,
       removeControl, updateControlProperty, deleteSelectedGuide,
       groupSelectionIntoContainer, ungroupContainer,
+      selectComponent, clearSelection,
     });
   }
 

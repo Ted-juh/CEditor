@@ -108,13 +108,18 @@
 </div>
 
 <style>
+  /* overflow VISIBLE: selection handles and rotate zones sit just outside a
+     control's box, so a control at x:0 — the most common position in a panel
+     layout — had its left handles clipped off and ungrabbable. Content that
+     overhangs the panel edge now shows during editing (like any design
+     tool's artboard); export and preview still clip to the panel. */
   .panel-surface {
     position: relative;
     border: 1px solid #444;
     border-radius: 2px;
     box-shadow: 0 4px 24px rgba(0,0,0,0.4);
     flex-shrink: 0;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .panel-surface.device-drop-background {

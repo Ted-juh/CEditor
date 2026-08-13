@@ -399,6 +399,7 @@
       selectAll, pasteSelection, copySelection, cutSelection, duplicateControl,
       removeControl, updateControlProperty, deleteSelectedGuide,
       groupSelectionIntoContainer, ungroupContainer,
+      selectComponent, clearSelection,
     });
   }
 

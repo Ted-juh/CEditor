@@ -103,10 +103,11 @@
     resolveRadioShapeRadius,
   } from '../utils/radioSegmentStyle.js';
   import {
-    computeResizedRect, snapRectToGrid, snapToGridAxis,
+    computeResizedRect, computeRotatedResizedRect, snapRectToGrid, snapToGridAxis,
     clientToPanelPoint, angleFromCenter, computeRotation, normalizeRotation,
     resizeHandleStyle,
   } from '../utils/transformMath.js';
+  import { sortControlsForHitTest } from '../utils/controlOrder.js';
 
   let {
     control,
@@ -570,6 +571,66 @@
     );
   }
 
+  // --- Double-click: drill into containers, edit text in place ---
+  // The Figma model: double-clicking a container selects the child under the
+  // pointer (one level per double-click); double-clicking a text-bearing
+  // control edits its text right on the canvas. A selected child becomes
+  // directly interactive (see the .children-origin .selected CSS rule), so
+  // after drilling it can be dragged and resized without a properties trip.
+  let inlineTextEditing = $state(false);
+  let inlineTextValue = $state('');
+
+  function startInlineTextEdit() {
+    const txt = getSection(control, 'Text');
+    if (!txt || !core?.id) return false;
+    inlineTextValue = String(txt.content ?? '');
+    inlineTextEditing = true;
+    return true;
+  }
+
+  function commitInlineTextEdit() {
+    if (!inlineTextEditing) return;
+    inlineTextEditing = false;
+    const txt = getSection(control, 'Text');
+    if (String(txt?.content ?? '') !== inlineTextValue) {
+      updateControlProperty(core.id, 'Text.content', inlineTextValue);
+      pushSnapshot();   // one text edit, one undo step
+    }
+  }
+
+  function handleInlineTextKey(e) {
+    e.stopPropagation();
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      commitInlineTextEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      inlineTextEditing = false;   // discard
+    }
+  }
+
+  function drillIntoChildAt(px, py) {
+    const local = panelToLocalPoint(panelControls, core?.id, px, py);
+    const child = sortControlsForHitTest(getChildControls(sourceControl ?? control)).find((candidate) => {
+      const t = candidate._children?.Transform;
+      return t && local.x >= t.x && local.x <= t.x + t.width && local.y >= t.y && local.y <= t.y + t.height;
+    });
+    const childId = child?._children?.Core?.id;
+    if (!childId) return false;
+    selectComponent(childId, false);
+    return true;
+  }
+
+  function handleDoubleClick(e) {
+    if (!editorInteractionEnabled || isEditorLocked || inlineTextEditing) return;
+    e.stopPropagation();
+    if (childControls.length) {
+      const p = surfacePointFromClient(e.clientX, e.clientY);
+      if (p && drillIntoChildAt(p.x, p.y)) return;
+    }
+    startInlineTextEdit();
+  }
+
   // --- Click to select ---
   function handleMouseDown(e) {
     if (e.button !== 0) return;
@@ -966,15 +1027,34 @@
     const dx = (e.clientX - resizeStartMouse.x) / scale;
     const dy = (e.clientY - resizeStartMouse.y) / scale;
 
-    // Resize geometry (deltas + aspect lock + min/max clamping)
-    let rect = computeResizedRect(resizeStartRect, resizeHandle, dx, dy, {
+    const rotation = Number(transform?.rotation ?? 0) % 360;
+    const resizeOpts = {
       aspectLock: e.shiftKey || (transform?.aspectLock === true),
       aspectRatio: resizeStartRect.w / resizeStartRect.h,
       minW: Math.max(MIN_SIZE, transform?.minWidth || 0),
       minH: Math.max(MIN_SIZE, transform?.minHeight || 0),
       maxW: transform?.maxWidth || 0,
       maxH: transform?.maxHeight || 0,
-    });
+    };
+
+    // Rotated controls resize in their own frame (the handles are rotated
+    // with the box, so the drag must be too), with the opposite point held
+    // fixed on screen. Axis-aligned snapping is meaningless there, so it is
+    // skipped for them.
+    if (rotation) {
+      const rect = computeRotatedResizedRect(resizeStartRect, resizeHandle, dx, dy, rotation, resizeOpts);
+      transientX = Math.round(rect.x);
+      transientY = Math.round(rect.y);
+      transientW = Math.round(rect.w);
+      transientH = Math.round(rect.h);
+      snapGuides = [];
+      setActivePanelSnapGuides([]);
+      distanceLabels = [];
+      return;
+    }
+
+    // Resize geometry (deltas + aspect lock + min/max clamping)
+    let rect = computeResizedRect(resizeStartRect, resizeHandle, dx, dy, resizeOpts);
 
     // Holding Ctrl/Cmd suspends snapping during resize, matching drag.
     const snapSuspended = e.ctrlKey || e.metaKey;
@@ -2770,6 +2850,7 @@
   class:mouse-focus-outline={mouseFocusOutline}
   style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; --inv-scale:{1 / (scale || 1)}; {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
+  ondblclick={editorInteractionEnabled ? handleDoubleClick : undefined}
   ondragover={editorInteractionEnabled ? handleDeviceParameterDragOver : undefined}
   ondrop={editorInteractionEnabled ? handleDeviceParameterDrop : undefined}
   onpointerenter={previewInteractive ? onpreviewpointerenter : undefined}
@@ -3529,8 +3610,22 @@
     </div>
   {/if}
 
+  {#if inlineTextEditing}
+    <!-- svelte-ignore a11y_autofocus -->
+    <textarea
+      class="inline-text-editor"
+      bind:value={inlineTextValue}
+      autofocus
+      onfocus={(e) => e.target.select()}
+      onblur={commitInlineTextEdit}
+      onkeydown={handleInlineTextKey}
+      onmousedown={(e) => e.stopPropagation()}
+      ondblclick={(e) => e.stopPropagation()}
+    ></textarea>
+  {/if}
+
   <CanvasControlSelectionOverlay
-    showHandles={editorInteractionEnabled && isSelected && !isEditorLocked && $selectedComponentIds.size <= 1}
+    showHandles={editorInteractionEnabled && isSelected && !isEditorLocked && $selectedComponentIds.size <= 1 && !inlineTextEditing}
     {handles}
     {handleStyle}
     onResizeStart={handleResizeStart}
@@ -3539,6 +3634,7 @@
     {snapGuides}
     {distanceLabels}
     {isKeyObject}
+    angleLabel={isRotating && transientRotation != null ? `${normalizeRotation(transientRotation)}°` : null}
     overlayOffsetX={displayX + parentOffset.x}
     overlayOffsetY={displayY + parentOffset.y}
   />
@@ -3602,6 +3698,37 @@
      lot. Scoped to preview-interactive on purpose. In the EDITOR the transparency is wanted:
      clicking a child selects its container, which is how dragging a group around works. */
   .children-origin :global(.canvas-control.preview-interactive) {
+    pointer-events: auto;
+  }
+
+  /* A SELECTED child is directly interactive in the editor too: double-click
+     drills into a container (selecting the child under the pointer), and from
+     then on the child can be dragged/resized itself. Deselect (Esc steps back
+     out to the parent) and the container is one draggable unit again. */
+  .children-origin :global(.canvas-control.selected) {
+    pointer-events: auto;
+  }
+
+  /* In-place text editor (double-click a text-bearing control). Sized by the
+     control, screen-legible at every zoom via --inv-scale. */
+  .inline-text-editor {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    background: rgba(12, 20, 28, 0.85);
+    border: calc(1px * var(--inv-scale, 1)) solid #5B9BD5;
+    border-radius: 2px;
+    color: #FFF;
+    font-family: inherit;
+    font-size: calc(12px * var(--inv-scale, 1));
+    text-align: center;
+    padding: calc(2px * var(--inv-scale, 1));
+    resize: none;
+    outline: none;
+    overflow: hidden;
+    z-index: 20;
     pointer-events: auto;
   }
 

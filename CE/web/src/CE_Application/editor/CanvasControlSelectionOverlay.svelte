@@ -9,10 +9,15 @@
     snapGuides = [],
     distanceLabels = [],
     isKeyObject = false,
+    angleLabel = null,
     overlayOffsetX = 0,
     overlayOffsetY = 0,
   } = $props();
 </script>
+
+{#if angleLabel}
+  <div class="dist-label angle-label">{angleLabel}</div>
+{/if}
 
 {#if showHandles}
   {#each handles as handle (handle.id)}
@@ -195,6 +200,14 @@
 
   .dist-v::before { top: 0; }
   .dist-v::after { bottom: 0; }
+
+  /* Live angle readout during rotation, floated above the control. */
+  .angle-label {
+    left: 50%;
+    top: calc(-16px * var(--inv-scale, 1));
+    background: #5B9BD5;
+    color: #FFF;
+  }
 
   .dist-label {
     position: absolute;

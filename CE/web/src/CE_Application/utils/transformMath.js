@@ -60,6 +60,61 @@ export function computeResizedRect(startRect, handle, dx, dy, opts) {
   return { x, y, w, h };
 }
 
+/** The point a resize keeps fixed, as an offset from the rect centre in the
+ *  control's local (unrotated) frame: the opposite corner, or the opposite
+ *  edge's midpoint for edge handles. */
+function resizeAnchorOffset(rect, handle) {
+  let ax = 0;
+  let ay = 0;
+  if (handle.includes('l')) ax = rect.w / 2;
+  else if (handle.includes('r')) ax = -rect.w / 2;
+  if (handle.includes('t')) ay = rect.h / 2;
+  else if (handle.includes('b')) ay = -rect.h / 2;
+  return { x: ax, y: ay };
+}
+
+/**
+ * Resize a ROTATED rect from a handle drag. The pointer delta arrives in
+ * panel space; it is rotated into the control's local frame, the plain
+ * resize math runs there, and the box is repositioned so the anchor point
+ * (opposite corner/edge midpoint) stays fixed **in panel space** — which is
+ * what the user sees. Without this, dragging a handle on a 45°-rotated
+ * control resized along the wrong axis while the box slid away.
+ *
+ * Falls through to computeResizedRect for unrotated controls.
+ * Returns { x, y, w, h } (x/y are the unrotated box position, as stored).
+ */
+export function computeRotatedResizedRect(startRect, handle, dx, dy, rotationDeg, opts) {
+  const rot = Number(rotationDeg ?? 0) % 360;
+  if (Math.abs(rot) < 0.001) return computeResizedRect(startRect, handle, dx, dy, opts);
+
+  const theta = (rot * Math.PI) / 180;
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+
+  // Pointer delta in the control's local frame
+  const dxl = dx * cos + dy * sin;
+  const dyl = -dx * sin + dy * cos;
+
+  // World position of the anchor before the resize
+  const c0 = { x: startRect.x + startRect.w / 2, y: startRect.y + startRect.h / 2 };
+  const a0 = resizeAnchorOffset(startRect, handle);
+  const anchorWorld = {
+    x: c0.x + a0.x * cos - a0.y * sin,
+    y: c0.y + a0.x * sin + a0.y * cos,
+  };
+
+  // Plain resize in local space, then recentre so the anchor stays put
+  const local = computeResizedRect(startRect, handle, dxl, dyl, opts);
+  const a1 = resizeAnchorOffset(local, handle);
+  const c1 = {
+    x: anchorWorld.x - (a1.x * cos - a1.y * sin),
+    y: anchorWorld.y - (a1.x * sin + a1.y * cos),
+  };
+
+  return { x: c1.x - local.w / 2, y: c1.y - local.h / 2, w: local.w, h: local.h };
+}
+
 /**
  * Snap a rect's size to a grid. x/y are snapped via `snapX`/`snapY` callbacks
  * (which may account for a grid origin offset). w/h are rounded to the

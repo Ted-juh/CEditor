@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { keyboardNudgeSmall, keyboardNudgeLarge } from '../stores/runtimePreferences.js';
-import { flatControls, isContainerControl } from './containment.js';
+import { findParentOfControl, flatControls, isContainerControl } from './containment.js';
 
 /**
  * Editor canvas keyboard shortcuts.
@@ -56,6 +56,20 @@ export function handleEditorShortcut(e, ctx) {
 
   const ids = selectedComponentIds;
   if (ids.size === 0) return;
+
+  // --- Escape: step out of the drill-down (or deselect) ---
+  // The inverse of double-click-into-a-container: a single selected child
+  // hands selection back to its parent; anything else deselects.
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    const firstId = [...ids][0];
+    const parentId = ids.size === 1
+      ? findParentOfControl(panel.controls, firstId)?._children?.Core?.id
+      : null;
+    if (parentId != null) ctx.selectComponent?.(parentId);
+    else ctx.clearSelection?.();
+    return;
+  }
 
   const selectedCtrls = flatControls(panel.controls).filter(c => ids.has(c._children?.Core?.id));
   if (selectedCtrls.length === 0) return;
