@@ -1,5 +1,23 @@
 # GUI editing-capabilities review — 2026-08-13
 
+> **Status (2026-08-13, same branch):** the ten-step fix order at the bottom of
+> this document has been implemented — one commit per step, each with tests.
+> Covered: the guarded keyboard dispatcher (S2/D1/D2), zoom-compensated
+> selection chrome + drag threshold (S1/A1/F19/F28), display-panel target
+> lifecycle + colour fixes (S3/B1–B8), gesture-boundary undo + history
+> hygiene (S6/E1), the tree as a real layers panel (C1–C6/C9/C11), wheel
+> scroll + Ctrl+wheel zoom + single fit (A3/F25/F26/F27), standard modifiers
+> (A6/A7/F6–F10), view-centred insertion + one insert catalog + dead-menu
+> removal (D4/D5/F6), the multi-select bounding box with group resize
+> (A8/F11), and the live status bar (D7).
+> Still open, in rough priority order: anchored colour/gradient popovers
+> (the dock still hosts them, now with a labelled context bar), inline canvas
+> text editing (E5), bar consolidation (S5), rotation-aware resize/hit-testing
+> or hiding rotation (A4), edge-handle clipping at panel edges (A2),
+> paste/duplicate unification + name uniqueness (E2), guides
+> persistence/undo (F14), menu enabled/checked states (D3), and a format
+> painter (E3).
+
 Scope: the whole editing GUI — canvas, display panel, component tree, menu bar, the four
 bars (Appearance / Function / Zoom / Icon rail), tab strip, status bar, shortcuts, and the
 cross-cutting workflows (undo, clipboard, insertion, text editing, workspace switching).
