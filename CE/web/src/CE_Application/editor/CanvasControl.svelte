@@ -39,6 +39,7 @@
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty, reparentControls } from '../stores/controls.js';
+  import { pushSnapshot } from '../stores/history.js';
   import { adoptParameterMetadata } from '../utils/parameterAdoption.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
@@ -880,6 +881,10 @@
     // Clear multi-drag delta
     multiDragDelta.set({ x: 0, y: 0, active: false });
 
+    // One gesture = one undo step, committed at the boundary instead of
+    // letting the 400ms debounce merge it with whatever comes next.
+    if (moved) pushSnapshot();
+
     isDragging = false;
     dragEngaged = false;
     transientX = null;
@@ -965,6 +970,7 @@
           'Transform.height': transientH,
         },
       ]]));
+      pushSnapshot();   // gesture boundary — one resize, one undo step
     }
 
     isResizing = false;
@@ -1027,6 +1033,7 @@
 
     if (core?.id && transientRotation !== rotateStartRotation) {
       updateControlProperty(core.id, 'Transform.rotation', normalizeRotation(transientRotation));
+      pushSnapshot();   // gesture boundary — one rotation, one undo step
     }
 
     isRotating = false;

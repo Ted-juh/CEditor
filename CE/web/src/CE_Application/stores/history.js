@@ -1,5 +1,5 @@
 import { get, writable } from 'svelte/store';
-import { panels, resolvedActivePanelId, activeEditorTab } from './panels.js';
+import { panels, resolvedActivePanelId, activeEditorTab, selectedComponentIds } from './panels.js';
 import {
   componentWorkspaceMode,
   componentDocuments,
@@ -31,7 +31,9 @@ export const redoAvailable = writable(false);
 
 const MAX_HISTORY = 50;
 
-// Per-context history: Map<contextKey, { undoStack: [], redoStack: [] }>
+// Per-context history: Map<contextKey, { undoStack: [], redoStack: [] }>.
+// Stack entries are { json, selection } — the serialized state plus the
+// selection that went with it, so undoing a delete re-selects what came back.
 const historyMap = new Map();
 let isRestoring = false;
 // Recording is suspended for the length of a preview run. Everything a preview does to the
@@ -42,6 +44,15 @@ let isRestoring = false;
 let suppressed = false;
 let debounceTimer = null;
 let lastSnapshotJson = null;
+let lastSelection = [];
+// Which context the committed baseline describes. A snapshot may only be
+// pushed against a baseline of the SAME context — otherwise a flush racing a
+// context switch would push one document's old state onto another's stack.
+let baselineKey = null;
+// Context the pending debounce belongs to. A tab switch flushes this before
+// re-baselining — otherwise an edit made within the debounce window of a
+// switch was silently erased from history.
+let pendingContext = null;
 
 /**
  * Resolve which editing context is currently active. The component workspace
@@ -93,7 +104,11 @@ function updateAvailability() {
   redoAvailable.set(h.redoStack.length > 0);
 }
 
-/** Serialize the active context's editable state, stripping transient fields. */
+/** Serialize the active context's editable state, stripping transient fields.
+ *  Base64 asset payloads (background image/texture, viewer images) are
+ *  excluded: at 50 snapshots per context, a 4MB image would pin ~200MB of
+ *  strings. Undo therefore does not revert those payloads — restore keeps
+ *  whatever asset is currently loaded. */
 function snapshotOf(context) {
   if (!context) return null;
   if (context.kind === 'component') {
@@ -103,11 +118,18 @@ function snapshotOf(context) {
   }
   const panel = get(panels).find((p) => p.id === context.id);
   if (!panel) return null;
-  const { id, modified, ...data } = panel;
+  const { id, modified, bgImage, bgTexture, viewer, ...data } = panel;
   return JSON.stringify(data);
 }
 
-function restoreSnapshot(context, json) {
+/** Selection ids as a plain array, captured alongside panel snapshots. */
+function selectionOf(context) {
+  if (context?.kind !== 'panel') return [];
+  return [...get(selectedComponentIds)];
+}
+
+function restoreSnapshot(context, entry) {
+  const json = entry?.json;
   if (json == null) return;
   isRestoring = true;
   if (context.kind === 'component') {
@@ -126,37 +148,46 @@ function restoreSnapshot(context, json) {
   } else {
     const data = JSON.parse(json);
     panels.update((list) =>
+      // Spread order keeps the excluded asset fields (bgImage/bgTexture/viewer)
+      // from the live panel — they are not part of the snapshot.
       list.map((p) => (p.id === context.id ? { ...p, ...data, modified: true } : p))
     );
+    // Restore the selection that went with this state, so undoing a delete
+    // hands the control back selected instead of blanking the properties view.
+    if (Array.isArray(entry.selection)) {
+      selectedComponentIds.set(new Set(entry.selection));
+    }
   }
   isRestoring = false;
   lastSnapshotJson = json;
+  lastSelection = Array.isArray(entry.selection) ? entry.selection : [];
+  baselineKey = contextKey(context);
 }
 
-/**
- * Push the current active context state onto the undo stack.
- * Called automatically via debounce, or manually before destructive actions.
- */
-export function pushSnapshot() {
+function commitSnapshot(context) {
   if (isRestoring || suppressed) return;
   clearTimeout(debounceTimer);
   debounceTimer = null;
+  pendingContext = null;
 
-  const context = activeContext();
   if (!context) return;
 
   const json = snapshotOf(context);
   if (json == null) return;
 
-  // Skip if identical to last snapshot, or if there is no committed baseline yet.
-  if (json === lastSnapshotJson) return;
-  if (lastSnapshotJson == null) {
+  // Skip if identical to last snapshot, or if there is no committed baseline
+  // yet. A baseline from a different context can't be diffed against — it
+  // becomes the new baseline instead of a bogus undo entry.
+  if (json === lastSnapshotJson && baselineKey === contextKey(context)) return;
+  if (lastSnapshotJson == null || baselineKey !== contextKey(context)) {
     lastSnapshotJson = json;
+    lastSelection = selectionOf(context);
+    baselineKey = contextKey(context);
     return;
   }
 
   const history = getHistory(contextKey(context));
-  history.undoStack.push(lastSnapshotJson);
+  history.undoStack.push({ json: lastSnapshotJson, selection: lastSelection });
 
   // Cap undo stack size
   if (history.undoStack.length > MAX_HISTORY) {
@@ -167,7 +198,27 @@ export function pushSnapshot() {
   history.redoStack.length = 0;
 
   lastSnapshotJson = json;
+  lastSelection = selectionOf(context);
   updateAvailability();
+}
+
+/**
+ * Push the current active context state onto the undo stack.
+ * Called automatically via debounce, or manually at gesture boundaries
+ * (drag/resize/rotate end) so one gesture is exactly one undo step.
+ */
+export function pushSnapshot() {
+  commitSnapshot(activeContext());
+}
+
+/** Flush a snapshot that is still waiting on the debounce timer. */
+function flushPendingSnapshot() {
+  if (!debounceTimer) return;
+  clearTimeout(debounceTimer);
+  debounceTimer = null;
+  const context = pendingContext ?? activeContext();
+  pendingContext = null;
+  commitSnapshot(context);
 }
 
 /**
@@ -177,7 +228,12 @@ export function pushSnapshot() {
 function scheduleSnapshot() {
   if (isRestoring || suppressed) return;
   if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(pushSnapshot, 400);
+  pendingContext = activeContext();
+  debounceTimer = setTimeout(() => {
+    const context = pendingContext ?? activeContext();
+    pendingContext = null;
+    commitSnapshot(context);
+  }, 400);
 }
 
 /**
@@ -198,10 +254,17 @@ export function setHistoryRecordingSuppressed(on) {
   }
 }
 
-/** Reset the committed baseline to the active context's current state. */
+/** Reset the committed baseline to the active context's current state.
+ *  Flushes any snapshot still waiting on the debounce first — it belongs to
+ *  the context being left, and dropping it erased the last pre-switch edit
+ *  from history. */
 function resetBaseline() {
   if (isRestoring) return;
-  lastSnapshotJson = snapshotOf(activeContext());
+  flushPendingSnapshot();
+  const context = activeContext();
+  lastSnapshotJson = snapshotOf(context);
+  lastSelection = selectionOf(context);
+  baselineKey = context ? contextKey(context) : null;
   updateAvailability();
 }
 
@@ -210,11 +273,7 @@ function resetBaseline() {
  */
 export function undo() {
   // Flush any pending debounced snapshot first
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
-    pushSnapshot();
-  }
+  flushPendingSnapshot();
 
   const context = activeContext();
   if (!context) return;
@@ -225,7 +284,7 @@ export function undo() {
   // Save current state to redo
   const current = snapshotOf(context);
   if (current == null) return;
-  history.redoStack.push(current);
+  history.redoStack.push({ json: current, selection: selectionOf(context) });
 
   // Restore previous state
   const prev = history.undoStack.pop();
@@ -246,7 +305,7 @@ export function redo() {
   // Save current state to undo
   const current = snapshotOf(context);
   if (current == null) return;
-  history.undoStack.push(current);
+  history.undoStack.push({ json: current, selection: selectionOf(context) });
 
   // Restore redo state
   const next = history.redoStack.pop();
@@ -274,9 +333,26 @@ export function canRedo() {
  * Subscribe to the editable stores and capture snapshots on changes.
  * Call once at app startup.
  */
+let historyInited = false;
+
 export function initHistory() {
   // Capture initial state of whatever context is active.
   resetBaseline();
+
+  // Subscriptions are registered once; repeated init calls (tests, hot
+  // reload) only re-baseline instead of stacking duplicate subscribers.
+  if (historyInited) return;
+  historyInited = true;
+
+  // Keep the baseline's selection current while the document itself is
+  // unchanged, so an undo entry pairs each state with the selection the user
+  // had in it. Skipped while an edit is pending — a delete clears the
+  // selection as part of the gesture, and the entry must keep the PRE-edit
+  // selection to hand back on undo.
+  selectedComponentIds.subscribe((ids) => {
+    if (isRestoring || suppressed || debounceTimer) return;
+    lastSelection = [...ids];
+  });
 
   // Re-baseline when the active context changes so the next edit is measured
   // against the newly-focused panel or component document, not the previous one.
@@ -293,6 +369,23 @@ export function initHistory() {
   componentDocuments.subscribe(() => {
     if (isRestoring) return;
     scheduleSnapshot();
+  });
+
+  // Garbage-collect stacks for closed documents. Self-contained (no import
+  // from the close paths, which would be circular): a context whose document
+  // no longer exists can never be undone into again, yet its snapshots used
+  // to pin memory for the whole session.
+  panels.subscribe((list) => {
+    const alive = new Set(list.map((p) => `panel:${p.id}`));
+    for (const key of historyMap.keys()) {
+      if (key.startsWith('panel:') && !alive.has(key)) historyMap.delete(key);
+    }
+  });
+  componentDocuments.subscribe((list) => {
+    const alive = new Set(list.map((doc) => `component:${doc.id}`));
+    for (const key of historyMap.keys()) {
+      if (key.startsWith('component:') && !alive.has(key)) historyMap.delete(key);
+    }
   });
 }
 
