@@ -138,12 +138,14 @@ export function createMarqueeController(state, { getSurface, getScale, isBlocked
     state.end = { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale };
   }
 
-  function onEnd() {
+  function onEnd(e) {
     if (!state.isActive) return;
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onEnd);
     state.isActive = false;
-    onSelect?.(getRect());
+    // The mouseup event rides along so the consumer can read modifiers
+    // (Shift+marquee extends the selection instead of replacing it).
+    onSelect?.(getRect(), e);
 
     // Swallow the click that follows mouseup so canvas-click handlers don't
     // immediately clear the selection we just made.

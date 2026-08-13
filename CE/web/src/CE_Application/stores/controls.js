@@ -316,6 +316,50 @@ export function duplicateControl(ids) {
 }
 
 /**
+ * Duplicate controls at their exact positions, leaving the selection alone.
+ * Backs the Alt+drag gesture: the dragged originals move on, and these clones
+ * stay behind where the gesture started.
+ * @param {string|string[]|Set<string>} ids
+ * @returns {object[]|null} The clones, or null
+ */
+export function duplicateControlsInPlace(ids) {
+  const panelId = get(resolvedActivePanelId);
+  if (panelId == null) return null;
+
+  const idList = typeof ids === 'string' ? [ids] : [...ids];
+  const panel = get(panels).find(p => p.id === panelId);
+  if (!panel) return null;
+
+  const rootIds = selectionRoots(panel.controls, idList);
+  const clones = [];
+  for (const id of rootIds) {
+    const source = findControlById(panel.controls, id);
+    if (!source) continue;
+    const clone = remintControlIds(source);
+    clone._children.Core.name = `${clone._children.Core.name}_copy`;
+    if (isExclusiveSelectBehavior(clone?._children?.Behavior) && clone._children.Behavior.defaultValue === true) {
+      clone._children.Behavior.defaultValue = false;
+    }
+    const parent = findParentOfControl(panel.controls, id);
+    clones.push({ clone, parentId: parent?._children?.Core?.id ?? null });
+  }
+  if (clones.length === 0) return null;
+
+  panels.update(list =>
+    list.map(p => {
+      if (p.id !== panelId) return p;
+      let controls = p.controls;
+      for (const { clone, parentId } of clones) {
+        controls = insertControlIntoTree(controls, parentId, clone);
+      }
+      return { ...p, controls, modified: true };
+    })
+  );
+
+  return clones.map(({ clone }) => clone);
+}
+
+/**
  * Update a property on a control using a dot-notation path.
  * Path is relative to the control's _children, e.g.:
  *   "Transform.x" → control._children.Transform.x

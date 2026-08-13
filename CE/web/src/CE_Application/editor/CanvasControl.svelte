@@ -38,7 +38,7 @@
   import TransportRenderer from './TransportRenderer.svelte';
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
-  import { applyControlPatchesById, getSection, updateControlProperty, reparentControls } from '../stores/controls.js';
+  import { applyControlPatchesById, duplicateControlsInPlace, getSection, updateControlProperty, reparentControls } from '../stores/controls.js';
   import { pushSnapshot } from '../stores/history.js';
   import { adoptParameterMetadata } from '../utils/parameterAdoption.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
@@ -462,6 +462,14 @@
   // control — by whole panel units when zoomed out — and dirties the document.
   const DRAG_ENGAGE_SCREEN_PX = 4;
   let dragEngaged = $state(false);
+  // Space held during a drag keeps the control in its current parent
+  // (Figma's convention). Alt is busy: Alt+drag leaves a copy behind.
+  // Space isn't a MouseEvent modifier, so it's tracked via key listeners
+  // that live only for the duration of the drag.
+  let dragSpaceHeld = false;
+  function handleDragSpaceKey(e) {
+    if (e.key === ' ') dragSpaceHeld = e.type === 'keydown';
+  }
   let rootElement = $state(null);
 
   // --- Resize state ---
@@ -567,9 +575,11 @@
     if (e.button !== 0) return;
     e.stopPropagation();
 
-    const multiKey = e.ctrlKey || e.metaKey;
+    // Shift+click is the industry-standard extend gesture; Ctrl/Cmd+click
+    // does the same for muscle memory from file managers.
+    const multiKey = e.ctrlKey || e.metaKey || e.shiftKey;
     if (multiKey) {
-      // Ctrl+click: toggle this component in/out of selection
+      // Toggle this component in/out of selection
       selectComponent(core?.id, true);
     } else if (!isSelected) {
       // Normal click on unselected: replace selection with just this one
@@ -590,6 +600,7 @@
     // Start drag
     isDragging = true;
     dragEngaged = false;
+    dragSpaceHeld = false;
     dragStartMouse = { x: e.clientX, y: e.clientY };
     dragStartPos = { x: transform?.x ?? 0, y: transform?.y ?? 0 };
     transientX = dragStartPos.x;
@@ -598,6 +609,8 @@
 
     window.addEventListener('mousemove', handleDragMove);
     window.addEventListener('mouseup', handleDragEnd);
+    window.addEventListener('keydown', handleDragSpaceKey);
+    window.addEventListener('keyup', handleDragSpaceKey);
   }
 
   function parseDeviceParameterDrag(event) {
@@ -775,20 +788,31 @@
       if (screenDist < DRAG_ENGAGE_SCREEN_PX) return;
       dragEngaged = true;
     }
-    const dx = (e.clientX - dragStartMouse.x) / scale;
-    const dy = (e.clientY - dragStartMouse.y) / scale;
+    let dx = (e.clientX - dragStartMouse.x) / scale;
+    let dy = (e.clientY - dragStartMouse.y) / scale;
+
+    // Shift constrains the move to the dominant axis.
+    if (e.shiftKey) {
+      if (Math.abs(dx) >= Math.abs(dy)) dy = 0;
+      else dx = 0;
+    }
 
     let newX = dragStartPos.x + dx;
     let newY = dragStartPos.y + dy;
 
+    // Holding Ctrl/Cmd suspends every snap for the duration — the only way
+    // to place something 2px off a neighbour's edge without a settings trip.
+    const snapSuspended = e.ctrlKey || e.metaKey;
+
     // Grid snap first
-    if (snapToGrid && gridSize > 0) {
+    if (!snapSuspended && snapToGrid && gridSize > 0) {
       newX = snapToGridX(newX);
       newY = snapToGridY(newY);
     }
 
     // Alignment snap overrides grid when within threshold
-    const align = alignSnap(newX, newY, displayW, displayH);
+    const align = snapSuspended ? { x: newX, y: newY, guides: [] } : alignSnap(newX, newY, displayW, displayH);
+    if (snapSuspended) setActivePanelSnapGuides([]);
     transientX = Math.round(align.x);
     transientY = Math.round(align.y);
     snapGuides = align.guides;
@@ -800,10 +824,11 @@
       multiDragDelta.set({ x: transientX - dragStartPos.x, y: transientY - dragStartPos.y, active: true });
     }
 
-    // Highlight the container under the pointer as the drop target (Alt suppresses).
+    // Highlight the container under the pointer as the drop target
+    // (holding Space keeps the current parent).
     const currentParentId = parentChainIds[0] ?? null;
     const surfacePoint = surfacePointFromClient(e.clientX, e.clientY);
-    const target = (!e.altKey && surfacePoint) ? dropCandidateAt(surfacePoint.x, surfacePoint.y) : currentParentId;
+    const target = (!dragSpaceHeld && surfacePoint) ? dropCandidateAt(surfacePoint.x, surfacePoint.y) : currentParentId;
     containerDropTargetId.set(target !== currentParentId ? target : null);
   }
 
@@ -811,6 +836,8 @@
     if (!isDragging) return;
     window.removeEventListener('mousemove', handleDragMove);
     window.removeEventListener('mouseup', handleDragEnd);
+    window.removeEventListener('keydown', handleDragSpaceKey);
+    window.removeEventListener('keyup', handleDragSpaceKey);
     containerDropTargetId.set(null);
 
     const dx = transientX - dragStartPos.x;
@@ -819,10 +846,17 @@
     const ids = get(selectedComponentIds);
     const isMultiDrag = ids.size > 1 && ids.has(core?.id);
 
+    // Alt held at drop: leave a copy of the moved controls where the gesture
+    // started — Alt+drag-duplicate, done before the originals move so the
+    // clones inherit the start positions.
+    if (moved && e?.altKey === true) {
+      duplicateControlsInPlace(isMultiDrag ? ids : [core?.id]);
+    }
+
     // Where did the drag end — over which container (or top level)?
     const currentParentId = parentChainIds[0] ?? null;
     let targetParentId = currentParentId;
-    if (moved && e?.altKey !== true) {
+    if (moved && !dragSpaceHeld) {
       const surfacePoint = surfacePointFromClient(e?.clientX, e?.clientY);
       if (surfacePoint) targetParentId = dropCandidateAt(surfacePoint.x, surfacePoint.y);
     }
@@ -942,11 +976,15 @@
       maxH: transform?.maxHeight || 0,
     });
 
+    // Holding Ctrl/Cmd suspends snapping during resize, matching drag.
+    const snapSuspended = e.ctrlKey || e.metaKey;
+
     // Grid snap
-    if (snapToGrid) rect = snapRectToGrid(rect, gridSize, snapToGridX, snapToGridY);
+    if (!snapSuspended && snapToGrid) rect = snapRectToGrid(rect, gridSize, snapToGridX, snapToGridY);
 
     // Alignment snap overrides grid when within threshold
-    const align = alignSnap(rect.x, rect.y, rect.w, rect.h);
+    const align = snapSuspended ? { x: rect.x, y: rect.y, guides: [] } : alignSnap(rect.x, rect.y, rect.w, rect.h);
+    if (snapSuspended) setActivePanelSnapGuides([]);
     transientX = Math.round(align.x);
     transientY = Math.round(align.y);
     transientW = Math.round(rect.w);
