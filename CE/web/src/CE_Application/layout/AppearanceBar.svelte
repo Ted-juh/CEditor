@@ -111,20 +111,20 @@
     return '#FFFFFF';
   }
 
-  function toStoredColour(value, previous = 'FFFFFFFF') {
-    const hex = String(value ?? '').replace(/^#/, '').toUpperCase();
-    if (hex.length !== 6) return previous;
-    const previousHex = String(previous ?? '').replace(/^#/, '').toUpperCase();
-    const alpha = previousHex.length === 8 ? previousHex.slice(0, 2) : 'FF';
-    return `${alpha}${hex}`;
-  }
-
-  function setColour(path, value, previous) {
-    set(path, toStoredColour(value, previous));
-  }
-
-  function openColour(path, previous) {
-    if (!core?.id || multiSelect) return;
+  // Every colour edits through the display panel's Colors tab — clicking a
+  // swatch activates a target there. The bar previously also offered the
+  // native OS colour dialog beside each swatch: a second, different picker
+  // for the same property, and one that could never touch the alpha byte.
+  function openColour(path, previous, label = 'Colour') {
+    if (!core?.id) return;
+    if (multiSelect) {
+      activateColorTarget({
+        type: 'callback',
+        label: `${$selectedComponentIds.size} selected · ${label}`,
+        apply: (hex) => updateSelectedProperty(path, hex),
+      }, String(previous ?? 'FFFFFFFF'));
+      return;
+    }
     activateColorTarget({ type: 'control', controlId: core.id, path }, String(previous ?? 'FFFFFFFF'));
   }
 
@@ -222,15 +222,13 @@
     <div class="look-row control-row">
       {#if shownFacet === 'text'}
       <div class="prop-group">
-        <input
+        <button
           class="color-swatch"
-          type="color"
-          value={textColour}
           style="background: {textColour};"
-          title="Text colour"
-          onchange={(event) => setColour('Text.Fill.colour', event.target.value, textFill?.colour)}
-        />
-        <button class="target-btn" title="Open text colour in Colors panel" onclick={() => openColour('Text.Fill.colour', textFill?.colour)}>...</button>
+          title="Text colour — edits in the Colors panel"
+          aria-label="Text colour"
+          onclick={() => openColour('Text.Fill.colour', textFill?.colour, 'Text colour')}
+        ></button>
       </div>
 
       <div class="prop-group">
@@ -276,29 +274,25 @@
       </div>
     {:else if shownFacet === 'fill'}
       <div class="prop-group">
-        <input
+        <button
           class="color-swatch"
-          type="color"
-          value={backgroundColour}
           style="background: {backgroundColour};"
-          title="Background fill colour"
-          onchange={(event) => setColour('Background.Fill.colour', event.target.value, backgroundFill?.colour)}
-        />
-        <button class="target-btn" title="Open fill colour in Colors panel" onclick={() => openColour('Background.Fill.colour', backgroundFill?.colour)}>...</button>
+          title="Background fill colour — edits in the Colors panel"
+          aria-label="Background fill colour"
+          onclick={() => openColour('Background.Fill.colour', backgroundFill?.colour, 'Fill colour')}
+        ></button>
       </div>
     {:else if shownFacet === 'border'}
       <div class="prop-group">
         {#if backgroundBorder}
           <span class="mini-label">C</span>
-          <input
+          <button
             class="color-swatch"
-            type="color"
-            value={borderColour}
             style="background: {borderColour};"
-            title="Border colour"
-            onchange={(event) => setColour('Background.Border.colour', event.target.value, backgroundBorder?.colour)}
-          />
-          <button class="target-btn" title="Open border colour in Colors panel" onclick={() => openColour('Background.Border.colour', backgroundBorder?.colour)}>...</button>
+            title="Border colour — edits in the Colors panel"
+            aria-label="Border colour"
+            onclick={() => openColour('Background.Border.colour', backgroundBorder?.colour, 'Border colour')}
+          ></button>
         {/if}
         {#if backgroundCorners}
           <span class="mini-label">R</span>
@@ -354,15 +348,13 @@
         <input class="number-field size-field" type="number" min="4" step="1" value={icon?.size ?? 16} title="Icon size" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Icon.size', event.target.value, icon?.size ?? 16, 4)} />
       </div>
       <div class="prop-group">
-        <input
+        <button
           class="color-swatch"
-          type="color"
-          value={iconTintColour}
           style="background: {iconTintColour};"
-          title="Icon tint"
-          onchange={(event) => setColour('Icon.tint', event.target.value, icon?.tint)}
-        />
-        <button class="target-btn" title="Open icon tint in Colors panel" onclick={() => openColour('Icon.tint', icon?.tint)}>...</button>
+          title="Icon tint — edits in the Colors panel"
+          aria-label="Icon tint"
+          onclick={() => openColour('Icon.tint', icon?.tint, 'Icon tint')}
+        ></button>
         <span class="mini-label">O</span>
         <input class="number-field opacity-field" type="number" min="0" max="1" step="0.05" value={icon?.opacity ?? 1} title="Icon opacity" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Icon.opacity', event.target.value, icon?.opacity ?? 1, 0, 1)} />
         <span class="mini-label">R</span>
@@ -454,29 +446,10 @@
     border: 1px solid #555;
     cursor: pointer;
     padding: 0;
-    background: transparent;
   }
 
-  .color-swatch::-webkit-color-swatch-wrapper {
-    padding: 0;
-  }
-
-  .color-swatch::-webkit-color-swatch {
-    border: none;
-    border-radius: 2px;
-  }
-
-  .target-btn {
-    width: 20px;
-    height: 18px;
-    border-radius: 3px;
-    border: 1px solid #444;
-    background: #333;
-    color: #999;
-    cursor: pointer;
-    font-size: 10px;
-    line-height: 1;
-    padding: 0;
+  .color-swatch:hover {
+    border-color: #5B9BD5;
   }
 
   .font-select,
@@ -545,8 +518,7 @@
   .toggle-btn:first-child { border-radius: 3px 0 0 3px; }
   .toggle-btn:last-child  { border-radius: 0 3px 3px 0; }
 
-  .toggle-btn:hover,
-  .target-btn:hover {
+  .toggle-btn:hover {
     background: #444;
     color: #DDD;
   }
