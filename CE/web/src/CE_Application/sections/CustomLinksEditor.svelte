@@ -4,6 +4,11 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import CheckSquare from 'lucide-svelte/icons/square-check';
+  import Bug from 'lucide-svelte/icons/bug';
+  import Brackets from 'lucide-svelte/icons/brackets';
+  import Hash from 'lucide-svelte/icons/hash';
   import ConditionBuilder from './ConditionBuilder.svelte';
   import { activePanel } from '../stores/panels.js';
   import {
@@ -302,11 +307,17 @@
 
 {#if links}
   <PropertySection title="Logic">
-    <PropertyCell label="Enabled" span={2} hint="Enable internal and external logic links for this component.">
-      <PropertyToggle value={links.enabled !== false} onchange={() => setRoot('enabled', !(links.enabled !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Debug" span={2} hint="Show link debug information in the test bench later.">
-      <PropertyToggle value={links.debug === true} onchange={() => setRoot('debug', !(links.debug === true))} />
+    <PropertyCell label="Logic" span={2} hint="Enable logic links, show link debug information. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'enabled', title: 'Enabled — enable internal and external logic links for this component', on: links.enabled !== false, icon: CheckSquare },
+          { key: 'debug', title: 'Debug — show link debug information in the test bench later', on: links.debug === true, icon: Bug },
+        ]}
+        ontoggle={(key) => {
+          if (key === 'enabled') setRoot('enabled', !(links.enabled !== false));
+          else if (key === 'debug') setRoot('debug', !(links.debug === true));
+        }}
+      />
     </PropertyCell>
   </PropertySection>
 
@@ -516,11 +527,17 @@
           <PropertyCell label="Output Max" span={1} compact hint="Highest target value after mapping.">
             <NumberCell label="OutMax" value={selected.outputMax ?? 1} step={0.01} defaultValue={1} onchange={(value) => set('outputMax', value)} />
           </PropertyCell>
-          <PropertyCell label="Clamp" span={2} hint="Keep mapped values inside the output range.">
-            <PropertyToggle value={selected.clamp !== false} onchange={() => set('clamp', !(selected.clamp !== false))} />
-          </PropertyCell>
-          <PropertyCell label="Round" span={2} hint="Round mapped values to whole numbers before snapping.">
-            <PropertyToggle value={selected.round === true} onchange={() => set('round', !(selected.round === true))} />
+          <PropertyCell label="Clamp / Round" span={2} hint="Clamp mapped values to the output range, round to whole numbers before snapping. Hover a chip for its name.">
+            <FlagStrip
+              flags={[
+                { key: 'clamp', title: 'Clamp — keep mapped values inside the output range', on: selected.clamp !== false, icon: Brackets },
+                { key: 'round', title: 'Round — round mapped values to whole numbers before snapping', on: selected.round === true, icon: Hash },
+              ]}
+              ontoggle={(key) => {
+                if (key === 'clamp') set('clamp', !(selected.clamp !== false));
+                else if (key === 'round') set('round', !(selected.round === true));
+              }}
+            />
           </PropertyCell>
         {:else if selected.type === 'offset'}
           <PropertyCell label="Amount" span={2} compact hint="Amount added to the source before writing the target.">

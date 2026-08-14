@@ -2,8 +2,11 @@
   import { getSection, updateControlProperty, removeControlNode } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
-  import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Segmented from '../properties/Segmented.svelte';
+  import CheckSquare from 'lucide-svelte/icons/square-check';
+  import Eye from 'lucide-svelte/icons/eye';
   import ConditionBuilder from './ConditionBuilder.svelte';
   import { createHitZone } from '../utils/customComponentFactory.js';
 
@@ -227,11 +230,17 @@
     </PropertySection>
 
     <PropertySection title="Target">
-      <PropertyCell label="Enabled" span={1} hint="Enable or disable this interaction zone.">
-        <PropertyToggle value={selected.enabled !== false} onchange={() => set('enabled', !(selected.enabled !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Editor" span={1} hint="Show this zone in designer/debug overlays.">
-        <PropertyToggle value={selected.visibleInEditor !== false} onchange={() => set('visibleInEditor', !(selected.visibleInEditor !== false))} />
+      <PropertyCell label="State" span={2} hint="Zone enabled, visible in designer/debug overlays. Hover a chip for its name.">
+        <FlagStrip
+          flags={[
+            { key: 'enabled', title: 'Enabled — enable or disable this interaction zone', on: selected.enabled !== false, icon: CheckSquare },
+            { key: 'editor', title: 'Editor — show this zone in designer/debug overlays', on: selected.visibleInEditor !== false, icon: Eye },
+          ]}
+          ontoggle={(key) => {
+            if (key === 'enabled') set('enabled', !(selected.enabled !== false));
+            else if (key === 'editor') set('visibleInEditor', !(selected.visibleInEditor !== false));
+          }}
+        />
       </PropertyCell>
       <PropertyCell label="Shape" span={2} hint="Shape used for hit testing.">
         <select class="val" value={selected.shape ?? 'rectangle'} onchange={(event) => set('shape', event.target.value)}>
@@ -285,10 +294,15 @@
         <NumberCell label="H" value={selected.bounds?.height ?? 100} step={1} min={0} defaultValue={100} onchange={(value) => set('bounds.height', value)} />
       </PropertyCell>
       <PropertyCell label="Unit" span={2} hint="Percent keeps zones responsive; px keeps them fixed.">
-        <select class="val" value={selected.bounds?.unit ?? 'percent'} onchange={(event) => set('bounds.unit', event.target.value)}>
-          <option value="percent">percent</option>
-          <option value="px">px</option>
-        </select>
+        <Segmented
+          ariaLabel="Bounds unit"
+          value={selected.bounds?.unit ?? 'percent'}
+          options={[
+            { value: 'percent', label: 'percent' },
+            { value: 'px', label: 'px' },
+          ]}
+          onchange={(v) => set('bounds.unit', v)}
+        />
       </PropertyCell>
       <PropertyCell label="Condition" span={4} hint="When this zone is active. Leave empty for always.">
         <ConditionBuilder value={selected.condition ?? ''} channels={channelNames} onChange={(next) => set('condition', next)} placeholder="zone always active" />

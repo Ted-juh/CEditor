@@ -5,6 +5,9 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import ArrowRightToLine from 'lucide-svelte/icons/arrow-right-to-line';
+  import ArrowRightFromLine from 'lucide-svelte/icons/arrow-right-from-line';
 
   let { control = null } = $props();
 
@@ -433,11 +436,17 @@
         <option value="allInternals">allInternals</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Inputs" span={2} hint="Allow other components to drive published inputs.">
-      <PropertyToggle value={api?.acceptsExternalLinks !== false} onchange={() => set('ExternalAPI.acceptsExternalLinks', !(api?.acceptsExternalLinks !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Outputs" span={2} hint="Allow this component to drive other components.">
-      <PropertyToggle value={api?.emitsExternalLinks !== false} onchange={() => set('ExternalAPI.emitsExternalLinks', !(api?.emitsExternalLinks !== false))} />
+    <PropertyCell label="External" span={2} hint="Accept external input links, emit external output links. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'inputs', title: 'Inputs — allow other components to drive published inputs', on: api?.acceptsExternalLinks !== false, icon: ArrowRightToLine },
+          { key: 'outputs', title: 'Outputs — allow this component to drive other components', on: api?.emitsExternalLinks !== false, icon: ArrowRightFromLine },
+        ]}
+        ontoggle={(key) => {
+          if (key === 'inputs') set('ExternalAPI.acceptsExternalLinks', !(api?.acceptsExternalLinks !== false));
+          else if (key === 'outputs') set('ExternalAPI.emitsExternalLinks', !(api?.emitsExternalLinks !== false));
+        }}
+      />
     </PropertyCell>
   </PropertySection>
 

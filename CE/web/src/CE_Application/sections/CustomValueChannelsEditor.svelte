@@ -5,6 +5,9 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Cable from 'lucide-svelte/icons/cable';
+  import Magnet from 'lucide-svelte/icons/magnet';
   import { createValueChannel } from '../utils/customComponentFactory.js';
   import { normalizeCustomChannelValue, snapCustomChannelValue } from '../utils/customComponentInteraction.js';
 
@@ -333,11 +336,17 @@
           <button type="button" onclick={jumpToPublish}>Edit in Publish</button>
         </div>
       </PropertyCell>
-      <PropertyCell label="Device" span={1} hint="Allow MIDI/device binding for this value.">
-        <PropertyToggle value={selected.deviceBindable !== false} onchange={() => set('deviceBindable', !(selected.deviceBindable !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Snap" span={1} hint="Snap this value to its defined step/ticks/grid.">
-        <PropertyToggle value={selected.snap?.enabled !== false} onchange={() => set('snap.enabled', !(selected.snap?.enabled !== false))} />
+      <PropertyCell label="Device / Snap" span={2} hint="Allow MIDI/device binding, snap the value to its defined step/ticks/grid. Hover a chip for its name.">
+        <FlagStrip
+          flags={[
+            { key: 'device', title: 'Device — allow MIDI/device binding for this value', on: selected.deviceBindable !== false, icon: Cable },
+            { key: 'snap', title: 'Snap — snap this value to its defined step/ticks/grid', on: selected.snap?.enabled !== false, icon: Magnet },
+          ]}
+          ontoggle={(key) => {
+            if (key === 'device') set('deviceBindable', !(selected.deviceBindable !== false));
+            else if (key === 'snap') set('snap.enabled', !(selected.snap?.enabled !== false));
+          }}
+        />
       </PropertyCell>
     </PropertySection>
 
