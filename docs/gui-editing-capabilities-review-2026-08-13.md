@@ -24,9 +24,16 @@
 > DPD's fake title bar and dead nav items are gone (E4); and New Panel is a
 > template dialog with size presets, plus Panel/Recent colour rows in the
 > Colors tab (E6).
-> Still open: paste/duplicate unification + name uniqueness (E2), guides
-> persistence/undo (F14), menu enabled/checked states (D3), a format
-> painter (E3), and the properties-panel round (including ~130 native
+> **Third round (2026-08-14, same branch):** the four remaining findings
+> landed — paste/duplicate unified on one clipboard model with unique
+> `_copy` names and paste-into-surviving-parent (E2); guides moved into the
+> panel document so they save, load, and undo with everything else (F14);
+> menu items now grey out when their command can't run and Grid/Snap show
+> checkmarks, with Escape closing menus (D3); and a format painter —
+> Ctrl+Alt+C copies a control's Background/Text/Icon/Effects styling
+> (never its words), Ctrl+Alt+V restyles the whole selection in one undo
+> step, from the Edit menu and canvas context menu too (E3).
+> Still open: only the properties-panel round (including ~130 native
 > colour inputs in sections/* that should route through the display panel).
 
 Scope: the whole editing GUI — canvas, display panel, component tree, menu bar, the four
