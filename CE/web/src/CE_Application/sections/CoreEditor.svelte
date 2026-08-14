@@ -1,7 +1,7 @@
 <script>
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let { control = null } = $props();
 
@@ -80,7 +80,7 @@
     </div>
     <div class="prop-row">
       <span class="lbl">Z-Index</span>
-      <NumberInput value={core.zIndex} step={1} min={0} onchange={(v) => set('zIndex', v)} />
+      <NumberCell value={core.zIndex} step={1} min={0} onchange={(v) => set('zIndex', v)} />
     </div>
     <div class="prop-row">
       <span class="lbl">Layer</span>

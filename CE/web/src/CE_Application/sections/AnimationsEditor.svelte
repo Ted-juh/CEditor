@@ -5,7 +5,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let { control = null } = $props();
 
@@ -256,11 +256,11 @@
       <PropertyCell label="Kind" span={1} hint="Animation family. Transition is the only runtime kind in this slice.">
         <input class="val" type="text" value={selectedAnimation.kind ?? 'transition'} onchange={(e) => setAnimationProp('kind', e.target.value)} />
       </PropertyCell>
-      <PropertyCell label="Duration" span={1} hint="Transition duration in milliseconds.">
-        <NumberInput value={selectedAnimation.duration ?? 120} step={1} min={0} onchange={(value) => setAnimationProp('duration', value)} />
+      <PropertyCell label="Duration" span={1} compact hint="Transition duration in milliseconds.">
+        <NumberCell label="Dur" value={selectedAnimation.duration ?? 120} step={1} min={0} defaultValue={120} onchange={(value) => setAnimationProp('duration', value)} />
       </PropertyCell>
-      <PropertyCell label="Delay" span={1} hint="Transition delay in milliseconds.">
-        <NumberInput value={selectedAnimation.delay ?? 0} step={1} min={0} onchange={(value) => setAnimationProp('delay', value)} />
+      <PropertyCell label="Delay" span={1} compact hint="Transition delay in milliseconds.">
+        <NumberCell label="Delay" value={selectedAnimation.delay ?? 0} step={1} min={0} defaultValue={0} onchange={(value) => setAnimationProp('delay', value)} />
       </PropertyCell>
       <PropertyCell label="Easing" span={2} hint="Named easing curve, mapped to a CSS timing function.">
         <select class="val" value={selectedAnimation.easing ?? 'outQuad'} onchange={(e) => setAnimationProp('easing', e.target.value)}>

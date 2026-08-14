@@ -5,7 +5,7 @@
   import { availableIcons } from '../stores/appSettings.js';
   import PropertyGrid from '../properties/PropertyGrid.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let { control = null } = $props();
 
@@ -47,11 +47,13 @@
       </select>
     </PropertyCell>
 
-    <PropertyCell label="Size" span={1} hint="Display size in pixels">
-      <NumberInput
+    <PropertyCell label="Size" span={1} compact hint="Display size in pixels">
+      <NumberCell
+        label="Size"
         value={icon?.size ?? 16}
         min={4}
         step={1}
+        defaultValue={16}
         onchange={(value) => set('Icon.size', value)}
       />
     </PropertyCell>
@@ -60,20 +62,24 @@
       <input class="icon-select" type="text" value={icon?.tint ?? 'FFFFFFFF'} onchange={(event) => set('Icon.tint', event.target.value)} />
     </PropertyCell>
 
-    <PropertyCell label="Opacity" span={1} hint="Opacity applied to the icon image.">
-      <NumberInput
+    <PropertyCell label="Opacity" span={1} compact hint="Opacity applied to the icon image.">
+      <NumberCell
+        label="Opac"
         value={icon?.opacity ?? 1}
         min={0}
         max={1}
         step={0.05}
+        defaultValue={1}
         onchange={(value) => set('Icon.opacity', value)}
       />
     </PropertyCell>
 
-    <PropertyCell label="Rotate" span={1} hint="Rotation applied to the icon layer.">
-      <NumberInput
+    <PropertyCell label="Rotate" span={1} compact hint="Rotation applied to the icon layer.">
+      <NumberCell
+        label="Rot"
         value={icon?.rotation ?? 0}
         step={1}
+        defaultValue={0}
         onchange={(value) => set('Icon.rotation', value)}
       />
     </PropertyCell>

@@ -3,7 +3,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
   import { syncPresetChoiceRows, initPresetChoiceSync } from '../stores/presetChoiceSync.js';
 
@@ -23,8 +23,8 @@
 
 {#if lb}
   <PropertySection title="Rows">
-    <PropertyCell label="Row height" span={2} hint="Fixed row height in px (0 = auto from font size).">
-      <NumberInput value={lb.rowHeight ?? 0} step={1} min={0} max={80} onchange={(v) => set('rowHeight', Math.max(0, Math.round(v)))} />
+    <PropertyCell label="Row height" span={2} compact hint="Fixed row height in px (0 = auto from font size).">
+      <NumberCell label="Height" value={lb.rowHeight ?? 0} step={1} min={0} max={80} defaultValue={0} onchange={(v) => set('rowHeight', Math.max(0, Math.round(v)))} />
     </PropertyCell>
     <PropertyCell label="Density" span={2} hint="Comfortable or compact auto row height.">
       <select class="val" value={lb.density ?? 'comfortable'} onchange={(e) => set('density', e.target.value)}>

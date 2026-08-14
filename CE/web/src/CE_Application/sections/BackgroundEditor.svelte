@@ -15,7 +15,6 @@
   import { deepClone } from '../utils/deepClone.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import LayerEffectsSection from '../panels/LayerEffectsSection.svelte';
-  import NumberInput from './NumberInput.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import { browseImage, onImageBrowsed } from '../bridge/bridge.js';
   import BlendModeSelect from '../properties/BlendModeSelect.svelte';

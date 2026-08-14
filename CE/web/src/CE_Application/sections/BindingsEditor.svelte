@@ -5,7 +5,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let { control = null } = $props();
 
@@ -165,17 +165,17 @@
 
     {#if selectedBinding.mapMode === 'range'}
       <PropertySection title="Range Map">
-        <PropertyCell label="In Min" span={1} hint="Minimum input value for normalization.">
-          <NumberInput value={selectedBinding.inputMin ?? 0} step={0.01} onchange={(value) => setBindingProp('inputMin', value)} />
+        <PropertyCell label="In Min" span={1} compact hint="Minimum input value for normalization.">
+          <NumberCell label="InMin" value={selectedBinding.inputMin ?? 0} step={0.01} defaultValue={0} onchange={(value) => setBindingProp('inputMin', value)} />
         </PropertyCell>
-        <PropertyCell label="In Max" span={1} hint="Maximum input value for normalization.">
-          <NumberInput value={selectedBinding.inputMax ?? 1} step={0.01} onchange={(value) => setBindingProp('inputMax', value)} />
+        <PropertyCell label="In Max" span={1} compact hint="Maximum input value for normalization.">
+          <NumberCell label="InMax" value={selectedBinding.inputMax ?? 1} step={0.01} defaultValue={1} onchange={(value) => setBindingProp('inputMax', value)} />
         </PropertyCell>
-        <PropertyCell label="Out Min" span={1} hint="Minimum output value written to the target.">
-          <NumberInput value={selectedBinding.outputMin ?? 0} step={0.01} onchange={(value) => setBindingProp('outputMin', value)} />
+        <PropertyCell label="Out Min" span={1} compact hint="Minimum output value written to the target.">
+          <NumberCell label="OutMin" value={selectedBinding.outputMin ?? 0} step={0.01} defaultValue={0} onchange={(value) => setBindingProp('outputMin', value)} />
         </PropertyCell>
-        <PropertyCell label="Out Max" span={1} hint="Maximum output value written to the target.">
-          <NumberInput value={selectedBinding.outputMax ?? 100} step={0.01} onchange={(value) => setBindingProp('outputMax', value)} />
+        <PropertyCell label="Out Max" span={1} compact hint="Maximum output value written to the target.">
+          <NumberCell label="OutMax" value={selectedBinding.outputMax ?? 100} step={0.01} defaultValue={100} onchange={(value) => setBindingProp('outputMax', value)} />
         </PropertyCell>
         <PropertyCell label="Clamp" span={1} hint="Clamp the output to the configured range.">
           <PropertyToggle value={selectedBinding.clamp !== false} onchange={() => setBindingProp('clamp', !(selectedBinding.clamp !== false))} />
@@ -192,11 +192,11 @@
       </PropertySection>
     {:else if selectedBinding.mapMode === 'boolean'}
       <PropertySection title="Boolean Map">
-        <PropertyCell label="False" span={2} hint="Output used when the source resolves to false.">
-          <NumberInput value={selectedBinding.falseValue ?? 0} step={0.01} onchange={(value) => setBindingProp('falseValue', value)} />
+        <PropertyCell label="False" span={2} compact hint="Output used when the source resolves to false.">
+          <NumberCell label="False" value={selectedBinding.falseValue ?? 0} step={0.01} defaultValue={0} onchange={(value) => setBindingProp('falseValue', value)} />
         </PropertyCell>
-        <PropertyCell label="True" span={2} hint="Output used when the source resolves to true.">
-          <NumberInput value={selectedBinding.trueValue ?? 100} step={0.01} onchange={(value) => setBindingProp('trueValue', value)} />
+        <PropertyCell label="True" span={2} compact hint="Output used when the source resolves to true.">
+          <NumberCell label="True" value={selectedBinding.trueValue ?? 100} step={0.01} defaultValue={100} onchange={(value) => setBindingProp('trueValue', value)} />
         </PropertyCell>
       </PropertySection>
     {:else if selectedBinding.mapMode === 'enum'}
