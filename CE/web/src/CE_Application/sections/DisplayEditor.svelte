@@ -17,6 +17,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
   import NumberInput from './NumberInput.svelte';
 
   let { control = null } = $props();
@@ -745,11 +746,11 @@
     <PropertyCell label="Backlight" span={2} hint="Turn the backlight wash on or off.">
       <PropertyToggle value={display.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>
-    <PropertyCell label="Brightness" span={2} hint="Foreground intensity (0–100).">
-      <NumberInput value={display.brightness ?? 100} step={5} min={0} max={100} onchange={(value) => set('brightness', value)} />
+    <PropertyCell label="Brightness" span={2} hint="Foreground intensity (0–100). Drag the track, type a value, or step with ▴▾.">
+      <PropertyScrub value={display.brightness ?? 100} step={1} min={0} max={100} defaultValue={100} onchange={(value) => set('brightness', value)} />
     </PropertyCell>
-    <PropertyCell label="Contrast" span={2} hint="LCD trim-pot feel — ghost/backlight strength (0–100).">
-      <NumberInput value={display.contrast ?? 55} step={5} min={0} max={100} onchange={(value) => set('contrast', value)} />
+    <PropertyCell label="Contrast" span={2} hint="LCD trim-pot feel — ghost/backlight strength (0–100). Drag, type, or step.">
+      <PropertyScrub value={display.contrast ?? 55} step={1} min={0} max={100} defaultValue={55} onchange={(value) => set('contrast', value)} />
     </PropertyCell>
     <PropertyCell label="Bright Src" span={2} hint="Drive Brightness live from a slider/knob/number in preview (its range maps to 0–100).">
       <select class="val" value={display.brightnessSourceId ?? ''} onchange={(event) => set('brightnessSourceId', event.target.value)}>
