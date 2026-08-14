@@ -8,6 +8,9 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import PanelTop from 'lucide-svelte/icons/panel-top';
+  import Tags from 'lucide-svelte/icons/tags';
 
   let { control = null } = $props();
 
@@ -209,11 +212,14 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Header" span={1} hint="Show the pattern / source / rate strip.">
-      <PropertyToggle value={a.showHeader !== false} onchange={() => set('showHeader', !(a.showHeader !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Note names" span={1} hint="Print the note in each step cell.">
-      <PropertyToggle value={a.showNotes !== false} onchange={() => set('showNotes', !(a.showNotes !== false))} />
+    <PropertyCell label="Show" span={2} hint="Header strip and note names in the step cells. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'showHeader', title: 'Header — the pattern / source / rate strip', on: a.showHeader !== false, icon: PanelTop },
+          { key: 'showNotes', title: 'Note names — print the note in each step cell', on: a.showNotes !== false, icon: Tags },
+        ]}
+        ontoggle={(key, next) => set(key, next)}
+      />
     </PropertyCell>
     <PropertyCell label="Field" span={1} hint="Lane background colour.">
       <input class="cswatch" type="color" value={colRgb(a.fieldColour, 'FF101017')} onchange={(e) => setCol('fieldColour', a.fieldColour, e.target.value)} />

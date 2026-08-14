@@ -9,6 +9,10 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import PanelTop from 'lucide-svelte/icons/panel-top';
+  import Tags from 'lucide-svelte/icons/tags';
+  import Hash from 'lucide-svelte/icons/hash';
 
   let { control = null } = $props();
 
@@ -217,14 +221,15 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Header" span={1} hint="Show the map / size / last-hit strip.">
-      <PropertyToggle value={d.showHeader !== false} onchange={() => set('showHeader', !(d.showHeader !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Drum names on the pads (hidden automatically on small pads).">
-      <PropertyToggle value={d.showLabels !== false} onchange={() => set('showLabels', !(d.showLabels !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Note nums" span={1} hint="The MIDI note number on each pad.">
-      <PropertyToggle value={d.showNotes !== false} onchange={() => set('showNotes', !(d.showNotes !== false))} />
+    <PropertyCell label="Show" span={2} hint="Header strip, drum-name labels, note numbers. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'showHeader', title: 'Header — the map / size / last-hit strip', on: d.showHeader !== false, icon: PanelTop },
+          { key: 'showLabels', title: 'Labels — drum names on the pads (hidden automatically on small pads)', on: d.showLabels !== false, icon: Tags },
+          { key: 'showNotes', title: 'Note numbers — the MIDI note number on each pad', on: d.showNotes !== false, icon: Hash },
+        ]}
+        ontoggle={(key, next) => set(key, next)}
+      />
     </PropertyCell>
     <PropertyCell label="Field" span={1} hint="Grid background colour.">
       <input class="cswatch" type="color" value={colRgb(d.fieldColour, 'FF101017')} onchange={(e) => setCol('fieldColour', d.fieldColour, e.target.value)} />
@@ -238,7 +243,7 @@
     <PropertyCell label="Hit" span={1} hint="Colour of a sounding pad.">
       <input class="cswatch" type="color" value={colRgb(d.hitColour, 'FFF2C94C')} onchange={(e) => setCol('hitColour', d.hitColour, e.target.value)} />
     </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Label colour.">
+    <PropertyCell label="Labels" span={2} hint="Label colour.">
       <input class="cswatch" type="color" value={colRgb(d.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', d.labelColour, e.target.value)} />
     </PropertyCell>
   </PropertySection>

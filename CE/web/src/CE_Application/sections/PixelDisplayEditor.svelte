@@ -9,6 +9,14 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Segmented from '../properties/Segmented.svelte';
+  import Grip from 'lucide-svelte/icons/grip';
+  import Palette from 'lucide-svelte/icons/palette';
+  import Ghost from 'lucide-svelte/icons/ghost';
+  import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
+  import ScanLine from 'lucide-svelte/icons/scan-line';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
   import { isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
   import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
   import { ICON_GLYPHS } from '../utils/pixelFont.js';
@@ -339,11 +347,14 @@
     <PropertyCell label="Image" span={3} hint="Static image dithered onto the grid (drawn behind the elements). Clear to remove.">
       <input class="val" type="file" accept="image/*" onchange={onPickImage} />
     </PropertyCell>
-    <PropertyCell label="Dither" span={1} hint="Floyd–Steinberg dither vs hard threshold.">
-      <PropertyToggle value={pixel.imageDither !== false} onchange={() => toggle('imageDither', true)} />
-    </PropertyCell>
-    <PropertyCell label="Img Colour" span={2} hint="Keep the image's colours (posterized, LED-panel look) instead of 1-bit dots.">
-      <PropertyToggle value={pixel.imageColour === true} onchange={() => toggle('imageColour', false)} />
+    <PropertyCell label="Render" span={1} hint="Dither and keep-colour for the image. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'imageDither', title: 'Dither — Floyd–Steinberg dither vs hard threshold', on: pixel.imageDither !== false, icon: Grip },
+          { key: 'imageColour', title: "Colour — keep the image's colours (posterized, LED-panel look) instead of 1-bit dots", on: pixel.imageColour === true, icon: Palette },
+        ]}
+        ontoggle={(key) => toggle(key, key === 'imageDither')}
+      />
     </PropertyCell>
     {#if pixel.imageSrc}
       <PropertyCell label="Clear Image" span={4} hint="Remove the image.">
@@ -374,11 +385,16 @@
         <input class="val" type="text" value={editLayout?.name ?? ''} oninput={(event) => renameLayout(editLayout?.id, event.target.value)} />
       </PropertyCell>
       <PropertyCell label="Transition" span={2} hint="Animate the new layout in when switching (runtime preview).">
-        <select class="val" value={pixel.layoutTransition ?? 'none'} onchange={(event) => set('layoutTransition', event.target.value)}>
-          <option value="none">None</option>
-          <option value="fade">Fade in</option>
-          <option value="slide">Slide in</option>
-        </select>
+        <Segmented
+          ariaLabel="Layout transition"
+          value={pixel.layoutTransition ?? 'none'}
+          options={[
+            { value: 'none', label: 'None' },
+            { value: 'fade', label: 'Fade in' },
+            { value: 'slide', label: 'Slide in' },
+          ]}
+          onchange={(v) => set('layoutTransition', v)}
+        />
       </PropertyCell>
       <PropertyCell label="Duration" span={2} hint="Transition length (ms).">
         <PropertyScrub value={pixel.transitionMs ?? 250} step={50} min={0} max={2000} defaultValue={250} onchange={(value) => set('transitionMs', Math.max(0, Math.round(value)))} />
@@ -840,11 +856,14 @@
     <PropertyCell label="Contrast" span={2} hint="Ghost/backlight strength (0–100).">
       <PropertyScrub value={pixel.contrast ?? 55} step={1} min={0} max={100} defaultValue={55} onchange={(value) => set('contrast', value)} />
     </PropertyCell>
-    <PropertyCell label="Ghost dots" span={2} hint="Faint unlit dots (realism cue).">
-      <PropertyToggle value={pixel.showGhost !== false} onchange={() => toggle('showGhost', true)} />
-    </PropertyCell>
-    <PropertyCell label="Design grid" span={2} hint="Show a grid overlay while editing (editor aid — never painted at runtime).">
-      <PropertyToggle value={pixel.showGrid === true} onchange={() => toggle('showGrid', false)} />
+    <PropertyCell label="Show" span={2} hint="Ghost dots and the design grid. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'showGhost', title: 'Ghost dots — faint unlit dots (realism cue)', on: pixel.showGhost !== false, icon: Ghost },
+          { key: 'showGrid', title: 'Design grid — grid overlay while editing (editor aid, never painted at runtime)', on: pixel.showGrid === true, icon: Grid3x3 },
+        ]}
+        ontoggle={(key) => toggle(key, key === 'showGhost')}
+      />
     </PropertyCell>
     <PropertyCell label="Snap" span={2} compact hint="Snap element drags to this pixel step (0 = free). Also sets the grid spacing.">
       <NumberCell label="Snap" value={pixel.snapGrid ?? 0} defaultValue={0} step={1} min={0} max={64} onchange={(value) => set('snapGrid', Math.max(0, Math.round(value)))} />
@@ -865,17 +884,25 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Scanlines" span={2} hint="Horizontal scanline overlay.">
-      <PropertyToggle value={pixel.showScanlines === true} onchange={() => toggle('showScanlines', false)} />
-    </PropertyCell>
-    <PropertyCell label="Glass sheen" span={2} hint="Diagonal glass reflection overlay.">
-      <PropertyToggle value={pixel.showGlass !== false} onchange={() => toggle('showGlass', true)} />
+    <PropertyCell label="Overlays" span={2} hint="Scanlines and glass sheen. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'showScanlines', title: 'Scanlines — horizontal scanline overlay', on: pixel.showScanlines === true, icon: ScanLine },
+          { key: 'showGlass', title: 'Glass sheen — diagonal glass reflection overlay', on: pixel.showGlass !== false, icon: Sparkles },
+        ]}
+        ontoggle={(key) => toggle(key, key === 'showGlass')}
+      />
     </PropertyCell>
     <PropertyCell label="Dot Shape" span={2} hint="Round (LCD/OLED) or square (blockier) dots.">
-      <select class="val" value={pixel.dotShape ?? 'round'} onchange={(event) => set('dotShape', event.target.value)}>
-        <option value="round">Round</option>
-        <option value="square">Square</option>
-      </select>
+      <Segmented
+        ariaLabel="Dot shape"
+        value={pixel.dotShape ?? 'round'}
+        options={[
+          { value: 'round', label: 'Round' },
+          { value: 'square', label: 'Square' },
+        ]}
+        onchange={(v) => set('dotShape', v)}
+      />
     </PropertyCell>
     <PropertyCell label="Gamma" span={2} hint="Brightness response curve. 1 = linear; >1 lifts mid-tones, <1 crushes them.">
       <PropertyScrub value={pixel.gamma ?? 1} step={0.1} min={0.2} max={4} defaultValue={1} onchange={(value) => set('gamma', value)} />
