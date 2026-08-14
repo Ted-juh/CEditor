@@ -6,7 +6,11 @@
   // `hint` is rendered in the panel's Info bar — a fixed 80px box with no
   // scrollbar. Keep it to one sentence saying what the control does, under 120
   // characters. House rules: docs/property-hints.md.
-  let { label = '', span = 1, disabled = false, hint = '', children } = $props();
+  //
+  // `compact` suppresses the label strip for controls that carry their own
+  // label inside the well (NumberCell); `label` stays required for the filter
+  // and hint plumbing, and the well bottom-aligns with labelled neighbours.
+  let { label = '', span = 1, disabled = false, hint = '', compact = false, children } = $props();
 
   // A PropertyCell inside a PropertySection coordinates filtering through the
   // section's context (shared filter + title-match + a visible-row counter);
@@ -31,12 +35,15 @@
   class:span-2={span === 2}
   class:span-4={span === 4}
   class:disabled
+  class:compact
   class:filtered-out={!visible}
   role="group"
   onmouseenter={() => hint && setHint(hint)}
   onmouseleave={() => hint && clearHint()}
 >
-  <span class="property-label">{label}</span>
+  {#if !compact}
+    <span class="property-label">{label}</span>
+  {/if}
   <div class="property-input">
     {@render children()}
   </div>
@@ -55,6 +62,10 @@
   .property-cell.span-4 { grid-column: span 4; }
 
   .property-cell.filtered-out { display: none; }
+
+  /* Compact cells bottom-align their well with labelled neighbours in the
+     same grid row. */
+  .property-cell.compact { justify-content: flex-end; }
 
   .property-label {
     font-size: 10px;

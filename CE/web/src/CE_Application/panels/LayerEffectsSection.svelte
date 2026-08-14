@@ -12,7 +12,7 @@
   import PropertyColor from '../properties/PropertyColor.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import AlignmentPicker from '../properties/AlignmentPicker.svelte';
-  import NumberInput from '../sections/NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import BlendModeSelect from '../properties/BlendModeSelect.svelte';
   import FitModeSelect from '../properties/FitModeSelect.svelte';
 
@@ -83,13 +83,13 @@
         <PropertyCell label="Fit" span={1} hint="How the {label.toLowerCase()} fills the panel area">
           <FitModeSelect value={fit} onchange={(v) => set('Fit', v)} />
         </PropertyCell>
-        <PropertyCell label="Offset X" span={1} hint="Horizontal offset from anchor in pixels">
-          <NumberInput value={get('OffsetX', 0)} step={1}
-                       onchange={(v) => set('OffsetX', v)} />
+        <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset from anchor in pixels">
+          <NumberCell label="X" value={get('OffsetX', 0)} step={1} defaultValue={0}
+                      onchange={(v) => set('OffsetX', v)} />
         </PropertyCell>
-        <PropertyCell label="Offset Y" span={1} hint="Vertical offset from anchor in pixels">
-          <NumberInput value={get('OffsetY', 0)} step={1}
-                       onchange={(v) => set('OffsetY', v)} />
+        <PropertyCell label="Offset Y" span={1} compact hint="Vertical offset from anchor in pixels">
+          <NumberCell label="Y" value={get('OffsetY', 0)} step={1} defaultValue={0}
+                      onchange={(v) => set('OffsetY', v)} />
         </PropertyCell>
       </div>
     </div>
@@ -99,14 +99,14 @@
     <PropertyCell label="Flip V" span={1} hint="Flip {label.toLowerCase()} vertically">
       <PropertyToggle value={get('FlipV', false)} onchange={() => toggle('FlipV')} />
     </PropertyCell>
-    <PropertyCell label="Angle" span={2} hint="Rotate the {label.toLowerCase()} in degrees">
-      <NumberInput value={get('Rotation', 0)} step={1} min={-360} max={360}
-                   onchange={(v) => set('Rotation', v)} />
+    <PropertyCell label="Angle" span={2} compact hint="Rotate the {label.toLowerCase()} in degrees">
+      <NumberCell label="Angle" value={get('Rotation', 0)} step={1} min={-360} max={360} defaultValue={0}
+                  onchange={(v) => set('Rotation', v)} />
     </PropertyCell>
     {#if fit === 'tile'}
-      <PropertyCell label="Scale" span={4} hint="Tile size multiplier">
-        <NumberInput value={get('TileScale', 1.0)} step={0.1} min={0.1}
-                     onchange={(v) => set('TileScale', v)} />
+      <PropertyCell label="Scale" span={4} compact hint="Tile size multiplier">
+        <NumberCell label="Scale" value={get('TileScale', 1.0)} step={0.1} min={0.1} defaultValue={1}
+                    onchange={(v) => set('TileScale', v)} />
       </PropertyCell>
     {/if}
   </PropertySection>
@@ -116,13 +116,13 @@
       <BlendModeSelect value={get('Blend', 'normal')}
                        onchange={(v) => set('Blend', v)} />
     </PropertyCell>
-    <PropertyCell label="Opacity" span={1} hint="{label} layer opacity (0–100%)">
-      <NumberInput value={get('Opacity', 100)} step={1} min={0} max={100}
-                   onchange={(v) => set('Opacity', v)} />
+    <PropertyCell label="Opacity" span={1} compact hint="{label} layer opacity (0–100%)">
+      <NumberCell label="Opac" value={get('Opacity', 100)} step={1} min={0} max={100} defaultValue={100}
+                  onchange={(v) => set('Opacity', v)} />
     </PropertyCell>
-    <PropertyCell label="Blur" span={1} hint="Blur amount in pixels">
-      <NumberInput value={get('Blur', 0)} step={1} min={0}
-                   onchange={(v) => set('Blur', v)} />
+    <PropertyCell label="Blur" span={1} compact hint="Blur amount in pixels">
+      <NumberCell label="Blur" value={get('Blur', 0)} step={1} min={0} defaultValue={0}
+                  onchange={(v) => set('Blur', v)} />
     </PropertyCell>
     <PropertyCell label="Tint" span={1} hint="Colour tint applied over the {label.toLowerCase()}">
       <PropertyColor value={String(get('Tint', 'FFFFFF'))}

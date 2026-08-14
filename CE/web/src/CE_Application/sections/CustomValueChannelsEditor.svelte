@@ -4,6 +4,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import { createValueChannel } from '../utils/customComponentFactory.js';
   import { normalizeCustomChannelValue, snapCustomChannelValue } from '../utils/customComponentInteraction.js';
@@ -361,11 +362,11 @@
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Dead Zone" span={1} hint="Optional dead-zone amount for value mapping.">
-        <NumberInput value={selected.curve?.deadZone ?? 0} step={0.01} min={0} max={1} onchange={(value) => set('curve.deadZone', value)} />
+      <PropertyCell label="Dead Zone" span={1} compact hint="Optional dead-zone amount for value mapping.">
+        <NumberCell label="DZ" value={selected.curve?.deadZone ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(value) => set('curve.deadZone', value)} />
       </PropertyCell>
-      <PropertyCell label="Hysteresis" span={1} hint="Optional hysteresis amount for stable stepped controls.">
-        <NumberInput value={selected.curve?.hysteresis ?? 0} step={0.01} min={0} max={1} onchange={(value) => set('curve.hysteresis', value)} />
+      <PropertyCell label="Hysteresis" span={1} compact hint="Optional hysteresis amount for stable stepped controls.">
+        <NumberCell label="Hys" value={selected.curve?.hysteresis ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(value) => set('curve.hysteresis', value)} />
       </PropertyCell>
     </PropertySection>
   {/if}

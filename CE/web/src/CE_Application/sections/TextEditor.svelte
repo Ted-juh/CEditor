@@ -19,6 +19,7 @@
   import { deepClone } from '../utils/deepClone.js';
   import { browseImage, onImageBrowsed } from '../bridge/bridge.js';
   import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import TextLineDecorationControls from './TextLineDecorationControls.svelte';
   import {
     DEFAULT_TEXT_FILL_GRADIENT,
@@ -1198,8 +1199,8 @@
         </PropertySection>
 
         <PropertySection title="Colour Effects">
-          <PropertyCell label="Opacity" span={1} hint="Opacity of the image fill.">
-            <NumberInput value={Number(fillProp('imageOpacity', 100))} min={0} max={100} step={1} onchange={(value) => set('Text.Fill.imageOpacity', value)} />
+          <PropertyCell label="Opacity" span={1} compact hint="Opacity of the image fill.">
+            <NumberCell label="Opac" value={Number(fillProp('imageOpacity', 100))} min={0} max={100} step={1} defaultValue={100} onchange={(value) => set('Text.Fill.imageOpacity', value)} />
           </PropertyCell>
           <PropertyCell label="Tint" span={2} hint="Tint colour multiplied with the image fill.">
             <PropertyColor
@@ -1240,8 +1241,8 @@
         </PropertySection>
 
         <PropertySection title="Colour Effects">
-          <PropertyCell label="Opacity" span={1} hint="Opacity of the texture fill.">
-            <NumberInput value={Number(fillProp('textureOpacity', 100))} min={0} max={100} step={1} onchange={(value) => set('Text.Fill.textureOpacity', value)} />
+          <PropertyCell label="Opacity" span={1} compact hint="Opacity of the texture fill.">
+            <NumberCell label="Opac" value={Number(fillProp('textureOpacity', 100))} min={0} max={100} step={1} defaultValue={100} onchange={(value) => set('Text.Fill.textureOpacity', value)} />
           </PropertyCell>
           <PropertyCell label="Tint" span={2} hint="Tint colour multiplied with the texture fill.">
             <PropertyColor
