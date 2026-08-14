@@ -4,6 +4,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberInput from './NumberInput.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
   import {
     extractDetachedGeneratedHitZones,
     extractDetachedGeneratedParts,
@@ -557,7 +558,7 @@
 {#if designer}
   <PropertySection title="Simulation">
     <PropertyCell label="Test Value" span={2} hint="Normalized preview value for value-driven bindings and recipes.">
-      <NumberInput value={preview.testValue ?? 0.5} step={0.01} min={0} max={1} onchange={(value) => setPreview('testValue', value)} />
+      <PropertyScrub value={preview.testValue ?? 0.5} step={0.01} min={0} max={1} defaultValue={0.5} onchange={(value) => setPreview('testValue', value)} />
     </PropertyCell>
     <PropertyCell label="State" span={2} hint="Preview state label for future state simulation.">
       <select class="val" value={preview.state ?? 'base'} onchange={(event) => setPreview('state', event.target.value)}>

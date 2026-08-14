@@ -4,6 +4,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberInput from './NumberInput.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
   import { createValueChannel } from '../utils/customComponentFactory.js';
   import { normalizeCustomChannelValue, snapCustomChannelValue } from '../utils/customComponentInteraction.js';
 
@@ -317,10 +318,10 @@
           </div>
         </PropertyCell>
         <PropertyCell label="Lower Gap" span={2} hint="Minimum normalized distance above the lower source. For max, set this to keep it above min.">
-          <NumberInput value={selected.constraints?.normalizedMinGap ?? 0} step={0.01} min={0} max={1} onchange={(value) => set('constraints.normalizedMinGap', value)} />
+          <PropertyScrub value={selected.constraints?.normalizedMinGap ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(value) => set('constraints.normalizedMinGap', value)} />
         </PropertyCell>
         <PropertyCell label="Upper Gap" span={2} hint="Minimum normalized distance below the upper source. For min, set this to keep it below max.">
-          <NumberInput value={selected.constraints?.normalizedMaxGap ?? 0} step={0.01} min={0} max={1} onchange={(value) => set('constraints.normalizedMaxGap', value)} />
+          <PropertyScrub value={selected.constraints?.normalizedMaxGap ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(value) => set('constraints.normalizedMaxGap', value)} />
         </PropertyCell>
       </PropertySection>
     {/if}

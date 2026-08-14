@@ -7,7 +7,6 @@
 
   // Typed values clamp but are NOT snapped to step — the step quantum applies
   // to stepping and scrubbing only, so exact values can always be entered.
-  let decimals = $derived((String(step).split('.')[1] || '').length);
   let editing = $state(false);
   let draft = $state('');
   let inputEl = $state(null);
@@ -16,9 +15,11 @@
     return ((v - min) / (max - min)) * 100;
   }
 
+  // Display the stored value faithfully (it may sit off the step grid after a
+  // typed entry); toFixed(6) only strips float noise like 0.30000000000000004.
   function format(v) {
     const n = Number(v ?? 0);
-    return decimals > 0 ? String(parseFloat(n.toFixed(decimals))) : String(Math.round(n));
+    return Number.isFinite(n) ? String(parseFloat(n.toFixed(6))) : '0';
   }
 
   function clamp(v) {
@@ -41,7 +42,7 @@
 
   function nudge(dir, mult) {
     const quantum = step > 0 ? step : 1;
-    const next = clamp(Math.round((value + dir * quantum * mult) / quantum) * quantum);
+    const next = clamp(parseFloat((Math.round((value + dir * quantum * mult) / quantum) * quantum).toFixed(6)));
     if (next !== value) onchange?.(next);
   }
 

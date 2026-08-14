@@ -1,7 +1,8 @@
 <script>
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
 
   let { control = null } = $props();
 
@@ -25,54 +26,22 @@
 {#if transform}
   <div class="prop-card">
     <div class="prop-row-pair">
-      <div class="prop-row half">
-        <span class="lbl">X</span>
-        <NumberInput value={transform.x} step={1} onchange={(v) => set('x', v)} />
-      </div>
-      <div class="prop-row half">
-        <span class="lbl">Y</span>
-        <NumberInput value={transform.y} step={1} onchange={(v) => set('y', v)} />
-      </div>
+      <NumberCell label="X" value={transform.x} step={1} onchange={(v) => set('x', v)} />
+      <NumberCell label="Y" value={transform.y} step={1} onchange={(v) => set('y', v)} />
+      <NumberCell label="W" value={transform.width} step={1} min={10} onchange={(v) => set('width', v)} />
+      <NumberCell label="H" value={transform.height} step={1} min={10} onchange={(v) => set('height', v)} />
     </div>
     <div class="prop-row-pair">
-      <div class="prop-row half">
-        <span class="lbl">W</span>
-        <NumberInput value={transform.width} step={1} min={10} onchange={(v) => set('width', v)} />
-      </div>
-      <div class="prop-row half">
-        <span class="lbl">H</span>
-        <NumberInput value={transform.height} step={1} min={10} onchange={(v) => set('height', v)} />
-      </div>
+      <PropertyScrub label="Opac" value={transform.opacity} step={0.05} min={0} max={1} defaultValue={1} onchange={(v) => set('opacity', v)} />
+      <NumberCell label="Rot" value={transform.rotation} step={1} defaultValue={0} onchange={(v) => set('rotation', v)} />
     </div>
     <div class="prop-row-pair">
-      <div class="prop-row half">
-        <span class="lbl">Opacity</span>
-        <NumberInput value={transform.opacity} step={0.05} min={0} max={1} onchange={(v) => set('opacity', v)} />
-      </div>
-      <div class="prop-row half">
-        <span class="lbl">Rot</span>
-        <NumberInput value={transform.rotation} step={1} onchange={(v) => set('rotation', v)} />
-      </div>
+      <NumberCell label="Min W" value={transform.minWidth ?? 0} step={1} min={0} onchange={(v) => set('minWidth', v)} />
+      <NumberCell label="Min H" value={transform.minHeight ?? 0} step={1} min={0} onchange={(v) => set('minHeight', v)} />
     </div>
     <div class="prop-row-pair">
-      <div class="prop-row half">
-        <span class="lbl">MinW</span>
-        <NumberInput value={transform.minWidth ?? 0} step={1} min={0} onchange={(v) => set('minWidth', v)} />
-      </div>
-      <div class="prop-row half">
-        <span class="lbl">MinH</span>
-        <NumberInput value={transform.minHeight ?? 0} step={1} min={0} onchange={(v) => set('minHeight', v)} />
-      </div>
-    </div>
-    <div class="prop-row-pair">
-      <div class="prop-row half">
-        <span class="lbl">MaxW</span>
-        <NumberInput value={transform.maxWidth ?? 0} step={1} min={0} onchange={(v) => set('maxWidth', v)} />
-      </div>
-      <div class="prop-row half">
-        <span class="lbl">MaxH</span>
-        <NumberInput value={transform.maxHeight ?? 0} step={1} min={0} onchange={(v) => set('maxHeight', v)} />
-      </div>
+      <NumberCell label="Max W" value={transform.maxWidth ?? 0} step={1} min={0} onchange={(v) => set('maxWidth', v)} />
+      <NumberCell label="Max H" value={transform.maxHeight ?? 0} step={1} min={0} onchange={(v) => set('maxHeight', v)} />
     </div>
     <div class="prop-row">
       <span class="lbl">Aspect Lock</span>

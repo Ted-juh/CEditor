@@ -42,12 +42,15 @@ test('value box shows the value and names itself after the label', () => {
   assert.match(html, /aria-label="Bri value"/);
 });
 
-test('integer step renders whole numbers; fractional step keeps decimals', () => {
-  const int = renderScrub({ value: 55.4, min: 0, max: 100, step: 1 });
-  assert.match(int, /<input[^>]*value="55"/, 'step 1 rounds the display');
+test('display is faithful to the stored value, not snapped to step', () => {
+  const offGrid = renderScrub({ value: 55.4, min: 0, max: 100, step: 1 });
+  assert.match(offGrid, /<input[^>]*value="55.4"/, 'typed off-step values keep their precision');
 
   const frac = renderScrub({ value: 1.25, min: 0.1, max: 5, step: 0.05 });
-  assert.match(frac, /<input[^>]*value="1.25"/, 'fractional step keeps decimals');
+  assert.match(frac, /<input[^>]*value="1.25"/, 'fractional values render as typed');
+
+  const noisy = renderScrub({ value: 0.30000000000000004, min: 0, max: 1, step: 0.1 });
+  assert.match(noisy, /<input[^>]*value="0.3"/, 'float noise is stripped');
 });
 
 test('fill and thumb reflect the value position in the range', () => {

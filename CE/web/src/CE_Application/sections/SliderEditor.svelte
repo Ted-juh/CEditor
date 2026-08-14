@@ -5,6 +5,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberInput from './NumberInput.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
   import BackgroundEditor from './BackgroundEditor.svelte';
   import { createSliderSemanticParts } from '../utils/sliderEntityFactory.js';
   import { numberOr } from '../utils/primitives.js';
@@ -225,7 +226,7 @@
         <NumberInput value={circularEndAngle()} step={1} min={-720} max={720} onchange={setCircularEndAngle} />
       </PropertyCell>
       <PropertyCell label="Sweep" span={2} hint="How much of the circle is active.">
-        <NumberInput value={behavior.sweepAngle ?? 270} step={1} min={1} max={360} onchange={(value) => set('Behavior.sweepAngle', clampSweep(value))} />
+        <PropertyScrub value={behavior.sweepAngle ?? 270} step={1} min={1} max={360} defaultValue={270} onchange={(value) => set('Behavior.sweepAngle', clampSweep(value))} />
       </PropertyCell>
       <PropertyCell label="Diameter" span={2} hint="Circular track diameter in pixels. Set to 0 for automatic fitting.">
         <NumberInput value={behavior.circularDiameter ?? 0} step={1} min={0} onchange={(value) => set('Behavior.circularDiameter', Math.max(0, value))} />
@@ -239,7 +240,7 @@
       </PropertyCell>
       {#if (behavior.circularDragMode === 'knob' || behavior.circularDragMode === 'rotary')}
         <PropertyCell label="Drag Speed" span={2} hint="Sensitivity multiplier for the relative drag. 1 means 250px of travel (knob) or one full turn (rotary) covers the whole range.">
-          <NumberInput value={behavior.circularDragSensitivity ?? 1} step={0.1} min={0.1} max={10} onchange={(value) => set('Behavior.circularDragSensitivity', Math.max(0.1, Math.min(10, value)))} />
+          <PropertyScrub value={behavior.circularDragSensitivity ?? 1} step={0.1} min={0.1} max={10} defaultValue={1} onchange={(value) => set('Behavior.circularDragSensitivity', Math.max(0.1, Math.min(10, value)))} />
         </PropertyCell>
       {/if}
     {/if}

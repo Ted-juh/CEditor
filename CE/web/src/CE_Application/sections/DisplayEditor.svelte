@@ -709,7 +709,7 @@
           </select>
         </PropertyCell>
         <PropertyCell label="Speed" span={2} hint="Preset speed multiplier.">
-          <NumberInput value={display.animSpeed ?? 1} step={0.1} min={0.1} max={5} onchange={(value) => set('animSpeed', value)} />
+          <PropertyScrub value={display.animSpeed ?? 1} step={0.1} min={0.1} max={5} defaultValue={1} onchange={(value) => set('animSpeed', value)} />
         </PropertyCell>
       {/if}
     </PropertySection>
@@ -813,7 +813,7 @@
       </select>
     </PropertyCell>
     <PropertyCell label="Speed" span={2} hint="Scroll speed in characters per second.">
-      <NumberInput value={display.scrollSpeed ?? 4} step={1} min={0} max={60} onchange={(value) => set('scrollSpeed', value)} />
+      <PropertyScrub value={display.scrollSpeed ?? 4} step={1} min={0} max={60} defaultValue={4} onchange={(value) => set('scrollSpeed', value)} />
     </PropertyCell>
     <PropertyCell label="Gap" span={2} hint="Blank characters between loop repeats.">
       <NumberInput value={display.scrollGap ?? 3} step={1} min={0} onchange={(value) => set('scrollGap', Math.round(value))} />
@@ -850,7 +850,7 @@
       <NumberInput value={display.padding ?? 10} step={1} min={0} onchange={(value) => set('padding', value)} />
     </PropertyCell>
     <PropertyCell label="Font Scale" span={2} hint="Relative glyph size.">
-      <NumberInput value={display.fontScale ?? 1} step={0.05} min={0.3} max={3} onchange={(value) => set('fontScale', value)} />
+      <PropertyScrub value={display.fontScale ?? 1} step={0.05} min={0.3} max={3} defaultValue={1} onchange={(value) => set('fontScale', value)} />
     </PropertyCell>
     <PropertyCell label="Char Gap" span={2} hint="Extra spacing between characters (px).">
       <NumberInput value={display.charSpacing ?? 1} step={1} min={0} onchange={(value) => set('charSpacing', value)} />

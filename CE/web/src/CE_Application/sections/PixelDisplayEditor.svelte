@@ -8,6 +8,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberInput from './NumberInput.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
   import { isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
   import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
   import { ICON_GLYPHS } from '../utils/pixelFont.js';
@@ -380,7 +381,7 @@
         </select>
       </PropertyCell>
       <PropertyCell label="Duration" span={2} hint="Transition length (ms).">
-        <NumberInput value={pixel.transitionMs ?? 250} step={50} min={0} max={2000} onchange={(value) => set('transitionMs', Math.max(0, Math.round(value)))} />
+        <PropertyScrub value={pixel.transitionMs ?? 250} step={50} min={0} max={2000} defaultValue={250} onchange={(value) => set('transitionMs', Math.max(0, Math.round(value)))} />
       </PropertyCell>
     {/if}
   </PropertySection>
@@ -794,7 +795,7 @@
         </select>
       </PropertyCell>
       <PropertyCell label="Speed" span={2} hint="Preset speed multiplier.">
-        <NumberInput value={pixel.animSpeed ?? 1} step={0.1} min={0.1} max={5} onchange={(value) => set('animSpeed', value)} />
+        <PropertyScrub value={pixel.animSpeed ?? 1} step={0.1} min={0.1} max={5} defaultValue={1} onchange={(value) => set('animSpeed', value)} />
       </PropertyCell>
       <PropertyCell label="Colour" span={2} hint="Hue-cycling colour for the preset.">
         <PropertyToggle value={pixel.animColour === true} onchange={() => toggle('animColour', false)} />
@@ -834,10 +835,10 @@
       <PropertyToggle value={pixel.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>
     <PropertyCell label="Brightness" span={2} hint="Dot intensity (0–100).">
-      <NumberInput value={pixel.brightness ?? 100} step={5} min={0} max={100} onchange={(value) => set('brightness', value)} />
+      <PropertyScrub value={pixel.brightness ?? 100} step={1} min={0} max={100} defaultValue={100} onchange={(value) => set('brightness', value)} />
     </PropertyCell>
     <PropertyCell label="Contrast" span={2} hint="Ghost/backlight strength (0–100).">
-      <NumberInput value={pixel.contrast ?? 55} step={5} min={0} max={100} onchange={(value) => set('contrast', value)} />
+      <PropertyScrub value={pixel.contrast ?? 55} step={1} min={0} max={100} defaultValue={55} onchange={(value) => set('contrast', value)} />
     </PropertyCell>
     <PropertyCell label="Ghost dots" span={2} hint="Faint unlit dots (realism cue).">
       <PropertyToggle value={pixel.showGhost !== false} onchange={() => toggle('showGhost', true)} />
@@ -877,10 +878,10 @@
       </select>
     </PropertyCell>
     <PropertyCell label="Gamma" span={2} hint="Brightness response curve. 1 = linear; >1 lifts mid-tones, <1 crushes them.">
-      <NumberInput value={pixel.gamma ?? 1} step={0.1} min={0.2} max={4} onchange={(value) => set('gamma', value)} />
+      <PropertyScrub value={pixel.gamma ?? 1} step={0.1} min={0.2} max={4} defaultValue={1} onchange={(value) => set('gamma', value)} />
     </PropertyCell>
     <PropertyCell label="Glow" span={2} hint="Bloom halo under lit dots (0 = crisp, 1 = strong glow).">
-      <NumberInput value={pixel.glow ?? 0} step={0.1} min={0} max={1} onchange={(value) => set('glow', value)} />
+      <PropertyScrub value={pixel.glow ?? 0} step={0.1} min={0} max={1} defaultValue={0} onchange={(value) => set('glow', value)} />
     </PropertyCell>
     <PropertyCell label="Padding" span={2} hint="Inset from the bezel to the screen (px).">
       <NumberInput value={pixel.padding ?? 8} step={1} min={0} onchange={(value) => set('padding', value)} />

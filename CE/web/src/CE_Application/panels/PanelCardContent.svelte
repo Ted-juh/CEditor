@@ -6,6 +6,7 @@
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { browseImage, onImageBrowsed, requestFileInfo, onFileInfo } from '../bridge/bridge.js';
   import NumberInput from '../sections/NumberInput.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -519,8 +520,8 @@
                    onchange={(e) => updatePanel(panel.id, { bgGradientName: e.target.value })} />
           </PropertyCell>
           <PropertyCell label="Opacity" span={4} hint="Gradient layer opacity (0–100%)">
-            <NumberInput value={panel.bgGradientOpacity ?? 100} step={1} min={0} max={100}
-                         onchange={(v) => updatePanel(panel.id, { bgGradientOpacity: v })} />
+            <PropertyScrub value={panel.bgGradientOpacity ?? 100} step={1} min={0} max={100} defaultValue={100}
+                           onchange={(v) => updatePanel(panel.id, { bgGradientOpacity: v })} />
           </PropertyCell>
         </PropertySection>
 

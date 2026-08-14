@@ -16,6 +16,7 @@
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import LayerEffectsSection from '../panels/LayerEffectsSection.svelte';
   import NumberInput from './NumberInput.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
   import { browseImage, onImageBrowsed } from '../bridge/bridge.js';
   import BlendModeSelect from '../properties/BlendModeSelect.svelte';
   import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
@@ -465,7 +466,7 @@
           </div>
           <div class="prop-row full-span">
             <span class="lbl">Opacity</span>
-            <NumberInput value={fill?.gradientOpacity ?? 100} step={1} min={0} max={100} onchange={(v) => setFillProp('gradientOpacity', v)} />
+            <PropertyScrub value={fill?.gradientOpacity ?? 100} step={1} min={0} max={100} defaultValue={100} onchange={(v) => setFillProp('gradientOpacity', v)} />
           </div>
           <div class="prop-row full-span">
             <span class="lbl">Blend</span>
