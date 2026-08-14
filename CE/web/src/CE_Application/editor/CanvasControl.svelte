@@ -45,7 +45,7 @@
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
   import { get } from 'svelte/store';
   import { showDistances } from '../stores/editorView.js';
-  import { guides } from '../stores/guides.js';
+  import { guides, selectedGuide } from '../stores/guides.js';
   import { fileCache, loadFile } from '../stores/fileCache.js';
   import { findAlignmentSnap, computeDistances } from '../utils/canvasSnapping.js';
   import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
@@ -635,6 +635,10 @@
   function handleMouseDown(e) {
     if (e.button !== 0) return;
     e.stopPropagation();
+
+    // Selecting a control ends any guide selection — a stale selected guide
+    // used to hijack the next Delete press away from the controls.
+    selectedGuide.set(null);
 
     // Shift+click is the industry-standard extend gesture; Ctrl/Cmd+click
     // does the same for muscle memory from file managers.

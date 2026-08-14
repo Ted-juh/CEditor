@@ -25,7 +25,7 @@
   import SettingsView from './SettingsView.svelte';
   import BehaviorDesigner from './BehaviorDesigner.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
-  import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
+  import { addGuide, deleteSelectedGuide, selectedGuide } from '../stores/guides.js';
   import { activePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
   import { fitToWindowSignal, zoomStepSignal, zoomToSelectionSignal } from '../stores/editorCommands.js';
@@ -416,6 +416,7 @@
     if (pan.spaceHeld) return;
     if (e.target === e.currentTarget || e.target.classList.contains('panel-surface')) {
       clearSelection();
+      selectedGuide.set(null);
     }
   }
 

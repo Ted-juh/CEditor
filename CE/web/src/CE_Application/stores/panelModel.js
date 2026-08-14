@@ -132,6 +132,11 @@ export function createPanel(name = null) {
     gridOriginX: 0,
     gridOriginY: 0,
     snapToGrid: get(defaultSnapToGrid),
+    // Ruler guides are part of the document: they save with the panel,
+    // restore with the session, and undo with everything else. They used to
+    // live in a session-only store — one reload and a layout's whole
+    // scaffold was gone.
+    guides: { horizontal: [], vertical: [] },
     notepad: {
       notes: [{ name: 'Note 1', content: '' }],
       activeNoteIndex: 0,
