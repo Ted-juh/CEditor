@@ -5,7 +5,7 @@
   import { deriveIdentity } from '../utils/exportIdentity.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { browseImage, onImageBrowsed, requestFileInfo, onFileInfo } from '../bridge/bridge.js';
-  import NumberInput from '../sections/NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -358,13 +358,13 @@
       </PropertyCell>
     </PropertySection>
     <PropertySection title="Size">
-      <PropertyCell label="Width" span={2} hint="Panel width in pixels">
-        <NumberInput value={panel.width} step={1} min={1}
-                     onchange={(v) => updatePanel(panel.id, { width: v })} />
+      <PropertyCell label="Width" span={2} compact hint="Panel width in pixels">
+        <NumberCell label="W" value={panel.width} step={1} min={1}
+                    onchange={(v) => updatePanel(panel.id, { width: v })} />
       </PropertyCell>
-      <PropertyCell label="Height" span={2} hint="Panel height in pixels">
-        <NumberInput value={panel.height} step={1} min={1}
-                     onchange={(v) => updatePanel(panel.id, { height: v })} />
+      <PropertyCell label="Height" span={2} compact hint="Panel height in pixels">
+        <NumberCell label="H" value={panel.height} step={1} min={1}
+                    onchange={(v) => updatePanel(panel.id, { height: v })} />
       </PropertyCell>
     </PropertySection>
     <PropertySection title="Constraints" collapsed={$sectionCollapse['core-constraints'] ?? true} ontoggle={(v) => setCollapsed('core-constraints', v)}>
@@ -393,21 +393,21 @@
           </ul>
         </PropertyCell>
       {/if}
-      <PropertyCell label="Min W" span={2} hint="Minimum width when resizable" disabled={!panel.resizable}>
-        <NumberInput value={panel.resizable ? panel.minWidth : panel.width} step={1} min={0}
-                     onchange={(v) => updatePanel(panel.id, { minWidth: v })} />
+      <PropertyCell label="Min W" span={2} compact hint="Minimum width when resizable" disabled={!panel.resizable}>
+        <NumberCell label="Min W" value={panel.resizable ? panel.minWidth : panel.width} step={1} min={0}
+                    onchange={(v) => updatePanel(panel.id, { minWidth: v })} />
       </PropertyCell>
-      <PropertyCell label="Min H" span={2} hint="Minimum height when resizable" disabled={!panel.resizable}>
-        <NumberInput value={panel.resizable ? panel.minHeight : panel.height} step={1} min={0}
-                     onchange={(v) => updatePanel(panel.id, { minHeight: v })} />
+      <PropertyCell label="Min H" span={2} compact hint="Minimum height when resizable" disabled={!panel.resizable}>
+        <NumberCell label="Min H" value={panel.resizable ? panel.minHeight : panel.height} step={1} min={0}
+                    onchange={(v) => updatePanel(panel.id, { minHeight: v })} />
       </PropertyCell>
-      <PropertyCell label="Max W" span={2} hint="Maximum width when resizable. 0 = no limit." disabled={!panel.resizable}>
-        <NumberInput value={panel.resizable ? panel.maxWidth : panel.width} step={1} min={0}
-                     onchange={(v) => updatePanel(panel.id, { maxWidth: v })} />
+      <PropertyCell label="Max W" span={2} compact hint="Maximum width when resizable. 0 = no limit." disabled={!panel.resizable}>
+        <NumberCell label="Max W" value={panel.resizable ? panel.maxWidth : panel.width} step={1} min={0}
+                    onchange={(v) => updatePanel(panel.id, { maxWidth: v })} />
       </PropertyCell>
-      <PropertyCell label="Max H" span={2} hint="Maximum height when resizable. 0 = no limit." disabled={!panel.resizable}>
-        <NumberInput value={panel.resizable ? panel.maxHeight : panel.height} step={1} min={0}
-                     onchange={(v) => updatePanel(panel.id, { maxHeight: v })} />
+      <PropertyCell label="Max H" span={2} compact hint="Maximum height when resizable. 0 = no limit." disabled={!panel.resizable}>
+        <NumberCell label="Max H" value={panel.resizable ? panel.maxHeight : panel.height} step={1} min={0}
+                    onchange={(v) => updatePanel(panel.id, { maxHeight: v })} />
       </PropertyCell>
     </PropertySection>
     <PropertySection title="Info" collapsed={$sectionCollapse['core-info'] ?? true} ontoggle={(v) => setCollapsed('core-info', v)}>
@@ -565,13 +565,13 @@
         <PropertyToggle value={panel.snapToGrid}
                         onchange={() => handleToggle('snapToGrid')} />
       </PropertyCell>
-      <PropertyCell label="Size" span={2} hint="Grid cell size in pixels">
-        <NumberInput value={panel.gridSize} step={1} min={1}
-                     onchange={(v) => updatePanel(panel.id, { gridSize: v })} />
+      <PropertyCell label="Size" span={2} compact hint="Grid cell size in pixels">
+        <NumberCell label="Size" value={panel.gridSize} step={1} min={1}
+                    onchange={(v) => updatePanel(panel.id, { gridSize: v })} />
       </PropertyCell>
-      <PropertyCell label="Thickness" span={2} hint="Grid line thickness in pixels">
-        <NumberInput value={panel.gridLineWidth ?? 1} step={1} min={1} max={10}
-                     onchange={(v) => updatePanel(panel.id, { gridLineWidth: v })} />
+      <PropertyCell label="Thickness" span={2} compact hint="Grid line thickness in pixels">
+        <NumberCell label="Thick" value={panel.gridLineWidth ?? 1} defaultValue={1} step={1} min={1} max={10}
+                    onchange={(v) => updatePanel(panel.id, { gridLineWidth: v })} />
       </PropertyCell>
       <PropertyCell label="Type" span={2} hint="Grid line style">
         <select class="val" value={panel.gridType ?? 'lines'}
@@ -588,9 +588,9 @@
       </PropertyCell>
     </PropertySection>
     <PropertySection title="Subdivision" collapsed={$sectionCollapse['grid-subdivision'] ?? true} ontoggle={(v) => setCollapsed('grid-subdivision', v)}>
-      <PropertyCell label="Divisions" span={2} hint="Group every Nth cell with a thicker border (1 = none)">
-        <NumberInput value={panel.gridSubdivision ?? 1} step={1} min={1} max={10}
-                     onchange={(v) => updatePanel(panel.id, { gridSubdivision: v })} />
+      <PropertyCell label="Divisions" span={2} compact hint="Group every Nth cell with a thicker border (1 = none)">
+        <NumberCell label="Div" value={panel.gridSubdivision ?? 1} defaultValue={1} step={1} min={1} max={10}
+                    onchange={(v) => updatePanel(panel.id, { gridSubdivision: v })} />
       </PropertyCell>
       <PropertyCell label="Colour" span={2} hint="Subdivision border colour (AARRGGBB hex)">
         <PropertyColor value={panel.gridSubColour ?? '55FFFFFF'}
@@ -603,13 +603,13 @@
         <PropertyToggle value={panel.gridCentered ?? false}
                         onchange={() => updatePanel(panel.id, { gridCentered: !panel.gridCentered })} />
       </PropertyCell>
-      <PropertyCell label="Offset X" span={2} hint="Shift grid origin horizontally in pixels" disabled={panel.gridCentered}>
-        <NumberInput value={panel.gridOriginX ?? 0} step={1}
-                     onchange={(v) => updatePanel(panel.id, { gridOriginX: v })} />
+      <PropertyCell label="Offset X" span={2} compact hint="Shift grid origin horizontally in pixels" disabled={panel.gridCentered}>
+        <NumberCell label="X" value={panel.gridOriginX ?? 0} defaultValue={0} step={1}
+                    onchange={(v) => updatePanel(panel.id, { gridOriginX: v })} />
       </PropertyCell>
-      <PropertyCell label="Offset Y" span={2} hint="Shift grid origin vertically in pixels" disabled={panel.gridCentered}>
-        <NumberInput value={panel.gridOriginY ?? 0} step={1}
-                     onchange={(v) => updatePanel(panel.id, { gridOriginY: v })} />
+      <PropertyCell label="Offset Y" span={2} compact hint="Shift grid origin vertically in pixels" disabled={panel.gridCentered}>
+        <NumberCell label="Y" value={panel.gridOriginY ?? 0} defaultValue={0} step={1}
+                    onchange={(v) => updatePanel(panel.id, { gridOriginY: v })} />
       </PropertyCell>
     </PropertySection>
   {:else if tabId === 'export'}

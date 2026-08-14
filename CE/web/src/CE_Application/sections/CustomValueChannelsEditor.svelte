@@ -3,7 +3,6 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import { createValueChannel } from '../utils/customComponentFactory.js';
@@ -267,17 +266,17 @@
       </PropertyCell>
 
       {#if selectedNumeric}
-        <PropertyCell label="Min" span={1} hint="Minimum numeric value.">
-          <NumberInput value={selected.min ?? 0} step={1} onchange={(value) => set('min', value)} />
+        <PropertyCell label="Min" span={1} compact hint="Minimum numeric value.">
+          <NumberCell label="Min" value={selected.min ?? 0} step={1} defaultValue={0} onchange={(value) => set('min', value)} />
         </PropertyCell>
-        <PropertyCell label="Max" span={1} hint="Maximum numeric value.">
-          <NumberInput value={selected.max ?? 1} step={1} onchange={(value) => set('max', value)} />
+        <PropertyCell label="Max" span={1} compact hint="Maximum numeric value.">
+          <NumberCell label="Max" value={selected.max ?? 1} step={1} defaultValue={1} onchange={(value) => set('max', value)} />
         </PropertyCell>
-        <PropertyCell label="Step" span={1} hint="Legal increment for snapping and keyboard changes.">
-          <NumberInput value={selected.step ?? 0.01} step={0.01} min={0} onchange={(value) => set('step', value)} />
+        <PropertyCell label="Step" span={1} compact hint="Legal increment for snapping and keyboard changes.">
+          <NumberCell label="Step" value={selected.step ?? 0.01} step={0.01} min={0} defaultValue={0.01} onchange={(value) => set('step', value)} />
         </PropertyCell>
-        <PropertyCell label="Default" span={1} hint="Initial value when the component is inserted.">
-          <NumberInput value={selected.defaultValue ?? 0} step={selected.step ?? 0.01} onchange={(value) => set('defaultValue', value)} />
+        <PropertyCell label="Default" span={1} compact hint="Initial value when the component is inserted.">
+          <NumberCell label="Def" value={selected.defaultValue ?? 0} step={selected.step ?? 0.01} defaultValue={0} onchange={(value) => set('defaultValue', value)} />
         </PropertyCell>
       {:else}
         <PropertyCell label="Default" span={4} hint="Initial value for this non-numeric channel.">
@@ -343,8 +342,8 @@
     </PropertySection>
 
     <PropertySection title="Formatting & Mapping">
-      <PropertyCell label="Precision" span={1} hint="Displayed decimal precision.">
-        <NumberInput value={selected.format?.precision ?? 2} step={1} min={0} max={6} onchange={(value) => set('format.precision', Math.max(0, Math.round(value)))} />
+      <PropertyCell label="Precision" span={1} compact hint="Displayed decimal precision.">
+        <NumberCell label="Prec" value={selected.format?.precision ?? 2} step={1} min={0} max={6} defaultValue={2} onchange={(value) => set('format.precision', Math.max(0, Math.round(value)))} />
       </PropertyCell>
       <PropertyCell label="Prefix" span={1} hint="Text before formatted values.">
         <input class="val" type="text" value={selected.format?.prefix ?? ''} onchange={(event) => set('format.prefix', event.target.value)} />

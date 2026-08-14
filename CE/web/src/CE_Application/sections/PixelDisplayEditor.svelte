@@ -7,7 +7,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import { isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
   import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
@@ -320,11 +320,11 @@
 {#if pixel}
   <div class="lcd-inspector">
   <PropertySection title="Screen">
-    <PropertyCell label="Pixels W" span={2} hint="Grid resolution: pixel columns. All element coordinates refer to this grid.">
-      <NumberInput value={pixel.pixelsW ?? 128} step={1} min={8} max={1024} onchange={(value) => set('pixelsW', Math.round(value))} />
+    <PropertyCell label="Pixels W" span={2} compact hint="Grid resolution: pixel columns. All element coordinates refer to this grid.">
+      <NumberCell label="W" value={pixel.pixelsW ?? 128} defaultValue={128} step={1} min={8} max={1024} onchange={(value) => set('pixelsW', Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Pixels H" span={2} hint="Grid resolution: pixel rows.">
-      <NumberInput value={pixel.pixelsH ?? 64} step={1} min={8} max={1024} onchange={(value) => set('pixelsH', Math.round(value))} />
+    <PropertyCell label="Pixels H" span={2} compact hint="Grid resolution: pixel rows.">
+      <NumberCell label="H" value={pixel.pixelsH ?? 64} defaultValue={64} step={1} min={8} max={1024} onchange={(value) => set('pixelsH', Math.round(value))} />
     </PropertyCell>
     <PropertyCell label="Grid" span={2} hint="The working resolution all X/Y/W/H values refer to.">
       <span class="hint-note">{pixelsW} × {pixelsH} px</span>
@@ -762,14 +762,14 @@
       <PropertyCell label="File" span={4} hint="Animated GIF/APNG/WebP (decoded frame-by-frame), or one image holding sprite frames side-by-side.">
         <input class="val" type="file" accept="image/*" onchange={onPickAnim} />
       </PropertyCell>
-      <PropertyCell label="Frames" span={2} hint="Sprite-sheet frame count. 0 = the file is an animated GIF/APNG.">
-        <NumberInput value={pixel.animFrames ?? 0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
+      <PropertyCell label="Frames" span={2} compact hint="Sprite-sheet frame count. 0 = the file is an animated GIF/APNG.">
+        <NumberCell label="Frames" value={pixel.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
       </PropertyCell>
-      <PropertyCell label="Cols" span={1} hint="Sprite columns. 0 = single horizontal strip; set for a grid or vertical (cols=1) sheet.">
-        <NumberInput value={pixel.animSpriteCols ?? 0} step={1} min={0} max={64} onchange={(value) => set('animSpriteCols', Math.round(value))} />
+      <PropertyCell label="Cols" span={1} compact hint="Sprite columns. 0 = single horizontal strip; set for a grid or vertical (cols=1) sheet.">
+        <NumberCell label="Cols" value={pixel.animSpriteCols ?? 0} defaultValue={0} step={1} min={0} max={64} onchange={(value) => set('animSpriteCols', Math.round(value))} />
       </PropertyCell>
-      <PropertyCell label="FPS" span={1} hint="Sprite-sheet playback rate.">
-        <NumberInput value={pixel.animFps ?? 12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />
+      <PropertyCell label="FPS" span={1} compact hint="Sprite-sheet playback rate.">
+        <NumberCell label="FPS" value={pixel.animFps ?? 12} defaultValue={12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />
       </PropertyCell>
       <PropertyCell label="Loop" span={1} hint="Loop forever, or hold the last frame.">
         <PropertyToggle value={pixel.animLoop !== false} onchange={() => toggle('animLoop', true)} />
@@ -846,8 +846,8 @@
     <PropertyCell label="Design grid" span={2} hint="Show a grid overlay while editing (editor aid — never painted at runtime).">
       <PropertyToggle value={pixel.showGrid === true} onchange={() => toggle('showGrid', false)} />
     </PropertyCell>
-    <PropertyCell label="Snap" span={2} hint="Snap element drags to this pixel step (0 = free). Also sets the grid spacing.">
-      <NumberInput value={pixel.snapGrid ?? 0} step={1} min={0} max={64} onchange={(value) => set('snapGrid', Math.max(0, Math.round(value)))} />
+    <PropertyCell label="Snap" span={2} compact hint="Snap element drags to this pixel step (0 = free). Also sets the grid spacing.">
+      <NumberCell label="Snap" value={pixel.snapGrid ?? 0} defaultValue={0} step={1} min={0} max={64} onchange={(value) => set('snapGrid', Math.max(0, Math.round(value)))} />
     </PropertyCell>
     <PropertyCell label="Bright Src" span={2} hint="Drive Brightness live from a slider/knob/number in preview.">
       <select class="val" value={pixel.brightnessSourceId ?? ''} onchange={(event) => set('brightnessSourceId', event.target.value)}>
@@ -883,8 +883,8 @@
     <PropertyCell label="Glow" span={2} hint="Bloom halo under lit dots (0 = crisp, 1 = strong glow).">
       <PropertyScrub value={pixel.glow ?? 0} step={0.1} min={0} max={1} defaultValue={0} onchange={(value) => set('glow', value)} />
     </PropertyCell>
-    <PropertyCell label="Padding" span={2} hint="Inset from the bezel to the screen (px).">
-      <NumberInput value={pixel.padding ?? 8} step={1} min={0} onchange={(value) => set('padding', value)} />
+    <PropertyCell label="Padding" span={2} compact hint="Inset from the bezel to the screen (px).">
+      <NumberCell label="Pad" value={pixel.padding ?? 8} defaultValue={8} step={1} min={0} onchange={(value) => set('padding', value)} />
     </PropertyCell>
   </PropertySection>
 
@@ -900,8 +900,8 @@
         <option value="digits">0–9</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Max length" span={2} hint="Cap on the edited string (0 = unbounded).">
-      <NumberInput value={pixel.editMaxLength ?? 16} step={1} min={0} max={256} onchange={(value) => set('editMaxLength', Math.max(0, Math.round(value)))} />
+    <PropertyCell label="Max length" span={2} compact hint="Cap on the edited string (0 = unbounded).">
+      <NumberCell label="Len" value={pixel.editMaxLength ?? 16} defaultValue={16} step={1} min={0} max={256} onchange={(value) => set('editMaxLength', Math.max(0, Math.round(value)))} />
     </PropertyCell>
   </PropertySection>
 
@@ -910,17 +910,17 @@
       <input class="val" type="file" accept="image/*" onchange={onPickCustomFont} />
     </PropertyCell>
     {#if pixel.customFont?.src}
-      <PropertyCell label="Cell W" span={1} hint="Glyph cell width (px).">
-        <NumberInput value={pixel.customFont?.glyphW ?? 6} step={1} min={2} max={64} onchange={(value) => setCustomFont({ glyphW: Math.max(2, Math.round(value)) })} />
+      <PropertyCell label="Cell W" span={1} compact hint="Glyph cell width (px).">
+        <NumberCell label="W" value={pixel.customFont?.glyphW ?? 6} defaultValue={6} step={1} min={2} max={64} onchange={(value) => setCustomFont({ glyphW: Math.max(2, Math.round(value)) })} />
       </PropertyCell>
-      <PropertyCell label="Cell H" span={1} hint="Glyph cell height (px).">
-        <NumberInput value={pixel.customFont?.glyphH ?? 8} step={1} min={2} max={64} onchange={(value) => setCustomFont({ glyphH: Math.max(2, Math.round(value)) })} />
+      <PropertyCell label="Cell H" span={1} compact hint="Glyph cell height (px).">
+        <NumberCell label="H" value={pixel.customFont?.glyphH ?? 8} defaultValue={8} step={1} min={2} max={64} onchange={(value) => setCustomFont({ glyphH: Math.max(2, Math.round(value)) })} />
       </PropertyCell>
-      <PropertyCell label="Cols" span={1} hint="Glyph columns per row in the sheet.">
-        <NumberInput value={pixel.customFont?.cols ?? 16} step={1} min={1} max={64} onchange={(value) => setCustomFont({ cols: Math.max(1, Math.round(value)) })} />
+      <PropertyCell label="Cols" span={1} compact hint="Glyph columns per row in the sheet.">
+        <NumberCell label="Cols" value={pixel.customFont?.cols ?? 16} defaultValue={16} step={1} min={1} max={64} onchange={(value) => setCustomFont({ cols: Math.max(1, Math.round(value)) })} />
       </PropertyCell>
-      <PropertyCell label="First" span={1} hint="Char code of the first glyph (32 = space, 65 = 'A').">
-        <NumberInput value={pixel.customFont?.first ?? 32} step={1} min={0} max={255} onchange={(value) => setCustomFont({ first: Math.max(0, Math.round(value)) })} />
+      <PropertyCell label="First" span={1} compact hint="Char code of the first glyph (32 = space, 65 = 'A').">
+        <NumberCell label="First" value={pixel.customFont?.first ?? 32} defaultValue={32} step={1} min={0} max={255} onchange={(value) => setCustomFont({ first: Math.max(0, Math.round(value)) })} />
       </PropertyCell>
       <PropertyCell label="Remove" span={4} hint="Drop the custom font (elements fall back to the built-in face).">
         <button class="val add-field" type="button" onclick={() => set('customFont', null)}>Remove custom font</button>

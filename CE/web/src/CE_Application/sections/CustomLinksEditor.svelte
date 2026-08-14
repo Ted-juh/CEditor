@@ -3,7 +3,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import ConditionBuilder from './ConditionBuilder.svelte';
   import { activePanel } from '../stores/panels.js';
   import {
@@ -504,17 +504,17 @@
     {#if ['map', 'offset', 'clamp', 'condition', 'switch', 'enable-disable', 'show-hide'].includes(String(selected.type ?? 'map'))}
       <PropertySection title="Link Options">
         {#if selected.type === 'map'}
-          <PropertyCell label="Input Min" span={1} hint="Lowest source value for the mapping.">
-            <NumberInput value={selected.inputMin ?? 0} step={0.01} onchange={(value) => set('inputMin', value)} />
+          <PropertyCell label="Input Min" span={1} compact hint="Lowest source value for the mapping.">
+            <NumberCell label="In Min" value={selected.inputMin ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('inputMin', value)} />
           </PropertyCell>
-          <PropertyCell label="Input Max" span={1} hint="Highest source value for the mapping.">
-            <NumberInput value={selected.inputMax ?? 1} step={0.01} onchange={(value) => set('inputMax', value)} />
+          <PropertyCell label="Input Max" span={1} compact hint="Highest source value for the mapping.">
+            <NumberCell label="In Max" value={selected.inputMax ?? 1} step={0.01} defaultValue={1} onchange={(value) => set('inputMax', value)} />
           </PropertyCell>
-          <PropertyCell label="Output Min" span={1} hint="Lowest target value after mapping.">
-            <NumberInput value={selected.outputMin ?? 0} step={0.01} onchange={(value) => set('outputMin', value)} />
+          <PropertyCell label="Output Min" span={1} compact hint="Lowest target value after mapping.">
+            <NumberCell label="OutMin" value={selected.outputMin ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('outputMin', value)} />
           </PropertyCell>
-          <PropertyCell label="Output Max" span={1} hint="Highest target value after mapping.">
-            <NumberInput value={selected.outputMax ?? 1} step={0.01} onchange={(value) => set('outputMax', value)} />
+          <PropertyCell label="Output Max" span={1} compact hint="Highest target value after mapping.">
+            <NumberCell label="OutMax" value={selected.outputMax ?? 1} step={0.01} defaultValue={1} onchange={(value) => set('outputMax', value)} />
           </PropertyCell>
           <PropertyCell label="Clamp" span={2} hint="Keep mapped values inside the output range.">
             <PropertyToggle value={selected.clamp !== false} onchange={() => set('clamp', !(selected.clamp !== false))} />
@@ -523,15 +523,15 @@
             <PropertyToggle value={selected.round === true} onchange={() => set('round', !(selected.round === true))} />
           </PropertyCell>
         {:else if selected.type === 'offset'}
-          <PropertyCell label="Amount" span={2} hint="Amount added to the source before writing the target.">
-            <NumberInput value={selected.amount ?? 0} step={0.01} onchange={(value) => set('amount', value)} />
+          <PropertyCell label="Amount" span={2} compact hint="Amount added to the source before writing the target.">
+            <NumberCell label="Amt" value={selected.amount ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('amount', value)} />
           </PropertyCell>
         {:else if selected.type === 'clamp'}
-          <PropertyCell label="Min" span={2} hint="Lowest allowed routed value.">
-            <NumberInput value={selected.min ?? 0} step={0.01} onchange={(value) => set('min', value)} />
+          <PropertyCell label="Min" span={2} compact hint="Lowest allowed routed value.">
+            <NumberCell label="Min" value={selected.min ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('min', value)} />
           </PropertyCell>
-          <PropertyCell label="Max" span={2} hint="Highest allowed routed value.">
-            <NumberInput value={selected.max ?? 1} step={0.01} onchange={(value) => set('max', value)} />
+          <PropertyCell label="Max" span={2} compact hint="Highest allowed routed value.">
+            <NumberCell label="Max" value={selected.max ?? 1} step={0.01} defaultValue={1} onchange={(value) => set('max', value)} />
           </PropertyCell>
         {:else if selected.type === 'condition'}
           <PropertyCell label="Expression" span={4} hint="Condition picking the true/false value below.">

@@ -4,7 +4,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import BackgroundEditor from './BackgroundEditor.svelte';
   import { createSliderSemanticParts } from '../utils/sliderEntityFactory.js';
@@ -219,17 +219,17 @@
       <PropertyCell label="Wrap" span={2} hint="Allow circular range/band spans to cross the seam.">
         <PropertyToggle value={behavior.allowWrapAround === true} onchange={() => set('Behavior.allowWrapAround', !(behavior.allowWrapAround === true))} />
       </PropertyCell>
-      <PropertyCell label="Start Angle" span={2} hint="Angle where the circular slider begins.">
-        <NumberInput value={behavior.startAngle ?? 135} step={1} min={-720} max={720} onchange={(value) => set('Behavior.startAngle', value)} />
+      <PropertyCell label="Start Angle" span={2} compact hint="Angle where the circular slider begins.">
+        <NumberCell label="Start" value={behavior.startAngle ?? 135} defaultValue={135} step={1} min={-720} max={720} onchange={(value) => set('Behavior.startAngle', value)} />
       </PropertyCell>
-      <PropertyCell label="End Angle" span={2} hint="Angle where the circular slider ends; changing it updates the sweep.">
-        <NumberInput value={circularEndAngle()} step={1} min={-720} max={720} onchange={setCircularEndAngle} />
+      <PropertyCell label="End Angle" span={2} compact hint="Angle where the circular slider ends; changing it updates the sweep.">
+        <NumberCell label="End" value={circularEndAngle()} step={1} min={-720} max={720} onchange={setCircularEndAngle} />
       </PropertyCell>
       <PropertyCell label="Sweep" span={2} hint="How much of the circle is active.">
         <PropertyScrub value={behavior.sweepAngle ?? 270} step={1} min={1} max={360} defaultValue={270} onchange={(value) => set('Behavior.sweepAngle', clampSweep(value))} />
       </PropertyCell>
-      <PropertyCell label="Diameter" span={2} hint="Circular track diameter in pixels. Set to 0 for automatic fitting.">
-        <NumberInput value={behavior.circularDiameter ?? 0} step={1} min={0} onchange={(value) => set('Behavior.circularDiameter', Math.max(0, value))} />
+      <PropertyCell label="Diameter" span={2} compact hint="Circular track diameter in pixels. Set to 0 for automatic fitting.">
+        <NumberCell label="Diam" value={behavior.circularDiameter ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('Behavior.circularDiameter', Math.max(0, value))} />
       </PropertyCell>
       <PropertyCell label="Drag" span={2} hint="absolute jumps to the clicked angle; knob is the plugin-standard vertical drag from the current value; rotary follows actual rotation about the dial.">
         <select class="val" value={behavior.circularDragMode ?? 'absolute'} onchange={(event) => set('Behavior.circularDragMode', event.target.value)}>
@@ -247,20 +247,20 @@
   </PropertySection>
 
   <PropertySection title="Values">
-    <PropertyCell label="Min" span={1} hint="Numeric minimum for the slider domain.">
-      <NumberInput value={behavior.min ?? 0} step={1} onchange={(value) => set('Behavior.min', value)} />
+    <PropertyCell label="Min" span={1} compact hint="Numeric minimum for the slider domain.">
+      <NumberCell label="Min" value={behavior.min ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.min', value)} />
     </PropertyCell>
-    <PropertyCell label="Max" span={1} hint="Numeric maximum for the slider domain.">
-      <NumberInput value={behavior.max ?? 1} step={1} onchange={(value) => set('Behavior.max', value)} />
+    <PropertyCell label="Max" span={1} compact hint="Numeric maximum for the slider domain.">
+      <NumberCell label="Max" value={behavior.max ?? 1} defaultValue={1} step={1} onchange={(value) => set('Behavior.max', value)} />
     </PropertyCell>
-    <PropertyCell label="Step" span={1} hint="Primary legal increment for keyboard, wheel, and snapping.">
-      <NumberInput value={behavior.step ?? 0.01} step={0.01} min={0.001} onchange={(value) => set('Behavior.step', value)} />
+    <PropertyCell label="Step" span={1} compact hint="Primary legal increment for keyboard, wheel, and snapping.">
+      <NumberCell label="Step" value={behavior.step ?? 0.01} defaultValue={0.01} step={0.01} min={0.001} onchange={(value) => set('Behavior.step', value)} />
     </PropertyCell>
-    <PropertyCell label="Precision" span={1} hint="Readout precision for labels and preview text.">
-      <NumberInput value={behavior.precision ?? 2} step={1} min={0} max={6} onchange={(value) => set('Behavior.precision', Math.max(0, Math.round(value)))} />
+    <PropertyCell label="Precision" span={1} compact hint="Readout precision for labels and preview text.">
+      <NumberCell label="Prec" value={behavior.precision ?? 2} defaultValue={2} step={1} min={0} max={6} onchange={(value) => set('Behavior.precision', Math.max(0, Math.round(value)))} />
     </PropertyCell>
-    <PropertyCell label="Centre" span={1} hint="Optional centre reference value for bipolar sliders and centre markers.">
-      <NumberInput value={behavior.centerValue ?? ((numberOr(behavior.min, 0) + numberOr(behavior.max, 1)) / 2)} step={numberOr(behavior.step, 0.01)} onchange={(value) => set('Behavior.centerValue', value)} />
+    <PropertyCell label="Centre" span={1} compact hint="Optional centre reference value for bipolar sliders and centre markers.">
+      <NumberCell label="Centre" value={behavior.centerValue ?? ((numberOr(behavior.min, 0) + numberOr(behavior.max, 1)) / 2)} defaultValue={(numberOr(behavior.min, 0) + numberOr(behavior.max, 1)) / 2} step={numberOr(behavior.step, 0.01)} onchange={(value) => set('Behavior.centerValue', value)} />
     </PropertyCell>
     <PropertyCell label="Fill Origin" span={1} hint="Choose where single-value fill starts.">
       <select class="val" value={behavior.fillOrigin ?? 'min'} onchange={(event) => set('Behavior.fillOrigin', event.target.value)}>
@@ -270,16 +270,16 @@
     </PropertyCell>
 
     {#if valueMode !== 'single'}
-      <PropertyCell label="Default Start" span={2} hint="Authored default for the start handle.">
-        <NumberInput value={behavior.defaultStartValue ?? behavior.min ?? 0} step={numberOr(behavior.step, 0.01)} onchange={(value) => set('Behavior.defaultStartValue', value)} />
+      <PropertyCell label="Default Start" span={2} compact hint="Authored default for the start handle.">
+        <NumberCell label="Start" value={behavior.defaultStartValue ?? behavior.min ?? 0} defaultValue={behavior.min ?? 0} step={numberOr(behavior.step, 0.01)} onchange={(value) => set('Behavior.defaultStartValue', value)} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Default Current" span={valueMode === 'single' ? 2 : 1} hint="Authored default for the current handle/value.">
-      <NumberInput value={behavior.defaultCurrentValue ?? 0} step={numberOr(behavior.step, 0.01)} onchange={(value) => set('Behavior.defaultCurrentValue', value)} />
+    <PropertyCell label="Default Current" span={valueMode === 'single' ? 2 : 1} compact hint="Authored default for the current handle/value.">
+      <NumberCell label="Cur" value={behavior.defaultCurrentValue ?? 0} defaultValue={0} step={numberOr(behavior.step, 0.01)} onchange={(value) => set('Behavior.defaultCurrentValue', value)} />
     </PropertyCell>
     {#if valueMode !== 'single'}
-      <PropertyCell label="Default End" span={1} hint="Authored default for the end handle.">
-        <NumberInput value={behavior.defaultEndValue ?? behavior.max ?? 1} step={numberOr(behavior.step, 0.01)} onchange={(value) => set('Behavior.defaultEndValue', value)} />
+      <PropertyCell label="Default End" span={1} compact hint="Authored default for the end handle.">
+        <NumberCell label="End" value={behavior.defaultEndValue ?? behavior.max ?? 1} defaultValue={behavior.max ?? 1} step={numberOr(behavior.step, 0.01)} onchange={(value) => set('Behavior.defaultEndValue', value)} />
       </PropertyCell>
     {/if}
 
@@ -335,14 +335,14 @@
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Gap" span={1} hint="Distance from the track for generated min and max labels.">
-        <NumberInput value={behavior.labelMinMaxGap ?? 22} step={1} onchange={(value) => set('Behavior.labelMinMaxGap', value)} />
+      <PropertyCell label="Gap" span={1} compact hint="Distance from the track for generated min and max labels.">
+        <NumberCell label="Gap" value={behavior.labelMinMaxGap ?? 22} defaultValue={22} step={1} onchange={(value) => set('Behavior.labelMinMaxGap', value)} />
       </PropertyCell>
-      <PropertyCell label="Offset X" span={1} hint="Horizontal offset for generated min and max labels.">
-        <NumberInput value={behavior.labelMinMaxOffsetX ?? 0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetX', value)} />
+      <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset for generated min and max labels.">
+        <NumberCell label="X" value={behavior.labelMinMaxOffsetX ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetX', value)} />
       </PropertyCell>
-      <PropertyCell label="Offset Y" span={1} hint="Vertical offset for generated min and max labels.">
-        <NumberInput value={behavior.labelMinMaxOffsetY ?? 0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetY', value)} />
+      <PropertyCell label="Offset Y" span={1} compact hint="Vertical offset for generated min and max labels.">
+        <NumberCell label="Y" value={behavior.labelMinMaxOffsetY ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetY', value)} />
       </PropertyCell>
     {:else if labelPositionTarget === 'readout'}
       <PropertyCell label="Readout Pos" span={1} hint="Position for the generated value readout.">
@@ -352,14 +352,14 @@
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Gap" span={1} hint="Distance from the component edge for top or bottom readout placement.">
-        <NumberInput value={behavior.labelReadoutGap ?? 14} step={1} onchange={(value) => set('Behavior.labelReadoutGap', value)} />
+      <PropertyCell label="Gap" span={1} compact hint="Distance from the component edge for top or bottom readout placement.">
+        <NumberCell label="Gap" value={behavior.labelReadoutGap ?? 14} defaultValue={14} step={1} onchange={(value) => set('Behavior.labelReadoutGap', value)} />
       </PropertyCell>
-      <PropertyCell label="Offset X" span={1} hint="Horizontal offset for the generated value readout.">
-        <NumberInput value={behavior.labelReadoutOffsetX ?? 0} step={1} onchange={(value) => set('Behavior.labelReadoutOffsetX', value)} />
+      <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset for the generated value readout.">
+        <NumberCell label="X" value={behavior.labelReadoutOffsetX ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelReadoutOffsetX', value)} />
       </PropertyCell>
-      <PropertyCell label="Offset Y" span={1} hint="Vertical offset for the generated value readout.">
-        <NumberInput value={behavior.labelReadoutOffsetY ?? 0} step={1} onchange={(value) => set('Behavior.labelReadoutOffsetY', value)} />
+      <PropertyCell label="Offset Y" span={1} compact hint="Vertical offset for the generated value readout.">
+        <NumberCell label="Y" value={behavior.labelReadoutOffsetY ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelReadoutOffsetY', value)} />
       </PropertyCell>
     {/if}
 
@@ -367,11 +367,11 @@
       <PropertyToggle value={behavior.showCenterMarker === true} onchange={() => set('Behavior.showCenterMarker', !(behavior.showCenterMarker === true))} />
     </PropertyCell>
 
-    <PropertyCell label="Major Count" span={1} hint="Generated major tick stops across the slider domain.">
-      <NumberInput value={behavior.majorTickCount ?? 11} step={1} min={2} onchange={(value) => set('Behavior.majorTickCount', Math.max(2, Math.round(value)))} />
+    <PropertyCell label="Major Count" span={1} compact hint="Generated major tick stops across the slider domain.">
+      <NumberCell label="Major" value={behavior.majorTickCount ?? 11} defaultValue={11} step={1} min={2} onchange={(value) => set('Behavior.majorTickCount', Math.max(2, Math.round(value)))} />
     </PropertyCell>
-    <PropertyCell label="Minor / Gap" span={1} hint="Minor ticks inserted between each pair of major ticks.">
-      <NumberInput value={behavior.minorTickCount ?? 3} step={1} min={0} onchange={(value) => set('Behavior.minorTickCount', Math.max(0, Math.round(value)))} />
+    <PropertyCell label="Minor / Gap" span={1} compact hint="Minor ticks inserted between each pair of major ticks.">
+      <NumberCell label="Minor" value={behavior.minorTickCount ?? 3} defaultValue={3} step={1} min={0} onchange={(value) => set('Behavior.minorTickCount', Math.max(0, Math.round(value)))} />
     </PropertyCell>
     <PropertyCell label="Tick Placement" span={2} hint="Place ticks inside or outside the body track.">
       <select class="val" value={behavior.tickPlacement ?? 'outside'} onchange={(event) => set('Behavior.tickPlacement', event.target.value)}>
@@ -437,16 +437,16 @@
       </div>
     </PropertyCell>
 
-    <PropertyCell label="Track Size" span={1} hint="Thickness used by the ready-made slider body.">
-      <NumberInput value={parts?._children?.bodyTrackBase?._children?.Layout?.height ?? 10} step={1} min={2} onchange={(value) => setPatch({
+    <PropertyCell label="Track Size" span={1} compact hint="Thickness used by the ready-made slider body.">
+      <NumberCell label="Track" value={parts?._children?.bodyTrackBase?._children?.Layout?.height ?? 10} defaultValue={10} step={1} min={2} onchange={(value) => setPatch({
         'Parts.bodyTrackBase.Layout.height': value,
         'Parts.bodyTrackFill.Layout.height': value,
         'Parts.bodySelectedRange.Layout.height': value,
       })} />
     </PropertyCell>
 
-    <PropertyCell label="Pointer Size" span={2} hint="Primary current-handle size.">
-      <NumberInput value={parts?._children?.pointerCurrent?._children?.Layout?.width ?? 20} step={1} min={8} onchange={(value) => setPatch({
+    <PropertyCell label="Pointer Size" span={2} compact hint="Primary current-handle size.">
+      <NumberCell label="Ptr" value={parts?._children?.pointerCurrent?._children?.Layout?.width ?? 20} defaultValue={20} step={1} min={8} onchange={(value) => setPatch({
         'Parts.pointerStart.Layout.width': value,
         'Parts.pointerStart.Layout.height': value,
         'Parts.pointerCurrent.Layout.width': value,
@@ -455,11 +455,11 @@
         'Parts.pointerEnd.Layout.height': value,
       })} />
     </PropertyCell>
-    <PropertyCell label="Tick Major" span={1} hint="Generated major tick length.">
-      <NumberInput value={parts?._children?.tickMajor?._children?.Layout?.height ?? 12} step={1} min={2} onchange={(value) => set('Parts.tickMajor.Layout.height', value)} />
+    <PropertyCell label="Tick Major" span={1} compact hint="Generated major tick length.">
+      <NumberCell label="Major" value={parts?._children?.tickMajor?._children?.Layout?.height ?? 12} defaultValue={12} step={1} min={2} onchange={(value) => set('Parts.tickMajor.Layout.height', value)} />
     </PropertyCell>
-    <PropertyCell label="Tick Minor" span={1} hint="Generated minor tick length.">
-      <NumberInput value={parts?._children?.tickMinor?._children?.Layout?.height ?? 7} step={1} min={1} onchange={(value) => set('Parts.tickMinor.Layout.height', value)} />
+    <PropertyCell label="Tick Minor" span={1} compact hint="Generated minor tick length.">
+      <NumberCell label="Minor" value={parts?._children?.tickMinor?._children?.Layout?.height ?? 7} defaultValue={7} step={1} min={1} onchange={(value) => set('Parts.tickMinor.Layout.height', value)} />
     </PropertyCell>
 
   </PropertySection>

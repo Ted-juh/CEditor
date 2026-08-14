@@ -8,7 +8,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let { control = null } = $props();
 
@@ -313,47 +313,47 @@
           <button type="button" onclick={() => setBoundsPreset('inset')}>Inset</button>
         </div>
       </PropertyCell>
-      <PropertyCell label="X" span={1} hint="Left edge of the generated area.">
-        <NumberInput value={selected.bounds?.x ?? 0} step={1} onchange={(value) => set('bounds.x', value)} />
+      <PropertyCell label="X" span={1} compact hint="Left edge of the generated area.">
+        <NumberCell label="X" value={selected.bounds?.x ?? 0} step={1} defaultValue={0} onchange={(value) => set('bounds.x', value)} />
       </PropertyCell>
-      <PropertyCell label="Y" span={1} hint="Top edge of the generated area.">
-        <NumberInput value={selected.bounds?.y ?? 0} step={1} onchange={(value) => set('bounds.y', value)} />
+      <PropertyCell label="Y" span={1} compact hint="Top edge of the generated area.">
+        <NumberCell label="Y" value={selected.bounds?.y ?? 0} step={1} defaultValue={0} onchange={(value) => set('bounds.y', value)} />
       </PropertyCell>
-      <PropertyCell label="Width" span={1} hint="Generated area width.">
-        <NumberInput value={selected.bounds?.width ?? 100} step={1} min={1} onchange={(value) => set('bounds.width', Math.max(1, value))} />
+      <PropertyCell label="Width" span={1} compact hint="Generated area width.">
+        <NumberCell label="W" value={selected.bounds?.width ?? 100} step={1} min={1} defaultValue={100} onchange={(value) => set('bounds.width', Math.max(1, value))} />
       </PropertyCell>
-      <PropertyCell label="Height" span={1} hint="Generated area height.">
-        <NumberInput value={selected.bounds?.height ?? 100} step={1} min={1} onchange={(value) => set('bounds.height', Math.max(1, value))} />
+      <PropertyCell label="Height" span={1} compact hint="Generated area height.">
+        <NumberCell label="H" value={selected.bounds?.height ?? 100} step={1} min={1} defaultValue={100} onchange={(value) => set('bounds.height', Math.max(1, value))} />
       </PropertyCell>
     </PropertySection>
 
     <PropertySection title="Rules">
-      <PropertyCell label="Count" span={1} hint="Primary generated item count.">
-        <NumberInput value={selected.count ?? 11} step={1} min={0} onchange={(value) => set('count', Math.max(0, Math.round(value)))} />
+      <PropertyCell label="Count" span={1} compact hint="Primary generated item count.">
+        <NumberCell label="Count" value={selected.count ?? 11} step={1} min={0} defaultValue={11} onchange={(value) => set('count', Math.max(0, Math.round(value)))} />
       </PropertyCell>
-      <PropertyCell label="Minor" span={1} hint="Minor items between primary items, useful for ticks.">
-        <NumberInput value={selected.minorCount ?? 0} step={1} min={0} onchange={(value) => set('minorCount', Math.max(0, Math.round(value)))} />
+      <PropertyCell label="Minor" span={1} compact hint="Minor items between primary items, useful for ticks.">
+        <NumberCell label="Minor" value={selected.minorCount ?? 0} step={1} min={0} defaultValue={0} onchange={(value) => set('minorCount', Math.max(0, Math.round(value)))} />
       </PropertyCell>
-      <PropertyCell label="Rows" span={1} hint="Rows for grid-like generators.">
-        <NumberInput value={selected.rows ?? 4} step={1} min={1} onchange={(value) => set('rows', Math.max(1, Math.round(value)))} />
+      <PropertyCell label="Rows" span={1} compact hint="Rows for grid-like generators.">
+        <NumberCell label="Rows" value={selected.rows ?? 4} step={1} min={1} defaultValue={4} onchange={(value) => set('rows', Math.max(1, Math.round(value)))} />
       </PropertyCell>
-      <PropertyCell label="Columns" span={1} hint="Columns for grid-like generators.">
-        <NumberInput value={selected.columns ?? 4} step={1} min={1} onchange={(value) => set('columns', Math.max(1, Math.round(value)))} />
+      <PropertyCell label="Columns" span={1} compact hint="Columns for grid-like generators.">
+        <NumberCell label="Cols" value={selected.columns ?? 4} step={1} min={1} defaultValue={4} onchange={(value) => set('columns', Math.max(1, Math.round(value)))} />
       </PropertyCell>
-      <PropertyCell label="Base Note" span={1} hint="First MIDI note for piano key generators.">
-        <NumberInput value={selected.baseNote ?? 60} step={1} min={0} max={127} onchange={(value) => set('baseNote', Math.max(0, Math.min(127, Math.round(value))))} />
+      <PropertyCell label="Base Note" span={1} compact hint="First MIDI note for piano key generators.">
+        <NumberCell label="Note" value={selected.baseNote ?? 60} step={1} min={0} max={127} defaultValue={60} onchange={(value) => set('baseNote', Math.max(0, Math.min(127, Math.round(value))))} />
       </PropertyCell>
-      <PropertyCell label="Radius" span={1} hint="Circular generator radius as a percentage from the centre.">
-        <NumberInput value={selected.radius ?? 38} step={1} min={0} max={80} onchange={(value) => set('radius', Math.max(0, Math.min(80, value)))} />
+      <PropertyCell label="Radius" span={1} compact hint="Circular generator radius as a percentage from the centre.">
+        <NumberCell label="Rad" value={selected.radius ?? 38} step={1} min={0} max={80} defaultValue={38} onchange={(value) => set('radius', Math.max(0, Math.min(80, value)))} />
       </PropertyCell>
-      <PropertyCell label="Start" span={1} hint="Circular generator start angle in degrees.">
-        <NumberInput value={selected.startAngle ?? -135} step={1} min={-360} max={360} onchange={(value) => set('startAngle', Math.max(-360, Math.min(360, value)))} />
+      <PropertyCell label="Start" span={1} compact hint="Circular generator start angle in degrees.">
+        <NumberCell label="Start" value={selected.startAngle ?? -135} step={1} min={-360} max={360} defaultValue={-135} onchange={(value) => set('startAngle', Math.max(-360, Math.min(360, value)))} />
       </PropertyCell>
-      <PropertyCell label="End" span={1} hint="Circular generator end angle in degrees.">
-        <NumberInput value={selected.endAngle ?? 135} step={1} min={-360} max={360} onchange={(value) => set('endAngle', Math.max(-360, Math.min(360, value)))} />
+      <PropertyCell label="End" span={1} compact hint="Circular generator end angle in degrees.">
+        <NumberCell label="End" value={selected.endAngle ?? 135} step={1} min={-360} max={360} defaultValue={135} onchange={(value) => set('endAngle', Math.max(-360, Math.min(360, value)))} />
       </PropertyCell>
-      <PropertyCell label="LED Size" span={1} hint="Generated LED diameter in pixels.">
-        <NumberInput value={selected.ledSize ?? selected.size ?? 9} step={1} min={1} max={48} onchange={(value) => set('ledSize', Math.max(1, Math.min(48, value)))} />
+      <PropertyCell label="LED Size" span={1} compact hint="Generated LED diameter in pixels.">
+        <NumberCell label="Size" value={selected.ledSize ?? selected.size ?? 9} step={1} min={1} max={48} defaultValue={9} onchange={(value) => set('ledSize', Math.max(1, Math.min(48, value)))} />
       </PropertyCell>
       <PropertyCell label="Active" span={1} hint="Colour used when an LED threshold is passed.">
         <input class="val" type="text" value={selected.activeColour ?? selected.colour ?? 'FF5B9BD5'} onchange={(event) => set('activeColour', event.target.value)} />

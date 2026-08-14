@@ -5,7 +5,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let { control = null } = $props();
 
@@ -208,29 +208,29 @@
           </select>
         </PropertyCell>
       {/if}
-      <PropertyCell label="Min" span={2} hint="Lower bound the values are clamped to.">
-        <NumberInput value={behavior.min ?? 0} step={1} onchange={(value) => set('min', value)} />
+      <PropertyCell label="Min" span={2} compact hint="Lower bound the values are clamped to.">
+        <NumberCell label="Min" value={behavior.min ?? 0} defaultValue={0} step={1} onchange={(value) => set('min', value)} />
       </PropertyCell>
-      <PropertyCell label="Max" span={2} hint="Upper bound the values are clamped to.">
-        <NumberInput value={behavior.max ?? 100} step={1} onchange={(value) => set('max', value)} />
+      <PropertyCell label="Max" span={2} compact hint="Upper bound the values are clamped to.">
+        <NumberCell label="Max" value={behavior.max ?? 100} defaultValue={100} step={1} onchange={(value) => set('max', value)} />
       </PropertyCell>
-      <PropertyCell label="Step" span={2} hint="Increment per step / stepper click.">
-        <NumberInput value={behavior.step ?? 1} step={1} min={0} onchange={(value) => set('step', value)} />
+      <PropertyCell label="Step" span={2} compact hint="Increment per step / stepper click.">
+        <NumberCell label="Step" value={behavior.step ?? 1} defaultValue={1} step={1} min={0} onchange={(value) => set('step', value)} />
       </PropertyCell>
       <PropertyCell label="Integer" span={2} hint="Round values to whole numbers.">
         <PropertyToggle value={String(behavior.valueType ?? '') === 'int'} onchange={() => set('valueType', String(behavior.valueType ?? '') === 'int' ? 'float' : 'int')} />
       </PropertyCell>
       {#if isTwoValueRange}
-        <PropertyCell label="Low" span={2} hint="Default low (min) value of the range.">
-          <NumberInput value={behavior.defaultStartValue ?? behavior.min ?? 0} step={1} onchange={(value) => setStartValue(value)} />
+        <PropertyCell label="Low" span={2} compact hint="Default low (min) value of the range.">
+          <NumberCell label="Low" value={behavior.defaultStartValue ?? behavior.min ?? 0} defaultValue={behavior.min ?? 0} step={1} onchange={(value) => setStartValue(value)} />
         </PropertyCell>
-        <PropertyCell label="High" span={2} hint="Default high (max) value of the range.">
-          <NumberInput value={behavior.defaultEndValue ?? behavior.max ?? 100} step={1} onchange={(value) => setEndValue(value)} />
+        <PropertyCell label="High" span={2} compact hint="Default high (max) value of the range.">
+          <NumberCell label="High" value={behavior.defaultEndValue ?? behavior.max ?? 100} defaultValue={behavior.max ?? 100} step={1} onchange={(value) => setEndValue(value)} />
         </PropertyCell>
       {/if}
       {#if isRangeSpinbox}
-        <PropertyCell label="Font Size" span={2} hint="Height (px) of the value and ± glyphs.">
-          <NumberInput value={valueFontSize} step={1} min={4} onchange={(value) => setValueFontSize(value)} />
+        <PropertyCell label="Font Size" span={2} compact hint="Height (px) of the value and ± glyphs.">
+          <NumberCell label="Size" value={valueFontSize} defaultValue={12} step={1} min={4} onchange={(value) => setValueFontSize(value)} />
         </PropertyCell>
       {/if}
     </PropertySection>
@@ -249,11 +249,11 @@
         <PropertyCell label="Mode" span={4} hint="Repeating buttons keep firing while the button is held.">
           <div class="behavior-note">Repeats while held.</div>
         </PropertyCell>
-        <PropertyCell label="Delay" span={2} hint="Delay before repeating starts.">
-          <NumberInput value={behavior.repeatDelay ?? 300} step={10} min={0} onchange={(value) => set('repeatDelay', value)} />
+        <PropertyCell label="Delay" span={2} compact hint="Delay before repeating starts.">
+          <NumberCell label="Delay" value={behavior.repeatDelay ?? 300} defaultValue={300} step={10} min={0} onchange={(value) => set('repeatDelay', value)} />
         </PropertyCell>
-        <PropertyCell label="Interval" span={2} hint="Repeat interval while the button is held.">
-          <NumberInput value={behavior.repeatInterval ?? 120} step={10} min={10} onchange={(value) => set('repeatInterval', value)} />
+        <PropertyCell label="Interval" span={2} compact hint="Repeat interval while the button is held.">
+          <NumberCell label="Intvl" value={behavior.repeatInterval ?? 120} defaultValue={120} step={10} min={10} onchange={(value) => set('repeatInterval', value)} />
         </PropertyCell>
       {:else if momentarySubtype === 'press_to_talk'}
         <PropertyCell label="Mode" span={4} hint="Press-to-talk stays active only while the button is held.">
@@ -285,8 +285,8 @@
           <option value="vertical">vertical</option>
         </select>
       </PropertyCell>
-      <PropertyCell label="Columns" span={1} hint="Set to 0 for auto layout, or 2 for a 2 x 2 grid with four items.">
-        <NumberInput value={behavior.itemColumns ?? 0} step={1} min={0} onchange={(value) => set('itemColumns', Math.max(0, Math.round(value)))} />
+      <PropertyCell label="Columns" span={1} compact hint="Set to 0 for auto layout, or 2 for a 2 x 2 grid with four items.">
+        <NumberCell label="Cols" value={behavior.itemColumns ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('itemColumns', Math.max(0, Math.round(value)))} />
       </PropertyCell>
       <PropertyCell label="Select" span={2} hint="Single keeps one item active, multi allows several at once.">
         <select class="val" value={behavior.selectionMode ?? 'single'} onchange={(event) => set('selectionMode', event.target.value)}>
@@ -330,14 +330,14 @@
     </PropertySection>
   {:else if buttonType === 'timed'}
     <PropertySection title="Timed">
-      <PropertyCell label="Hold ms" span={2} hint="Required hold time for hold-to-confirm buttons.">
-        <NumberInput value={behavior.holdDuration ?? 1200} step={50} min={0} onchange={(value) => set('holdDuration', value)} />
+      <PropertyCell label="Hold ms" span={2} compact hint="Required hold time for hold-to-confirm buttons.">
+        <NumberCell label="Hold" value={behavior.holdDuration ?? 1200} defaultValue={1200} step={50} min={0} onchange={(value) => set('holdDuration', value)} />
       </PropertyCell>
-      <PropertyCell label="Clicks" span={1} hint="Required clicks for multi-click buttons.">
-        <NumberInput value={behavior.requiredClicks ?? 2} step={1} min={1} onchange={(value) => set('requiredClicks', Math.max(1, Math.round(value)))} />
+      <PropertyCell label="Clicks" span={1} compact hint="Required clicks for multi-click buttons.">
+        <NumberCell label="Clicks" value={behavior.requiredClicks ?? 2} defaultValue={2} step={1} min={1} onchange={(value) => set('requiredClicks', Math.max(1, Math.round(value)))} />
       </PropertyCell>
-      <PropertyCell label="Window" span={1} hint="Allowed time window between required clicks.">
-        <NumberInput value={behavior.clickWindow ?? 350} step={10} min={50} onchange={(value) => set('clickWindow', value)} />
+      <PropertyCell label="Window" span={1} compact hint="Allowed time window between required clicks.">
+        <NumberCell label="Win" value={behavior.clickWindow ?? 350} defaultValue={350} step={10} min={50} onchange={(value) => set('clickWindow', value)} />
       </PropertyCell>
     </PropertySection>
   {:else if buttonType === 'one_shot'}
@@ -345,8 +345,8 @@
       <PropertyCell label="Disable" span={2} hint="Disable the button after the first successful use.">
         <PropertyToggle value={behavior.disableAfterUse !== false} onchange={() => set('disableAfterUse', !(behavior.disableAfterUse !== false))} />
       </PropertyCell>
-      <PropertyCell label="Lockout" span={2} hint="Temporary lockout duration after firing. Zero keeps it disabled.">
-        <NumberInput value={behavior.lockoutDuration ?? 0} step={50} min={0} onchange={(value) => set('lockoutDuration', value)} />
+      <PropertyCell label="Lockout" span={2} compact hint="Temporary lockout duration after firing. Zero keeps it disabled.">
+        <NumberCell label="Lock" value={behavior.lockoutDuration ?? 0} defaultValue={0} step={50} min={0} onchange={(value) => set('lockoutDuration', value)} />
       </PropertyCell>
     </PropertySection>
   {/if}

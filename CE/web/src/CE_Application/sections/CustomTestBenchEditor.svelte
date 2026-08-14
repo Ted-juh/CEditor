@@ -3,7 +3,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import {
     extractDetachedGeneratedHitZones,
@@ -645,11 +645,12 @@
                   {/each}
                 </div>
               {:else}
-                <NumberInput
+                <NumberCell
                   value={Number(seededValues?.[channel.name] ?? definition?.defaultValue ?? 0)}
                   step={Number(definition?.step ?? (type === 'int' ? 1 : 0.01))}
                   min={Number(definition?.min ?? 0)}
                   max={Number(definition?.max ?? 1)}
+                  defaultValue={Number(definition?.defaultValue ?? 0)}
                   onchange={(value) => setChannelTestValue(channel.name, value)}
                 />
               {/if}

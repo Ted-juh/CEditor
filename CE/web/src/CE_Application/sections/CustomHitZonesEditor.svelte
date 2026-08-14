@@ -3,7 +3,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import ConditionBuilder from './ConditionBuilder.svelte';
   import { createHitZone } from '../utils/customComponentFactory.js';
 
@@ -263,8 +263,8 @@
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Priority" span={1} hint="Higher priority wins overlapping hit zones.">
-        <NumberInput value={selected.priority ?? 0} step={1} onchange={(value) => set('priority', Math.round(value))} />
+      <PropertyCell label="Priority" span={1} compact hint="Higher priority wins overlapping hit zones.">
+        <NumberCell label="Prio" value={selected.priority ?? 0} step={1} defaultValue={0} onchange={(value) => set('priority', Math.round(value))} />
       </PropertyCell>
       <PropertyCell label="Cursor" span={1} hint="Cursor shown over this zone.">
         <input class="val" type="text" value={selected.cursor ?? 'pointer'} onchange={(event) => set('cursor', event.target.value)} />
@@ -272,17 +272,17 @@
     </PropertySection>
 
     <PropertySection title="Bounds">
-      <PropertyCell label="X" span={1} hint="Zone X in its configured unit.">
-        <NumberInput value={selected.bounds?.x ?? 0} step={1} onchange={(value) => set('bounds.x', value)} />
+      <PropertyCell label="X" span={1} compact hint="Zone X in its configured unit.">
+        <NumberCell label="X" value={selected.bounds?.x ?? 0} step={1} defaultValue={0} onchange={(value) => set('bounds.x', value)} />
       </PropertyCell>
-      <PropertyCell label="Y" span={1} hint="Zone Y in its configured unit.">
-        <NumberInput value={selected.bounds?.y ?? 0} step={1} onchange={(value) => set('bounds.y', value)} />
+      <PropertyCell label="Y" span={1} compact hint="Zone Y in its configured unit.">
+        <NumberCell label="Y" value={selected.bounds?.y ?? 0} step={1} defaultValue={0} onchange={(value) => set('bounds.y', value)} />
       </PropertyCell>
-      <PropertyCell label="W" span={1} hint="Zone width.">
-        <NumberInput value={selected.bounds?.width ?? 100} step={1} min={0} onchange={(value) => set('bounds.width', value)} />
+      <PropertyCell label="W" span={1} compact hint="Zone width.">
+        <NumberCell label="W" value={selected.bounds?.width ?? 100} step={1} min={0} defaultValue={100} onchange={(value) => set('bounds.width', value)} />
       </PropertyCell>
-      <PropertyCell label="H" span={1} hint="Zone height.">
-        <NumberInput value={selected.bounds?.height ?? 100} step={1} min={0} onchange={(value) => set('bounds.height', value)} />
+      <PropertyCell label="H" span={1} compact hint="Zone height.">
+        <NumberCell label="H" value={selected.bounds?.height ?? 100} step={1} min={0} defaultValue={100} onchange={(value) => set('bounds.height', value)} />
       </PropertyCell>
       <PropertyCell label="Unit" span={2} hint="Percent keeps zones responsive; px keeps them fixed.">
         <select class="val" value={selected.bounds?.unit ?? 'percent'} onchange={(event) => set('bounds.unit', event.target.value)}>
