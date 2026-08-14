@@ -20,10 +20,16 @@ export async function resolve(specifier, context, nextResolve) {
   try {
     return await nextResolve(specifier, context);
   } catch (error) {
-    // Vite resolves extensionless TypeScript imports (`from './dragScrub'`);
-    // Node does not, so retry the bare specifier with the extension added.
+    // Vite resolves extensionless imports (`from './dragScrub'`, and
+    // lucide-svelte's `./defaultAttributes`); Node does not, so retry the bare
+    // specifier with an extension added — .ts first (our sources), then .js
+    // (compiled dependencies).
     if (error?.code === 'ERR_MODULE_NOT_FOUND' && !/\.[a-z]+$/i.test(specifier)) {
-      return nextResolve(`${specifier}.ts`, context);
+      try {
+        return await nextResolve(`${specifier}.ts`, context);
+      } catch {
+        return nextResolve(`${specifier}.js`, context);
+      }
     }
     throw error;
   }

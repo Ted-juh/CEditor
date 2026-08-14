@@ -19,6 +19,11 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Ghost from 'lucide-svelte/icons/ghost';
+  import ScanLine from 'lucide-svelte/icons/scan-line';
+  import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
 
   let { control = null } = $props();
 
@@ -768,17 +773,16 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Ghost dots" span={2} hint="Faint unlit cells behind the text (realism cue).">
-      <PropertyToggle value={display.showGhost !== false} onchange={() => toggle('showGhost', true)} />
-    </PropertyCell>
-    <PropertyCell label="Scanlines" span={2} hint="Horizontal scanline overlay.">
-      <PropertyToggle value={display.showScanlines === true} onchange={() => toggle('showScanlines', false)} />
-    </PropertyCell>
-    <PropertyCell label="Cell grid" span={2} hint="Faint pixel/cell grid lines.">
-      <PropertyToggle value={display.showGrid === true} onchange={() => toggle('showGrid', false)} />
-    </PropertyCell>
-    <PropertyCell label="Glass sheen" span={2} hint="Diagonal glass reflection overlay (colour set under Colour ▸ Glass).">
-      <PropertyToggle value={display.showGlass !== false} onchange={() => toggle('showGlass', true)} />
+    <PropertyCell label="Overlays" span={2} hint="Ghost dots, scanlines, cell grid, glass sheen. Hover a chip for its name; glass colour is under Colour ▸ Glass.">
+      <FlagStrip
+        flags={[
+          { key: 'showGhost', title: 'Ghost dots — faint unlit cells behind the text', on: display.showGhost !== false, icon: Ghost },
+          { key: 'showScanlines', title: 'Scanlines — horizontal scanline overlay', on: display.showScanlines === true, icon: ScanLine },
+          { key: 'showGrid', title: 'Cell grid — faint pixel/cell grid lines', on: display.showGrid === true, icon: Grid3x3 },
+          { key: 'showGlass', title: 'Glass sheen — diagonal reflection overlay', on: display.showGlass !== false, icon: Sparkles },
+        ]}
+        ontoggle={(key) => toggle(key, key === 'showGhost' || key === 'showGlass')}
+      />
     </PropertyCell>
     {#if String(display.panelType ?? '') === 'character'}
       <PropertyCell label="Dot Matrix" span={2} hint="Render character glyphs as a dot grid for a dot-matrix LCD look.">

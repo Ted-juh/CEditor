@@ -2,6 +2,10 @@
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Eye from 'lucide-svelte/icons/eye';
+  import CheckSquare from 'lucide-svelte/icons/square-check';
+  import Lock from 'lucide-svelte/icons/lock';
 
   let { control = null } = $props();
 
@@ -58,25 +62,15 @@
              onfocus={selectAll} onchange={(e) => handleInput('stylePreset', e)} />
     </div>
     <div class="prop-row">
-      <span class="lbl">Visible</span>
-      <button class="toggle-val" class:on={core.visible}
-              onclick={() => handleToggle('visible')}>
-        {core.visible ? 'On' : 'Off'}
-      </button>
-    </div>
-    <div class="prop-row">
-      <span class="lbl">Enabled</span>
-      <button class="toggle-val" class:on={core.enabled}
-              onclick={() => handleToggle('enabled')}>
-        {core.enabled ? 'On' : 'Off'}
-      </button>
-    </div>
-    <div class="prop-row">
-      <span class="lbl">Locked</span>
-      <button class="toggle-val" class:on={core.locked}
-              onclick={() => handleToggle('locked')}>
-        {core.locked ? 'On' : 'Off'}
-      </button>
+      <span class="lbl">State</span>
+      <FlagStrip
+        flags={[
+          { key: 'visible', title: 'Visible', on: !!core.visible, icon: Eye },
+          { key: 'enabled', title: 'Enabled', on: !!core.enabled, icon: CheckSquare },
+          { key: 'locked', title: 'Locked', on: !!core.locked, icon: Lock },
+        ]}
+        ontoggle={(key) => handleToggle(key)}
+      />
     </div>
     <div class="prop-row">
       <span class="lbl">Z-Index</span>
