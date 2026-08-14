@@ -6,6 +6,14 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Segmented from '../properties/Segmented.svelte';
+  import Repeat from 'lucide-svelte/icons/repeat';
+  import Blend from 'lucide-svelte/icons/blend';
+  import Focus from 'lucide-svelte/icons/focus';
+  import Keyboard from 'lucide-svelte/icons/keyboard';
+  import MousePointerClick from 'lucide-svelte/icons/mouse-pointer-click';
+  import Activity from 'lucide-svelte/icons/activity';
 
   let { control = null } = $props();
 
@@ -240,10 +248,15 @@
     <PropertySection title="Momentary">
       {#if momentarySubtype === 'action'}
         <PropertyCell label="Fire On" span={4} hint="Choose whether the action triggers on press start or on release.">
-          <select class="val" value={behavior.fireOn ?? 'onRelease'} onchange={(event) => set('fireOn', event.target.value)}>
-            <option value="onPressStart">onPressStart</option>
-            <option value="onRelease">onRelease</option>
-          </select>
+          <Segmented
+            ariaLabel="Fire on"
+            value={behavior.fireOn ?? 'onRelease'}
+            options={[
+              { value: 'onPressStart', label: 'onPressStart' },
+              { value: 'onRelease', label: 'onRelease' },
+            ]}
+            onchange={(v) => set('fireOn', v)}
+          />
         </PropertyCell>
       {:else if momentarySubtype === 'repeating'}
         <PropertyCell label="Mode" span={4} hint="Repeating buttons keep firing while the button is held.">
@@ -273,11 +286,16 @@
   {:else if buttonType === 'radio'}
     <PropertySection title="Radio Group">
       <PropertyCell label="Style" span={2} hint="Choose the visual style for the group items.">
-        <select class="val" value={radioVisualStyle} onchange={(event) => set('visualStyle', event.target.value)}>
-          <option value="radio">radio</option>
-          <option value="segmented">segmented</option>
-          <option value="tab">tab</option>
-        </select>
+        <Segmented
+          ariaLabel="Visual style"
+          value={radioVisualStyle}
+          options={[
+            { value: 'radio', label: 'radio' },
+            { value: 'segmented', label: 'segmented' },
+            { value: 'tab', label: 'tab' },
+          ]}
+          onchange={(v) => set('visualStyle', v)}
+        />
       </PropertyCell>
       <PropertyCell label="Layout" span={1} hint="Horizontal lays items in rows, vertical stacks them in one column by default.">
         <select class="val" value={behavior.orientation ?? 'horizontal'} onchange={(event) => set('orientation', event.target.value)}>
@@ -289,10 +307,15 @@
         <NumberCell label="Cols" value={behavior.itemColumns ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('itemColumns', Math.max(0, Math.round(value)))} />
       </PropertyCell>
       <PropertyCell label="Select" span={2} hint="Single keeps one item active, multi allows several at once.">
-        <select class="val" value={behavior.selectionMode ?? 'single'} onchange={(event) => set('selectionMode', event.target.value)}>
-          <option value="single">single</option>
-          <option value="multi">multi</option>
-        </select>
+        <Segmented
+          ariaLabel="Selection mode"
+          value={behavior.selectionMode ?? 'single'}
+          options={[
+            { value: 'single', label: 'single' },
+            { value: 'multi', label: 'multi' },
+          ]}
+          onchange={(v) => set('selectionMode', v)}
+        />
       </PropertyCell>
       <PropertyCell label="Deselect" span={2} hint="Allow the selected item to be turned off again.">
         <PropertyToggle value={behavior.allowDeselect === true} onchange={() => handleToggle('allowDeselect')} />
@@ -303,20 +326,31 @@
     </PropertySection>
   {:else if buttonType === 'cyclic'}
     <PropertySection title="Cyclic">
-      <PropertyCell label="Wrap" span={2} hint="Wrap to the first row after the last state.">
-        <PropertyToggle value={behavior.wrapBehavior !== false} onchange={() => set('wrapBehavior', !(behavior.wrapBehavior !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Mixed" span={2} hint="Allow a mixed state where the design calls for it.">
-        <PropertyToggle value={behavior.allowMixed === true} onchange={() => handleToggle('allowMixed')} />
+      <PropertyCell label="Allow" span={2} hint="Wrap to the first row after the last state, allow a mixed state. Hover a chip for its name.">
+        <FlagStrip
+          flags={[
+            { key: 'wrap', title: 'Wrap — wrap to the first row after the last state', on: behavior.wrapBehavior !== false, icon: Repeat },
+            { key: 'mixed', title: 'Mixed — allow a mixed state where the design calls for it', on: behavior.allowMixed === true, icon: Blend },
+          ]}
+          ontoggle={(key) => {
+            if (key === 'wrap') set('wrapBehavior', !(behavior.wrapBehavior !== false));
+            else if (key === 'mixed') handleToggle('allowMixed');
+          }}
+        />
       </PropertyCell>
     </PropertySection>
   {:else if buttonType === 'combobox'}
     <PropertySection title="Combobox">
       <PropertyCell label="Mode" span={2} hint="Dropdown uses the value rows as selectable options.">
-        <select class="val" value={behavior.subtype ?? 'dropdown'} onchange={(event) => handleSubtypeChange(event.target.value)}>
-          <option value="dropdown">dropdown</option>
-          <option value="searchable">searchable</option>
-        </select>
+        <Segmented
+          ariaLabel="Combobox mode"
+          value={behavior.subtype ?? 'dropdown'}
+          options={[
+            { value: 'dropdown', label: 'dropdown' },
+            { value: 'searchable', label: 'searchable' },
+          ]}
+          onchange={(v) => handleSubtypeChange(v)}
+        />
       </PropertyCell>
       <PropertyCell label="Default" span={2} hint="Internal value selected when the panel opens.">
         <input class="val" type="text" value={behavior.defaultValue ?? ''} onchange={(event) => set('defaultValue', event.target.value)} />
@@ -352,17 +386,29 @@
   {/if}
 
   <PropertySection title="Runtime">
-    <PropertyCell label="Focusable" span={2} hint="Allow the control to receive keyboard focus in preview/runtime.">
-      <PropertyToggle value={behavior.focusable !== false} onchange={() => set('focusable', !(behavior.focusable !== false))} />
+    <PropertyCell label="Input" span={2} hint="Keyboard focus, keyboard activation. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'focusable', title: 'Focusable — allow the control to receive keyboard focus in preview/runtime', on: behavior.focusable !== false, icon: Focus },
+          { key: 'keyboard', title: 'Keyboard — enable keyboard activation', on: behavior.keyboardEnabled !== false, icon: Keyboard },
+        ]}
+        ontoggle={(key) => {
+          if (key === 'focusable') set('focusable', !(behavior.focusable !== false));
+          else if (key === 'keyboard') set('keyboardEnabled', !(behavior.keyboardEnabled !== false));
+        }}
+      />
     </PropertyCell>
-    <PropertyCell label="Keyboard" span={2} hint="Enable keyboard activation.">
-      <PropertyToggle value={behavior.keyboardEnabled !== false} onchange={() => set('keyboardEnabled', !(behavior.keyboardEnabled !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Emit Click" span={2} hint="Expose click events to the future scripting/runtime layer.">
-      <PropertyToggle value={behavior.emitClick !== false} onchange={() => set('emitClick', !(behavior.emitClick !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Emit State" span={2} hint="Expose state changes to the future scripting/runtime layer.">
-      <PropertyToggle value={behavior.emitStateChange !== false} onchange={() => set('emitStateChange', !(behavior.emitStateChange !== false))} />
+    <PropertyCell label="Emit" span={2} hint="Emit click events and state changes. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'click', title: 'Emit Click — expose click events to the future scripting/runtime layer', on: behavior.emitClick !== false, icon: MousePointerClick },
+          { key: 'state', title: 'Emit State — expose state changes to the future scripting/runtime layer', on: behavior.emitStateChange !== false, icon: Activity },
+        ]}
+        ontoggle={(key) => {
+          if (key === 'click') set('emitClick', !(behavior.emitClick !== false));
+          else if (key === 'state') set('emitStateChange', !(behavior.emitStateChange !== false));
+        }}
+      />
     </PropertyCell>
   </PropertySection>
 {/if}

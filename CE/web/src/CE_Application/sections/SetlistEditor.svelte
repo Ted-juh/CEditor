@@ -9,6 +9,10 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Send from 'lucide-svelte/icons/send';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import Gauge from 'lucide-svelte/icons/gauge';
 
   let { control = null } = $props();
 
@@ -126,17 +130,22 @@
       </div>
     </PropertyCell>
 
-    <PropertyCell label="Loop" span={1} hint="Next at the end goes back to the first scene.">
+    <PropertyCell label="Loop" span={2} hint="Next at the end goes back to the first scene.">
       <PropertyToggle value={p.wrap === true} onchange={() => set('wrap', !(p.wrap === true))} />
     </PropertyCell>
-    <PropertyCell label="Send program" span={1} hint="Bank select then program change, in that order.">
-      <PropertyToggle value={p.sendProgram !== false} onchange={() => set('sendProgram', !(p.sendProgram !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Recall values" span={1} hint="Write each scene's captured panel values on recall.">
-      <PropertyToggle value={p.recallValues !== false} onchange={() => set('recallValues', !(p.recallValues !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Recall tempo" span={1} hint="A scene's tempo drives the Transport. Songs have tempos; that is most of what a setlist is for.">
-      <PropertyToggle value={p.recallTempo !== false} onchange={() => set('recallTempo', !(p.recallTempo !== false))} />
+    <PropertyCell label="Recall" span={2} hint="Send program, recall values, recall tempo. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'sendProgram', title: 'Send program — bank select then program change, in that order', on: p.sendProgram !== false, icon: Send },
+          { key: 'recallValues', title: "Recall values — write each scene's captured panel values on recall", on: p.recallValues !== false, icon: SlidersHorizontal },
+          { key: 'recallTempo', title: "Recall tempo — a scene's tempo drives the Transport", on: p.recallTempo !== false, icon: Gauge },
+        ]}
+        ontoggle={(key) => {
+          if (key === 'sendProgram') set('sendProgram', !(p.sendProgram !== false));
+          else if (key === 'recallValues') set('recallValues', !(p.recallValues !== false));
+          else if (key === 'recallTempo') set('recallTempo', !(p.recallTempo !== false));
+        }}
+      />
     </PropertyCell>
     <PropertyCell label="Crossfade" span={1} hint="Milliseconds to slide panel values on a recall; 0 snaps. Only numbers interpolate; the rest switch at halfway.">
       <input class="val" type="number" min="0" max="10000" step="50" value={crossfadeMs(control)} onchange={(e) => set('crossfadeMs', clampInt(e.target.value, 0, 10000, 0))} />

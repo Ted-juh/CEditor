@@ -4,6 +4,21 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Segmented from '../properties/Segmented.svelte';
+  import Image from 'lucide-svelte/icons/image';
+  import Rows2 from 'lucide-svelte/icons/rows-2';
+  import Badge from 'lucide-svelte/icons/badge';
+  import Palette from 'lucide-svelte/icons/palette';
+  import Rows3 from 'lucide-svelte/icons/rows-3';
+  import GalleryVertical from 'lucide-svelte/icons/gallery-vertical';
+  import ChevronsUpDown from 'lucide-svelte/icons/chevrons-up-down';
+  import Wind from 'lucide-svelte/icons/wind';
+  import Hand from 'lucide-svelte/icons/hand';
+  import Keyboard from 'lucide-svelte/icons/keyboard';
+  import LocateFixed from 'lucide-svelte/icons/locate-fixed';
+  import Search from 'lucide-svelte/icons/search';
+  import Highlighter from 'lucide-svelte/icons/highlighter';
   import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
   import { syncPresetChoiceRows, initPresetChoiceSync } from '../stores/presetChoiceSync.js';
 
@@ -27,39 +42,42 @@
       <NumberCell label="Height" value={lb.rowHeight ?? 0} step={1} min={0} max={80} defaultValue={0} onchange={(v) => set('rowHeight', Math.max(0, Math.round(v)))} />
     </PropertyCell>
     <PropertyCell label="Density" span={2} hint="Comfortable or compact auto row height.">
-      <select class="val" value={lb.density ?? 'comfortable'} onchange={(e) => set('density', e.target.value)}>
-        <option value="comfortable">Comfortable</option>
-        <option value="compact">Compact</option>
-      </select>
+      <Segmented
+        ariaLabel="Density"
+        value={lb.density ?? 'comfortable'}
+        options={[
+          { value: 'comfortable', label: 'Comfortable' },
+          { value: 'compact', label: 'Compact' },
+        ]}
+        onchange={(v) => set('density', v)}
+      />
     </PropertyCell>
-    <PropertyCell label="Icons" span={1} hint="Show per-row icons when set.">
-      <PropertyToggle value={lb.showIcons !== false} onchange={() => toggle('showIcons', true)} />
+    <PropertyCell label="Appearance" span={4} hint="Icons, two-line subtitles, badges, colour swatch, zebra stripes, card rows, edge fades. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'showIcons', title: 'Icons — show per-row icons when set', on: lb.showIcons !== false, icon: Image },
+          { key: 'twoLine', title: 'Two-line — per-row subtitle on a second line', on: lb.twoLine === true, icon: Rows2 },
+          { key: 'showBadges', title: 'Badges — per-row trailing badges', on: lb.showBadges !== false, icon: Badge },
+          { key: 'showSwatch', title: 'Swatch — per-row colour stripe', on: lb.showSwatch === true, icon: Palette },
+          { key: 'zebra', title: 'Zebra — alternating row stripes', on: lb.zebra === true, icon: Rows3 },
+          { key: 'cardRows', title: 'Cards — gaps + rounded corners per row', on: lb.cardRows === true, icon: GalleryVertical },
+          { key: 'fadeEdges', title: 'Fade edges — top/bottom fade hinting more content', on: lb.fadeEdges === true, icon: ChevronsUpDown },
+        ]}
+        ontoggle={(key) => toggle(key, key === 'showIcons' || key === 'showBadges')}
+      />
     </PropertyCell>
-    <PropertyCell label="Two-line" span={1} hint="Show the per-row subtitle on a second line.">
-      <PropertyToggle value={lb.twoLine === true} onchange={() => toggle('twoLine', false)} />
-    </PropertyCell>
-    <PropertyCell label="Badges" span={1} hint="Show per-row trailing badges.">
-      <PropertyToggle value={lb.showBadges !== false} onchange={() => toggle('showBadges', true)} />
-    </PropertyCell>
-    <PropertyCell label="Swatch" span={1} hint="Show the per-row colour stripe.">
-      <PropertyToggle value={lb.showSwatch === true} onchange={() => toggle('showSwatch', false)} />
-    </PropertyCell>
-    <PropertyCell label="Zebra" span={1} hint="Alternating row stripes.">
-      <PropertyToggle value={lb.zebra === true} onchange={() => toggle('zebra', false)} />
-    </PropertyCell>
-    <PropertyCell label="Cards" span={1} hint="Gaps + rounded corners per row.">
-      <PropertyToggle value={lb.cardRows === true} onchange={() => toggle('cardRows', false)} />
-    </PropertyCell>
-    <PropertyCell label="Fade edges" span={1} hint="Top/bottom fade hinting more content.">
-      <PropertyToggle value={lb.fadeEdges === true} onchange={() => toggle('fadeEdges', false)} />
-    </PropertyCell>
-    <PropertyCell label="Scrollbar" span={1} hint="Scrollbar visibility.">
-      <select class="val" value={lb.scrollbar ?? 'auto'} onchange={(e) => set('scrollbar', e.target.value)}>
-        <option value="auto">Auto</option>
-        <option value="always">Always</option>
-        <option value="thin">Thin</option>
-        <option value="hidden">Hidden</option>
-      </select>
+    <PropertyCell label="Scrollbar" span={4} hint="Scrollbar visibility.">
+      <Segmented
+        ariaLabel="Scrollbar visibility"
+        value={lb.scrollbar ?? 'auto'}
+        options={[
+          { value: 'auto', label: 'Auto' },
+          { value: 'always', label: 'Always' },
+          { value: 'thin', label: 'Thin' },
+          { value: 'hidden', label: 'Hidden' },
+        ]}
+        onchange={(v) => set('scrollbar', v)}
+      />
     </PropertyCell>
     <PropertyCell label="Empty text" span={4} hint="Shown when the list has no rows.">
       <input class="val" type="text" value={lb.emptyText ?? 'No items'} oninput={(e) => set('emptyText', e.target.value)} />
@@ -92,38 +110,50 @@
 
   <PropertySection title="Scroll & navigation">
     <PropertyCell label="Scroll" span={2} hint="Line-by-line snap, or smooth/pixel scrolling.">
-      <select class="val" value={lb.scrollMode ?? 'line'} onchange={(e) => set('scrollMode', e.target.value)}>
-        <option value="line">Line</option>
-        <option value="smooth">Smooth</option>
-      </select>
+      <Segmented
+        ariaLabel="Scroll mode"
+        value={lb.scrollMode ?? 'line'}
+        options={[
+          { value: 'line', label: 'Line' },
+          { value: 'smooth', label: 'Smooth' },
+        ]}
+        onchange={(v) => set('scrollMode', v)}
+      />
     </PropertyCell>
-    <PropertyCell label="Momentum" span={2} hint="Inertial flick scrolling (smooth mode).">
-      <PropertyToggle value={lb.momentum === true} onchange={() => toggle('momentum', false)} />
-    </PropertyCell>
-    <PropertyCell label="Drag scroll" span={1} hint="Grab and swipe the list.">
-      <PropertyToggle value={lb.dragScroll === true} onchange={() => toggle('dragScroll', false)} />
-    </PropertyCell>
-    <PropertyCell label="Keyboard" span={1} hint="Arrows / Page / Home / End move selection.">
-      <PropertyToggle value={lb.keyboardNav !== false} onchange={() => toggle('keyboardNav', true)} />
-    </PropertyCell>
-    <PropertyCell label="Follow sel" span={2} hint="Keep the selected row scrolled into view.">
-      <PropertyToggle value={lb.scrollIntoView !== false} onchange={() => toggle('scrollIntoView', true)} />
+    <PropertyCell label="Nav" span={2} hint="Momentum, drag scroll, keyboard navigation, follow selection. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'momentum', title: 'Momentum — inertial flick scrolling (smooth mode)', on: lb.momentum === true, icon: Wind },
+          { key: 'dragScroll', title: 'Drag scroll — grab and swipe the list', on: lb.dragScroll === true, icon: Hand },
+          { key: 'keyboardNav', title: 'Keyboard — arrows / Page / Home / End move selection', on: lb.keyboardNav !== false, icon: Keyboard },
+          { key: 'scrollIntoView', title: 'Follow selection — keep the selected row scrolled into view', on: lb.scrollIntoView !== false, icon: LocateFixed },
+        ]}
+        ontoggle={(key) => toggle(key, key === 'keyboardNav' || key === 'scrollIntoView')}
+      />
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Search">
     <PropertyCell label="Type-ahead" span={2} hint="Focus + type to jump to a matching row.">
-      <select class="val" value={lb.typeAhead ?? 'off'} onchange={(e) => set('typeAhead', e.target.value)}>
-        <option value="off">Off</option>
-        <option value="prefix">Prefix</option>
-        <option value="fuzzy">Fuzzy</option>
-      </select>
+      <Segmented
+        ariaLabel="Type-ahead"
+        value={lb.typeAhead ?? 'off'}
+        options={[
+          { value: 'off', label: 'Off' },
+          { value: 'prefix', label: 'Prefix' },
+          { value: 'fuzzy', label: 'Fuzzy' },
+        ]}
+        onchange={(v) => set('typeAhead', v)}
+      />
     </PropertyCell>
-    <PropertyCell label="Filter box" span={1} hint="Header search field that live-filters rows.">
-      <PropertyToggle value={lb.filterBox === true} onchange={() => toggle('filterBox', false)} />
-    </PropertyCell>
-    <PropertyCell label="Highlight" span={1} hint="Highlight the matched substring.">
-      <PropertyToggle value={lb.highlightMatch !== false} onchange={() => toggle('highlightMatch', true)} />
+    <PropertyCell label="Show" span={2} hint="Filter box, match highlighting. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'filterBox', title: 'Filter box — header search field that live-filters rows', on: lb.filterBox === true, icon: Search },
+          { key: 'highlightMatch', title: 'Highlight — highlight the matched substring', on: lb.highlightMatch !== false, icon: Highlighter },
+        ]}
+        ontoggle={(key) => toggle(key, key === 'highlightMatch')}
+      />
     </PropertyCell>
   </PropertySection>
 
@@ -141,11 +171,16 @@
       </select>
     </PropertyCell>
     <PropertyCell label="Commit" span={4} hint="When a pick 'commits' (fires recall / value-change).">
-      <select class="val" value={lb.confirmMode ?? 'single'} onchange={(e) => set('confirmMode', e.target.value)}>
-        <option value="single">Single click</option>
-        <option value="double">Double click</option>
-        <option value="enter">Enter key</option>
-      </select>
+      <Segmented
+        ariaLabel="Commit mode"
+        value={lb.confirmMode ?? 'single'}
+        options={[
+          { value: 'single', label: 'Single click' },
+          { value: 'double', label: 'Double click' },
+          { value: 'enter', label: 'Enter key' },
+        ]}
+        onchange={(v) => set('confirmMode', v)}
+      />
     </PropertyCell>
   </PropertySection>
 

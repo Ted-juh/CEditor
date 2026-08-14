@@ -31,6 +31,14 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import MousePointerClick from 'lucide-svelte/icons/mouse-pointer-click';
+  import Layers from 'lucide-svelte/icons/layers';
+  import BringToFront from 'lucide-svelte/icons/bring-to-front';
+  import FlipHorizontal from 'lucide-svelte/icons/flip-horizontal-2';
+  import FlipVertical from 'lucide-svelte/icons/flip-vertical-2';
+  import Mouse from 'lucide-svelte/icons/mouse';
+  import MoveHorizontal from 'lucide-svelte/icons/move-horizontal';
 
   let { control = null } = $props();
 
@@ -79,14 +87,19 @@
         {#each HIT_TEST_SHAPES as option (option)}<option value={option}>{option}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Take Clicks" span={2} hint="Off makes the control transparent to the pointer: clicks land on whatever sits behind it. Controls nested inside keep working.">
-      <PropertyToggle value={m.interceptClicks !== false} onchange={() => set('interceptClicks', !(m.interceptClicks !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Child Clicks" span={2} hint="On lets the parts inside become click targets in their own right, instead of the control being one opaque hit area.">
-      <PropertyToggle value={m.interceptChildClicks === true} onchange={() => set('interceptChildClicks', !(m.interceptChildClicks === true))} />
-    </PropertyCell>
-    <PropertyCell label="Raise On Click" span={2} hint="Bring the control in front of overlapping ones when pressed. Lasts for the preview session only — the authored order comes back when preview stops.">
-      <PropertyToggle value={m.bringToFrontOnClick === true} onchange={() => set('bringToFrontOnClick', !(m.bringToFrontOnClick === true))} />
+    <PropertyCell label="Clicks" span={2} hint="Take clicks, child part clicks, raise on click. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'take', title: 'Take Clicks — off makes the control transparent to the pointer: clicks land on whatever sits behind it; controls nested inside keep working', on: m.interceptClicks !== false, icon: MousePointerClick },
+          { key: 'child', title: 'Child Clicks — let the parts inside become click targets in their own right, instead of the control being one opaque hit area', on: m.interceptChildClicks === true, icon: Layers },
+          { key: 'raise', title: 'Raise On Click — bring the control in front of overlapping ones when pressed, for the preview session only', on: m.bringToFrontOnClick === true, icon: BringToFront },
+        ]}
+        ontoggle={(key) => {
+          if (key === 'take') set('interceptClicks', !(m.interceptClicks !== false));
+          else if (key === 'child') set('interceptChildClicks', !(m.interceptChildClicks === true));
+          else if (key === 'raise') set('bringToFrontOnClick', !(m.bringToFrontOnClick === true));
+        }}
+      />
     </PropertyCell>
   </PropertySection>
 
@@ -111,21 +124,33 @@
     <PropertyCell label="Sensitivity" span={2} hint="Multiplier on the control's own drag rate. 1 leaves it exactly as it is; 2 makes the same travel cover twice the range; 0.5 halves it for fine work.">
       <input class="val" type="number" min="0.01" max="10" step="0.05" value={getDragSensitivity(m)} onchange={(event) => set('dragSensitivity', Math.max(0.01, Math.min(10, num(event.target.value, 1))))} />
     </PropertyCell>
-    <PropertyCell label="Invert X" span={1} hint="Flip whatever this control already does horizontally — on a right-to-left slider it reverses that, rather than forcing one absolute direction.">
-      <PropertyToggle value={m.invertX === true} onchange={() => set('invertX', !(m.invertX === true))} />
-    </PropertyCell>
-    <PropertyCell label="Invert Y" span={1} hint="Flip whatever this control already does vertically.">
-      <PropertyToggle value={m.invertY === true} onchange={() => set('invertY', !(m.invertY === true))} />
+    <PropertyCell label="Invert" span={2} hint="Invert X, invert Y. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'x', title: 'Invert X — flip whatever this control already does horizontally; on a right-to-left slider it reverses that, rather than forcing one absolute direction', on: m.invertX === true, icon: FlipHorizontal },
+          { key: 'y', title: 'Invert Y — flip whatever this control already does vertically', on: m.invertY === true, icon: FlipVertical },
+        ]}
+        ontoggle={(key) => {
+          if (key === 'x') set('invertX', !(m.invertX === true));
+          else if (key === 'y') set('invertY', !(m.invertY === true));
+        }}
+      />
     </PropertyCell>
   </PropertySection>
 
   {#if hasWheelBehavior}
     <PropertySection title="Wheel">
-      <PropertyCell label="Wheel" span={2} hint="Allow mouse-wheel scrubbing while the control is focused or hovered. Shared with the Slider tab — one setting, two places to reach it.">
-        <PropertyToggle value={behavior.wheelEnabled === true} onchange={() => setBehavior('wheelEnabled', !(behavior.wheelEnabled === true))} />
-      </PropertyCell>
-      <PropertyCell label="Reverse Mouse" span={2} hint="Invert wheel and drag value direction without changing the visual track direction. Shared with the Slider tab.">
-        <PropertyToggle value={behavior.reverseMouseDirection === true} onchange={() => setBehavior('reverseMouseDirection', !(behavior.reverseMouseDirection === true))} />
+      <PropertyCell label="Wheel" span={2} hint="Wheel scrubbing, reversed mouse direction — shared with the Slider tab. Hover a chip for its name.">
+        <FlagStrip
+          flags={[
+            { key: 'wheel', title: 'Wheel — allow mouse-wheel scrubbing while the control is focused or hovered', on: behavior.wheelEnabled === true, icon: Mouse },
+            { key: 'reverse', title: 'Reverse Mouse — invert wheel and drag value direction without changing the visual track direction', on: behavior.reverseMouseDirection === true, icon: MoveHorizontal },
+          ]}
+          ontoggle={(key) => {
+            if (key === 'wheel') setBehavior('wheelEnabled', !(behavior.wheelEnabled === true));
+            else if (key === 'reverse') setBehavior('reverseMouseDirection', !(behavior.reverseMouseDirection === true));
+          }}
+        />
       </PropertyCell>
     </PropertySection>
   {/if}
