@@ -9,6 +9,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
@@ -59,11 +60,6 @@
   function depthPct(d) { return Math.round(num(d?.depth, 1) * 100); }
   // Which standard sources are "external" (need the synth/controller to send them).
   const EXTERNAL = new Set(['aftertouch', 'breath', 'foot', 'velocity']);
-
-  // Accent-colour swatches: the native picker edits RGB; we preserve each
-  // colour's original alpha so faint grids keep their transparency.
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if r}
@@ -135,20 +131,14 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Curve" span={1} hint="The transfer-curve line colour.">
-      <input class="cswatch" type="color" value={colRgb(r.curveColour, 'FF39D98A')} onchange={(e) => setCol('curveColour', r.curveColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Input" span={1} hint="The live input bar + crosshair colour.">
-      <input class="cswatch" type="color" value={colRgb(r.inputColour, 'FFF2C94C')} onchange={(e) => setCol('inputColour', r.inputColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Field" span={1} hint="Curve-area background colour.">
-      <input class="cswatch" type="color" value={colRgb(r.fieldColour, 'FF0A0A0F')} onchange={(e) => setCol('fieldColour', r.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Grid" span={1} hint="Grid lines (stays faint — its transparency is kept).">
-      <input class="cswatch" type="color" value={colRgb(r.gridColour, 'FFFFFFFF')} onchange={(e) => setCol('gridColour', r.gridColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Label colour.">
-      <input class="cswatch" type="color" value={colRgb(r.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', r.labelColour, e.target.value)} />
+    <PropertyCell label="Colours" span={4} hint="Transfer curve, live input bar, field background, grid lines, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'curveColour', label: 'Curve', value: r.curveColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'Router.curveColour' } },
+        { key: 'inputColour', label: 'Input', value: r.inputColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Router.inputColour' } },
+        { key: 'fieldColour', label: 'Field', value: r.fieldColour ?? 'FF0A0A0F', target: { type: 'control', controlId: core?.id, path: 'Router.fieldColour' } },
+        { key: 'gridColour', label: 'Grid', value: r.gridColour ?? 'FFFFFFFF', target: { type: 'control', controlId: core?.id, path: 'Router.gridColour' } },
+        { key: 'labelColour', label: 'Labels', value: r.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Router.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
@@ -162,7 +152,9 @@
           <div class="dest" class:off={d.enabled === false}>
             <div class="drow">
               <input class="val name" type="text" value={d.label ?? ''} placeholder="Destination" onchange={(e) => updateDest(i, 'label', e.target.value)} />
-              <input class="swatch" type="color" value={`#${String(d.colour ?? 'FF39D98A').slice(-6)}`} onchange={(e) => updateDest(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+              <span class="dcol"><SwatchCluster swatches={[
+                { key: 'colour', label: 'Colour', value: d.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateDest(i, 'colour', hex) } },
+              ]} /></span>
               <label class="flag"><input type="checkbox" checked={d.enabled !== false} onchange={(e) => updateDest(i, 'enabled', e.currentTarget.checked)} /><span>On</span></label>
               <button type="button" class="action-btn danger" onclick={() => removeDest(i)} title="Remove">✕</button>
             </div>
@@ -203,8 +195,7 @@
   .dest.off { opacity: 0.55; }
   .drow { display: flex; align-items: center; gap: 8px; }
   .drow .name { flex: 1 1 auto; }
-  .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
+  .dcol { flex: 0 0 52px; display: flex; }
   .drow2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #8a8a8a; }

@@ -12,6 +12,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
   import SongChainCells from '../properties/SongChainCells.svelte';
 
@@ -27,12 +28,6 @@
   function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
   function clampInt(v, lo, hi, f) { const n = Math.round(num(v, f)); return n < lo ? lo : n > hi ? hi : n; }
   function clampNum(v, lo, hi, f) { const n = num(v, f); return n < lo ? lo : n > hi ? hi : n; }
-  function colRgb(v, fb) { const t = String(v ?? fb).replace(/^#/, ''); return `#${t.length >= 6 ? t.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) {
-    const t = String(cur ?? '').replace(/^#/, '');
-    const al = /^[0-9a-fA-F]{8}$/.test(t) ? t.slice(0, 2) : 'FF';
-    set(prop, `${al}${hex.replace('#', '').toUpperCase()}`);
-  }
 
   let take = $derived.by(() => { try { return recorderTake(control); } catch { return { events: [], pending: {} }; } });
   let count = $derived(takeEventCount(take));
@@ -260,11 +255,15 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Face" span={1} hint=""><input class="col" type="color" value={colRgb(p.faceColour, 'FF141420')} oninput={(e) => setCol('faceColour', p.faceColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Notes" span={1} hint=""><input class="col" type="color" value={colRgb(p.noteColour, 'FF56CCF2')} oninput={(e) => setCol('noteColour', p.noteColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Recording" span={1} hint="Also colours the newest overdub pass, so you can see what you just added."><input class="col" type="color" value={colRgb(p.recordColour, 'FFEB5757')} oninput={(e) => setCol('recordColour', p.recordColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Playhead" span={1} hint=""><input class="col" type="color" value={colRgb(p.playheadColour, 'FFF2C94C')} oninput={(e) => setCol('playheadColour', p.playheadColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Labels" span={1} hint=""><input class="col" type="color" value={colRgb(p.labelColour, 'FFB9B9B9')} oninput={(e) => setCol('labelColour', p.labelColour, e.target.value)} /></PropertyCell>
+    <PropertyCell label="Colours" span={4} hint="Face, notes, recording (also colours the newest overdub pass), playhead, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'faceColour', label: 'Face', value: p.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'Recorder.faceColour' } },
+        { key: 'noteColour', label: 'Notes', value: p.noteColour ?? 'FF56CCF2', target: { type: 'control', controlId: core?.id, path: 'Recorder.noteColour' } },
+        { key: 'recordColour', label: 'Rec', value: p.recordColour ?? 'FFEB5757', target: { type: 'control', controlId: core?.id, path: 'Recorder.recordColour' } },
+        { key: 'playheadColour', label: 'Play', value: p.playheadColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Recorder.playheadColour' } },
+        { key: 'labelColour', label: 'Labels', value: p.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Recorder.labelColour' } },
+      ]} />
+    </PropertyCell>
   </PropertySection>
 {/if}
 
@@ -287,5 +286,4 @@
   .btn.on { border-color: #56CCF2; color: #E8E8EE; }
   .btn.rec.on { border-color: #EB5757; color: #EB5757; }
   .btn.wide { width: 100%; }
-  .col { width: 26px; height: 20px; padding: 0; border: 1px solid #2a2a36; background: #141420; border-radius: 3px; }
 </style>

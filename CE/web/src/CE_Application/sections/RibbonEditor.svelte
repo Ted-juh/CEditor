@@ -3,6 +3,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   let { control = null } = $props();
 
@@ -28,16 +29,6 @@
     const patch = {};
     for (const [k, v] of Object.entries(fields)) patch[`Ribbon.${k}`] = v;
     applyControlPatch(core.id, patch);
-  }
-
-  function hexToInput(argb) {
-    const s = String(argb ?? '').replace(/^#/, '');
-    return /^[0-9a-fA-F]{8}$/.test(s) ? `#${s.slice(2)}` : (/^[0-9a-fA-F]{6}$/.test(s) ? `#${s}` : '#000000');
-  }
-  function inputToArgb(prev, hex) {
-    const rgb = String(hex ?? '').replace(/^#/, '').toUpperCase();
-    const alpha = /^[0-9a-fA-F]{8}$/.test(String(prev ?? '').replace(/^#/, '')) ? String(prev).replace(/^#/, '').slice(0, 2) : 'FF';
-    return `${alpha}${rgb}`;
   }
 </script>
 
@@ -109,17 +100,13 @@
     <PropertyCell label="Label" span={4} hint="Caption under the strip/wheel.">
       <input class="val" type="text" value={r.label ?? ''} onchange={(e) => set('label', e.target.value)} />
     </PropertyCell>
-    <PropertyCell label="Fill" span={2} hint="Strip fill / notch accent.">
-      <input class="val color" type="color" value={hexToInput(r.fillColour)} onchange={(e) => set('fillColour', inputToArgb(r.fillColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Indicator" span={2} hint="Position indicator colour.">
-      <input class="val color" type="color" value={hexToInput(r.indicatorColour)} onchange={(e) => set('indicatorColour', inputToArgb(r.indicatorColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Track" span={2} hint="Strip groove colour.">
-      <input class="val color" type="color" value={hexToInput(r.trackColour)} onchange={(e) => set('trackColour', inputToArgb(r.trackColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Wheel" span={2} hint="Wheel body colour.">
-      <input class="val color" type="color" value={hexToInput(r.wheelColour)} onchange={(e) => set('wheelColour', inputToArgb(r.wheelColour, e.target.value))} />
+    <PropertyCell label="Colours" span={4} hint="Strip fill / notch accent, position indicator, strip groove, wheel body. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'fillColour', label: 'Fill', value: r.fillColour, target: { type: 'control', controlId: core?.id, path: 'Ribbon.fillColour' } },
+        { key: 'indicatorColour', label: 'Indic', value: r.indicatorColour, target: { type: 'control', controlId: core?.id, path: 'Ribbon.indicatorColour' } },
+        { key: 'trackColour', label: 'Track', value: r.trackColour, target: { type: 'control', controlId: core?.id, path: 'Ribbon.trackColour' } },
+        { key: 'wheelColour', label: 'Wheel', value: r.wheelColour, target: { type: 'control', controlId: core?.id, path: 'Ribbon.wheelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -130,7 +117,6 @@
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
   }
   .val:focus { border-color: #5B9BD5; }
-  .val.color { padding: 1px 2px; height: 24px; cursor: pointer; }
   .presets { display: flex; gap: 6px; flex-wrap: wrap; }
   .action-btn {
     background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD;

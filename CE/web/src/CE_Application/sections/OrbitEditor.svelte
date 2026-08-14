@@ -71,17 +71,13 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Field" span={1} hint="Background inside the pad.">
-      <input class="cswatch" type="color" value={colRgb(o.fieldColour, 'FF0D0D12')} onchange={(e) => setCol('fieldColour', o.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Rings" span={1} hint="Orbit rings (stays faint — its transparency is kept).">
-      <input class="cswatch" type="color" value={colRgb(o.ringColour, 'FF2A6BA8')} onchange={(e) => setCol('ringColour', o.ringColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Centre" span={1} hint="Centre hub colour.">
-      <input class="cswatch" type="color" value={colRgb(o.centreColour, 'FF3A3A44')} onchange={(e) => setCol('centreColour', o.centreColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Satellite label colour.">
-      <input class="cswatch" type="color" value={colRgb(o.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', o.labelColour, e.target.value)} />
+    <PropertyCell label="Colours" span={4} hint="Field background, orbit rings, centre hub, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'fieldColour', label: 'Field', value: o.fieldColour ?? 'FF0D0D12', target: { type: 'control', controlId: core?.id, path: 'Orbit.fieldColour' } },
+        { key: 'ringColour', label: 'Rings', value: o.ringColour ?? 'FF2A6BA8', target: { type: 'control', controlId: core?.id, path: 'Orbit.ringColour' } },
+        { key: 'centreColour', label: 'Centre', value: o.centreColour ?? 'FF3A3A44', target: { type: 'control', controlId: core?.id, path: 'Orbit.centreColour' } },
+        { key: 'labelColour', label: 'Labels', value: o.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Orbit.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
@@ -95,7 +91,9 @@
           <div class="node" class:off={s.enabled === false}>
             <div class="nrow">
               <input class="val name" type="text" value={s.label ?? ''} placeholder="Node" onchange={(e) => updateNode(i, 'label', e.target.value)} />
-              <input class="swatch" type="color" value={`#${String(s.colour ?? 'FF5B9BD5').slice(-6)}`} onchange={(e) => updateNode(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+              <span class="ncol"><SwatchCluster swatches={[
+                { key: 'colour', label: 'Colour', value: s.colour ?? 'FF5B9BD5', target: { type: 'callback', apply: (hex) => updateNode(i, 'colour', hex) } },
+              ]} /></span>
               <label class="flag"><input type="checkbox" checked={s.enabled !== false} onchange={(e) => updateNode(i, 'enabled', e.currentTarget.checked)} /><span>On</span></label>
               <button type="button" class="action-btn danger" onclick={() => removeNode(i)} title="Remove">✕</button>
             </div>
@@ -141,8 +139,7 @@
   .node.off { opacity: 0.55; }
   .nrow { display: flex; align-items: center; gap: 8px; }
   .nrow .name { flex: 1 1 auto; }
-  .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
+  .ncol { flex: 0 0 52px; display: flex; }
   .nrow2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; align-items: end; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #8a8a8a; }

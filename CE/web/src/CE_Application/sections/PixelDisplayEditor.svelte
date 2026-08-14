@@ -11,6 +11,7 @@
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
   import Segmented from '../properties/Segmented.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import Grip from 'lucide-svelte/icons/grip';
   import Palette from 'lucide-svelte/icons/palette';
   import Ghost from 'lucide-svelte/icons/ghost';
@@ -18,7 +19,6 @@
   import ScanLine from 'lucide-svelte/icons/scan-line';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import { isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
-  import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
   import { ICON_GLYPHS } from '../utils/pixelFont.js';
   import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
   const ICON_NAMES = Object.keys(ICON_GLYPHS);
@@ -567,7 +567,9 @@
           {#if el.kind === 'bitmap'}
             {@const bd = bitmapDims(el)}
             <div class="ex-row">
-              <input class="val cswatch" type="color" title="Bitmap colour" value={aarrggbbToHex(el.colour || 'FF2BE86A')} oninput={(event) => setElement(i, 'colour', mergeHexKeepAlpha(el.colour || 'FF000000', event.target.value))} />
+              <span class="elcol"><SwatchCluster swatches={[
+                { key: 'colour', label: 'Colour', value: el.colour || 'FF2BE86A', target: { type: 'callback', apply: (hex) => setElement(i, 'colour', hex) } },
+              ]} /></span>
               <button class="val add-field" type="button" onclick={() => clearPaint(i)}>Clear</button>
               <button class="val add-field" type="button" onclick={() => invertPaint(i, el)}>Invert</button>
               <span class="ex-lab">{bd.w}×{bd.h}</span>
@@ -628,7 +630,9 @@
                 <label class="ex-chk" title="Show the MIDI value in hexadecimal (00–7F)"><input type="checkbox" checked={el.radix === 'hex'} onchange={(event) => setElement(i, 'radix', event.target.checked ? 'hex' : 'dec')} />Hex</label>
               {/if}
             {/if}
-            <input class="val cswatch" type="color" title="Pick element colour (keeps alpha)" value={aarrggbbToHex(el.colour || 'FF2BE86A')} oninput={(event) => setElement(i, 'colour', mergeHexKeepAlpha(el.colour || 'FF000000', event.target.value))} />
+            <span class="elcol"><SwatchCluster swatches={[
+              { key: 'colour', label: 'Colour', value: el.colour || 'FF2BE86A', target: { type: 'callback', apply: (hex) => setElement(i, 'colour', hex) } },
+            ]} /></span>
             <input class="val ecol" type="text" title="Element colour AARRGGBB or RRGGBB (empty = panel lit colour)" placeholder="colour" value={el.colour ?? ''} onchange={(event) => setElement(i, 'colour', event.target.value.trim())} />
             <label class="ex-chk" title="Element visible"><input type="checkbox" checked={el.visible !== false} onchange={(event) => setElement(i, 'visible', event.target.checked)} />Vis</label>
             <label class="ex-chk" title="Blink this element on/off (~530ms)"><input type="checkbox" checked={el.blink === true} onchange={(event) => setElement(i, 'blink', event.target.checked)} />Blk</label>
@@ -819,27 +823,15 @@
     {/if}
   </PropertySection>
 
-  {#snippet colourField(prop, current, fallback)}
-    <div class="field-row">
-      <input class="val cswatch" type="color" title="Pick RGB (keeps the current alpha)" value={aarrggbbToHex(current ?? fallback)} oninput={(event) => set(prop, mergeHexKeepAlpha(current ?? fallback, event.target.value))} />
-      <input class="val" type="text" title="AARRGGBB (alpha + RGB)" value={current ?? fallback} onchange={(event) => set(prop, event.target.value.trim())} />
-    </div>
-  {/snippet}
   <PropertySection title="Colour">
-    <PropertyCell label="Lit" span={2} hint="Lit dot colour, AARRGGBB.">
-      {@render colourField('litColour', pixel.litColour, 'FFF2F2F2')}
-    </PropertyCell>
-    <PropertyCell label="Unlit" span={2} hint="Faint unlit 'ghost' dot colour, AARRGGBB.">
-      {@render colourField('unlitColour', pixel.unlitColour, '14FFFFFF')}
-    </PropertyCell>
-    <PropertyCell label="Screen" span={2} hint="Screen substrate behind the dots, AARRGGBB.">
-      {@render colourField('screenColour', pixel.screenColour, 'FF000000')}
-    </PropertyCell>
-    <PropertyCell label="Backlight" span={2} hint="Backlight wash colour, AARRGGBB.">
-      {@render colourField('backlightColour', pixel.backlightColour, '4D0E5A2E')}
-    </PropertyCell>
-    <PropertyCell label="Glass" span={2} hint="Glass sheen overlay colour, AARRGGBB.">
-      {@render colourField('glassTint', pixel.glassTint, '14FFFFFF')}
+    <PropertyCell label="Screen colours" span={4} hint="Lit dots, unlit ghost dots, screen substrate, backlight wash, glass sheen. Click a swatch to edit it (with alpha) in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'litColour', label: 'Lit', value: pixel.litColour ?? 'FFF2F2F2', target: { type: 'control', controlId: core?.id, path: 'Pixel.litColour' } },
+        { key: 'unlitColour', label: 'Unlit', value: pixel.unlitColour ?? '14FFFFFF', target: { type: 'control', controlId: core?.id, path: 'Pixel.unlitColour' } },
+        { key: 'screenColour', label: 'Screen', value: pixel.screenColour ?? 'FF000000', target: { type: 'control', controlId: core?.id, path: 'Pixel.screenColour' } },
+        { key: 'backlightColour', label: 'Backlt', value: pixel.backlightColour ?? '4D0E5A2E', target: { type: 'control', controlId: core?.id, path: 'Pixel.backlightColour' } },
+        { key: 'glassTint', label: 'Glass', value: pixel.glassTint ?? '14FFFFFF', target: { type: 'control', controlId: core?.id, path: 'Pixel.glassTint' } },
+      ]} />
     </PropertyCell>
     <PropertyCell label="Reset" span={4} hint="Restore the default look (colours, brightness, dots, glass). Leaves elements, layouts and text untouched.">
       <button class="val add-field" type="button" onclick={() => resetAppearance()}>↺ Reset appearance</button>
@@ -983,12 +975,9 @@
     align-items: center;
   }
 
-  .cswatch {
-    width: 26px;
-    flex: 0 0 auto;
-    padding: 1px;
-    height: 22px;
-    cursor: pointer;
+  .elcol {
+    flex: 0 0 56px;
+    display: flex;
   }
 
   .bitmap-hint {

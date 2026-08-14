@@ -15,7 +15,9 @@
   let { swatches = [] } = $props();
 
   function pick(s) {
-    activateColorTarget(s.target, s.value);
+    // The swatch key rides along so callback targets (dynamic collections
+    // with no stable path) can still be matched for the live ring.
+    activateColorTarget({ ...s.target, _swatchKey: s.key }, s.value);
     displayTabRequest.set({ tab: 'colors' });
   }
 
@@ -26,6 +28,9 @@
     }
     if (s.target.type === 'panel') {
       return t.type === 'panel' && t.prop === s.target.prop;
+    }
+    if (s.target.type === 'callback') {
+      return t.type === 'callback' && t._swatchKey === s.key;
     }
     return false;
   }

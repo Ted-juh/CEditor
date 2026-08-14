@@ -14,6 +14,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
 
   let { control = null } = $props();
@@ -109,12 +110,6 @@
   function applySeed(id) {
     // The random seed wants randomness; everything else ignores the supplier.
     set('pattern', phraseSeedPattern(id, steps, rows, () => Math.random()));
-  }
-  function colRgb(v, fb) { const t = String(v ?? fb).replace(/^#/, ''); return `#${t.length >= 6 ? t.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) {
-    const t = String(cur ?? '').replace(/^#/, '');
-    const al = /^[0-9a-fA-F]{8}$/.test(t) ? t.slice(0, 2) : 'FF';
-    set(prop, `${al}${hex.replace('#', '').toUpperCase()}`);
   }
 </script>
 
@@ -307,11 +302,15 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Face" span={1} hint=""><input class="col" type="color" value={colRgb(p.faceColour, 'FF141420')} oninput={(e) => setCol('faceColour', p.faceColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Empty cell" span={1} hint=""><input class="col" type="color" value={colRgb(p.cellColour, 'FF20202C')} oninput={(e) => setCol('cellColour', p.cellColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Note" span={1} hint=""><input class="col" type="color" value={colRgb(p.noteColour, 'FF39D98A')} oninput={(e) => setCol('noteColour', p.noteColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Playhead" span={1} hint=""><input class="col" type="color" value={colRgb(p.playColour, 'FFF2C94C')} oninput={(e) => setCol('playColour', p.playColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Labels" span={1} hint=""><input class="col" type="color" value={colRgb(p.labelColour, 'FFB9B9B9')} oninput={(e) => setCol('labelColour', p.labelColour, e.target.value)} /></PropertyCell>
+    <PropertyCell label="Colours" span={4} hint="Face, empty cell, note, playhead, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'faceColour', label: 'Face', value: p.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'Phrase.faceColour' } },
+        { key: 'cellColour', label: 'Empty', value: p.cellColour ?? 'FF20202C', target: { type: 'control', controlId: core?.id, path: 'Phrase.cellColour' } },
+        { key: 'noteColour', label: 'Note', value: p.noteColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'Phrase.noteColour' } },
+        { key: 'playColour', label: 'Play', value: p.playColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Phrase.playColour' } },
+        { key: 'labelColour', label: 'Labels', value: p.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Phrase.labelColour' } },
+      ]} />
+    </PropertyCell>
   </PropertySection>
 {/if}
 
@@ -332,5 +331,4 @@
   .seed { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
   .seed:hover { border-color: #4a4a58; color: #E8E8EE; }
   .link { background: none; border: none; color: #8FC7F5; font-size: 11px; padding: 0 0 0 4px; cursor: pointer; text-decoration: underline; }
-  .col { width: 26px; height: 20px; padding: 0; border: 1px solid #2a2a36; background: #141420; border-radius: 3px; }
 </style>
