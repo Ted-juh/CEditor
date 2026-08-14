@@ -92,7 +92,4 @@
   .val { color: #DDD; font-size: 11px; background: #1A1A1A; padding: 4px 6px; border-radius: 3px; border: 1px solid #333; flex: 1; min-width: 0; font-family: inherit; outline: none; }
   .val:focus { border-color: #5B9BD5; }
   .val.readonly { background: transparent; border-color: transparent; color: #666; }
-  .toggle-val { background: #1A1A1A; border: 1px solid #333; color: #888; font-size: 11px; padding: 3px 10px; border-radius: 3px; cursor: pointer; font-family: inherit; min-width: 40px; text-align: center; }
-  .toggle-val.on { background: #094771; border-color: #0B6EB5; color: #DDD; }
-  .toggle-val:hover { border-color: #5B9BD5; }
 </style>

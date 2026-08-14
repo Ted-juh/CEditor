@@ -20,6 +20,7 @@
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import Segmented from '../properties/Segmented.svelte';
   import Ghost from 'lucide-svelte/icons/ghost';
   import ScanLine from 'lucide-svelte/icons/scan-line';
   import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
@@ -794,27 +795,42 @@
     {/if}
     {#if String(display.panelType ?? '') !== 'segment'}
       <PropertyCell label="Dot Shape" span={2} hint="Round (LCD/OLED) or square (blockier) dots. Applies to dot-matrix and graphic mode.">
-        <select class="val" value={display.dotShape ?? 'round'} onchange={(event) => set('dotShape', event.target.value)}>
-          <option value="round">Round</option>
-          <option value="square">Square</option>
-        </select>
+        <Segmented
+          ariaLabel="Dot shape"
+          value={display.dotShape ?? 'round'}
+          options={[
+            { value: 'round', label: 'Round' },
+            { value: 'square', label: 'Square' },
+          ]}
+          onchange={(v) => set('dotShape', v)}
+        />
       </PropertyCell>
     {/if}
   </PropertySection>
 
   <PropertySection title="Motion">
     <PropertyCell label="Scroll" span={2} hint="Marquee a line that's longer than the column count.">
-      <select class="val" value={display.scroll ?? 'off'} onchange={(event) => set('scroll', event.target.value)}>
-        <option value="off">Off</option>
-        <option value="left">Left</option>
-        <option value="right">Right</option>
-      </select>
+      <Segmented
+        ariaLabel="Scroll direction"
+        value={display.scroll ?? 'off'}
+        options={[
+          { value: 'off', label: 'Off' },
+          { value: 'left', label: 'Left' },
+          { value: 'right', label: 'Right' },
+        ]}
+        onchange={(v) => set('scroll', v)}
+      />
     </PropertyCell>
     <PropertyCell label="Scroll Mode" span={2} hint="Loop wraps around; bounce ping-pongs back and forth.">
-      <select class="val" value={display.scrollMode ?? 'loop'} onchange={(event) => set('scrollMode', event.target.value)}>
-        <option value="loop">Loop</option>
-        <option value="bounce">Bounce</option>
-      </select>
+      <Segmented
+        ariaLabel="Scroll mode"
+        value={display.scrollMode ?? 'loop'}
+        options={[
+          { value: 'loop', label: 'Loop' },
+          { value: 'bounce', label: 'Bounce' },
+        ]}
+        onchange={(v) => set('scrollMode', v)}
+      />
     </PropertyCell>
     <PropertyCell label="Speed" span={2} hint="Scroll speed in characters per second.">
       <PropertyScrub value={display.scrollSpeed ?? 4} step={1} min={0} max={60} defaultValue={4} onchange={(value) => set('scrollSpeed', value)} />

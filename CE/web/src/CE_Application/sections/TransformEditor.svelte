@@ -73,7 +73,6 @@
   .prop-row-pair { display: flex; gap: 4px; }
   .prop-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 3px; }
   .prop-row:hover { background: #2A2A2A; }
-  .prop-row.half { flex: 1; }
   .lbl { color: #888; font-size: 11px; min-width: 20px; flex-shrink: 0; }
   .toggle-val {
     background: #252525; border: none; color: #888; font-size: 11px;

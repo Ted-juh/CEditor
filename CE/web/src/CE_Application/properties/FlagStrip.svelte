@@ -3,10 +3,12 @@
   // W3 widget. Each chip lights blue when on; the tooltip and aria-label carry
   // the full name, so the strip states several facts in the height of one row.
   //
-  //   flags: [{ key, title, on, icon, disabled? }]  — icon is a lucide-svelte
-  //   component (e.g. import Eye from 'lucide-svelte/icons/eye').
+  //   flags: [{ key, title, on, icon, disabled?, active? }]  — icon is a
+  //   lucide-svelte component (e.g. import Eye from 'lucide-svelte/icons/eye').
   //   ontoggle(key, next) fires with the flag's key and its next state.
-  let { flags = [], ontoggle = null } = $props();
+  //   `active` marks a chip whose secondary editor is currently open (ring);
+  //   oncontextmenu(key, event) lets a chip open one on right-click.
+  let { flags = [], ontoggle = null, oncontextmenu = null } = $props();
 </script>
 
 <div class="flagstrip" role="group">
@@ -14,11 +16,13 @@
     <button type="button"
             class="flag"
             class:on={f.on}
+            class:active={f.active === true}
             title={f.title}
             aria-label={f.title}
             aria-pressed={f.on}
             disabled={f.disabled === true}
-            onclick={() => ontoggle?.(f.key, !f.on)}>
+            onclick={() => ontoggle?.(f.key, !f.on)}
+            oncontextmenu={(e) => oncontextmenu?.(f.key, e)}>
       <f.icon size={13} strokeWidth={2} />
     </button>
   {/each}
@@ -71,5 +75,9 @@
   .flag:focus-visible {
     outline: 2px solid #5B9BD5;
     outline-offset: -2px;
+  }
+
+  .flag.active {
+    box-shadow: inset 0 0 0 1px #5B9BD5;
   }
 </style>

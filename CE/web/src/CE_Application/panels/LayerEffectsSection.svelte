@@ -13,6 +13,7 @@
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import AlignmentPicker from '../properties/AlignmentPicker.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import Segmented from '../properties/Segmented.svelte';
   import BlendModeSelect from '../properties/BlendModeSelect.svelte';
   import FitModeSelect from '../properties/FitModeSelect.svelte';
 
@@ -152,11 +153,16 @@
   {#if showClipping}
     <PropertySection title="Clipping">
       <PropertyCell label="Mode" span={4} hint="How this layer is clipped inside the component background">
-        <select class="val" value={clipMode} onchange={(e) => set('ClipMode', e.target.value)}>
-          <option value="none">None</option>
-          <option value="shape">Shape</option>
-          <option value="border-inner">Border Inner</option>
-        </select>
+        <Segmented
+          ariaLabel="Clipping mode"
+          value={clipMode}
+          options={[
+            { value: 'none', label: 'None' },
+            { value: 'shape', label: 'Shape' },
+            { value: 'border-inner', label: 'Border Inner' },
+          ]}
+          onchange={(v) => set('ClipMode', v)}
+        />
       </PropertyCell>
     </PropertySection>
   {/if}
