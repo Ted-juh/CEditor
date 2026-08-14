@@ -7,6 +7,7 @@ import { recordInsertUse } from './insertRecents.js';
 import { stateEditScope } from './stateEditScope.js';
 import { deepClone } from '../utils/deepClone.js';
 import {
+  collectControlNames,
   collectSubtreeIds,
   controlPanelRect,
   findControlById,
@@ -18,6 +19,7 @@ import {
   remintControlIds,
   removeControlFromTree,
   selectionRoots,
+  uniqueCopyName,
 } from '../utils/containment.js';
 import { instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
 import { isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../utils/selectGroupUtils.js';
@@ -344,14 +346,17 @@ export function duplicateControl(ids) {
   // container — the descendant rides along in the subtree copy.
   const rootIds = selectionRoots(panel.controls, idList);
 
+  const existingNames = collectControlNames(panel.controls);
   const clones = [];
   for (const id of rootIds) {
     const source = findControlById(panel.controls, id);
     if (!source) continue;
 
-    // Fresh ids for the control and every descendant
+    // Fresh ids for the control and every descendant; a unique name for the
+    // root (names are script handles — same rule as paste).
     const clone = remintControlIds(source);
-    clone._children.Core.name = `${clone._children.Core.name}_copy`;
+    clone._children.Core.name = uniqueCopyName(existingNames, clone._children.Core.name);
+    existingNames.add(clone._children.Core.name);
 
     if (clone._children.Transform) {
       const offset = get(duplicateOffset);
@@ -403,12 +408,14 @@ export function duplicateControlsInPlace(ids) {
   if (!panel) return null;
 
   const rootIds = selectionRoots(panel.controls, idList);
+  const existingNames = collectControlNames(panel.controls);
   const clones = [];
   for (const id of rootIds) {
     const source = findControlById(panel.controls, id);
     if (!source) continue;
     const clone = remintControlIds(source);
-    clone._children.Core.name = `${clone._children.Core.name}_copy`;
+    clone._children.Core.name = uniqueCopyName(existingNames, clone._children.Core.name);
+    existingNames.add(clone._children.Core.name);
     if (isExclusiveSelectBehavior(clone?._children?.Behavior) && clone._children.Behavior.defaultValue === true) {
       clone._children.Behavior.defaultValue = false;
     }

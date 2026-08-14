@@ -99,6 +99,29 @@ export function collectSubtreeIds(control) {
   return out;
 }
 
+/**
+ * A copy-name that collides with nothing: strips any existing `_copy`/`_copyN`
+ * suffix, then walks `_copy`, `_copy2`, `_copy3`… until free. Names are the
+ * script-addressable handle for a control (`set("cutoff.value", …)`), so a
+ * duplicate silently reusing a name creates an ambiguous script target — and
+ * the two old suffix rules (`x_copy_copy_copy` from duplicate, strip-one-suffix
+ * from paste) never guaranteed uniqueness at all.
+ *
+ * `existingNames` is a Set the caller owns; add each returned name to it when
+ * cloning several controls in one operation.
+ */
+export function uniqueCopyName(existingNames, sourceName) {
+  const base = String(sourceName ?? 'control').replace(/_copy\d*$/, '') || 'control';
+  let candidate = `${base}_copy`;
+  for (let n = 2; existingNames.has(candidate); n++) candidate = `${base}_copy${n}`;
+  return candidate;
+}
+
+/** The names currently used anywhere in a control tree, as a Set. */
+export function collectControlNames(controls) {
+  return new Set(flatControls(controls).map((c) => String(c._children?.Core?.name ?? '')));
+}
+
 /** Selected ids minus those whose ancestor is also selected. */
 export function selectionRoots(controls, ids) {
   const idSet = ids instanceof Set ? ids : new Set(ids);
