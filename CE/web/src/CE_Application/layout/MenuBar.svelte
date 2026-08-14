@@ -1,6 +1,8 @@
 <script>
   import { get } from 'svelte/store';
-  import { closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, buildActivePanelVst3 } from '../stores/panels.js';
+  import { closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, selectedComponentIds, setActiveEditorTab, buildActivePanelVst3 } from '../stores/panels.js';
+  import { undoAvailable, redoAvailable } from '../stores/history.js';
+  import { hasClipboardContent } from '../stores/clipboard.js';
   import { INSERT_CATEGORIES } from '../models/insertCatalog.js';
   import { openNewPanelDialog } from '../stores/newPanelDialog.js';
   import { addControl } from '../stores/controls.js';
@@ -14,6 +16,14 @@
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles, selectedDeviceProfileId } from '../stores/deviceProfiles.js';
   import { buildInfo, buildLabel } from '../buildInfo.js';
+
+  // Menu state predicates, evaluated when a dropdown opens. A menu item that
+  // is always enabled and never shows state cannot tell the user whether
+  // clicking it will do anything — Undo stayed clickable with an empty stack,
+  // and "Toggle Grid" never said which way it would toggle.
+  const hasPanel = () => !!get(activePanel);
+  const hasSelection = () => get(selectedComponentIds).size > 0;
+  const canSave = () => get(activeEditorTab)?.type === 'script' || hasPanel();
 
   function newCustomComponent() {
     const document = createComponentDocument();
@@ -76,12 +86,12 @@
       { label: 'New Script Workspace', action: () => newScriptWorkspace() },
       { label: 'Open Script Workspace', action: () => openScriptWorkspaceFromFile() },
       { type: 'separator' },
-      { label: 'Save',       shortcut: 'Ctrl+S', action: () => {
+      { label: 'Save',       shortcut: 'Ctrl+S', enabled: canSave, action: () => {
         const tab = get(activeEditorTab);
         if (tab?.type === 'script') saveActiveScriptWorkspace();
         else saveActivePanel();
       } },
-      { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: () => {
+      { label: 'Save As...', shortcut: 'Ctrl+Shift+S', enabled: canSave, action: () => {
         const tab = get(activeEditorTab);
         if (tab?.type === 'script') saveActiveScriptWorkspaceAs();
         else saveActivePanelAs();
@@ -93,24 +103,24 @@
       { label: 'Close Program', shortcut: 'Alt+F4', action: () => closeApplication() },
     ],
     Edit: [
-      { label: 'Undo', shortcut: 'Ctrl+Z', action: () => undo() },
-      { label: 'Redo', shortcut: 'Ctrl+Y', action: () => redo() },
+      { label: 'Undo', shortcut: 'Ctrl+Z', enabled: () => get(undoAvailable), action: () => undo() },
+      { label: 'Redo', shortcut: 'Ctrl+Y', enabled: () => get(redoAvailable), action: () => redo() },
       { type: 'separator' },
-      { label: 'Cut',   shortcut: 'Ctrl+X', action: () => cutSelection() },
-      { label: 'Copy',  shortcut: 'Ctrl+C', action: () => copySelection() },
-      { label: 'Paste', shortcut: 'Ctrl+V', action: () => pasteSelection() },
+      { label: 'Cut',   shortcut: 'Ctrl+X', enabled: hasSelection, action: () => cutSelection() },
+      { label: 'Copy',  shortcut: 'Ctrl+C', enabled: hasSelection, action: () => copySelection() },
+      { label: 'Paste', shortcut: 'Ctrl+V', enabled: () => hasClipboardContent() && hasPanel(), action: () => pasteSelection() },
       { type: 'separator' },
-      { label: 'Select All', shortcut: 'Ctrl+A', action: () => selectAll() },
+      { label: 'Select All', shortcut: 'Ctrl+A', enabled: () => (get(activePanel)?.controls?.length ?? 0) > 0, action: () => selectAll() },
     ],
     View: [
-      { label: 'Zoom In',  shortcut: 'Ctrl++', action: () => requestZoomStep(1) },
-      { label: 'Zoom Out', shortcut: 'Ctrl+-', action: () => requestZoomStep(-1) },
-      { label: 'Reset Zoom', action: () => editorZoom.set(100) },
-      { label: 'Fit to Window', shortcut: 'Ctrl+0', action: () => requestFitToWindow() },
-      { label: 'Zoom to Selection', shortcut: 'Ctrl+Shift+P', action: () => requestZoomToSelection() },
+      { label: 'Zoom In',  shortcut: 'Ctrl++', enabled: hasPanel, action: () => requestZoomStep(1) },
+      { label: 'Zoom Out', shortcut: 'Ctrl+-', enabled: hasPanel, action: () => requestZoomStep(-1) },
+      { label: 'Reset Zoom', enabled: hasPanel, action: () => editorZoom.set(100) },
+      { label: 'Fit to Window', shortcut: 'Ctrl+0', enabled: hasPanel, action: () => requestFitToWindow() },
+      { label: 'Zoom to Selection', shortcut: 'Ctrl+Shift+P', enabled: hasSelection, action: () => requestZoomToSelection() },
       { type: 'separator' },
-      { label: 'Toggle Grid', action: () => { const p = get(activePanel); if (p) updatePanel(p.id, { gridEnabled: !p.gridEnabled }); } },
-      { label: 'Toggle Snap', action: () => { const p = get(activePanel); if (p) updatePanel(p.id, { snapToGrid: !p.snapToGrid }); } },
+      { label: 'Grid', enabled: hasPanel, checked: () => get(activePanel)?.gridEnabled === true, action: () => { const p = get(activePanel); if (p) updatePanel(p.id, { gridEnabled: !p.gridEnabled }); } },
+      { label: 'Snap to Grid', enabled: hasPanel, checked: () => get(activePanel)?.snapToGrid === true, action: () => { const p = get(activePanel); if (p) updatePanel(p.id, { snapToGrid: !p.snapToGrid }); } },
     ],
     // Every insertable type, from the same catalog the icon rail uses —
     // the hand-written copy here knew 11 of the 47 types and had neither
@@ -119,11 +129,12 @@
       { type: 'header', label: category.label },
       ...category.items.map((item) => ({
         label: item.label,
+        enabled: hasPanel,
         action: () => addControl(item.type),
       })),
     ]),
     Build: [
-      { label: 'Build VST3', action: () => buildActivePanelVst3() },
+      { label: 'Build VST3', enabled: hasPanel, action: () => buildActivePanelVst3() },
     ],
     Help: [
       { label: 'Keyboard Shortcuts', shortcut: 'F1', action: () => {
@@ -151,6 +162,10 @@
     }
   }
 
+  function handleWindowKeydown(e) {
+    if (e.key === 'Escape' && openMenu) openMenu = null;
+  }
+
   function handleMenuHover(name) {
     if (openMenu !== null) {
       openMenu = name;
@@ -158,7 +173,7 @@
   }
 </script>
 
-<svelte:window onclick={handleWindowClick} />
+<svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} />
 
 <nav class="menubar">
   {#each menuNames as name}
@@ -180,7 +195,14 @@
             {:else if item.type === 'header'}
               <div class="dropdown-header">{item.label}</div>
             {:else}
-              <button class="dropdown-item" onclick={() => handleItemClick(item)}>
+              <button
+                class="dropdown-item"
+                disabled={item.enabled ? !item.enabled() : false}
+                onclick={() => handleItemClick(item)}
+              >
+                {#if item.checked}
+                  <span class="item-check">{item.checked() ? '\u2713' : ''}</span>
+                {/if}
                 <span class="item-label">{item.label}</span>
                 {#if item.shortcut}
                   <span class="item-shortcut">{item.shortcut}</span>
@@ -279,7 +301,23 @@
     text-align: left;
   }
 
-  .dropdown-item:hover {
+  .dropdown-item:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .item-check {
+    width: 14px;
+    flex-shrink: 0;
+    color: #5B9BD5;
+    font-size: 11px;
+  }
+
+  .item-label {
+    flex: 1;
+  }
+
+  .dropdown-item:hover:not(:disabled) {
     background: #094771;
     color: #FFF;
   }
