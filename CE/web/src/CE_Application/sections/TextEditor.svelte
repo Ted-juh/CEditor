@@ -18,7 +18,6 @@
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { deepClone } from '../utils/deepClone.js';
   import { browseImage, onImageBrowsed } from '../bridge/bridge.js';
-  import NumberInput from './NumberInput.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import TextLineDecorationControls from './TextLineDecorationControls.svelte';
   import {
@@ -766,11 +765,13 @@
           </select>
         </PropertyCell>
 
-        <PropertyCell label="Size" span={2} hint="Font size in pixels">
-          <NumberInput
+        <PropertyCell label="Size" span={2} compact hint="Font size in pixels">
+          <NumberCell
+            label="Size"
             value={font?.size ?? 12}
             min={1}
             step={1}
+            defaultValue={12}
             onchange={(value) => set('Text.Font.size', value)}
           />
         </PropertyCell>
@@ -806,18 +807,22 @@
           </div>
         </PropertyCell>
 
-        <PropertyCell label="Word Spacing" span={2} hint="Adjust spacing added to each whitespace character in pixels.">
-          <NumberInput
+        <PropertyCell label="Word Spacing" span={2} compact hint="Adjust spacing added to each whitespace character in pixels.">
+          <NumberCell
+            label="Word"
             value={font?.wordSpacing ?? 0}
             step={0.5}
+            defaultValue={0}
             onchange={(value) => set('Text.Font.wordSpacing', value)}
           />
         </PropertyCell>
 
-        <PropertyCell label="Letter Spacing" span={2} hint="Adjust spacing between characters in pixels">
-          <NumberInput
+        <PropertyCell label="Letter Spacing" span={2} compact hint="Adjust spacing between characters in pixels">
+          <NumberCell
+            label="Letter"
             value={font?.letterSpacing ?? 0}
             step={0.5}
+            defaultValue={0}
             onchange={(value) => set('Text.Font.letterSpacing', value)}
           />
         </PropertyCell>
@@ -845,10 +850,12 @@
         </select>
       </PropertyCell>
 
-      <PropertyCell label="Baseline" span={1} hint="Additional baseline shift in pixels. Positive raises the text.">
-        <NumberInput
+      <PropertyCell label="Baseline" span={1} compact hint="Additional baseline shift in pixels. Positive raises the text.">
+        <NumberCell
+          label="Base"
           value={Number(font?.baselineShift ?? 0)}
           step={0.5}
+          defaultValue={0}
           onchange={(value) => set('Text.Font.baselineShift', value)}
         />
       </PropertyCell>
@@ -874,13 +881,16 @@
           <PropertyCell
             label={axis.tag.toUpperCase()}
             span={1}
+            compact
             hint={`${axis.tag.toUpperCase()} variable-font axis (${axis.min} to ${axis.max}).`}
           >
-            <NumberInput
+            <NumberCell
+              label={axis.tag.toUpperCase()}
               value={fontAxisValue(axis)}
               min={Number(axis.min)}
               max={Number(axis.max)}
               step={axis.tag === 'slnt' ? 1 : 1}
+              defaultValue={Number(axis.default ?? 0)}
               onchange={(value) => setFontAxis(axis.tag, value)}
             />
           </PropertyCell>
@@ -1014,15 +1024,18 @@
       <PropertyCell
         label="Max Lines"
         span={1}
+        compact
         disabled={textFlowModeValue !== 'rotate'}
         hint={textFlowModeValue === 'rotate'
           ? 'Limit the number of visible wrapped lines. Set to 0 for unlimited.'
           : 'Line limiting currently applies to normal block text.'}
       >
-        <NumberInput
+        <NumberCell
+          label="Lines"
           value={Math.max(0, Number(multilineProp('maxLines', 0)))}
           min={0}
           step={1}
+          defaultValue={0}
           onchange={(value) => set('Text.Multiline.maxLines', Math.max(0, Math.round(Number(value) || 0)))}
           disabled={textFlowModeValue !== 'rotate'}
         />
@@ -1047,11 +1060,13 @@
         </select>
       </PropertyCell>
 
-      <PropertyCell label="Line Height" span={4} hint="Multiplier applied to the font size when spacing lines vertically.">
-        <NumberInput
+      <PropertyCell label="Line Height" span={4} compact hint="Multiplier applied to the font size when spacing lines vertically.">
+        <NumberCell
+          label="Line H"
           value={Math.max(0.5, Number(multilineProp('lineHeight', 1.2)))}
           min={0.5}
           step={0.1}
+          defaultValue={1.2}
           onchange={(value) => setMultilineNumber('lineHeight', value, 0.1, 0.5)}
         />
       </PropertyCell>
@@ -1076,7 +1091,7 @@
         <div class="offset-panel">
           <div class="offset-row">
             <span class="offset-label">H</span>
-            <NumberInput
+            <NumberCell
               value={position?.offsetX ?? 0}
               step={1}
               onchange={(value) => set('Text.Position.offsetX', value)}
@@ -1084,7 +1099,7 @@
           </div>
           <div class="offset-row">
             <span class="offset-label">V</span>
-            <NumberInput
+            <NumberCell
               value={displayedVerticalOffset}
               step={1}
               onchange={(value) => set('Text.Position.offsetY', -value)}
@@ -1137,7 +1152,7 @@
         </div>
         <div class="prop-row full-span">
           <span class="lbl">Fill Order</span>
-          <NumberInput value={Number(fillProp('order', 50))} step={1} onchange={(value) => setFillNumber('order', value, 1)} />
+          <NumberCell value={Number(fillProp('order', 50))} step={1} onchange={(value) => setFillNumber('order', value, 1)} />
         </div>
       </PropertySection>
     {/if}
@@ -1165,7 +1180,7 @@
         </div>
         <div class="prop-row full-span">
           <span class="lbl">Fill Order</span>
-          <NumberInput value={Number(fillProp('order', 50))} step={1} onchange={(value) => setFillNumber('order', value, 1)} />
+          <NumberCell value={Number(fillProp('order', 50))} step={1} onchange={(value) => setFillNumber('order', value, 1)} />
         </div>
       </PropertySection>
     {/if}
@@ -1190,11 +1205,11 @@
               <option value="fill">Fill</option>
             </select>
           </PropertyCell>
-          <PropertyCell label="Offset X" span={1} hint="Horizontal offset of the image fill.">
-            <NumberInput value={Number(fillProp('imageOffsetX', 0))} step={1} onchange={(value) => set('Text.Fill.imageOffsetX', value)} />
+          <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset of the image fill.">
+            <NumberCell label="X" value={Number(fillProp('imageOffsetX', 0))} step={1} defaultValue={0} onchange={(value) => set('Text.Fill.imageOffsetX', value)} />
           </PropertyCell>
-          <PropertyCell label="Offset Y" span={1} hint="Vertical offset of the image fill.">
-            <NumberInput value={Number(fillProp('imageOffsetY', 0))} step={1} onchange={(value) => set('Text.Fill.imageOffsetY', value)} />
+          <PropertyCell label="Offset Y" span={1} compact hint="Vertical offset of the image fill.">
+            <NumberCell label="Y" value={Number(fillProp('imageOffsetY', 0))} step={1} defaultValue={0} onchange={(value) => set('Text.Fill.imageOffsetY', value)} />
           </PropertyCell>
         </PropertySection>
 
@@ -1209,8 +1224,8 @@
               onswatchclick={() => activateColorTarget({ type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill.imageTint') }, String(fillProp('imageTint', 'FFFFFFFF')))}
             />
           </PropertyCell>
-          <PropertyCell label="Fill Order" span={1} hint="Draw order of the main text fill layer. Lower draws earlier, higher draws later.">
-            <NumberInput value={Number(fillProp('order', 50))} step={1} onchange={(value) => setFillNumber('order', value, 1)} />
+          <PropertyCell label="Fill Order" span={1} compact hint="Draw order of the main text fill layer. Lower draws earlier, higher draws later.">
+            <NumberCell label="Order" value={Number(fillProp('order', 50))} step={1} defaultValue={50} onchange={(value) => setFillNumber('order', value, 1)} />
           </PropertyCell>
         </PropertySection>
       {/if}
@@ -1229,14 +1244,14 @@
       </PropertySection>
       {#if !($sectionCollapse[fillLayerCollapseKey('texture')] ?? false)}
         <PropertySection title="Geometry">
-          <PropertyCell label="Scale" span={2} hint="Tile scale for the texture pattern.">
-            <NumberInput value={Number(fillProp('textureTileScale', 1))} min={0.1} step={0.1} onchange={(value) => set('Text.Fill.textureTileScale', value)} />
+          <PropertyCell label="Scale" span={2} compact hint="Tile scale for the texture pattern.">
+            <NumberCell label="Scale" value={Number(fillProp('textureTileScale', 1))} min={0.1} step={0.1} defaultValue={1} onchange={(value) => set('Text.Fill.textureTileScale', value)} />
           </PropertyCell>
-          <PropertyCell label="Offset X" span={1} hint="Horizontal offset of the tiled pattern.">
-            <NumberInput value={Number(fillProp('textureOffsetX', 0))} step={1} onchange={(value) => set('Text.Fill.textureOffsetX', value)} />
+          <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset of the tiled pattern.">
+            <NumberCell label="X" value={Number(fillProp('textureOffsetX', 0))} step={1} defaultValue={0} onchange={(value) => set('Text.Fill.textureOffsetX', value)} />
           </PropertyCell>
-          <PropertyCell label="Offset Y" span={1} hint="Vertical offset of the tiled pattern.">
-            <NumberInput value={Number(fillProp('textureOffsetY', 0))} step={1} onchange={(value) => set('Text.Fill.textureOffsetY', value)} />
+          <PropertyCell label="Offset Y" span={1} compact hint="Vertical offset of the tiled pattern.">
+            <NumberCell label="Y" value={Number(fillProp('textureOffsetY', 0))} step={1} defaultValue={0} onchange={(value) => set('Text.Fill.textureOffsetY', value)} />
           </PropertyCell>
         </PropertySection>
 
@@ -1251,8 +1266,8 @@
               onswatchclick={() => activateColorTarget({ type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill.textureTint') }, String(fillProp('textureTint', 'FFFFFFFF')))}
             />
           </PropertyCell>
-          <PropertyCell label="Fill Order" span={1} hint="Draw order of the main text fill layer. Lower draws earlier, higher draws later.">
-            <NumberInput value={Number(fillProp('order', 50))} step={1} onchange={(value) => setFillNumber('order', value, 1)} />
+          <PropertyCell label="Fill Order" span={1} compact hint="Draw order of the main text fill layer. Lower draws earlier, higher draws later.">
+            <NumberCell label="Order" value={Number(fillProp('order', 50))} step={1} defaultValue={50} onchange={(value) => setFillNumber('order', value, 1)} />
           </PropertyCell>
         </PropertySection>
       {/if}
@@ -1322,33 +1337,38 @@
         </select>
       </PropertyCell>
 
-      <PropertyCell label="Start Offset" span={2} hint="Offset the text run along the path before the first glyph is placed.">
-        <NumberInput value={Number(position?.flowStartOffset ?? 0)} step={1} onchange={(value) => set('Text.Position.flowStartOffset', value)} />
+      <PropertyCell label="Start Offset" span={2} compact hint="Offset the text run along the path before the first glyph is placed.">
+        <NumberCell label="Start" value={Number(position?.flowStartOffset ?? 0)} step={1} defaultValue={0} onchange={(value) => set('Text.Position.flowStartOffset', value)} />
       </PropertyCell>
-      <PropertyCell label="Fixed Advance" span={2} disabled={String(position?.flowDistribution ?? 'natural') !== 'fixed'} hint="Advance used by Fixed distribution mode.">
-        <NumberInput value={Number(position?.flowFixedAdvance ?? 0)} min={0} step={1} onchange={(value) => set('Text.Position.flowFixedAdvance', value)} disabled={String(position?.flowDistribution ?? 'natural') !== 'fixed'} />
+      <PropertyCell label="Fixed Advance" span={2} compact disabled={String(position?.flowDistribution ?? 'natural') !== 'fixed'} hint="Advance used by Fixed distribution mode.">
+        <NumberCell label="Adv" value={Number(position?.flowFixedAdvance ?? 0)} min={0} step={1} defaultValue={0} onchange={(value) => set('Text.Position.flowFixedAdvance', value)} disabled={String(position?.flowDistribution ?? 'natural') !== 'fixed'} />
       </PropertyCell>
 
       {#if textFlowModeValue === 'rotate' || textFlowModeValue === 'line' || textFlowModeValue === 'wave' || textFlowModeValue === 'zigzag' || textFlowModeValue === 'perimeter'}
-        <PropertyCell label="Angle" span={4} hint="Set the exact angle in degrees. Rotate turns the text block; Line distributes letters across an angled baseline.">
-          <NumberInput
+        <PropertyCell label="Angle" span={4} compact hint="Set the exact angle in degrees. Rotate turns the text block; Line distributes letters across an angled baseline.">
+          <NumberCell
+            label="Angle"
             value={textFlowAngleValue}
             step={1}
             onchange={setFlowAngle}
           />
         </PropertyCell>
       {:else if textFlowModeValue === 'stair'}
-        <PropertyCell label="Step X" span={2} hint="Horizontal shift applied to each successive character in stair mode.">
-          <NumberInput
+        <PropertyCell label="Step X" span={2} compact hint="Horizontal shift applied to each successive character in stair mode.">
+          <NumberCell
+            label="Step X"
             value={position?.flowStepX ?? 8}
             step={1}
+            defaultValue={8}
             onchange={(value) => set('Text.Position.flowStepX', value)}
           />
         </PropertyCell>
-        <PropertyCell label="Step Y" span={2} hint="Vertical shift applied to each successive character in stair mode.">
-          <NumberInput
+        <PropertyCell label="Step Y" span={2} compact hint="Vertical shift applied to each successive character in stair mode.">
+          <NumberCell
+            label="Step Y"
             value={position?.flowStepY ?? 8}
             step={1}
+            defaultValue={8}
             onchange={(value) => set('Text.Position.flowStepY', value)}
           />
         </PropertyCell>
@@ -1360,101 +1380,109 @@
           </select>
         </PropertyCell>
       {:else if textFlowModeValue === 'vertical'}
-        <PropertyCell label="Step Y" span={2} hint="Vertical advance between glyphs in true vertical typesetting.">
-          <NumberInput value={Number(position?.flowStepY ?? 8)} step={1} onchange={(value) => set('Text.Position.flowStepY', value)} />
+        <PropertyCell label="Step Y" span={2} compact hint="Vertical advance between glyphs in true vertical typesetting.">
+          <NumberCell label="Step Y" value={Number(position?.flowStepY ?? 8)} step={1} defaultValue={8} onchange={(value) => set('Text.Position.flowStepY', value)} />
         </PropertyCell>
-        <PropertyCell label="Step X" span={2} hint="Horizontal column offset between explicit lines in true vertical typesetting.">
-          <NumberInput value={Number(position?.flowStepX ?? 8)} step={1} onchange={(value) => set('Text.Position.flowStepX', value)} />
+        <PropertyCell label="Step X" span={2} compact hint="Horizontal column offset between explicit lines in true vertical typesetting.">
+          <NumberCell label="Step X" value={Number(position?.flowStepX ?? 8)} step={1} defaultValue={8} onchange={(value) => set('Text.Position.flowStepX', value)} />
         </PropertyCell>
       {:else if textFlowModeValue === 'arc'}
-        <PropertyCell label="Angle" span={2} hint="Centre angle for the arc in degrees.">
-          <NumberInput
+        <PropertyCell label="Angle" span={2} compact hint="Centre angle for the arc in degrees.">
+          <NumberCell
+            label="Angle"
             value={textFlowAngleValue}
             step={1}
             onchange={setFlowAngle}
           />
         </PropertyCell>
-        <PropertyCell label="Radius" span={1} hint="Distance from the arc centre to the glyph baseline.">
-          <NumberInput
+        <PropertyCell label="Radius" span={1} compact hint="Distance from the arc centre to the glyph baseline.">
+          <NumberCell
+            label="Rad"
             value={position?.flowRadius ?? 48}
             min={1}
             step={1}
+            defaultValue={48}
             onchange={(value) => set('Text.Position.flowRadius', value)}
           />
         </PropertyCell>
-        <PropertyCell label="Sweep" span={1} hint="How much of the circle the arc should cover, in degrees. Negative values reverse the direction.">
-          <NumberInput
+        <PropertyCell label="Sweep" span={1} compact hint="How much of the circle the arc should cover, in degrees. Negative values reverse the direction.">
+          <NumberCell
+            label="Sweep"
             value={position?.flowSweep ?? 180}
             step={1}
+            defaultValue={180}
             onchange={(value) => set('Text.Position.flowSweep', value)}
           />
         </PropertyCell>
       {:else if textFlowModeValue === 'circle'}
-        <PropertyCell label="Angle" span={2} hint="Starting angle for the full-circle text run in degrees.">
-          <NumberInput
+        <PropertyCell label="Angle" span={2} compact hint="Starting angle for the full-circle text run in degrees.">
+          <NumberCell
+            label="Angle"
             value={textFlowAngleValue}
             step={1}
             onchange={setFlowAngle}
           />
         </PropertyCell>
-        <PropertyCell label="Radius" span={2} hint="Distance from the circle centre to the glyph baseline.">
-          <NumberInput
+        <PropertyCell label="Radius" span={2} compact hint="Distance from the circle centre to the glyph baseline.">
+          <NumberCell
+            label="Rad"
             value={position?.flowRadius ?? 48}
             min={1}
             step={1}
+            defaultValue={48}
             onchange={(value) => set('Text.Position.flowRadius', value)}
           />
         </PropertyCell>
       {:else if textFlowModeValue === 'wave' || textFlowModeValue === 'zigzag'}
-        <PropertyCell label="Amplitude" span={2} hint="Wave or zigzag height from the baseline.">
-          <NumberInput value={Number(position?.flowAmplitude ?? 18)} min={0} step={1} onchange={(value) => set('Text.Position.flowAmplitude', value)} />
+        <PropertyCell label="Amplitude" span={2} compact hint="Wave or zigzag height from the baseline.">
+          <NumberCell label="Amp" value={Number(position?.flowAmplitude ?? 18)} min={0} step={1} defaultValue={18} onchange={(value) => set('Text.Position.flowAmplitude', value)} />
         </PropertyCell>
-        <PropertyCell label="Frequency" span={2} hint="How many wave or zigzag cycles the run should cover.">
-          <NumberInput value={Number(position?.flowFrequency ?? 1)} min={0.1} step={0.1} onchange={(value) => set('Text.Position.flowFrequency', value)} />
+        <PropertyCell label="Frequency" span={2} compact hint="How many wave or zigzag cycles the run should cover.">
+          <NumberCell label="Freq" value={Number(position?.flowFrequency ?? 1)} min={0.1} step={0.1} defaultValue={1} onchange={(value) => set('Text.Position.flowFrequency', value)} />
         </PropertyCell>
       {:else if textFlowModeValue === 'spiral'}
-        <PropertyCell label="Turns" span={2} hint="How many turns the spiral should complete.">
-          <NumberInput value={Number(position?.flowTurns ?? 2)} min={0.1} step={0.1} onchange={(value) => set('Text.Position.flowTurns', value)} />
+        <PropertyCell label="Turns" span={2} compact hint="How many turns the spiral should complete.">
+          <NumberCell label="Turns" value={Number(position?.flowTurns ?? 2)} min={0.1} step={0.1} defaultValue={2} onchange={(value) => set('Text.Position.flowTurns', value)} />
         </PropertyCell>
-        <PropertyCell label="Radius" span={2} hint="Base radius of the spiral.">
-          <NumberInput value={Number(position?.flowRadius ?? 48)} min={1} step={1} onchange={(value) => set('Text.Position.flowRadius', value)} />
+        <PropertyCell label="Radius" span={2} compact hint="Base radius of the spiral.">
+          <NumberCell label="Rad" value={Number(position?.flowRadius ?? 48)} min={1} step={1} defaultValue={48} onchange={(value) => set('Text.Position.flowRadius', value)} />
         </PropertyCell>
       {:else if textFlowModeValue === 'perimeter'}
-        <PropertyCell label="Inset" span={4} hint="Inset the text path from the component edge.">
-          <NumberInput value={Number(position?.flowPerimeterInset ?? 0)} step={1} onchange={(value) => set('Text.Position.flowPerimeterInset', value)} />
+        <PropertyCell label="Inset" span={4} compact hint="Inset the text path from the component edge.">
+          <NumberCell label="Inset" value={Number(position?.flowPerimeterInset ?? 0)} step={1} defaultValue={0} onchange={(value) => set('Text.Position.flowPerimeterInset', value)} />
         </PropertyCell>
       {:else if textFlowModeValue === 'bezier'}
-        <PropertyCell label="Start X" span={1} hint="Bezier start X as a percentage of the text box.">
-          <NumberInput value={Number(position?.flowPathStartX ?? 0)} step={1} onchange={(value) => set('Text.Position.flowPathStartX', value)} />
+        <PropertyCell label="Start X" span={1} compact hint="Bezier start X as a percentage of the text box.">
+          <NumberCell label="St X" value={Number(position?.flowPathStartX ?? 0)} step={1} defaultValue={0} onchange={(value) => set('Text.Position.flowPathStartX', value)} />
         </PropertyCell>
-        <PropertyCell label="Start Y" span={1} hint="Bezier start Y as a percentage of the text box.">
-          <NumberInput value={Number(position?.flowPathStartY ?? 50)} step={1} onchange={(value) => set('Text.Position.flowPathStartY', value)} />
+        <PropertyCell label="Start Y" span={1} compact hint="Bezier start Y as a percentage of the text box.">
+          <NumberCell label="St Y" value={Number(position?.flowPathStartY ?? 50)} step={1} defaultValue={50} onchange={(value) => set('Text.Position.flowPathStartY', value)} />
         </PropertyCell>
-        <PropertyCell label="End X" span={1} hint="Bezier end X as a percentage of the text box.">
-          <NumberInput value={Number(position?.flowPathEndX ?? 100)} step={1} onchange={(value) => set('Text.Position.flowPathEndX', value)} />
+        <PropertyCell label="End X" span={1} compact hint="Bezier end X as a percentage of the text box.">
+          <NumberCell label="End X" value={Number(position?.flowPathEndX ?? 100)} step={1} defaultValue={100} onchange={(value) => set('Text.Position.flowPathEndX', value)} />
         </PropertyCell>
-        <PropertyCell label="End Y" span={1} hint="Bezier end Y as a percentage of the text box.">
-          <NumberInput value={Number(position?.flowPathEndY ?? 50)} step={1} onchange={(value) => set('Text.Position.flowPathEndY', value)} />
+        <PropertyCell label="End Y" span={1} compact hint="Bezier end Y as a percentage of the text box.">
+          <NumberCell label="End Y" value={Number(position?.flowPathEndY ?? 50)} step={1} defaultValue={50} onchange={(value) => set('Text.Position.flowPathEndY', value)} />
         </PropertyCell>
-        <PropertyCell label="Ctrl 1 X" span={1} hint="Bezier first control handle X.">
-          <NumberInput value={Number(position?.flowPathC1X ?? 33)} step={1} onchange={(value) => set('Text.Position.flowPathC1X', value)} />
+        <PropertyCell label="Ctrl 1 X" span={1} compact hint="Bezier first control handle X.">
+          <NumberCell label="C1 X" value={Number(position?.flowPathC1X ?? 33)} step={1} defaultValue={33} onchange={(value) => set('Text.Position.flowPathC1X', value)} />
         </PropertyCell>
-        <PropertyCell label="Ctrl 1 Y" span={1} hint="Bezier first control handle Y.">
-          <NumberInput value={Number(position?.flowPathC1Y ?? 0)} step={1} onchange={(value) => set('Text.Position.flowPathC1Y', value)} />
+        <PropertyCell label="Ctrl 1 Y" span={1} compact hint="Bezier first control handle Y.">
+          <NumberCell label="C1 Y" value={Number(position?.flowPathC1Y ?? 0)} step={1} defaultValue={0} onchange={(value) => set('Text.Position.flowPathC1Y', value)} />
         </PropertyCell>
-        <PropertyCell label="Ctrl 2 X" span={1} hint="Bezier second control handle X.">
-          <NumberInput value={Number(position?.flowPathC2X ?? 66)} step={1} onchange={(value) => set('Text.Position.flowPathC2X', value)} />
+        <PropertyCell label="Ctrl 2 X" span={1} compact hint="Bezier second control handle X.">
+          <NumberCell label="C2 X" value={Number(position?.flowPathC2X ?? 66)} step={1} defaultValue={66} onchange={(value) => set('Text.Position.flowPathC2X', value)} />
         </PropertyCell>
-        <PropertyCell label="Ctrl 2 Y" span={1} hint="Bezier second control handle Y.">
-          <NumberInput value={Number(position?.flowPathC2Y ?? 100)} step={1} onchange={(value) => set('Text.Position.flowPathC2Y', value)} />
+        <PropertyCell label="Ctrl 2 Y" span={1} compact hint="Bezier second control handle Y.">
+          <NumberCell label="C2 Y" value={Number(position?.flowPathC2Y ?? 100)} step={1} defaultValue={100} onchange={(value) => set('Text.Position.flowPathC2Y', value)} />
         </PropertyCell>
       {:else if textFlowModeValue === 'polyline' || textFlowModeValue === 'freehand'}
         {#each [0, 1, 2, 3] as index}
-          <PropertyCell label={`P${index + 1} X`} span={1} hint="Path point X as a percentage of the text box.">
-            <NumberInput value={flowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'x', index * 33)} step={1} onchange={(value) => setFlowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'x', value)} />
+          <PropertyCell label={`P${index + 1} X`} span={1} compact hint="Path point X as a percentage of the text box.">
+            <NumberCell label={`P${index + 1} X`} value={flowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'x', index * 33)} step={1} defaultValue={index * 33} onchange={(value) => setFlowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'x', value)} />
           </PropertyCell>
-          <PropertyCell label={`P${index + 1} Y`} span={1} hint="Path point Y as a percentage of the text box.">
-            <NumberInput value={flowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'y', 50)} step={1} onchange={(value) => setFlowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'y', value)} />
+          <PropertyCell label={`P${index + 1} Y`} span={1} compact hint="Path point Y as a percentage of the text box.">
+            <NumberCell label={`P${index + 1} Y`} value={flowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'y', 50)} step={1} defaultValue={50} onchange={(value) => setFlowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'y', value)} />
           </PropertyCell>
         {/each}
       {/if}
@@ -1489,22 +1517,26 @@
       {/if}
 
       {#if textEffects?.outlineEnabled === true}
-        <PropertyCell label="Outline Thickness" span={1} hint="Extra outline thickness outside the glyph fill, in pixels.">
-          <NumberInput
+        <PropertyCell label="Outline Thickness" span={1} compact hint="Extra outline thickness outside the glyph fill, in pixels.">
+          <NumberCell
+            label="Thick"
             value={Math.max(1, effectProp('outlineThickness', effectProp('outlineWidth', 1)))}
             min={1}
             step={1}
+            defaultValue={1}
             onchange={(value) => {
               setEffectNumber('outlineThickness', value);
               setEffectNumber('outlineWidth', value);
             }}
           />
         </PropertyCell>
-        <PropertyCell label="Outline Distance" span={1} hint="Gap between the glyph and the outline band, in pixels.">
-          <NumberInput
+        <PropertyCell label="Outline Distance" span={1} compact hint="Gap between the glyph and the outline band, in pixels.">
+          <NumberCell
+            label="Dist"
             value={Math.max(0, effectProp('outlineDistance', 0))}
             min={0}
             step={1}
+            defaultValue={0}
             onchange={(value) => setEffectNumber('outlineDistance', value)}
           />
         </PropertyCell>
@@ -1549,20 +1581,20 @@
             <option value="yes">Yes</option>
           </select>
         </PropertyCell>
-        <PropertyCell label="Dash Len" span={1} disabled={effectProp('outlineDashEnabled', false) !== true} hint="Length of each outline dash.">
-          <NumberInput value={Number(effectProp('outlineDashLength', 8))} min={1} step={1} onchange={(value) => setEffectNumber('outlineDashLength', value, 1)} disabled={effectProp('outlineDashEnabled', false) !== true} />
+        <PropertyCell label="Dash Len" span={1} compact disabled={effectProp('outlineDashEnabled', false) !== true} hint="Length of each outline dash.">
+          <NumberCell label="Len" value={Number(effectProp('outlineDashLength', 8))} min={1} step={1} defaultValue={8} onchange={(value) => setEffectNumber('outlineDashLength', value, 1)} disabled={effectProp('outlineDashEnabled', false) !== true} />
         </PropertyCell>
-        <PropertyCell label="Gap" span={1} disabled={effectProp('outlineDashEnabled', false) !== true} hint="Gap between dashed outline segments.">
-          <NumberInput value={Number(effectProp('outlineDashGap', 4))} min={1} step={1} onchange={(value) => setEffectNumber('outlineDashGap', value, 1)} disabled={effectProp('outlineDashEnabled', false) !== true} />
+        <PropertyCell label="Gap" span={1} compact disabled={effectProp('outlineDashEnabled', false) !== true} hint="Gap between dashed outline segments.">
+          <NumberCell label="Gap" value={Number(effectProp('outlineDashGap', 4))} min={1} step={1} defaultValue={4} onchange={(value) => setEffectNumber('outlineDashGap', value, 1)} disabled={effectProp('outlineDashEnabled', false) !== true} />
         </PropertyCell>
-        <PropertyCell label="Order" span={1} hint="Draw order for the outline layer. Lower draws earlier, higher draws later.">
-          <NumberInput value={Number(effectProp('outlineOrder', 40))} step={1} onchange={(value) => setEffectNumber('outlineOrder', value, 1)} />
+        <PropertyCell label="Order" span={1} compact hint="Draw order for the outline layer. Lower draws earlier, higher draws later.">
+          <NumberCell label="Order" value={Number(effectProp('outlineOrder', 40))} step={1} defaultValue={40} onchange={(value) => setEffectNumber('outlineOrder', value, 1)} />
         </PropertyCell>
       {/if}
 
       {#if textEffects?.stroke2Enabled === true}
-        <PropertyCell label="2nd Thickness" span={1} hint="Thickness of the secondary stroke.">
-          <NumberInput value={Number(effectProp('stroke2Thickness', 1))} min={1} step={1} onchange={(value) => setEffectNumber('stroke2Thickness', value, 1)} />
+        <PropertyCell label="2nd Thickness" span={1} compact hint="Thickness of the secondary stroke.">
+          <NumberCell label="Thick" value={Number(effectProp('stroke2Thickness', 1))} min={1} step={1} defaultValue={1} onchange={(value) => setEffectNumber('stroke2Thickness', value, 1)} />
         </PropertyCell>
         <PropertyCell label="Placement" span={1} hint="Place the secondary stroke inside, centered on, or outside the glyph edge.">
           <select class="text-select" value={String(effectProp('stroke2Placement', 'inner'))} onchange={(event) => set('Text.Effects.stroke2Placement', event.target.value)}>
@@ -1577,11 +1609,11 @@
             <option value="yes">Yes</option>
           </select>
         </PropertyCell>
-        <PropertyCell label="Dash Len" span={1} disabled={effectProp('stroke2DashEnabled', false) !== true} hint="Length of each secondary stroke dash.">
-          <NumberInput value={Number(effectProp('stroke2DashLength', 6))} min={1} step={1} onchange={(value) => setEffectNumber('stroke2DashLength', value, 1)} disabled={effectProp('stroke2DashEnabled', false) !== true} />
+        <PropertyCell label="Dash Len" span={1} compact disabled={effectProp('stroke2DashEnabled', false) !== true} hint="Length of each secondary stroke dash.">
+          <NumberCell label="Len" value={Number(effectProp('stroke2DashLength', 6))} min={1} step={1} defaultValue={6} onchange={(value) => setEffectNumber('stroke2DashLength', value, 1)} disabled={effectProp('stroke2DashEnabled', false) !== true} />
         </PropertyCell>
-        <PropertyCell label="Gap" span={1} disabled={effectProp('stroke2DashEnabled', false) !== true} hint="Gap between secondary stroke dashes.">
-          <NumberInput value={Number(effectProp('stroke2DashGap', 3))} min={1} step={1} onchange={(value) => setEffectNumber('stroke2DashGap', value, 1)} disabled={effectProp('stroke2DashEnabled', false) !== true} />
+        <PropertyCell label="Gap" span={1} compact disabled={effectProp('stroke2DashEnabled', false) !== true} hint="Gap between secondary stroke dashes.">
+          <NumberCell label="Gap" value={Number(effectProp('stroke2DashGap', 3))} min={1} step={1} defaultValue={3} onchange={(value) => setEffectNumber('stroke2DashGap', value, 1)} disabled={effectProp('stroke2DashEnabled', false) !== true} />
         </PropertyCell>
         <PropertyCell label="Stroke Colour" span={2} hint="AARRGGBB colour for the secondary stroke.">
           <PropertyColor
@@ -1590,8 +1622,8 @@
             onswatchclick={() => handleEffectColorSwatch('stroke2Colour', 'FFFFFFFF')}
           />
         </PropertyCell>
-        <PropertyCell label="Order" span={2} hint="Draw order for the secondary stroke layer. Lower draws earlier, higher draws later.">
-          <NumberInput value={Number(effectProp('stroke2Order', 45))} step={1} onchange={(value) => setEffectNumber('stroke2Order', value, 1)} />
+        <PropertyCell label="Order" span={2} compact hint="Draw order for the secondary stroke layer. Lower draws earlier, higher draws later.">
+          <NumberCell label="Order" value={Number(effectProp('stroke2Order', 45))} step={1} defaultValue={45} onchange={(value) => setEffectNumber('stroke2Order', value, 1)} />
         </PropertyCell>
       {/if}
 
@@ -1603,25 +1635,31 @@
             <option value="extrude">Extrude</option>
           </select>
         </PropertyCell>
-        <PropertyCell label="Shadow X" span={1} hint="Horizontal shadow offset in pixels.">
-          <NumberInput
+        <PropertyCell label="Shadow X" span={1} compact hint="Horizontal shadow offset in pixels.">
+          <NumberCell
+            label="X"
             value={effectProp('shadowOffsetX', 1)}
             step={0.5}
+            defaultValue={1}
             onchange={(value) => setEffectNumber('shadowOffsetX', value)}
           />
         </PropertyCell>
-        <PropertyCell label="Shadow Y" span={1} hint="Vertical shadow offset in pixels.">
-          <NumberInput
+        <PropertyCell label="Shadow Y" span={1} compact hint="Vertical shadow offset in pixels.">
+          <NumberCell
+            label="Y"
             value={effectProp('shadowOffsetY', 1)}
             step={0.5}
+            defaultValue={1}
             onchange={(value) => setEffectNumber('shadowOffsetY', value)}
           />
         </PropertyCell>
-        <PropertyCell label="Shadow Blur" span={1} hint="Blur radius for the text shadow.">
-          <NumberInput
+        <PropertyCell label="Shadow Blur" span={1} compact hint="Blur radius for the text shadow.">
+          <NumberCell
+            label="Blur"
             value={effectProp('shadowBlur', 2)}
             min={0}
             step={0.5}
+            defaultValue={2}
             onchange={(value) => setEffectNumber('shadowBlur', value)}
           />
         </PropertyCell>
@@ -1632,31 +1670,35 @@
             onswatchclick={() => handleEffectColorSwatch('shadowColour', '80000000')}
           />
         </PropertyCell>
-        <PropertyCell label="Distance" span={1} disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} hint="Length used by long-shadow and extrude shadow styles.">
-          <NumberInput value={Number(effectProp('shadowDistance', 12))} min={0} step={1} onchange={(value) => setEffectNumber('shadowDistance', value, 1)} disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} />
+        <PropertyCell label="Distance" span={1} compact disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} hint="Length used by long-shadow and extrude shadow styles.">
+          <NumberCell label="Dist" value={Number(effectProp('shadowDistance', 12))} min={0} step={1} defaultValue={12} onchange={(value) => setEffectNumber('shadowDistance', value, 1)} disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} />
         </PropertyCell>
-        <PropertyCell label="Steps" span={1} disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} hint="Number of repeated copies used for long-shadow and extrude styles.">
-          <NumberInput value={Number(effectProp('shadowSteps', 8))} min={1} step={1} onchange={(value) => set('Text.Effects.shadowSteps', Math.max(1, Math.round(Number(value) || 1)))} disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} />
+        <PropertyCell label="Steps" span={1} compact disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} hint="Number of repeated copies used for long-shadow and extrude styles.">
+          <NumberCell label="Steps" value={Number(effectProp('shadowSteps', 8))} min={1} step={1} defaultValue={8} onchange={(value) => set('Text.Effects.shadowSteps', Math.max(1, Math.round(Number(value) || 1)))} disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} />
         </PropertyCell>
-        <PropertyCell label="Order" span={1} hint="Draw order for the shadow layer. Lower draws earlier, higher draws later.">
-          <NumberInput value={Number(effectProp('shadowOrder', 10))} step={1} onchange={(value) => setEffectNumber('shadowOrder', value, 1)} />
+        <PropertyCell label="Order" span={1} compact hint="Draw order for the shadow layer. Lower draws earlier, higher draws later.">
+          <NumberCell label="Order" value={Number(effectProp('shadowOrder', 10))} step={1} defaultValue={10} onchange={(value) => setEffectNumber('shadowOrder', value, 1)} />
         </PropertyCell>
       {/if}
 
       {#if textEffects?.glowEnabled === true}
-        <PropertyCell label="Glow Size" span={1} hint="Blur radius for the outer text glow.">
-          <NumberInput
+        <PropertyCell label="Glow Size" span={1} compact hint="Blur radius for the outer text glow.">
+          <NumberCell
+            label="Size"
             value={effectProp('glowSize', 4)}
             min={0}
             step={0.5}
+            defaultValue={4}
             onchange={(value) => setEffectNumber('glowSize', value)}
           />
         </PropertyCell>
-        <PropertyCell label="Glow Intensity" span={1} hint="Strength of the glow at the chosen size. Higher values stack a brighter halo.">
-          <NumberInput
+        <PropertyCell label="Glow Intensity" span={1} compact hint="Strength of the glow at the chosen size. Higher values stack a brighter halo.">
+          <NumberCell
+            label="Int"
             value={effectProp('glowIntensity', 1)}
             min={0}
             step={0.25}
+            defaultValue={1}
             onchange={(value) => setEffectNumber('glowIntensity', value, 0.25)}
           />
         </PropertyCell>
@@ -1667,17 +1709,19 @@
             onswatchclick={() => handleEffectColorSwatch('glowColour', '80FFFFFF')}
           />
         </PropertyCell>
-        <PropertyCell label="Order" span={2} hint="Draw order for the glow layer. Lower draws earlier, higher draws later.">
-          <NumberInput value={Number(effectProp('glowOrder', 20))} step={1} onchange={(value) => setEffectNumber('glowOrder', value, 1)} />
+        <PropertyCell label="Order" span={2} compact hint="Draw order for the glow layer. Lower draws earlier, higher draws later.">
+          <NumberCell label="Order" value={Number(effectProp('glowOrder', 20))} step={1} defaultValue={20} onchange={(value) => setEffectNumber('glowOrder', value, 1)} />
         </PropertyCell>
       {/if}
 
       {#if textEffects?.innerGlowEnabled === true}
-        <PropertyCell label="Inner Glow" span={1} hint="Blur radius for the inner glow clipped inside glyphs.">
-          <NumberInput
+        <PropertyCell label="Inner Glow" span={1} compact hint="Blur radius for the inner glow clipped inside glyphs.">
+          <NumberCell
+            label="Size"
             value={effectProp('innerGlowSize', 3)}
             min={0}
             step={0.5}
+            defaultValue={3}
             onchange={(value) => setEffectNumber('innerGlowSize', value)}
           />
         </PropertyCell>
@@ -1688,20 +1732,20 @@
             onswatchclick={() => handleEffectColorSwatch('innerGlowColour', '80FFFFFF')}
           />
         </PropertyCell>
-        <PropertyCell label="Order" span={1} hint="Draw order for the inner glow layer. Lower draws earlier, higher draws later.">
-          <NumberInput value={Number(effectProp('innerGlowOrder', 80))} step={1} onchange={(value) => setEffectNumber('innerGlowOrder', value, 1)} />
+        <PropertyCell label="Order" span={1} compact hint="Draw order for the inner glow layer. Lower draws earlier, higher draws later.">
+          <NumberCell label="Order" value={Number(effectProp('innerGlowOrder', 80))} step={1} defaultValue={80} onchange={(value) => setEffectNumber('innerGlowOrder', value, 1)} />
         </PropertyCell>
       {/if}
 
       {#if textEffects?.innerShadowEnabled === true}
-        <PropertyCell label="Inner X" span={1} hint="Horizontal offset of the inner shadow.">
-          <NumberInput value={Number(effectProp('innerShadowOffsetX', 1))} step={0.5} onchange={(value) => setEffectNumber('innerShadowOffsetX', value)} />
+        <PropertyCell label="Inner X" span={1} compact hint="Horizontal offset of the inner shadow.">
+          <NumberCell label="X" value={Number(effectProp('innerShadowOffsetX', 1))} step={0.5} defaultValue={1} onchange={(value) => setEffectNumber('innerShadowOffsetX', value)} />
         </PropertyCell>
-        <PropertyCell label="Inner Y" span={1} hint="Vertical offset of the inner shadow.">
-          <NumberInput value={Number(effectProp('innerShadowOffsetY', 1))} step={0.5} onchange={(value) => setEffectNumber('innerShadowOffsetY', value)} />
+        <PropertyCell label="Inner Y" span={1} compact hint="Vertical offset of the inner shadow.">
+          <NumberCell label="Y" value={Number(effectProp('innerShadowOffsetY', 1))} step={0.5} defaultValue={1} onchange={(value) => setEffectNumber('innerShadowOffsetY', value)} />
         </PropertyCell>
-        <PropertyCell label="Inner Blur" span={1} hint="Blur radius for the inner shadow.">
-          <NumberInput value={Number(effectProp('innerShadowBlur', 2))} min={0} step={0.5} onchange={(value) => setEffectNumber('innerShadowBlur', value)} />
+        <PropertyCell label="Inner Blur" span={1} compact hint="Blur radius for the inner shadow.">
+          <NumberCell label="Blur" value={Number(effectProp('innerShadowBlur', 2))} min={0} step={0.5} defaultValue={2} onchange={(value) => setEffectNumber('innerShadowBlur', value)} />
         </PropertyCell>
         <PropertyCell label="Inner Colour" span={1} hint="AARRGGBB inner shadow colour.">
           <PropertyColor
@@ -1710,43 +1754,51 @@
             onswatchclick={() => handleEffectColorSwatch('innerShadowColour', '80000000')}
           />
         </PropertyCell>
-        <PropertyCell label="Order" span={4} hint="Draw order for the inner shadow layer. Lower draws earlier, higher draws later.">
-          <NumberInput value={Number(effectProp('innerShadowOrder', 60))} step={1} onchange={(value) => setEffectNumber('innerShadowOrder', value, 1)} />
+        <PropertyCell label="Order" span={4} compact hint="Draw order for the inner shadow layer. Lower draws earlier, higher draws later.">
+          <NumberCell label="Order" value={Number(effectProp('innerShadowOrder', 60))} step={1} defaultValue={60} onchange={(value) => setEffectNumber('innerShadowOrder', value, 1)} />
         </PropertyCell>
       {/if}
 
       {#if textEffects?.blurEnabled === true}
-        <PropertyCell label="Blur" span={4} hint="Blur applied to the main text fill and outline.">
-          <NumberInput
+        <PropertyCell label="Blur" span={4} compact hint="Blur applied to the main text fill and outline.">
+          <NumberCell
+            label="Blur"
             value={effectProp('blurAmount', 1)}
             min={0}
             step={0.5}
+            defaultValue={1}
             onchange={(value) => setEffectNumber('blurAmount', value)}
           />
         </PropertyCell>
       {/if}
 
       {#if textEffects?.motionEnabled === true}
-        <PropertyCell label="Motion Angle" span={1} hint="Direction of the smear in degrees.">
-          <NumberInput
+        <PropertyCell label="Motion Angle" span={1} compact hint="Direction of the smear in degrees.">
+          <NumberCell
+            label="Angle"
             value={effectProp('motionAngle', 0)}
             step={1}
+            defaultValue={0}
             onchange={(value) => setEffectNumber('motionAngle', value)}
           />
         </PropertyCell>
-        <PropertyCell label="Distance" span={1} hint="Total smear distance in pixels.">
-          <NumberInput
+        <PropertyCell label="Distance" span={1} compact hint="Total smear distance in pixels.">
+          <NumberCell
+            label="Dist"
             value={effectProp('motionDistance', 8)}
             min={0}
             step={0.5}
+            defaultValue={8}
             onchange={(value) => setEffectNumber('motionDistance', value)}
           />
         </PropertyCell>
-        <PropertyCell label="Steps" span={1} hint="Number of layered copies used for the smear.">
-          <NumberInput
+        <PropertyCell label="Steps" span={1} compact hint="Number of layered copies used for the smear.">
+          <NumberCell
+            label="Steps"
             value={effectProp('motionSteps', 4)}
             min={1}
             step={1}
+            defaultValue={4}
             onchange={(value) => set('Text.Effects.motionSteps', Math.max(1, Math.round(Number(value) || 1)))}
           />
         </PropertyCell>
@@ -1757,8 +1809,8 @@
             onswatchclick={() => handleEffectColorSwatch('motionColour', '80FFFFFF')}
           />
         </PropertyCell>
-        <PropertyCell label="Order" span={1} hint="Draw order for the motion layer. Lower draws earlier, higher draws later.">
-          <NumberInput value={Number(effectProp('motionOrder', 30))} step={1} onchange={(value) => setEffectNumber('motionOrder', value, 1)} />
+        <PropertyCell label="Order" span={1} compact hint="Draw order for the motion layer. Lower draws earlier, higher draws later.">
+          <NumberCell label="Order" value={Number(effectProp('motionOrder', 30))} step={1} defaultValue={30} onchange={(value) => setEffectNumber('motionOrder', value, 1)} />
         </PropertyCell>
       {/if}
 
@@ -1774,11 +1826,13 @@
             <option value="outer">Outer</option>
           </select>
         </PropertyCell>
-        <PropertyCell label="Depth" span={1} hint="Offset depth of the highlight/shadow copies.">
-          <NumberInput
+        <PropertyCell label="Depth" span={1} compact hint="Offset depth of the highlight/shadow copies.">
+          <NumberCell
+            label="Depth"
             value={effectProp('bevelDepth', 1.5)}
             min={0}
             step={0.5}
+            defaultValue={1.5}
             onchange={(value) => setEffectNumber('bevelDepth', value)}
           />
         </PropertyCell>
@@ -1796,41 +1850,49 @@
             onswatchclick={() => handleEffectColorSwatch('bevelShadowColour', '99000000')}
           />
         </PropertyCell>
-        <PropertyCell label="Order" span={4} hint="Draw order for the bevel layer. Lower draws earlier, higher draws later.">
-          <NumberInput value={Number(effectProp('bevelOrder', 60))} step={1} onchange={(value) => setEffectNumber('bevelOrder', value, 1)} />
+        <PropertyCell label="Order" span={4} compact hint="Draw order for the bevel layer. Lower draws earlier, higher draws later.">
+          <NumberCell label="Order" value={Number(effectProp('bevelOrder', 60))} step={1} defaultValue={60} onchange={(value) => setEffectNumber('bevelOrder', value, 1)} />
         </PropertyCell>
       {/if}
 
       {#if reflectionEffectActive}
-        <PropertyCell label="Angle" span={1} hint="Direction from the text toward the reflection, in degrees. 0=Up, 90=Right, 180=Down, 270=Left.">
-          <NumberInput
+        <PropertyCell label="Angle" span={1} compact hint="Direction from the text toward the reflection, in degrees. 0=Up, 90=Right, 180=Down, 270=Left.">
+          <NumberCell
+            label="Angle"
             value={reflectionProp('reflectionAngle', 180)}
             step={1}
+            defaultValue={180}
             onchange={(value) => set('Text.Effects.reflectionAngle', reflectionStoredAngleFromDisplay(value))}
           />
         </PropertyCell>
-        <PropertyCell label="Distance" span={1} hint="Distance from the text to the mirrored reflection.">
-          <NumberInput
+        <PropertyCell label="Distance" span={1} compact hint="Distance from the text to the mirrored reflection.">
+          <NumberCell
+            label="Dist"
             value={reflectionProp('reflectionDistance', 8)}
             min={0}
             step={0.5}
+            defaultValue={8}
             onchange={(value) => setEffectNumber('reflectionDistance', value)}
           />
         </PropertyCell>
-        <PropertyCell label="Intensity" span={1} hint="Opacity of the reflection layer.">
-          <NumberInput
+        <PropertyCell label="Intensity" span={1} compact hint="Opacity of the reflection layer.">
+          <NumberCell
+            label="Int"
             value={reflectionProp('reflectionIntensity', 0.45)}
             min={0}
             max={1}
             step={0.05}
+            defaultValue={0.45}
             onchange={(value) => set('Text.Effects.reflectionIntensity', Math.max(0, Math.min(1, Number(value) || 0)))}
           />
         </PropertyCell>
-        <PropertyCell label="Blur" span={1} hint="Blur applied to the reflection.">
-          <NumberInput
+        <PropertyCell label="Blur" span={1} compact hint="Blur applied to the reflection.">
+          <NumberCell
+            label="Blur"
             value={reflectionProp('reflectionBlur', 2)}
             min={0}
             step={0.5}
+            defaultValue={2}
             onchange={(value) => setEffectNumber('reflectionBlur', value)}
           />
         </PropertyCell>
@@ -1841,11 +1903,13 @@
             </button>
           </div>
         </PropertyCell>
-        <PropertyCell label="Fade Amount" span={2} hint="Measured from the near edge of the reflection. Fade Out starts dropping here; Fade In reaches full opacity here.">
-          <NumberInput
+        <PropertyCell label="Fade Amount" span={2} compact hint="Measured from the near edge of the reflection. Fade Out starts dropping here; Fade In reaches full opacity here.">
+          <NumberCell
+            label="Fade"
             value={reflectionProp('reflectionFadeAmount', 0)}
             min={0}
             step={1}
+            defaultValue={0}
             onchange={(value) => setEffectNumber('reflectionFadeAmount', value, 1)}
           />
         </PropertyCell>
@@ -1856,8 +1920,8 @@
             onswatchclick={() => handleEffectColorSwatch('reflectionColour', reflectionColorValue())}
           />
         </PropertyCell>
-        <PropertyCell label="Order" span={4} hint="Draw order for the reflection layer. Lower draws earlier, higher draws later.">
-          <NumberInput value={Number(effectProp('reflectionOrder', 5))} step={1} onchange={(value) => setEffectNumber('reflectionOrder', value, 1)} />
+        <PropertyCell label="Order" span={4} compact hint="Draw order for the reflection layer. Lower draws earlier, higher draws later.">
+          <NumberCell label="Order" value={Number(effectProp('reflectionOrder', 5))} step={1} defaultValue={5} onchange={(value) => setEffectNumber('reflectionOrder', value, 1)} />
         </PropertyCell>
       {/if}
     </PropertySection>
