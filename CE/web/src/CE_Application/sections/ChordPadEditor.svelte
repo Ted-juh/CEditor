@@ -4,6 +4,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   let { control = null } = $props();
 
@@ -25,8 +26,6 @@
     try { return chordPadPads(control).map((p) => p.name).join('  ·  '); } catch { return ''; }
   });
 
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if cp}
@@ -117,8 +116,10 @@
       <PropertyCell label="In channel" span={1} hint="Which MIDI channel to watch. 0 = omni (any channel), which is usually what you want.">
         <input class="val" type="number" min="0" max="16" step="1" value={num(cp.echoChannel, 0)} onchange={(e) => set('echoChannel', clampInt(e.target.value, 0, 16, 0))} />
       </PropertyCell>
-      <PropertyCell label="Echo colour" span={1} hint="Colour of the incoming-note outline.">
-        <input class="cswatch" type="color" value={colRgb(cp.echoColour, 'FF39D98A')} onchange={(e) => setCol('echoColour', cp.echoColour, e.target.value)} />
+      <PropertyCell label="Echo colour" span={1} hint="Colour of the incoming-note outline. Click the swatch to edit it in the Colors tab.">
+        <SwatchCluster swatches={[
+          { key: 'echo', label: 'Echo', value: cp.echoColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'ChordPad.echoColour' } },
+        ]} />
       </PropertyCell>
     {/if}
     <PropertyCell label="" span={4} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth.">
@@ -127,20 +128,14 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Pads" span={1} hint="Pad fill colour.">
-      <input class="cswatch" type="color" value={colRgb(cp.padColour, 'FF171720')} onchange={(e) => setCol('padColour', cp.padColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="In key" span={1} hint="Accent for in-key chords / major ring.">
-      <input class="cswatch" type="color" value={colRgb(cp.inKeyColour, 'FF5B9BD5')} onchange={(e) => setCol('inKeyColour', cp.inKeyColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Tonic" span={1} hint="Accent for the tonic + sounding notes.">
-      <input class="cswatch" type="color" value={colRgb(cp.tonicColour, 'FFF2C94C')} onchange={(e) => setCol('tonicColour', cp.tonicColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Minors" span={1} hint="Accent for the inner (relative minor) ring.">
-      <input class="cswatch" type="color" value={colRgb(cp.minorColour, 'FF9B8AFF')} onchange={(e) => setCol('minorColour', cp.minorColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={2} hint="Label colour.">
-      <input class="cswatch" type="color" value={colRgb(cp.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', cp.labelColour, e.target.value)} />
+    <PropertyCell label="Pad colours" span={4} hint="Pad fill, in-key accent, tonic accent, minor ring, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'padColour', label: 'Pads', value: cp.padColour ?? 'FF171720', target: { type: 'control', controlId: core?.id, path: 'ChordPad.padColour' } },
+        { key: 'inKeyColour', label: 'In key', value: cp.inKeyColour ?? 'FF5B9BD5', target: { type: 'control', controlId: core?.id, path: 'ChordPad.inKeyColour' } },
+        { key: 'tonicColour', label: 'Tonic', value: cp.tonicColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'ChordPad.tonicColour' } },
+        { key: 'minorColour', label: 'Minors', value: cp.minorColour ?? 'FF9B8AFF', target: { type: 'control', controlId: core?.id, path: 'ChordPad.minorColour' } },
+        { key: 'labelColour', label: 'Labels', value: cp.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'ChordPad.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -148,7 +143,6 @@
 <style>
   .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
   .val:focus { border-color: #5B9BD5; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .preview { font-size: 12px; color: #C8C8CE; background: #141420; border: 1px solid #2a2a36; border-radius: 5px; padding: 6px 8px; line-height: 1.6; }
   .note { font-size: 11px; color: #8a8a94; }
 </style>

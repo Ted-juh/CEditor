@@ -4,7 +4,6 @@
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
   import { ZONE_SHOW_KINDS, WIDGET_ZONE_KINDS, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
-  import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
   import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
   import { setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
   // Reset only appearance (never content: layouts/zones/text/sources).
@@ -21,6 +20,7 @@
   import NumberCell from '../properties/NumberCell.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
   import Segmented from '../properties/Segmented.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import Ghost from 'lucide-svelte/icons/ghost';
   import ScanLine from 'lucide-svelte/icons/scan-line';
   import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
@@ -721,27 +721,15 @@
     </PropertySection>
   {/if}
 
-  {#snippet colourField(prop, current, fallback)}
-    <div class="field-row">
-      <input class="val cswatch" type="color" title="Pick RGB (keeps the current alpha)" value={aarrggbbToHex(current ?? fallback)} oninput={(event) => set(prop, mergeHexKeepAlpha(current ?? fallback, event.target.value))} />
-      <input class="val" type="text" title="AARRGGBB (alpha + RGB)" value={current ?? fallback} onchange={(event) => set(prop, event.target.value.trim())} />
-    </div>
-  {/snippet}
   <PropertySection title="Colour">
-    <PropertyCell label="Lit" span={2} hint="Foreground (lit segment) colour, AARRGGBB.">
-      {@render colourField('litColour', display.litColour, 'FF2BE86A')}
-    </PropertyCell>
-    <PropertyCell label="Unlit" span={2} hint="Faint unlit 'ghost' segment colour, AARRGGBB.">
-      {@render colourField('unlitColour', display.unlitColour, '242BE86A')}
-    </PropertyCell>
-    <PropertyCell label="Screen" span={2} hint="Screen substrate behind the pixels, AARRGGBB.">
-      {@render colourField('screenColour', display.screenColour, 'FF06371C')}
-    </PropertyCell>
-    <PropertyCell label="Backlight" span={2} hint="Backlight wash colour, AARRGGBB.">
-      {@render colourField('backlightColour', display.backlightColour, 'FF0E5A2E')}
-    </PropertyCell>
-    <PropertyCell label="Glass" span={2} hint="Glass sheen overlay colour, AARRGGBB (low alpha = subtle).">
-      {@render colourField('glassTint', display.glassTint, '14FFFFFF')}
+    <PropertyCell label="Screen colours" span={4} hint="Lit, unlit ghost, screen substrate, backlight wash, glass sheen. Click a swatch to edit it (with alpha) in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'litColour', label: 'Lit', value: display.litColour ?? 'FF2BE86A', target: { type: 'control', controlId: core?.id, path: 'Display.litColour' } },
+        { key: 'unlitColour', label: 'Unlit', value: display.unlitColour ?? '242BE86A', target: { type: 'control', controlId: core?.id, path: 'Display.unlitColour' } },
+        { key: 'screenColour', label: 'Screen', value: display.screenColour ?? 'FF06371C', target: { type: 'control', controlId: core?.id, path: 'Display.screenColour' } },
+        { key: 'backlightColour', label: 'Backlt', value: display.backlightColour ?? 'FF0E5A2E', target: { type: 'control', controlId: core?.id, path: 'Display.backlightColour' } },
+        { key: 'glassTint', label: 'Glass', value: display.glassTint ?? '14FFFFFF', target: { type: 'control', controlId: core?.id, path: 'Display.glassTint' } },
+      ]} />
     </PropertyCell>
     <PropertyCell label="Reset" span={4} hint="Restore the default look (colours, brightness, ghost). Leaves layouts, zones and text untouched.">
       <button class="val add-field" type="button" onclick={() => resetAppearance()}>↺ Reset appearance</button>
@@ -930,14 +918,6 @@
   .field-row .rm {
     width: 30px;
     flex: 0 0 auto;
-    cursor: pointer;
-  }
-
-  .field-row .cswatch {
-    width: 30px;
-    flex: 0 0 auto;
-    padding: 1px;
-    height: 24px;
     cursor: pointer;
   }
 
