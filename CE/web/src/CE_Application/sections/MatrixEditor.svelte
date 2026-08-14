@@ -3,6 +3,7 @@
   import { matrixRows, matrixCols, matrixAmounts, matrixIndex } from '../utils/matrixLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
   let { control = null } = $props();
@@ -66,15 +67,6 @@
   }
   function clearAmounts() { set('amounts', amounts.map(() => 0)); }
 
-  function hexToInput(argb) {
-    const s = String(argb ?? '').replace(/^#/, '');
-    return /^[0-9a-fA-F]{8}$/.test(s) ? `#${s.slice(2)}` : (/^[0-9a-fA-F]{6}$/.test(s) ? `#${s}` : '#000000');
-  }
-  function inputToArgb(prev, hex) {
-    const rgb = String(hex ?? '').replace(/^#/, '').toUpperCase();
-    const alpha = /^[0-9a-fA-F]{8}$/.test(String(prev ?? '').replace(/^#/, '')) ? String(prev).replace(/^#/, '').slice(0, 2) : 'FF';
-    return `${alpha}${rgb}`;
-  }
 </script>
 
 {#if m}
@@ -152,17 +144,13 @@
   </PropertySection>
 
   <PropertySection title="Style">
-    <PropertyCell label="Positive" span={2} hint="Colour for positive amounts.">
-      <input class="val color" type="color" value={hexToInput(m.posColour)} onchange={(e) => set('posColour', inputToArgb(m.posColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Negative" span={2} hint="Colour for negative amounts.">
-      <input class="val color" type="color" value={hexToInput(m.negColour)} onchange={(e) => set('negColour', inputToArgb(m.negColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Cell bg" span={2} hint="Cell background.">
-      <input class="val color" type="color" value={hexToInput(m.cellBg)} onchange={(e) => set('cellBg', inputToArgb(m.cellBg, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={2} hint="Label text colour.">
-      <input class="val color" type="color" value={hexToInput(m.labelColour)} onchange={(e) => set('labelColour', inputToArgb(m.labelColour, e.target.value))} />
+    <PropertyCell label="Colours" span={4} hint="Positive amounts, negative amounts, cell background, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'posColour', label: 'Pos', value: m.posColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'Matrix.posColour' } },
+        { key: 'negColour', label: 'Neg', value: m.negColour ?? 'FFEB5757', target: { type: 'control', controlId: core?.id, path: 'Matrix.negColour' } },
+        { key: 'cellBg', label: 'Cells', value: m.cellBg ?? 'FF161616', target: { type: 'control', controlId: core?.id, path: 'Matrix.cellBg' } },
+        { key: 'labelColour', label: 'Labels', value: m.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Matrix.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -173,7 +161,6 @@
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
   }
   .val:focus { border-color: #5B9BD5; }
-  .val.color { padding: 1px 2px; height: 24px; cursor: pointer; }
   .lst { display: flex; flex-direction: column; gap: 5px; }
   .lrow { display: flex; align-items: center; gap: 5px; }
   .lrow .val { flex: 1 1 auto; }

@@ -10,6 +10,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PanelTop from 'lucide-svelte/icons/panel-top';
   import Tags from 'lucide-svelte/icons/tags';
   import Hash from 'lucide-svelte/icons/hash';
@@ -51,9 +52,6 @@
     set('pads', list);
   }
   let overridden = $derived((Array.isArray(d?.pads) ? d.pads : []).filter((p) => p && Object.keys(p).length).length);
-
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const al = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${al}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if d}
@@ -116,8 +114,10 @@
       <PropertyCell label="In channel" span={1} hint="Which MIDI channel to watch. 0 = omni (any channel), which is usually what you want.">
         <input class="val" type="number" min="0" max="16" step="1" value={num(d.echoChannel, 0)} onchange={(e) => set('echoChannel', clampInt(e.target.value, 0, 16, 0))} />
       </PropertyCell>
-      <PropertyCell label="Echo colour" span={1} hint="Colour of the incoming-note outline.">
-        <input class="cswatch" type="color" value={colRgb(d.echoColour, 'FF39D98A')} onchange={(e) => setCol('echoColour', d.echoColour, e.target.value)} />
+      <PropertyCell label="Echo colour" span={1} hint="Colour of the incoming-note outline. Click the swatch to edit it in the Colors tab.">
+        <SwatchCluster swatches={[
+          { key: 'echoColour', label: 'Echo', value: d.echoColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'DrumPads.echoColour' } },
+        ]} />
       </PropertyCell>
     {/if}
     <PropertyCell label="" span={4} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth.">
@@ -175,8 +175,11 @@
                    onchange={(e) => setPad(p.index, 'choke', clampInt(e.target.value, 0, 8, 0))} />
             <input class="chk" role="cell" type="checkbox" checked={p.roll} aria-label={`Pad ${p.index + 1} roll`}
                    onchange={(e) => setPad(p.index, 'roll', e.target.checked)} />
-            <input class="cswatch" role="cell" type="color" value={colRgb(p.colour, d.accentColour ?? 'FF5B9BD5')} aria-label={`Pad ${p.index + 1} colour`}
-                   onchange={(e) => setPad(p.index, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} />
+            <span role="cell">
+              <SwatchCluster swatches={[
+                { key: `pad-${p.id}`, label: `P${p.index + 1}`, value: p.colour ?? d.accentColour ?? 'FF5B9BD5', target: { type: 'callback', apply: (hex) => setPad(p.index, 'colour', hex) } },
+              ]} />
+            </span>
             <button class="x" type="button" title="Reset this pad" aria-label={`Reset pad ${p.index + 1}`}
                     onclick={() => clearPad(p.index)}>↺</button>
           </div>
@@ -221,7 +224,7 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Show" span={2} hint="Header strip, drum-name labels, note numbers. Hover a chip for its name.">
+    <PropertyCell label="Show" span={4} hint="Header strip, drum-name labels, note numbers. Hover a chip for its name.">
       <FlagStrip
         flags={[
           { key: 'showHeader', title: 'Header — the map / size / last-hit strip', on: d.showHeader !== false, icon: PanelTop },
@@ -231,20 +234,14 @@
         ontoggle={(key, next) => set(key, next)}
       />
     </PropertyCell>
-    <PropertyCell label="Field" span={1} hint="Grid background colour.">
-      <input class="cswatch" type="color" value={colRgb(d.fieldColour, 'FF101017')} onchange={(e) => setCol('fieldColour', d.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Pads" span={1} hint="Pad fill colour.">
-      <input class="cswatch" type="color" value={colRgb(d.padColour, 'FF171720')} onchange={(e) => setCol('padColour', d.padColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Accent" span={1} hint="Default pad stripe, for pads with no colour of their own.">
-      <input class="cswatch" type="color" value={colRgb(d.accentColour, 'FF5B9BD5')} onchange={(e) => setCol('accentColour', d.accentColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Hit" span={1} hint="Colour of a sounding pad.">
-      <input class="cswatch" type="color" value={colRgb(d.hitColour, 'FFF2C94C')} onchange={(e) => setCol('hitColour', d.hitColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={2} hint="Label colour.">
-      <input class="cswatch" type="color" value={colRgb(d.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', d.labelColour, e.target.value)} />
+    <PropertyCell label="Colours" span={4} hint="Grid background, pad fill, accent stripe, hit, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'fieldColour', label: 'Field', value: d.fieldColour ?? 'FF101017', target: { type: 'control', controlId: core?.id, path: 'DrumPads.fieldColour' } },
+        { key: 'padColour', label: 'Pads', value: d.padColour ?? 'FF171720', target: { type: 'control', controlId: core?.id, path: 'DrumPads.padColour' } },
+        { key: 'accentColour', label: 'Accent', value: d.accentColour ?? 'FF5B9BD5', target: { type: 'control', controlId: core?.id, path: 'DrumPads.accentColour' } },
+        { key: 'hitColour', label: 'Hit', value: d.hitColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'DrumPads.hitColour' } },
+        { key: 'labelColour', label: 'Labels', value: d.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'DrumPads.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -254,7 +251,6 @@
   .val:focus { border-color: #5B9BD5; }
   .note.warn { color: #E0A030; }
   .chk { justify-self: center; width: 14px; height: 14px; accent-color: var(--accent, #5B9BD5); cursor: pointer; }
-  .cswatch { width: 100%; height: 22px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .note { font-size: 11px; color: #8a8a94; }
   .table { display: flex; flex-direction: column; gap: 3px; }
   .thead, .trow { display: grid; grid-template-columns: 20px 1fr 52px 44px 30px 34px 24px; gap: 4px; align-items: center; }

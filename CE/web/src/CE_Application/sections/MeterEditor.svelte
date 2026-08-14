@@ -5,6 +5,7 @@
   import { activePanel } from '../stores/panels.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
   let { control = null } = $props();
@@ -36,15 +37,6 @@
     const next = [...zones]; next.splice(i, 1); setZones(next);
   }
   // AARRGGBB <-> #RRGGBB for the colour inputs (alpha preserved).
-  function hexToInput(argb) {
-    const s = String(argb ?? '').replace(/^#/, '');
-    return /^[0-9a-fA-F]{8}$/.test(s) ? `#${s.slice(2)}` : (/^[0-9a-fA-F]{6}$/.test(s) ? `#${s}` : '#000000');
-  }
-  function inputToArgb(prev, hex) {
-    const rgb = String(hex ?? '').replace(/^#/, '').toUpperCase();
-    const alpha = /^[0-9a-fA-F]{8}$/.test(String(prev ?? '').replace(/^#/, '')) ? String(prev).replace(/^#/, '').slice(0, 2) : 'FF';
-    return `${alpha}${rgb}`;
-  }
 </script>
 
 {#if m}
@@ -107,8 +99,10 @@
     <PropertyCell label="Thickness" span={2} hint="Bar/arc thickness in px (0 = fill the box).">
       <input class="val" type="number" min="0" value={m.thickness ?? 0} onchange={(e) => set('thickness', Math.max(0, num(e.target.value, 0)))} />
     </PropertyCell>
-    <PropertyCell label="Track" span={2} hint="Unlit background colour.">
-      <input class="val color" type="color" value={hexToInput(m.trackColour)} onchange={(e) => set('trackColour', inputToArgb(m.trackColour, e.target.value))} />
+    <PropertyCell label="Track" span={2} hint="Unlit background colour. Click the swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'trackColour', label: 'Track', value: m.trackColour ?? 'FF1B1B1B', target: { type: 'control', controlId: core?.id, path: 'Meter.trackColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
@@ -121,7 +115,9 @@
         {#each zones as z, i (i)}
           <div class="zrow">
             <input class="val zfrom" type="number" min="0" max="1" step="0.05" title="From (0–1)" value={z.from ?? 0} onchange={(e) => updateZone(i, 'from', Math.max(0, Math.min(1, num(e.target.value, 0))))} />
-            <input class="val color" type="color" value={hexToInput(z.colour)} onchange={(e) => updateZone(i, 'colour', inputToArgb(z.colour, e.target.value))} />
+            <SwatchCluster swatches={[
+              { key: `zone-${i}`, label: 'Zone', value: z.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateZone(i, 'colour', hex) } },
+            ]} />
             <button type="button" class="action-btn danger" onclick={() => removeZone(i)}>✕</button>
           </div>
         {/each}
@@ -141,8 +137,10 @@
       <PropertyCell label="Decay/s" span={1} hint="Normalized units per second the marker falls.">
         <input class="val" type="number" min="0" step="0.05" value={m.peakDecayPerSec ?? 0.4} onchange={(e) => set('peakDecayPerSec', Math.max(0, num(e.target.value, 0.4)))} />
       </PropertyCell>
-      <PropertyCell label="Colour" span={2} hint="Peak marker colour.">
-        <input class="val color" type="color" value={hexToInput(m.peakColour)} onchange={(e) => set('peakColour', inputToArgb(m.peakColour, e.target.value))} />
+      <PropertyCell label="Colour" span={2} hint="Peak marker colour. Click the swatch to edit it in the Colors tab.">
+        <SwatchCluster swatches={[
+          { key: 'peakColour', label: 'Peak', value: m.peakColour ?? 'FFF2F2F2', target: { type: 'control', controlId: core?.id, path: 'Meter.peakColour' } },
+        ]} />
       </PropertyCell>
     {/if}
   </PropertySection>
@@ -197,7 +195,6 @@
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
   }
   .val:focus { border-color: #5B9BD5; }
-  .val.color { padding: 1px 2px; height: 24px; cursor: pointer; }
   .zones { display: flex; flex-direction: column; gap: 6px; }
   .zrow { display: flex; align-items: center; gap: 6px; }
   .zrow .zfrom { flex: 0 0 70px; }

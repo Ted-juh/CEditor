@@ -8,6 +8,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   let { control = null } = $props();
 
@@ -43,16 +44,6 @@
   function removePoint(i) {
     const next = envelopePointRemoved(points, i);
     if (next) setPoints(next);
-  }
-
-  function hexToInput(argb) {
-    const s = String(argb ?? '').replace(/^#/, '');
-    return /^[0-9a-fA-F]{8}$/.test(s) ? `#${s.slice(2)}` : (/^[0-9a-fA-F]{6}$/.test(s) ? `#${s}` : '#000000');
-  }
-  function inputToArgb(prev, hex) {
-    const rgb = String(hex ?? '').replace(/^#/, '').toUpperCase();
-    const alpha = /^[0-9a-fA-F]{8}$/.test(String(prev ?? '').replace(/^#/, '')) ? String(prev).replace(/^#/, '').slice(0, 2) : 'FF';
-    return `${alpha}${rgb}`;
   }
 </script>
 
@@ -154,17 +145,13 @@
     <PropertyCell label="Fill" span={1} hint="Shade the area under the curve.">
       <PropertyToggle value={e.fillUnder !== false} onchange={() => set('fillUnder', !(e.fillUnder !== false))} />
     </PropertyCell>
-    <PropertyCell label="Line" span={2} hint="Curve line colour.">
-      <input class="val color" type="color" value={hexToInput(e.lineColour)} onchange={(ev) => set('lineColour', inputToArgb(e.lineColour, ev.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Fill colour" span={2} hint="Area fill colour.">
-      <input class="val color" type="color" value={hexToInput(e.fillColour)} onchange={(ev) => set('fillColour', inputToArgb(e.fillColour, ev.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Nodes" span={2} hint="Node handle colour.">
-      <input class="val color" type="color" value={hexToInput(e.nodeColour)} onchange={(ev) => set('nodeColour', inputToArgb(e.nodeColour, ev.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Sustain" span={2} hint="Sustain marker + node colour.">
-      <input class="val color" type="color" value={hexToInput(e.sustainColour)} onchange={(ev) => set('sustainColour', inputToArgb(e.sustainColour, ev.target.value))} />
+    <PropertyCell label="Colours" span={4} hint="Curve line, area fill, node handles, sustain marker. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'lineColour', label: 'Line', value: e.lineColour, target: { type: 'control', controlId: core?.id, path: 'Envelope.lineColour' } },
+        { key: 'fillColour', label: 'Fill', value: e.fillColour, target: { type: 'control', controlId: core?.id, path: 'Envelope.fillColour' } },
+        { key: 'nodeColour', label: 'Nodes', value: e.nodeColour, target: { type: 'control', controlId: core?.id, path: 'Envelope.nodeColour' } },
+        { key: 'sustainColour', label: 'Sustain', value: e.sustainColour, target: { type: 'control', controlId: core?.id, path: 'Envelope.sustainColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -175,7 +162,6 @@
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
   }
   .val:focus { border-color: #5B9BD5; }
-  .val.color { padding: 1px 2px; height: 24px; cursor: pointer; }
   .nodes { display: flex; flex-direction: column; gap: 5px; }
   .nrow { display: flex; align-items: center; gap: 5px; }
   .nrow .nlabel { flex: 0 0 16px; color: #888; font-size: 11px; text-align: right; }

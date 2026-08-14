@@ -9,6 +9,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PanelTop from 'lucide-svelte/icons/panel-top';
   import Tags from 'lucide-svelte/icons/tags';
 
@@ -61,9 +62,6 @@
       .map((h) => (h ? '●' : '·')).join(' ');
   });
   let mutes = $derived(Array.isArray(a?.mutes) ? a.mutes : []);
-
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const al = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${al}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if a}
@@ -212,7 +210,7 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Show" span={2} hint="Header strip and note names in the step cells. Hover a chip for its name.">
+    <PropertyCell label="Show" span={4} hint="Header strip and note names in the step cells. Hover a chip for its name.">
       <FlagStrip
         flags={[
           { key: 'showHeader', title: 'Header — the pattern / source / rate strip', on: a.showHeader !== false, icon: PanelTop },
@@ -221,20 +219,14 @@
         ontoggle={(key, next) => set(key, next)}
       />
     </PropertyCell>
-    <PropertyCell label="Field" span={1} hint="Lane background colour.">
-      <input class="cswatch" type="color" value={colRgb(a.fieldColour, 'FF101017')} onchange={(e) => setCol('fieldColour', a.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Steps" span={1} hint="Colour of the note blocks.">
-      <input class="cswatch" type="color" value={colRgb(a.stepColour, 'FF5B9BD5')} onchange={(e) => setCol('stepColour', a.stepColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Playhead" span={1} hint="Colour of the step currently sounding.">
-      <input class="cswatch" type="color" value={colRgb(a.headColour, 'FFF2C94C')} onchange={(e) => setCol('headColour', a.headColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Rests" span={1} hint="Fill for muted / rested steps.">
-      <input class="cswatch" type="color" value={colRgb(a.restColour, 'FF2A2A34')} onchange={(e) => setCol('restColour', a.restColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={2} hint="Label colour.">
-      <input class="cswatch" type="color" value={colRgb(a.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', a.labelColour, e.target.value)} />
+    <PropertyCell label="Colours" span={4} hint="Lane background, note blocks, playhead, rests, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'fieldColour', label: 'Field', value: a.fieldColour ?? 'FF101017', target: { type: 'control', controlId: core?.id, path: 'Arp.fieldColour' } },
+        { key: 'stepColour', label: 'Steps', value: a.stepColour ?? 'FF5B9BD5', target: { type: 'control', controlId: core?.id, path: 'Arp.stepColour' } },
+        { key: 'headColour', label: 'Playhd', value: a.headColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Arp.headColour' } },
+        { key: 'restColour', label: 'Rests', value: a.restColour ?? 'FF2A2A34', target: { type: 'control', controlId: core?.id, path: 'Arp.restColour' } },
+        { key: 'labelColour', label: 'Labels', value: a.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Arp.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -242,7 +234,6 @@
 <style>
   .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
   .val:focus { border-color: #5B9BD5; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .warn { font-size: 11px; color: #F2C94C; background: #241f10; border: 1px solid #4a3f18; border-radius: 5px; padding: 6px 8px; line-height: 1.5; }
   .preview { font-size: 12px; color: #C8C8CE; background: #141420; border: 1px solid #2a2a36; border-radius: 5px; padding: 6px 8px; line-height: 1.6; }
   .preview.mono { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 1px; }

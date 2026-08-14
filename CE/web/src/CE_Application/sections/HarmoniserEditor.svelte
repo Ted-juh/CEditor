@@ -12,6 +12,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   let { control = null } = $props();
 
@@ -24,12 +25,6 @@
   }
   function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
   function clampInt(v, lo, hi, f) { const n = Math.round(num(v, f)); return n < lo ? lo : n > hi ? hi : n; }
-  function colRgb(v, fb) { const t = String(v ?? fb).replace(/^#/, ''); return `#${t.length >= 6 ? t.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) {
-    const t = String(cur ?? '').replace(/^#/, '');
-    const al = /^[0-9a-fA-F]{8}$/.test(t) ? t.slice(0, 2) : 'FF';
-    set(prop, `${al}${hex.replace('#', '').toUpperCase()}`);
-  }
 
   let isMemory = $derived(harmoniserMode(control) === 'memory');
   let flats = $derived(useFlats(num(p?.key, 0), String(p?.scale ?? 'major')));
@@ -226,12 +221,16 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Face" span={1} hint=""><input class="col" type="color" value={colRgb(p.faceColour, 'FF141420')} oninput={(e) => setCol('faceColour', p.faceColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="White keys" span={1} hint=""><input class="col" type="color" value={colRgb(p.whiteColour, 'FFE8E8EE')} oninput={(e) => setCol('whiteColour', p.whiteColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Black keys" span={1} hint=""><input class="col" type="color" value={colRgb(p.blackColour, 'FF1A1A22')} oninput={(e) => setCol('blackColour', p.blackColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="You played" span={1} hint="The key you pressed, so it is distinct from what the harmoniser added."><input class="col" type="color" value={colRgb(p.playedColour, 'FFF2C94C')} oninput={(e) => setCol('playedColour', p.playedColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="It added" span={1} hint=""><input class="col" type="color" value={colRgb(p.addedColour, 'FFBB6BD9')} oninput={(e) => setCol('addedColour', p.addedColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Labels" span={1} hint=""><input class="col" type="color" value={colRgb(p.labelColour, 'FFB9B9B9')} oninput={(e) => setCol('labelColour', p.labelColour, e.target.value)} /></PropertyCell>
+    <PropertyCell label="Colours" span={4} hint="Face, white keys, black keys, the key you played, the notes it added, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'faceColour', label: 'Face', value: p.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.faceColour' } },
+        { key: 'whiteColour', label: 'White', value: p.whiteColour ?? 'FFE8E8EE', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.whiteColour' } },
+        { key: 'blackColour', label: 'Black', value: p.blackColour ?? 'FF1A1A22', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.blackColour' } },
+        { key: 'playedColour', label: 'Played', value: p.playedColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.playedColour' } },
+        { key: 'addedColour', label: 'Added', value: p.addedColour ?? 'FFBB6BD9', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.addedColour' } },
+        { key: 'labelColour', label: 'Labels', value: p.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.labelColour' } },
+      ]} />
+    </PropertyCell>
   </PropertySection>
 {/if}
 
@@ -243,5 +242,4 @@
   .seed { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 2px 7px; border-radius: 4px; cursor: pointer; }
   .seed:hover:not(:disabled) { border-color: #4a4a58; color: #E8E8EE; }
   .seed:disabled { opacity: 0.4; cursor: default; }
-  .col { width: 26px; height: 20px; padding: 0; border: 1px solid #2a2a36; background: #141420; border-radius: 3px; }
 </style>

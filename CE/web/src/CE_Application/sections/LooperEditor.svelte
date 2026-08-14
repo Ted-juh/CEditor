@@ -2,6 +2,7 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
   import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
@@ -29,10 +30,6 @@
   function clearLane(i) { updateLane(i, 'points', []); }
   function pointCount(l) { return Array.isArray(l?.points) ? l.points.length : 0; }
 
-  // Accent-colour swatches: the native picker edits RGB; we preserve each
-  // colour's original alpha so faint grids keep their transparency.
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if lp}
@@ -80,17 +77,13 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Lane" span={1} hint="Lane background colour.">
-      <input class="cswatch" type="color" value={colRgb(lp.laneColour, 'FF0E0E13')} onchange={(e) => setCol('laneColour', lp.laneColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Grid" span={1} hint="Grid lines (stays faint — its transparency is kept).">
-      <input class="cswatch" type="color" value={colRgb(lp.gridColour, 'FFFFFFFF')} onchange={(e) => setCol('gridColour', lp.gridColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Playhead" span={1} hint="The sweeping playhead colour.">
-      <input class="cswatch" type="color" value={colRgb(lp.playheadColour, 'FFFFFFFF')} onchange={(e) => setCol('playheadColour', lp.playheadColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Lane label colour.">
-      <input class="cswatch" type="color" value={colRgb(lp.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', lp.labelColour, e.target.value)} />
+    <PropertyCell label="Colours" span={4} hint="Lane background, grid lines, playhead, lane labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'laneColour', label: 'Lane', value: lp.laneColour ?? 'FF0E0E13', target: { type: 'control', controlId: core?.id, path: 'Looper.laneColour' } },
+        { key: 'gridColour', label: 'Grid', value: lp.gridColour ?? '22FFFFFF', target: { type: 'control', controlId: core?.id, path: 'Looper.gridColour' } },
+        { key: 'playheadColour', label: 'Playhd', value: lp.playheadColour ?? 'FFFFFFFF', target: { type: 'control', controlId: core?.id, path: 'Looper.playheadColour' } },
+        { key: 'labelColour', label: 'Labels', value: lp.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Looper.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
@@ -104,7 +97,9 @@
           <div class="lane" class:off={l.enabled === false}>
             <div class="lrow">
               <input class="val name" type="text" value={l.label ?? ''} placeholder="Lane" onchange={(e) => updateLane(i, 'label', e.target.value)} />
-              <input class="swatch" type="color" value={`#${String(l.colour ?? 'FF39D98A').slice(-6)}`} onchange={(e) => updateLane(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+              <SwatchCluster swatches={[
+                { key: `lane-${i}`, label: 'Colour', value: l.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateLane(i, 'colour', hex) } },
+              ]} />
               <span class="pts">{pointCount(l) ? `${pointCount(l)} pts` : 'empty'}</span>
               <label class="flag"><input type="checkbox" checked={l.enabled !== false} onchange={(e) => updateLane(i, 'enabled', e.currentTarget.checked)} /><span>On</span></label>
               <button type="button" class="action-btn" onclick={() => clearLane(i)} title="Clear recording">Clear</button>
@@ -134,8 +129,6 @@
   .lane.off { opacity: 0.55; }
   .lrow { display: flex; align-items: center; gap: 8px; }
   .lrow .name { flex: 1 1 auto; }
-  .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .pts { font-size: 10px; color: #8a8a94; white-space: nowrap; }
   .lrow2 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .fld { display: flex; flex-direction: column; gap: 3px; }

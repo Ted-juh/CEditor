@@ -3,6 +3,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   let { control = null } = $props();
 
@@ -18,15 +19,6 @@
   function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
   function setCornerLabel(i, value) { set('cornerLabels', labels.map((l, idx) => idx === i ? value : l)); }
 
-  function hexToInput(argb) {
-    const s = String(argb ?? '').replace(/^#/, '');
-    return /^[0-9a-fA-F]{8}$/.test(s) ? `#${s.slice(2)}` : (/^[0-9a-fA-F]{6}$/.test(s) ? `#${s}` : '#000000');
-  }
-  function inputToArgb(prev, hex) {
-    const rgb = String(hex ?? '').replace(/^#/, '').toUpperCase();
-    const alpha = /^[0-9a-fA-F]{8}$/.test(String(prev ?? '').replace(/^#/, '')) ? String(prev).replace(/^#/, '').slice(0, 2) : 'FF';
-    return `${alpha}${rgb}`;
-  }
 </script>
 
 {#if j}
@@ -102,17 +94,13 @@
         <input class="val" type="number" min="2" max="200" value={j.trailLength ?? 24} onchange={(e) => set('trailLength', Math.max(2, Math.round(num(e.target.value, 24))))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Puck" span={2} hint="Puck colour.">
-      <input class="val color" type="color" value={hexToInput(j.puckColour)} onchange={(e) => set('puckColour', inputToArgb(j.puckColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Pad" span={2} hint="Pad background.">
-      <input class="val color" type="color" value={hexToInput(j.padColour)} onchange={(e) => set('padColour', inputToArgb(j.padColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Corner mark" span={2} hint="Corner marker colour.">
-      <input class="val color" type="color" value={hexToInput(j.cornerColour)} onchange={(e) => set('cornerColour', inputToArgb(j.cornerColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Trail colour" span={2} hint="Motion-trail colour.">
-      <input class="val color" type="color" value={hexToInput(j.trailColour)} onchange={(e) => set('trailColour', inputToArgb(j.trailColour, e.target.value))} />
+    <PropertyCell label="Colours" span={4} hint="Puck, pad background, corner marks, motion trail. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'puckColour', label: 'Puck', value: j.puckColour ?? 'FF5B9BD5', target: { type: 'control', controlId: core?.id, path: 'Joystick.puckColour' } },
+        { key: 'padColour', label: 'Pad', value: j.padColour ?? 'FF141414', target: { type: 'control', controlId: core?.id, path: 'Joystick.padColour' } },
+        { key: 'cornerColour', label: 'Corners', value: j.cornerColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Joystick.cornerColour' } },
+        { key: 'trailColour', label: 'Trail', value: j.trailColour ?? '665B9BD5', target: { type: 'control', controlId: core?.id, path: 'Joystick.trailColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -123,5 +111,4 @@
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
   }
   .val:focus { border-color: #5B9BD5; }
-  .val.color { padding: 1px 2px; height: 24px; cursor: pointer; }
 </style>

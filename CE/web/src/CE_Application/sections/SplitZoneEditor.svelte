@@ -10,6 +10,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   let { control = null } = $props();
 
@@ -105,17 +106,6 @@
     const list = zones.map((z) => ({ ...z }));
     [list[i], list[j]] = [list[j], list[i]];
     set('zones', list);
-  }
-  function colRgb(v, fb) { const t = String(v ?? fb).replace(/^#/, ''); return `#${t.length >= 6 ? t.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) {
-    const t = String(cur ?? '').replace(/^#/, '');
-    const al = /^[0-9a-fA-F]{8}$/.test(t) ? t.slice(0, 2) : 'FF';
-    set(prop, `${al}${hex.replace('#', '').toUpperCase()}`);
-  }
-  function setZoneCol(i, cur, hex) {
-    const t = String(cur ?? '').replace(/^#/, '');
-    const al = /^[0-9a-fA-F]{8}$/.test(t) ? t.slice(0, 2) : 'FF';
-    setZone(i, 'colour', `${al}${hex.replace('#', '').toUpperCase()}`);
   }
 </script>
 
@@ -269,7 +259,9 @@
                   </select>
                 </td>
                 <td><input type="checkbox" checked={z.polyPressure !== false} onchange={(e) => setZone(i, 'polyPressure', e.target.checked)} /></td>
-                <td><input class="col" type="color" value={colRgb(z.colour, 'FF5B9BD5')} oninput={(e) => setZoneCol(i, z.colour, e.target.value)} /></td>
+                <td><SwatchCluster swatches={[
+                  { key: `zoneColour_${z.id}`, label: 'Col', value: z.colour ?? 'FF5B9BD5', target: { type: 'callback', apply: (hex) => setZone(i, 'colour', hex) } },
+                ]} /></td>
                 <td class="acts">
                   <button type="button" title="Move up" onclick={() => moveZone(i, -1)} disabled={i === 0}>↑</button>
                   <button type="button" title="Move down" onclick={() => moveZone(i, 1)} disabled={i === zones.length - 1}>↓</button>
@@ -296,12 +288,16 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Face" span={1} hint="Panel behind the keyboard."><input class="col" type="color" value={colRgb(s.faceColour, 'FF141420')} oninput={(e) => setCol('faceColour', s.faceColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="White keys" span={1} hint=""><input class="col" type="color" value={colRgb(s.whiteColour, 'FFE8E8EE')} oninput={(e) => setCol('whiteColour', s.whiteColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Black keys" span={1} hint=""><input class="col" type="color" value={colRgb(s.blackColour, 'FF1A1A22')} oninput={(e) => setCol('blackColour', s.blackColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Held" span={1} hint="Colour of a key currently sounding."><input class="col" type="color" value={colRgb(s.litColour, 'FFF2C94C')} oninput={(e) => setCol('litColour', s.litColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Gap" span={1} hint="Colour of a key no zone claims."><input class="col" type="color" value={colRgb(s.gapColour, 'FF3A3A46')} oninput={(e) => setCol('gapColour', s.gapColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Labels" span={1} hint=""><input class="col" type="color" value={colRgb(s.labelColour, 'FFB9B9B9')} oninput={(e) => setCol('labelColour', s.labelColour, e.target.value)} /></PropertyCell>
+    <PropertyCell label="Colours" span={4} hint="Face, white keys, black keys, held key, unclaimed-key gap, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'faceColour', label: 'Face', value: s.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'SplitZone.faceColour' } },
+        { key: 'whiteColour', label: 'White', value: s.whiteColour ?? 'FFE8E8EE', target: { type: 'control', controlId: core?.id, path: 'SplitZone.whiteColour' } },
+        { key: 'blackColour', label: 'Black', value: s.blackColour ?? 'FF1A1A22', target: { type: 'control', controlId: core?.id, path: 'SplitZone.blackColour' } },
+        { key: 'litColour', label: 'Held', value: s.litColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'SplitZone.litColour' } },
+        { key: 'gapColour', label: 'Gap', value: s.gapColour ?? 'FF3A3A46', target: { type: 'control', controlId: core?.id, path: 'SplitZone.gapColour' } },
+        { key: 'labelColour', label: 'Labels', value: s.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'SplitZone.labelColour' } },
+      ]} />
+    </PropertyCell>
   </PropertySection>
 {/if}
 
@@ -326,7 +322,6 @@
   .preset { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
   .preset:hover { border-color: #4a4a58; color: #E8E8EE; }
   .nl { color: #6f6f78; font-size: 10px; margin-left: 3px; }
-  .col { width: 26px; height: 20px; padding: 0; border: 1px solid #2a2a36; background: #141420; border-radius: 3px; }
   .acts button { background: #1A1A1A; border: 1px solid #333; color: #888; font-size: 11px; padding: 1px 5px; border-radius: 3px; cursor: pointer; }
   .acts button:disabled { opacity: 0.3; cursor: default; }
   .action-btn { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer; }

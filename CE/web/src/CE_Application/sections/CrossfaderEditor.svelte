@@ -3,6 +3,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   let { control = null } = $props();
 
@@ -15,16 +16,6 @@
   }
   function toggle(prop) { set(prop, !(x?.[prop] === true)); }
   function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
-
-  function hexToInput(argb) {
-    const s = String(argb ?? '').replace(/^#/, '');
-    return /^[0-9a-fA-F]{8}$/.test(s) ? `#${s.slice(2)}` : (/^[0-9a-fA-F]{6}$/.test(s) ? `#${s}` : '#000000');
-  }
-  function inputToArgb(prev, hex) {
-    const rgb = String(hex ?? '').replace(/^#/, '').toUpperCase();
-    const alpha = /^[0-9a-fA-F]{8}$/.test(String(prev ?? '').replace(/^#/, '')) ? String(prev).replace(/^#/, '').slice(0, 2) : 'FF';
-    return `${alpha}${rgb}`;
-  }
 </script>
 
 {#if x}
@@ -80,17 +71,13 @@
     <PropertyCell label="Label B" span={1}>
       <input class="val" type="text" value={x.labelB ?? 'B'} onchange={(e) => set('labelB', e.target.value)} />
     </PropertyCell>
-    <PropertyCell label="A colour" span={2} hint="A-side fill.">
-      <input class="val color" type="color" value={hexToInput(x.fillAColour)} onchange={(e) => set('fillAColour', inputToArgb(x.fillAColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="B colour" span={2} hint="B-side fill.">
-      <input class="val color" type="color" value={hexToInput(x.fillBColour)} onchange={(e) => set('fillBColour', inputToArgb(x.fillBColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Handle" span={2} hint="Handle colour.">
-      <input class="val color" type="color" value={hexToInput(x.handleColour)} onchange={(e) => set('handleColour', inputToArgb(x.handleColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Track" span={2} hint="Groove colour.">
-      <input class="val color" type="color" value={hexToInput(x.trackColour)} onchange={(e) => set('trackColour', inputToArgb(x.trackColour, e.target.value))} />
+    <PropertyCell label="Colours" span={4} hint="A-side fill, B-side fill, handle, groove. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'fillAColour', label: 'A', value: x.fillAColour, target: { type: 'control', controlId: core?.id, path: 'Crossfader.fillAColour' } },
+        { key: 'fillBColour', label: 'B', value: x.fillBColour, target: { type: 'control', controlId: core?.id, path: 'Crossfader.fillBColour' } },
+        { key: 'handleColour', label: 'Handle', value: x.handleColour, target: { type: 'control', controlId: core?.id, path: 'Crossfader.handleColour' } },
+        { key: 'trackColour', label: 'Track', value: x.trackColour, target: { type: 'control', controlId: core?.id, path: 'Crossfader.trackColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -101,5 +88,4 @@
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
   }
   .val:focus { border-color: #5B9BD5; }
-  .val.color { padding: 1px 2px; height: 24px; cursor: pointer; }
 </style>

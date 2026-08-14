@@ -9,6 +9,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
 
   let { control = null } = $props();
@@ -75,10 +76,6 @@
     if (!Object.keys(captured).length) return;
     setPresets(presets.map((p, idx) => idx === i ? { ...p, values: { ...(p.values ?? {}), ...captured } } : p));
   }
-
-  // Accent-colour swatches (preserve alpha).
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if cn}
@@ -136,17 +133,13 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Field" span={1} hint="Map background colour.">
-      <input class="cswatch" type="color" value={colRgb(cn.fieldColour, 'FF0C0C12')} onchange={(e) => setCol('fieldColour', cn.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Probe" span={1} hint="Probe / readout colour.">
-      <input class="cswatch" type="color" value={colRgb(cn.probeColour, 'FFF2C94C')} onchange={(e) => setCol('probeColour', cn.probeColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Links" span={1} hint="Link colour (stays faint — its transparency is kept).">
-      <input class="cswatch" type="color" value={colRgb(cn.linkColour, 'FF2A6BA8')} onchange={(e) => setCol('linkColour', cn.linkColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Label colour.">
-      <input class="cswatch" type="color" value={colRgb(cn.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', cn.labelColour, e.target.value)} />
+    <PropertyCell label="Colours" span={4} hint="Map background, probe, links, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'fieldColour', label: 'Field', value: cn.fieldColour ?? 'FF0C0C12', target: { type: 'control', controlId: core?.id, path: 'Constellation.fieldColour' } },
+        { key: 'probeColour', label: 'Probe', value: cn.probeColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Constellation.probeColour' } },
+        { key: 'linkColour', label: 'Links', value: cn.linkColour ?? 'FF2A6BA8', target: { type: 'control', controlId: core?.id, path: 'Constellation.linkColour' } },
+        { key: 'labelColour', label: 'Labels', value: cn.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Constellation.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
@@ -157,7 +150,11 @@
         {#each targets as t, i (t.id ?? i)}
           <div class="trow">
             <input class="val name" type="text" value={t.label ?? ''} placeholder="Target" onchange={(e) => updateTarget(i, 'label', e.target.value)} />
-            <input class="swatch" type="color" value={`#${String(t.colour ?? 'FF39D98A').slice(-6)}`} onchange={(e) => updateTarget(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+            <span class="clus">
+              <SwatchCluster swatches={[
+                { key: `target-${t.id ?? i}`, label: 'Colour', value: t.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateTarget(i, 'colour', hex) } },
+              ]} />
+            </span>
             <button type="button" class="action-btn danger" onclick={() => removeTarget(i)} title="Remove">✕</button>
           </div>
         {/each}
@@ -174,7 +171,11 @@
           <div class="preset">
             <div class="prow">
               <input class="val name" type="text" value={p.label ?? ''} placeholder="Preset name" onchange={(e) => updatePreset(i, 'label', e.target.value)} />
-              <input class="swatch" type="color" value={`#${String(p.colour ?? 'FF5B9BD5').slice(-6)}`} onchange={(e) => updatePreset(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+              <span class="clus">
+                <SwatchCluster swatches={[
+                  { key: `preset-${p.id ?? i}`, label: 'Colour', value: p.colour ?? 'FF5B9BD5', target: { type: 'callback', apply: (hex) => updatePreset(i, 'colour', hex) } },
+                ]} />
+              </span>
               <button type="button" class="action-btn" onclick={() => capturePreset(i)} disabled={capturable === 0} title={capturable ? `Set from the panel's current bound controls (${capturable})` : 'Bind targets to parameters that panel controls drive, then capture'}>Capture</button>
               <button type="button" class="action-btn danger" onclick={() => removePreset(i)} title="Remove">✕</button>
             </div>
@@ -202,7 +203,6 @@
 <style>
   .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
   .val:focus { border-color: #5B9BD5; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .rows { display: flex; flex-direction: column; gap: 8px; }
   .trow { display: flex; align-items: center; gap: 8px; }
   .trow .name { flex: 1 1 auto; }
@@ -211,7 +211,7 @@
   .prow .name { flex: 1 1 auto; }
   .prow2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; border-top: 1px solid #2a2a2a; padding-top: 7px; }
-  .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
+  .clus { flex: 0 0 44px; display: flex; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .03em; color: #8a8a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .empty { border: 1px dashed #3A3A3A; border-radius: 4px; color: #8A8A8A; font-size: 11px; padding: 8px; }

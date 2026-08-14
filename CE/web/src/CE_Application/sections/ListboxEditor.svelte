@@ -3,6 +3,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
   import Segmented from '../properties/Segmented.svelte';
@@ -19,7 +20,6 @@
   import LocateFixed from 'lucide-svelte/icons/locate-fixed';
   import Search from 'lucide-svelte/icons/search';
   import Highlighter from 'lucide-svelte/icons/highlighter';
-  import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
   import { syncPresetChoiceRows, initPresetChoiceSync } from '../stores/presetChoiceSync.js';
 
   let { control = null } = $props();
@@ -94,11 +94,10 @@
         <option value="bold">Bold only</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Accent" span={2} hint="Selection/highlight colour (empty = the Background border colour).">
-      <div class="field-row">
-        <input class="val cswatch" type="color" title="Pick accent (keeps alpha)" value={aarrggbbToHex(lb.accentColour || 'FF89C2FF')} oninput={(e) => set('accentColour', mergeHexKeepAlpha(lb.accentColour || 'FF000000', e.target.value))} />
-        <input class="val" type="text" placeholder="AARRGGBB" value={lb.accentColour ?? ''} onchange={(e) => set('accentColour', e.target.value.trim())} />
-      </div>
+    <PropertyCell label="Accent" span={2} hint="Selection/highlight colour (empty = the Background border colour). Click the swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'accentColour', label: 'Accent', value: lb.accentColour || 'FF89C2FF', target: { type: 'control', controlId: core?.id, path: 'Listbox.accentColour' } },
+      ]} />
     </PropertyCell>
     <PropertyCell label="Animate" span={2} hint="Slide/fade the selection indicator between rows.">
       <PropertyToggle value={lb.selectionAnim === true} onchange={() => toggle('selectionAnim', false)} />
@@ -231,5 +230,4 @@
     border-color: #5B9BD5;
   }
   .field-row { display: flex; gap: 4px; align-items: center; }
-  .cswatch { width: 30px; flex: 0 0 auto; padding: 1px; height: 24px; cursor: pointer; }
 </style>

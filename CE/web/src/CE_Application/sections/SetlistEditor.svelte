@@ -10,6 +10,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import Send from 'lucide-svelte/icons/send';
   import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
   import Gauge from 'lucide-svelte/icons/gauge';
@@ -25,12 +26,6 @@
   }
   function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
   function clampInt(v, lo, hi, f) { const n = Math.round(num(v, f)); return n < lo ? lo : n > hi ? hi : n; }
-  function colRgb(v, fb) { const t = String(v ?? fb).replace(/^#/, ''); return `#${t.length >= 6 ? t.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) {
-    const t = String(cur ?? '').replace(/^#/, '');
-    const al = /^[0-9a-fA-F]{8}$/.test(t) ? t.slice(0, 2) : 'FF';
-    set(prop, `${al}${hex.replace('#', '').toUpperCase()}`);
-  }
   function optInt(v, lo, hi) {
     const t = String(v ?? '').trim();
     if (!t) return null;                       // empty means "don't send one"
@@ -251,11 +246,15 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Face" span={1} hint=""><input class="col" type="color" value={colRgb(p.faceColour, 'FF141420')} oninput={(e) => setCol('faceColour', p.faceColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Row" span={1} hint=""><input class="col" type="color" value={colRgb(p.rowColour, 'FF20202C')} oninput={(e) => setCol('rowColour', p.rowColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Current" span={1} hint=""><input class="col" type="color" value={colRgb(p.currentColour, 'FF56CCF2')} oninput={(e) => setCol('currentColour', p.currentColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Text" span={1} hint=""><input class="col" type="color" value={colRgb(p.textColour, 'FFE8E8EE')} oninput={(e) => setCol('textColour', p.textColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Labels" span={1} hint=""><input class="col" type="color" value={colRgb(p.labelColour, 'FFB9B9B9')} oninput={(e) => setCol('labelColour', p.labelColour, e.target.value)} /></PropertyCell>
+    <PropertyCell label="Colours" span={4} hint="Face, row, current scene, text, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'faceColour', label: 'Face', value: p.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'Setlist.faceColour' } },
+        { key: 'rowColour', label: 'Row', value: p.rowColour ?? 'FF20202C', target: { type: 'control', controlId: core?.id, path: 'Setlist.rowColour' } },
+        { key: 'currentColour', label: 'Current', value: p.currentColour ?? 'FF56CCF2', target: { type: 'control', controlId: core?.id, path: 'Setlist.currentColour' } },
+        { key: 'textColour', label: 'Text', value: p.textColour ?? 'FFE8E8EE', target: { type: 'control', controlId: core?.id, path: 'Setlist.textColour' } },
+        { key: 'labelColour', label: 'Labels', value: p.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Setlist.labelColour' } },
+      ]} />
+    </PropertyCell>
   </PropertySection>
 {/if}
 
@@ -283,5 +282,4 @@
   .mini.danger:hover { border-color: #EB5757; color: #EB5757; }
   .meta { font-size: 10.5px; color: #7a7a84; padding-left: 18px; }
   .warn { color: #F2C94C; }
-  .col { width: 26px; height: 20px; padding: 0; border: 1px solid #2a2a36; background: #141420; border-radius: 3px; }
 </style>

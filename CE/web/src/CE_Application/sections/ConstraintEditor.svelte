@@ -4,6 +4,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
@@ -33,10 +34,6 @@
     free: 'No rule — members move independently (a plain linked-fader bank).',
   };
   let modeHint = $derived(MODE_HINTS[String(cs?.mode ?? 'sum')] ?? '');
-
-  // Accent-colour swatches (preserve alpha).
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if cs}
@@ -70,17 +67,13 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Field" span={1} hint="Cell background colour.">
-      <input class="cswatch" type="color" value={colRgb(cs.fieldColour, 'FF0E0E13')} onchange={(e) => setCol('fieldColour', cs.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Track" span={1} hint="Empty bar track colour (stays faint — its transparency is kept).">
-      <input class="cswatch" type="color" value={colRgb(cs.trackColour, 'FFFFFFFF')} onchange={(e) => setCol('trackColour', cs.trackColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Link" span={1} hint="Link chain + badge colour.">
-      <input class="cswatch" type="color" value={colRgb(cs.linkColour, 'FFF2C94C')} onchange={(e) => setCol('linkColour', cs.linkColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Label colour.">
-      <input class="cswatch" type="color" value={colRgb(cs.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', cs.labelColour, e.target.value)} />
+    <PropertyCell label="Colours" span={4} hint="Cell background, bar track, link chain + badge, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'fieldColour', label: 'Field', value: cs.fieldColour ?? 'FF0E0E13', target: { type: 'control', controlId: core?.id, path: 'Constraint.fieldColour' } },
+        { key: 'trackColour', label: 'Track', value: cs.trackColour ?? 'FFFFFFFF', target: { type: 'control', controlId: core?.id, path: 'Constraint.trackColour' } },
+        { key: 'linkColour', label: 'Link', value: cs.linkColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Constraint.linkColour' } },
+        { key: 'labelColour', label: 'Labels', value: cs.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Constraint.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
@@ -92,7 +85,11 @@
           <div class="member">
             <div class="mrow">
               <input class="val name" type="text" value={m.label ?? ''} placeholder="Member" onchange={(e) => updateMember(i, 'label', e.target.value)} />
-              <input class="swatch" type="color" value={`#${String(m.colour ?? 'FF39D98A').slice(-6)}`} onchange={(e) => updateMember(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+              <span class="clus">
+                <SwatchCluster swatches={[
+                  { key: `member-${m.id ?? i}`, label: 'Colour', value: m.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateMember(i, 'colour', hex) } },
+                ]} />
+              </span>
               <label class="fld"><span>Value</span>
                 <input class="val vnum" type="number" min="0" max="1" step="0.05" value={num(m.value, 0.5)} onchange={(e) => updateMember(i, 'value', clamp01(num(e.target.value, 0.5)))} />
               </label>
@@ -109,14 +106,13 @@
 <style>
   .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
   .val:focus { border-color: #5B9BD5; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .rule { font-size: 11px; color: #8a8a94; }
   .rows { display: flex; flex-direction: column; gap: 8px; }
   .member { border: 1px solid #303030; border-radius: 6px; background: #171717; padding: 8px; }
   .mrow { display: flex; align-items: flex-end; gap: 8px; }
   .mrow .name { flex: 1 1 auto; }
   .vnum { width: 64px; }
-  .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
+  .clus { flex: 0 0 44px; display: flex; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #8a8a8a; }
   .empty { border: 1px dashed #3A3A3A; border-radius: 4px; color: #8A8A8A; font-size: 11px; padding: 8px; }

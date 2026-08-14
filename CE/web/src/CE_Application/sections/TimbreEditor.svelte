@@ -8,6 +8,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
@@ -82,10 +83,6 @@
     setAnchors(anchors.map((a, idx) => idx === i ? { ...a, values: { ...(a.values ?? {}), ...captured } } : a));
   }
 
-  // Accent-colour swatches: the native picker edits RGB; we preserve each
-  // colour's original alpha so faint elements keep their transparency.
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if tb}
@@ -116,14 +113,12 @@
   </PropertySection>
 
   <PropertySection title="Appearance">
-    <PropertyCell label="Field" span={1} hint="Pad background colour (behind the anchor heat).">
-      <input class="cswatch" type="color" value={colRgb(tb.fieldColour, 'FF0C0C12')} onchange={(e) => setCol('fieldColour', tb.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Puck" span={1} hint="The blend puck colour.">
-      <input class="cswatch" type="color" value={colRgb(tb.puckColour, 'FFF2C94C')} onchange={(e) => setCol('puckColour', tb.puckColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={2} hint="Axis + anchor label colour.">
-      <input class="cswatch" type="color" value={colRgb(tb.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', tb.labelColour, e.target.value)} />
+    <PropertyCell label="Colours" span={2} hint="Field background, blend puck, axis + anchor labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'fieldColour', label: 'Field', value: tb.fieldColour ?? 'FF0C0C12', target: { type: 'control', controlId: core?.id, path: 'Timbre.fieldColour' } },
+        { key: 'puckColour', label: 'Puck', value: tb.puckColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Timbre.puckColour' } },
+        { key: 'labelColour', label: 'Labels', value: tb.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Timbre.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
@@ -134,7 +129,9 @@
         {#each targets as t, i (t.id ?? i)}
           <div class="trow">
             <input class="val name" type="text" value={t.label ?? ''} placeholder="Target" onchange={(e) => updateTarget(i, 'label', e.target.value)} />
-            <input class="swatch" type="color" value={`#${String(t.colour ?? 'FF39D98A').slice(-6)}`} onchange={(e) => updateTarget(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+            <SwatchCluster swatches={[
+              { key: `targetColour_${t.id ?? i}`, label: 'Colour', value: t.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateTarget(i, 'colour', hex) } },
+            ]} />
             <button type="button" class="action-btn danger" onclick={() => removeTarget(i)} title="Remove">✕</button>
           </div>
         {/each}
