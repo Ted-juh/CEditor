@@ -148,7 +148,9 @@
           <div class="anchor">
             <div class="arow">
               <input class="val name" type="text" value={a.label ?? ''} placeholder="Patch name" onchange={(e) => updateAnchor(i, 'label', e.target.value)} />
-              <input class="swatch" type="color" value={`#${String(a.colour ?? 'FF5B9BD5').slice(-6)}`} onchange={(e) => updateAnchor(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+              <SwatchCluster swatches={[
+                { key: `anchorColour_${a.id ?? i}`, label: 'Colour', value: a.colour ?? 'FF5B9BD5', target: { type: 'callback', apply: (hex) => updateAnchor(i, 'colour', hex) } },
+              ]} />
               <button type="button" class="action-btn" onclick={() => captureAnchor(i)} disabled={capturable === 0} title={capturable ? `Set this anchor's values from the panel's current bound controls (${capturable})` : 'Bind targets to device parameters that panel controls also drive, then capture'}>Capture</button>
               <button type="button" class="action-btn danger" onclick={() => removeAnchor(i)} title="Remove">✕</button>
             </div>
@@ -187,8 +189,6 @@
   .arow .name { flex: 1 1 auto; }
   .arow2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; border-top: 1px solid #2a2a2a; padding-top: 7px; }
-  .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .03em; color: #8a8a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .note { font-size: 11px; color: #8a8a94; }

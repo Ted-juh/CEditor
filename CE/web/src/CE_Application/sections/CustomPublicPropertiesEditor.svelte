@@ -9,6 +9,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   let { control = null } = $props();
 
@@ -169,20 +170,6 @@
     return valueAtPath(control, path);
   }
 
-  function toCssHex(value) {
-    const raw = String(value ?? '').trim().replace(/^#/, '');
-    if (/^[0-9a-fA-F]{8}$/.test(raw)) return `#${raw.slice(2)}`;
-    if (/^[0-9a-fA-F]{6}$/.test(raw)) return `#${raw}`;
-    return '#000000';
-  }
-
-  function fromCssHex(hex, previousValue) {
-    const clean = String(hex ?? '').trim().replace(/^#/, '').toUpperCase();
-    if (!/^[0-9A-F]{6}$/.test(clean)) return String(previousValue ?? '');
-    const previous = String(previousValue ?? '').trim().replace(/^#/, '').toUpperCase();
-    return /^[0-9A-F]{8}$/.test(previous) ? `${previous.slice(0, 2)}${clean}` : clean;
-  }
-
   async function setPropertyFile(entry, file) {
     const path = String(entry?.path ?? '').trim();
     if (!core?.id || !path || !file) return;
@@ -316,12 +303,9 @@
               {/each}
             </select>
           {:else if type === 'color' || type === 'colour'}
-            <input
-              class="color-swatch"
-              type="color"
-              value={toCssHex(channelValue(entry.channel))}
-              onchange={(event) => setChannelValue(entry.channel, fromCssHex(event.target.value, channelValue(entry.channel)))}
-            />
+            <SwatchCluster swatches={[
+              { key: `input_${name}`, label: 'Colour', value: channelValue(entry.channel), target: { type: 'callback', apply: (hex) => setChannelValue(entry.channel, hex) } },
+            ]} />
             <input
               class="val"
               type="text"
@@ -367,12 +351,9 @@
               {/each}
             </select>
           {:else if type === 'color' || type === 'colour'}
-            <input
-              class="color-swatch"
-              type="color"
-              value={toCssHex(propertyValue(path))}
-              onchange={(event) => setPropertyValue(path, fromCssHex(event.target.value, propertyValue(path)), type, entry.defaultValue)}
-            />
+            <SwatchCluster swatches={[
+              { key: `prop_${name}`, label: 'Colour', value: propertyValue(path), target: { type: 'callback', apply: (hex) => setPropertyValue(path, hex, type, entry.defaultValue) } },
+            ]} />
             <input
               class="val"
               type="text"
@@ -573,17 +554,6 @@
   .val {
     width: 100%;
     min-width: 0;
-  }
-
-  .color-swatch {
-    width: 32px;
-    height: 28px;
-    min-width: 32px;
-    border: 1px solid #3B4A53;
-    border-radius: 5px;
-    background: #10161A;
-    padding: 2px;
-    cursor: pointer;
   }
 
   .file-input {

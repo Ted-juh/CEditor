@@ -7,6 +7,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   let { control = null } = $props();
 
@@ -26,8 +27,6 @@
   // Both non-internal sources make the tempo read-only and the tap pointless.
   let external = $derived(transportIsFollowing(src));
 
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const al = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${al}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if t}
@@ -102,17 +101,13 @@
     <PropertyCell label="Tap tempo" span={1} hint="Tapping the face sets the tempo. Inactive while following an external clock or the DAW.">
       <PropertyToggle value={t.showTap !== false} onchange={() => set('showTap', !(t.showTap !== false))} />
     </PropertyCell>
-    <PropertyCell label="Face" span={1} hint="Background colour.">
-      <input class="cswatch" type="color" value={colRgb(t.faceColour, 'FF141420')} onchange={(e) => setCol('faceColour', t.faceColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Accent" span={1} hint="Play button / running colour.">
-      <input class="cswatch" type="color" value={colRgb(t.accentColour, 'FF39D98A')} onchange={(e) => setCol('accentColour', t.accentColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Beat" span={1} hint="Beat-pulse colour.">
-      <input class="cswatch" type="color" value={colRgb(t.beatColour, 'FFF2C94C')} onchange={(e) => setCol('beatColour', t.beatColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={2} hint="Label colour.">
-      <input class="cswatch" type="color" value={colRgb(t.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', t.labelColour, e.target.value)} />
+    <PropertyCell label="Colours" span={4} hint="Face background, play/running accent, beat pulse, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'faceColour', label: 'Face', value: t.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'Transport.faceColour' } },
+        { key: 'accentColour', label: 'Accent', value: t.accentColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'Transport.accentColour' } },
+        { key: 'beatColour', label: 'Beat', value: t.beatColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Transport.beatColour' } },
+        { key: 'labelColour', label: 'Labels', value: t.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Transport.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -121,6 +116,5 @@
   .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
   .val:focus { border-color: #5B9BD5; }
   .val:disabled { opacity: 0.5; cursor: not-allowed; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .note { font-size: 11px; color: #8a8a94; }
 </style>
