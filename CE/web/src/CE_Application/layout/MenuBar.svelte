@@ -3,6 +3,7 @@
   import { closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, selectedComponentIds, setActiveEditorTab, buildActivePanelVst3 } from '../stores/panels.js';
   import { undoAvailable, redoAvailable } from '../stores/history.js';
   import { hasClipboardContent } from '../stores/clipboard.js';
+  import { styleClipboard, copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
   import { INSERT_CATEGORIES } from '../models/insertCatalog.js';
   import { openNewPanelDialog } from '../stores/newPanelDialog.js';
   import { addControl } from '../stores/controls.js';
@@ -111,6 +112,9 @@
       { label: 'Paste', shortcut: 'Ctrl+V', enabled: () => hasClipboardContent() && hasPanel(), action: () => pasteSelection() },
       { type: 'separator' },
       { label: 'Select All', shortcut: 'Ctrl+A', enabled: () => (get(activePanel)?.controls?.length ?? 0) > 0, action: () => selectAll() },
+      { type: 'separator' },
+      { label: 'Copy Style', shortcut: 'Ctrl+Alt+C', enabled: hasSelection, action: () => copyControlStyle() },
+      { label: 'Paste Style', shortcut: 'Ctrl+Alt+V', enabled: () => !!get(styleClipboard) && hasSelection(), action: () => applyStyleToSelection() },
     ],
     View: [
       { label: 'Zoom In',  shortcut: 'Ctrl++', enabled: hasPanel, action: () => requestZoomStep(1) },

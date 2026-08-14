@@ -46,8 +46,9 @@ export function handleEditorShortcut(e, ctx) {
   }
 
   // --- Select All / Paste (work regardless of selection) ---
+  // Plain paste only — Ctrl+Alt+V is the format painter, handled below.
   if (mod && e.key === 'a') { e.preventDefault(); selectAll(); return; }
-  if (mod && e.key === 'v') { e.preventDefault(); pasteSelection(); return; }
+  if (mod && e.key === 'v' && !e.altKey) { e.preventDefault(); pasteSelection(); return; }
 
   // --- Delete guide line first (falls through to component delete if none) ---
   if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -73,6 +74,10 @@ export function handleEditorShortcut(e, ctx) {
 
   const selectedCtrls = flatControls(panel.controls).filter(c => ids.has(c._children?.Core?.id));
   if (selectedCtrls.length === 0) return;
+
+  // --- Format painter (before plain copy/paste — same letters plus Alt) ---
+  if (mod && e.altKey && e.key === 'c') { e.preventDefault(); ctx.copyControlStyle?.(); return; }
+  if (mod && e.altKey && e.key === 'v') { e.preventDefault(); ctx.applyStyleToSelection?.(); return; }
 
   // --- Clipboard / destructive ops ---
   if (mod && e.key === 'c') { e.preventDefault(); copySelection(); return; }

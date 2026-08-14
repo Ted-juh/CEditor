@@ -18,6 +18,7 @@
   import { duplicateControl, groupSelectionIntoContainer, removeControl, ungroupContainer, updateControlProperty } from './CE_Application/stores/controls.js';
   import { copySelection, cutSelection, pasteSelection, selectAll } from './CE_Application/stores/clipboard.js';
   import { deleteSelectedGuide } from './CE_Application/stores/guides.js';
+  import { applyStyleToSelection, copyControlStyle } from './CE_Application/stores/styleClipboard.js';
   import { previewModeEnabled } from './CE_Application/stores/interactionPreview.js';
   import { saveActiveScriptWorkspace, saveActiveScriptWorkspaceAs } from './CE_Application/stores/scriptWorkspace.js';
   import { handleEditorShortcut } from './CE_Application/utils/editorShortcuts.js';
@@ -137,6 +138,7 @@
       removeControl, updateControlProperty, deleteSelectedGuide,
       groupSelectionIntoContainer, ungroupContainer,
       selectComponent, clearSelection,
+      copyControlStyle, applyStyleToSelection,
     });
   }
 

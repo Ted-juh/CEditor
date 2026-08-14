@@ -41,6 +41,7 @@
   import { createScriptWorkspaceDocument, scriptDocuments, updateScriptDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { isSourceScript } from '../scripting/scriptModel.js';
   import { openNewPanelDialog } from '../stores/newPanelDialog.js';
+  import { copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
@@ -401,6 +402,7 @@
       removeControl, updateControlProperty, deleteSelectedGuide,
       groupSelectionIntoContainer, ungroupContainer,
       selectComponent, clearSelection,
+      copyControlStyle, applyStyleToSelection,
     });
   }
 

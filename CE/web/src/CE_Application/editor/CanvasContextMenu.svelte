@@ -8,6 +8,7 @@
   import { getBindableComponentPorts } from '../models/componentPorts.js';
   import { cutSelection, copySelection, pasteSelection, selectAll, hasClipboardContent } from '../stores/clipboard.js';
   import { bringToFront, bringForward, sendBackward, sendToBack } from '../stores/alignment.js';
+  import { styleClipboard, copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { guides, clearGuides } from '../stores/guides.js';
 
@@ -126,6 +127,8 @@
     {#if $selectedComponentIds.size > 0}
       <div class="ctx-separator"></div>
       <button class="ctx-item" onclick={dupe}>Duplicate<span class="ctx-shortcut">Ctrl+D</span></button>
+      <button class="ctx-item" disabled={!single} onclick={() => { copyControlStyle(); close(); }}>Copy Style<span class="ctx-shortcut">Ctrl+Alt+C</span></button>
+      <button class="ctx-item" disabled={!$styleClipboard} onclick={() => { applyStyleToSelection(); close(); }}>Paste Style<span class="ctx-shortcut">Ctrl+Alt+V</span></button>
       <button class="ctx-item ctx-danger" onclick={del}>Delete<span class="ctx-shortcut">Del</span></button>
       <div class="ctx-separator"></div>
       <button class="ctx-item" onclick={group}>Group into Container<span class="ctx-shortcut">Ctrl+G</span></button>

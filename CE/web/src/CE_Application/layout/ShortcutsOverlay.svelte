@@ -20,6 +20,8 @@
       ['Ctrl+V', 'Paste'],
       ['Ctrl+A', 'Select All'],
       ['Ctrl+D', 'Duplicate'],
+      ['Ctrl+Alt+C', 'Copy style'],
+      ['Ctrl+Alt+V', 'Paste style'],
       ['Ctrl+G', 'Group into container'],
       ['Ctrl+Shift+G', 'Ungroup container'],
       ['Delete', 'Delete selected'],
