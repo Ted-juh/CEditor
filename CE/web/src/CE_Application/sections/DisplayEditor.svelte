@@ -404,8 +404,8 @@
               <option value={src.id}>{src.name}</option>
             {/each}
           </select>
-          <input class="val num" type="number" value={f.min ?? 0} onchange={(event) => setField(i, 'min', Number(event.target.value))} title="Min" />
-          <input class="val num" type="number" value={f.max ?? 127} onchange={(event) => setField(i, 'max', Number(event.target.value))} title="Max" />
+          <span class="num nc-wrap" title="Min"><NumberCell value={f.min ?? 0} defaultValue={0} step={1} onchange={(value) => setField(i, 'min', value)} /></span>
+          <span class="num nc-wrap" title="Max"><NumberCell value={f.max ?? 127} defaultValue={127} step={1} onchange={(value) => setField(i, 'max', value)} /></span>
           <button class="val rm" type="button" onclick={() => removeField(i)} title="Remove field">✕</button>
         </div>
       </PropertyCell>
@@ -474,9 +474,9 @@
         {#each (editLayout.zones ?? []) as z, i (z.id ?? i)}
           <div class="zone-cell">
             <span class="zone-num" title="Zone">#{i + 1}</span>
-            <input class="val zn" type="number" min="1" title="Row" value={z.row ?? 1} onchange={(event) => setZone(i, 'row', Math.round(Number(event.target.value)))} />
-            <input class="val zn" type="number" min="1" title="Col start" value={z.colStart ?? 1} onchange={(event) => setZone(i, 'colStart', Math.round(Number(event.target.value)))} />
-            <input class="val zn" type="number" min="1" title="Col end" value={z.colEnd ?? cols} onchange={(event) => setZone(i, 'colEnd', Math.round(Number(event.target.value)))} />
+            <span class="zn nc-wrap" title="Row"><NumberCell value={z.row ?? 1} defaultValue={1} step={1} min={1} onchange={(value) => setZone(i, 'row', Math.round(value))} /></span>
+            <span class="zn nc-wrap" title="Col start"><NumberCell value={z.colStart ?? 1} defaultValue={1} step={1} min={1} onchange={(value) => setZone(i, 'colStart', Math.round(value))} /></span>
+            <span class="zn nc-wrap" title="Col end"><NumberCell value={z.colEnd ?? cols} defaultValue={cols} step={1} min={1} onchange={(value) => setZone(i, 'colEnd', Math.round(value))} /></span>
             <select class="val zsel" title="Show" value={z.show ?? 'static'} onchange={(event) => setZone(i, 'show', event.target.value)}>
               {#each ZONE_SHOW_KINDS as kind}
                 <option value={kind}>{kind}</option>
@@ -535,7 +535,7 @@
               <span class="zx-lab">Suf</span>
               <input class="val zn2" type="text" title="Suffix text" value={z.suffix ?? ''} oninput={(event) => setZone(i, 'suffix', event.target.value)} />
               <span class="zx-lab">Dec</span>
-              <input class="val zn" type="number" min="0" max="6" title="Decimal places (value kind)" value={z.precision ?? 0} onchange={(event) => setZone(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
+              <span class="zn nc-wrap" title="Decimal places (value kind)"><NumberCell value={z.precision ?? 0} defaultValue={0} step={1} min={0} max={6} onchange={(value) => setZone(i, 'precision', Math.max(0, Math.round(value)))} /></span>
               <span class="zx-lab">Lbl</span>
               <input class="val ztext" type="text" title="Custom label (name kind; empty = source name)" placeholder="(source name)" value={z.label ?? ''} oninput={(event) => setZone(i, 'label', event.target.value)} />
               <span class="zx-lab">Vis</span>
@@ -545,7 +545,7 @@
               </select>
               {#if WIDGET_ZONE_KINDS.has(z.show)}
                 <span class="zx-lab">Rows</span>
-                <input class="val zn" type="number" min="1" max="16" title="Rows tall (graphic panels)" value={z.rowSpan ?? 1} onchange={(event) => setZone(i, 'rowSpan', Math.max(1, Math.round(Number(event.target.value))))} />
+                <span class="zn nc-wrap" title="Rows tall (graphic panels)"><NumberCell value={z.rowSpan ?? 1} defaultValue={1} step={1} min={1} max={16} onchange={(value) => setZone(i, 'rowSpan', Math.max(1, Math.round(value)))} /></span>
                 <span class="zx-lab">Frame</span>
                 <select class="val zn2" title="Outline frame" value={z.frame === true ? 'on' : 'off'} onchange={(event) => setZone(i, 'frame', event.target.value === 'on')}>
                   <option value="off">off</option>
@@ -622,9 +622,9 @@
             {:else if op === 'eq' || op === 'ne'}
               <input class="val zn" type="text" title="Selector value" placeholder="value" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
             {:else}
-              <input class="val zn" type="number" title="Threshold" placeholder="a" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
+              <span class="zn nc-wrap" title="Threshold"><NumberCell value={m.when ?? ''} step={1} onchange={(value) => setSelectorRow(i, 'when', value)} /></span>
               {#if op === 'between'}
-                <input class="val zn" type="number" title="Upper bound" placeholder="b" value={m.when2 ?? ''} oninput={(event) => setSelectorRow(i, 'when2', event.target.value)} />
+                <span class="zn nc-wrap" title="Upper bound"><NumberCell value={m.when2 ?? ''} step={1} onchange={(value) => setSelectorRow(i, 'when2', value)} /></span>
               {/if}
             {/if}
             <select class="val" title="Layout" value={String(m.layoutId ?? '')} onchange={(event) => setSelectorRow(i, 'layoutId', event.target.value)}>
@@ -656,7 +656,7 @@
               <option value="untilChange">until</option>
             </select>
             {#if (ov.dismiss ?? 'timer') === 'timer'}
-              <input class="val zn" type="number" min="0" title="Duration ms" value={ov.duration ?? 800} onchange={(event) => setOverlay(i, 'duration', Math.round(Number(event.target.value)))} />
+              <span class="zn nc-wrap" title="Duration ms"><NumberCell value={ov.duration ?? 800} defaultValue={800} step={1} min={0} onchange={(value) => setOverlay(i, 'duration', Math.round(value))} /></span>
             {/if}
             <button class="val rm" type="button" onclick={() => removeOverlay(i)} title="Remove">✕</button>
           </div>
@@ -920,6 +920,12 @@
   .field-row .num {
     width: 58px;
     flex: 0 0 auto;
+  }
+
+  /* Fixed-width shell around a NumberCell in rows/tables: the cell fills the
+     span instead of flexing the column open. */
+  .nc-wrap {
+    display: flex;
   }
 
   .field-row .rm {

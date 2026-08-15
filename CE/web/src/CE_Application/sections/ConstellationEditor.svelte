@@ -5,6 +5,7 @@
   import { panelPreviewSessions } from '../stores/interactionPreview.js';
   import { isRangeBehavior, getRangeMin, getRangeMax, getCurrentRangeValue } from '../utils/rangeBehavior.js';
   import { autoArrange, captureConstellationValues } from '../utils/constellationLayout.js';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -104,28 +105,28 @@
         hint="How many bars one full wander cycle takes."
       >
         {#snippet children()}
-          <PropertyCell label="Wander (bars)" span={2} hint="How many bars one full pass through the map takes.">
-            <input class="val" type="number" min={MIN_BARS} max={MAX_BARS} step="1" value={cn.wanderBars ?? 8} onchange={(e) => set('wanderBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(e.target.value, 8))))} />
+          <PropertyCell label="Wander (bars)" span={2} compact hint="How many bars one full pass through the map takes.">
+            <NumberCell label="Bars" value={cn.wanderBars ?? 8} step={1} min={MIN_BARS} max={MAX_BARS} defaultValue={8} onchange={(v) => set('wanderBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(v, 8))))} />
           </PropertyCell>
         {/snippet}
       </TransportSyncCells>
       {#if cn.syncToTransport !== true}
-        <PropertyCell label="Wander rate" span={2} hint="Wander speed (cycles per second).">
-          <input class="val" type="number" min="0.01" max="2" step="0.01" value={cn.wanderRate ?? 0.08} onchange={(e) => set('wanderRate', Math.max(0.01, num(e.target.value, 0.08)))} />
+        <PropertyCell label="Wander rate" span={2} compact hint="Wander speed (cycles per second).">
+          <NumberCell label="Rate" value={cn.wanderRate ?? 0.08} step={0.01} min={0.01} max={2} defaultValue={0.08} onchange={(v) => set('wanderRate', Math.max(0.01, num(v, 0.08)))} />
         </PropertyCell>
       {/if}
     {/if}
     {#if String(cn.mode ?? 'blend') === 'blend'}
-      <PropertyCell label="Blend" span={2} hint="Morph sharpness — higher makes the nearest preset dominate sooner.">
-        <input class="val" type="number" min="1" max="6" step="0.5" value={cn.blendPower ?? 2} onchange={(e) => set('blendPower', Math.max(1, Math.min(6, num(e.target.value, 2))))} />
+      <PropertyCell label="Blend" span={2} compact hint="Morph sharpness — higher makes the nearest preset dominate sooner.">
+        <NumberCell label="Blend" value={cn.blendPower ?? 2} step={0.5} min={1} max={6} defaultValue={2} onchange={(v) => set('blendPower', Math.max(1, Math.min(6, num(v, 2))))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Links" span={1} hint="Draw constellation lines between sonically-similar presets.">
       <PropertyToggle value={cn.showLinks !== false} onchange={() => set('showLinks', !(cn.showLinks !== false))} />
     </PropertyCell>
     {#if cn.showLinks !== false}
-      <PropertyCell label="Neighbours" span={1} hint="How many nearest neighbours each preset links to.">
-        <input class="val" type="number" min="1" max="6" step="1" value={cn.linkCount ?? 2} onchange={(e) => set('linkCount', Math.max(1, Math.min(6, Math.round(num(e.target.value, 2)))))} />
+      <PropertyCell label="Neighbours" span={1} compact hint="How many nearest neighbours each preset links to.">
+        <NumberCell label="Count" value={cn.linkCount ?? 2} step={1} min={1} max={6} defaultValue={2} onchange={(v) => set('linkCount', Math.max(1, Math.min(6, Math.round(num(v, 2)))))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Labels" span={1} hint="Show preset names.">
@@ -189,14 +190,14 @@
               <button type="button" class="action-btn danger" onclick={() => removePreset(i)} title="Remove">✕</button>
             </div>
             <div class="prow2">
-              <label class="fld"><span>X</span><input class="val" type="number" min="0" max="1" step="0.05" value={num(p.x, 0.5)} onchange={(e) => updatePreset(i, 'x', clamp01(num(e.target.value, 0.5)))} /></label>
-              <label class="fld"><span>Y</span><input class="val" type="number" min="0" max="1" step="0.05" value={num(p.y, 0.5)} onchange={(e) => updatePreset(i, 'y', clamp01(num(e.target.value, 0.5)))} /></label>
+              <label class="fld"><span>X</span><span class="nc-wrap"><NumberCell value={num(p.x, 0.5)} step={0.05} min={0} max={1} onchange={(v) => updatePreset(i, 'x', clamp01(num(v, 0.5)))} /></span></label>
+              <label class="fld"><span>Y</span><span class="nc-wrap"><NumberCell value={num(p.y, 0.5)} step={0.05} min={0} max={1} onchange={(v) => updatePreset(i, 'y', clamp01(num(v, 0.5)))} /></span></label>
             </div>
             {#if targets.length}
               <div class="grid">
                 {#each targets as t (t.id)}
                   <label class="fld"><span>{t.label}</span>
-                    <input class="val" type="number" min="0" max="1" step="0.05" value={pv(p, t.id)} onchange={(e) => updatePresetValue(i, t.id, clamp01(num(e.target.value, 0)))} />
+                    <span class="nc-wrap"><NumberCell value={pv(p, t.id)} step={0.05} min={0} max={1} onchange={(v) => updatePresetValue(i, t.id, clamp01(num(v, 0)))} /></span>
                   </label>
                 {/each}
               </div>
@@ -221,6 +222,7 @@
   .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; border-top: 1px solid #2a2a2a; padding-top: 7px; }
   .clus { flex: 0 0 44px; display: flex; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
+  .nc-wrap { display: flex; }
   .fld > span { font-size: 10px; letter-spacing: .03em; color: #8a8a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .empty { border: 1px dashed #3A3A3A; border-radius: 4px; color: #8A8A8A; font-size: 11px; padding: 8px; }
   .action-btn { background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 8px; cursor: pointer; align-self: flex-start; }

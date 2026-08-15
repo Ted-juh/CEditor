@@ -1,5 +1,6 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
@@ -47,14 +48,14 @@
       hint="Loop over a number of bars instead of seconds, so the loop point is the bar line."
     >
       {#snippet children()}
-        <PropertyCell label="Loop (bars)" span={2} hint="Loop length in bars. 0.25 = one beat in 4/4.">
-          <input class="val" type="number" min={MIN_BARS} max={MAX_BARS} step="0.25" value={lp.loopBars ?? 2} onchange={(e) => set('loopBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(e.target.value, 2))))} />
+        <PropertyCell label="Loop (bars)" span={2} compact hint="Loop length in bars. 0.25 = one beat in 4/4.">
+          <NumberCell label="Bars" value={lp.loopBars ?? 2} step={0.25} min={MIN_BARS} max={MAX_BARS} defaultValue={2} onchange={(v) => set('loopBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(v, 2))))} />
         </PropertyCell>
       {/snippet}
     </TransportSyncCells>
     {#if lp.syncToTransport !== true}
-      <PropertyCell label="Loop (s)" span={2} hint="Loop length in seconds — how long one pass around takes.">
-        <input class="val" type="number" min="0.1" max="60" step="0.1" value={lp.loopSeconds ?? 4} onchange={(e) => set('loopSeconds', Math.max(0.1, num(e.target.value, 4)))} />
+      <PropertyCell label="Loop (s)" span={2} compact hint="Loop length in seconds — how long one pass around takes.">
+        <NumberCell label="Sec" value={lp.loopSeconds ?? 4} step={0.1} min={0.1} max={60} defaultValue={4} onchange={(v) => set('loopSeconds', Math.max(0.1, num(v, 4)))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Record" span={1} hint="Press & move inside a lane in preview to record its motion.">
@@ -70,11 +71,11 @@
       <PropertyToggle value={lp.showDivisions === true} onchange={() => set('showDivisions', !(lp.showDivisions === true))} />
     </PropertyCell>
     {#if lp.showDivisions === true}
-      <PropertyCell label="Major" span={1} hint="Major value-division lines (same as a slider's Major Count).">
-        <input class="val" type="number" min="2" max="21" step="1" value={lp.majorTickCount ?? 5} onchange={(e) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(e.target.value, 5)))))} />
+      <PropertyCell label="Major" span={1} compact hint="Major value-division lines (same as a slider's Major Count).">
+        <NumberCell label="Major" value={lp.majorTickCount ?? 5} step={1} min={2} max={21} defaultValue={5} onchange={(v) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(v, 5)))))} />
       </PropertyCell>
-      <PropertyCell label="Minor / gap" span={1} hint="Minor lines between each pair of majors (same as a slider's Minor / Gap).">
-        <input class="val" type="number" min="0" max="8" step="1" value={lp.minorTickCount ?? 0} onchange={(e) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(e.target.value, 0)))))} />
+      <PropertyCell label="Minor / gap" span={1} compact hint="Minor lines between each pair of majors (same as a slider's Minor / Gap).">
+        <NumberCell label="Minor" value={lp.minorTickCount ?? 0} step={1} min={0} max={8} defaultValue={0} onchange={(v) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(v, 0)))))} />
       </PropertyCell>
     {/if}
   </PropertySection>
@@ -113,7 +114,7 @@
             </div>
             <div class="lrow2">
               <label class="fld"><span>Rest %</span>
-                <input class="val" type="number" min="0" max="100" step="5" value={Math.round(num(l.rest, 0) * 100)} onchange={(e) => updateLane(i, 'rest', Math.max(0, Math.min(1, num(e.target.value, 0) / 100)))} />
+                <span class="nc-wrap"><NumberCell value={Math.round(num(l.rest, 0) * 100)} step={5} min={0} max={100} onchange={(v) => updateLane(i, 'rest', Math.max(0, Math.min(1, num(v, 0) / 100)))} /></span>
               </label>
             </div>
           </div>
@@ -138,6 +139,7 @@
   .lrow2 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #8a8a8a; }
+  .nc-wrap { display: flex; }
   .flag { display: inline-flex; align-items: center; gap: 5px; color: #B9B9B9; font-size: 11px; white-space: nowrap; }
   .empty { border: 1px dashed #3A3A3A; border-radius: 4px; color: #8A8A8A; font-size: 11px; padding: 8px; }
   .action-btn {

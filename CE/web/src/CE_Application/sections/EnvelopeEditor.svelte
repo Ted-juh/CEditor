@@ -114,11 +114,11 @@
         <NumberCell label="End" value={e.loopEnd ?? 0} min={0} defaultValue={0} onchange={(v) => set('loopEnd', Math.max(0, Math.round(num(v, 0))))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Snap X" span={2} hint="Grid snap for time when dragging (0 = free).">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={e.snapX ?? 0} onchange={(ev) => set('snapX', Math.max(0, Math.min(1, num(ev.target.value, 0))))} />
+    <PropertyCell label="Snap X" span={2} compact hint="Grid snap for time when dragging (0 = free).">
+      <NumberCell label="Snap X" value={e.snapX ?? 0} step={0.05} min={0} max={1} defaultValue={0} onchange={(v) => set('snapX', Math.max(0, Math.min(1, num(v, 0))))} />
     </PropertyCell>
-    <PropertyCell label="Snap Y" span={2} hint="Grid snap for level when dragging (0 = free).">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={e.snapY ?? 0} onchange={(ev) => set('snapY', Math.max(0, Math.min(1, num(ev.target.value, 0))))} />
+    <PropertyCell label="Snap Y" span={2} compact hint="Grid snap for level when dragging (0 = free).">
+      <NumberCell label="Snap Y" value={e.snapY ?? 0} step={0.05} min={0} max={1} defaultValue={0} onchange={(v) => set('snapY', Math.max(0, Math.min(1, num(v, 0))))} />
     </PropertyCell>
   </PropertySection>
 
@@ -136,8 +136,8 @@
         </select>
       </PropertyCell>
       {#if !e.phaseSourceId}
-        <PropertyCell label="Phase" span={4} hint="0–1 position of the playhead.">
-          <input class="val" type="number" min="0" max="1" step="0.01" value={e.phase ?? 0} onchange={(ev) => set('phase', Math.max(0, Math.min(1, num(ev.target.value, 0))))} />
+        <PropertyCell label="Phase" span={4} compact hint="0–1 position of the playhead.">
+          <NumberCell label="Phase" value={e.phase ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(v) => set('phase', Math.max(0, Math.min(1, num(v, 0))))} />
         </PropertyCell>
       {/if}
     {/if}
@@ -147,11 +147,11 @@
     <PropertyCell label="Grid" span={1} hint="Draw a background grid.">
       <PropertyToggle value={e.showGrid !== false} onchange={() => set('showGrid', !(e.showGrid !== false))} />
     </PropertyCell>
-    <PropertyCell label="Cols" span={1} hint="Vertical grid divisions.">
-      <input class="val" type="number" min="0" max="32" value={e.gridX ?? 4} onchange={(ev) => set('gridX', Math.max(0, Math.round(num(ev.target.value, 4))))} />
+    <PropertyCell label="Cols" span={1} compact hint="Vertical grid divisions.">
+      <NumberCell label="Cols" value={e.gridX ?? 4} step={1} min={0} max={32} defaultValue={4} onchange={(v) => set('gridX', Math.max(0, Math.round(num(v, 4))))} />
     </PropertyCell>
-    <PropertyCell label="Rows" span={1} hint="Horizontal grid divisions.">
-      <input class="val" type="number" min="0" max="32" value={e.gridY ?? 4} onchange={(ev) => set('gridY', Math.max(0, Math.round(num(ev.target.value, 4))))} />
+    <PropertyCell label="Rows" span={1} compact hint="Horizontal grid divisions.">
+      <NumberCell label="Rows" value={e.gridY ?? 4} step={1} min={0} max={32} defaultValue={4} onchange={(v) => set('gridY', Math.max(0, Math.round(num(v, 4))))} />
     </PropertyCell>
     <PropertyCell label="Fill" span={1} hint="Shade the area under the curve.">
       <PropertyToggle value={e.fillUnder !== false} onchange={() => set('fillUnder', !(e.fillUnder !== false))} />

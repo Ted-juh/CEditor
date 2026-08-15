@@ -4,6 +4,7 @@
     RIBBON_MODES, RIBBON_MODE_LABELS, ribbonZones, ribbonRange,
   } from '../utils/noteRibbonLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats, noteName } from '../utils/chordPadLayout.js';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
@@ -62,11 +63,11 @@
         {#each scaleKeys as k (k)}<option value={k}>{SCALE_LABELS[k] ?? k}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Lowest" span={1} hint="MIDI note at the low end of the strip (48 = C3, 60 = middle C).">
-      <input class="val" type="number" min="0" max="127" step="1" value={num(r.baseNote, 48)} onchange={(e) => set('baseNote', clampInt(e.target.value, 0, 127, 48))} />
+    <PropertyCell label="Lowest" span={1} compact hint="MIDI note at the low end of the strip (48 = C3, 60 = middle C).">
+      <NumberCell label="Note" value={num(r.baseNote, 48)} step={1} min={0} max={127} onchange={(v) => set('baseNote', clampInt(v, 0, 127, 48))} />
     </PropertyCell>
-    <PropertyCell label="Octaves" span={1} hint="How far the strip reaches. Wider = more range, narrower = more precision per pixel.">
-      <input class="val" type="number" min="1" max="5" step="1" value={num(r.octaves, 2)} onchange={(e) => set('octaves', clampInt(e.target.value, 1, 5, 2))} />
+    <PropertyCell label="Octaves" span={1} compact hint="How far the strip reaches. Wider = more range, narrower = more precision per pixel.">
+      <NumberCell label="Oct" value={num(r.octaves, 2)} step={1} min={1} max={5} onchange={(v) => set('octaves', clampInt(v, 1, 5, 2))} />
     </PropertyCell>
     <PropertyCell label="" span={4} hint="What the strip currently covers.">
       <div class="preview">{span}</div>
@@ -75,15 +76,15 @@
 
   <PropertySection title="Performance" icon={Activity}>
     {#if isGlide}
-      <PropertyCell label="Bend range" span={2} hint="Semitones of pitch bend. Must match the synth's own bend range; 2 is the common default.">
-        <input class="val" type="number" min="1" max="48" step="1" value={num(r.bendRange, 2)} onchange={(e) => set('bendRange', clampInt(e.target.value, 1, 48, 2))} />
+      <PropertyCell label="Bend range" span={2} compact hint="Semitones of pitch bend. Must match the synth's own bend range; 2 is the common default.">
+        <NumberCell label="Bend" value={num(r.bendRange, 2)} step={1} min={1} max={48} onchange={(v) => set('bendRange', clampInt(v, 1, 48, 2))} />
       </PropertyCell>
       <PropertyCell label="" span={2} hint="Bend only reaches ±the range, so past that the note retriggers on a new root.">
         <div class="note">Retriggers past ±{num(r.bendRange, 2)} semitones</div>
       </PropertyCell>
     {/if}
-    <PropertyCell label="Velocity" span={1} hint="Note-on velocity (1–127) when velocity is fixed.">
-      <input class="val" type="number" min="1" max="127" step="1" value={num(r.velocity, 96)} onchange={(e) => set('velocity', clampInt(e.target.value, 1, 127, 96))} />
+    <PropertyCell label="Velocity" span={1} compact hint="Note-on velocity (1–127) when velocity is fixed.">
+      <NumberCell label="Vel" value={num(r.velocity, 96)} step={1} min={1} max={127} onchange={(v) => set('velocity', clampInt(v, 1, 127, 96))} />
     </PropertyCell>
     <PropertyCell label="Vel. from" span={1} hint="Position takes velocity from where on the short axis you touched — the closest a mouse gets to dynamics.">
       <select class="val" value={r.velocityFrom ?? 'fixed'} onchange={(e) => set('velocityFrom', e.target.value)}>
@@ -91,8 +92,8 @@
         <option value="position">Touch position</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Channel" span={1} hint="MIDI channel for notes, bend and the CC (1–16).">
-      <input class="val" type="number" min="1" max="16" step="1" value={num(r.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
+    <PropertyCell label="Channel" span={1} compact hint="MIDI channel for notes, bend and the CC (1–16).">
+      <NumberCell label="Ch" value={num(r.channel, 1)} step={1} min={1} max={16} onchange={(v) => set('channel', clampInt(v, 1, 16, 1))} />
     </PropertyCell>
     <PropertyCell label="Latch" span={1} hint="The note keeps sounding after release; touch again to silence it.">
       <PropertyToggle value={r.latch === true} onchange={() => set('latch', !(r.latch === true))} />
@@ -104,16 +105,16 @@
       </select>
     </PropertyCell>
     {#if String(r.modAxis ?? 'none') === 'cc'}
-      <PropertyCell label="CC" span={2} hint="Which controller that axis sends (1 = mod wheel, 74 = filter cutoff on many synths).">
-        <input class="val" type="number" min="0" max="127" step="1" value={num(r.modCc, 1)} onchange={(e) => set('modCc', clampInt(e.target.value, 0, 127, 1))} />
+      <PropertyCell label="CC" span={2} compact hint="Which controller that axis sends (1 = mod wheel, 74 = filter cutoff on many synths).">
+        <NumberCell label="CC" value={num(r.modCc, 1)} step={1} min={0} max={127} onchange={(v) => set('modCc', clampInt(v, 0, 127, 1))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Echo MIDI in" span={1} hint="Outline the matching zones from notes arriving on the hardware MIDI input.">
       <PropertyToggle value={r.echo === true} onchange={() => set('echo', !(r.echo === true))} />
     </PropertyCell>
     {#if r.echo === true}
-      <PropertyCell label="In channel" span={1} hint="Which MIDI channel to watch. 0 = omni (any channel), which is usually what you want.">
-        <input class="val" type="number" min="0" max="16" step="1" value={num(r.echoChannel, 0)} onchange={(e) => set('echoChannel', clampInt(e.target.value, 0, 16, 0))} />
+      <PropertyCell label="In channel" span={1} compact hint="Which MIDI channel to watch. 0 = omni (any channel), which is usually what you want.">
+        <NumberCell label="Ch" value={num(r.echoChannel, 0)} step={1} min={0} max={16} onchange={(v) => set('echoChannel', clampInt(v, 0, 16, 0))} />
       </PropertyCell>
       <PropertyCell label="Echo colour" span={1} hint="Colour of the incoming-note outline. Click the swatch to edit it in the Colors tab.">
         <SwatchCluster swatches={[

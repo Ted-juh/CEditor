@@ -234,12 +234,12 @@
       {/snippet}
     </TransportSyncCells>
     {#if p.syncToTransport !== true}
-      <PropertyCell label="Rate" span={1} hint="Steps per second.">
-        <input class="val" type="number" min="0.1" max="40" step="0.5" value={num(p.rate, 8)} onchange={(e) => set('rate', clampNum(e.target.value, 0.1, 40, 8))} />
+      <PropertyCell label="Rate" span={1} compact hint="Steps per second.">
+        <NumberCell label="Rate" value={num(p.rate, 8)} step={0.5} min={0.1} max={40} onchange={(v) => set('rate', clampNum(v, 0.1, 40, 8))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Gate" span={1} hint="Note length as a fraction of the step; 1 = legato. A note that the next step ties is exempt.">
-      <input class="val" type="number" min="0.05" max="1" step="0.05" value={num(p.gate, 0.8)} onchange={(e) => set('gate', clampNum(e.target.value, 0.05, 1, 0.8))} />
+    <PropertyCell label="Gate" span={1} compact hint="Note length as a fraction of the step; 1 = legato. A note that the next step ties is exempt.">
+      <NumberCell label="Gate" value={num(p.gate, 0.8)} step={0.05} min={0.05} max={1} onchange={(v) => set('gate', clampNum(v, 0.05, 1, 0.8))} />
     </PropertyCell>
     <PropertyCell label="Swing from" span={1} hint="Transport = inherit the clock's swing. Own = this sequencer's own setting. Free-running always uses its own.">
       <select class="val" value={p.swingSource ?? 'transport'} onchange={(e) => set('swingSource', e.target.value)}>
@@ -247,17 +247,17 @@
         <option value="own">Its own</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Swing" span={1} hint="Delays every odd step by up to half a step. Shares the Arpeggiator's swing setting.">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={num(p.swing, 0)} onchange={(e) => set('swing', clampNum(e.target.value, 0, 1, 0))} />
+    <PropertyCell label="Swing" span={1} compact hint="Delays every odd step by up to half a step. Shares the Arpeggiator's swing setting.">
+      <NumberCell label="Swing" value={num(p.swing, 0)} step={0.05} min={0} max={1} onchange={(v) => set('swing', clampNum(v, 0, 1, 0))} />
     </PropertyCell>
-    <PropertyCell label="Velocity" span={1} hint="The default a cell uses when it has none of its own.">
-      <input class="val" type="number" min="1" max="127" step="1" value={num(p.velocity, 100)} onchange={(e) => set('velocity', clampInt(e.target.value, 1, 127, 100))} />
+    <PropertyCell label="Velocity" span={1} compact hint="The default a cell uses when it has none of its own.">
+      <NumberCell label="Vel" value={num(p.velocity, 100)} step={1} min={1} max={127} onchange={(v) => set('velocity', clampInt(v, 1, 127, 100))} />
     </PropertyCell>
-    <PropertyCell label="Channel" span={1} hint="MIDI channel 1–16.">
-      <input class="val" type="number" min="1" max="16" step="1" value={num(p.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
+    <PropertyCell label="Channel" span={1} compact hint="MIDI channel 1–16.">
+      <NumberCell label="Ch" value={num(p.channel, 1)} step={1} min={1} max={16} onchange={(v) => set('channel', clampInt(v, 1, 16, 1))} />
     </PropertyCell>
-    <PropertyCell label="Bar line" span={1} hint="Shade every Nth step, so 16 steps read as four beats.">
-      <input class="val" type="number" min="1" max="16" step="1" value={num(p.accentEvery, 4)} onchange={(e) => set('accentEvery', clampInt(e.target.value, 1, 16, 4))} />
+    <PropertyCell label="Bar line" span={1} compact hint="Shade every Nth step, so 16 steps read as four beats.">
+      <NumberCell label="Every" value={num(p.accentEvery, 4)} step={1} min={1} max={16} onchange={(v) => set('accentEvery', clampInt(v, 1, 16, 4))} />
     </PropertyCell>
   </PropertySection>
 

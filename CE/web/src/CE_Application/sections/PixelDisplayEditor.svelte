@@ -524,10 +524,10 @@
             <option value={kind}>{kind}</option>
           {/each}
         </select>
-        <input class="val en" type="number" title="X (px)" value={el.x ?? 0} onchange={(event) => setElement(i, 'x', Math.round(Number(event.target.value)))} />
-        <input class="val en" type="number" title="Y (px)" value={el.y ?? 0} onchange={(event) => setElement(i, 'y', Math.round(Number(event.target.value)))} />
-        <input class="val en" type="number" title="Width (px); for text: alignment/clip box (0 = none)" value={el.w ?? 0} onchange={(event) => setElement(i, 'w', Math.round(Number(event.target.value)))} />
-        <input class="val en" type="number" title="Height (px); for text: font height" value={el.h ?? 8} onchange={(event) => setElement(i, 'h', Math.round(Number(event.target.value)))} />
+        <span class="en nc-wrap" title="X (px)"><NumberCell value={el.x ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'x', Math.round(value))} /></span>
+        <span class="en nc-wrap" title="Y (px)"><NumberCell value={el.y ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'y', Math.round(value))} /></span>
+        <span class="en nc-wrap" title="Width (px); for text: alignment/clip box (0 = none)"><NumberCell value={el.w ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'w', Math.round(value))} /></span>
+        <span class="en nc-wrap" title="Height (px); for text: font height"><NumberCell value={el.h ?? 8} defaultValue={8} step={1} onchange={(value) => setElement(i, 'h', Math.round(value))} /></span>
         {#if el.kind === 'static'}
           <input class="val etext" type="text" placeholder="caption text" value={el.text ?? ''} oninput={(event) => setElement(i, 'text', event.target.value)} />
         {:else if el.kind === 'icon'}
@@ -602,9 +602,9 @@
             {#if el.kind === 'anim'}
               {#if (el.animMode ?? 'preset') === 'file'}
                 <input class="val ex-fill" type="file" accept="image/*" title="Animated GIF/APNG/WebP, or a sprite sheet" onchange={(event) => onPickElementAnim(i, event)} />
-                <input class="val en" type="number" min="0" max="180" title="Sprite frame count (0 = animated file)" placeholder="frames" value={el.animFrames ?? 0} onchange={(event) => setElement(i, 'animFrames', Math.max(0, Math.round(Number(event.target.value))))} />
-                <input class="val en" type="number" min="0" max="64" title="Sprite columns (0 = single horizontal strip)" placeholder="cols" value={el.animSpriteCols ?? 0} onchange={(event) => setElement(i, 'animSpriteCols', Math.max(0, Math.round(Number(event.target.value))))} />
-                <input class="val en" type="number" min="1" max="60" title="Sprite FPS" value={el.animFps ?? 12} onchange={(event) => setElement(i, 'animFps', Math.max(1, Math.round(Number(event.target.value))))} />
+                <span class="en nc-wrap" title="Sprite frame count (0 = animated file)"><NumberCell value={el.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => setElement(i, 'animFrames', Math.max(0, Math.round(value)))} /></span>
+                <span class="en nc-wrap" title="Sprite columns (0 = single horizontal strip)"><NumberCell value={el.animSpriteCols ?? 0} defaultValue={0} step={1} min={0} max={64} onchange={(value) => setElement(i, 'animSpriteCols', Math.max(0, Math.round(value)))} /></span>
+                <span class="en nc-wrap" title="Sprite FPS"><NumberCell value={el.animFps ?? 12} defaultValue={12} step={1} min={1} max={60} onchange={(value) => setElement(i, 'animFps', Math.max(1, Math.round(value)))} /></span>
                 <label class="ex-chk" title="Loop, or hold the last frame"><input type="checkbox" checked={el.animLoop !== false} onchange={(event) => setElement(i, 'animLoop', event.target.checked)} />Loop</label>
                 <label class="ex-chk" title="Keep the file's colours (posterized) instead of 1-bit dither"><input type="checkbox" checked={el.animColour === true} onchange={(event) => setElement(i, 'animColour', event.target.checked)} />Clr</label>
               {:else}
@@ -616,7 +616,7 @@
                   <option value="spinner">Spinner</option>
                   <option value="plasma">Plasma</option>
                 </select>
-                <input class="val en" type="number" min="0.1" max="5" step="0.1" title="Speed multiplier" value={el.animSpeed ?? 1} onchange={(event) => setElement(i, 'animSpeed', Number(event.target.value))} />
+                <span class="en nc-wrap" title="Speed multiplier"><NumberCell value={el.animSpeed ?? 1} defaultValue={1} step={0.1} min={0.1} max={5} onchange={(value) => setElement(i, 'animSpeed', value)} /></span>
                 <label class="ex-chk" title="Hue-cycling colour"><input type="checkbox" checked={el.animColour === true} onchange={(event) => setElement(i, 'animColour', event.target.checked)} />Clr</label>
               {/if}
             {:else}
@@ -627,7 +627,7 @@
               </select>
               <input class="val en" type="text" title="Prefix text" placeholder="pre" value={el.prefix ?? ''} oninput={(event) => setElement(i, 'prefix', event.target.value)} />
               <input class="val en" type="text" title="Suffix text" placeholder="suf" value={el.suffix ?? ''} oninput={(event) => setElement(i, 'suffix', event.target.value)} />
-              <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
+              <span class="en nc-wrap" title="Decimal places (value kind)"><NumberCell value={el.precision ?? 0} defaultValue={0} step={1} min={0} max={6} onchange={(value) => setElement(i, 'precision', Math.max(0, Math.round(value)))} /></span>
               <input class="val ex-fill" type="text" title="Caption under the widget, or the name override for name kind" placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
               <label class="ex-chk" title="Marquee-scroll the text when it overflows the W box"><input type="checkbox" checked={el.scroll === true} onchange={(event) => setElement(i, 'scroll', event.target.checked)} />Scrl</label>
               <label class="ex-chk" title="Word-wrap into stacked lines (overrides scroll)"><input type="checkbox" checked={el.wrap === true} onchange={(event) => setElement(i, 'wrap', event.target.checked)} />Wrap</label>
@@ -666,11 +666,11 @@
                 <option value="square">sqr</option>
               </select>
               <span class="ex-lab">Cyc</span>
-              <input class="val en" type="number" min="0.25" max="16" step="0.25" title="Cycles shown across the width" value={el.waveCycles ?? 2} onchange={(event) => setElement(i, 'waveCycles', Number(event.target.value))} />
+              <span class="en nc-wrap" title="Cycles shown across the width"><NumberCell value={el.waveCycles ?? 2} defaultValue={2} step={0.25} min={0.25} max={16} onchange={(value) => setElement(i, 'waveCycles', value)} /></span>
               <span class="ex-lab">Spd</span>
-              <input class="val en" type="number" min="0" max="10" step="0.1" title="Phase scroll speed" value={el.waveSpeed ?? 1} onchange={(event) => setElement(i, 'waveSpeed', Number(event.target.value))} />
+              <span class="en nc-wrap" title="Phase scroll speed"><NumberCell value={el.waveSpeed ?? 1} defaultValue={1} step={0.1} min={0} max={10} onchange={(value) => setElement(i, 'waveSpeed', value)} /></span>
               <span class="ex-lab">Dep</span>
-              <input class="val en" type="number" min="0" max="1" step="0.05" title="LFO wobble depth (needs an LFO source)" value={el.waveDepth ?? 0.5} onchange={(event) => setElement(i, 'waveDepth', Number(event.target.value))} />
+              <span class="en nc-wrap" title="LFO wobble depth (needs an LFO source)"><NumberCell value={el.waveDepth ?? 0.5} defaultValue={0.5} step={0.05} min={0} max={1} onchange={(value) => setElement(i, 'waveDepth', value)} /></span>
               <span class="ex-lab">Frm</span>
               <input type="checkbox" class="ex-chk" title="Outline frame" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />
               <span class="ex-lab">Cut</span>
@@ -738,7 +738,7 @@
             {/if}
             {#if el.kind === 'scope'}
               <span class="ex-lab">Secs</span>
-              <input class="val en" type="number" min="0.25" max="60" step="0.25" title="Time window the trace spans" value={el.scopeSecs ?? 3} onchange={(event) => setElement(i, 'scopeSecs', Number(event.target.value))} />
+              <span class="en nc-wrap" title="Time window the trace spans"><NumberCell value={el.scopeSecs ?? 3} defaultValue={3} step={0.25} min={0.25} max={60} onchange={(value) => setElement(i, 'scopeSecs', value)} /></span>
               <label class="ex-chk" title="Fill under the trace"><input type="checkbox" checked={el.scopeFill === true} onchange={(event) => setElement(i, 'scopeFill', event.target.checked)} />Fill</label>
               <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
               <label class="ex-chk" title="Colour the trace by level (green/yellow/red)"><input type="checkbox" checked={el.meterColours === true} onchange={(event) => setElement(i, 'meterColours', event.target.checked)} />Clr</label>
@@ -1093,6 +1093,12 @@
     width: 44px;
     flex: 0 0 auto;
     text-align: center;
+  }
+
+  /* Fixed-width shell around a NumberCell in rows/tables: the cell fills the
+     span instead of flexing the column open. */
+  .nc-wrap {
+    display: flex;
   }
 
   .el-extra .en {
