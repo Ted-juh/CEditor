@@ -16,6 +16,11 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import Music from 'lucide-svelte/icons/music';
+  import Clock from 'lucide-svelte/icons/clock';
+  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+  import ListMusic from 'lucide-svelte/icons/list-music';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -114,7 +119,7 @@
 </script>
 
 {#if p}
-  <PropertySection title="Phrase Sequencer">
+  <PropertySection title="Phrase Sequencer" icon={Music}>
     <PropertyCell label="Run" span={1} hint="Advance the sequence in preview / player. Stopped, the grid still shows the pattern.">
       <PropertyToggle value={p.running !== false} onchange={() => set('running', !(p.running !== false))} />
     </PropertyCell>
@@ -210,7 +215,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Timing">
+  <PropertySection title="Timing" icon={Clock}>
     <TransportSyncCells
       synced={p.syncToTransport === true}
       onchange={(v) => set('syncToTransport', v)}
@@ -253,7 +258,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Pattern">
+  <PropertySection title="Pattern" icon={LayoutGrid}>
     <PropertyCell label="Start from" span={4} hint="A blank grid is a blank page. These replace the pattern — the hardest part of a step sequencer is the first four notes.">
       <div class="seeds">
         {#each PHRASE_SEEDS as sd (sd.id)}
@@ -275,7 +280,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Patterns & song">
+  <PropertySection title="Patterns & song" icon={ListMusic}>
     <PropertyCell label="" span={4} hint="Storing and loading are copies, so editing the grid never rewrites a stored pattern behind your back.">
       <div class="slots">
         {#each Array.from({ length: MAX_PATTERNS }, (_, i) => i) as i (i)}
@@ -301,7 +306,7 @@
     />
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Face, empty cell, note, playhead, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'faceColour', label: 'Face', value: p.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'Phrase.faceColour' } },

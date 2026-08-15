@@ -8,6 +8,10 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import Clock from 'lucide-svelte/icons/clock';
+  import Repeat from 'lucide-svelte/icons/repeat';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -30,7 +34,7 @@
 </script>
 
 {#if t}
-  <PropertySection title="Transport">
+  <PropertySection title="Transport" icon={Clock}>
     <PropertyCell label="Source" span={2} hint="Internal = this is the master clock. MIDI clock in = follow an incoming clock. Host/DAW = follow the DAW playhead. Followers ignore the tempo box.">
       <select class="val" value={t.source ?? 'internal'} onchange={(e) => set('source', e.target.value)}>
         {#each TRANSPORT_SOURCES as s (s)}<option value={s}>{TRANSPORT_SOURCE_LABELS[s] ?? s}</option>{/each}
@@ -66,10 +70,12 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Loop">
-    <PropertyCell label="Loop" span={1} hint="Fold the position into a bar range, so the clock comes back round instead of running on forever.">
-      <PropertyToggle value={t.loopEnabled === true} onchange={() => set('loopEnabled', !(t.loopEnabled === true))} />
-    </PropertyCell>
+  <PropertySection title="Loop" icon={Repeat}>
+    {#snippet tools()}
+      <HeaderPill value={t.loopEnabled === true}
+                  title="Fold the position into a bar range, so the clock comes back round instead of running on forever."
+                  onchange={() => set('loopEnabled', !(t.loopEnabled === true))} />
+    {/snippet}
     {#if t.loopEnabled === true}
       <PropertyCell label="From bar" span={1} hint="The first bar of the loop, counting from 1.">
         <input class="val" type="number" min="1" max={MAX_LOOP_BAR} step="1" value={num(t.loopStartBar, 1)} onchange={(e) => set('loopStartBar', clampInt(e.target.value, 1, MAX_LOOP_BAR, 1))} />
@@ -77,7 +83,7 @@
       <PropertyCell label="Length (bars)" span={1} hint="How long the loop is. 0.25 = one beat in 4/4.">
         <input class="val" type="number" min={MIN_BARS} max={MAX_BARS} step="0.25" value={num(t.loopLengthBars, 4)} onchange={(e) => set('loopLengthBars', clampNum(e.target.value, MIN_BARS, MAX_BARS, 4))} />
       </PropertyCell>
-      <PropertyCell label="" span={1} hint="">
+      <PropertyCell label="" span={2} hint="">
         <div class="note">bars {num(t.loopStartBar, 1)}–{num(t.loopStartBar, 1) + num(t.loopLengthBars, 4)}</div>
       </PropertyCell>
       {#if external}
@@ -88,7 +94,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Playable" span={1} hint="Allow play/stop and tap tempo in preview / the player.">
       <PropertyToggle value={t.editable !== false} onchange={() => set('editable', !(t.editable !== false))} />
     </PropertyCell>

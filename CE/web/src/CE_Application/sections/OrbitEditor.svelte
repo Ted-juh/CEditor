@@ -6,6 +6,9 @@
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
   import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
+  import Orbit from 'lucide-svelte/icons/orbit';
+  import Satellite from 'lucide-svelte/icons/satellite';
+  import Palette from 'lucide-svelte/icons/palette';
 
   import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
@@ -32,7 +35,7 @@
 </script>
 
 {#if o}
-  <PropertySection title="Orbit">
+  <PropertySection title="Orbit" icon={Orbit}>
     <PropertyCell label="Run" span={1} hint="Animate the satellites in preview / player.">
       <PropertyToggle value={o.running !== false} onchange={() => set('running', !(o.running !== false))} />
     </PropertyCell>
@@ -70,7 +73,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Field background, orbit rings, centre hub, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'fieldColour', label: 'Field', value: o.fieldColour ?? 'FF0D0D12', target: { type: 'control', controlId: core?.id, path: 'Orbit.fieldColour' } },
@@ -81,7 +84,10 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Satellites">
+  <PropertySection title="Satellites" icon={Satellite}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add satellite" onclick={addNode}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each satellite emits a live 0–1 value from its position. Bind its 'Node' port in Device Bindings.">
       <div class="nodes">
         {#if nodes.length === 0}
@@ -122,7 +128,6 @@
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addNode}>Add satellite</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -153,4 +158,10 @@
   .action-btn:hover { border-color: #5B9BD5; }
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:hover { border-color: #C96A6A; }
+  .hdr-btn {
+    height: 16px; font-size: 9px; padding: 0 8px; border-radius: 8px;
+    background: #252525; border: 1px solid #333; color: #777;
+    font-family: inherit; cursor: pointer; line-height: 1;
+  }
+  .hdr-btn:hover { border-color: #4A6E8C; color: #CCC; }
 </style>

@@ -9,6 +9,10 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Blend from 'lucide-svelte/icons/blend';
+  import Target from 'lucide-svelte/icons/target';
+  import Anchor from 'lucide-svelte/icons/anchor';
+  import Palette from 'lucide-svelte/icons/palette';
 
   import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
@@ -86,7 +90,7 @@
 </script>
 
 {#if tb}
-  <PropertySection title="Timbre Space">
+  <PropertySection title="Timbre Space" icon={Blend}>
     <PropertyCell label="X axis" span={2} hint="Name the horizontal musical direction (e.g. dark → bright).">
       <input class="val" type="text" value={tb.axisX ?? ''} onchange={(e) => set('axisX', e.target.value)} />
     </PropertyCell>
@@ -112,7 +116,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={2} hint="Field background, blend puck, axis + anchor labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'fieldColour', label: 'Field', value: tb.fieldColour ?? 'FF0C0C12', target: { type: 'control', controlId: core?.id, path: 'Timbre.fieldColour' } },
@@ -122,7 +126,10 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Targets">
+  <PropertySection title="Targets" icon={Target}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add target" onclick={addTarget}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each target is one parameter the anchors morph. Bind its 'Target' port in Device Bindings.">
       <div class="rows">
         {#if targets.length === 0}<div class="empty">No targets yet. Add one, then bind its port.</div>{/if}
@@ -135,12 +142,14 @@
             <button type="button" class="action-btn danger" onclick={() => removeTarget(i)} title="Remove">✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addTarget}>Add target</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Anchors">
+  <PropertySection title="Anchors" icon={Anchor}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add anchor" onclick={addAnchor}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each anchor is a named patch at X/Y (0–1) storing a value per target. Capture stamps the panel's current values.">
       <div class="rows">
         {#if anchors.length === 0}<div class="empty">No anchors yet. Add one and set its per-target values.</div>{/if}
@@ -169,7 +178,6 @@
             {/if}
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addAnchor}>Add anchor</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -202,4 +210,10 @@
   .action-btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: #3B3B3B; }
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:hover { border-color: #C96A6A; }
+  .hdr-btn {
+    height: 16px; font-size: 9px; padding: 0 8px; border-radius: 8px;
+    background: #252525; border: 1px solid #333; color: #777;
+    font-family: inherit; cursor: pointer; line-height: 1;
+  }
+  .hdr-btn:hover { border-color: #4A6E8C; color: #CCC; }
 </style>

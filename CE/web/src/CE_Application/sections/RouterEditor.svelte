@@ -10,6 +10,9 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Route from 'lucide-svelte/icons/route';
+  import LogOut from 'lucide-svelte/icons/log-out';
+  import Palette from 'lucide-svelte/icons/palette';
 
   import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
@@ -63,7 +66,7 @@
 </script>
 
 {#if r}
-  <PropertySection title="Expression Router">
+  <PropertySection title="Expression Router" icon={Route}>
     <PropertyCell label="Source" span={2} hint="The incoming signal to shape. Aftertouch, Breath, Foot and Velocity only work if your gear sends them.">
       <select class="val" value={r.source ?? 'modwheel'} onchange={(e) => set('source', e.target.value)}>
         {#each ROUTER_INPUT_SOURCES as s (s.id)}
@@ -130,7 +133,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Transfer curve, live input bar, field background, grid lines, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'curveColour', label: 'Curve', value: r.curveColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'Router.curveColour' } },
@@ -142,7 +145,10 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Destinations">
+  <PropertySection title="Destinations" icon={LogOut}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add destination" onclick={addDest}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each destination maps the curve to one bound parameter: depth (−100…+100%) and output range.">
       <div class="dests">
         {#if dests.length === 0}
@@ -171,7 +177,6 @@
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addDest}>Add destination</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -208,4 +213,10 @@
   .action-btn:hover { border-color: #5B9BD5; }
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:hover { border-color: #C96A6A; }
+  .hdr-btn {
+    height: 16px; font-size: 9px; padding: 0 8px; border-radius: 8px;
+    background: #252525; border: 1px solid #333; color: #777;
+    font-family: inherit; cursor: pointer; line-height: 1;
+  }
+  .hdr-btn:hover { border-color: #4A6E8C; color: #CCC; }
 </style>

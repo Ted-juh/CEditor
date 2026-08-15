@@ -15,6 +15,12 @@
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
   import SongChainCells from '../properties/SongChainCells.svelte';
+  import CircleDot from 'lucide-svelte/icons/circle-dot';
+  import Magnet from 'lucide-svelte/icons/magnet';
+  import Wrench from 'lucide-svelte/icons/wrench';
+  import Bookmark from 'lucide-svelte/icons/bookmark';
+  import Monitor from 'lucide-svelte/icons/monitor';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -69,7 +75,7 @@
 </script>
 
 {#if p}
-  <PropertySection title="Recorder">
+  <PropertySection title="Recorder" icon={CircleDot}>
     <PropertyCell label="" span={4} hint="Arming waits for the top of the loop, so the take starts on the loop's downbeat.">
       <div class="transport">
         <button type="button" class="btn rec" class:on={isRecordingState(state) || state === 'armed'}
@@ -129,7 +135,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Quantise">
+  <PropertySection title="Quantise" icon={Magnet}>
     <PropertyCell label="" span={4} hint="">
       <div class="note">
         Strength pulls the timing toward the grid; full snap removes the feel.
@@ -164,7 +170,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Repair">
+  <PropertySection title="Repair" icon={Wrench}>
     <PropertyCell label="" span={4} hint="">
       <div class="note">
         Nudge the whole take, or fix a single note.
@@ -205,7 +211,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Takes">
+  <PropertySection title="Takes" icon={Bookmark}>
     <PropertyCell label="" span={4} hint="Storing and loading are copies in each direction.">
       <div class="note">
         {slots.length ? `${slots.length} stored${liveSlot >= 0 ? ` · slot ${liveSlot + 1} was loaded last` : ''}.` : 'No stored takes yet.'}
@@ -239,7 +245,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Display">
+  <PropertySection title="Display" icon={Monitor}>
     <PropertyCell label="Click to arm" span={1} hint="Clicking the roll in preview arms and stops it. Turn off for a display-only recorder driven by a script.">
       <PropertyToggle value={p.editable !== false} onchange={() => set('editable', !(p.editable !== false))} />
     </PropertyCell>
@@ -254,7 +260,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Face, notes, recording (also colours the newest overdub pass), playhead, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'faceColour', label: 'Face', value: p.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'Recorder.faceColour' } },

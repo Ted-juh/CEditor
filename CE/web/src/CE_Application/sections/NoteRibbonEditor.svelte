@@ -8,6 +8,9 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import Music from 'lucide-svelte/icons/music';
+  import Activity from 'lucide-svelte/icons/activity';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -37,7 +40,7 @@
 </script>
 
 {#if r}
-  <PropertySection title="Ribbon Keyboard">
+  <PropertySection title="Ribbon Keyboard" icon={Music}>
     <PropertyCell label="Mode" span={2} hint="Scale snap = in-key notes only. Chromatic = every semitone. Glide = continuous pitch via pitch bend.">
       <select class="val" value={r.mode ?? 'snap'} onchange={(e) => set('mode', e.target.value)}>
         {#each RIBBON_MODES as m (m)}<option value={m}>{RIBBON_MODE_LABELS[m] ?? m}</option>{/each}
@@ -70,7 +73,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Performance">
+  <PropertySection title="Performance" icon={Activity}>
     {#if isGlide}
       <PropertyCell label="Bend range" span={2} hint="Semitones of pitch bend. Must match the synth's own bend range; 2 is the common default.">
         <input class="val" type="number" min="1" max="48" step="1" value={num(r.bendRange, 2)} onchange={(e) => set('bendRange', clampInt(e.target.value, 1, 48, 2))} />
@@ -126,7 +129,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Header" span={1} hint="Show the key / mode / current-note strip.">
       <PropertyToggle value={r.showHeader !== false} onchange={() => set('showHeader', !(r.showHeader !== false))} />
     </PropertyCell>

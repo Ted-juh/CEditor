@@ -11,6 +11,9 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Piano from 'lucide-svelte/icons/piano';
+  import SquareDashed from 'lucide-svelte/icons/square-dashed';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -110,7 +113,7 @@
 </script>
 
 {#if s}
-  <PropertySection title="Zone Splitter">
+  <PropertySection title="Zone Splitter" icon={Piano}>
     <PropertyCell label="In channel" span={1} hint="Which MIDI channel to take notes from. 0 = omni (any channel).">
       <input class="val" type="number" min="0" max="16" step="1" value={num(s.inputChannel, 0)} onchange={(e) => set('inputChannel', clampInt(e.target.value, 0, 16, 0))} />
     </PropertyCell>
@@ -181,7 +184,10 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Zones">
+  <PropertySection title="Zones" icon={SquareDashed}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add zone" onclick={addZone}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Zones may overlap — a note inside two is sent twice, on two channels. Drag the split points in preview.">
       <div class="tablewrap">
         <table class="zt">
@@ -282,12 +288,9 @@
         claimed the most recent note-on; <b>While sounding</b> = every zone currently holding a note.
       </div>
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="">
-      <button type="button" class="action-btn" onclick={addZone}>Add zone</button>
-    </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Face, white keys, black keys, held key, unclaimed-key gap, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'faceColour', label: 'Face', value: s.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'SplitZone.faceColour' } },
@@ -324,5 +327,10 @@
   .nl { color: #6f6f78; font-size: 10px; margin-left: 3px; }
   .acts button { background: #1A1A1A; border: 1px solid #333; color: #888; font-size: 11px; padding: 1px 5px; border-radius: 3px; cursor: pointer; }
   .acts button:disabled { opacity: 0.3; cursor: default; }
-  .action-btn { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+  .hdr-btn {
+    height: 16px; font-size: 9px; padding: 0 8px; border-radius: 8px;
+    background: #252525; border: 1px solid #333; color: #777;
+    font-family: inherit; cursor: pointer; line-height: 1;
+  }
+  .hdr-btn:hover { border-color: #4A6E8C; color: #CCC; }
 </style>

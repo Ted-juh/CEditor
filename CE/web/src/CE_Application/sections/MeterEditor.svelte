@@ -7,6 +7,14 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import Gauge from 'lucide-svelte/icons/gauge';
+  import Hash from 'lucide-svelte/icons/hash';
+  import PaintBucket from 'lucide-svelte/icons/paint-bucket';
+  import SquareDashed from 'lucide-svelte/icons/square-dashed';
+  import Mountain from 'lucide-svelte/icons/mountain';
+  import Ruler from 'lucide-svelte/icons/ruler';
+  import Radius from 'lucide-svelte/icons/radius';
 
   let { control = null } = $props();
 
@@ -40,7 +48,7 @@
 </script>
 
 {#if m}
-  <PropertySection title="Meter">
+  <PropertySection title="Meter" icon={Gauge}>
     <PropertyCell label="Orientation" span={2} hint="Horizontal / vertical bar, or a radial arc.">
       <select class="val" value={m.orientation ?? 'horizontal'} onchange={(e) => set('orientation', e.target.value)}>
         <option value="horizontal">Horizontal</option>
@@ -64,7 +72,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Value">
+  <PropertySection title="Value" icon={Hash}>
     <PropertyCell label="Source" span={4} hint="A knob / slider / number whose live value drives the meter in preview (a bound device parameter drives it at runtime).">
       <select class="val" value={m.valueSourceId ?? ''} onchange={(e) => set('valueSourceId', e.target.value)}>
         <option value="">— Static / bound level —</option>
@@ -86,7 +94,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Fill">
+  <PropertySection title="Fill" icon={PaintBucket}>
     <PropertyCell label="Segments" span={2} hint="0 = smooth continuous fill; N = N discrete LED segments.">
       <input class="val" type="number" min="0" max="64" value={m.segments ?? 0} onchange={(e) => set('segments', Math.max(0, Math.round(num(e.target.value, 0))))} />
     </PropertyCell>
@@ -106,7 +114,10 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Zones">
+  <PropertySection title="Zones" icon={SquareDashed}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add zone" onclick={addZone}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each zone lights the fill from its position (0–1) upward; leave one at 0 for the base colour.">
       <div class="zones">
         {#if zones.length === 0}
@@ -121,15 +132,16 @@
             <button type="button" class="action-btn danger" onclick={() => removeZone(i)}>✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addZone}>Add zone</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Peak hold">
-    <PropertyCell label="Enabled" span={2} hint="Show a marker at the recent maximum that holds then falls.">
-      <PropertyToggle value={m.peakHold === true} onchange={() => toggle('peakHold')} />
-    </PropertyCell>
+  <PropertySection title="Peak hold" icon={Mountain}>
+    {#snippet tools()}
+      <HeaderPill value={m.peakHold === true}
+                  title="Show a marker at the recent maximum that holds then falls."
+                  onchange={() => toggle('peakHold')} />
+    {/snippet}
     {#if m.peakHold === true}
       <PropertyCell label="Hold (ms)" span={1} hint="How long the marker holds before falling.">
         <input class="val" type="number" min="0" value={m.peakHoldMs ?? 1200} onchange={(e) => set('peakHoldMs', Math.max(0, num(e.target.value, 1200)))} />
@@ -145,7 +157,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Scale & readout">
+  <PropertySection title="Scale & readout" icon={Ruler}>
     <PropertyCell label="Ticks" span={2} hint="Draw scale tick marks along the meter.">
       <PropertyToggle value={m.showTicks === true} onchange={() => toggle('showTicks')} />
     </PropertyCell>
@@ -178,7 +190,7 @@
   </PropertySection>
 
   {#if String(m.orientation) === 'arc'}
-    <PropertySection title="Arc">
+    <PropertySection title="Arc" icon={Radius}>
       <PropertyCell label="Start°" span={2} hint="Arc start angle (clockwise from 3 o'clock).">
         <input class="val" type="number" value={m.arcStart ?? 135} onchange={(e) => set('arcStart', num(e.target.value, 135))} />
       </PropertyCell>
@@ -207,4 +219,10 @@
   .action-btn:hover { border-color: #5B9BD5; }
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:hover { border-color: #C96A6A; }
+  .hdr-btn {
+    height: 16px; font-size: 9px; padding: 0 8px; border-radius: 8px;
+    background: #252525; border: 1px solid #333; color: #777;
+    font-family: inherit; cursor: pointer; line-height: 1;
+  }
+  .hdr-btn:hover { border-color: #4A6E8C; color: #CCC; }
 </style>

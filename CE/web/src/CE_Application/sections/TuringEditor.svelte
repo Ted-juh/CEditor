@@ -6,6 +6,9 @@
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
+  import Dices from 'lucide-svelte/icons/dices';
+  import LogOut from 'lucide-svelte/icons/log-out';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -39,7 +42,7 @@
 </script>
 
 {#if tr}
-  <PropertySection title="Turing Modulator">
+  <PropertySection title="Turing Modulator" icon={Dices}>
     <PropertyCell label="Run" span={1} hint="Advance the sequence in preview / player.">
       <PropertyToggle value={tr.running !== false} onchange={() => set('running', !(tr.running !== false))} />
     </PropertyCell>
@@ -102,7 +105,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Step bars, live head step, field background, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'barColour', label: 'Bars', value: tr.barColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'Turing.barColour' } },
@@ -113,7 +116,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Outputs">
+  <PropertySection title="Outputs" icon={LogOut}>
     <PropertyCell label="" span={4} hint="Ports: Value = the current step's level; Gate = 1 above the threshold; Inverse = 1 − Value.">
       <div class="ports">
         <span class="chip"><i style="background:#39D98A"></i>Value</span>

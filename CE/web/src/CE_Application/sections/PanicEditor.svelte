@@ -5,6 +5,8 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Siren from 'lucide-svelte/icons/siren';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -22,7 +24,7 @@
 </script>
 
 {#if p}
-  <PropertySection title="Panic">
+  <PropertySection title="Panic" icon={Siren}>
     <PropertyCell label="Label" span={2} hint="Text on the button.">
       <input class="val" type="text" value={p.label ?? 'PANIC'} onchange={(e) => set('label', e.target.value)} />
     </PropertyCell>
@@ -53,7 +55,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Summary" span={4} hint="Show the second line saying what pressing it will do.">
       <PropertyToggle value={p.showSummary !== false} onchange={() => set('showSummary', !(p.showSummary !== false))} />
     </PropertyCell>

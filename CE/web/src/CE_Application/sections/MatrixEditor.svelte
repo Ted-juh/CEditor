@@ -5,6 +5,11 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
+  import LogIn from 'lucide-svelte/icons/log-in';
+  import LogOut from 'lucide-svelte/icons/log-out';
+  import Hash from 'lucide-svelte/icons/hash';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -70,7 +75,7 @@
 </script>
 
 {#if m}
-  <PropertySection title="Matrix">
+  <PropertySection title="Matrix" icon={Grid3x3}>
     <PropertyCell label="Cell style" span={2} hint="How each cell shows its amount.">
       <select class="val" value={m.cellStyle ?? 'bar'} onchange={(e) => set('cellStyle', e.target.value)}>
         <option value="bar">Bar</option>
@@ -98,7 +103,10 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Sources">
+  <PropertySection title="Sources" icon={LogIn}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add source" onclick={addRow}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Modulation sources — the grid's rows. Each cell is a bindable 'Source → Destination' port.">
       <div class="lst">
         {#each rows as label, i (i)}
@@ -107,12 +115,14 @@
             <button type="button" class="action-btn danger" disabled={rows.length <= 1} onclick={() => removeRow(i)}>✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addRow}>Add source</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Destinations">
+  <PropertySection title="Destinations" icon={LogOut}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add destination" onclick={addCol}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Modulation destinations — the grid's columns.">
       <div class="lst">
         {#each cols as label, i (i)}
@@ -121,12 +131,11 @@
             <button type="button" class="action-btn danger" disabled={cols.length <= 1} onclick={() => removeCol(i)}>✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addCol}>Add destination</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Amounts">
+  <PropertySection title="Amounts" icon={Hash}>
     <PropertyCell label="" span={4} hint="Set routing amounts numerically (or drag cells in preview).">
       <div class="grid" style={`grid-template-columns: 46px repeat(${cols.length}, minmax(0, 1fr));`}>
         <div class="ghdr"></div>
@@ -143,7 +152,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Style">
+  <PropertySection title="Style" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Positive amounts, negative amounts, cell background, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'posColour', label: 'Pos', value: m.posColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'Matrix.posColour' } },
@@ -176,4 +185,10 @@
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:disabled { opacity: 0.35; cursor: default; }
   .action-btn.danger:not(:disabled):hover { border-color: #C96A6A; }
+  .hdr-btn {
+    height: 16px; font-size: 9px; padding: 0 8px; border-radius: 8px;
+    background: #252525; border: 1px solid #333; color: #777;
+    font-family: inherit; cursor: pointer; line-height: 1;
+  }
+  .hdr-btn:hover { border-color: #4A6E8C; color: #CCC; }
 </style>

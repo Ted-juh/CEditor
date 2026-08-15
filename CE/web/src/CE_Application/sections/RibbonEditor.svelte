@@ -4,6 +4,9 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Ribbon from 'lucide-svelte/icons/ribbon';
+  import IterationCcw from 'lucide-svelte/icons/iteration-ccw';
+  import Monitor from 'lucide-svelte/icons/monitor';
 
   let { control = null } = $props();
 
@@ -33,7 +36,7 @@
 </script>
 
 {#if r}
-  <PropertySection title="Ribbon">
+  <PropertySection title="Ribbon" icon={Ribbon}>
     <PropertyCell label="Preset" span={4} hint="Quick-set for the common hardware controllers.">
       <div class="presets">
         <button type="button" class="action-btn" onclick={() => applyPreset('ribbon')}>Touch ribbon</button>
@@ -65,7 +68,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Return to rest">
+  <PropertySection title="Return to rest" icon={IterationCcw}>
     <PropertyCell label="Mode" span={2} hint="What the value does on release. Centre = pitch wheel; None = latch (mod wheel / ribbon).">
       <select class="val" value={r.returnMode ?? 'none'} onchange={(e) => set('returnMode', e.target.value)}>
         <option value="none">None (latch)</option>
@@ -90,7 +93,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Display">
+  <PropertySection title="Display" icon={Monitor}>
     <PropertyCell label="Touch glow" span={2} hint="Glow while held.">
       <PropertyToggle value={r.showGlow !== false} onchange={() => set('showGlow', !(r.showGlow !== false))} />
     </PropertyCell>
