@@ -3,6 +3,21 @@
   import Italic from 'lucide-svelte/icons/italic';
   import Underline from 'lucide-svelte/icons/underline';
   import Strikethrough from 'lucide-svelte/icons/strikethrough';
+  import Blend from 'lucide-svelte/icons/blend';
+  import BrickWall from 'lucide-svelte/icons/brick-wall';
+  import CaseSensitive from 'lucide-svelte/icons/case-sensitive';
+  import Crosshair from 'lucide-svelte/icons/crosshair';
+  import Droplet from 'lucide-svelte/icons/droplet';
+  import ImageIcon from 'lucide-svelte/icons/image';
+  import Minus from 'lucide-svelte/icons/minus';
+  import Move from 'lucide-svelte/icons/move';
+  import PaintBucket from 'lucide-svelte/icons/paint-bucket';
+  import Palette from 'lucide-svelte/icons/palette';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Spline from 'lucide-svelte/icons/spline';
+  import TextAlignJustify from 'lucide-svelte/icons/text-align-justify';
+  import Type from 'lucide-svelte/icons/type';
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { availableFonts, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
@@ -723,6 +738,7 @@
   <div class="text-editor-sections">
     <PropertySection
       title="Text"
+      icon={Pencil}
       collapsed={textSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('text'), value)}
     >
@@ -749,6 +765,7 @@
     {#key fontEditorRenderKey}
       <PropertySection
         title="Font Settings"
+        icon={Type}
         collapsed={fontSectionCollapsed}
         ontoggle={(value) => setCollapsed(sectionKey('font'), value)}
       >
@@ -831,6 +848,7 @@
 
     <PropertySection
       title="Typography"
+      icon={CaseSensitive}
       collapsed={typographySectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('typography'), value)}
     >
@@ -900,6 +918,7 @@
 
     <PropertySection
       title="Multiline"
+      icon={TextAlignJustify}
       collapsed={multilineSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('multiline'), value)}
     >
@@ -1074,6 +1093,7 @@
 
     <PropertySection
       title="Position"
+      icon={Crosshair}
       collapsed={positionSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('position'), value)}
     >
@@ -1112,6 +1132,7 @@
 
     <PropertySection
       title="Fill"
+      icon={PaintBucket}
       collapsed={fillSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('fill'), value)}
     >
@@ -1140,6 +1161,7 @@
     {#if textFillModeValue === 'solid'}
       <PropertySection
         title="Solid"
+        icon={Droplet}
         collapsed={$sectionCollapse[fillLayerCollapseKey('solid')] ?? false}
         ontoggle={(value) => setCollapsed(fillLayerCollapseKey('solid'), value)}
       >
@@ -1160,6 +1182,7 @@
     {#if textFillModeValue === 'gradient'}
       <PropertySection
         title="Gradient"
+        icon={Blend}
         collapsed={$sectionCollapse[fillLayerCollapseKey('gradient')] ?? false}
         ontoggle={(value) => setCollapsed(fillLayerCollapseKey('gradient'), value)}
       >
@@ -1188,6 +1211,7 @@
     {#if textFillModeValue === 'image'}
       <PropertySection
         title="Image"
+        icon={ImageIcon}
         collapsed={$sectionCollapse[fillLayerCollapseKey('image')] ?? false}
         ontoggle={(value) => setCollapsed(fillLayerCollapseKey('image'), value)}
       >
@@ -1197,7 +1221,7 @@
         </div>
       </PropertySection>
       {#if !($sectionCollapse[fillLayerCollapseKey('image')] ?? false)}
-        <PropertySection title="Geometry">
+        <PropertySection title="Geometry" icon={Move}>
           <PropertyCell label="Fit" span={2} hint="How the image should fit inside the text fill area.">
             <select class="text-select" value={String(fillProp('imageFit', 'cover'))} onchange={(event) => set('Text.Fill.imageFit', event.target.value)}>
               <option value="cover">Cover</option>
@@ -1213,7 +1237,7 @@
           </PropertyCell>
         </PropertySection>
 
-        <PropertySection title="Colour Effects">
+        <PropertySection title="Colour Effects" icon={Palette}>
           <PropertyCell label="Opacity" span={1} compact hint="Opacity of the image fill.">
             <NumberCell label="Opac" value={Number(fillProp('imageOpacity', 100))} min={0} max={100} step={1} defaultValue={100} onchange={(value) => set('Text.Fill.imageOpacity', value)} />
           </PropertyCell>
@@ -1234,6 +1258,7 @@
     {#if textFillModeValue === 'texture'}
       <PropertySection
         title="Texture"
+        icon={BrickWall}
         collapsed={$sectionCollapse[fillLayerCollapseKey('texture')] ?? false}
         ontoggle={(value) => setCollapsed(fillLayerCollapseKey('texture'), value)}
       >
@@ -1243,7 +1268,7 @@
         </div>
       </PropertySection>
       {#if !($sectionCollapse[fillLayerCollapseKey('texture')] ?? false)}
-        <PropertySection title="Geometry">
+        <PropertySection title="Geometry" icon={Move}>
           <PropertyCell label="Scale" span={2} compact hint="Tile scale for the texture pattern.">
             <NumberCell label="Scale" value={Number(fillProp('textureTileScale', 1))} min={0.1} step={0.1} defaultValue={1} onchange={(value) => set('Text.Fill.textureTileScale', value)} />
           </PropertyCell>
@@ -1255,7 +1280,7 @@
           </PropertyCell>
         </PropertySection>
 
-        <PropertySection title="Colour Effects">
+        <PropertySection title="Colour Effects" icon={Palette}>
           <PropertyCell label="Opacity" span={1} compact hint="Opacity of the texture fill.">
             <NumberCell label="Opac" value={Number(fillProp('textureOpacity', 100))} min={0} max={100} step={1} defaultValue={100} onchange={(value) => set('Text.Fill.textureOpacity', value)} />
           </PropertyCell>
@@ -1275,6 +1300,7 @@
 
     <PropertySection
       title="Flow"
+      icon={Spline}
       collapsed={orientationSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('orientation'), value)}
     >
@@ -1491,6 +1517,7 @@
 
     <PropertySection
       title="Effects"
+      icon={Sparkles}
       collapsed={effectsSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('effects'), value)}
     >
@@ -1928,6 +1955,7 @@
 
     <PropertySection
       title="Line"
+      icon={Minus}
       collapsed={lineSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('line'), value)}
     >
