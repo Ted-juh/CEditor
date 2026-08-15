@@ -46,6 +46,7 @@
     tidyGrid, arrangeCircular,
   } from '../stores/alignment.js';
   import { guides } from '../stores/guides.js';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let control = $derived($selectedControl);
   let activePropertiesTab = $derived(String($activeComponentPropertiesTab ?? ''));
@@ -117,15 +118,25 @@
       </div>
       <div class="layout-row">
         <span class="input-label">Gap</span>
-        <input class="spacing-input sm" type="number" value={contentLayout?.gap ?? 8} oninput={(e) => setLayout('gap', Number(e.currentTarget.value ?? 0))} />
+        <span class="spacing-input sm nc-wrap">
+          <NumberCell value={contentLayout?.gap ?? 8} defaultValue={8} onchange={(v) => setLayout('gap', v)} />
+        </span>
         <span class="unit">px</span>
       </div>
       <div class="layout-row">
         <span class="input-label">Pad</span>
-        <input class="spacing-input sm" type="number" value={contentLayout?.paddingLeft ?? 8} title="Padding left" oninput={(e) => setLayout('paddingLeft', Number(e.currentTarget.value ?? 0))} />
-        <input class="spacing-input sm" type="number" value={contentLayout?.paddingRight ?? 8} title="Padding right" oninput={(e) => setLayout('paddingRight', Number(e.currentTarget.value ?? 0))} />
-        <input class="spacing-input sm" type="number" value={contentLayout?.paddingTop ?? 6} title="Padding top" oninput={(e) => setLayout('paddingTop', Number(e.currentTarget.value ?? 0))} />
-        <input class="spacing-input sm" type="number" value={contentLayout?.paddingBottom ?? 6} title="Padding bottom" oninput={(e) => setLayout('paddingBottom', Number(e.currentTarget.value ?? 0))} />
+        <span class="spacing-input sm nc-wrap" title="Padding left">
+          <NumberCell value={contentLayout?.paddingLeft ?? 8} defaultValue={8} onchange={(v) => setLayout('paddingLeft', v)} />
+        </span>
+        <span class="spacing-input sm nc-wrap" title="Padding right">
+          <NumberCell value={contentLayout?.paddingRight ?? 8} defaultValue={8} onchange={(v) => setLayout('paddingRight', v)} />
+        </span>
+        <span class="spacing-input sm nc-wrap" title="Padding top">
+          <NumberCell value={contentLayout?.paddingTop ?? 6} defaultValue={6} onchange={(v) => setLayout('paddingTop', v)} />
+        </span>
+        <span class="spacing-input sm nc-wrap" title="Padding bottom">
+          <NumberCell value={contentLayout?.paddingBottom ?? 6} defaultValue={6} onchange={(v) => setLayout('paddingBottom', v)} />
+        </span>
       </div>
     </div>
     <div class="section-divider"></div>
@@ -160,11 +171,15 @@
       <div class="section-label">Position</div>
       <div class="region-row">
         <span class="input-label">X</span>
-        <input class="spacing-input" type="number" bind:value={regionX} onfocus={(e) => e.target.select()} />
+        <span class="spacing-input nc-wrap">
+          <NumberCell value={regionX} onchange={(v) => regionX = v} />
+        </span>
       </div>
       <div class="region-row">
         <span class="input-label">Y</span>
-        <input class="spacing-input" type="number" bind:value={regionY} onfocus={(e) => e.target.select()} />
+        <span class="spacing-input nc-wrap">
+          <NumberCell value={regionY} onchange={(v) => regionY = v} />
+        </span>
       </div>
     </div>
   {/if}
@@ -240,7 +255,9 @@
         {useFixedH ? 'Fixed' : 'Auto'}
       </button>
       {#if useFixedH}
-        <input class="spacing-input" type="number" bind:value={fixedHGap} min="0" onfocus={(e) => e.target.select()} />
+        <span class="spacing-input nc-wrap">
+          <NumberCell value={fixedHGap} min={0} onchange={(v) => fixedHGap = v} />
+        </span>
         <span class="unit">px</span>
       {/if}
     </div>
@@ -252,7 +269,9 @@
         {useFixedV ? 'Fixed' : 'Auto'}
       </button>
       {#if useFixedV}
-        <input class="spacing-input" type="number" bind:value={fixedVGap} min="0" onfocus={(e) => e.target.select()} />
+        <span class="spacing-input nc-wrap">
+          <NumberCell value={fixedVGap} min={0} onchange={(v) => fixedVGap = v} />
+        </span>
         <span class="unit">px</span>
       {/if}
     </div>
@@ -328,20 +347,30 @@
         <LayoutGrid size={16} strokeWidth={1.5} />
       </button>
       <span class="input-label">Cols</span>
-      <input class="spacing-input sm" type="number" bind:value={gridCols} min="1" onfocus={(e) => e.target.select()} />
+      <span class="spacing-input sm nc-wrap">
+        <NumberCell value={gridCols} min={1} onchange={(v) => gridCols = v} />
+      </span>
       <span class="input-label">Gap</span>
-      <input class="spacing-input sm" type="number" bind:value={gridGapX} min="0" onfocus={(e) => e.target.select()} />
+      <span class="spacing-input sm nc-wrap">
+        <NumberCell value={gridGapX} min={0} onchange={(v) => gridGapX = v} />
+      </span>
       <span class="unit">x</span>
-      <input class="spacing-input sm" type="number" bind:value={gridGapY} min="0" onfocus={(e) => e.target.select()} />
+      <span class="spacing-input sm nc-wrap">
+        <NumberCell value={gridGapY} min={0} onchange={(v) => gridGapY = v} />
+      </span>
     </div>
     <div class="layout-row">
       <button class="action-btn" disabled={!canCircle} title="Arrange in Circle" onclick={() => arrangeCircular(circleRadius, circleStartAngle)}>
         <Circle size={16} strokeWidth={1.5} />
       </button>
       <span class="input-label">R</span>
-      <input class="spacing-input sm" type="number" bind:value={circleRadius} min="1" onfocus={(e) => e.target.select()} />
+      <span class="spacing-input sm nc-wrap">
+        <NumberCell value={circleRadius} min={1} onchange={(v) => circleRadius = v} />
+      </span>
       <span class="input-label">Angle</span>
-      <input class="spacing-input sm" type="number" bind:value={circleStartAngle} onfocus={(e) => e.target.select()} />
+      <span class="spacing-input sm nc-wrap">
+        <NumberCell value={circleStartAngle} onchange={(v) => circleStartAngle = v} />
+      </span>
       <span class="unit">&deg;</span>
     </div>
   </div>
@@ -455,26 +484,18 @@
   .toggle-btn:hover { background: #333; color: #CCC; }
   .toggle-btn.active { background: #094771; color: #FFF; }
 
+  /* Sizing wrappers around NumberCell — keep row/column width discipline. */
   .spacing-input {
-    width: 50px;
-    height: 22px;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #CCC;
-    font-size: 11px;
-    font-family: inherit;
-    padding: 0 4px;
-    text-align: center;
+    width: 58px;
+    flex-shrink: 0;
   }
 
   .spacing-input.sm {
-    width: 38px;
+    width: 46px;
   }
 
-  .spacing-input:focus {
-    outline: none;
-    border-color: #5B9BD5;
+  .nc-wrap {
+    display: flex;
   }
 
   .unit {

@@ -14,6 +14,7 @@
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { addStopInLargestGap, updateStopAt, deleteStopAt } from '../utils/gradientStops.js';
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   const SECTION_ORDER_STORAGE_KEY = 'ce.gradientSettings.sectionOrder.v1';
   const DEFAULT_SECTION_ORDER = ['type', 'geometry', 'shape', 'edge', 'stops', 'presets'];
@@ -149,18 +150,7 @@
         {#if showAngle}
           <div class="section-sub-label">Angle</div>
           <div class="input-row">
-            <div class="num-input-wrap">
-              <button class="pos-arrow left" tabindex="-1" onclick={() => update({ angle: Math.max(0, (gradient.angle ?? 90) - 1) })}>&#9664;</button>
-              <input
-                class="num-input"
-                type="number"
-                onkeydown={blurOnEnter}
-                min="0" max="360"
-                value={gradient.angle}
-                onchange={(e) => update({ angle: parseInt(e.target.value) || 0 })}
-              />
-              <button class="pos-arrow right" tabindex="-1" onclick={() => update({ angle: Math.min(360, (gradient.angle ?? 90) + 1) })}>&#9654;</button>
-            </div>
+            <NumberCell min={0} max={360} value={gradient.angle} defaultValue={90} onchange={(v) => update({ angle: parseInt(v) || 0 })} />
             <span class="input-suffix">°</span>
           </div>
         {/if}
@@ -168,62 +158,19 @@
           <div class="section-sub-label offset">Centre</div>
           <div class="input-row">
             <span class="input-prefix">X</span>
-            <div class="num-input-wrap">
-              <button class="pos-arrow left" tabindex="-1" onclick={() => update({ centerX: Math.max(0, (gradient.centerX ?? 50) - 1) })}>&#9664;</button>
-              <input
-                class="num-input"
-                type="number"
-                onkeydown={blurOnEnter}
-                min="0" max="100"
-                value={gradient.centerX}
-                onchange={(e) => update({ centerX: parseInt(e.target.value) || 50 })}
-              />
-              <button class="pos-arrow right" tabindex="-1" onclick={() => update({ centerX: Math.min(100, (gradient.centerX ?? 50) + 1) })}>&#9654;</button>
-            </div>
+            <NumberCell min={0} max={100} value={gradient.centerX} defaultValue={50} onchange={(v) => update({ centerX: parseInt(v) || 50 })} />
             <span class="input-prefix" style="margin-left: 4px">Y</span>
-            <div class="num-input-wrap">
-              <button class="pos-arrow left" tabindex="-1" onclick={() => update({ centerY: Math.max(0, (gradient.centerY ?? 50) - 1) })}>&#9664;</button>
-              <input
-                class="num-input"
-                type="number"
-                onkeydown={blurOnEnter}
-                min="0" max="100"
-                value={gradient.centerY}
-                onchange={(e) => update({ centerY: parseInt(e.target.value) || 50 })}
-              />
-              <button class="pos-arrow right" tabindex="-1" onclick={() => update({ centerY: Math.min(100, (gradient.centerY ?? 50) + 1) })}>&#9654;</button>
-            </div>
+            <NumberCell min={0} max={100} value={gradient.centerY} defaultValue={50} onchange={(v) => update({ centerY: parseInt(v) || 50 })} />
           </div>
         {/if}
         {#if showRadius}
           <div class="section-sub-label offset">Radius</div>
           <div class="input-row">
             {#if shape === 'rectangle' || shape === 'ellipse'}<span class="input-prefix">X</span>{/if}
-            <div class="num-input-wrap">
-              <button class="pos-arrow left" tabindex="-1" onclick={() => update({ radiusX: Math.max(1, (gradient.radiusX ?? 50) - 1) })}>&#9664;</button>
-              <input
-                class="num-input"
-                type="number"
-                onkeydown={blurOnEnter}
-                min="1" max="200"
-                value={gradient.radiusX}
-                onchange={(e) => update({ radiusX: parseInt(e.target.value) || 50 })}
-              />
-              <button class="pos-arrow right" tabindex="-1" onclick={() => update({ radiusX: Math.min(200, (gradient.radiusX ?? 50) + 1) })}>&#9654;</button>
-            </div>
+            <NumberCell min={1} max={200} value={gradient.radiusX} defaultValue={50} onchange={(v) => update({ radiusX: parseInt(v) || 50 })} />
             {#if shape === 'rectangle' || shape === 'ellipse'}
               <span class="input-prefix" style="margin-left: 4px">Y</span>
-              <div class="num-input-wrap">
-                <button class="pos-arrow left" tabindex="-1" onclick={() => update({ radiusY: Math.max(1, (gradient.radiusY ?? 50) - 1) })}>&#9664;</button>
-                <input
-                  class="num-input"
-                  type="number"
-                  min="1" max="200"
-                  value={gradient.radiusY}
-                  onchange={(e) => update({ radiusY: parseInt(e.target.value) || 50 })}
-                />
-                <button class="pos-arrow right" tabindex="-1" onclick={() => update({ radiusY: Math.min(200, (gradient.radiusY ?? 50) + 1) })}>&#9654;</button>
-              </div>
+              <NumberCell min={1} max={200} value={gradient.radiusY} defaultValue={50} onchange={(v) => update({ radiusY: parseInt(v) || 50 })} />
             {/if}
           </div>
         {/if}
@@ -265,18 +212,7 @@
           </div>
         </div>
         <div class="input-row">
-          <div class="num-input-wrap">
-            <button class="pos-arrow left" tabindex="-1" onclick={() => update({ edge: Math.max(0, (gradient.edge ?? 0) - 1) })}>&#9664;</button>
-            <input
-              class="num-input"
-              type="number"
-              onkeydown={blurOnEnter}
-              min="0" max="100"
-              value={gradient.edge ?? 0}
-              onchange={(e) => update({ edge: parseInt(e.target.value) || 0 })}
-            />
-            <button class="pos-arrow right" tabindex="-1" onclick={() => update({ edge: Math.min(100, (gradient.edge ?? 0) + 1) })}>&#9654;</button>
-          </div>
+          <NumberCell min={0} max={100} value={gradient.edge ?? 0} defaultValue={0} onchange={(v) => update({ edge: parseInt(v) || 0 })} />
           <span class="input-suffix">%</span>
         </div>
       </div>
