@@ -5495,22 +5495,8 @@
     white-space: nowrap;
   }
 
-  .swatch-num input {
-    width: 34px;
-    height: 22px;
-    padding: 0 2px;
-    border: 1px solid #34444F;
-    border-radius: 4px;
-    background: #0D1419;
-    color: #E8EEF5;
-    font: inherit;
-    font-size: 11px;
-    text-align: center;
-  }
-
-  .swatch-num input:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+  .swatch-num .nc-wrap {
+    width: 44px;
   }
 
   .mini-gradient-btn {
@@ -6294,9 +6280,7 @@
   }
 
   .dock-field input,
-  .dock-field select,
-  .dock-number-grid input,
-  .paint-grid input {
+  .dock-field select {
     min-width: 0;
     box-sizing: border-box;
     border: 1px solid #3B4650;
@@ -6308,9 +6292,7 @@
   }
 
   .dock-field input:not([type='checkbox']):not([type='range']),
-  .dock-field select,
-  .dock-number-grid input,
-  .paint-grid input:not([type='color']) {
+  .dock-field select {
     width: 100%;
     height: 25px;
     padding: 0 7px;
@@ -6404,8 +6386,7 @@
   .dock-button-grid button:disabled,
   .pivot-actions button:disabled,
   .dock-field input:disabled,
-  .dock-field select:disabled,
-  .paint-grid input:disabled {
+  .dock-field select:disabled {
     cursor: not-allowed;
     opacity: 0.45;
   }
@@ -7749,27 +7730,7 @@
   }
 
   .surface-zoombar .szb-inc-input {
-    width: 34px;
-    background: #0D1419;
-    border: 1px solid #2D3A44;
-    border-radius: 3px;
-    color: #E8EEF5;
-    font-size: 10px;
-    text-align: center;
-    padding: 2px;
-    outline: none;
-    appearance: textfield;
-    -moz-appearance: textfield;
-  }
-
-  .surface-zoombar .szb-inc-input::-webkit-inner-spin-button,
-  .surface-zoombar .szb-inc-input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-
-  .surface-zoombar .szb-inc-input:focus {
-    border-color: #14B8A6;
+    width: 44px;
   }
 
   .szb-divider {
@@ -7997,9 +7958,7 @@
     color: #F3FFFD;
   }
 
-  .palette-grid button:disabled,
-  .palette-stepper input:disabled,
-  .palette-corner input:disabled {
+  .palette-grid button:disabled {
     cursor: not-allowed;
     opacity: 0.45;
   }
@@ -8134,17 +8093,9 @@
     white-space: nowrap;
   }
 
-  .palette-corner input,
-  .palette-stepper input {
+  .palette-corner .nc-wrap,
+  .palette-stepper .nc-wrap {
     width: 60px;
-    height: 28px;
-    border: 1px solid #34444F;
-    border-radius: 4px;
-    background: #0D1419;
-    color: #E8EEF5;
-    font: inherit;
-    font-size: 11px;
-    text-align: center;
   }
 
   .surface-scroll {
@@ -8327,9 +8278,7 @@
   }
 
   .dock-field input,
-  .dock-field select,
-  .dock-number-grid input,
-  .paint-grid input {
+  .dock-field select {
     border-color: #33434E;
     background: #0D1419;
   }
