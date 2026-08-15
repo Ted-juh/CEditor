@@ -6,6 +6,7 @@
   import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
@@ -84,8 +85,8 @@
       </select>
     </PropertyCell>
     {#if isInput}
-      <PropertyCell label="In channel" span={2} hint="Which MIDI channel to take notes from. 0 = omni (any channel).">
-        <input class="val" type="number" min="0" max="16" step="1" value={num(a.inputChannel, 0)} onchange={(e) => set('inputChannel', clampInt(e.target.value, 0, 16, 0))} />
+      <PropertyCell label="In channel" span={2} compact hint="Which MIDI channel to take notes from. 0 = omni (any channel).">
+        <NumberCell label="Ch" min={0} max={16} step={1} value={num(a.inputChannel, 0)} defaultValue={0} onchange={(v) => set('inputChannel', clampInt(v, 0, 16, 0))} />
       </PropertyCell>
       <PropertyCell label="" span={2} hint="A hardware output must be selected on the 'mainSynth' device role for the arp's own notes to come back out.">
         <div class="note">Keyboard in → arp out</div>
@@ -115,8 +116,8 @@
           {#each scaleKeys as k (k)}<option value={k}>{SCALE_LABELS[k] ?? k}</option>{/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Degree" span={1} hint="Which scale degree the chord is built on (0 = tonic).">
-        <input class="val" type="number" min="0" max={degreeCount - 1} step="1" value={num(a.degree, 0)} onchange={(e) => set('degree', clampInt(e.target.value, 0, degreeCount - 1, 0))} />
+      <PropertyCell label="Degree" span={1} compact hint="Which scale degree the chord is built on (0 = tonic).">
+        <NumberCell label="Deg" min={0} max={degreeCount - 1} step={1} value={num(a.degree, 0)} defaultValue={0} onchange={(v) => set('degree', clampInt(v, 0, degreeCount - 1, 0))} />
       </PropertyCell>
       <PropertyCell label="Chord" span={1} hint="Triad or four-note seventh.">
         <select class="val" value={a.chordType ?? 'triad'} onchange={(e) => set('chordType', e.target.value)}>
@@ -124,8 +125,8 @@
           <option value="seventh">Seventh</option>
         </select>
       </PropertyCell>
-      <PropertyCell label="Octave" span={1} hint="Octave of the chord root (3 → C3).">
-        <input class="val" type="number" min="-1" max="8" step="1" value={num(a.baseOctave, 3)} onchange={(e) => set('baseOctave', clampInt(e.target.value, -1, 8, 3))} />
+      <PropertyCell label="Octave" span={1} compact hint="Octave of the chord root (3 → C3).">
+        <NumberCell label="Oct" min={-1} max={8} step={1} value={num(a.baseOctave, 3)} defaultValue={3} onchange={(v) => set('baseOctave', clampInt(v, -1, 8, 3))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="" span={4} hint="The step walk this produces, left to right.">
@@ -149,15 +150,15 @@
         </PropertyCell>
       {/if}
     {:else}
-      <PropertyCell label="Rate" span={1} hint="Steps per second.">
-        <input class="val" type="number" min="0.1" max="40" step="0.5" value={num(a.rate, 6)} onchange={(e) => set('rate', clampNum(e.target.value, 0.1, 40, 6))} />
+      <PropertyCell label="Rate" span={1} compact hint="Steps per second.">
+        <NumberCell label="Rate" min={0.1} max={40} step={0.5} value={num(a.rate, 6)} defaultValue={6} onchange={(v) => set('rate', clampNum(v, 0.1, 40, 6))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Octaves" span={1} hint="Repeat the note set upward this many octaves.">
-      <input class="val" type="number" min="1" max="4" step="1" value={num(a.octaves, 1)} onchange={(e) => set('octaves', clampInt(e.target.value, 1, 4, 1))} />
+    <PropertyCell label="Octaves" span={1} compact hint="Repeat the note set upward this many octaves.">
+      <NumberCell label="Oct" min={1} max={4} step={1} value={num(a.octaves, 1)} defaultValue={1} onchange={(v) => set('octaves', clampInt(v, 1, 4, 1))} />
     </PropertyCell>
-    <PropertyCell label="Gate" span={1} hint="Note length as a fraction of the step (1 = legato).">
-      <input class="val" type="number" min="0.05" max="1" step="0.05" value={num(a.gate, 0.6)} onchange={(e) => set('gate', clampNum(e.target.value, 0.05, 1, 0.6))} />
+    <PropertyCell label="Gate" span={1} compact hint="Note length as a fraction of the step (1 = legato).">
+      <NumberCell label="Gate" min={0.05} max={1} step={0.05} value={num(a.gate, 0.6)} defaultValue={0.6} onchange={(v) => set('gate', clampNum(v, 0.05, 1, 0.6))} />
     </PropertyCell>
     <PropertyCell label="Swing from" span={1} hint="Transport = inherit the clock's swing. Own = this arp's own setting. Free-running always uses its own.">
       <select class="val" value={a.swingSource ?? 'transport'} onchange={(e) => set('swingSource', e.target.value)}>
@@ -165,17 +166,17 @@
         <option value="own">Its own</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Swing" span={1} hint="Delay every odd step, up to half a step (0 = straight).">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={num(a.swing, 0)} onchange={(e) => set('swing', clampNum(e.target.value, 0, 1, 0))} />
+    <PropertyCell label="Swing" span={1} compact hint="Delay every odd step, up to half a step (0 = straight).">
+      <NumberCell label="Swing" min={0} max={1} step={0.05} value={num(a.swing, 0)} defaultValue={0} onchange={(v) => set('swing', clampNum(v, 0, 1, 0))} />
     </PropertyCell>
     <PropertyCell label="Latch" span={1} hint="External sources: keep arpeggiating the last chord after the pad (or the keyboard) is released.">
       <PropertyToggle value={a.latch === true} onchange={() => set('latch', !(a.latch === true))} />
     </PropertyCell>
-    <PropertyCell label="Velocity" span={1} hint="Note-on velocity (1–127).">
-      <input class="val" type="number" min="1" max="127" step="1" value={num(a.velocity, 96)} onchange={(e) => set('velocity', clampInt(e.target.value, 1, 127, 96))} />
+    <PropertyCell label="Velocity" span={1} compact hint="Note-on velocity (1–127).">
+      <NumberCell label="Vel" min={1} max={127} step={1} value={num(a.velocity, 96)} defaultValue={96} onchange={(v) => set('velocity', clampInt(v, 1, 127, 96))} />
     </PropertyCell>
-    <PropertyCell label="Channel" span={1} hint="MIDI channel the notes go out on (1–16).">
-      <input class="val" type="number" min="1" max="16" step="1" value={num(a.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
+    <PropertyCell label="Channel" span={1} compact hint="MIDI channel the notes go out on (1–16).">
+      <NumberCell label="Ch" min={1} max={16} step={1} value={num(a.channel, 1)} defaultValue={1} onchange={(v) => set('channel', clampInt(v, 1, 16, 1))} />
     </PropertyCell>
     <PropertyCell label="Editable" span={1} hint="Click a step in preview to mute / unmute it.">
       <PropertyToggle value={a.editable !== false} onchange={() => set('editable', !(a.editable !== false))} />
@@ -187,14 +188,14 @@
       <PropertyToggle value={a.euclidEnabled === true} onchange={() => set('euclidEnabled', !(a.euclidEnabled === true))} />
     </PropertyCell>
     {#if a.euclidEnabled === true}
-      <PropertyCell label="Steps" span={1} hint="Length of the rest pattern.">
-        <input class="val" type="number" min="1" max="32" step="1" value={num(a.euclidSteps, 8)} onchange={(e) => set('euclidSteps', clampInt(e.target.value, 1, 32, 8))} />
+      <PropertyCell label="Steps" span={1} compact hint="Length of the rest pattern.">
+        <NumberCell label="Steps" min={1} max={32} step={1} value={num(a.euclidSteps, 8)} defaultValue={8} onchange={(v) => set('euclidSteps', clampInt(v, 1, 32, 8))} />
       </PropertyCell>
-      <PropertyCell label="Pulses" span={1} hint="How many of those steps play.">
-        <input class="val" type="number" min="0" max={num(a.euclidSteps, 8)} step="1" value={num(a.euclidPulses, 5)} onchange={(e) => set('euclidPulses', clampInt(e.target.value, 0, num(a.euclidSteps, 8), 5))} />
+      <PropertyCell label="Pulses" span={1} compact hint="How many of those steps play.">
+        <NumberCell label="Pulses" min={0} max={num(a.euclidSteps, 8)} step={1} value={num(a.euclidPulses, 5)} defaultValue={5} onchange={(v) => set('euclidPulses', clampInt(v, 0, num(a.euclidSteps, 8), 5))} />
       </PropertyCell>
-      <PropertyCell label="Rotate" span={1} hint="Shift the pattern's starting point.">
-        <input class="val" type="number" min="0" max="31" step="1" value={num(a.euclidRotate, 0)} onchange={(e) => set('euclidRotate', clampInt(e.target.value, 0, 31, 0))} />
+      <PropertyCell label="Rotate" span={1} compact hint="Shift the pattern's starting point.">
+        <NumberCell label="Rot" min={0} max={31} step={1} value={num(a.euclidRotate, 0)} defaultValue={0} onchange={(v) => set('euclidRotate', clampInt(v, 0, 31, 0))} />
       </PropertyCell>
       <PropertyCell label="" span={4} hint="● plays, · rests.">
         <div class="preview mono">{euclidPreview}</div>

@@ -10,6 +10,7 @@
   } from '../utils/harmoniserLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, noteName, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
@@ -106,8 +107,8 @@
           {#each scaleKeys as k (k)}<option value={k}>{SCALE_LABELS[k] ?? k}</option>{/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Chord size" span={1} hint="Notes stacked in thirds up the scale. 3 is a triad, 4 a seventh, 5 a ninth.">
-        <input class="val" type="number" min="2" max="6" step="1" value={num(p.size, 3)} onchange={(e) => set('size', clampInt(e.target.value, 2, 6, 3))} />
+      <PropertyCell label="Chord size" span={1} compact hint="Notes stacked in thirds up the scale. 3 is a triad, 4 a seventh, 5 a ninth.">
+        <NumberCell label="Size" min={2} max={6} step={1} value={num(p.size, 3)} defaultValue={3} onchange={(v) => set('size', clampInt(v, 2, 6, 3))} />
       </PropertyCell>
       <PropertyCell label="Out of key" span={1} hint="What to do with a note that has no degree in the scale.">
         <select class="val" value={p.outOfKey ?? 'pass'} onchange={(e) => set('outOfKey', e.target.value)}>
@@ -132,27 +133,27 @@
         {#each VOICINGS as v (v)}<option value={v}>{VOICING_LABELS[v] ?? v}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Inversion" span={1} hint="Lifts the lowest voices up an octave, one per step.">
-      <input class="val" type="number" min="0" max="3" step="1" value={num(p.inversion, 0)} onchange={(e) => set('inversion', clampInt(e.target.value, 0, 3, 0))} />
+    <PropertyCell label="Inversion" span={1} compact hint="Lifts the lowest voices up an octave, one per step.">
+      <NumberCell label="Inv" min={0} max={3} step={1} value={num(p.inversion, 0)} defaultValue={0} onchange={(v) => set('inversion', clampInt(v, 0, 3, 0))} />
     </PropertyCell>
-    <PropertyCell label="Octave" span={1} hint="Moves the added voices by whole octaves, leaving the played note where it is.">
-      <input class="val" type="number" min="-3" max="3" step="1" value={num(p.octaveSpread, 0)} onchange={(e) => set('octaveSpread', clampInt(e.target.value, -3, 3, 0))} />
+    <PropertyCell label="Octave" span={1} compact hint="Moves the added voices by whole octaves, leaving the played note where it is.">
+      <NumberCell label="Oct" min={-3} max={3} step={1} value={num(p.octaveSpread, 0)} defaultValue={0} onchange={(v) => set('octaveSpread', clampInt(v, -3, 3, 0))} />
     </PropertyCell>
-    <PropertyCell label="Max voices" span={1} hint="A hard ceiling on how many notes one key can produce.">
-      <input class="val" type="number" min="1" max={MAX_VOICES} step="1" value={num(p.maxVoices, 6)} onchange={(e) => set('maxVoices', clampInt(e.target.value, 1, MAX_VOICES, 6))} />
+    <PropertyCell label="Max voices" span={1} compact hint="A hard ceiling on how many notes one key can produce.">
+      <NumberCell label="Max" min={1} max={MAX_VOICES} step={1} value={num(p.maxVoices, 6)} defaultValue={6} onchange={(v) => set('maxVoices', clampInt(v, 1, MAX_VOICES, 6))} />
     </PropertyCell>
 
     <PropertyCell label="Keep played note" span={2} hint="Send the played note along with the harmony. Off sends the harmony only.">
       <PropertyToggle value={p.keepPlayed !== false} onchange={() => set('keepPlayed', !(p.keepPlayed !== false))} />
     </PropertyCell>
-    <PropertyCell label="In channel" span={1} hint="0 listens on every channel.">
-      <input class="val" type="number" min="0" max="16" step="1" value={num(p.inputChannel, 0)} onchange={(e) => set('inputChannel', clampInt(e.target.value, 0, 16, 0))} />
+    <PropertyCell label="In channel" span={1} compact hint="0 listens on every channel.">
+      <NumberCell label="Ch" min={0} max={16} step={1} value={num(p.inputChannel, 0)} defaultValue={0} onchange={(v) => set('inputChannel', clampInt(v, 0, 16, 0))} />
     </PropertyCell>
-    <PropertyCell label="Out channel" span={1} hint="Where the chord is sent.">
-      <input class="val" type="number" min="1" max="16" step="1" value={num(p.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
+    <PropertyCell label="Out channel" span={1} compact hint="Where the chord is sent.">
+      <NumberCell label="Ch" min={1} max={16} step={1} value={num(p.channel, 1)} defaultValue={1} onchange={(v) => set('channel', clampInt(v, 1, 16, 1))} />
     </PropertyCell>
-    <PropertyCell label="Velocity" span={1} hint="0 follows the velocity you played. Any other value is fixed — an organ-like part that ignores how hard you hit it.">
-      <input class="val" type="number" min="0" max="127" step="1" value={num(p.velocity, 0)} onchange={(e) => set('velocity', clampInt(e.target.value, 0, 127, 0))} />
+    <PropertyCell label="Velocity" span={1} compact hint="0 follows the velocity you played. Any other value is fixed — an organ-like part that ignores how hard you hit it.">
+      <NumberCell label="Vel" min={0} max={127} step={1} value={num(p.velocity, 0)} defaultValue={0} onchange={(v) => set('velocity', clampInt(v, 0, 127, 0))} />
     </PropertyCell>
 
     <PropertyCell label="" span={4} hint={isMemory ? 'The shape applied to C.' : 'The chord built on every degree of the key.'}>
@@ -169,8 +170,8 @@
         {#each VOICE_LEADING as v (v)}<option value={v}>{VOICE_LEADING_LABELS[v] ?? v}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Strum" span={1} hint="Spread the chord over this many milliseconds. Note-offs are never strummed.">
-      <input class="val" type="number" min="0" max="400" step="5" value={harmoniserStrum(control)} onchange={(e) => set('strumMs', clampInt(e.target.value, 0, 400, 0))} />
+    <PropertyCell label="Strum" span={1} compact hint="Spread the chord over this many milliseconds. Note-offs are never strummed.">
+      <NumberCell label="Strum" min={0} max={400} step={5} value={harmoniserStrum(control)} onchange={(v) => set('strumMs', clampInt(v, 0, 400, 0))} />
     </PropertyCell>
     <PropertyCell label="Direction" span={1} hint="Which end of the chord arrives first.">
       <select class="val" value={p.strumDirection ?? 'up'} onchange={(e) => set('strumDirection', e.target.value)}>
@@ -193,8 +194,8 @@
           An override replaces the stacked chord for <b>one</b> degree and leaves the others alone.
         </div>
       </PropertyCell>
-      <PropertyCell label="Degree" span={1} hint="1 is the tonic.">
-        <input class="val" type="number" min="1" max={degreeCount} step="1" value={selDegree} onchange={(e) => { selDegree = clampInt(e.target.value, 1, degreeCount, 1); }} />
+      <PropertyCell label="Degree" span={1} compact hint="1 is the tonic.">
+        <NumberCell label="Deg" min={1} max={degreeCount} step={1} value={selDegree} onchange={(v) => { selDegree = clampInt(v, 1, degreeCount, 1); }} />
       </PropertyCell>
       <PropertyCell label="Chord" span={2} hint="Semitones from the played note, comma separated. Blank uses the stacked thirds.">
         <input class="val" type="text" placeholder="stacked thirds" value={(degreeOverride ?? []).join(', ')} onchange={(e) => setDegreeText(e.target.value)} />
@@ -217,11 +218,11 @@
     <PropertyCell label="Header" span={1} hint="The chord name and mode strip.">
       <PropertyToggle value={p.showHeader !== false} onchange={() => set('showHeader', !(p.showHeader !== false))} />
     </PropertyCell>
-    <PropertyCell label="Low note" span={1} hint="The keyboard's resting low note when nothing is sounding. It stretches to fit whatever plays.">
-      <input class="val" type="number" min="0" max="108" step="1" value={num(p.displayLow, 48)} onchange={(e) => set('displayLow', clampInt(e.target.value, 0, 108, 48))} />
+    <PropertyCell label="Low note" span={1} compact hint="The keyboard's resting low note when nothing is sounding. It stretches to fit whatever plays.">
+      <NumberCell label="Note" min={0} max={108} step={1} value={num(p.displayLow, 48)} defaultValue={48} onchange={(v) => set('displayLow', clampInt(v, 0, 108, 48))} />
     </PropertyCell>
-    <PropertyCell label="Span" span={1} hint="How many semitones it shows at rest.">
-      <input class="val" type="number" min="12" max="60" step="1" value={num(p.displaySpan, 24)} onchange={(e) => set('displaySpan', clampInt(e.target.value, 12, 60, 24))} />
+    <PropertyCell label="Span" span={1} compact hint="How many semitones it shows at rest.">
+      <NumberCell label="Span" min={12} max={60} step={1} value={num(p.displaySpan, 24)} defaultValue={24} onchange={(v) => set('displaySpan', clampInt(v, 12, 60, 24))} />
     </PropertyCell>
   </PropertySection>
 

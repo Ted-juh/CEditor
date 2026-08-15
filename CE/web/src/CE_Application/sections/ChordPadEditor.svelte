@@ -2,6 +2,7 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats, chordPadPads } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
@@ -69,17 +70,17 @@
           <option value="drop2">Drop 2</option>
         </select>
       </PropertyCell>
-      <PropertyCell label="Inversion" span={1} hint="Rotate the chord tones upward.">
-        <input class="val" type="number" min="0" max="3" step="1" value={num(cp.inversion, 0)} onchange={(e) => set('inversion', clampInt(e.target.value, 0, 3, 0))} />
+      <PropertyCell label="Inversion" span={1} compact hint="Rotate the chord tones upward.">
+        <NumberCell label="Inv" min={0} max={3} step={1} value={num(cp.inversion, 0)} defaultValue={0} onchange={(v) => set('inversion', clampInt(v, 0, 3, 0))} />
       </PropertyCell>
     {:else}
-      <PropertyCell label="Octaves" span={2} hint="How many octaves of scale notes to lay out.">
-        <input class="val" type="number" min="1" max="3" step="1" value={num(cp.noteSpan, 2)} onchange={(e) => set('noteSpan', clampInt(e.target.value, 1, 3, 2))} />
+      <PropertyCell label="Octaves" span={2} compact hint="How many octaves of scale notes to lay out.">
+        <NumberCell label="Oct" min={1} max={3} step={1} value={num(cp.noteSpan, 2)} defaultValue={2} onchange={(v) => set('noteSpan', clampInt(v, 1, 3, 2))} />
       </PropertyCell>
     {/if}
     {#if String(cp.layout ?? 'wheel') === 'grid'}
-      <PropertyCell label="Columns" span={2} hint="Grid width.">
-        <input class="val" type="number" min="1" max="8" step="1" value={num(cp.gridCols, 4)} onchange={(e) => set('gridCols', clampInt(e.target.value, 1, 8, 4))} />
+      <PropertyCell label="Columns" span={2} compact hint="Grid width.">
+        <NumberCell label="Cols" min={1} max={8} step={1} value={num(cp.gridCols, 4)} defaultValue={4} onchange={(v) => set('gridCols', clampInt(v, 1, 8, 4))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="" span={4} hint="What the pads currently spell.">
@@ -88,17 +89,17 @@
   </PropertySection>
 
   <PropertySection title="Performance" icon={Activity}>
-    <PropertyCell label="Octave" span={1} hint="Transpose the whole pad in octaves.">
-      <input class="val" type="number" min="-3" max="3" step="1" value={num(cp.octave, 0)} onchange={(e) => set('octave', clampInt(e.target.value, -3, 3, 0))} />
+    <PropertyCell label="Octave" span={1} compact hint="Transpose the whole pad in octaves.">
+      <NumberCell label="Oct" min={-3} max={3} step={1} value={num(cp.octave, 0)} defaultValue={0} onchange={(v) => set('octave', clampInt(v, -3, 3, 0))} />
     </PropertyCell>
-    <PropertyCell label="Velocity" span={1} hint="Note-on velocity (1–127).">
-      <input class="val" type="number" min="1" max="127" step="1" value={num(cp.velocity, 96)} onchange={(e) => set('velocity', clampInt(e.target.value, 1, 127, 96))} />
+    <PropertyCell label="Velocity" span={1} compact hint="Note-on velocity (1–127).">
+      <NumberCell label="Vel" min={1} max={127} step={1} value={num(cp.velocity, 96)} defaultValue={96} onchange={(v) => set('velocity', clampInt(v, 1, 127, 96))} />
     </PropertyCell>
-    <PropertyCell label="Channel" span={1} hint="MIDI channel the notes go out on (1–16).">
-      <input class="val" type="number" min="1" max="16" step="1" value={num(cp.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
+    <PropertyCell label="Channel" span={1} compact hint="MIDI channel the notes go out on (1–16).">
+      <NumberCell label="Ch" min={1} max={16} step={1} value={num(cp.channel, 1)} defaultValue={1} onchange={(v) => set('channel', clampInt(v, 1, 16, 1))} />
     </PropertyCell>
-    <PropertyCell label="Strum" span={1} hint="Milliseconds between chord notes (0 = block chord).">
-      <input class="val" type="number" min="0" max="200" step="2" value={num(cp.strumMs, 0)} onchange={(e) => set('strumMs', clampInt(e.target.value, 0, 200, 0))} />
+    <PropertyCell label="Strum" span={1} compact hint="Milliseconds between chord notes (0 = block chord).">
+      <NumberCell label="Strum" min={0} max={200} step={2} value={num(cp.strumMs, 0)} defaultValue={0} onchange={(v) => set('strumMs', clampInt(v, 0, 200, 0))} />
     </PropertyCell>
     <PropertyCell label="Latch" span={1} hint="Pads keep sounding until tapped again (hands-free auditioning).">
       <PropertyToggle value={cp.latch === true} onchange={() => set('latch', !(cp.latch === true))} />
@@ -116,8 +117,8 @@
       <PropertyToggle value={cp.echo === true} onchange={() => set('echo', !(cp.echo === true))} />
     </PropertyCell>
     {#if cp.echo === true}
-      <PropertyCell label="In channel" span={1} hint="Which MIDI channel to watch. 0 = omni (any channel), which is usually what you want.">
-        <input class="val" type="number" min="0" max="16" step="1" value={num(cp.echoChannel, 0)} onchange={(e) => set('echoChannel', clampInt(e.target.value, 0, 16, 0))} />
+      <PropertyCell label="In channel" span={1} compact hint="Which MIDI channel to watch. 0 = omni (any channel), which is usually what you want.">
+        <NumberCell label="Ch" min={0} max={16} step={1} value={num(cp.echoChannel, 0)} defaultValue={0} onchange={(v) => set('echoChannel', clampInt(v, 0, 16, 0))} />
       </PropertyCell>
       <PropertyCell label="Echo colour" span={1} hint="Colour of the incoming-note outline. Click the swatch to edit it in the Colors tab.">
         <SwatchCluster swatches={[

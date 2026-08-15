@@ -5,6 +5,7 @@
     MIN_BARS, MAX_BARS, MAX_LOOP_BAR, MAX_COUNT_IN_BARS,
   } from '../utils/transportLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
@@ -46,21 +47,21 @@
       </PropertyCell>
     {/if}
 
-    <PropertyCell label="Tempo" span={2} hint="Beats per minute ({MIN_BPM}–{MAX_BPM}). Changing it never jumps the position — only the rate ahead of the current beat." disabled={external}>
-      <input class="val" type="number" min={MIN_BPM} max={MAX_BPM} step="0.1" disabled={external}
-             value={num(t.bpm, 120)} onchange={(e) => set('bpm', clampNum(e.target.value, MIN_BPM, MAX_BPM, 120))} />
+    <PropertyCell label="Tempo" span={2} compact hint="Beats per minute ({MIN_BPM}–{MAX_BPM}). Changing it never jumps the position — only the rate ahead of the current beat." disabled={external}>
+      <NumberCell label="BPM" min={MIN_BPM} max={MAX_BPM} step={0.1} disabled={external}
+             value={num(t.bpm, 120)} defaultValue={120} onchange={(v) => set('bpm', clampNum(v, MIN_BPM, MAX_BPM, 120))} />
     </PropertyCell>
-    <PropertyCell label="Beats/bar" span={1} hint="Time signature numerator — drives the bar.beat readout and the downbeat accent.">
-      <input class="val" type="number" min="1" max="32" step="1" value={num(t.beatsPerBar, 4)} onchange={(e) => set('beatsPerBar', clampInt(e.target.value, 1, 32, 4))} />
+    <PropertyCell label="Beats/bar" span={1} compact hint="Time signature numerator — drives the bar.beat readout and the downbeat accent.">
+      <NumberCell label="Beats" min={1} max={32} step={1} value={num(t.beatsPerBar, 4)} defaultValue={4} onchange={(v) => set('beatsPerBar', clampInt(v, 1, 32, 4))} />
     </PropertyCell>
-    <PropertyCell label="Beat unit" span={1} hint="Time signature denominator (4 = quarter notes).">
-      <input class="val" type="number" min="1" max="32" step="1" value={num(t.beatUnit, 4)} onchange={(e) => set('beatUnit', clampInt(e.target.value, 1, 32, 4))} />
+    <PropertyCell label="Beat unit" span={1} compact hint="Time signature denominator (4 = quarter notes).">
+      <NumberCell label="Unit" min={1} max={32} step={1} value={num(t.beatUnit, 4)} defaultValue={4} onchange={(v) => set('beatUnit', clampInt(v, 1, 32, 4))} />
     </PropertyCell>
     <PropertyCell label="Run on load" span={1} hint="Start the clock as soon as the panel opens, so an exported Player is already running.">
       <PropertyToggle value={t.runOnLoad === true} onchange={() => set('runOnLoad', !(t.runOnLoad === true))} />
     </PropertyCell>
-    <PropertyCell label="Count-in" span={1} hint="Bars of silence before the first step fires when you press play; 0 = off. Synced components hold and stay quiet.">
-      <input class="val" type="number" min="0" max={MAX_COUNT_IN_BARS} step="1" value={num(t.countInBars, 0)} onchange={(e) => set('countInBars', clampInt(e.target.value, 0, MAX_COUNT_IN_BARS, 0))} />
+    <PropertyCell label="Count-in" span={1} compact hint="Bars of silence before the first step fires when you press play; 0 = off. Synced components hold and stay quiet.">
+      <NumberCell label="Bars" min={0} max={MAX_COUNT_IN_BARS} step={1} value={num(t.countInBars, 0)} defaultValue={0} onchange={(v) => set('countInBars', clampInt(v, 0, MAX_COUNT_IN_BARS, 0))} />
     </PropertyCell>
     <PropertyCell label="Clock out" span={1} hint="Send MIDI clock so hardware follows this panel — 24 messages per quarter note.">
       <PropertyToggle value={t.clockOut === true} onchange={() => set('clockOut', !(t.clockOut === true))} />
@@ -77,11 +78,11 @@
                   onchange={() => set('loopEnabled', !(t.loopEnabled === true))} />
     {/snippet}
     {#if t.loopEnabled === true}
-      <PropertyCell label="From bar" span={1} hint="The first bar of the loop, counting from 1.">
-        <input class="val" type="number" min="1" max={MAX_LOOP_BAR} step="1" value={num(t.loopStartBar, 1)} onchange={(e) => set('loopStartBar', clampInt(e.target.value, 1, MAX_LOOP_BAR, 1))} />
+      <PropertyCell label="From bar" span={1} compact hint="The first bar of the loop, counting from 1.">
+        <NumberCell label="Bar" min={1} max={MAX_LOOP_BAR} step={1} value={num(t.loopStartBar, 1)} defaultValue={1} onchange={(v) => set('loopStartBar', clampInt(v, 1, MAX_LOOP_BAR, 1))} />
       </PropertyCell>
-      <PropertyCell label="Length (bars)" span={1} hint="How long the loop is. 0.25 = one beat in 4/4.">
-        <input class="val" type="number" min={MIN_BARS} max={MAX_BARS} step="0.25" value={num(t.loopLengthBars, 4)} onchange={(e) => set('loopLengthBars', clampNum(e.target.value, MIN_BARS, MAX_BARS, 4))} />
+      <PropertyCell label="Length (bars)" span={1} compact hint="How long the loop is. 0.25 = one beat in 4/4.">
+        <NumberCell label="Len" min={MIN_BARS} max={MAX_BARS} step={0.25} value={num(t.loopLengthBars, 4)} defaultValue={4} onchange={(v) => set('loopLengthBars', clampNum(v, MIN_BARS, MAX_BARS, 4))} />
       </PropertyCell>
       <PropertyCell label="" span={2} hint="">
         <div class="note">bars {num(t.loopStartBar, 1)}–{num(t.loopStartBar, 1) + num(t.loopLengthBars, 4)}</div>
@@ -101,8 +102,8 @@
     <PropertyCell label="Position" span={1} hint="Show the bar.beat.tick readout and the beat pulse.">
       <PropertyToggle value={t.showPosition !== false} onchange={() => set('showPosition', !(t.showPosition !== false))} />
     </PropertyCell>
-    <PropertyCell label="Swing" span={1} hint="Shuffle for every follower on this clock — delays every odd step by up to half a step.">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={num(t.swing, 0)} onchange={(e) => set('swing', clampNum(e.target.value, 0, 1, 0))} />
+    <PropertyCell label="Swing" span={1} compact hint="Shuffle for every follower on this clock — delays every odd step by up to half a step.">
+      <NumberCell label="Swing" min={0} max={1} step={0.05} value={num(t.swing, 0)} defaultValue={0} onchange={(v) => set('swing', clampNum(v, 0, 1, 0))} />
     </PropertyCell>
     <PropertyCell label="Tap tempo" span={1} hint="Tapping the face sets the tempo. Inactive while following an external clock or the DAW.">
       <PropertyToggle value={t.showTap !== false} onchange={() => set('showTap', !(t.showTap !== false))} />
