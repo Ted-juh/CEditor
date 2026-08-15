@@ -14,6 +14,16 @@
   import Keyboard from 'lucide-svelte/icons/keyboard';
   import MousePointerClick from 'lucide-svelte/icons/mouse-pointer-click';
   import Activity from 'lucide-svelte/icons/activity';
+  import Settings2 from 'lucide-svelte/icons/settings-2';
+  import Hash from 'lucide-svelte/icons/hash';
+  import Zap from 'lucide-svelte/icons/zap';
+  import ToggleRight from 'lucide-svelte/icons/toggle-right';
+  import CircleDot from 'lucide-svelte/icons/circle-dot';
+  import RotateCw from 'lucide-svelte/icons/rotate-cw';
+  import ChevronsUpDown from 'lucide-svelte/icons/chevrons-up-down';
+  import Clock from 'lucide-svelte/icons/clock';
+  import Target from 'lucide-svelte/icons/target';
+  import Play from 'lucide-svelte/icons/play';
 
   let { control = null } = $props();
 
@@ -180,7 +190,7 @@
 </script>
 
 {#if behavior}
-  <PropertySection title="Behavior">
+  <PropertySection title="Behavior" icon={Settings2}>
     <PropertyCell label="Type" span={showSubtypeSelector ? 2 : 4} hint="Behavior is defined by the inserted button type.">
       <input class="val" type="text" value={buttonType} readonly />
     </PropertyCell>
@@ -207,7 +217,7 @@
   </PropertySection>
 
   {#if showValueSection}
-    <PropertySection title="Value">
+    <PropertySection title="Value" icon={Hash}>
       {#if isTwoValueRange}
         <PropertyCell label="Variant" span={4} hint="Spinner = boxed [low] [− +] [high]; Slider = dual-handle min/max track.">
           <select class="val" value={rangeVariant} onchange={(event) => setVariant(event.target.value)}>
@@ -245,7 +255,7 @@
   {/if}
 
   {#if buttonType === 'momentary'}
-    <PropertySection title="Momentary">
+    <PropertySection title="Momentary" icon={Zap}>
       {#if momentarySubtype === 'action'}
         <PropertyCell label="Fire On" span={4} hint="Choose whether the action triggers on press start or on release.">
           <Segmented
@@ -275,7 +285,7 @@
       {/if}
     </PropertySection>
   {:else if buttonType === 'toggle'}
-    <PropertySection title="Toggle">
+    <PropertySection title="Toggle" icon={ToggleRight}>
       <PropertyCell label="Allow Off" span={2} hint="Permit the active state to be switched back off.">
         <PropertyToggle value={behavior.allowUncheck !== false} onchange={() => set('allowUncheck', !(behavior.allowUncheck !== false))} />
       </PropertyCell>
@@ -284,7 +294,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if buttonType === 'radio'}
-    <PropertySection title="Radio Group">
+    <PropertySection title="Radio Group" icon={CircleDot}>
       <PropertyCell label="Style" span={2} hint="Choose the visual style for the group items.">
         <Segmented
           ariaLabel="Visual style"
@@ -325,7 +335,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if buttonType === 'cyclic'}
-    <PropertySection title="Cyclic">
+    <PropertySection title="Cyclic" icon={RotateCw}>
       <PropertyCell label="Allow" span={2} hint="Wrap to the first row after the last state, allow a mixed state. Hover a chip for its name.">
         <FlagStrip
           flags={[
@@ -340,7 +350,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if buttonType === 'combobox'}
-    <PropertySection title="Combobox">
+    <PropertySection title="Combobox" icon={ChevronsUpDown}>
       <PropertyCell label="Mode" span={2} hint="Dropdown uses the value rows as selectable options.">
         <Segmented
           ariaLabel="Combobox mode"
@@ -363,7 +373,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if buttonType === 'timed'}
-    <PropertySection title="Timed">
+    <PropertySection title="Timed" icon={Clock}>
       <PropertyCell label="Hold ms" span={2} compact hint="Required hold time for hold-to-confirm buttons.">
         <NumberCell label="Hold" value={behavior.holdDuration ?? 1200} defaultValue={1200} step={50} min={0} onchange={(value) => set('holdDuration', value)} />
       </PropertyCell>
@@ -375,7 +385,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if buttonType === 'one_shot'}
-    <PropertySection title="One-Shot">
+    <PropertySection title="One-Shot" icon={Target}>
       <PropertyCell label="Disable" span={2} hint="Disable the button after the first successful use.">
         <PropertyToggle value={behavior.disableAfterUse !== false} onchange={() => set('disableAfterUse', !(behavior.disableAfterUse !== false))} />
       </PropertyCell>
@@ -385,7 +395,7 @@
     </PropertySection>
   {/if}
 
-  <PropertySection title="Runtime">
+  <PropertySection title="Runtime" icon={Play}>
     <PropertyCell label="Input" span={2} hint="Keyboard focus, keyboard activation. Hover a chip for its name.">
       <FlagStrip
         flags={[

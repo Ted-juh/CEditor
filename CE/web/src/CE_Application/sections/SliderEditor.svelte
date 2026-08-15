@@ -18,6 +18,11 @@
   import CheckCheck from 'lucide-svelte/icons/check-check';
   import Hand from 'lucide-svelte/icons/hand';
   import Type from 'lucide-svelte/icons/type';
+  import Bookmark from 'lucide-svelte/icons/bookmark';
+  import Shapes from 'lucide-svelte/icons/shapes';
+  import Hash from 'lucide-svelte/icons/hash';
+  import MousePointer from 'lucide-svelte/icons/mouse-pointer';
+  import Palette from 'lucide-svelte/icons/palette';
   import BackgroundEditor from './BackgroundEditor.svelte';
   import { createSliderSemanticParts } from '../utils/sliderEntityFactory.js';
   import { numberOr } from '../utils/primitives.js';
@@ -166,7 +171,7 @@
 </script>
 
 {#if behavior}
-  <PropertySection title="Slider Presets">
+  <PropertySection title="Slider Presets" icon={Bookmark}>
     <PropertyCell label="Linear" span={4} hint="Insert a ready-made starting point and refresh the semantic slider style parts.">
       <div class="preset-grid">
         <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'linear', valueMode: 'single', direction: 'ltr', width: 220, height: 48 })}>Single</button>
@@ -188,7 +193,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Type">
+  <PropertySection title="Type" icon={Shapes}>
     <PropertyCell label="Geometry" span={2} hint="Linear uses a track axis, circular uses a dial arc.">
       <select class="val" value={geometry} onchange={(event) => set('Behavior.geometry', event.target.value)}>
         <option value="linear">linear</option>
@@ -258,7 +263,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Values">
+  <PropertySection title="Values" icon={Hash}>
     <PropertyCell label="Min" span={1} compact hint="Numeric minimum for the slider domain.">
       <NumberCell label="Min" value={behavior.min ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.min', value)} />
     </PropertyCell>
@@ -316,7 +321,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Ticks & Labels">
+  <PropertySection title="Ticks & Labels" icon={Ruler}>
     <PropertyCell label="Show" span={4} hint="Ticks, min/max labels, handle labels, readout, centre marker. Right-click min/max or readout to place them.">
       <FlagStrip
         flags={[
@@ -390,7 +395,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Interaction">
+  <PropertySection title="Interaction" icon={MousePointer}>
     <PropertyCell label="Track Click" span={2} hint="Choose whether a click grabs the nearest handle or keeps using the active one.">
       <select class="val" value={behavior.trackClickMode ?? 'moveNearestHandle'} onchange={(event) => set('Behavior.trackClickMode', event.target.value)}>
         <option value="moveNearestHandle">moveNearestHandle</option>
@@ -425,7 +430,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Formatting">
+  <PropertySection title="Formatting" icon={Type}>
     <PropertyCell label="Prefix" span={1} hint="Shown before numeric values in handle labels and the readout.">
       <input class="val" type="text" value={behavior.prefix ?? ''} onchange={(event) => set('Behavior.prefix', event.target.value)} />
     </PropertyCell>
@@ -440,7 +445,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Style">
+  <PropertySection title="Style" icon={Palette}>
     <PropertyCell label="Edit Part" span={4} hint="Choose which slider element gets the full layered fill editor with solid, gradient, image, and overlay support.">
       <div class="style-target-grid">
         {#each STYLE_TARGETS as target (target.id)}

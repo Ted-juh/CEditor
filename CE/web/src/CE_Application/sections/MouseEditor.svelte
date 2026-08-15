@@ -32,6 +32,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
   import MousePointerClick from 'lucide-svelte/icons/mouse-pointer-click';
   import Layers from 'lucide-svelte/icons/layers';
   import BringToFront from 'lucide-svelte/icons/bring-to-front';
@@ -39,6 +40,10 @@
   import FlipVertical from 'lucide-svelte/icons/flip-vertical-2';
   import Mouse from 'lucide-svelte/icons/mouse';
   import MoveHorizontal from 'lucide-svelte/icons/move-horizontal';
+  import MousePointer from 'lucide-svelte/icons/mouse-pointer';
+  import Focus from 'lucide-svelte/icons/focus';
+  import Hand from 'lucide-svelte/icons/hand';
+  import ChevronsUpDown from 'lucide-svelte/icons/chevrons-up-down';
 
   let { control = null } = $props();
 
@@ -76,7 +81,7 @@
 </script>
 
 {#if m}
-  <PropertySection title="Pointer">
+  <PropertySection title="Pointer" icon={MousePointer}>
     <PropertyCell label="Cursor" span={2} hint="Pointer shape over this control in preview and in the plugin. 'default' leaves the surface's own cursor alone.">
       <select class="val" value={getCursor(m)} onchange={(event) => set('cursor', event.target.value)}>
         {#each CURSOR_OPTIONS as option (option)}<option value={option}>{option}</option>{/each}
@@ -103,19 +108,23 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Focus">
-    <PropertyCell label="Focusable" span={2} hint="Let the control take keyboard focus in preview and in the plugin. Off keeps it out of the tab order entirely.">
-      <PropertyToggle value={focusable} onchange={() => set('focusable', !focusable)} />
-    </PropertyCell>
-    <PropertyCell label="Tab Index" span={2} hint="Position in the tab order. -1 means reachable by click but skipped by Tab; 0 means natural order. Controls with a role of their own keep the order the surface assigns.">
-      <input class="val" type="number" min="-1" max="999" step="1" value={resolveTabIndex(m)} onchange={(event) => set('tabIndex', clampInt(event.target.value, -1, 999, -1))} />
-    </PropertyCell>
-    <PropertyCell label="Focus Ring" span={2} hint="Draw a ring when focus arrives by keyboard. Clicking never draws it, which is what a plugin UI wants.">
-      <PropertyToggle value={m.focusOutline === true} onchange={() => set('focusOutline', !(m.focusOutline === true))} />
-    </PropertyCell>
+  <PropertySection title="Focus" icon={Focus}>
+    {#snippet tools()}
+      <HeaderPill value={focusable}
+                  title="Let the control take keyboard focus in preview and in the plugin. Off keeps it out of the tab order entirely."
+                  onchange={() => set('focusable', !focusable)} />
+    {/snippet}
+    {#if focusable}
+      <PropertyCell label="Tab Index" span={2} hint="Position in the tab order. -1 means reachable by click but skipped by Tab; 0 means natural order. Controls with a role of their own keep the order the surface assigns.">
+        <input class="val" type="number" min="-1" max="999" step="1" value={resolveTabIndex(m)} onchange={(event) => set('tabIndex', clampInt(event.target.value, -1, 999, -1))} />
+      </PropertyCell>
+      <PropertyCell label="Focus Ring" span={2} hint="Draw a ring when focus arrives by keyboard. Clicking never draws it, which is what a plugin UI wants.">
+        <PropertyToggle value={m.focusOutline === true} onchange={() => set('focusOutline', !(m.focusOutline === true))} />
+      </PropertyCell>
+    {/if}
   </PropertySection>
 
-  <PropertySection title="Drag">
+  <PropertySection title="Drag" icon={Hand}>
     <PropertyCell label="Drag Mode" span={2} hint="How pointer motion becomes value. auto follows the control's own geometry — the behaviour it had before this setting existed. vertical is the plugin-standard knob drag; circular follows rotation about the centre; free counts motion in every direction.">
       <select class="val" value={dragMode} onchange={(event) => set('dragMode', event.target.value)}>
         {#each DRAG_MODE_OPTIONS as option (option)}<option value={option}>{option}</option>{/each}
@@ -139,7 +148,7 @@
   </PropertySection>
 
   {#if hasWheelBehavior}
-    <PropertySection title="Wheel">
+    <PropertySection title="Wheel" icon={ChevronsUpDown}>
       <PropertyCell label="Wheel" span={2} hint="Wheel scrubbing, reversed mouse direction — shared with the Slider tab. Hover a chip for its name.">
         <FlagStrip
           flags={[

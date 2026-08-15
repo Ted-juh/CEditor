@@ -20,6 +20,11 @@
   import LocateFixed from 'lucide-svelte/icons/locate-fixed';
   import Search from 'lucide-svelte/icons/search';
   import Highlighter from 'lucide-svelte/icons/highlighter';
+  import List from 'lucide-svelte/icons/list';
+  import MousePointerClick from 'lucide-svelte/icons/mouse-pointer-click';
+  import ArrowUpDown from 'lucide-svelte/icons/arrow-up-down';
+  import MousePointer from 'lucide-svelte/icons/mouse-pointer';
+  import Database from 'lucide-svelte/icons/database';
   import { syncPresetChoiceRows, initPresetChoiceSync } from '../stores/presetChoiceSync.js';
 
   let { control = null } = $props();
@@ -37,7 +42,7 @@
 </script>
 
 {#if lb}
-  <PropertySection title="Rows">
+  <PropertySection title="Rows" icon={List}>
     <PropertyCell label="Row height" span={2} compact hint="Fixed row height in px (0 = auto from font size).">
       <NumberCell label="Height" value={lb.rowHeight ?? 0} step={1} min={0} max={80} defaultValue={0} onchange={(v) => set('rowHeight', Math.max(0, Math.round(v)))} />
     </PropertyCell>
@@ -84,7 +89,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Selection">
+  <PropertySection title="Selection" icon={MousePointerClick}>
     <PropertyCell label="Style" span={2} hint="How the selected row is marked.">
       <select class="val" value={lb.selectionStyle ?? 'bar'} onchange={(e) => set('selectionStyle', e.target.value)}>
         <option value="bar">Full bar</option>
@@ -107,7 +112,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Scroll & navigation">
+  <PropertySection title="Scroll & navigation" icon={ArrowUpDown}>
     <PropertyCell label="Scroll" span={2} hint="Line-by-line snap, or smooth/pixel scrolling.">
       <Segmented
         ariaLabel="Scroll mode"
@@ -132,7 +137,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Search">
+  <PropertySection title="Search" icon={Search}>
     <PropertyCell label="Type-ahead" span={2} hint="Focus + type to jump to a matching row.">
       <Segmented
         ariaLabel="Type-ahead"
@@ -156,7 +161,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Interaction">
+  <PropertySection title="Interaction" icon={MousePointer}>
     <PropertyCell label="Hover" span={1} hint="Highlight the row under the pointer.">
       <PropertyToggle value={lb.hoverHighlight !== false} onchange={() => toggle('hoverHighlight', true)} />
     </PropertyCell>
@@ -183,7 +188,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Data">
+  <PropertySection title="Data" icon={Database}>
     <PropertyCell label="Source" span={2} hint="Rows from the Value editor, the device's live preset list, or the profile's shipped factory catalog.">
       <select class="val" value={lb.choiceSource ?? 'rows'} onchange={(e) => { set('choiceSource', e.target.value); if (e.target.value !== 'rows') syncPresetChoiceRows({}); }}>
         <option value="rows">Value rows</option>
