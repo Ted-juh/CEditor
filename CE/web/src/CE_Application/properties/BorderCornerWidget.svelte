@@ -557,24 +557,10 @@
   .corner-cell.sel { outline: 2px solid #E5A029; outline-offset: -2px; }
 
   .corner-input {
-    width: 30px;
-    height: 16px;
-    background: #111;
-    border: 1px solid #444;
-    border-radius: 2px;
-    color: #DDD;
-    font-size: 9px;
-    font-family: inherit;
-    text-align: center;
-    outline: none;
-    padding: 0 1px;
-    cursor: text;
-    appearance: textfield;
-    -moz-appearance: textfield;
+    width: 44px;
+    max-width: 100%;
   }
-  .corner-input::-webkit-inner-spin-button,
-  .corner-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-  .corner-input:focus { border-color: #5B9BD5; background: #1A1A1A; }
+  .nc-wrap { display: flex; }
 
   /* Edit rows */
   .edit-row {
