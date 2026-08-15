@@ -8,6 +8,11 @@
   import FlagStrip from '../properties/FlagStrip.svelte';
   import ArrowRightToLine from 'lucide-svelte/icons/arrow-right-to-line';
   import ArrowRightFromLine from 'lucide-svelte/icons/arrow-right-from-line';
+  import Share2 from 'lucide-svelte/icons/share-2';
+  import Eye from 'lucide-svelte/icons/eye';
+  import LogIn from 'lucide-svelte/icons/log-in';
+  import LogOut from 'lucide-svelte/icons/log-out';
+  import Pencil from 'lucide-svelte/icons/pencil';
 
   let { control = null } = $props();
 
@@ -425,7 +430,7 @@
 </script>
 
 {#if published}
-  <PropertySection title="Public API">
+  <PropertySection title="Public API" icon={Share2}>
     <PropertyCell label="Name" span={2} hint="Addressable name for external links and future scripts.">
       <input class="val" type="text" value={api?.addressableName ?? ''} onchange={(event) => set('ExternalAPI.addressableName', event.target.value)} />
     </PropertyCell>
@@ -450,7 +455,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="API Preview">
+  <PropertySection title="API Preview" icon={Eye}>
     <PropertyCell label="Status" span={2} hint="Readiness of the public contract for library reuse and cross-component links.">
       <div class="contract-status" class:warn={contractStatus.label !== 'Ready'}>
         <strong>{contractStatus.label}</strong>
@@ -556,7 +561,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Published Inputs">
+  <PropertySection title="Published Inputs" icon={LogIn}>
     <PropertyCell label="Add" span={2} hint="Add a public input by name.">
       <input class="val" type="text" bind:value={newInputName} placeholder="inputName" />
     </PropertyCell>
@@ -635,7 +640,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Published Outputs">
+  <PropertySection title="Published Outputs" icon={LogOut}>
     <PropertyCell label="Add" span={3} hint="Add a public output by name.">
       <input class="val" type="text" bind:value={newOutputName} placeholder="outputName" />
     </PropertyCell>
@@ -711,7 +716,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Editable Properties">
+  <PropertySection title="Editable Properties" icon={Pencil}>
     <PropertyCell label="Add" span={3} hint="Add a friendly editable property by name.">
       <input class="val" type="text" bind:value={newPropertyName} placeholder="propertyName" />
     </PropertyCell>

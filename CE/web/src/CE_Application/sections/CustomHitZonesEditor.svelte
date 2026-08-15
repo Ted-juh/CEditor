@@ -7,6 +7,10 @@
   import Segmented from '../properties/Segmented.svelte';
   import CheckSquare from 'lucide-svelte/icons/square-check';
   import Eye from 'lucide-svelte/icons/eye';
+  import SquareDashed from 'lucide-svelte/icons/square-dashed';
+  import MapIcon from 'lucide-svelte/icons/map';
+  import Target from 'lucide-svelte/icons/target';
+  import Move from 'lucide-svelte/icons/move';
   import ConditionBuilder from './ConditionBuilder.svelte';
   import { createHitZone } from '../utils/customComponentFactory.js';
 
@@ -153,7 +157,7 @@
 </script>
 
 {#if zones}
-  <PropertySection title="Hit Zones">
+  <PropertySection title="Hit Zones" icon={SquareDashed}>
     <PropertyCell label="Add" span={3} hint="Create an interaction area independent from visible layers.">
       <input class="val" type="text" bind:value={newName} placeholder="hitZoneName" />
     </PropertyCell>
@@ -174,7 +178,7 @@
   </PropertySection>
 
   {#if selected}
-    <PropertySection title="Hit Zone Map">
+    <PropertySection title="Hit Zone Map" icon={MapIcon}>
       <PropertyCell label="Map" span={2} hint="Scaled overview of authored hit zones.">
         <div class="zone-map">
           <div class="map-stage">
@@ -229,7 +233,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Target">
+    <PropertySection title="Target" icon={Target}>
       <PropertyCell label="State" span={2} hint="Zone enabled, visible in designer/debug overlays. Hover a chip for its name.">
         <FlagStrip
           flags={[
@@ -280,7 +284,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Bounds">
+    <PropertySection title="Bounds" icon={Move}>
       <PropertyCell label="X" span={1} compact hint="Zone X in its configured unit.">
         <NumberCell label="X" value={selected.bounds?.x ?? 0} step={1} defaultValue={0} onchange={(value) => set('bounds.x', value)} />
       </PropertyCell>

@@ -4,6 +4,10 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+  import Square from 'lucide-svelte/icons/square';
+  import Move from 'lucide-svelte/icons/move';
+  import Layers from 'lucide-svelte/icons/layers';
 
   let { control = null } = $props();
 
@@ -34,7 +38,7 @@
 </script>
 
 {#if layout}
-  <PropertySection title="Layout">
+  <PropertySection title="Layout" icon={LayoutGrid}>
     <PropertyCell label="Mode" span={2} hint="Choose how text and icon are arranged inside the component.">
       <select class="val" value={layout.mode ?? 'text_only'} onchange={(event) => set('mode', event.target.value)}>
         {#each MODE_OPTIONS as option}
@@ -61,7 +65,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Padding">
+  <PropertySection title="Padding" icon={Square}>
     <PropertyCell label="Padding Left" span={1} compact hint="Left padding inside the button frame.">
       <NumberCell label="L" value={layout.paddingLeft ?? 8} step={1} min={0} defaultValue={8} onchange={(value) => set('paddingLeft', value)} />
     </PropertyCell>
@@ -76,7 +80,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Offsets">
+  <PropertySection title="Offsets" icon={Move}>
     <PropertyCell label="Text Offset X" span={1} compact hint="Nudge the text content horizontally.">
       <NumberCell label="Txt X" value={layout.textOffsetX ?? 0} step={1} defaultValue={0} onchange={(value) => set('textOffsetX', value)} />
     </PropertyCell>
@@ -91,7 +95,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Overlay">
+  <PropertySection title="Overlay" icon={Layers}>
     <PropertyCell label="Text Z" span={2} compact hint="Text should usually stay above the icon in overlay mode.">
       <NumberCell label="Text Z" value={layout.textZIndex ?? 2} step={1} defaultValue={2} onchange={(value) => set('textZIndex', value)} />
     </PropertyCell>

@@ -9,6 +9,10 @@
   import Copy from 'lucide-svelte/icons/copy';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Haze from 'lucide-svelte/icons/haze';
+  import WandSparkles from 'lucide-svelte/icons/wand-sparkles';
+  import Box from 'lucide-svelte/icons/box';
+  import Type from 'lucide-svelte/icons/type';
+  import ImageIcon from 'lucide-svelte/icons/image';
 
   let { control = null } = $props();
 
@@ -38,7 +42,7 @@
 </script>
 
 {#if effects}
-  <PropertySection title="Effects Target">
+  <PropertySection title="Effects Target" icon={WandSparkles}>
     <PropertyCell label="Target" span={4} hint="Centralized effects editing for component, text, and icon.">
       <div class="target-row">
         {#each TARGETS as target}
@@ -51,7 +55,7 @@
   </PropertySection>
 
   {#if selectedTarget === 'component'}
-    <PropertySection title="Component Effects">
+    <PropertySection title="Component Effects" icon={Box}>
       <PropertyCell label="Shadow" span={1} hint="Enable the first component drop shadow.">
         <PropertyToggle
           value={effects?._children?.Shadows?.items?.[0]?.enabled === true}
@@ -73,7 +77,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if selectedTarget === 'text' && textEffects}
-    <PropertySection title="Text Effects">
+    <PropertySection title="Text Effects" icon={Type}>
       <PropertyCell label="Enable" span={2} hint="Text shadow, glow, blur. Hover a chip for its name.">
         <FlagStrip
           flags={[
@@ -101,7 +105,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if selectedTarget === 'icon' && iconEffects}
-    <PropertySection title="Icon Effects">
+    <PropertySection title="Icon Effects" icon={ImageIcon}>
       <PropertyCell label="Enable" span={2} hint="Icon shadow, glow, blur. Hover a chip for its name.">
         <FlagStrip
           flags={[

@@ -4,7 +4,13 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
   import MousePointer from 'lucide-svelte/icons/mouse-pointer';
+  import Settings2 from 'lucide-svelte/icons/settings-2';
+  import Eye from 'lucide-svelte/icons/eye';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Hash from 'lucide-svelte/icons/hash';
+  import StickyNote from 'lucide-svelte/icons/sticky-note';
   import Keyboard from 'lucide-svelte/icons/keyboard';
   import Mouse from 'lucide-svelte/icons/mouse';
   import Magnet from 'lucide-svelte/icons/magnet';
@@ -220,7 +226,7 @@
 </script>
 
 {#if behaviors}
-  <PropertySection title="Behavior Modules">
+  <PropertySection title="Behavior Modules" icon={Settings2}>
     <PropertyCell label="Add" span={3} hint="Create a behavior module such as slider, button, grid, piano bar, scroll, or filmstrip control.">
       <input class="val" type="text" bind:value={newName} placeholder="behaviorName" />
     </PropertyCell>
@@ -240,7 +246,7 @@
   </PropertySection>
 
   {#if selected}
-    <PropertySection title="Behavior Preview">
+    <PropertySection title="Behavior Preview" icon={Eye}>
       <PropertyCell label="Preview" span={2} hint="Visual sketch of how this behavior responds to input.">
         <div class={`behavior-preview ${behaviorPreviewClass}`} class:disabled={selected?.enabled === false}>
           <span class="preview-stage">
@@ -279,10 +285,13 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Definition">
-      <PropertyCell label="Enabled" span={1} hint="Enable or disable this internal behavior module.">
-        <PropertyToggle value={selected.enabled !== false} onchange={() => set('enabled', !(selected.enabled !== false))} />
-      </PropertyCell>
+    <PropertySection title="Definition" icon={Pencil}>
+      {#snippet tools()}
+        <HeaderPill value={selected.enabled !== false}
+                    title="Enable or disable this internal behavior module."
+                    onchange={() => set('enabled', !(selected.enabled !== false))} />
+      {/snippet}
+      {#if selected.enabled !== false}
       <PropertyCell label="Type" span={2} hint="Behavior type decides what interaction rules are available.">
         <select class="val" value={selected.type ?? 'slider'} onchange={(event) => handleTypeChange(event.target.value)}>
           {#each TYPE_OPTIONS as option}
@@ -311,9 +320,10 @@
           {/each}
         </select>
       </PropertyCell>
+      {/if}
     </PropertySection>
 
-    <PropertySection title="Interaction">
+    <PropertySection title="Interaction" icon={MousePointer}>
       <PropertyCell label="Input" span={4} hint="Pointer, keyboard, wheel, snap, reverse mouse. Hover a chip for its name.">
         <FlagStrip
           flags={[
@@ -380,7 +390,7 @@
     </PropertySection>
 
     {#if selected.type === 'xy-pad' || selected.role === 'xyPad' || selected.role === 'xy-pad' || selected.geometry === 'xy' || selected.geometry === 'grid'}
-      <PropertySection title="XY Channels">
+      <PropertySection title="XY Channels" icon={Hash}>
         <PropertyCell label="X Channel" span={2} hint="Horizontal value controlled by this XY behavior.">
           <select class="val" value={selectedValueChannels[0] ?? selected.valueChannel ?? ''} onchange={(event) => setValueChannelAt(0, event.target.value)}>
             <option value="">none</option>
@@ -411,7 +421,7 @@
       </PropertySection>
     {/if}
 
-    <PropertySection title="Notes">
+    <PropertySection title="Notes" icon={StickyNote}>
       <PropertyCell label="Purpose" span={4} hint="Short design note for collaborators and downloaded components.">
         <textarea class="val code" rows="4" value={selected.description ?? ''} onchange={(event) => set('description', event.target.value)}></textarea>
       </PropertyCell>

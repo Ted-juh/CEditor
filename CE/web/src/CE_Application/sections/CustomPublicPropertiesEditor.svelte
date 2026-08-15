@@ -3,6 +3,11 @@
   import LayoutDashboard from 'lucide-svelte/icons/layout-dashboard';
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
   import X from 'lucide-svelte/icons/x';
+  import Share2 from 'lucide-svelte/icons/share-2';
+  import LogIn from 'lucide-svelte/icons/log-in';
+  import LogOut from 'lucide-svelte/icons/log-out';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import CircleOff from 'lucide-svelte/icons/circle-off';
   import { getSection, applyControlPatch, updateControlProperty } from '../stores/controls.js';
   import { valueAtPath } from '../stores/controlTreeUtils.js';
   import { fingerprintCustomComponent } from '../utils/customComponentPackage.js';
@@ -217,7 +222,7 @@
   }
 </script>
 
-<PropertySection title="Public API">
+<PropertySection title="Public API" icon={Share2}>
   <PropertyCell label="Name" span={1} hint="The name this component is addressed by when a panel places it.">
     <div class="contract-card">
       <strong>{contractLabel}</strong>
@@ -285,7 +290,7 @@
 </PropertySection>
 
 {#if inputEntries.length}
-  <PropertySection title="Published Inputs">
+  <PropertySection title="Published Inputs" icon={LogIn}>
     {#each inputEntries as [name, entry] (name)}
       {@const channel = channelEntry(entry.channel)}
       {@const type = String(entry.type ?? channel?.type ?? 'float').trim().toLowerCase()}
@@ -333,7 +338,7 @@
 {/if}
 
 {#if propertyEntries.length}
-  <PropertySection title="Editable Properties">
+  <PropertySection title="Editable Properties" icon={Pencil}>
     {#each propertyEntries as [name, entry] (name)}
       {@const type = String(entry.type ?? 'text').trim().toLowerCase()}
       {@const path = String(entry.path ?? '').trim()}
@@ -394,7 +399,7 @@
 {/if}
 
 {#if outputEntries.length}
-  <PropertySection title="Published Outputs">
+  <PropertySection title="Published Outputs" icon={LogOut}>
     <PropertyCell label="Available" span={4} hint="Published output values can be linked to other custom components and panel routes.">
       <div class="output-list">
         {#each outputEntries as [name, entry] (name)}
@@ -409,7 +414,7 @@
 {/if}
 
 {#if !surfaceCount}
-  <PropertySection title="Nothing exposed">
+  <PropertySection title="Nothing exposed" icon={CircleOff}>
     <PropertyCell label="" span={4} hint="This component exposes no public inputs, outputs, or editable properties.">
       <div class="empty-state">No public controls exposed.</div>
     </PropertyCell>

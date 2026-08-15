@@ -2,12 +2,18 @@
   import { applyControlPatch, getSection, updateControlProperty, removeControlNode } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
-  import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
   import Cable from 'lucide-svelte/icons/cable';
   import Magnet from 'lucide-svelte/icons/magnet';
+  import Hash from 'lucide-svelte/icons/hash';
+  import Eye from 'lucide-svelte/icons/eye';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Brackets from 'lucide-svelte/icons/brackets';
+  import Share2 from 'lucide-svelte/icons/share-2';
+  import Type from 'lucide-svelte/icons/type';
   import { createValueChannel } from '../utils/customComponentFactory.js';
   import { normalizeCustomChannelValue, snapCustomChannelValue } from '../utils/customComponentInteraction.js';
 
@@ -198,7 +204,7 @@
 </script>
 
 {#if channels}
-  <PropertySection title="Channels">
+  <PropertySection title="Channels" icon={Hash}>
     <PropertyCell label="Add" span={3} hint="Create a named value channel for sliders, grids, modes, note selections, scroll offsets, and external links.">
       <input class="val" type="text" bind:value={newName} placeholder="channelName" />
     </PropertyCell>
@@ -218,7 +224,7 @@
   </PropertySection>
 
   {#if selected}
-    <PropertySection title="Channel Preview">
+    <PropertySection title="Channel Preview" icon={Eye}>
       <PropertyCell label="Signal" span={2} hint="Default value shown as normalized 0..1 signal.">
         <div class="signal-card">
           <div class="signal-track">
@@ -256,7 +262,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Definition">
+    <PropertySection title="Definition" icon={Pencil}>
       <PropertyCell label="Label" span={2} hint="Friendly label shown in the designer and public API.">
         <input class="val" type="text" value={selected.label ?? selectedName} onchange={(event) => set('label', event.target.value)} />
       </PropertyCell>
@@ -294,10 +300,13 @@
     </PropertySection>
 
     {#if selectedNumeric}
-      <PropertySection title="Constraints">
-        <PropertyCell label="Enabled" span={1} hint="Clamp this channel before bindings, states, links, and preview output use the value.">
-          <PropertyToggle value={selected.constraints?.enabled !== false} onchange={() => set('constraints.enabled', !(selected.constraints?.enabled !== false))} />
-        </PropertyCell>
+      <PropertySection title="Constraints" icon={Brackets}>
+        {#snippet tools()}
+          <HeaderPill value={selected.constraints?.enabled !== false}
+                      title="Clamp this channel before bindings, states, links, and preview output use the value."
+                      onchange={() => set('constraints.enabled', !(selected.constraints?.enabled !== false))} />
+        {/snippet}
+        {#if selected.constraints?.enabled !== false}
         <PropertyCell label="Lower From" span={1} hint="Optional channel this value cannot go below. Use this for value >= min.">
           <select class="val" value={lowerConstraintChannel} onchange={(event) => setConstraintChannel('constraints.normalizedMin', event.target.value, 0)}>
             <option value="">Fixed minimum</option>
@@ -314,7 +323,7 @@
             {/each}
           </select>
         </PropertyCell>
-        <PropertyCell label="Range" span={1} hint="Raw normalized clamp range currently configured for this channel.">
+        <PropertyCell label="Range" span={2} hint="Raw normalized clamp range currently configured for this channel.">
           <div class="constraint-readout">
             <span>{String(selected.constraints?.normalizedMin ?? 0)}</span>
             <span>{String(selected.constraints?.normalizedMax ?? 1)}</span>
@@ -326,10 +335,11 @@
         <PropertyCell label="Upper Gap" span={2} hint="Minimum normalized distance below the upper source. For min, set this to keep it below max.">
           <PropertyScrub value={selected.constraints?.normalizedMaxGap ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(value) => set('constraints.normalizedMaxGap', value)} />
         </PropertyCell>
+        {/if}
       </PropertySection>
     {/if}
 
-    <PropertySection title="Public API">
+    <PropertySection title="Public API" icon={Share2}>
       <PropertyCell label="Published" span={2} hint="Edited in the Publish tab. The channel flags follow it automatically.">
         <div class="published-chip" class:none={!publishedAsLabel}>
           <strong>{publishedAsLabel || 'not published'}</strong>
@@ -350,7 +360,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Formatting & Mapping">
+    <PropertySection title="Formatting & Mapping" icon={Type}>
       <PropertyCell label="Precision" span={1} compact hint="Displayed decimal precision.">
         <NumberCell label="Prec" value={selected.format?.precision ?? 2} step={1} min={0} max={6} defaultValue={2} onchange={(value) => set('format.precision', Math.max(0, Math.round(value)))} />
       </PropertyCell>
