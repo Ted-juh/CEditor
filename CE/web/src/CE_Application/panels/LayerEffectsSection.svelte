@@ -14,6 +14,8 @@
   import AlignmentPicker from '../properties/AlignmentPicker.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import Segmented from '../properties/Segmented.svelte';
+  import ImageIcon from 'lucide-svelte/icons/image';
+  import BrickWall from 'lucide-svelte/icons/brick-wall';
   import BlendModeSelect from '../properties/BlendModeSelect.svelte';
   import FitModeSelect from '../properties/FitModeSelect.svelte';
 
@@ -52,7 +54,14 @@
   let clipMode = $derived(get('ClipMode', 'shape'));
 </script>
 
-<PropertySection title={label} {collapsed} ontoggle={(v) => oncollapsetoggle?.(v)}>
+<PropertySection title={label} icon={prefix === 'Texture' ? BrickWall : ImageIcon} {collapsed} ontoggle={(v) => oncollapsetoggle?.(v)}>
+  {#snippet tools()}
+    <button class="layer-tool-btn" class:active={soloActive} title="Solo layer" onclick={() => onsolo?.()}>S</button>
+    <button class="layer-tool-btn" class:active={muteActive} title="Mute layer" onclick={() => onmute?.()}>M</button>
+    <button class="layer-tool-btn" title="Reset layer" onclick={() => onreset?.()}>R</button>
+    <button class="layer-tool-btn" title="Copy layer settings" onclick={() => oncopy?.()}>C</button>
+    <button class="layer-tool-btn" disabled={!canPaste} title="Paste layer settings" onclick={() => onpaste?.()}>P</button>
+  {/snippet}
   <div class="bg-file-row">
     <button class="bg-browse-btn" title="Browse..." onclick={() => onbrowse?.()}>...</button>
     <input class="val"
@@ -65,13 +74,6 @@
 </PropertySection>
 
 {#if !collapsed}
-  <div class="layer-tools-row">
-    <button class="layer-tool-btn" class:active={soloActive} title="Solo layer" onclick={() => onsolo?.()}>S</button>
-    <button class="layer-tool-btn" class:active={muteActive} title="Mute layer" onclick={() => onmute?.()}>M</button>
-    <button class="layer-tool-btn" title="Reset layer" onclick={() => onreset?.()}>R</button>
-    <button class="layer-tool-btn" title="Copy layer settings" onclick={() => oncopy?.()}>C</button>
-    <button class="layer-tool-btn" disabled={!canPaste} title="Paste layer settings" onclick={() => onpaste?.()}>P</button>
-  </div>
 
   <PropertySection title="Geometry">
     <div class="bg-props-layout">
@@ -237,23 +239,20 @@
     user-select: none;
   }
 
-  .layer-tools-row {
-    display: flex;
-    gap: 4px;
-    padding: 2px 0 4px 0;
-  }
-
+  /* Header-slot sizing: the S/M/R/C/P tools live in the section header now. */
   .layer-tool-btn {
-    width: 24px;
-    height: 22px;
+    width: 18px;
+    height: 16px;
     background: #1A1A1A;
     border: 1px solid #333;
     border-radius: 3px;
     color: #777;
-    font-size: 10px;
+    font-size: 9px;
     font-family: inherit;
     cursor: pointer;
     flex-shrink: 0;
+    padding: 0;
+    line-height: 1;
   }
 
   .layer-tool-btn:hover {

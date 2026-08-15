@@ -4,6 +4,8 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import IterationCcw from 'lucide-svelte/icons/iteration-ccw';
 
   let { control = null } = $props();
 
@@ -37,19 +39,21 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Return to rest">
-    <PropertyCell label="Spring back" span={2} hint="Glide the puck back to centre when released (pitch/mod-wheel feel).">
-      <PropertyToggle value={j.returnToCenter === true} onchange={() => toggle('returnToCenter')} />
-    </PropertyCell>
+  <PropertySection title="Return to rest" icon={IterationCcw}>
+    {#snippet tools()}
+      <HeaderPill value={j.returnToCenter === true}
+                  title="Glide the puck back to centre when released (pitch/mod-wheel feel)"
+                  onchange={() => toggle('returnToCenter')} />
+    {/snippet}
     {#if j.returnToCenter === true}
-      <PropertyCell label="Axes" span={1} hint="Which axes spring back.">
+      <PropertyCell label="Axes" span={2} hint="Which axes spring back.">
         <select class="val" value={j.returnAxes ?? 'both'} onchange={(e) => set('returnAxes', e.target.value)}>
           <option value="both">Both</option>
           <option value="x">X only</option>
           <option value="y">Y only</option>
         </select>
       </PropertyCell>
-      <PropertyCell label="Speed" span={1} hint="Glide speed (units/sec).">
+      <PropertyCell label="Speed" span={2} hint="Glide speed (units/sec).">
         <input class="val" type="number" min="0.5" step="0.5" value={j.returnRate ?? 4} onchange={(e) => set('returnRate', Math.max(0.1, num(e.target.value, 4)))} />
       </PropertyCell>
     {/if}

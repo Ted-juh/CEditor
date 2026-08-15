@@ -2,7 +2,11 @@
   import { setContext } from 'svelte';
   import { propertyFilter } from '../stores/propertyFilter.js';
 
-  let { title = '', collapsed = $bindable(false), ontoggle = null, children } = $props();
+  // `icon` (a lucide-svelte component) gives the header a scannable landmark.
+  // `tools` is an inline snippet rendered at the right edge of the header —
+  // the W6 slot for a master-enable pill, a tiny picker, or an add button —
+  // so a section whose only decision lives in its header needs no body rows.
+  let { title = '', collapsed = $bindable(false), ontoggle = null, icon = undefined, tools = undefined, children } = $props();
 
   let filter = $derived(String($propertyFilter ?? '').trim().toLowerCase());
   let filterActive = $derived(filter !== '');
@@ -36,13 +40,24 @@
 </script>
 
 <div class="property-section" class:filtered-hidden={hideSection}>
-  <button class="property-section-header" onclick={toggle}>
-    <svg class="chevron" class:collapsed={collapsed && !filterActive} width="10" height="10" viewBox="0 0 10 10">
-      <path d="M2 3l3 4 3-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <span class="header-line"></span>
-    <span class="property-section-title">{title}</span>
-  </button>
+  <div class="property-section-header">
+    <button class="header-toggle" onclick={toggle} aria-expanded={!collapsed}>
+      <svg class="chevron" class:collapsed={collapsed && !filterActive} width="10" height="10" viewBox="0 0 10 10">
+        <path d="M2 3l3 4 3-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      {#if icon}
+        {@const Icon = icon}
+        <span class="header-icon"><Icon size={12} strokeWidth={2} /></span>
+      {/if}
+      <span class="header-line"></span>
+      <span class="property-section-title">{title}</span>
+    </button>
+    {#if tools}
+      <span class="header-tools">
+        {@render tools()}
+      </span>
+    {/if}
+  </div>
   {#if renderGrid}
     <div class="property-grid">
       {@render children()}
@@ -63,8 +78,20 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    width: 100%;
-    padding: 6px 8px;
+    padding: 0 8px 0 0;
+  }
+
+  .property-section-header:hover {
+    background: #252525;
+  }
+
+  .header-toggle {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0 6px 8px;
     background: none;
     border: none;
     color: #5B9BD5;
@@ -77,15 +104,28 @@
     text-align: left;
   }
 
+  .property-section-header:hover .header-toggle {
+    color: #BBB;
+  }
+
+  .header-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    opacity: 0.85;
+  }
+
   .header-line {
     flex: 1;
     height: 1px;
     background: #333;
   }
 
-  .property-section-header:hover {
-    background: #252525;
-    color: #BBB;
+  .header-tools {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
   .chevron {
