@@ -9,6 +9,7 @@
   import { resolveInteractiveControl, serializeInteractionRuntime } from '../utils/interactionRuntime.js';
   import { adjustRangeValue, getCurrentRangeValue, getRangeMax, getRangeMin, snapRangeValue } from '../utils/rangeBehavior.js';
   import { numberOr } from '../utils/primitives.js';
+  import NumberCell from '../properties/NumberCell.svelte';
   import {
     formatSliderNumericValue,
     getSliderValueMode,
@@ -496,14 +497,12 @@
                         const next = Number(customChannelValue(channelName, channel)) - numberOr(channel?.step, 0.01);
                         handleCustomChannelChange(channelName, channel, { currentTarget: { value: next } });
                       }}>-</button>
-                      <input
-                        class="number-input"
-                        type="number"
+                      <NumberCell
                         min={numberOr(channel?.min, 0)}
                         max={numberOr(channel?.max, 1)}
                         step={numberOr(channel?.step, 0.01)}
                         value={customChannelValue(channelName, channel)}
-                        oninput={(event) => handleCustomChannelChange(channelName, channel, event)}
+                        onchange={(value) => handleCustomChannelChange(channelName, channel, { currentTarget: { value } })}
                       />
                       <button type="button" class="step-btn" onclick={() => {
                         const next = Number(customChannelValue(channelName, channel)) + numberOr(channel?.step, 0.01);
@@ -544,14 +543,12 @@
                 </label>
                 <div class="range-stepper">
                   <button type="button" class="step-btn" onclick={() => handleSliderRoleStep(role, -1)}>-</button>
-                  <input
-                    class="number-input"
-                    type="number"
+                  <NumberCell
                     min={getRangeMin(behavior)}
                     max={getRangeMax(behavior)}
                     step={numberOr(behavior?.step, 0.01)}
                     value={Number(sliderRuntimeValues?.[role] ?? 0)}
-                    oninput={(event) => handleSliderValueChange(role, event)}
+                    onchange={(value) => handleSliderValueChange(role, { currentTarget: { value } })}
                   />
                   <button type="button" class="step-btn" onclick={() => handleSliderRoleStep(role, 1)}>+</button>
                 </div>
@@ -568,15 +565,13 @@
             </label>
             <div class="range-stepper">
               <button type="button" class="step-btn" onclick={() => handleRangeStep(-1)}>-</button>
-              <input
-              class="number-input"
-              type="number"
-              min={getRangeMin(behavior)}
-              max={getRangeMax(behavior)}
-              step={numberOr(behavior?.step, 0.01)}
-              value={getCurrentRangeValue(behavior, session)}
-              oninput={handleValueChange}
-            />
+              <NumberCell
+                min={getRangeMin(behavior)}
+                max={getRangeMax(behavior)}
+                step={numberOr(behavior?.step, 0.01)}
+                value={getCurrentRangeValue(behavior, session)}
+                onchange={(value) => handleValueChange({ currentTarget: { value } })}
+              />
               <button type="button" class="step-btn" onclick={() => handleRangeStep(1)}>+</button>
             </div>
             <div class="value-readout">
@@ -836,10 +831,6 @@
     letter-spacing: 0.35px;
   }
 
-  .number-input {
-    width: 100%;
-  }
-
   .range-stepper {
     display: grid;
     grid-template-columns: 36px 1fr 36px;
@@ -862,17 +853,6 @@
   .step-btn:hover {
     border-color: #5B9BD5;
     background: #2C2C2C;
-  }
-
-  .number-input {
-    border: 1px solid #3B3B3B;
-    background: #131313;
-    color: #E5E5E5;
-    border-radius: 4px;
-    padding: 6px 8px;
-    font-size: 11px;
-    font-family: inherit;
-    box-sizing: border-box;
   }
 
   .select-input {

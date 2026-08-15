@@ -8,6 +8,7 @@
   import { newPanelDialogOpen, closeNewPanelDialog } from '../stores/newPanelDialog.js';
   import { PANEL_SIZE_PRESETS, PANEL_TEMPLATES, buildPanelFromTemplate } from '../models/panelTemplates.js';
   import { addPanel } from '../stores/panels.js';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let name = $state('');
   let templateId = $state('blank');
@@ -118,9 +119,9 @@
           {/each}
         </div>
         <div class="size-custom">
-          <input type="number" min="80" step="10" bind:value={width} aria-label="Width" />
+          <span class="nc-wrap"><NumberCell label="W" min={80} step={10} value={width} onchange={(value) => { width = value; }} /></span>
           <span class="x">×</span>
-          <input type="number" min="80" step="10" bind:value={height} aria-label="Height" />
+          <span class="nc-wrap"><NumberCell label="H" min={80} step={10} value={height} onchange={(value) => { height = value; }} /></span>
           <span class="unit">px</span>
         </div>
       </div>
@@ -290,22 +291,12 @@
     gap: 6px;
   }
 
-  .size-custom input {
-    width: 64px;
-    height: 24px;
-    background: #1C1C1C;
-    border: 1px solid #3A3A3A;
-    border-radius: 4px;
-    color: #DDD;
-    font-size: 11px;
-    font-family: inherit;
-    text-align: center;
-    outline: none;
-    appearance: textfield;
-    -moz-appearance: textfield;
+  .size-custom .nc-wrap {
+    display: flex;
+    width: 80px;
+    flex: 0 0 auto;
   }
 
-  .size-custom input:focus { border-color: #5B9BD5; }
   .size-custom .x, .size-custom .unit { color: #777; font-size: 11px; }
 
   .dialog-actions {

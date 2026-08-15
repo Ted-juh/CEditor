@@ -36,6 +36,7 @@
   import DeviceInsight from './DeviceInsight.svelte';
   import ScriptInsight from './ScriptInsight.svelte';
   import DisplayToolbar from '../components/DisplayToolbar.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let control = $derived($selectedControl);
   let core = $derived(getSection(control, 'Core'));
@@ -318,16 +319,9 @@
             <option value={option.value}>{option.label}</option>
           {/each}
         </select>
-        <input
-          class="number-field size-field"
-          type="number"
-          min="1"
-          step="1"
-          value={font?.size ?? 14}
-          title="Font size"
-          onfocus={(event) => event.target.select()}
-          onchange={(event) => setNumber('Text.Font.size', event.target.value, font?.size ?? 14, 1)}
-        />
+        <span class="number-field size-field nc-wrap" title="Font size">
+          <NumberCell min={1} step={1} value={font?.size ?? 14} defaultValue={14} onchange={(value) => setNumber('Text.Font.size', value, font?.size ?? 14, 1)} />
+        </span>
       </div>
 
       <div class="prop-group toggle-group">
@@ -377,32 +371,25 @@
         {/if}
         {#if backgroundCorners}
           <span class="mini-label">R</span>
-          <input
-            class="number-field size-field"
-            type="number"
-            min="0"
-            step="1"
-            value={backgroundCorners?.radius ?? 0}
-            title="Corner radius"
-            onfocus={(event) => event.target.select()}
-            onchange={(event) => setNumber('Background.Corners.radius', event.target.value, backgroundCorners?.radius ?? 0, 0)}
-          />
+          <span class="number-field size-field nc-wrap" title="Corner radius">
+            <NumberCell min={0} step={1} value={backgroundCorners?.radius ?? 0} defaultValue={0} onchange={(value) => setNumber('Background.Corners.radius', value, backgroundCorners?.radius ?? 0, 0)} />
+          </span>
         {/if}
       </div>
       {:else if shownFacet === 'box'}
       <div class="prop-group">
         <span class="mini-label">X</span>
-        <input class="number-field" type="number" step="1" value={transform?.x ?? 0} title="X position" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.x', event.target.value, transform?.x ?? 0)} />
+        <span class="number-field nc-wrap" title="X position"><NumberCell step={1} value={transform?.x ?? 0} defaultValue={0} onchange={(value) => setNumber('Transform.x', value, transform?.x ?? 0)} /></span>
         <span class="mini-label">Y</span>
-        <input class="number-field" type="number" step="1" value={transform?.y ?? 0} title="Y position" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.y', event.target.value, transform?.y ?? 0)} />
+        <span class="number-field nc-wrap" title="Y position"><NumberCell step={1} value={transform?.y ?? 0} defaultValue={0} onchange={(value) => setNumber('Transform.y', value, transform?.y ?? 0)} /></span>
         <span class="mini-label">W</span>
-        <input class="number-field" type="number" min="1" step="1" value={transform?.width ?? 0} title="Width" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.width', event.target.value, transform?.width ?? 0, 1)} />
+        <span class="number-field nc-wrap" title="Width"><NumberCell min={1} step={1} value={transform?.width ?? 0} defaultValue={0} onchange={(value) => setNumber('Transform.width', value, transform?.width ?? 0, 1)} /></span>
         <span class="mini-label">H</span>
-        <input class="number-field" type="number" min="1" step="1" value={transform?.height ?? 0} title="Height" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.height', event.target.value, transform?.height ?? 0, 1)} />
+        <span class="number-field nc-wrap" title="Height"><NumberCell min={1} step={1} value={transform?.height ?? 0} defaultValue={0} onchange={(value) => setNumber('Transform.height', value, transform?.height ?? 0, 1)} /></span>
         <span class="mini-label">R</span>
-        <input class="number-field" type="number" step="1" value={transform?.rotation ?? 0} title="Rotation (degrees)" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.rotation', event.target.value, transform?.rotation ?? 0)} />
+        <span class="number-field nc-wrap" title="Rotation (degrees)"><NumberCell step={1} value={transform?.rotation ?? 0} defaultValue={0} onchange={(value) => setNumber('Transform.rotation', value, transform?.rotation ?? 0)} /></span>
         <span class="mini-label">O</span>
-        <input class="number-field opacity-field" type="number" min="0" max="1" step="0.05" value={transform?.opacity ?? 1} title="Opacity" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.opacity', event.target.value, transform?.opacity ?? 1, 0, 1)} />
+        <span class="number-field opacity-field nc-wrap" title="Opacity"><NumberCell min={0} max={1} step={0.05} value={transform?.opacity ?? 1} defaultValue={1} onchange={(value) => setNumber('Transform.opacity', value, transform?.opacity ?? 1, 0, 1)} /></span>
       </div>
       {:else if shownFacet === 'effects'}
       <div class="prop-group toggle-group">
@@ -410,9 +397,9 @@
       </div>
       <div class="prop-group">
         <span class="mini-label">Blur</span>
-        <input class="number-field" type="number" min="0" step="0.5" value={effects?._children?.Filters?.blur ?? 0} title="Blur" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Effects.Filters.blur', event.target.value, effects?._children?.Filters?.blur ?? 0, 0)} />
+        <span class="number-field nc-wrap" title="Blur"><NumberCell min={0} step={0.5} value={effects?._children?.Filters?.blur ?? 0} defaultValue={0} onchange={(value) => setNumber('Effects.Filters.blur', value, effects?._children?.Filters?.blur ?? 0, 0)} /></span>
         <span class="mini-label">Brt</span>
-        <input class="number-field" type="number" min="0" step="1" value={effects?._children?.Filters?.brightness ?? 100} title="Brightness" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Effects.Filters.brightness', event.target.value, effects?._children?.Filters?.brightness ?? 100, 0)} />
+        <span class="number-field nc-wrap" title="Brightness"><NumberCell min={0} step={1} value={effects?._children?.Filters?.brightness ?? 100} defaultValue={100} onchange={(value) => setNumber('Effects.Filters.brightness', value, effects?._children?.Filters?.brightness ?? 100, 0)} /></span>
       </div>
       <div class="prop-group">
         <select class="font-select" value={blendMode} title="Blend mode" onchange={(event) => set('Effects.Blend.mode', event.target.value)}>
@@ -430,7 +417,7 @@
           {/each}
         </select>
         <span class="mini-label">Sz</span>
-        <input class="number-field size-field" type="number" min="4" step="1" value={icon?.size ?? 16} title="Icon size" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Icon.size', event.target.value, icon?.size ?? 16, 4)} />
+        <span class="number-field size-field nc-wrap" title="Icon size"><NumberCell min={4} step={1} value={icon?.size ?? 16} defaultValue={16} onchange={(value) => setNumber('Icon.size', value, icon?.size ?? 16, 4)} /></span>
       </div>
       <div class="prop-group">
         <button
@@ -441,9 +428,9 @@
           onclick={() => openColour('Icon.tint', icon?.tint, 'Icon tint')}
         ></button>
         <span class="mini-label">O</span>
-        <input class="number-field opacity-field" type="number" min="0" max="1" step="0.05" value={icon?.opacity ?? 1} title="Icon opacity" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Icon.opacity', event.target.value, icon?.opacity ?? 1, 0, 1)} />
+        <span class="number-field opacity-field nc-wrap" title="Icon opacity"><NumberCell min={0} max={1} step={0.05} value={icon?.opacity ?? 1} defaultValue={1} onchange={(value) => setNumber('Icon.opacity', value, icon?.opacity ?? 1, 0, 1)} /></span>
         <span class="mini-label">R</span>
-        <input class="number-field" type="number" step="1" value={icon?.rotation ?? 0} title="Icon rotation" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Icon.rotation', event.target.value, icon?.rotation ?? 0)} />
+        <span class="number-field nc-wrap" title="Icon rotation"><NumberCell step={1} value={icon?.rotation ?? 0} defaultValue={0} onchange={(value) => setNumber('Icon.rotation', value, icon?.rotation ?? 0)} /></span>
       </div>
       {/if}
 
@@ -635,33 +622,16 @@
     color: #8F8F8F;
   }
 
-  .number-field {
-    height: 22px;
-    width: 52px;
-    background: #1E1E1E;
-    color: #DDD;
-    border: 1px solid #3A3A3A;
-    border-radius: 3px;
-    font-size: 11px;
-    font-family: inherit;
-    padding: 0 4px;
-    outline: none;
-    appearance: textfield;
-    -moz-appearance: textfield;
+  /* Width-preserving wrappers around NumberCell — the cell's flex:1 fills
+     the wrapper instead of the whole row. */
+  .nc-wrap {
+    display: flex;
+    flex: 0 0 auto;
   }
 
-  .number-field::-webkit-inner-spin-button,
-  .number-field::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-
-  .number-field:focus {
-    border-color: #5B9BD5;
-  }
-
-  .size-field { width: 44px; }
-  .opacity-field { width: 44px; }
+  .number-field { width: 56px; }
+  .size-field { width: 50px; }
+  .opacity-field { width: 50px; }
 
   .mini-label {
     color: #8F8F8F;
