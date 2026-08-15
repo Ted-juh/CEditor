@@ -11,6 +11,7 @@
   import RemoveFormatting from 'lucide-svelte/icons/remove-formatting';
   import Pipette from 'lucide-svelte/icons/pipette';
   import { availableFonts, ensureStoredFontLoaded } from '../stores/appSettings.js';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let { getEditorElement, onPickColor } = $props();
 
@@ -60,16 +61,6 @@
     }
   }
 
-  function handleFontSizeKey(e) {
-    if (e.key === 'Enter') {
-      e.target.blur();
-      applyFontSize();
-    }
-  }
-
-  function selectAll(e) {
-    e.target.select();
-  }
 </script>
 
 <div class="notepad-settings">
@@ -92,16 +83,9 @@
           <option value={s}>{s}px</option>
         {/each}
       </select>
-      <input
-        type="number"
-        class="size-input"
-        bind:value={fontSize}
-        min="6"
-        max="72"
-        onfocus={selectAll}
-        onkeydown={handleFontSizeKey}
-        onchange={applyFontSize}
-      />
+      <span class="size-input nc-wrap">
+        <NumberCell min={6} max={72} value={fontSize} onchange={(v) => { fontSize = v; applyFontSize(); }} />
+      </span>
     </div>
   </div>
 
@@ -228,20 +212,13 @@
     flex: 1;
   }
 
+  /* Sizing wrapper around the size NumberCell — keeps the combo the wide half of the row. */
   .size-input {
-    width: 42px;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    color: #DDD;
-    font-size: 11px;
-    padding: 3px 4px;
-    border-radius: 3px;
-    text-align: center;
-    font-family: inherit;
+    width: 56px;
+    flex-shrink: 0;
   }
-  .size-input:focus {
-    border-color: #5B9BD5;
-    outline: none;
+  .nc-wrap {
+    display: flex;
   }
 
   .toolbar-row {

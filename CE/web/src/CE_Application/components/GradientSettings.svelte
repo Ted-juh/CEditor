@@ -100,10 +100,6 @@
     [next[from], next[to]] = [next[to], next[from]];
     sectionOrder = next;
   }
-
-  function blurOnEnter(e) {
-    if (e.key === 'Enter') e.target.blur();
-  }
 </script>
 
 <div class="gradient-settings">
@@ -235,18 +231,9 @@
                 title="Click to edit colour"
               ></button>
               <span class="stop-hex">#{stop.color}</span>
-              <div class="stop-pos-wrap">
-                <button class="pos-arrow left" tabindex="-1" onclick={() => updateStop(stop.origIdx, { position: Math.max(0, stop.position - 1) })} title="Decrease">&#9664;</button>
-                <input
-                  class="stop-pos"
-                  type="number"
-                  onkeydown={blurOnEnter}
-                  min="0" max="100"
-                  value={stop.position}
-                  onchange={(e) => updateStop(stop.origIdx, { position: parseInt(e.target.value) || 0 })}
-                />
-                <button class="pos-arrow right" tabindex="-1" onclick={() => updateStop(stop.origIdx, { position: Math.min(100, stop.position + 1) })} title="Increase">&#9654;</button>
-              </div>
+              <span class="stop-pos nc-wrap">
+                <NumberCell min={0} max={100} value={stop.position} onchange={(v) => updateStop(stop.origIdx, { position: parseInt(v) || 0 })} />
+              </span>
               <span class="stop-pct">%</span>
               {#if gradient.stops.length > 2}
                 <button class="stop-delete" onclick={() => deleteStop(stop.origIdx)} title="Delete stop">
@@ -415,33 +402,6 @@
     gap: 3px;
   }
 
-  .num-input-wrap {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .num-input-wrap:focus-within {
-    border-color: #5B9BD5;
-  }
-
-  .num-input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    color: #DDD;
-    font-size: 11px;
-    padding: 3px 4px;
-    font-family: inherit;
-    outline: none;
-    width: 0;
-  }
-
-
   .input-prefix, .input-suffix {
     font-size: 10px;
     color: #666;
@@ -530,48 +490,14 @@
     white-space: nowrap;
   }
 
-  .stop-pos-wrap {
-    display: flex;
-    align-items: center;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .stop-pos-wrap:focus-within {
-    border-color: #5B9BD5;
-  }
-
-  .pos-arrow {
-    background: none;
-    border: none;
-    color: #555;
-    cursor: pointer;
-    padding: 0 2px;
-    font-size: 7px;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: color 0.1s;
-  }
-
-  .pos-arrow:hover {
-    color: #DDD;
-  }
-
+  /* Sizing wrapper around the stop-position NumberCell — keeps the row column narrow. */
   .stop-pos {
-    width: 28px;
-    background: transparent;
-    border: none;
-    color: #DDD;
-    font-size: 10px;
-    padding: 1px 0;
-    font-family: inherit;
-    outline: none;
-    text-align: center;
+    width: 54px;
+    flex-shrink: 0;
+  }
+
+  .nc-wrap {
+    display: flex;
   }
 
   .stop-pct {

@@ -30,6 +30,7 @@
     displayNameForSlot,
   } from '../../stores/presetLibrarian.js';
   import { isJuceAvailable } from '../../bridge/bridge.js';
+  import NumberCell from '../../properties/NumberCell.svelte';
 
   let { model, merged, profileId = '' } = $props();
 
@@ -216,11 +217,11 @@
         </select>
         <input type="checkbox" checked={bank.writable != null ? bank.writable === true : bank.role === 'user'}
           onchange={(e) => bank.writable = e.target.checked} title="May the librarian overwrite these slots?" />
-        <input class="num" type="number" min="0" bind:value={bank.startSlot} onfocus={sel} />
-        <input class="num" type="number" min="1" bind:value={bank.slotCount} onfocus={sel} />
-        <input class="num" type="number" min="0" max="127" bind:value={bank.programBase} placeholder="0" onfocus={sel} />
-        <input class="num" type="number" min="0" max="127" bind:value={bank.bankMsb} placeholder="—" onfocus={sel} />
-        <input class="num" type="number" min="0" max="127" bind:value={bank.bankLsb} placeholder="—" onfocus={sel} />
+        <span class="nc-wrap"><NumberCell min={0} value={bank.startSlot} onchange={(v) => bank.startSlot = v} /></span>
+        <span class="nc-wrap"><NumberCell min={1} value={bank.slotCount} onchange={(v) => bank.slotCount = v} /></span>
+        <span class="nc-wrap"><NumberCell min={0} max={127} value={bank.programBase} onchange={(v) => bank.programBase = v} /></span>
+        <span class="nc-wrap"><NumberCell min={0} max={127} value={bank.bankMsb} onchange={(v) => bank.bankMsb = v} /></span>
+        <span class="nc-wrap"><NumberCell min={0} max={127} value={bank.bankLsb} onchange={(v) => bank.bankLsb = v} /></span>
         <button class="xbtn" title="remove bank" onclick={() => removeBank(i)}>✕</button>
       </div>
     {/each}
@@ -236,13 +237,13 @@
         {#each RECALL_KINDS as kind (kind.id)}<option value={kind.id}>{kind.label}</option>{/each}
       </select>
       {#if presets.recall}
-        <label class="lm">channel <input class="num" type="number" min="1" max="16" bind:value={presets.recall.channel} placeholder="dev" onfocus={sel} /></label>
+        <label class="lm">channel <span class="nc-wrap inline"><NumberCell min={1} max={16} value={presets.recall.channel} onchange={(v) => presets.recall.channel = v} /></span></label>
       {/if}
       {#if presets.recall?.kind === 'sysex'}
         <input class="psel grow" bind:value={templateText} onblur={applyTemplate}
           placeholder="F0 7D $deviceId 0C $slot $checksum F7" title="Tokens: hex bytes, $deviceId, $slot, $program, $bankMsb, $bankLsb, $checksum" />
       {/if}
-      <label class="lm">preview slot <input class="num" type="number" min="0" bind:value={previewSlot} onfocus={sel} /></label>
+      <label class="lm">preview slot <span class="nc-wrap inline"><NumberCell min={0} value={previewSlot} onchange={(v) => previewSlot = v} /></span></label>
     </div>
     <div class="rtbar">
       {#if recallPreview?.ok}
@@ -263,10 +264,9 @@
         <label class="lm">slot variable <input class="psel" bind:value={model.presets.nameRequest.slotVariable} placeholder="slot" onfocus={sel} /></label>
       {/if}
       <span class="lm">Init patch</span>
-      <input class="num" type="number" min="0"
-        value={presets.initPatch?.slot ?? ''}
-        onchange={(e) => model.presets.initPatch = e.target.value === '' ? undefined : { slot: Number(e.target.value) }}
-        placeholder="—" title="Slot of the device's init/neutral patch" onfocus={sel} />
+      <span class="nc-wrap inline" title="Slot of the device's init/neutral patch">
+        <NumberCell min={0} value={presets.initPatch?.slot ?? ''} onchange={(v) => model.presets.initPatch = { slot: Number(v) }} />
+      </span>
     </div>
   </div>
 
@@ -358,4 +358,7 @@
   .libbank { border-top: 1px solid rgba(255, 255, 255, 0.06); }
   .importlbl { cursor: pointer; }
   .warnrow { padding: 4px 10px; font-size: 12px; }
+  /* Wrappers keeping NumberCell inside its grid column / row slot. */
+  .nc-wrap { display: flex; min-width: 0; }
+  .nc-wrap.inline { display: inline-flex; width: 74px; vertical-align: middle; }
 </style>
