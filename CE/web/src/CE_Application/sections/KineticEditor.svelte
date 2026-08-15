@@ -5,6 +5,9 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import Orbit from 'lucide-svelte/icons/orbit';
+  import Palette from 'lucide-svelte/icons/palette';
+  import LogOut from 'lucide-svelte/icons/log-out';
 
   let { control = null } = $props();
 
@@ -26,7 +29,7 @@
 </script>
 
 {#if k}
-  <PropertySection title="Kinetic">
+  <PropertySection title="Kinetic" icon={Orbit}>
     <PropertyCell label="Run" span={1} hint="Integrate the physics in preview / player.">
       <PropertyToggle value={k.running !== false} onchange={() => set('running', !(k.running !== false))} />
     </PropertyCell>
@@ -62,7 +65,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Field background, ball + trail, walls, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'fieldColour', label: 'Field', value: k.fieldColour ?? 'FF0D0D12', target: { type: 'control', controlId: core?.id, path: 'Kinetic.fieldColour' } },
@@ -73,7 +76,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Outputs">
+  <PropertySection title="Outputs" icon={LogOut}>
     <PropertyCell label="" span={4} hint="Ports: X, Y, Speed, and a Bounce gate that pulses on each wall hit. Bind them in Device Bindings.">
       <div class="ports">
         <span class="chip"><i style="background:#39D98A"></i>X</span>

@@ -11,6 +11,10 @@
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
+  import Waypoints from 'lucide-svelte/icons/waypoints';
+  import Palette from 'lucide-svelte/icons/palette';
+  import Target from 'lucide-svelte/icons/target';
+  import Bookmark from 'lucide-svelte/icons/bookmark';
 
   let { control = null } = $props();
 
@@ -79,7 +83,7 @@
 </script>
 
 {#if cn}
-  <PropertySection title="Constellation">
+  <PropertySection title="Constellation" icon={Waypoints}>
     <PropertyCell label="Mode" span={2} hint="Snap = recall the nearest preset exactly (discrete). Blend = morph between nearby presets by distance (continuous).">
       <select class="val" value={cn.mode ?? 'blend'} onchange={(e) => set('mode', e.target.value)}>
         <option value="blend">Blend (morph)</option>
@@ -132,7 +136,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Map background, probe, links, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'fieldColour', label: 'Field', value: cn.fieldColour ?? 'FF0C0C12', target: { type: 'control', controlId: core?.id, path: 'Constellation.fieldColour' } },
@@ -143,7 +147,10 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Targets">
+  <PropertySection title="Targets" icon={Target}>
+    {#snippet tools()}
+      <button type="button" class="header-add-btn" title="Add target" onclick={addTarget}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each target is one parameter the presets morph. Bind its 'Target' port in Device Bindings.">
       <div class="rows">
         {#if targets.length === 0}<div class="empty">No targets yet. Add one, then bind its port.</div>{/if}
@@ -158,12 +165,14 @@
             <button type="button" class="action-btn danger" onclick={() => removeTarget(i)} title="Remove">✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addTarget}>Add target</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Presets">
+  <PropertySection title="Presets" icon={Bookmark}>
+    {#snippet tools()}
+      <button type="button" class="header-add-btn" title="Add preset" onclick={addPreset}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each preset is a star at X/Y (0–1) storing a value per target. Capture stamps the panel's current values.">
       <div class="rows">
         {#if presets.length === 0}<div class="empty">No presets yet. Add one and set its per-target values.</div>{/if}
@@ -194,7 +203,6 @@
             {/if}
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addPreset}>Add preset</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -220,4 +228,10 @@
   .action-btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: #3B3B3B; }
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:hover { border-color: #C96A6A; }
+  .header-add-btn {
+    height: 16px; padding: 0 8px; border-radius: 8px; border: 1px solid #333;
+    background: #252525; color: #777; font-size: 9px; font-family: inherit;
+    cursor: pointer; line-height: 1;
+  }
+  .header-add-btn:hover { color: #CCC; border-color: #4A6E8C; }
 </style>

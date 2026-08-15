@@ -9,6 +9,12 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import Spline from 'lucide-svelte/icons/spline';
+  import CircleDot from 'lucide-svelte/icons/circle-dot';
+  import Repeat from 'lucide-svelte/icons/repeat';
+  import Play from 'lucide-svelte/icons/play';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -48,7 +54,7 @@
 </script>
 
 {#if e}
-  <PropertySection title="Envelope">
+  <PropertySection title="Envelope" icon={Spline}>
     <PropertyCell label="Preset" span={4} hint="Seed a shape. ADSR / AR / AD / DAHDSR keep stages; MSEG / Free let every node move.">
       <select class="val" value={e.preset ?? 'adsr'} onchange={(ev) => applyPreset(ev.target.value)}>
         <option value="adsr">ADSR</option>
@@ -70,7 +76,10 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Nodes">
+  <PropertySection title="Nodes" icon={CircleDot}>
+    {#snippet tools()}
+      <button type="button" class="header-add-btn" title="Add node" onclick={addPoint}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Normalized position (0–1). Curve = the segment shape ending at that node.">
       <div class="nodes">
         {#each points as p, i (p.id ?? i)}
@@ -88,12 +97,11 @@
             <button type="button" class="action-btn danger" disabled={i === 0 || i === points.length - 1} onclick={() => removePoint(i)} title="Remove node">✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addPoint}>Add node</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Loop & snap">
+  <PropertySection title="Loop & snap" icon={Repeat}>
     <PropertyCell label="Loop" span={2} hint="Cycle a section (function-generator / looping envelope).">
       <PropertyToggle value={e.loopEnabled === true} onchange={() => toggle('loopEnabled')} />
     </PropertyCell>
@@ -113,10 +121,12 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Playhead">
-    <PropertyCell label="Show" span={2} hint="A moving dot along the curve at the current phase.">
-      <PropertyToggle value={e.showPlayhead === true} onchange={() => toggle('showPlayhead')} />
-    </PropertyCell>
+  <PropertySection title="Playhead" icon={Play}>
+    {#snippet tools()}
+      <HeaderPill value={e.showPlayhead === true}
+                  title="A moving dot along the curve at the current phase."
+                  onchange={() => toggle('showPlayhead')} />
+    {/snippet}
     {#if e.showPlayhead === true}
       <PropertyCell label="Phase source" span={4} hint="A knob / slider whose 0–1 value drives the playhead in preview.">
         <select class="val" value={e.phaseSourceId ?? ''} onchange={(ev) => set('phaseSourceId', ev.target.value)}>
@@ -125,14 +135,14 @@
         </select>
       </PropertyCell>
       {#if !e.phaseSourceId}
-        <PropertyCell label="Phase" span={2} hint="0–1 position of the playhead.">
+        <PropertyCell label="Phase" span={4} hint="0–1 position of the playhead.">
           <input class="val" type="number" min="0" max="1" step="0.01" value={e.phase ?? 0} onchange={(ev) => set('phase', Math.max(0, Math.min(1, num(ev.target.value, 0))))} />
         </PropertyCell>
       {/if}
     {/if}
   </PropertySection>
 
-  <PropertySection title="Style">
+  <PropertySection title="Style" icon={Palette}>
     <PropertyCell label="Grid" span={1} hint="Draw a background grid.">
       <PropertyToggle value={e.showGrid !== false} onchange={() => set('showGrid', !(e.showGrid !== false))} />
     </PropertyCell>
@@ -175,4 +185,10 @@
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:disabled { opacity: 0.35; cursor: default; }
   .action-btn.danger:not(:disabled):hover { border-color: #C96A6A; }
+  .header-add-btn {
+    height: 16px; padding: 0 8px; border-radius: 8px; border: 1px solid #333;
+    background: #252525; color: #777; font-size: 9px; font-family: inherit;
+    cursor: pointer; line-height: 1;
+  }
+  .header-add-btn:hover { color: #CCC; border-color: #4A6E8C; }
 </style>

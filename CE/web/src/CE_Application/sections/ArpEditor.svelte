@@ -12,6 +12,10 @@
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PanelTop from 'lucide-svelte/icons/panel-top';
   import Tags from 'lucide-svelte/icons/tags';
+  import Music from 'lucide-svelte/icons/music';
+  import Clock from 'lucide-svelte/icons/clock';
+  import VolumeX from 'lucide-svelte/icons/volume-x';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -65,7 +69,7 @@
 </script>
 
 {#if a}
-  <PropertySection title="Arpeggiator">
+  <PropertySection title="Arpeggiator" icon={Music}>
     <PropertyCell label="Run" span={1} hint="Start / stop the clock. Stopped, the lane still shows the walk.">
       <PropertyToggle value={a.running !== false} onchange={() => set('running', !(a.running !== false))} />
     </PropertyCell>
@@ -129,7 +133,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Timing">
+  <PropertySection title="Timing" icon={Clock}>
     <PropertyCell label="Sync to transport" span={2} hint="Take the step length from the panel's Transport instead of a free rate.">
       <PropertyToggle value={synced} onchange={(v) => set('syncToTransport', v === true)} />
     </PropertyCell>
@@ -178,7 +182,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Rests">
+  <PropertySection title="Rests" icon={VolumeX}>
     <PropertyCell label="Euclidean" span={1} hint="Spread N pulses evenly over M steps.">
       <PropertyToggle value={a.euclidEnabled === true} onchange={() => set('euclidEnabled', !(a.euclidEnabled === true))} />
     </PropertyCell>
@@ -209,7 +213,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Show" span={4} hint="Header strip and note names in the step cells. Hover a chip for its name.">
       <FlagStrip
         flags={[

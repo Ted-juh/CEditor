@@ -6,6 +6,9 @@
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import HeaderPill from '../properties/HeaderPill.svelte';
   import IterationCcw from 'lucide-svelte/icons/iteration-ccw';
+  import Gamepad2 from 'lucide-svelte/icons/gamepad-2';
+  import SquareDashedBottomCode from 'lucide-svelte/icons/square-dashed-bottom-code';
+  import Monitor from 'lucide-svelte/icons/monitor';
 
   let { control = null } = $props();
 
@@ -24,7 +27,7 @@
 </script>
 
 {#if j}
-  <PropertySection title="Joystick">
+  <PropertySection title="Joystick" icon={Gamepad2}>
     <PropertyCell label="Bipolar" span={2} hint="X/Y ports emit −1..1 (vs 0..1). Corner blends are always 0..1.">
       <PropertyToggle value={j.bipolar !== false} onchange={() => set('bipolar', !(j.bipolar !== false))} />
     </PropertyCell>
@@ -59,7 +62,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Corners">
+  <PropertySection title="Corners" icon={SquareDashedBottomCode}>
     <PropertyCell label="Show" span={2} hint="Draw corner markers + labels.">
       <PropertyToggle value={j.showCorners !== false} onchange={() => set('showCorners', !(j.showCorners !== false))} />
     </PropertyCell>
@@ -77,7 +80,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Display">
+  <PropertySection title="Display" icon={Monitor}>
     <PropertyCell label="Grid" span={1} hint="Background grid.">
       <PropertyToggle value={j.showGrid !== false} onchange={() => set('showGrid', !(j.showGrid !== false))} />
     </PropertyCell>

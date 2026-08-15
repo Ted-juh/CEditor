@@ -4,6 +4,10 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import ArrowLeftRight from 'lucide-svelte/icons/arrow-left-right';
+  import IterationCcw from 'lucide-svelte/icons/iteration-ccw';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -19,7 +23,7 @@
 </script>
 
 {#if x}
-  <PropertySection title="Crossfader">
+  <PropertySection title="Crossfader" icon={ArrowLeftRight}>
     <PropertyCell label="Law" span={2} hint="Equal-power = constant loudness. Linear = −6 dB dip at centre. Sharp = both full through the middle.">
       <select class="val" value={x.law ?? 'equalPower'} onchange={(e) => set('law', e.target.value)}>
         <option value="equalPower">Equal power (−3 dB)</option>
@@ -50,18 +54,20 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Return to centre">
-    <PropertyCell label="Spring back" span={2} hint="Glide the handle back to centre when released.">
-      <PropertyToggle value={x.returnToCenter === true} onchange={() => toggle('returnToCenter')} />
-    </PropertyCell>
+  <PropertySection title="Return to centre" icon={IterationCcw}>
+    {#snippet tools()}
+      <HeaderPill value={x.returnToCenter === true}
+                  title="Glide the handle back to centre when released."
+                  onchange={() => toggle('returnToCenter')} />
+    {/snippet}
     {#if x.returnToCenter === true}
-      <PropertyCell label="Speed" span={2} hint="Glide speed (units/sec).">
+      <PropertyCell label="Speed" span={4} hint="Glide speed (units/sec).">
         <input class="val" type="number" min="0.5" step="0.5" value={x.returnRate ?? 4} onchange={(e) => set('returnRate', Math.max(0.1, num(e.target.value, 4)))} />
       </PropertyCell>
     {/if}
   </PropertySection>
 
-  <PropertySection title="Labels & colours">
+  <PropertySection title="Labels & colours" icon={Palette}>
     <PropertyCell label="Labels" span={2} hint="Show the A/B end labels.">
       <PropertyToggle value={x.showLabels !== false} onchange={() => set('showLabels', !(x.showLabels !== false))} />
     </PropertyCell>

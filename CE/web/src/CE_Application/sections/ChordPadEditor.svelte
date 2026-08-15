@@ -5,6 +5,9 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Music from 'lucide-svelte/icons/music';
+  import Activity from 'lucide-svelte/icons/activity';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -29,7 +32,7 @@
 </script>
 
 {#if cp}
-  <PropertySection title="Chord Pad">
+  <PropertySection title="Chord Pad" icon={Music}>
     <PropertyCell label="Layout" span={2} hint="Wheel = circle of fifths, with relative minors inside their majors. Grid = compact, in-key only.">
       <select class="val" value={cp.layout ?? 'wheel'} onchange={(e) => set('layout', e.target.value)}>
         <option value="wheel">Wheel (circle of fifths)</option>
@@ -84,7 +87,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Performance">
+  <PropertySection title="Performance" icon={Activity}>
     <PropertyCell label="Octave" span={1} hint="Transpose the whole pad in octaves.">
       <input class="val" type="number" min="-3" max="3" step="1" value={num(cp.octave, 0)} onchange={(e) => set('octave', clampInt(e.target.value, -3, 3, 0))} />
     </PropertyCell>
@@ -127,7 +130,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Pad colours" span={4} hint="Pad fill, in-key accent, tonic accent, minor ring, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'padColour', label: 'Pads', value: cp.padColour ?? 'FF171720', target: { type: 'control', controlId: core?.id, path: 'ChordPad.padColour' } },

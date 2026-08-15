@@ -5,6 +5,9 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Link from 'lucide-svelte/icons/link';
+  import Palette from 'lucide-svelte/icons/palette';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
 
   import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
@@ -37,7 +40,7 @@
 </script>
 
 {#if cs}
-  <PropertySection title="Constraint Cell">
+  <PropertySection title="Constraint Cell" icon={Link}>
     <PropertyCell label="Rule" span={2} hint={modeHint}>
       <select class="val" value={cs.mode ?? 'sum'} onchange={(e) => set('mode', e.target.value)}>
         <option value="sum">Sum = 100%</option>
@@ -66,7 +69,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Cell background, bar track, link chain + badge, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'fieldColour', label: 'Field', value: cs.fieldColour ?? 'FF0E0E13', target: { type: 'control', controlId: core?.id, path: 'Constraint.fieldColour' } },
@@ -77,7 +80,10 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Members">
+  <PropertySection title="Members" icon={SlidersHorizontal}>
+    {#snippet tools()}
+      <button type="button" class="header-add-btn" title="Add member" onclick={addMember}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="The linked parameters, moving together to satisfy the rule. Bind each 'Member' port in Device Bindings.">
       <div class="rows">
         {#if members.length === 0}<div class="empty">No members yet. Add one, then bind its port.</div>{/if}
@@ -97,7 +103,6 @@
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addMember}>Add member</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -120,4 +125,10 @@
   .action-btn:hover { border-color: #5B9BD5; }
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:hover { border-color: #C96A6A; }
+  .header-add-btn {
+    height: 16px; padding: 0 8px; border-radius: 8px; border: 1px solid #333;
+    background: #252525; color: #777; font-size: 9px; font-family: inherit;
+    cursor: pointer; line-height: 1;
+  }
+  .header-add-btn:hover { color: #CCC; border-color: #4A6E8C; }
 </style>

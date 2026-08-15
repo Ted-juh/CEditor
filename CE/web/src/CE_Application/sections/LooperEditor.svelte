@@ -6,6 +6,9 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
   import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
+  import Repeat from 'lucide-svelte/icons/repeat';
+  import Palette from 'lucide-svelte/icons/palette';
+  import Rows3 from 'lucide-svelte/icons/rows-3';
 
   import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
@@ -33,7 +36,7 @@
 </script>
 
 {#if lp}
-  <PropertySection title="Looper">
+  <PropertySection title="Looper" icon={Repeat}>
     <PropertyCell label="Run" span={1} hint="Play the loops in preview / player.">
       <PropertyToggle value={lp.running !== false} onchange={() => set('running', !(lp.running !== false))} />
     </PropertyCell>
@@ -76,7 +79,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Lane background, grid lines, playhead, lane labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'laneColour', label: 'Lane', value: lp.laneColour ?? 'FF0E0E13', target: { type: 'control', controlId: core?.id, path: 'Looper.laneColour' } },
@@ -87,7 +90,10 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Lanes">
+  <PropertySection title="Lanes" icon={Rows3}>
+    {#snippet tools()}
+      <button type="button" class="header-add-btn" title="Add lane" onclick={addLane}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each lane records a value-over-loop gesture. Bind its 'Lane' port in Device Bindings.">
       <div class="lanes">
         {#if lanes.length === 0}
@@ -112,7 +118,6 @@
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addLane}>Add lane</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -142,4 +147,10 @@
   .action-btn:hover { border-color: #5B9BD5; }
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:hover { border-color: #C96A6A; }
+  .header-add-btn {
+    height: 16px; padding: 0 8px; border-radius: 8px; border: 1px solid #333;
+    background: #252525; color: #777; font-size: 9px; font-family: inherit;
+    cursor: pointer; line-height: 1;
+  }
+  .header-add-btn:hover { color: #CCC; border-color: #4A6E8C; }
 </style>

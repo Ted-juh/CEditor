@@ -11,9 +11,15 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
   import PanelTop from 'lucide-svelte/icons/panel-top';
   import Tags from 'lucide-svelte/icons/tags';
   import Hash from 'lucide-svelte/icons/hash';
+  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+  import Zap from 'lucide-svelte/icons/zap';
+  import SquareDashed from 'lucide-svelte/icons/square-dashed';
+  import Table from 'lucide-svelte/icons/table';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -55,7 +61,7 @@
 </script>
 
 {#if d}
-  <PropertySection title="Drum Pads">
+  <PropertySection title="Drum Pads" icon={LayoutGrid}>
     <PropertyCell label="Rows" span={1} hint="Grid height.">
       <input class="val" type="number" min="1" max="8" step="1" value={num(d.rows, 4)} onchange={(e) => set('rows', clampInt(e.target.value, 1, 8, 4))} />
     </PropertyCell>
@@ -84,7 +90,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Trigger">
+  <PropertySection title="Trigger" icon={Zap}>
     <PropertyCell label="Mode" span={2} hint="Momentary = held while pressed. One-shot = a short fixed gate. Toggle = on until you hit the pad again.">
       <select class="val" value={d.mode ?? 'momentary'} onchange={(e) => set('mode', e.target.value)}>
         {#each PAD_MODES as m (m)}<option value={m}>{PAD_MODE_LABELS[m] ?? m}</option>{/each}
@@ -125,10 +131,12 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Corner zones">
-    <PropertyCell label="Corners" span={2} hint="Give the four corners of every pad their own action, so the same sixteen triggers carry a second vocabulary — a roll under one thumb, a flam under the other. The map is the same on every pad on purpose: a corner is a gesture your hand learns once.">
-      <PropertyToggle value={d.zones === true} onchange={() => set('zones', !(d.zones === true))} />
-    </PropertyCell>
+  <PropertySection title="Corner zones" icon={SquareDashed}>
+    {#snippet tools()}
+      <HeaderPill value={d.zones === true}
+                  title="Give the four corners of every pad their own action, so the same sixteen triggers carry a second vocabulary — a roll under one thumb, a flam under the other. The map is the same on every pad on purpose: a corner is a gesture your hand learns once."
+                  onchange={() => set('zones', !(d.zones === true))} />
+    {/snippet}
     {#if d.zones === true}
       <PropertyCell label="Corner size" span={2} hint="How much of each pad a corner claims, measured in from both edges. The rest of the pad is the face and always plays a plain hit.">
         <input class="val" type="number" min="0.05" max="0.45" step="0.01" value={num(d.cornerSize, 0.28)}
@@ -152,7 +160,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Pads">
+  <PropertySection title="Pads" icon={Table}>
     <PropertyCell label="" span={4} hint="Each row overrides one pad — blank fields use the generated map. Pads sharing a choke number cut each other.">
       <div class="table" role="table" aria-label="Pad overrides">
         <div class="thead" role="row">
@@ -223,7 +231,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Show" span={4} hint="Header strip, drum-name labels, note numbers. Hover a chip for its name.">
       <FlagStrip
         flags={[

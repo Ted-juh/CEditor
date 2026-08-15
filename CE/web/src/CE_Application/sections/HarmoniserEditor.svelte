@@ -13,6 +13,11 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Music from 'lucide-svelte/icons/music';
+  import Layers from 'lucide-svelte/icons/layers';
+  import Hash from 'lucide-svelte/icons/hash';
+  import Monitor from 'lucide-svelte/icons/monitor';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -83,7 +88,7 @@
 </script>
 
 {#if p}
-  <PropertySection title="Harmoniser">
+  <PropertySection title="Harmoniser" icon={Music}>
     <PropertyCell label="Mode" span={4} hint="Diatonic = the chord for the played note's degree in the key. Memory = a fixed shape transposed to whatever you play.">
       <select class="val" value={p.mode ?? 'diatonic'} onchange={(e) => set('mode', e.target.value)}>
         {#each HARMONY_MODES as m (m)}<option value={m}>{HARMONY_MODE_LABELS[m] ?? m}</option>{/each}
@@ -158,7 +163,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Voicing extras">
+  <PropertySection title="Voicing extras" icon={Layers}>
     <PropertyCell label="Voice leading" span={4} hint="Pick the inversion closest to the previous chord. Closest = least total movement; Smooth = holds the top voice.">
       <select class="val" value={voiceLeading(control)} onchange={(e) => set('voiceLeading', e.target.value)}>
         {#each VOICE_LEADING as v (v)}<option value={v}>{VOICE_LEADING_LABELS[v] ?? v}</option>{/each}
@@ -182,7 +187,7 @@
   </PropertySection>
 
   {#if !isMemory}
-    <PropertySection title="Per-degree chords">
+    <PropertySection title="Per-degree chords" icon={Hash}>
       <PropertyCell label="" span={4} hint="">
         <div class="note">
           An override replaces the stacked chord for <b>one</b> degree and leaves the others alone.
@@ -205,7 +210,7 @@
     </PropertySection>
   {/if}
 
-  <PropertySection title="Display">
+  <PropertySection title="Display" icon={Monitor}>
     <PropertyCell label="Click to audition" span={1} hint="Click a key in preview to hear the chord. Most of the editor's life is spent with no keyboard plugged in.">
       <PropertyToggle value={p.editable !== false} onchange={() => set('editable', !(p.editable !== false))} />
     </PropertyCell>
@@ -220,7 +225,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
+  <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Colours" span={4} hint="Face, white keys, black keys, the key you played, the notes it added, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'faceColour', label: 'Face', value: p.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.faceColour' } },
