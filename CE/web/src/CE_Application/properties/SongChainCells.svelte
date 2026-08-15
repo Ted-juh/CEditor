@@ -10,6 +10,7 @@
     addLink, removeLink, updateLink, moveLink, MAX_CHAIN_STEPS, MAX_REPEATS,
   } from '../utils/songChain.js';
   import PropertyCell from './PropertyCell.svelte';
+  import NumberCell from './NumberCell.svelte';
 
   let {
     chain = [],
@@ -52,8 +53,8 @@
           <option value={String(k)}>{slotNames[k] ?? `Slot ${k + 1}`}</option>
         {/each}
       </select>
-      <label class="lbl">×<input class="val tiny" type="number" min="1" max={MAX_REPEATS} value={link.repeats}
-        onchange={(e) => onchange(updateLink(chain, i, { repeats: clampInt(e.target.value, 1, MAX_REPEATS, 1) }))} /></label>
+      <label class="lbl">×<span class="tiny nc-wrap"><NumberCell min={1} max={MAX_REPEATS} value={link.repeats}
+        onchange={(v) => onchange(updateLink(chain, i, { repeats: clampInt(v, 1, MAX_REPEATS, 1) }))} /></span></label>
       <button type="button" class="mini" title="Move up" onclick={() => onchange(moveLink(chain, i, -1))} disabled={i === 0}>↑</button>
       <button type="button" class="mini" title="Move down" onclick={() => onchange(moveLink(chain, i, 1))} disabled={i === links.length - 1}>↓</button>
       <button type="button" class="mini" title={link.enabled ? 'Skip this link' : 'Play this link'} onclick={() => onchange(updateLink(chain, i, { enabled: !link.enabled }))}>{link.enabled ? '●' : '○'}</button>
@@ -71,7 +72,8 @@
 
 <style>
   .val { width: 100%; background: #141420; border: 1px solid #2a2a36; color: #E8E8EE; font-size: 12px; padding: 3px 6px; border-radius: 4px; }
-  .val.tiny { width: 44px; }
+  .tiny { width: 44px; }
+  .nc-wrap { display: flex; }
   .note { font-size: 11px; color: #9a9aa4; background: #141420; border: 1px solid #2a2a36; border-radius: 5px; padding: 5px 7px; line-height: 1.5; }
   .link { display: flex; align-items: center; gap: 4px; }
   .link.off { opacity: 0.5; }

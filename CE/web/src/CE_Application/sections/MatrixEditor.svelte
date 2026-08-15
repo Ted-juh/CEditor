@@ -5,6 +5,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
   import LogIn from 'lucide-svelte/icons/log-in';
   import LogOut from 'lucide-svelte/icons/log-out';
@@ -95,8 +96,8 @@
     <PropertyCell label="Values" span={1} hint="Print the amount in each cell.">
       <PropertyToggle value={m.showValues === true} onchange={() => toggle('showValues')} />
     </PropertyCell>
-    <PropertyCell label="Snap" span={1} hint="Cell amount snap step (0 = free).">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={m.step ?? 0} onchange={(e) => set('step', Math.max(0, Math.min(1, num(e.target.value, 0))))} />
+    <PropertyCell label="Snap" span={1} compact hint="Cell amount snap step (0 = free).">
+      <NumberCell label="Snap" min={0} max={1} step={0.05} value={m.step ?? 0} defaultValue={0} onchange={(v) => set('step', Math.max(0, Math.min(1, v)))} />
     </PropertyCell>
     <PropertyCell label="Clear" span={1} hint="Reset all amounts to zero.">
       <button type="button" class="action-btn" onclick={clearAmounts}>Clear</button>
@@ -143,9 +144,11 @@
         {#each rows as rlabel, r (`row${r}`)}
           <div class="ghdr rlab" title={rlabel}>{rlabel}</div>
           {#each cols as _, c (`cell${r}_${c}`)}
-            <input class="val cell" type="number" min={m.bipolar !== false ? -1 : 0} max="1" step="0.05"
-                   value={amounts[matrixIndex(r, c, cols.length)] ?? 0}
-                   onchange={(e) => setAmount(r, c, num(e.target.value, 0))} />
+            <span class="cell nc-wrap">
+              <NumberCell min={m.bipolar !== false ? -1 : 0} max={1} step={0.05}
+                          value={amounts[matrixIndex(r, c, cols.length)] ?? 0} defaultValue={0}
+                          onchange={(v) => setAmount(r, c, v)} />
+            </span>
           {/each}
         {/each}
       </div>
@@ -176,7 +179,8 @@
   .grid { display: grid; gap: 3px; align-items: center; }
   .ghdr { color: #9a9a9a; font-size: 10px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ghdr.rlab { text-align: right; padding-right: 3px; }
-  .cell { padding: 2px 3px; font-size: 11px; text-align: center; }
+  .cell { min-width: 0; }
+  .nc-wrap { display: flex; }
   .action-btn {
     background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD;
     font-size: 11px; padding: 4px 8px; cursor: pointer; align-self: flex-start;

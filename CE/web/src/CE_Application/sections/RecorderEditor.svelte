@@ -11,6 +11,7 @@
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
@@ -105,8 +106,8 @@
     <PropertyCell label="One pass" span={1} hint="Stop at the end of the first lap instead of layering until you press stop.">
       <PropertyToggle value={p.once === true} onchange={() => set('once', !(p.once === true))} />
     </PropertyCell>
-    <PropertyCell label="Count-in" span={1} hint="Bars to wait after arming before capture starts. It still begins on a loop boundary.">
-      <input class="val" type="number" min="0" max="4" step="1" value={countInBars(control)} onchange={(e) => set('countIn', clampInt(e.target.value, 0, 4, 0))} />
+    <PropertyCell label="Count-in" span={1} compact hint="Bars to wait after arming before capture starts. It still begins on a loop boundary.">
+      <NumberCell label="Count" min={0} max={4} step={1} value={countInBars(control)} onchange={(v) => set('countIn', clampInt(v, 0, 4, 0))} />
     </PropertyCell>
 
     <TransportSyncCells
@@ -114,24 +115,24 @@
       hint="The loop is a number of bars, so it keeps its musical length when the tempo changes."
     >
       {#snippet children()}
-        <PropertyCell label="Bars" span={1} hint="Loop length in bars.">
-          <input class="val" type="number" min={MIN_BARS} max={MAX_BARS} step="1" value={num(p.bars, 2)} onchange={(e) => set('bars', clampInt(e.target.value, MIN_BARS, MAX_BARS, 2))} />
+        <PropertyCell label="Bars" span={1} compact hint="Loop length in bars.">
+          <NumberCell label="Bars" min={MIN_BARS} max={MAX_BARS} step={1} value={num(p.bars, 2)} defaultValue={2} onchange={(v) => set('bars', clampInt(v, MIN_BARS, MAX_BARS, 2))} />
         </PropertyCell>
       {/snippet}
     </TransportSyncCells>
     {#if p.syncToTransport !== true}
-      <PropertyCell label="Length" span={1} hint="Loop length in seconds, free-running.">
-        <input class="val" type="number" min="0.25" max="60" step="0.25" value={num(p.seconds, 4)} onchange={(e) => set('seconds', clampNum(e.target.value, 0.25, 60, 4))} />
+      <PropertyCell label="Length" span={1} compact hint="Loop length in seconds, free-running.">
+        <NumberCell label="Len" min={0.25} max={60} step={0.25} value={num(p.seconds, 4)} defaultValue={4} onchange={(v) => set('seconds', clampNum(v, 0.25, 60, 4))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Channel" span={1} hint="The channel playback sends on. Captured notes keep their own channel in the take; this is where they go out.">
-      <input class="val" type="number" min="1" max="16" step="1" value={num(p.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
+    <PropertyCell label="Channel" span={1} compact hint="The channel playback sends on. Captured notes keep their own channel in the take; this is where they go out.">
+      <NumberCell label="Ch" min={1} max={16} step={1} value={num(p.channel, 1)} defaultValue={1} onchange={(v) => set('channel', clampInt(v, 1, 16, 1))} />
     </PropertyCell>
-    <PropertyCell label="Transpose" span={1} hint="Semitones. A note landing outside 0–127 is dropped, not clamped.">
-      <input class="val" type="number" min="-48" max="48" step="1" value={num(p.transpose, 0)} onchange={(e) => set('transpose', clampInt(e.target.value, -48, 48, 0))} />
+    <PropertyCell label="Transpose" span={1} compact hint="Semitones. A note landing outside 0–127 is dropped, not clamped.">
+      <NumberCell label="Semi" min={-48} max={48} step={1} value={num(p.transpose, 0)} defaultValue={0} onchange={(v) => set('transpose', clampInt(v, -48, 48, 0))} />
     </PropertyCell>
-    <PropertyCell label="Velocity ×" span={1} hint="Scales every recorded velocity on the way out.">
-      <input class="val" type="number" min="0.1" max="2" step="0.05" value={num(p.velocityScale, 1)} onchange={(e) => set('velocityScale', clampNum(e.target.value, 0.1, 2, 1))} />
+    <PropertyCell label="Velocity ×" span={1} compact hint="Scales every recorded velocity on the way out.">
+      <NumberCell label="Vel" min={0.1} max={2} step={0.05} value={num(p.velocityScale, 1)} defaultValue={1} onchange={(v) => set('velocityScale', clampNum(v, 0.1, 2, 1))} />
     </PropertyCell>
   </PropertySection>
 
@@ -141,11 +142,11 @@
         Strength pulls the timing toward the grid; full snap removes the feel.
       </div>
     </PropertyCell>
-    <PropertyCell label="Grid" span={1} hint="Divisions per loop. 16 over one bar is sixteenth notes.">
-      <input class="val" type="number" min="1" max="64" step="1" value={num(p.grid, 16)} onchange={(e) => set('grid', clampInt(e.target.value, 1, 64, 16))} />
+    <PropertyCell label="Grid" span={1} compact hint="Divisions per loop. 16 over one bar is sixteenth notes.">
+      <NumberCell label="Grid" min={1} max={64} step={1} value={num(p.grid, 16)} defaultValue={16} onchange={(v) => set('grid', clampInt(v, 1, 64, 16))} />
     </PropertyCell>
-    <PropertyCell label="Strength" span={1} hint="0 keeps it exactly as played; 1 snaps hard to the grid.">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={num(p.quantizeStrength, 0)} onchange={(e) => set('quantizeStrength', clampNum(e.target.value, 0, 1, 0))} />
+    <PropertyCell label="Strength" span={1} compact hint="0 keeps it exactly as played; 1 snaps hard to the grid.">
+      <NumberCell label="Str" min={0} max={1} step={0.05} value={num(p.quantizeStrength, 0)} defaultValue={0} onchange={(v) => set('quantizeStrength', clampNum(v, 0, 1, 0))} />
     </PropertyCell>
     <PropertyCell label="Lengths too" span={1} hint="Off by default: quantising lengths turns a legato line into blocks, which is a separate decision from fixing the timing.">
       <PropertyToggle value={p.quantizeLength === true} onchange={() => set('quantizeLength', !(p.quantizeLength === true))} />
@@ -185,24 +186,24 @@
       </div>
     </PropertyCell>
     {#if count}
-      <PropertyCell label="Note" span={2} hint="Which recorded note the fields below edit, in time order.">
-        <input class="val" type="number" min="1" max={count} step="1" value={selIdx + 1} onchange={(e) => { selNote = clampInt(e.target.value, 1, count, 1) - 1; }} />
+      <PropertyCell label="Note" span={2} compact hint="Which recorded note the fields below edit, in time order.">
+        <NumberCell label="Note" min={1} max={count} step={1} value={selIdx + 1} onchange={(v) => { selNote = clampInt(v, 1, count, 1) - 1; }} />
       </PropertyCell>
       <PropertyCell label="" span={2} hint="">
         <div class="note">{sel ? `${rowLabelFor(sel.note, recorderUseFlats(control))} at ${(sel.t * 100).toFixed(1)}%` : '—'}</div>
       </PropertyCell>
       {#if sel}
-        <PropertyCell label="Position" span={1} hint="Where in the loop it starts, as a percentage.">
-          <input class="val" type="number" min="0" max="99.9" step="0.5" value={Number((sel.t * 100).toFixed(1))} onchange={(e) => patchNote({ t: clampNum(e.target.value, 0, 99.9, 0) / 100 })} />
+        <PropertyCell label="Position" span={1} compact hint="Where in the loop it starts, as a percentage.">
+          <NumberCell label="Pos" min={0} max={99.9} step={0.5} value={Number((sel.t * 100).toFixed(1))} onchange={(v) => patchNote({ t: clampNum(v, 0, 99.9, 0) / 100 })} />
         </PropertyCell>
-        <PropertyCell label="Pitch" span={1} hint="MIDI note number.">
-          <input class="val" type="number" min="0" max="127" step="1" value={sel.note} onchange={(e) => patchNote({ note: clampInt(e.target.value, 0, 127, 60) })} />
+        <PropertyCell label="Pitch" span={1} compact hint="MIDI note number.">
+          <NumberCell label="Note" min={0} max={127} step={1} value={sel.note} onchange={(v) => patchNote({ note: clampInt(v, 0, 127, 60) })} />
         </PropertyCell>
-        <PropertyCell label="Velocity" span={1} hint="">
-          <input class="val" type="number" min="1" max="127" step="1" value={sel.velocity} onchange={(e) => patchNote({ velocity: clampInt(e.target.value, 1, 127, 100) })} />
+        <PropertyCell label="Velocity" span={1} compact hint="">
+          <NumberCell label="Vel" min={1} max={127} step={1} value={sel.velocity} onchange={(v) => patchNote({ velocity: clampInt(v, 1, 127, 100) })} />
         </PropertyCell>
-        <PropertyCell label="Length" span={1} hint="As a fraction of the loop.">
-          <input class="val" type="number" min="0.1" max="100" step="1" value={Number((sel.dur * 100).toFixed(1))} onchange={(e) => patchNote({ dur: clampNum(e.target.value, 0.1, 100, 10) / 100 })} />
+        <PropertyCell label="Length" span={1} compact hint="As a fraction of the loop.">
+          <NumberCell label="Len" min={0.1} max={100} step={1} value={Number((sel.dur * 100).toFixed(1))} onchange={(v) => patchNote({ dur: clampNum(v, 0.1, 100, 10) / 100 })} />
         </PropertyCell>
         <PropertyCell label="" span={4} hint="">
           <button type="button" class="btn" onclick={() => set('take', deleteNote(take, selIdx))}>Delete this note</button>
@@ -255,8 +256,8 @@
     <PropertyCell label="Pitch labels" span={1} hint="The note names down the left.">
       <PropertyToggle value={p.showGutter !== false} onchange={() => set('showGutter', !(p.showGutter !== false))} />
     </PropertyCell>
-    <PropertyCell label="Min rows" span={1} hint="The roll fits itself to the take, but never shows fewer rows than this.">
-      <input class="val" type="number" min="4" max="48" step="1" value={num(p.minSpan, 12)} onchange={(e) => set('minSpan', clampInt(e.target.value, 4, 48, 12))} />
+    <PropertyCell label="Min rows" span={1} compact hint="The roll fits itself to the take, but never shows fewer rows than this.">
+      <NumberCell label="Rows" min={4} max={48} step={1} value={num(p.minSpan, 12)} defaultValue={12} onchange={(v) => set('minSpan', clampInt(v, 4, 48, 12))} />
     </PropertyCell>
   </PropertySection>
 

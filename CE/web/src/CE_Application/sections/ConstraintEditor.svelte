@@ -5,6 +5,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import Link from 'lucide-svelte/icons/link';
   import Palette from 'lucide-svelte/icons/palette';
   import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
@@ -57,8 +58,8 @@
       <PropertyToggle value={cs.showBadge !== false} onchange={() => set('showBadge', !(cs.showBadge !== false))} />
     </PropertyCell>
     {#if String(cs.mode ?? 'sum') === 'order'}
-      <PropertyCell label="Min gap" span={2} hint="Minimum spacing kept between adjacent members (e.g. keep resonance a little below cutoff).">
-        <input class="val" type="number" min="0" max="0.9" step="0.02" value={cs.minGap ?? 0} onchange={(e) => set('minGap', clamp01(num(e.target.value, 0)))} />
+      <PropertyCell label="Min gap" span={2} compact hint="Minimum spacing kept between adjacent members (e.g. keep resonance a little below cutoff).">
+        <NumberCell label="Gap" min={0} max={0.9} step={0.02} value={cs.minGap ?? 0} defaultValue={0} onchange={(v) => set('minGap', clamp01(v))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Values" span={1} hint="Show live per-member values.">
@@ -97,7 +98,9 @@
                 ]} />
               </span>
               <label class="fld"><span>Value</span>
-                <input class="val vnum" type="number" min="0" max="1" step="0.05" value={num(m.value, 0.5)} onchange={(e) => updateMember(i, 'value', clamp01(num(e.target.value, 0.5)))} />
+                <span class="vnum nc-wrap">
+                  <NumberCell min={0} max={1} step={0.05} value={num(m.value, 0.5)} defaultValue={0.5} onchange={(v) => updateMember(i, 'value', clamp01(v))} />
+                </span>
               </label>
               <button type="button" class="action-btn danger" onclick={() => removeMember(i)} title="Remove">✕</button>
             </div>
@@ -117,6 +120,7 @@
   .mrow { display: flex; align-items: flex-end; gap: 8px; }
   .mrow .name { flex: 1 1 auto; }
   .vnum { width: 64px; }
+  .nc-wrap { display: flex; }
   .clus { flex: 0 0 44px; display: flex; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #8a8a8a; }

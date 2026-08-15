@@ -4,6 +4,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import Ribbon from 'lucide-svelte/icons/ribbon';
   import IterationCcw from 'lucide-svelte/icons/iteration-ccw';
   import Monitor from 'lucide-svelte/icons/monitor';
@@ -18,7 +19,6 @@
     updateControlProperty(core.id, `Ribbon.${prop}`, value);
   }
   function toggle(prop) { set(prop, !(r?.[prop] === true)); }
-  function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
 
   // Quick presets — set the handful of fields that make a ribbon / pitch / mod.
   // Patch is a flat map of dot-paths → values.
@@ -57,8 +57,8 @@
         <option value="horizontal">Horizontal</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Value" span={2} hint="Current / rest position (0–1).">
-      <input class="val" type="number" min="0" max="1" step="0.01" value={r.value ?? 0.5} onchange={(e) => set('value', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} />
+    <PropertyCell label="Value" span={2} compact hint="Current / rest position (0–1).">
+      <NumberCell label="Val" min={0} max={1} step={0.01} value={r.value ?? 0.5} defaultValue={0.5} onchange={(v) => set('value', Math.max(0, Math.min(1, v)))} />
     </PropertyCell>
     <PropertyCell label="Bipolar" span={1} hint="Value port emits −1..1 (pitch bend).">
       <PropertyToggle value={r.bipolar === true} onchange={() => toggle('bipolar')} />
@@ -79,17 +79,17 @@
       </select>
     </PropertyCell>
     {#if r.returnMode === 'rest'}
-      <PropertyCell label="Rest" span={1} hint="Rest value (0–1).">
-        <input class="val" type="number" min="0" max="1" step="0.01" value={r.returnValue ?? 0.5} onchange={(e) => set('returnValue', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} />
+      <PropertyCell label="Rest" span={1} compact hint="Rest value (0–1).">
+        <NumberCell label="Rest" min={0} max={1} step={0.01} value={r.returnValue ?? 0.5} defaultValue={0.5} onchange={(v) => set('returnValue', Math.max(0, Math.min(1, v)))} />
       </PropertyCell>
     {/if}
     {#if String(r.returnMode ?? 'none') !== 'none'}
-      <PropertyCell label="Speed" span={1} hint="Glide speed (units/sec; 0 = instant snap).">
-        <input class="val" type="number" min="0" step="0.5" value={r.returnRate ?? 8} onchange={(e) => set('returnRate', Math.max(0, num(e.target.value, 8)))} />
+      <PropertyCell label="Speed" span={1} compact hint="Glide speed (units/sec; 0 = instant snap).">
+        <NumberCell label="Spd" min={0} step={0.5} value={r.returnRate ?? 8} defaultValue={8} onchange={(v) => set('returnRate', Math.max(0, v))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Snap" span={2} hint="Value snap step (0 = continuous).">
-      <input class="val" type="number" min="0" max="1" step="0.01" value={r.snap ?? 0} onchange={(e) => set('snap', Math.max(0, Math.min(1, num(e.target.value, 0))))} />
+    <PropertyCell label="Snap" span={2} compact hint="Value snap step (0 = continuous).">
+      <NumberCell label="Snap" min={0} max={1} step={0.01} value={r.snap ?? 0} defaultValue={0} onchange={(v) => set('snap', Math.max(0, Math.min(1, v)))} />
     </PropertyCell>
   </PropertySection>
 

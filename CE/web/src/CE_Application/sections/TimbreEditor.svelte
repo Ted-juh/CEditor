@@ -9,6 +9,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import Blend from 'lucide-svelte/icons/blend';
   import Target from 'lucide-svelte/icons/target';
   import Anchor from 'lucide-svelte/icons/anchor';
@@ -97,8 +98,8 @@
     <PropertyCell label="Y axis" span={2} hint="Name the vertical musical direction (e.g. soft → aggressive).">
       <input class="val" type="text" value={tb.axisY ?? ''} onchange={(e) => set('axisY', e.target.value)} />
     </PropertyCell>
-    <PropertyCell label="Blend" span={2} hint="Sharpness of the blend — higher makes the nearest anchor dominate sooner.">
-      <input class="val" type="number" min="1" max="6" step="0.5" value={tb.power ?? 2} onchange={(e) => set('power', Math.max(1, Math.min(6, num(e.target.value, 2))))} />
+    <PropertyCell label="Blend" span={2} compact hint="Sharpness of the blend — higher makes the nearest anchor dominate sooner.">
+      <NumberCell label="Blend" min={1} max={6} step={0.5} value={tb.power ?? 2} defaultValue={2} onchange={(v) => set('power', Math.max(1, Math.min(6, v)))} />
     </PropertyCell>
     <PropertyCell label="Editable" span={1} hint="Drag the puck / anchors in preview.">
       <PropertyToggle value={tb.editable !== false} onchange={() => set('editable', !(tb.editable !== false))} />
@@ -164,14 +165,14 @@
               <button type="button" class="action-btn danger" onclick={() => removeAnchor(i)} title="Remove">✕</button>
             </div>
             <div class="arow2">
-              <label class="fld"><span>X</span><input class="val" type="number" min="0" max="1" step="0.05" value={num(a.x, 0.5)} onchange={(e) => updateAnchor(i, 'x', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} /></label>
-              <label class="fld"><span>Y</span><input class="val" type="number" min="0" max="1" step="0.05" value={num(a.y, 0.5)} onchange={(e) => updateAnchor(i, 'y', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} /></label>
+              <label class="fld"><span>X</span><NumberCell min={0} max={1} step={0.05} value={num(a.x, 0.5)} defaultValue={0.5} onchange={(v) => updateAnchor(i, 'x', Math.max(0, Math.min(1, v)))} /></label>
+              <label class="fld"><span>Y</span><NumberCell min={0} max={1} step={0.05} value={num(a.y, 0.5)} defaultValue={0.5} onchange={(v) => updateAnchor(i, 'y', Math.max(0, Math.min(1, v)))} /></label>
             </div>
             {#if targets.length}
               <div class="grid">
                 {#each targets as t (t.id)}
                   <label class="fld"><span>{t.label}</span>
-                    <input class="val" type="number" min="0" max="1" step="0.05" value={av(a, t.id)} onchange={(e) => updateAnchorValue(i, t.id, Math.max(0, Math.min(1, num(e.target.value, 0))))} />
+                    <NumberCell min={0} max={1} step={0.05} value={av(a, t.id)} defaultValue={0} onchange={(v) => updateAnchorValue(i, t.id, Math.max(0, Math.min(1, v)))} />
                   </label>
                 {/each}
               </div>

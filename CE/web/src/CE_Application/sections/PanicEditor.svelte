@@ -5,6 +5,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import Siren from 'lucide-svelte/icons/siren';
   import Palette from 'lucide-svelte/icons/palette';
 
@@ -34,8 +35,8 @@
       </select>
     </PropertyCell>
     {#if String(p.scope ?? 'all') === 'channel'}
-      <PropertyCell label="Channel" span={2} hint="The single channel to silence.">
-        <input class="val" type="number" min="1" max="16" step="1" value={num(p.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
+      <PropertyCell label="Channel" span={2} compact hint="The single channel to silence.">
+        <NumberCell label="Ch" min={1} max={16} step={1} value={num(p.channel, 1)} defaultValue={1} onchange={(v) => set('channel', clampInt(v, 1, 16, 1))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Reset CCs" span={1} hint="Also send CC 121 (reset all controllers), which releases a mod wheel or pedal left stuck up.">

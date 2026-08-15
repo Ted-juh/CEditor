@@ -390,9 +390,12 @@
           class:on={isCornerBorderEnabled(cell.id)} class:sel={selected === cell.id}
           onclick={() => toggleCornerBorder(cell.id)}
           oncontextmenu={(e) => handleContext(cell.id, e)}>
-          <input class="corner-input" type="number" value={getCorner(cell.id).radius} min={0} step={1}
-            onfocus={selectAll} onclick={(e) => e.stopPropagation()}
-            onchange={(e) => setCornerRadius(cell.id, Number(e.target.value))} />
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <span class="corner-input nc-wrap" onclick={(e) => e.stopPropagation()}>
+            <NumberCell value={getCorner(cell.id).radius} min={0} step={1}
+              onchange={(v) => setCornerRadius(cell.id, v)} />
+          </span>
         </div>
       {:else if cell.kind === 'side'}
         <!-- svelte-ignore a11y_consider_explicit_label -->
