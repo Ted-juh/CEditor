@@ -6,6 +6,7 @@
   import { learnCandidateLabel } from '../utils/midiNoteInput.js';
   import { midiLearnState, startMidiLearn, stopMidiLearn } from '../stores/noteInput.js';
   import { onDestroy } from 'svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -95,8 +96,8 @@
         </button>
       </PropertyCell>
       {#if String(r.source ?? '') === 'cc'}
-        <PropertyCell label="CC number" span={2} hint="Which controller number to follow (0–127).">
-          <input class="val" type="number" min="0" max="127" step="1" value={num(r.ccNumber, 1)} onchange={(e) => set('ccNumber', Math.max(0, Math.min(127, Math.round(num(e.target.value, 1)))))} />
+        <PropertyCell label="CC number" span={2} compact hint="Which controller number to follow (0–127).">
+          <NumberCell label="CC" value={num(r.ccNumber, 1)} step={1} min={0} max={127} onchange={(v) => set('ccNumber', Math.max(0, Math.min(127, Math.round(num(v, 1)))))} />
         </PropertyCell>
       {/if}
       {#if String(r.source ?? '') === 'polyAftertouch'}
@@ -107,28 +108,28 @@
           </select>
         </PropertyCell>
       {/if}
-      <PropertyCell label="In channel" span={1} hint="Which MIDI channel to take this controller from. 0 = omni (any channel).">
-        <input class="val" type="number" min="0" max="16" step="1" value={num(r.inputChannel, 0)} onchange={(e) => set('inputChannel', Math.max(0, Math.min(16, Math.round(num(e.target.value, 0)))))} />
+      <PropertyCell label="In channel" span={1} compact hint="Which MIDI channel to take this controller from. 0 = omni (any channel).">
+        <NumberCell label="Ch" value={num(r.inputChannel, 0)} step={1} min={0} max={16} onchange={(v) => set('inputChannel', Math.max(0, Math.min(16, Math.round(num(v, 0)))))} />
       </PropertyCell>
-      <PropertyCell label="Test in" span={1} hint="Stand-in value (0–1) until that controller sends something. The header reads Live once real data arrives.">
-        <input class="val" type="number" min="0" max="1" step="0.01" value={r.testInput ?? 0.5} onchange={(e) => set('testInput', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} />
+      <PropertyCell label="Test in" span={1} compact hint="Stand-in value (0–1) until that controller sends something. The header reads Live once real data arrives.">
+        <NumberCell label="Test" value={r.testInput ?? 0.5} step={0.01} min={0} max={1} defaultValue={0.5} onchange={(v) => set('testInput', Math.max(0, Math.min(1, num(v, 0.5))))} />
       </PropertyCell>
       <PropertyCell label="" span={4} hint="The controller is read from the hardware MIDI input on the device role.">
         <div class="note">Reads {String(r.source ?? '') === 'cc' ? `CC ${num(r.ccNumber, 1)}` : routerSourceLabel(r.source ?? 'modwheel')} from the MIDI input{num(r.inputChannel, 0) > 0 ? ` · ch ${num(r.inputChannel, 0)}` : ' · omni'}{String(r.source ?? '') === 'polyAftertouch' ? ` · ${String(r.polyMode ?? 'highest') === 'last' ? 'most recent key' : 'hardest key'}` : ''}</div>
       </PropertyCell>
     {/if}
-    <PropertyCell label="Dead-zone" span={2} hint="Ignore the bottom of the input range; the rest rescales to fill 0–1 (0 = off).">
-      <input class="val" type="number" min="0" max="0.9" step="0.02" value={r.deadzone ?? 0} onchange={(e) => set('deadzone', Math.max(0, Math.min(0.9, num(e.target.value, 0))))} />
+    <PropertyCell label="Dead-zone" span={2} compact hint="Ignore the bottom of the input range; the rest rescales to fill 0–1 (0 = off).">
+      <NumberCell label="Dz" value={r.deadzone ?? 0} step={0.02} min={0} max={0.9} defaultValue={0} onchange={(v) => set('deadzone', Math.max(0, Math.min(0.9, num(v, 0))))} />
     </PropertyCell>
     <PropertyCell label="Divisions" span={1} hint="Draw value-scale ticks along each destination meter, using the same major/minor tick generator as the sliders.">
       <PropertyToggle value={r.showDivisions === true} onchange={() => set('showDivisions', !(r.showDivisions === true))} />
     </PropertyCell>
     {#if r.showDivisions === true}
-      <PropertyCell label="Major" span={1} hint="Major tick count (same as a slider's Major Count).">
-        <input class="val" type="number" min="2" max="21" step="1" value={r.majorTickCount ?? 5} onchange={(e) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(e.target.value, 5)))))} />
+      <PropertyCell label="Major" span={1} compact hint="Major tick count (same as a slider's Major Count).">
+        <NumberCell label="Major" value={r.majorTickCount ?? 5} step={1} min={2} max={21} defaultValue={5} onchange={(v) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(v, 5)))))} />
       </PropertyCell>
-      <PropertyCell label="Minor / gap" span={1} hint="Minor ticks between each pair of majors (same as a slider's Minor / Gap).">
-        <input class="val" type="number" min="0" max="8" step="1" value={r.minorTickCount ?? 0} onchange={(e) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(e.target.value, 0)))))} />
+      <PropertyCell label="Minor / gap" span={1} compact hint="Minor ticks between each pair of majors (same as a slider's Minor / Gap).">
+        <NumberCell label="Minor" value={r.minorTickCount ?? 0} step={1} min={0} max={8} defaultValue={0} onchange={(v) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(v, 0)))))} />
       </PropertyCell>
     {/if}
   </PropertySection>
@@ -166,13 +167,13 @@
             </div>
             <div class="drow2">
               <label class="fld"><span>Depth</span>
-                <input class="val" type="number" min="-100" max="100" step="5" value={depthPct(d)} onchange={(e) => updateDest(i, 'depth', Math.max(-1, Math.min(1, num(e.target.value, 100) / 100)))} />
+                <NumberCell value={depthPct(d)} step={5} min={-100} max={100} onchange={(v) => updateDest(i, 'depth', Math.max(-1, Math.min(1, num(v, 100) / 100)))} />
               </label>
               <label class="fld"><span>Min</span>
-                <input class="val" type="number" min="0" max="1" step="0.05" value={d.min ?? 0} onchange={(e) => updateDest(i, 'min', Math.max(0, Math.min(1, num(e.target.value, 0))))} />
+                <NumberCell value={d.min ?? 0} step={0.05} min={0} max={1} defaultValue={0} onchange={(v) => updateDest(i, 'min', Math.max(0, Math.min(1, num(v, 0))))} />
               </label>
               <label class="fld"><span>Max</span>
-                <input class="val" type="number" min="0" max="1" step="0.05" value={d.max ?? 1} onchange={(e) => updateDest(i, 'max', Math.max(0, Math.min(1, num(e.target.value, 1))))} />
+                <NumberCell value={d.max ?? 1} step={0.05} min={0} max={1} defaultValue={1} onchange={(v) => updateDest(i, 'max', Math.max(0, Math.min(1, num(v, 1))))} />
               </label>
             </div>
           </div>

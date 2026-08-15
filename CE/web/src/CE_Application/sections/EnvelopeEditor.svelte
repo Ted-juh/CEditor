@@ -5,6 +5,7 @@
   import {
     envelopePreset, normalizePoints, envelopePointAdded, envelopePointRemoved,
   } from '../utils/envelopeLayout.js';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -85,8 +86,8 @@
         {#each points as p, i (p.id ?? i)}
           <div class="nrow">
             <span class="nlabel">{i + 1}</span>
-            <input class="val nnum" type="number" min="0" max="1" step="0.01" title="Time (x)" value={num(p.x, 0)} onchange={(ev) => updatePoint(i, 'x', Math.max(0, Math.min(1, num(ev.target.value, 0))))} />
-            <input class="val nnum" type="number" min="0" max="1" step="0.01" title="Level (y)" value={num(p.y, 0)} onchange={(ev) => updatePoint(i, 'y', Math.max(0, Math.min(1, num(ev.target.value, 0))))} />
+            <span class="nnum nc-wrap" title="Time (x)"><NumberCell value={num(p.x, 0)} step={0.01} min={0} max={1} onchange={(v) => updatePoint(i, 'x', Math.max(0, Math.min(1, num(v, 0))))} /></span>
+            <span class="nnum nc-wrap" title="Level (y)"><NumberCell value={num(p.y, 0)} step={0.01} min={0} max={1} onchange={(v) => updatePoint(i, 'y', Math.max(0, Math.min(1, num(v, 0))))} /></span>
             <select class="val ncurve" title="Segment curve" value={p.curve ?? 'linear'} onchange={(ev) => updatePoint(i, 'curve', ev.target.value)}>
               <option value="linear">Linear</option>
               <option value="exp">Exp</option>
@@ -106,11 +107,11 @@
       <PropertyToggle value={e.loopEnabled === true} onchange={() => toggle('loopEnabled')} />
     </PropertyCell>
     {#if e.loopEnabled === true}
-      <PropertyCell label="Loop start" span={1} hint="Node index the loop returns to.">
-        <input class="val" type="number" min="0" value={e.loopStart ?? 0} onchange={(ev) => set('loopStart', Math.max(0, Math.round(num(ev.target.value, 0))))} />
+      <PropertyCell label="Loop start" span={1} compact hint="Node index the loop returns to.">
+        <NumberCell label="Start" value={e.loopStart ?? 0} min={0} defaultValue={0} onchange={(v) => set('loopStart', Math.max(0, Math.round(num(v, 0))))} />
       </PropertyCell>
-      <PropertyCell label="Loop end" span={1} hint="Node index the loop repeats from.">
-        <input class="val" type="number" min="0" value={e.loopEnd ?? 0} onchange={(ev) => set('loopEnd', Math.max(0, Math.round(num(ev.target.value, 0))))} />
+      <PropertyCell label="Loop end" span={1} compact hint="Node index the loop repeats from.">
+        <NumberCell label="End" value={e.loopEnd ?? 0} min={0} defaultValue={0} onchange={(v) => set('loopEnd', Math.max(0, Math.round(num(v, 0))))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Snap X" span={2} hint="Grid snap for time when dragging (0 = free).">

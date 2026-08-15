@@ -1,6 +1,7 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
@@ -34,11 +35,11 @@
     <PropertyCell label="Editable" span={2} hint="Drag the puck in preview.">
       <PropertyToggle value={j.editable !== false} onchange={() => set('editable', !(j.editable !== false))} />
     </PropertyCell>
-    <PropertyCell label="Rest X" span={2} hint="Resting puck X (0–1).">
-      <input class="val" type="number" min="0" max="1" step="0.01" value={j.x ?? 0.5} onchange={(e) => set('x', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} />
+    <PropertyCell label="Rest X" span={2} compact hint="Resting puck X (0–1).">
+      <NumberCell label="X" value={j.x ?? 0.5} min={0} max={1} step={0.01} defaultValue={0.5} onchange={(v) => set('x', Math.max(0, Math.min(1, num(v, 0.5))))} />
     </PropertyCell>
-    <PropertyCell label="Rest Y" span={2} hint="Resting puck Y (0–1, bottom = 0).">
-      <input class="val" type="number" min="0" max="1" step="0.01" value={j.y ?? 0.5} onchange={(e) => set('y', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} />
+    <PropertyCell label="Rest Y" span={2} compact hint="Resting puck Y (0–1, bottom = 0).">
+      <NumberCell label="Y" value={j.y ?? 0.5} min={0} max={1} step={0.01} defaultValue={0.5} onchange={(v) => set('y', Math.max(0, Math.min(1, num(v, 0.5))))} />
     </PropertyCell>
   </PropertySection>
 
@@ -56,8 +57,8 @@
           <option value="y">Y only</option>
         </select>
       </PropertyCell>
-      <PropertyCell label="Speed" span={2} hint="Glide speed (units/sec).">
-        <input class="val" type="number" min="0.5" step="0.5" value={j.returnRate ?? 4} onchange={(e) => set('returnRate', Math.max(0.1, num(e.target.value, 4)))} />
+      <PropertyCell label="Speed" span={2} compact hint="Glide speed (units/sec).">
+        <NumberCell label="Spd" value={j.returnRate ?? 4} min={0.5} step={0.5} defaultValue={4} onchange={(v) => set('returnRate', Math.max(0.1, num(v, 4)))} />
       </PropertyCell>
     {/if}
   </PropertySection>
@@ -84,21 +85,21 @@
     <PropertyCell label="Grid" span={1} hint="Background grid.">
       <PropertyToggle value={j.showGrid !== false} onchange={() => set('showGrid', !(j.showGrid !== false))} />
     </PropertyCell>
-    <PropertyCell label="Divisions" span={1} hint="Grid divisions per axis.">
-      <input class="val" type="number" min="1" max="16" value={j.gridDiv ?? 4} onchange={(e) => set('gridDiv', Math.max(1, Math.round(num(e.target.value, 4))))} />
+    <PropertyCell label="Divisions" span={1} compact hint="Grid divisions per axis.">
+      <NumberCell label="Div" value={j.gridDiv ?? 4} min={1} max={16} step={1} defaultValue={4} onchange={(v) => set('gridDiv', Math.max(1, Math.round(num(v, 4))))} />
     </PropertyCell>
     <PropertyCell label="Crosshair" span={1} hint="Lines through the puck.">
       <PropertyToggle value={j.showCrosshair !== false} onchange={() => set('showCrosshair', !(j.showCrosshair !== false))} />
     </PropertyCell>
-    <PropertyCell label="Puck size" span={1} hint="Puck radius (px).">
-      <input class="val" type="number" min="3" value={j.puckRadius ?? 9} onchange={(e) => set('puckRadius', Math.max(3, num(e.target.value, 9)))} />
+    <PropertyCell label="Puck size" span={1} compact hint="Puck radius (px).">
+      <NumberCell label="Puck" value={j.puckRadius ?? 9} min={3} step={1} defaultValue={9} onchange={(v) => set('puckRadius', Math.max(3, num(v, 9)))} />
     </PropertyCell>
     <PropertyCell label="Trail" span={2} hint="Fading motion trail behind the puck.">
       <PropertyToggle value={j.showTrail === true} onchange={() => toggle('showTrail')} />
     </PropertyCell>
     {#if j.showTrail === true}
-      <PropertyCell label="Trail length" span={2} hint="Number of trail points.">
-        <input class="val" type="number" min="2" max="200" value={j.trailLength ?? 24} onchange={(e) => set('trailLength', Math.max(2, Math.round(num(e.target.value, 24))))} />
+      <PropertyCell label="Trail length" span={2} compact hint="Number of trail points.">
+        <NumberCell label="Len" value={j.trailLength ?? 24} min={2} max={200} step={1} defaultValue={24} onchange={(v) => set('trailLength', Math.max(2, Math.round(num(v, 24))))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Colours" span={4} hint="Puck, pad background, corner marks, motion trail. Click a swatch to edit it in the Colors tab.">

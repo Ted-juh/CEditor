@@ -5,6 +5,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
   import ArrowRightToLine from 'lucide-svelte/icons/arrow-right-to-line';
   import ArrowRightFromLine from 'lucide-svelte/icons/arrow-right-from-line';
@@ -605,17 +606,17 @@
       </PropertyCell>
       {@const inputType = String(selectedInputEntry.type ?? 'float').trim().toLowerCase()}
       {#if isNumericType(inputType)}
-        <PropertyCell label="Min" span={1} hint="Smallest value shown to users of this package.">
-          <input class="val" type="number" value={selectedInputEntry.min ?? ''} onchange={(event) => set(`PublishedProperties.inputs.${selectedInput}.min`, Number(event.target.value))} />
+        <PropertyCell label="Min" span={1} compact hint="Smallest value shown to users of this package.">
+          <NumberCell label="Min" value={selectedInputEntry.min ?? ''} onchange={(v) => set(`PublishedProperties.inputs.${selectedInput}.min`, v)} />
         </PropertyCell>
-        <PropertyCell label="Max" span={1} hint="Largest value shown to users of this package.">
-          <input class="val" type="number" value={selectedInputEntry.max ?? ''} onchange={(event) => set(`PublishedProperties.inputs.${selectedInput}.max`, Number(event.target.value))} />
+        <PropertyCell label="Max" span={1} compact hint="Largest value shown to users of this package.">
+          <NumberCell label="Max" value={selectedInputEntry.max ?? ''} onchange={(v) => set(`PublishedProperties.inputs.${selectedInput}.max`, v)} />
         </PropertyCell>
-        <PropertyCell label="Step" span={1} hint="Increment used in normal properties.">
-          <input class="val" type="number" value={selectedInputEntry.step ?? ''} onchange={(event) => set(`PublishedProperties.inputs.${selectedInput}.step`, Number(event.target.value))} />
+        <PropertyCell label="Step" span={1} compact hint="Increment used in normal properties.">
+          <NumberCell label="Step" value={selectedInputEntry.step ?? ''} onchange={(v) => set(`PublishedProperties.inputs.${selectedInput}.step`, v)} />
         </PropertyCell>
-        <PropertyCell label="Default" span={1} hint="Reset value for this published input.">
-          <input class="val" type="number" value={selectedInputEntry.defaultValue ?? ''} onchange={(event) => set(`PublishedProperties.inputs.${selectedInput}.defaultValue`, Number(event.target.value))} />
+        <PropertyCell label="Default" span={1} compact hint="Reset value for this published input.">
+          <NumberCell label="Def" value={selectedInputEntry.defaultValue ?? ''} onchange={(v) => set(`PublishedProperties.inputs.${selectedInput}.defaultValue`, v)} />
         </PropertyCell>
       {:else if isEnumType(inputType)}
         <PropertyCell label="Values" span={3} hint="Comma-separated public choices.">
@@ -681,17 +682,17 @@
       </PropertyCell>
       {@const outputType = String(selectedOutputEntry.type ?? 'float').trim().toLowerCase()}
       {#if isNumericType(outputType)}
-        <PropertyCell label="Min" span={1} hint="Smallest emitted value shown in route previews.">
-          <input class="val" type="number" value={selectedOutputEntry.min ?? ''} onchange={(event) => set(`PublishedProperties.outputs.${selectedOutput}.min`, Number(event.target.value))} />
+        <PropertyCell label="Min" span={1} compact hint="Smallest emitted value shown in route previews.">
+          <NumberCell label="Min" value={selectedOutputEntry.min ?? ''} onchange={(v) => set(`PublishedProperties.outputs.${selectedOutput}.min`, v)} />
         </PropertyCell>
-        <PropertyCell label="Max" span={1} hint="Largest emitted value shown in route previews.">
-          <input class="val" type="number" value={selectedOutputEntry.max ?? ''} onchange={(event) => set(`PublishedProperties.outputs.${selectedOutput}.max`, Number(event.target.value))} />
+        <PropertyCell label="Max" span={1} compact hint="Largest emitted value shown in route previews.">
+          <NumberCell label="Max" value={selectedOutputEntry.max ?? ''} onchange={(v) => set(`PublishedProperties.outputs.${selectedOutput}.max`, v)} />
         </PropertyCell>
-        <PropertyCell label="Step" span={1} hint="Increment for route previews and editors.">
-          <input class="val" type="number" value={selectedOutputEntry.step ?? ''} onchange={(event) => set(`PublishedProperties.outputs.${selectedOutput}.step`, Number(event.target.value))} />
+        <PropertyCell label="Step" span={1} compact hint="Increment for route previews and editors.">
+          <NumberCell label="Step" value={selectedOutputEntry.step ?? ''} onchange={(v) => set(`PublishedProperties.outputs.${selectedOutput}.step`, v)} />
         </PropertyCell>
-        <PropertyCell label="Default" span={1} hint="Documented resting value for this output.">
-          <input class="val" type="number" value={selectedOutputEntry.defaultValue ?? ''} onchange={(event) => set(`PublishedProperties.outputs.${selectedOutput}.defaultValue`, Number(event.target.value))} />
+        <PropertyCell label="Default" span={1} compact hint="Documented resting value for this output.">
+          <NumberCell label="Def" value={selectedOutputEntry.defaultValue ?? ''} onchange={(v) => set(`PublishedProperties.outputs.${selectedOutput}.defaultValue`, v)} />
         </PropertyCell>
       {:else if isEnumType(outputType)}
         <PropertyCell label="Values" span={3} hint="Comma-separated emitted choices.">
@@ -765,17 +766,17 @@
       </PropertyCell>
       {@const propertyType = String(selectedPropertyEntry.type ?? 'text').trim().toLowerCase()}
       {#if isNumericType(propertyType)}
-        <PropertyCell label="Min" span={1} hint="Smallest value shown in normal properties.">
-          <input class="val" type="number" value={selectedPropertyEntry.min ?? ''} onchange={(event) => set(`PublishedProperties.editableProperties.${selectedProperty}.min`, Number(event.target.value))} />
+        <PropertyCell label="Min" span={1} compact hint="Smallest value shown in normal properties.">
+          <NumberCell label="Min" value={selectedPropertyEntry.min ?? ''} onchange={(v) => set(`PublishedProperties.editableProperties.${selectedProperty}.min`, v)} />
         </PropertyCell>
-        <PropertyCell label="Max" span={1} hint="Largest value shown in normal properties.">
-          <input class="val" type="number" value={selectedPropertyEntry.max ?? ''} onchange={(event) => set(`PublishedProperties.editableProperties.${selectedProperty}.max`, Number(event.target.value))} />
+        <PropertyCell label="Max" span={1} compact hint="Largest value shown in normal properties.">
+          <NumberCell label="Max" value={selectedPropertyEntry.max ?? ''} onchange={(v) => set(`PublishedProperties.editableProperties.${selectedProperty}.max`, v)} />
         </PropertyCell>
-        <PropertyCell label="Step" span={1} hint="Increment used in normal properties.">
-          <input class="val" type="number" value={selectedPropertyEntry.step ?? ''} onchange={(event) => set(`PublishedProperties.editableProperties.${selectedProperty}.step`, Number(event.target.value))} />
+        <PropertyCell label="Step" span={1} compact hint="Increment used in normal properties.">
+          <NumberCell label="Step" value={selectedPropertyEntry.step ?? ''} onchange={(v) => set(`PublishedProperties.editableProperties.${selectedProperty}.step`, v)} />
         </PropertyCell>
-        <PropertyCell label="Default" span={1} hint="Reset value for this exposed property.">
-          <input class="val" type="number" value={selectedPropertyEntry.defaultValue ?? ''} onchange={(event) => set(`PublishedProperties.editableProperties.${selectedProperty}.defaultValue`, Number(event.target.value))} />
+        <PropertyCell label="Default" span={1} compact hint="Reset value for this exposed property.">
+          <NumberCell label="Def" value={selectedPropertyEntry.defaultValue ?? ''} onchange={(v) => set(`PublishedProperties.editableProperties.${selectedProperty}.defaultValue`, v)} />
         </PropertyCell>
       {:else if isEnumType(propertyType)}
         <PropertyCell label="Values" span={3} hint="Comma-separated public choices.">

@@ -1,6 +1,7 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
@@ -46,14 +47,14 @@
       hint="How many bars one global cycle takes. Each satellite's ratio is turns per cycle."
     >
       {#snippet children()}
-        <PropertyCell label="Cycle (bars)" span={2} hint="How many bars one global cycle takes. A satellite at ratio 2 then makes two turns per cycle, on the bar.">
-          <input class="val" type="number" min={MIN_BARS} max={MAX_BARS} step="1" value={o.cycleBars ?? 4} onchange={(e) => set('cycleBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(e.target.value, 4))))} />
+        <PropertyCell label="Cycle (bars)" span={2} compact hint="How many bars one global cycle takes. A satellite at ratio 2 then makes two turns per cycle, on the bar.">
+          <NumberCell label="Bars" value={o.cycleBars ?? 4} min={MIN_BARS} max={MAX_BARS} step={1} defaultValue={4} onchange={(v) => set('cycleBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(v, 4))))} />
         </PropertyCell>
       {/snippet}
     </TransportSyncCells>
     {#if o.syncToTransport !== true}
-      <PropertyCell label="Rate" span={2} hint="Global speed — cycles per second (all ratios are relative to this).">
-        <input class="val" type="number" min="0" max="10" step="0.05" value={o.rate ?? 0.25} onchange={(e) => set('rate', Math.max(0, num(e.target.value, 0.25)))} />
+      <PropertyCell label="Rate" span={2} compact hint="Global speed — cycles per second (all ratios are relative to this).">
+        <NumberCell label="Rate" value={o.rate ?? 0.25} min={0} max={10} step={0.05} defaultValue={0.25} onchange={(v) => set('rate', Math.max(0, num(v, 0.25)))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Editable" span={1} hint="Drag satellites to a new radius/angle in preview.">
@@ -105,13 +106,13 @@
             </div>
             <div class="nrow2">
               <label class="fld"><span>Radius %</span>
-                <input class="val" type="number" min="0" max="100" step="5" value={pct(s.radius, 60)} onchange={(e) => updateNode(i, 'radius', Math.max(0, Math.min(1, num(e.target.value, 60) / 100)))} />
+                <NumberCell value={pct(s.radius, 60)} min={0} max={100} step={5} onchange={(v) => updateNode(i, 'radius', Math.max(0, Math.min(1, num(v, 60) / 100)))} />
               </label>
               <label class="fld"><span>Angle°</span>
-                <input class="val" type="number" min="0" max="360" step="5" value={Math.round(num(s.angle, 0))} onchange={(e) => updateNode(i, 'angle', ((num(e.target.value, 0) % 360) + 360) % 360)} />
+                <NumberCell value={Math.round(num(s.angle, 0))} min={0} max={360} step={5} onchange={(v) => updateNode(i, 'angle', ((num(v, 0) % 360) + 360) % 360)} />
               </label>
               <label class="fld"><span>Speed</span>
-                <input class="val" type="number" min="-8" max="8" step="0.5" value={num(s.ratio, 1)} onchange={(e) => updateNode(i, 'ratio', num(e.target.value, 1))} />
+                <NumberCell value={num(s.ratio, 1)} min={-8} max={8} step={0.5} onchange={(v) => updateNode(i, 'ratio', num(v, 1))} />
               </label>
               <label class="fld"><span>Output</span>
                 <select class="val" value={s.output ?? 'y'} onchange={(e) => updateNode(i, 'output', e.target.value)}>
@@ -122,7 +123,7 @@
                 </select>
               </label>
               <label class="fld"><span>Depth %</span>
-                <input class="val" type="number" min="0" max="100" step="5" value={pct(s.depth, 100)} onchange={(e) => updateNode(i, 'depth', Math.max(0, Math.min(1, num(e.target.value, 100) / 100)))} />
+                <NumberCell value={pct(s.depth, 100)} min={0} max={100} step={5} onchange={(v) => updateNode(i, 'depth', Math.max(0, Math.min(1, num(v, 100) / 100)))} />
               </label>
               <label class="flag inv"><input type="checkbox" checked={s.invert === true} onchange={(e) => updateNode(i, 'invert', e.currentTarget.checked)} /><span>Invert</span></label>
             </div>

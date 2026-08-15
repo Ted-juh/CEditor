@@ -455,9 +455,9 @@
             {:else if op === 'eq' || op === 'ne'}
               <input class="val en" type="text" title="Selector value" placeholder="value" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
             {:else}
-              <input class="val en" type="number" title="Threshold" placeholder="a" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
+              <span class="en nc-wrap" title="Threshold"><NumberCell value={m.when ?? ''} step={1} onchange={(value) => setSelectorRow(i, 'when', value)} /></span>
               {#if op === 'between'}
-                <input class="val en" type="number" title="Upper bound" placeholder="b" value={m.when2 ?? ''} oninput={(event) => setSelectorRow(i, 'when2', event.target.value)} />
+                <span class="en nc-wrap" title="Upper bound"><NumberCell value={m.when2 ?? ''} step={1} onchange={(value) => setSelectorRow(i, 'when2', value)} /></span>
               {/if}
             {/if}
             <select class="val" title="Layout" value={String(m.layoutId ?? '')} onchange={(event) => setSelectorRow(i, 'layoutId', event.target.value)}>
@@ -489,7 +489,7 @@
               <option value="untilChange">until</option>
             </select>
             {#if (ov.dismiss ?? 'timer') === 'timer'}
-              <input class="val en" type="number" min="0" title="Duration ms" value={ov.duration ?? 800} onchange={(event) => setOverlay(i, 'duration', Math.round(Number(event.target.value)))} />
+              <span class="en nc-wrap" title="Duration ms"><NumberCell value={ov.duration ?? 800} defaultValue={800} step={1} min={0} onchange={(value) => setOverlay(i, 'duration', Math.round(value))} /></span>
             {/if}
             <button class="val erm" type="button" onclick={() => removeOverlay(i)} title="Remove">✕</button>
           </div>

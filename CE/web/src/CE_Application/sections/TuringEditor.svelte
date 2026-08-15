@@ -1,6 +1,7 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
@@ -61,12 +62,12 @@
       {/snippet}
     </TransportSyncCells>
     {#if tr.syncToTransport !== true}
-      <PropertyCell label="Rate" span={1} hint="Steps per second.">
-        <input class="val" type="number" min="0.1" max="30" step="0.5" value={tr.rate ?? 2} onchange={(e) => set('rate', Math.max(0.1, num(e.target.value, 2)))} />
+      <PropertyCell label="Rate" span={1} compact hint="Steps per second.">
+        <NumberCell label="Rate" value={tr.rate ?? 2} min={0.1} max={30} step={0.5} defaultValue={2} onchange={(v) => set('rate', Math.max(0.1, num(v, 2)))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Length" span={2} hint="Loop length in steps (2–64).">
-      <input class="val" type="number" min="2" max="64" step="1" value={tr.length ?? 8} onchange={(e) => setLength(e.target.value)} />
+    <PropertyCell label="Length" span={2} compact hint="Loop length in steps (2–64).">
+      <NumberCell label="Len" value={tr.length ?? 8} min={2} max={64} step={1} defaultValue={8} onchange={(v) => setLength(v)} />
     </PropertyCell>
     <PropertyCell label="Randomness" span={4} hint="0% = a locked loop; 100% = a new value every step; in between, the sequence slowly evolves.">
       <div class="rangewrap">
@@ -74,11 +75,11 @@
         <span class="pctlbl">{rndPct === 0 ? 'locked' : rndPct === 100 ? 'chaos' : `${rndPct}%`}</span>
       </div>
     </PropertyCell>
-    <PropertyCell label="Quantize" span={2} hint="Snap step values to N discrete levels (0 = continuous). Try 2 for on/off, 5 for a scale-like feel.">
-      <input class="val" type="number" min="0" max="24" step="1" value={tr.quantizeLevels ?? 0} onchange={(e) => set('quantizeLevels', Math.max(0, Math.min(24, Math.round(num(e.target.value, 0)))))} />
+    <PropertyCell label="Quantize" span={2} compact hint="Snap step values to N discrete levels (0 = continuous). Try 2 for on/off, 5 for a scale-like feel.">
+      <NumberCell label="Quant" value={tr.quantizeLevels ?? 0} min={0} max={24} step={1} defaultValue={0} onchange={(v) => set('quantizeLevels', Math.max(0, Math.min(24, Math.round(num(v, 0)))))} />
     </PropertyCell>
-    <PropertyCell label="Gate at" span={1} hint="The Gate port fires when a step's value is at/above this threshold.">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={tr.gateThreshold ?? 0.5} onchange={(e) => set('gateThreshold', clamp01(num(e.target.value, 0.5)))} />
+    <PropertyCell label="Gate at" span={1} compact hint="The Gate port fires when a step's value is at/above this threshold.">
+      <NumberCell label="Gate" value={tr.gateThreshold ?? 0.5} min={0} max={1} step={0.05} defaultValue={0.5} onchange={(v) => set('gateThreshold', clamp01(num(v, 0.5)))} />
     </PropertyCell>
     <PropertyCell label="Edit" span={1} hint="Drag the step bars in preview to seed the sequence.">
       <PropertyToggle value={tr.editable !== false} onchange={() => set('editable', !(tr.editable !== false))} />
@@ -90,11 +91,11 @@
       <PropertyToggle value={tr.showDivisions === true} onchange={() => set('showDivisions', !(tr.showDivisions === true))} />
     </PropertyCell>
     {#if tr.showDivisions === true}
-      <PropertyCell label="Major" span={1} hint="Major division lines across the value range (same as a slider's Major Count).">
-        <input class="val" type="number" min="2" max="21" step="1" value={tr.majorTickCount ?? 5} onchange={(e) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(e.target.value, 5)))))} />
+      <PropertyCell label="Major" span={1} compact hint="Major division lines across the value range (same as a slider's Major Count).">
+        <NumberCell label="Major" value={tr.majorTickCount ?? 5} min={2} max={21} step={1} defaultValue={5} onchange={(v) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(v, 5)))))} />
       </PropertyCell>
-      <PropertyCell label="Minor / gap" span={1} hint="Minor lines inserted between each pair of majors (same as a slider's Minor / Gap).">
-        <input class="val" type="number" min="0" max="8" step="1" value={tr.minorTickCount ?? 0} onchange={(e) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(e.target.value, 0)))))} />
+      <PropertyCell label="Minor / gap" span={1} compact hint="Minor lines inserted between each pair of majors (same as a slider's Minor / Gap).">
+        <NumberCell label="Minor" value={tr.minorTickCount ?? 0} min={0} max={8} step={1} defaultValue={0} onchange={(v) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(v, 0)))))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Seed" span={3} hint="Regenerate the step values. Drag the bars in preview for a hand-drawn sequence.">

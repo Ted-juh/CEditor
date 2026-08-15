@@ -3,6 +3,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
   import HeaderPill from '../properties/HeaderPill.svelte';
   import MousePointer from 'lucide-svelte/icons/mouse-pointer';
@@ -349,8 +350,8 @@
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Sensitivity" span={2} hint="Multiplier for vertical, horizontal, or both drag modes. 1 means one control height/width covers the full value range.">
-        <input class="val" type="number" min="0.01" max="10" step="0.05" value={selected.dragSensitivity ?? 1} onchange={(event) => set('dragSensitivity', Math.max(0.01, Math.min(10, Number(event.target.value) || 1)))} />
+      <PropertyCell label="Sensitivity" span={2} compact hint="Multiplier for vertical, horizontal, or both drag modes. 1 means one control height/width covers the full value range.">
+        <NumberCell label="Sens" min={0.01} max={10} step={0.05} value={selected.dragSensitivity ?? 1} defaultValue={1} onchange={(v) => set('dragSensitivity', Math.max(0.01, Math.min(10, v || 1)))} />
       </PropertyCell>
       <PropertyCell label="Invert" span={2} hint="Flip the horizontal or vertical drag direction for this behavior only. Hover a chip for its name.">
         <FlagStrip
@@ -376,14 +377,14 @@
               {/each}
             </select>
           </PropertyCell>
-          <PropertyCell label="Weight X" span={1} hint="Relative contribution of horizontal motion.">
-            <input class="val" type="number" min="0" max="4" step="0.1" value={selected.weightX ?? 1} onchange={(event) => set('weightX', Math.max(0, Math.min(4, Number(event.target.value) || 1)))} />
+          <PropertyCell label="Weight X" span={1} compact hint="Relative contribution of horizontal motion.">
+            <NumberCell label="X" min={0} max={4} step={0.1} value={selected.weightX ?? 1} defaultValue={1} onchange={(v) => set('weightX', Math.max(0, Math.min(4, v || 1)))} />
           </PropertyCell>
-          <PropertyCell label="Weight Y" span={1} hint="Relative contribution of vertical motion.">
-            <input class="val" type="number" min="0" max="4" step="0.1" value={selected.weightY ?? 1} onchange={(event) => set('weightY', Math.max(0, Math.min(4, Number(event.target.value) || 1)))} />
+          <PropertyCell label="Weight Y" span={1} compact hint="Relative contribution of vertical motion.">
+            <NumberCell label="Y" min={0} max={4} step={0.1} value={selected.weightY ?? 1} defaultValue={1} onchange={(v) => set('weightY', Math.max(0, Math.min(4, v || 1)))} />
           </PropertyCell>
-          <PropertyCell label="Increase Angle" span={2} hint="Direction treated as increase, in degrees: 0 is right, 90 is up, 45 is the up-right default.">
-            <input class="val" type="number" min="0" max="90" step="5" value={selected.increaseAngle ?? 45} onchange={(event) => set('increaseAngle', Math.max(0, Math.min(90, Number(event.target.value) || 45)))} />
+          <PropertyCell label="Increase Angle" span={2} compact hint="Direction treated as increase, in degrees: 0 is right, 90 is up, 45 is the up-right default.">
+            <NumberCell label="Angle" min={0} max={90} step={5} value={selected.increaseAngle ?? 45} defaultValue={45} onchange={(v) => set('increaseAngle', Math.max(0, Math.min(90, v || 45)))} />
           </PropertyCell>
         {/if}
       {/if}
