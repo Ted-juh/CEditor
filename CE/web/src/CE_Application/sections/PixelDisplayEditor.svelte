@@ -18,6 +18,14 @@
   import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
   import ScanLine from 'lucide-svelte/icons/scan-line';
   import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Monitor from 'lucide-svelte/icons/monitor';
+  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+  import Files from 'lucide-svelte/icons/files';
+  import Shapes from 'lucide-svelte/icons/shapes';
+  import Film from 'lucide-svelte/icons/film';
+  import Lamp from 'lucide-svelte/icons/lamp';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Type from 'lucide-svelte/icons/type';
   import { isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
   import { ICON_GLYPHS } from '../utils/pixelFont.js';
   import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
@@ -327,7 +335,7 @@
 
 {#if pixel}
   <div class="lcd-inspector">
-  <PropertySection title="Screen">
+  <PropertySection title="Screen" icon={Monitor}>
     <PropertyCell label="Pixels W" span={2} compact hint="Grid resolution: pixel columns. All element coordinates refer to this grid.">
       <NumberCell label="W" value={pixel.pixelsW ?? 128} defaultValue={128} step={1} min={8} max={1024} onchange={(value) => set('pixelsW', Math.round(value))} />
     </PropertyCell>
@@ -363,12 +371,13 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Layouts">
-    {#if layouts.length === 0}
-      <PropertyCell label="Layouts" span={4} hint="Multiple element scenes for one screen, switched by the Pages rules. Enabling moves current elements into Layout 1.">
-        <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts</button>
-      </PropertyCell>
-    {:else}
+  <PropertySection title="Layouts" icon={LayoutGrid}>
+    {#snippet tools()}
+      {#if layouts.length === 0}
+        <button class="hdr-add" type="button" title="Multiple element scenes for one screen, switched by the Pages rules. Enabling moves current elements into Layout 1." onclick={() => addLayout()}>+ Enable</button>
+      {/if}
+    {/snippet}
+    {#if layouts.length > 0}
       <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Elements table edits and previews. Runtime switching follows the Pages rules.">
         <div class="field-row">
           <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => selectEditLayout(event.target.value)}>
@@ -403,7 +412,11 @@
   </PropertySection>
 
   {#if layouts.length > 0}
-    <PropertySection title="Pages">
+    <PropertySection title="Pages" icon={Files}>
+      {#snippet tools()}
+        <button class="hdr-add" type="button" title="Add a selector value/range → layout rule. Rules match top-to-bottom; put specific ones first." onclick={() => addSelectorRow()}>+ Rule</button>
+        <button class="hdr-add" type="button" title="Add a transient page shown on a control change (for N ms, or until a change)." onclick={() => addOverlay()}>+ Overlay</button>
+      {/snippet}
       <PropertyCell label="Selector" span={4} hint="A control whose value selects the resting layout (e.g. a mode/preset combobox).">
         <select class="val" value={pages.selectorSourceId ?? ''} onchange={(event) => setPageProp('selectorSourceId', event.target.value)}>
           <option value="">None (always default)</option>
@@ -456,9 +469,6 @@
           </div>
         </PropertyCell>
       {/each}
-      <PropertyCell label="Map" span={4} hint="Add a selector value/range → layout rule. Rules match top-to-bottom; put specific ones first.">
-        <button class="val add-field" type="button" onclick={() => addSelectorRow()}>+ Add page rule</button>
-      </PropertyCell>
 
       {#each (pages.overlays ?? []) as ov, i (ov.id ?? i)}
         <PropertyCell label={`Overlay ${i + 1}`} span={4} hint="Transiently show a layout when a control changes.">
@@ -485,13 +495,14 @@
           </div>
         </PropertyCell>
       {/each}
-      <PropertyCell label="Overlays" span={4} hint="Add a transient page shown on a control change (for N ms, or until a change).">
-        <button class="val add-field" type="button" onclick={() => addOverlay()}>+ Add overlay page</button>
-      </PropertyCell>
     </PropertySection>
   {/if}
 
-  <PropertySection title="Elements">
+  <PropertySection title="Elements" icon={Shapes}>
+    {#snippet tools()}
+      <button class="hdr-add" type="button" title="Add a pixel-addressed element. Text kinds draw at X/Y with font height H; widgets fill the X/Y/W/H rect." onclick={() => addElement()}>+ Element</button>
+      <button class="hdr-add" type="button" title="Add a control that ★ Active may follow." onclick={() => addScope()}>+ Scope</button>
+    {/snippet}
     {#if elements.length > 0}
       <div class="el-head">
         <span class="el-num">#</span>
@@ -739,9 +750,6 @@
         </div>
       {/if}
     {/each}
-    <PropertyCell label="Elements" span={4} hint="Add a pixel-addressed element. Text kinds draw at X/Y with font height H; widgets fill the X/Y/W/H rect.">
-      <button class="val add-field" type="button" onclick={() => addElement()}>+ Add element</button>
-    </PropertyCell>
 
     {#each groupNames as g (g)}
       <PropertyCell label={`Group “${g}”`} span={4} hint="Elements in this group drag together on screen; toggle to show/hide them all.">
@@ -765,12 +773,9 @@
         </div>
       </PropertyCell>
     {/each}
-    <PropertyCell label="Scope" span={4} hint="Add a control that ★ Active may follow.">
-      <button class="val add-field" type="button" onclick={() => addScope()}>+ Add to @active scope</button>
-    </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Animation">
+  <PropertySection title="Animation" icon={Film}>
     <PropertyCell label="Mode" span={4} hint="Dot-matrix animation played behind the elements. File = GIF/APNG or a sprite sheet; Preset = built-in effects.">
       <select class="val" value={pixel.animMode ?? 'off'} onchange={(event) => set('animMode', event.target.value)}>
         <option value="off">Off</option>
@@ -823,7 +828,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Colour">
+  <PropertySection title="Colour" icon={Palette}>
     <PropertyCell label="Screen colours" span={4} hint="Lit dots, unlit ghost dots, screen substrate, backlight wash, glass sheen. Click a swatch to edit it (with alpha) in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'litColour', label: 'Lit', value: pixel.litColour ?? 'FFF2F2F2', target: { type: 'control', controlId: core?.id, path: 'Pixel.litColour' } },
@@ -838,7 +843,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Lighting">
+  <PropertySection title="Lighting" icon={Lamp}>
     <PropertyCell label="Backlight" span={2} hint="Turn the backlight wash on or off.">
       <PropertyToggle value={pixel.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>
@@ -907,7 +912,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="On-screen text">
+  <PropertySection title="On-screen text" icon={Pencil}>
     <PropertyCell label="Edit text" span={4} hint="The string shown by an 'edit' element bound to ✎ This screen's text.">
       <input class="val" type="text" value={pixel.editText ?? 'INIT'} oninput={(event) => set('editText', event.target.value)} />
     </PropertyCell>
@@ -924,7 +929,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Custom font">
+  <PropertySection title="Custom font" icon={Type}>
     <PropertyCell label="Glyph sheet" span={4} hint="An image of glyph cells in a grid, left-to-right then top-to-bottom. Text elements set Font → Custom to use it.">
       <input class="val" type="file" accept="image/*" onchange={onPickCustomFont} />
     </PropertyCell>
@@ -1019,6 +1024,28 @@
   .add-field {
     cursor: pointer;
     text-align: center;
+  }
+
+  /* Compact add-buttons in the section header's tools slot (HeaderPill palette). */
+  .hdr-add {
+    height: 16px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #252525;
+    color: #777;
+    font-size: 9px;
+    font-family: inherit;
+    cursor: pointer;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  .hdr-add:hover {
+    color: #CCC;
+    border-color: #4A6E8C;
   }
 
   .hint-note {

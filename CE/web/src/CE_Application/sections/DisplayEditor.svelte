@@ -25,6 +25,17 @@
   import ScanLine from 'lucide-svelte/icons/scan-line';
   import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
   import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Monitor from 'lucide-svelte/icons/monitor';
+  import Type from 'lucide-svelte/icons/type';
+  import Hash from 'lucide-svelte/icons/hash';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+  import Files from 'lucide-svelte/icons/files';
+  import Film from 'lucide-svelte/icons/film';
+  import Palette from 'lucide-svelte/icons/palette';
+  import Lamp from 'lucide-svelte/icons/lamp';
+  import Play from 'lucide-svelte/icons/play';
+  import Square from 'lucide-svelte/icons/square';
 
   let { control = null } = $props();
 
@@ -292,7 +303,7 @@
 
 {#if display}
   <div class="lcd-inspector">
-  <PropertySection title="Screen">
+  <PropertySection title="Screen" icon={Monitor}>
     <PropertyCell label="Panel Type" span={String(display.panelType ?? '') === 'graphic' ? 4 : 2} hint="Character cells, a 7/14/16-segment display, or a graphic (free-pixel) dot-matrix.">
       <select class="val" value={display.panelType ?? 'character'} onchange={(event) => set('panelType', event.target.value)}>
         <option value="character">Character</option>
@@ -345,7 +356,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Text">
+  <PropertySection title="Text" icon={Type}>
     {#each Array.from({ length: rows }) as _, index}
       <PropertyCell label={`Line ${index + 1}`} span={4} hint="Text for this row, padded or truncated to the column count. Value tokens in braces: value, pct, bar, bar:N.">
         <input class="val" type="text" value={lines[index] ?? ''} oninput={(event) => setLine(index, event.target.value)} />
@@ -353,7 +364,10 @@
     {/each}
   </PropertySection>
 
-  <PropertySection title="Value">
+  <PropertySection title="Value" icon={Hash}>
+    {#snippet tools()}
+      <button class="hdr-add" type="button" title="Add an extra value field, addressed as v2/p2/b2, v3/... in the lines." onclick={() => addField()}>+ Add</button>
+    {/snippet}
     <PropertyCell label="Source" span={4} hint="Drive the value live from another control (slider / knob / number) in preview. None = use the static value below.">
       <select class="val" value={display.valueSourceId ?? ''} onchange={(event) => setValueSource(event.target.value)}>
         <option value="">None (static value)</option>
@@ -396,12 +410,9 @@
         </div>
       </PropertyCell>
     {/each}
-    <PropertyCell label="Fields" span={4} hint="Add an extra value field, addressed as v2/p2/b2, v3/... in the lines.">
-      <button class="val add-field" type="button" onclick={() => addField()}>+ Add value field</button>
-    </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Edit Field">
+  <PropertySection title="Edit Field" icon={Pencil}>
     <PropertyCell label="Text" span={4} hint="Editable text such as a preset name. Bind a zone with Show = edit to '✎ This screen's text'.">
       <input class="val" type="text" value={display.editText ?? ''} oninput={(event) => set('editText', event.target.value)} />
     </PropertyCell>
@@ -418,12 +429,15 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Layouts">
-    {#if layouts.length === 0}
-      <PropertyCell label="Layouts" span={4} hint="Compose the display from bound regions instead of the lines above. Add a layout to switch modes.">
-        <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts</button>
-      </PropertyCell>
-    {:else}
+  <PropertySection title="Layouts" icon={LayoutGrid}>
+    {#snippet tools()}
+      {#if layouts.length === 0}
+        <button class="hdr-add" type="button" title="Compose the display from bound regions instead of the lines above. Add a layout to switch modes." onclick={() => addLayout()}>+ Enable</button>
+      {:else}
+        <button class="hdr-add" type="button" title="Add a region to this layout." onclick={() => addZone()}>+ Zone</button>
+      {/if}
+    {/snippet}
+    {#if layouts.length > 0}
       <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Zones table edits and previews. Runtime switching is set by the Pages rules.">
         <div class="field-row">
           <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => selectEditLayout(event.target.value)}>
@@ -559,15 +573,17 @@
             </div>
           {/if}
         {/each}
-        <PropertyCell label="Zones" span={4} hint="Add a region to this layout.">
-          <button class="val add-field" type="button" onclick={() => addZone()}>+ Add zone</button>
-        </PropertyCell>
       {/if}
     {/if}
   </PropertySection>
 
   {#if layouts.length > 0}
-    <PropertySection title="Pages">
+    <PropertySection title="Pages" icon={Files}>
+      {#snippet tools()}
+        <button class="hdr-add" type="button" title="Add a selector value/range → layout rule. Rules match top-to-bottom; put specific ones first." onclick={() => addSelectorRow()}>+ Rule</button>
+        <button class="hdr-add" type="button" title="Add a transient page shown on a control change (for N ms, or until a change)." onclick={() => addOverlay()}>+ Overlay</button>
+        <button class="hdr-add" type="button" title="Add a control that @active is allowed to follow." onclick={() => addScope()}>+ Scope</button>
+      {/snippet}
       <PropertyCell label="Selector" span={4} hint="A control whose value selects the resting layout (e.g. a mode/preset combobox).">
         <select class="val" value={pages.selectorSourceId ?? ''} onchange={(event) => setPageProp('selectorSourceId', event.target.value)}>
           <option value="">None (always default)</option>
@@ -620,9 +636,6 @@
           </div>
         </PropertyCell>
       {/each}
-      <PropertyCell label="Map" span={4} hint="Add a selector value/range → layout rule. Rules match top-to-bottom; put specific ones first.">
-        <button class="val add-field" type="button" onclick={() => addSelectorRow()}>+ Add page rule</button>
-      </PropertyCell>
 
       {#each (pages.overlays ?? []) as ov, i (ov.id ?? i)}
         <PropertyCell label={`Overlay ${i + 1}`} span={4} hint="Transiently show a layout when a control changes.">
@@ -649,9 +662,6 @@
           </div>
         </PropertyCell>
       {/each}
-      <PropertyCell label="Overlays" span={4} hint="Add a transient page shown on a control change (for N ms, or until a change).">
-        <button class="val add-field" type="button" onclick={() => addOverlay()}>+ Add overlay page</button>
-      </PropertyCell>
 
       <PropertyCell label="@active scope" span={4} hint="Restrict the @active source to these controls only. Empty = any control counts as active.">
         <span class="hint-note">{activeScope.length === 0 ? 'Any control' : `${activeScope.length} control(s)`}</span>
@@ -669,14 +679,11 @@
           </div>
         </PropertyCell>
       {/each}
-      <PropertyCell label="Scope" span={4} hint="Add a control that @active is allowed to follow.">
-        <button class="val add-field" type="button" onclick={() => addScope()}>+ Add to @active scope</button>
-      </PropertyCell>
     </PropertySection>
   {/if}
 
   {#if String(display.panelType ?? '') === 'graphic'}
-    <PropertySection title="Animation">
+    <PropertySection title="Animation" icon={Film}>
       <PropertyCell label="Mode" span={4} hint="Dot-matrix animation played behind the zones/text. File = GIF/APNG or a sprite sheet; Preset = built-in effects.">
         <select class="val" value={display.animMode ?? 'off'} onchange={(event) => set('animMode', event.target.value)}>
           <option value="off">Off</option>
@@ -721,7 +728,7 @@
     </PropertySection>
   {/if}
 
-  <PropertySection title="Colour">
+  <PropertySection title="Colour" icon={Palette}>
     <PropertyCell label="Screen colours" span={4} hint="Lit, unlit ghost, screen substrate, backlight wash, glass sheen. Click a swatch to edit it (with alpha) in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'litColour', label: 'Lit', value: display.litColour ?? 'FF2BE86A', target: { type: 'control', controlId: core?.id, path: 'Display.litColour' } },
@@ -736,7 +743,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Lighting">
+  <PropertySection title="Lighting" icon={Lamp}>
     <PropertyCell label="Backlight" span={2} hint="Turn the backlight wash on or off.">
       <PropertyToggle value={display.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>
@@ -796,7 +803,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Motion">
+  <PropertySection title="Motion" icon={Play}>
     <PropertyCell label="Scroll" span={2} hint="Marquee a line that's longer than the column count.">
       <Segmented
         ariaLabel="Scroll direction"
@@ -853,7 +860,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Layout">
+  <PropertySection title="Layout" icon={Square}>
     <PropertyCell label="Padding" span={2} compact hint="Inset from the bezel to the screen (px).">
       <NumberCell label="Pad" value={display.padding ?? 10} defaultValue={10} step={1} min={0} onchange={(value) => set('padding', value)} />
     </PropertyCell>
@@ -924,6 +931,28 @@
   .add-field {
     cursor: pointer;
     text-align: center;
+  }
+
+  /* Compact add-buttons in the section header's tools slot (HeaderPill palette). */
+  .hdr-add {
+    height: 16px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #252525;
+    color: #777;
+    font-size: 9px;
+    font-family: inherit;
+    cursor: pointer;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  .hdr-add:hover {
+    color: #CCC;
+    border-color: #4A6E8C;
   }
 
   .hint-note {

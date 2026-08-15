@@ -18,6 +18,21 @@
   import BrickWall from 'lucide-svelte/icons/brick-wall';
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
+  import IdCard from 'lucide-svelte/icons/id-card';
+  import Power from 'lucide-svelte/icons/power';
+  import Scaling from 'lucide-svelte/icons/scaling';
+  import Ruler from 'lucide-svelte/icons/ruler';
+  import Info from 'lucide-svelte/icons/info';
+  import Layers from 'lucide-svelte/icons/layers';
+  import ArrowUpDown from 'lucide-svelte/icons/arrow-up-down';
+  import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
+  import Grid2x2 from 'lucide-svelte/icons/grid-2x2';
+  import Crosshair from 'lucide-svelte/icons/crosshair';
+  import Package from 'lucide-svelte/icons/package';
+  import KeyRound from 'lucide-svelte/icons/key-round';
+  import Puzzle from 'lucide-svelte/icons/puzzle';
+  import Cpu from 'lucide-svelte/icons/cpu';
+  import Hammer from 'lucide-svelte/icons/hammer';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';
@@ -309,7 +324,7 @@
 
 {#if panel}
   {#if tabId === 'core'}
-    <PropertySection title="Identity">
+    <PropertySection title="Identity" icon={IdCard}>
       <PropertyCell label="Name" span={2} hint="Display name of the panel">
         <input class="val" type="text" value={panel.name}
                onchange={(e) => handlePropChange('name', e)} />
@@ -347,7 +362,7 @@
                   onchange={(e) => handlePropChange('description', e)}></textarea>
       </PropertyCell>
     </PropertySection>
-    <PropertySection title="State">
+    <PropertySection title="State" icon={Power}>
       <PropertyCell label="Enabled" span={2} hint="Enable or disable all interaction on this panel at runtime">
         <PropertyToggle value={panel.enabled}
                         onchange={() => handleToggle('enabled')} />
@@ -357,7 +372,7 @@
                         onchange={() => handleToggle('locked')} />
       </PropertyCell>
     </PropertySection>
-    <PropertySection title="Size">
+    <PropertySection title="Size" icon={Scaling}>
       <PropertyCell label="Width" span={2} compact hint="Panel width in pixels">
         <NumberCell label="W" value={panel.width} step={1} min={1}
                     onchange={(v) => updatePanel(panel.id, { width: v })} />
@@ -367,7 +382,7 @@
                     onchange={(v) => updatePanel(panel.id, { height: v })} />
       </PropertyCell>
     </PropertySection>
-    <PropertySection title="Constraints" collapsed={$sectionCollapse['core-constraints'] ?? true} ontoggle={(v) => setCollapsed('core-constraints', v)}>
+    <PropertySection title="Constraints" icon={Ruler} collapsed={$sectionCollapse['core-constraints'] ?? true} ontoggle={(v) => setCollapsed('core-constraints', v)}>
       <PropertyCell label="Lock Ratio" span={2} hint="Keep width/height ratio when resizing">
         <PropertyToggle value={panel.lockAspectRatio}
                         onchange={() => handleToggle('lockAspectRatio')} />
@@ -410,7 +425,7 @@
                     onchange={(v) => updatePanel(panel.id, { maxHeight: v })} />
       </PropertyCell>
     </PropertySection>
-    <PropertySection title="Info" collapsed={$sectionCollapse['core-info'] ?? true} ontoggle={(v) => setCollapsed('core-info', v)}>
+    <PropertySection title="Info" icon={Info} collapsed={$sectionCollapse['core-info'] ?? true} ontoggle={(v) => setCollapsed('core-info', v)}>
       <div class="info-row">
         <span class="info-label">Panel ID</span>
         <span class="info-value">{panel.id}</span>
@@ -434,7 +449,7 @@
     </PropertySection>
 
   {:else if tabId === 'background'}
-    <PropertySection title="Background">
+    <PropertySection title="Background" icon={Layers}>
       <div class="bg-layer-buttons">
         <button class="bg-layer-btn" class:active={panel.bgSolid !== false}
                 title="Solid fill"
@@ -463,7 +478,7 @@
       </div>
     </PropertySection>
 
-    <PropertySection title="Z-Order" collapsed={$sectionCollapse['bg-zorder'] ?? true} ontoggle={(v) => setCollapsed('bg-zorder', v)}>
+    <PropertySection title="Z-Order" icon={ArrowUpDown} collapsed={$sectionCollapse['bg-zorder'] ?? true} ontoggle={(v) => setCollapsed('bg-zorder', v)}>
       <div class="zorder-hint">Front</div>
       {#each [...layerOrder()].reverse() as layerId, i}
         {@const realIdx = layerOrder().length - 1 - i}
@@ -485,7 +500,7 @@
 
     {#each [...layerOrder()].reverse() as layerId (layerId)}
       {#if layerId === 'solid' && panel.bgSolid !== false}
-        <PropertySection title="Solid">
+        <PropertySection title="Solid" icon={PaintBucket}>
           <PropertyCell label="" span={2} hint="Background fill colour — click swatch to open colour picker">
             <button class="bg-swatch"
                     style="background:#{String(panel.bgColour ?? '333333').slice(-6)}"
@@ -504,7 +519,7 @@
 
       {/if}
       {#if layerId === 'gradient' && panel.bgGradientEnabled === true}
-        <PropertySection title="Gradient">
+        <PropertySection title="Gradient" icon={Blend}>
           <PropertyCell label="" span={2} hint="Gradient preview — click to edit">
             <button class="bg-swatch"
                     style="background:{gradientToCSS(panel.bgGradient)}"
@@ -556,7 +571,7 @@
       {/if}
     {/each}
   {:else if tabId === 'grid'}
-    <PropertySection title="Grid">
+    <PropertySection title="Grid" icon={Grid3x3}>
       <PropertyCell label="Show" span={2} hint="Show or hide the grid overlay">
         <PropertyToggle value={panel.gridEnabled}
                         onchange={() => handleToggle('gridEnabled')} />
@@ -587,7 +602,7 @@
                        onswatchclick={() => handleSwatchClick('gridColour', panel.gridColour ?? '33FFFFFF')} />
       </PropertyCell>
     </PropertySection>
-    <PropertySection title="Subdivision" collapsed={$sectionCollapse['grid-subdivision'] ?? true} ontoggle={(v) => setCollapsed('grid-subdivision', v)}>
+    <PropertySection title="Subdivision" icon={Grid2x2} collapsed={$sectionCollapse['grid-subdivision'] ?? true} ontoggle={(v) => setCollapsed('grid-subdivision', v)}>
       <PropertyCell label="Divisions" span={2} compact hint="Group every Nth cell with a thicker border (1 = none)">
         <NumberCell label="Div" value={panel.gridSubdivision ?? 1} defaultValue={1} step={1} min={1} max={10}
                     onchange={(v) => updatePanel(panel.id, { gridSubdivision: v })} />
@@ -598,7 +613,7 @@
                        onswatchclick={() => handleSwatchClick('gridSubColour', panel.gridSubColour ?? '55FFFFFF')} />
       </PropertyCell>
     </PropertySection>
-    <PropertySection title="Origin" collapsed={$sectionCollapse['grid-origin'] ?? true} ontoggle={(v) => setCollapsed('grid-origin', v)}>
+    <PropertySection title="Origin" icon={Crosshair} collapsed={$sectionCollapse['grid-origin'] ?? true} ontoggle={(v) => setCollapsed('grid-origin', v)}>
       <PropertyCell label="Centre" span={4} hint="Centre the grid on the panel — lines radiate from the middle">
         <PropertyToggle value={panel.gridCentered ?? false}
                         onchange={() => updatePanel(panel.id, { gridCentered: !panel.gridCentered })} />
@@ -613,7 +628,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if tabId === 'export'}
-    <PropertySection title="Plugin">
+    <PropertySection title="Plugin" icon={Package}>
       <PropertyCell label="Plugin Name" span={2} hint="Host-visible plugin name and .vst3 filename. Blank = use the panel name.">
         <input class="val" type="text"
                value={panel.exportSettings?.pluginName ?? ''}
@@ -643,7 +658,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Identity">
+    <PropertySection title="Identity" icon={KeyRound}>
       <PropertyCell label="Plugin GUID" span={4} hint="Stable per-panel id behind the plugin FUID. Change it and hosts treat a rebuild as a different plugin.">
         <div class="export-row">
           <input class="val val-mono" type="text" readonly value={panel.panelGuid ?? '(none)'} />
@@ -661,7 +676,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Scripting Modules">
+    <PropertySection title="Scripting Modules" icon={Puzzle}>
       <PropertyCell label="Modules" span={4}
                     hint="Which parts of the scripting API this panel's scripts can reach. Auto follows the scripts — it is the right answer almost always. Manual pins an explicit list; anything left off logs a notice naming the module instead of acting. ce.core (set/get/log/on/run) is always on.">
         <div class="export-row">
@@ -765,7 +780,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Scripting Runtime">
+    <PropertySection title="Scripting Runtime" icon={Cpu}>
       <PropertyCell label="Python" span={4}
                     hint="Embed the CPython runtime so Python scripts run window-closed and offline. Auto = only when this panel uses Python.">
         <div class="export-row">
@@ -795,7 +810,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Build">
+    <PropertySection title="Build" icon={Hammer}>
       <PropertyCell label="Output" span={4} hint="Builds the VST3 from this panel into export-out/. Progress streams into the Console panel.">
         <div class="export-row">
           <button class="export-action" onclick={() => buildActivePanelVst3()}>Build VST3</button>
