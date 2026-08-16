@@ -14,9 +14,10 @@
 // to put the tone in the parameter id where a panel can see it (`tone2.filter.cutoff`). That is
 // what makes "show tone 1, 2 and 3 at once" a layout decision rather than a profile rewrite.
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readCommitted } from '../../readCommitted.mjs';
 
 import {
   BLOCK_SIZES, BLOCKS, MODEL, PATCH_ARPEGGIO_COMMON, PATCH_ARPEGGIO_PATTERN, PATCH_COMMON,
@@ -442,9 +443,7 @@ function main() {
   const json = `${JSON.stringify(buildProfile(), null, 2)}\n`;
 
   if (check) {
-    let current = null;
-    try { current = readFileSync(out, 'utf8'); } catch { /* missing counts as stale */ }
-    if (current === json) { console.log('Gaia profile is up to date.'); return; }
+    if (readCommitted(out) === json) { console.log('Gaia profile is up to date.'); return; }
     console.error(`Stale: ${path.relative(REPO, out)} — run: node tools/scripts/qa/roland-gaia/make-gaia-profile.mjs`);
     process.exitCode = 1;
     return;

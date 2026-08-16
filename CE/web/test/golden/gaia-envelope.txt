@@ -1,6 +1,14 @@
-4x bg #39434C
-4x bg #BFCBD6
-1x transform rotate(-40.1deg)
-1x transform rotate(16.3deg)
-1x transform rotate(18.3deg)
-3x origin 0% 50%
+8x shape rect
+1x box 141.79999999999998,18.599999999999998 56.035702904487614x1.6
+1x box 141.79999999999998,5 1x32
+1x box 43,4.2 51.456000621890546x1.6
+1x box 43,5 1x32
+1x box 5,36.2 49.678969393496885x1.6
+1x box 5,37 190x1
+1x box 92.4,18.599999999999998 49.39999999999998x1.6
+1x box 92.4,5 1x32
+1x svg-transform rotate(-40.1 5.000 37.000)
+1x svg-transform rotate(16.3 43.000 5.000)
+1x svg-transform rotate(18.3 141.800 19.400)
+4x fill #39434C
+4x fill #BFCBD6

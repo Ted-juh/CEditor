@@ -8,6 +8,7 @@
   import { computeGridOrigin, buildGridStyle } from '../utils/gridCSS.js';
   import { handleEditorShortcut } from '../utils/editorShortcuts.js';
   import { findControlsInRect, findControlAtPoint } from '../utils/canvasSelection.js';
+  import { normalizePanelLayers } from '../utils/panelLayers.js';
   import { createPanController, createMarqueeController } from '../utils/canvasInteractions.js';
   import { DragScrub, presets } from '../scrub/dragScrub';
   import { scrubSample } from '../utils/scrubRuntime.js';
@@ -437,7 +438,8 @@
     const panelX = (screenX - rect.left) / scale;
     const panelY = (screenY - rect.top) / scale;
     // If right-clicking on a control that isn't selected, select it
-    const clickedCtrl = findControlAtPoint(canvasPanel.controls, panelX, panelY);
+    const clickedCtrl = findControlAtPoint(canvasPanel.controls, panelX, panelY,
+      normalizePanelLayers(canvasPanel.layers, canvasPanel.controls));
     const cid = clickedCtrl?._children?.Core?.id;
     if (cid && !$selectedComponentIds.has(cid)) selectComponent(cid);
     ctxMenu = { screenX, screenY, panelX, panelY };

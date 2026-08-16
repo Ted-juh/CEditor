@@ -1,4 +1,5 @@
 import { sortControlsForHitTest } from './controlOrder.js';
+import { normalizeLayerName } from './panelLayers.js';
 import { contentOrigin, getChildControls } from './containment.js';
 
 /** Rotate a panel-space point into a control's local (unrotated) frame,
@@ -96,11 +97,19 @@ export function findControlsInRect(controls, rect, getSection) {
  * every level. Descent carries the point through each rotated frame, so
  * children of a rotated container hit-test where they are drawn.
  */
-export function findControlAtPoint(controls, x, y) {
+export function findControlAtPoint(controls, x, y, layers = null) {
+  // A locked or hidden layer is not pickable. This is the point of locking scenery: you stop
+  // grabbing the section box when you meant the knob drawn on top of it, and the fix has to be
+  // here rather than in the click handler, because every selection route comes through this.
+  const blocked = new Set((layers ?? [])
+    .filter((layer) => layer?.locked === true || layer?.visible === false)
+    .map((layer) => layer.name));
+
   let hit = null;
   let localX = x;
   let localY = y;
-  for (const c of sortControlsForHitTest(controls)) {
+  for (const c of sortControlsForHitTest(controls, (layers ?? []).map((l) => l.name))) {
+    if (blocked.size && blocked.has(normalizeLayerName(c?._children?.Core?.layer))) continue;
     const t = c._children?.Transform;
     if (!t) continue;
     const p = toUnrotatedPoint(t, t.rotation, x, y);
@@ -118,7 +127,7 @@ export function findControlAtPoint(controls, x, y) {
   if (kids.length) {
     const t = hit._children.Transform;
     const origin = contentOrigin(hit);
-    const deeper = findControlAtPoint(kids, localX - (t.x ?? 0) - origin.x, localY - (t.y ?? 0) - origin.y);
+    const deeper = findControlAtPoint(kids, localX - (t.x ?? 0) - origin.x, localY - (t.y ?? 0) - origin.y, layers);
     if (deeper) return deeper;
   }
 

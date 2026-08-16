@@ -3,6 +3,7 @@ import { defaultGridSize, defaultSnapToGrid } from './runtimePreferences.js';
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
 import { expandControl, shrinkControl } from './documentShape.js';
+import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
 
 let nextId = 1;
 
@@ -158,6 +159,9 @@ export function createPanel(name = null) {
     },
     modified: false,
     controls: [],
+    // Paint order, back to front. One layer to begin with, because a panel with none is a panel
+    // whose controls have nowhere to live — normalizePanelLayers would invent it anyway.
+    layers: [createLayer()],
   };
 }
 
@@ -276,12 +280,20 @@ export function deserializePanel(json, filePath, name) {
     data.deviceSession = normalizeProjectDeviceSession(data.deviceSession);
   }
 
+  // The document stores each control as a diff against its type's defaults; the editor's model
+  // is always the full control, because everything that reads one reads deep paths off it. Done
+  // once and reused — expanding a 4.8 MB panel twice to build a layer list would be a silly way
+  // to spend a hundred milliseconds.
+  const controls = (data.controls ?? []).map(expandControl);
+
   return {
     ...createPanel(),
     ...data,
-    // The document stores each control as a diff against its type's defaults; the editor's model
-    // is always the full control, because everything that reads one reads deep paths off it.
-    controls: (data.controls ?? []).map(expandControl),
+    controls,
+    // Migration lives here rather than in a version bump: a document with no `layers` gets one
+    // built from first-appearance order, which is exactly what rendering used to infer, so it
+    // looks identical on the first load and stops restacking on every load after it.
+    layers: normalizePanelLayers(data.layers, controls),
     id,
     filePath,
     name: name || data.name || `Untitled ${id}`,

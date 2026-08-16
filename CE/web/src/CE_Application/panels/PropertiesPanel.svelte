@@ -12,6 +12,7 @@
   import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
   import Monitor from 'lucide-svelte/icons/monitor';
   import Box from 'lucide-svelte/icons/box';
+  import Boxes from 'lucide-svelte/icons/boxes';
   import Move from 'lucide-svelte/icons/move';
   import Frame from 'lucide-svelte/icons/frame';
   import MousePointer from 'lucide-svelte/icons/mouse-pointer';
@@ -212,6 +213,7 @@
     { id: 'setlist',    icon: ListOrdered,   label: 'Setlist',    section: 'Setlist' },
     { id: 'transport',  icon: Timer,         label: 'Transport',  section: 'Transport' },
     { id: 'contentlayout', icon: LayoutDashboard, label: 'Content Layout', section: 'ContentLayout' },
+    { id: 'children',   icon: Boxes,         label: 'Children',   section: 'Children' },
     { id: 'mouse',      icon: MousePointer,  label: 'Mouse',      section: 'Mouse' },
     { id: 'grid',       icon: Grid3x3,       label: 'Grid',       section: 'Grid' },
     { id: 'icon',       icon: Image,         label: 'Icon',       section: 'Icon' },

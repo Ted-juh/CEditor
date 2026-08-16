@@ -1,3 +1,3 @@
-8x shape path
-8x stroke #FFFFFF66 @ 1
-1x bg #101418
+1x bg #101418FF
+1x border 1px solid #FFFFFF66
+2x radius 6px 6px 6px 6px

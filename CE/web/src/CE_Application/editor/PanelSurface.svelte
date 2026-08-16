@@ -14,6 +14,9 @@
   import { showGuides } from '../stores/editorView.js';
   import { deviceParameterDrag } from '../stores/deviceParameterDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
+  import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
+  import { buildSceneryRenderPlan } from '../utils/sceneryRenderPlan.js';
+  import { initialMountCount, nextMountCount, mountIncomplete, scheduleNextSlice } from '../utils/progressiveMount.js';
 
   let {
     panel,
@@ -37,8 +40,41 @@
 
   // Default layer order if the panel doesn't specify one.
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
-  let orderedControls = $derived(sortControlsForRender(panel?.controls ?? []));
+  // What to paint, in order: controls, plus one image for each locked scenery layer. The decision
+  // lives in utils/sceneryRenderPlan.js so the preview surface makes it identically — a panel that
+  // changes when you press Preview is worse than one that never compiles at all.
+  let plan = $derived(buildSceneryRenderPlan(panel, { preview: false }));
+  // Children still need the flat control list for snapping, distance guides and hit-testing, and
+  // that list must include the folded ones: a control you cannot snap to because it was compiled
+  // would be a very confusing kind of invisible.
+  let panelLayers = $derived(normalizePanelLayers(panel?.layers, panel?.controls ?? []));
+  let orderedLayerNames = $derived(layerNames(panelLayers));
+  let hiddenLayers = $derived(new Set(panelLayers.filter((l) => l.visible === false).map((l) => l.name)));
+  let orderedControls = $derived(
+    sortControlsForRender(panel?.controls ?? [], orderedLayerNames)
+      .filter((control) => !hiddenLayers.has(normalizeLayerName(control?._children?.Core?.layer)))
+  );
   let scopedEditingControlId = $derived(scopedEditingControl?._children?.Core?.id ?? null);
+
+  // A large panel is mounted in slices so the editor appears before the last control is built —
+  // see utils/progressiveMount.js. Below its threshold `mountedCount` is simply the whole list and
+  // none of this runs.
+  let mountedCount = $state(0);
+  // Reset on a new panel, not on every edit: the identity that matters is which panel is open, and
+  // rebuilding from the first slice on each keystroke would be a flicker, not a speed-up.
+  let panelIdentity = $derived(panel?.id ?? null);
+  $effect(() => {
+    panelIdentity;
+    mountedCount = initialMountCount(plan.items.length);
+  });
+  $effect(() => {
+    const total = plan.items.length;
+    if (!mountIncomplete(mountedCount, total)) return;
+    return scheduleNextSlice(() => { mountedCount = nextMountCount(mountedCount, total); });
+  });
+  let renderItems = $derived(
+    mountedCount >= plan.items.length ? plan.items : plan.items.slice(0, mountedCount)
+  );
 
   function bindSurface(node) {
     surfaceRef = node;
@@ -78,23 +114,29 @@
     <GuideLines {scale} panelWidth={panel.width} panelHeight={panel.height} />
   {/if}
 
-  {#each orderedControls as control (control._children?.Core?.id)}
-    <CanvasControl
-      control={scopedEditingControlId != null && scopedEditingControlId === control._children?.Core?.id
-        ? scopedEditingControl
-        : control}
-      sourceControl={control}
-      {scale}
-      {snapToGrid}
-      {gridSize}
-      gridOriginX={gridOrigin.x}
-      gridOriginY={gridOrigin.y}
-      {panelLocked}
-      allControls={orderedControls}
-      panelControls={panel.controls}
-      panelWidth={panel.width}
-      panelHeight={panel.height}
-    />
+  {#each renderItems as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.control._children?.Core?.id)}
+    {#if item.type === 'scenery'}
+      <!-- A whole locked scenery layer, as one element. Not interactive by construction: unlock
+           the layer to get the controls back. -->
+      <img class="scenery-layer" src={item.url} width={panel.width} height={panel.height} alt="" />
+    {:else}
+      <CanvasControl
+        control={scopedEditingControlId != null && scopedEditingControlId === item.control._children?.Core?.id
+          ? scopedEditingControl
+          : item.control}
+        sourceControl={item.control}
+        {scale}
+        {snapToGrid}
+        {gridSize}
+        gridOriginX={gridOrigin.x}
+        gridOriginY={gridOrigin.y}
+        {panelLocked}
+        allControls={orderedControls}
+        panelControls={panel.controls}
+        panelWidth={panel.width}
+        panelHeight={panel.height}
+      />
+    {/if}
   {/each}
 
   <SelectionBoundsOverlay {panel} {scale} {panelLocked} />
@@ -148,6 +190,17 @@
     inset: 0;
     pointer-events: none;
     z-index: 0;
+  }
+
+  /* Compiled scenery. Deliberately without a z-index: it stacks by document order, in the sequence
+     the render plan put it, which is the layer's own depth. Giving it a number would put every
+     scenery layer in the same band and lose the ordering the plan just worked out. */
+  .scenery-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+    pointer-events: none;
   }
 
   .grid-overlay {

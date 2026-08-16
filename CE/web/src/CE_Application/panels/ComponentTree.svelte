@@ -5,13 +5,19 @@
 </script>
 
 <script>
-  import Eye from 'lucide-svelte/icons/eye';
-  import EyeOff from 'lucide-svelte/icons/eye-off';
-  import Lock from 'lucide-svelte/icons/lock';
-  import LockOpen from 'lucide-svelte/icons/lock-open';
-  import ChevronDown from 'lucide-svelte/icons/chevron-down';
-  import ChevronRight from 'lucide-svelte/icons/chevron-right';
-  import Search from 'lucide-svelte/icons/search';
+  // The row icons are drawn inline (see the snippets at the bottom) rather than imported from
+  // lucide-svelte. This dock renders one row per control — 413 of them for the GAIA panel — and
+  // every row carries three icons, so the icon component is instantiated ~1,200 times on load.
+  //
+  // lucide-svelte 1.0.1 is written in Svelte 4 syntax (`export let`, `$$restProps`, `<slot/>`), so
+  // each of those is a legacy-mode component wrapping ANOTHER component, which spreads two attribute
+  // objects and loops the path data through `<svelte:element>` — the most expensive way there is to
+  // put six path elements on screen. Measured by removing them from the build: 359 ms of a 2,041 ms
+  // panel load, the single largest item in it.
+  //
+  // The markup below is byte-for-byte what lucide renders (same viewBox, same path data, same
+  // stroke attributes), minus the class names, which nothing styles. Icons elsewhere in the editor
+  // are fine as components — this is about a list with hundreds of rows, not about lucide.
   import { activePanel, selectedComponentIds, selectComponent, keyObjectId } from '../stores/panels.js';
   import { applyControlPatchesById, updateControlProperty, reparentControls, removeControl, duplicateControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
   import { bringToFront, bringForward, sendBackward, sendToBack } from '../stores/alignment.js';
@@ -61,6 +67,31 @@
   // Flattened display rows: depth-first, siblings front-to-back (top of list =
   // front/highest z), respecting collapsed containers. While filtering,
   // matches and their ancestors are shown and collapse is ignored.
+  // Row objects are REUSED for controls that have not changed, and that is a performance
+  // contract rather than tidiness. These rows feed a keyed `{#each}`: Svelte matches by key and
+  // then writes each matched item's value signal, skipping the write when the value is unchanged.
+  // Building a fresh row every rebuild defeats that skip, so every one of the 413 rows counts as
+  // changed and every write walks the reaction graph — for a drag that moved one control.
+  //
+  // Controls are immutable (an edit replaces the control), so identity is the right key. Depth,
+  // container-ness and the inherited hidden/locked flags are part of the row, so a cached row is
+  // only reused while all of them still hold. (A control's OWN hidden/locked state needs no check:
+  // editing it replaces the control object, which misses the WeakMap on its own.)
+  const rowCache = new WeakMap();
+  const rowFor = (ctrl, id, depth, container, inheritedHidden, inheritedLocked) => {
+    const cached = rowCache.get(ctrl);
+    if (
+      cached !== undefined &&
+      cached.depth === depth &&
+      cached.container === container &&
+      cached.inheritedHidden === inheritedHidden &&
+      cached.inheritedLocked === inheritedLocked
+    ) return cached;
+    const row = { ctrl, id, depth, container, inheritedHidden, inheritedLocked };
+    rowCache.set(ctrl, row);
+    return row;
+  };
+
   let rows = $derived.by(() => {
     if (!$activePanel) return [];
     const controls = $activePanel.controls;
@@ -89,7 +120,7 @@
         const core = ctrl._children?.Core;
         const hidden = core?.visible === false;
         const locked = core?.locked === true;
-        out.push({ ctrl, id, depth, container, inheritedHidden, inheritedLocked });
+        out.push(rowFor(ctrl, id, depth, container, inheritedHidden, inheritedLocked));
         if (container && (query || !collapsedIds.has(id))) {
           visit(getChildControls(ctrl), depth + 1, inheritedHidden || hidden, inheritedLocked || locked);
         }
@@ -404,7 +435,7 @@
   </div>
 
   <div class="tree-filter">
-    <Search size={11} strokeWidth={1.5} />
+    {@render search()}
     <input
       class="filter-input"
       type="text"
@@ -454,9 +485,9 @@
               onclick={(e) => { e.stopPropagation(); toggleCollapsed(id); }}
             >
               {#if collapsedIds.has(id) && !filtering}
-                <ChevronRight size={11} strokeWidth={1.5} />
+                {@render chevronRight()}
               {:else}
-                <ChevronDown size={11} strokeWidth={1.5} />
+                {@render chevronDown()}
               {/if}
             </button>
           {:else}
@@ -483,7 +514,7 @@
 
           <div class="item-actions">
             {#if row.inheritedLocked}
-              <span class="inherited-icon" title="Locked by a parent container"><Lock size={10} strokeWidth={1.5} /></span>
+              <span class="inherited-icon" title="Locked by a parent container">{@render lockSmall()}</span>
             {/if}
             <button
               class="action-icon"
@@ -492,9 +523,9 @@
               onclick={(e) => { e.stopPropagation(); toggleVisible(id, core?.visible !== false); }}
             >
               {#if core?.visible !== false}
-                <Eye size={12} strokeWidth={1.5} />
+                {@render eye()}
               {:else}
-                <EyeOff size={12} strokeWidth={1.5} />
+                {@render eyeOff()}
               {/if}
             </button>
             <button
@@ -504,9 +535,9 @@
               onclick={(e) => { e.stopPropagation(); toggleLocked(id, core?.locked ?? false); }}
             >
               {#if core?.locked}
-                <Lock size={12} strokeWidth={1.5} />
+                {@render lock()}
               {:else}
-                <LockOpen size={12} strokeWidth={1.5} />
+                {@render lockOpen()}
               {/if}
             </button>
           </div>
@@ -544,6 +575,72 @@
     <button class="ctx-item" onclick={ctxToggleLocked}>{ctxCore?.locked ? 'Unlock' : 'Lock'}</button>
   </div>
 {/if}
+
+<!-- Row icons, drawn inline. See the note at the top of the script for why these are not
+     lucide-svelte components. Path data is lucide's own (ISC), copied verbatim. -->
+{#snippet chevronRight()}
+  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="m9 18 6-6-6-6" />
+  </svg>
+{/snippet}
+
+{#snippet chevronDown()}
+  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+{/snippet}
+
+{#snippet eye()}
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+{/snippet}
+
+{#snippet eyeOff()}
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" />
+    <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
+    <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
+    <path d="m2 2 20 20" />
+  </svg>
+{/snippet}
+
+{#snippet lock()}
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+{/snippet}
+
+{#snippet lockOpen()}
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+  </svg>
+{/snippet}
+
+{#snippet lockSmall()}
+  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+{/snippet}
+
+{#snippet search()}
+  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.3-4.3" />
+  </svg>
+{/snippet}
 
 <style>
   .tree-panel {

@@ -56,7 +56,14 @@ function applyDefaults(c) {
  */
 export function normalizeCorner(corners, pos) {
   if (!corners) return { ...CORNER_DEFAULT };
-  if (corners.linked) return applyDefaults(corners);
+  // `!== false`, not truthiness — the same tri-state read borderEnabled uses above, and for the
+  // same reason: the model's default is `true`, so ABSENT has to mean linked.
+  //
+  // Truthiness here meant a Corners object that had simply not mentioned `linked` took the
+  // unlinked branch, found no per-corner data, and came back with radius 0. It cost forty
+  // knobs, every LED lamp and every tick mark their roundness, with `radius: 999` sitting in the
+  // document the whole time — the shape of bug where the data is right and the read is wrong.
+  if (corners.linked !== false) return applyDefaults(corners);
   const c = corners[POS_TO_KEY[pos]];
   if (!c) return { ...CORNER_DEFAULT };
   return applyDefaults(c);

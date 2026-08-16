@@ -163,6 +163,9 @@
   }
 
   let behavior = $derived(getSection(control, 'Behavior'));
+  // Absent, not zero: the readout range is off until someone sets it, and `null` is how the model
+  // says so — the same tri-state the section padding uses, for the same reason.
+  let displayScaleOff = $derived(behavior?.displayMin == null && behavior?.displayMax == null);
   let parts = $derived(getSection(control, 'Parts'));
   let geometry = $derived(String(behavior?.geometry ?? 'linear'));
   let valueMode = $derived(String(behavior?.valueMode ?? 'single'));
@@ -442,6 +445,30 @@
     </PropertyCell>
     <PropertyCell label="Show Sign" span={1} hint="Show a plus sign for positive values.">
       <PropertyToggle value={behavior.showSign === true} onchange={() => set('Behavior.showSign', !(behavior.showSign === true))} />
+    </PropertyCell>
+
+    <!-- The readout's own range, when it differs from the wire's. A synth parameter stored 61..67
+         and printed -3..+3 is the case this exists for; typing into the readout maps back, so the
+         two directions agree. Both blank means no mapping at all. -->
+    <PropertyCell label="Reads as" span={2} disabled={displayScaleOff}
+                  hint="Low end of the range shown to the user, when it differs from the value range.">
+      <NumberInput value={behavior.displayMin ?? behavior.min ?? 0} step={1}
+                   onchange={(value) => set('Behavior.displayMin', value)} />
+    </PropertyCell>
+    <PropertyCell label="…to" span={2} disabled={displayScaleOff}
+                  hint="High end of the range shown to the user.">
+      <NumberInput value={behavior.displayMax ?? behavior.max ?? 1} step={1}
+                   onchange={(value) => set('Behavior.displayMax', value)} />
+    </PropertyCell>
+    <PropertyCell label="Remap readout" span={4}
+                  hint="Show a different range than the value range — for a parameter whose wire values are not what the instrument prints.">
+      <PropertyToggle
+        value={!displayScaleOff}
+        onchange={(on) => {
+          set('Behavior.displayMin', on ? numberOr(behavior.min, 0) : null);
+          set('Behavior.displayMax', on ? numberOr(behavior.max, 1) : null);
+        }}
+      />
     </PropertyCell>
   </PropertySection>
 

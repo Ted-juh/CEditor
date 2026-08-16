@@ -35,6 +35,25 @@ export function applyParameterAdoption(set, controlType, parameter) {
     set('Behavior.max', max);
     set('Behavior.defaultCurrentValue', value);
     set('Behavior.valueType', parameter.type === 'float' ? 'float' : 'int');
+
+    // The readout's range, when the profile says it differs from the wire's. The GAIA stores Octave
+    // Shift 61..67 and prints -3..+3; adopting only the wire range put 64 on screen where the
+    // instrument shows 0, on every bipolar parameter it has. `display.min/max` has been in the
+    // profile since it was written — nothing between the profile and the screen read it.
+    const displayMin = Number(parameter?.display?.min);
+    const displayMax = Number(parameter?.display?.max);
+    const remapped = Number.isFinite(displayMin) && Number.isFinite(displayMax)
+      && (displayMin !== min || displayMax !== max);
+    // EVERY adopted field is written on every adoption, including the ones this parameter has no
+    // opinion about. Adoption is a REBIND, not a merge: writing only what the new parameter
+    // provides leaves the old one's readout behind. Bind a knob to patchTempo (unit "BPM") and then
+    // to patchLevel (no unit) and it still read "64 BPM"; bind to any of the GAIA's 142 bipolar
+    // parameters and then to a plain 0..127 one and it still read "+64". displayMin/displayMax were
+    // already cleared for exactly this reason — these two were the same rule, half applied.
+    set('Behavior.displayMin', remapped ? displayMin : null);
+    set('Behavior.displayMax', remapped ? displayMax : null);
+    set('Behavior.unit', parameter?.display?.unit ? String(parameter.display.unit) : '');
+    set('Behavior.showSign', remapped && displayMin < 0);
   }
 
   if (parameter?.type === 'choice' && Array.isArray(parameter?.choices)) {

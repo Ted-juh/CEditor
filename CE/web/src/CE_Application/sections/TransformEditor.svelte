@@ -1,6 +1,9 @@
 <script>
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
-  import { selectedComponentIds } from '../stores/panels.js';
+  import { activePanel, selectedComponentIds } from '../stores/panels.js';
+  import { findParentOfControl } from '../utils/containment.js';
+  import { fitSettings, FIT_CONTENTS } from '../utils/containerFit.js';
+  import AlignmentPicker from '../properties/AlignmentPicker.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
 
@@ -12,6 +15,26 @@
   let isCustomComponent = $derived(String(core?.controlType ?? '') === 'CustomComponent');
   let designWidth = $derived(Number(designer?.designWidth) || 0);
   let designHeight = $derived(Number(designer?.designHeight) || 0);
+
+  // Anchoring and affectsFit are both statements about a PARENT — where x/y are measured from, and
+  // whether this control holds the parent open. On a top-level control they are inert, so the rows
+  // are not shown at all rather than shown doing nothing.
+  let parent = $derived(core?.id ? findParentOfControl($activePanel?.controls ?? [], core.id) : null);
+  let parentFit = $derived(parent ? fitSettings(parent) : null);
+  let parentFits = $derived(parentFit?.width === FIT_CONTENTS || parentFit?.height === FIT_CONTENTS);
+
+  // 3x3 reading order — AlignmentPicker maps options onto its grid positionally.
+  const ANCHOR_CELLS = [
+    { value: 'topLeft', label: 'Top left — x/y are absolute (the default)' },
+    { value: 'top', label: 'Top — x offsets from centre, y insets from the top' },
+    { value: 'topRight', label: 'Top right — x insets from the right edge' },
+    { value: 'left', label: 'Left — y offsets from centre' },
+    { value: 'center', label: 'Centre — x/y offset from the middle' },
+    { value: 'right', label: 'Right — x insets from the right edge' },
+    { value: 'bottomLeft', label: 'Bottom left — y insets from the bottom' },
+    { value: 'bottom', label: 'Bottom — y insets from the bottom' },
+    { value: 'bottomRight', label: 'Bottom right — x/y inset from that corner' },
+  ];
 
   function set(prop, value) {
     if (!core?.id) return;
@@ -43,6 +66,32 @@
       <NumberCell label="Max W" value={transform.maxWidth ?? 0} step={1} min={0} onchange={(v) => set('maxWidth', v)} />
       <NumberCell label="Max H" value={transform.maxHeight ?? 0} step={1} min={0} onchange={(v) => set('maxHeight', v)} />
     </div>
+    {#if parent}
+      <!-- Inside a container: how x/y are read, and whether this control counts toward the
+           container's fitted size. Absolute x/y cannot keep a title at the right edge of a box
+           whose width is derived from its contents, because that width is not known until after
+           the contents have been measured — which is what the anchor is for. -->
+      <div class="anchor-block">
+        <span class="lbl anchor-lbl">Anchor</span>
+        <div class="anchor-grid">
+          <AlignmentPicker
+            value={transform.anchor ?? 'topLeft'}
+            options={ANCHOR_CELLS}
+            onchange={(value) => set('anchor', value)}
+          />
+        </div>
+      </div>
+      <div class="prop-row" title="Off means this control does not hold its parent open — a title, a badge, a logo. On a parent that fits its contents, leaving a title On makes moving the title resize the section.">
+        <span class="lbl wide">Holds parent open</span>
+        <button class="toggle-val" class:on={transform.affectsFit !== false}
+                onclick={() => set('affectsFit', transform.affectsFit === false)}>
+          {transform.affectsFit === false ? 'No' : 'Yes'}
+        </button>
+        {#if !parentFits}
+          <span class="design-hint">parent size is locked</span>
+        {/if}
+      </div>
+    {/if}
     <div class="prop-row">
       <span class="lbl">Aspect Lock</span>
       <button class="toggle-val" class:on={transform.aspectLock} onclick={() => set('aspectLock', !transform.aspectLock)}>
@@ -74,6 +123,11 @@
   .prop-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 3px; }
   .prop-row:hover { background: #2A2A2A; }
   .lbl { color: #888; font-size: 11px; min-width: 20px; flex-shrink: 0; }
+  .lbl.wide { min-width: 96px; }
+  .anchor-block { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 3px; }
+  .anchor-block:hover { background: #2A2A2A; }
+  .anchor-lbl { min-width: 96px; }
+  .anchor-grid { width: 66px; height: 66px; display: flex; }
   .toggle-val {
     background: #252525; border: none; color: #888; font-size: 11px;
     padding: 2px 8px; border-radius: 3px; cursor: pointer; font-family: inherit;

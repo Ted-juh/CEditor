@@ -1,4 +1,5 @@
 import { get, writable } from 'svelte/store';
+import { deepClone } from '../utils/deepClone.js';
 import { panels, resolvedActivePanelId, activeEditorTab, selectedComponentIds } from './panels.js';
 import {
   componentWorkspaceMode,
@@ -32,7 +33,7 @@ export const redoAvailable = writable(false);
 const MAX_HISTORY = 50;
 
 // Per-context history: Map<contextKey, { undoStack: [], redoStack: [] }>.
-// Stack entries are { json, selection } — the serialized state plus the
+// Stack entries are { snapshot, selection } — the captured state plus the
 // selection that went with it, so undoing a delete re-selects what came back.
 const historyMap = new Map();
 let isRestoring = false;
@@ -43,7 +44,7 @@ let isRestoring = false;
 // evicts the real edits underneath.
 let suppressed = false;
 let debounceTimer = null;
-let lastSnapshotJson = null;
+let lastSnapshot = null;
 let lastSelection = [];
 // Which context the committed baseline describes. A snapshot may only be
 // pushed against a baseline of the SAME context — otherwise a flush racing a
@@ -104,22 +105,44 @@ function updateAvailability() {
   redoAvailable.set(h.redoStack.length > 0);
 }
 
-/** Serialize the active context's editable state, stripping transient fields.
- *  Base64 asset payloads (background image/texture, viewer images) are
- *  excluded: at 50 snapshots per context, a 4MB image would pin ~200MB of
- *  strings. Undo therefore does not revert those payloads — restore keeps
- *  whatever asset is currently loaded. */
+/**
+ * A snapshot of the active context's editable state.
+ *
+ * THIS USED TO BE `JSON.stringify(panel)`, AND THAT IS WHY BIG PANELS FELT SLOW. The in-memory
+ * model is the expanded control tree, so the GAIA panel — 4.8 MB on disk — stringifies to 21 MB
+ * and takes ~190 ms. That ran on a 400 ms debounce after every edit, which is a fifth of a second
+ * of dead main thread every time you let go of something, and MAX_HISTORY of them is a gigabyte
+ * of strings for the collector to walk.
+ *
+ * It is now a shallow copy that SHARES the control objects. The store is immutable by copy:
+ * mutatePanelControlsInList returns unchanged controls by reference and deepClones the ones it
+ * edits, so holding references costs one pointer per control and retains only what actually
+ * changed. Cost goes from O(bytes in the panel) to O(controls), and 21 MB becomes a few kilobytes.
+ *
+ * WHAT THIS RESTS ON, stated plainly: nothing may mutate a control in place. That is not a new
+ * requirement and not a fragile one — Svelte's reactivity already depends on it, so an in-place
+ * mutation would show up as "the canvas did not update" long before it showed up as a corrupted
+ * undo. historySnapshot.test.js pins it from the history side anyway, by editing through the real
+ * store API and asserting the snapshot taken beforehand did not move.
+ *
+ * Base64 asset payloads (background image/texture, viewer images) are still
+ * excluded: they would bloat the chrome comparison, and old snapshots would pin
+ * replaced payloads in memory. Undo therefore does not revert those payloads —
+ * restore keeps whatever asset is currently loaded.
+ */
 function snapshotOf(context) {
   if (!context) return null;
   if (context.kind === 'component') {
     const doc = get(componentDocuments).find((entry) => entry.id === context.id);
     if (!doc?.control) return null;
-    return JSON.stringify(doc.control);
+    return { control: doc.control };
   }
   const panel = get(panels).find((p) => p.id === context.id);
   if (!panel) return null;
   const { id, modified, bgImage, bgTexture, viewer, ...data } = panel;
-  return JSON.stringify(data);
+  // The array is copied so a stray in-place push cannot reach back into history; its ELEMENTS are
+  // shared, which is the whole point.
+  return { ...data, controls: Array.isArray(data.controls) ? data.controls.slice() : data.controls };
 }
 
 /** Selection ids as a plain array, captured alongside panel snapshots. */
@@ -128,12 +151,47 @@ function selectionOf(context) {
   return [...get(selectedComponentIds)];
 }
 
+/** Everything except the control tree, as a string. Small — panel settings, notepad, layers. */
+function chromeOf(snapshot) {
+  const { controls, control, ...rest } = snapshot;
+  return JSON.stringify(rest);
+}
+
+/**
+ * Are two snapshots the same state?
+ *
+ * Reference equality first, which is free and true for every control an edit did not touch. Only
+ * the ones whose identity changed get compared by value, and only those — so a no-op edit still
+ * dedupes (it did before, via the string compare) without the whole panel being serialized to
+ * find that out. O(changed), not O(panel).
+ */
+function sameSnapshot(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (chromeOf(a) !== chromeOf(b)) return false;
+
+  if (a.control || b.control) {
+    return a.control === b.control || JSON.stringify(a.control) === JSON.stringify(b.control);
+  }
+
+  const left = a.controls ?? [];
+  const right = b.controls ?? [];
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i++) {
+    if (left[i] === right[i]) continue;
+    if (JSON.stringify(left[i]) !== JSON.stringify(right[i])) return false;
+  }
+  return true;
+}
+
 function restoreSnapshot(context, entry) {
-  const json = entry?.json;
-  if (json == null) return;
+  const snapshot = entry?.snapshot;
+  if (snapshot == null) return;
   isRestoring = true;
   if (context.kind === 'component') {
-    const control = JSON.parse(json);
+    // Cloned on the way back in, so the live document and the history entry stop sharing the
+    // moment one of them is editable again. Restores are rare; the clone is not on any hot path.
+    const control = deepClone(snapshot.control);
     componentDocuments.update((list) =>
       list.map((doc) => {
         if (doc.id !== context.id) return doc;
@@ -146,7 +204,12 @@ function restoreSnapshot(context, entry) {
       })
     );
   } else {
-    const data = JSON.parse(json);
+    // The chrome — panel size, colours, notepad, export settings — is small enough to clone, so a
+    // restore never leaves the live panel aliasing a history entry's settings objects. The
+    // CONTROLS go back by reference, which is the point: they are immutable, and copying them is
+    // the cost this whole change exists to remove.
+    const { controls, ...chrome } = snapshot;
+    const data = { ...deepClone(chrome), controls: (controls ?? []).slice() };
     panels.update((list) =>
       // Spread order keeps the excluded asset fields (bgImage/bgTexture/viewer)
       // from the live panel — they are not part of the snapshot.
@@ -159,7 +222,7 @@ function restoreSnapshot(context, entry) {
     }
   }
   isRestoring = false;
-  lastSnapshotJson = json;
+  lastSnapshot = snapshot;
   lastSelection = Array.isArray(entry.selection) ? entry.selection : [];
   baselineKey = contextKey(context);
 }
@@ -172,22 +235,22 @@ function commitSnapshot(context) {
 
   if (!context) return;
 
-  const json = snapshotOf(context);
-  if (json == null) return;
+  const snapshot = snapshotOf(context);
+  if (snapshot == null) return;
 
   // Skip if identical to last snapshot, or if there is no committed baseline
   // yet. A baseline from a different context can't be diffed against — it
   // becomes the new baseline instead of a bogus undo entry.
-  if (json === lastSnapshotJson && baselineKey === contextKey(context)) return;
-  if (lastSnapshotJson == null || baselineKey !== contextKey(context)) {
-    lastSnapshotJson = json;
+  if (baselineKey === contextKey(context) && sameSnapshot(snapshot, lastSnapshot)) return;
+  if (lastSnapshot == null || baselineKey !== contextKey(context)) {
+    lastSnapshot = snapshot;
     lastSelection = selectionOf(context);
     baselineKey = contextKey(context);
     return;
   }
 
   const history = getHistory(contextKey(context));
-  history.undoStack.push({ json: lastSnapshotJson, selection: lastSelection });
+  history.undoStack.push({ snapshot: lastSnapshot, selection: lastSelection });
 
   // Cap undo stack size
   if (history.undoStack.length > MAX_HISTORY) {
@@ -197,7 +260,7 @@ function commitSnapshot(context) {
   // Clear redo stack on new action
   history.redoStack.length = 0;
 
-  lastSnapshotJson = json;
+  lastSnapshot = snapshot;
   lastSelection = selectionOf(context);
   updateAvailability();
 }
@@ -262,7 +325,7 @@ function resetBaseline() {
   if (isRestoring) return;
   flushPendingSnapshot();
   const context = activeContext();
-  lastSnapshotJson = snapshotOf(context);
+  lastSnapshot = snapshotOf(context);
   lastSelection = selectionOf(context);
   baselineKey = context ? contextKey(context) : null;
   updateAvailability();
@@ -284,7 +347,7 @@ export function undo() {
   // Save current state to redo
   const current = snapshotOf(context);
   if (current == null) return;
-  history.redoStack.push({ json: current, selection: selectionOf(context) });
+  history.redoStack.push({ snapshot: current, selection: selectionOf(context) });
 
   // Restore previous state
   const prev = history.undoStack.pop();
@@ -305,7 +368,7 @@ export function redo() {
   // Save current state to undo
   const current = snapshotOf(context);
   if (current == null) return;
-  history.undoStack.push({ json: current, selection: selectionOf(context) });
+  history.undoStack.push({ snapshot: current, selection: selectionOf(context) });
 
   // Restore redo state
   const next = history.redoStack.pop();

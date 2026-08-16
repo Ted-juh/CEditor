@@ -24,6 +24,8 @@ import {
 } from './runtimePreferences.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
+import { runWhenIdle } from '../utils/runWhenIdle.js';
+import { equalityWritable } from '../utils/equalityStore.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { createPanel, deserializePanel, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
 import {
@@ -282,8 +284,16 @@ function scheduleUnsavedSessionAutosave() {
   }
 
   autosaveTimer = setTimeout(() => {
-    persistUnsavedSessionSnapshot();
     autosaveTimer = null;
+    // WHEN THE BROWSER IS FREE, not when the timer happens to fire. Serialising the document is
+    // measured in hundreds of milliseconds on a large panel, and a bare setTimeout drops that on
+    // whatever the author is doing five seconds after an edit — which is a freeze in the middle of
+    // a drag with no visible cause. requestIdleCallback waits for a gap instead, and its `timeout`
+    // guarantees the snapshot still happens on a busy editor rather than being starved.
+    //
+    // flushUnsavedSessionSnapshot stays synchronous: it runs before destructive actions and on the
+    // way out, where the point is that the write has finished.
+    runWhenIdle(persistUnsavedSessionSnapshot, 2000);
   }, Math.max(5, get(autosaveIntervalSeconds)) * 1000);
 }
 
@@ -367,8 +377,19 @@ export function isSelected(id) {
   return get(selectedComponentIds).has(id);
 }
 
-/** Active multi-drag delta — applied visually to all selected components during drag */
-export const multiDragDelta = writable({ x: 0, y: 0, active: false });
+/**
+ * Active multi-drag delta — applied visually to all selected components during drag.
+ *
+ * Object-valued, and set to the idle value at the end of EVERY drag whether or not a multi-drag
+ * happened — which a plain writable turns into a notification, because safe_not_equal cannot see
+ * that two objects hold the same numbers. The same defect that made selecting a control cost
+ * 200 ms (utils/equalityStore.js); here it is worth a single callback, and it is fixed because it
+ * is the same bug rather than because the measurement demanded it.
+ */
+export const multiDragDelta = equalityWritable(
+  { x: 0, y: 0, active: false },
+  (a, b) => a?.x === b?.x && a?.y === b?.y && a?.active === b?.active,
+);
 
 /** Editor zoom state */
 export const editorZoom = writable(100);
