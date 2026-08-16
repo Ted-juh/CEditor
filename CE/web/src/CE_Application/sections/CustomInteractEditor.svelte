@@ -489,9 +489,8 @@
     width: 62px;
   }
 
-  .field-row input,
   .field-row select {
-    width: 62px;
+    width: auto;
     background: #1A1A1A;
     border: 1px solid #333;
     border-radius: 3px;
@@ -503,11 +502,6 @@
     box-sizing: border-box;
   }
 
-  .field-row select {
-    width: auto;
-  }
-
-  .field-row input:focus,
   .field-row select:focus {
     border-color: #5B9BD5;
   }

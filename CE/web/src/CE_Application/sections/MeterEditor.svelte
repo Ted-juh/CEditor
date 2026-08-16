@@ -213,7 +213,6 @@
   .zrow { display: flex; align-items: center; gap: 6px; }
   .zrow .zfrom { flex: 0 0 70px; }
   .nc-wrap { display: flex; }
-  .zrow .color { flex: 1 1 auto; }
   .empty { border: 1px dashed #3A3A3A; border-radius: 4px; color: #8A8A8A; font-size: 11px; padding: 8px; }
   .action-btn {
     background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD;

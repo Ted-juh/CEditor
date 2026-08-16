@@ -18,7 +18,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let { control = null } = $props();
 
@@ -61,11 +61,11 @@
          and a row that vanishes makes that look like it was thrown away. -->
     <PropertyCell label="Min W" span={2} disabled={!fitWidth}
                   hint="A fitted width never goes below this. 0 is pure fit.">
-      <NumberInput value={children.minWidth ?? 0} step={1} min={0} onchange={(v) => set('minWidth', v)} />
+      <NumberCell value={children.minWidth ?? 0} step={1} min={0} onchange={(v) => set('minWidth', v)} />
     </PropertyCell>
     <PropertyCell label="Min H" span={2} disabled={!fitHeight}
                   hint="A fitted height never goes below this. 0 is pure fit.">
-      <NumberInput value={children.minHeight ?? 0} step={1} min={0} onchange={(v) => set('minHeight', v)} />
+      <NumberCell value={children.minHeight ?? 0} step={1} min={0} onchange={(v) => set('minHeight', v)} />
     </PropertyCell>
 
     <PropertyCell label="" span={4} hint="Fitting changes this container's size only — children never move.">
@@ -84,7 +84,7 @@
   <PropertySection title="Padding">
     <PropertyCell label="All sides" span={2} disabled={perSide}
                   hint="Space between the container's edge and its contents, on every side.">
-      <NumberInput value={sharedPadding} step={1} min={0} onchange={(v) => set('padding', v)} />
+      <NumberCell value={sharedPadding} step={1} min={0} onchange={(v) => set('padding', v)} />
     </PropertyCell>
     <PropertyCell label="Per side" span={2} hint="Give each side its own padding — a header needs more room at the top.">
       <PropertyToggle value={perSide} onchange={setPerSide} />
@@ -92,16 +92,16 @@
 
     {#if perSide}
       <PropertyCell label="Left" span={1} hint="Padding on the left edge.">
-        <NumberInput value={children.paddingLeft ?? sharedPadding} step={1} min={0} onchange={(v) => set('paddingLeft', v)} />
+        <NumberCell value={children.paddingLeft ?? sharedPadding} step={1} min={0} onchange={(v) => set('paddingLeft', v)} />
       </PropertyCell>
       <PropertyCell label="Right" span={1} hint="Padding on the right edge.">
-        <NumberInput value={children.paddingRight ?? sharedPadding} step={1} min={0} onchange={(v) => set('paddingRight', v)} />
+        <NumberCell value={children.paddingRight ?? sharedPadding} step={1} min={0} onchange={(v) => set('paddingRight', v)} />
       </PropertyCell>
       <PropertyCell label="Top" span={1} hint="Padding above the contents — where a section header goes.">
-        <NumberInput value={children.paddingTop ?? sharedPadding} step={1} min={0} onchange={(v) => set('paddingTop', v)} />
+        <NumberCell value={children.paddingTop ?? sharedPadding} step={1} min={0} onchange={(v) => set('paddingTop', v)} />
       </PropertyCell>
       <PropertyCell label="Bottom" span={1} hint="Padding below the contents.">
-        <NumberInput value={children.paddingBottom ?? sharedPadding} step={1} min={0} onchange={(v) => set('paddingBottom', v)} />
+        <NumberCell value={children.paddingBottom ?? sharedPadding} step={1} min={0} onchange={(v) => set('paddingBottom', v)} />
       </PropertyCell>
     {/if}
   </PropertySection>

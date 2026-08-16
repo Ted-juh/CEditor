@@ -452,12 +452,12 @@
          two directions agree. Both blank means no mapping at all. -->
     <PropertyCell label="Reads as" span={2} disabled={displayScaleOff}
                   hint="Low end of the range shown to the user, when it differs from the value range.">
-      <NumberInput value={behavior.displayMin ?? behavior.min ?? 0} step={1}
+      <NumberCell value={behavior.displayMin ?? behavior.min ?? 0} step={1}
                    onchange={(value) => set('Behavior.displayMin', value)} />
     </PropertyCell>
     <PropertyCell label="…to" span={2} disabled={displayScaleOff}
                   hint="High end of the range shown to the user.">
-      <NumberInput value={behavior.displayMax ?? behavior.max ?? 1} step={1}
+      <NumberCell value={behavior.displayMax ?? behavior.max ?? 1} step={1}
                    onchange={(value) => set('Behavior.displayMax', value)} />
     </PropertyCell>
     <PropertyCell label="Remap readout" span={4}

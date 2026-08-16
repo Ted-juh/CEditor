@@ -234,5 +234,4 @@
     outline-offset: 1px;
     border-color: #5B9BD5;
   }
-  .field-row { display: flex; gap: 4px; align-items: center; }
 </style>

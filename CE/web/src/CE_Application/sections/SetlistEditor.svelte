@@ -272,7 +272,6 @@
 
 <style>
   .val { width: 100%; background: #141420; border: 1px solid #2a2a36; color: #E8E8EE; font-size: 12px; padding: 3px 6px; border-radius: 4px; }
-  .val.tiny { width: 46px; }
   /* Fixed-width shell around a NumberCell in a scene row: the cell fills the
      span instead of flexing the row open. */
   .nc-wrap { display: flex; }
