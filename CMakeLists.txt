@@ -368,6 +368,15 @@ target_include_directories(CEditorCtrl49ReducerTests PRIVATE
 
 add_test(NAME Ctrl49Reducer COMMAND CEditorCtrl49ReducerTests)
 
+# CTRL49 preset selection primitive: Bank Select + Program Change bytes + browser index math.
+add_executable(CEditorCtrl49PresetTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+    "${CE_ROOT}/tests/Ctrl49PresetTests.cpp"
+)
+target_compile_features(CEditorCtrl49PresetTests PRIVATE cxx_std_23)
+target_include_directories(CEditorCtrl49PresetTests PRIVATE "${CE_ROOT}/src")
+add_test(NAME Ctrl49Preset COMMAND CEditorCtrl49PresetTests)
+
 # CTRL49 Phase-4 seam: device-profile intent compiler turns an encoder value into the
 # exact synth bytes. Loads the shipped GAIA SH-01 profile; no hardware.
 add_executable(CEditorCtrl49SynthCompileTests
