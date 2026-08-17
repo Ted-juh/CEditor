@@ -21,6 +21,13 @@ Ctrl49Reducer::Ctrl49Reducer()
             value = 64;
 }
 
+void Ctrl49Reducer::setPageCount (int count)
+{
+    pageCount_ = count < 1 ? 1 : (count > kPageCount ? kPageCount : count);
+    if (page_ >= pageCount_)
+        page_ = pageCount_ - 1;
+}
+
 int Ctrl49Reducer::clamp (int value)
 {
     return value < 0 ? 0 : (value > 127 ? 127 : value);
@@ -100,19 +107,22 @@ std::optional<Ctrl49Action> Ctrl49Reducer::process (const std::uint8_t* data, st
 
     if (data1 >= 35 && data1 <= 38 && data2 == 127)  // Main/Browser/Control/Multi -> pages 1..4
     {
-        page_ = data1 - 35;
+        const int requested = data1 - 35;
+        if (requested >= pageCount_)
+            return std::nullopt;  // no such page in this host
+        page_ = requested;
         return makeAction ("Mode button selected page " + std::to_string (page_ + 1), true);
     }
 
     if (data1 == 39 && data2 == 127)  // Page Left
     {
-        page_ = (page_ + kPageCount - 1) % kPageCount;
+        page_ = (page_ + pageCount_ - 1) % pageCount_;
         return makeAction ("Page Left -> page " + std::to_string (page_ + 1), true);
     }
 
     if (data1 == 40 && data2 == 127)  // Page Right
     {
-        page_ = (page_ + 1) % kPageCount;
+        page_ = (page_ + 1) % pageCount_;
         return makeAction ("Page Right -> page " + std::to_string (page_ + 1), true);
     }
 

@@ -34,6 +34,11 @@ public:
     static constexpr int kPageCount = 4;
     static constexpr int kSlotCount = 8;
 
+    // Limits Page Left/Right and mode-button navigation to [0, count). Values/switches
+    // storage always covers all kPageCount pages; this only bounds navigation so a host
+    // with fewer real pages never lands on an empty one. Clamped to [1, kPageCount].
+    void setPageCount (int count);
+
     // Processes one complete MIDI message from the hidden input. Returns the resulting
     // action, or nullopt for messages that change nothing (poly pressure, SysEx replies,
     // unknown CCs, releases that carry no state).
@@ -56,6 +61,7 @@ private:
     bool switches_[kPageCount][kSlotCount] {};
     bool shiftDown_        = false;
     bool timeDivisionDown_ = false;
+    int  pageCount_    = kPageCount;
     int  page_         = 0;
     int  activeSlot_   = 0;
     int  padBank_      = 0;

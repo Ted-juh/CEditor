@@ -382,6 +382,21 @@ target_include_directories(CEditorCtrl49SynthCompileTests PRIVATE "${CE_ROOT}/sr
 target_link_libraries(CEditorCtrl49SynthCompileTests PRIVATE juce::juce_core)
 add_test(NAME Ctrl49SynthCompile COMMAND CEditorCtrl49SynthCompileTests)
 
+# CTRL49 Phase-5 assignment model: loads the shipped GAIA assignment and verifies every
+# bound parameter on every page compiles through the named profile. No hardware.
+add_executable(CEditorCtrl49AssignmentTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Assignment.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    "${CE_ROOT}/tests/Ctrl49AssignmentTests.cpp"
+)
+target_compile_features(CEditorCtrl49AssignmentTests PRIVATE cxx_std_23)
+target_compile_definitions(CEditorCtrl49AssignmentTests PRIVATE
+    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+target_include_directories(CEditorCtrl49AssignmentTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorCtrl49AssignmentTests PRIVATE juce::juce_core)
+add_test(NAME Ctrl49Assignment COMMAND CEditorCtrl49AssignmentTests)
+
 # CTRL49 bare bridge demonstrator (Phase 2 end state). Windows-only transports; the
 # executable itself compiles everywhere (guarded), but the WinMM/KSPROPERTY backends are
 # only added on Windows. Not a test — build and run against real hardware.
@@ -426,6 +441,22 @@ if(WIN32)
     target_compile_features(Ctrl49SynthTest PRIVATE cxx_std_23)
     target_include_directories(Ctrl49SynthTest PRIVATE "${CE_ROOT}/src")
     target_link_libraries(Ctrl49SynthTest PRIVATE winmm juce::juce_core)
+
+    # CTRL49 multi-knob page -> real synth (Phase 5): 8 encoders drive 8 assigned params
+    # across assignment pages, via the assignment model + DeviceProfile compiler.
+    add_executable(Ctrl49MultiTest
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Assignment.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49MultiTest.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    )
+    target_compile_features(Ctrl49MultiTest PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49MultiTest PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49MultiTest PRIVATE winmm juce::juce_core)
 endif()
 
 # --- Panel scripting runtime (Milestone 1): Lua (Sol3) + JavaScript (juce_javascript) ----------
