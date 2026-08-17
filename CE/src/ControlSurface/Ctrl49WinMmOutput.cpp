@@ -53,6 +53,19 @@ std::optional<unsigned int> Ctrl49WinMmOutput::findPort (const std::wstring& nam
     return std::nullopt;
 }
 
+std::vector<std::wstring> Ctrl49WinMmOutput::listOutputPortNames()
+{
+    std::vector<std::wstring> names;
+    const UINT count = midiOutGetNumDevs();
+    for (UINT index = 0; index < count; ++index)
+    {
+        MIDIOUTCAPSW caps {};
+        if (midiOutGetDevCapsW (index, &caps, sizeof (caps)) == MMSYSERR_NOERROR)
+            names.emplace_back (caps.szPname);
+    }
+    return names;
+}
+
 Ctrl49WinMmOutput::Ctrl49WinMmOutput (unsigned int deviceId)
 {
     HMIDIOUT handle = nullptr;
@@ -102,6 +115,28 @@ void Ctrl49WinMmOutput::sendSysEx (const Bytes& frame)
         midiOutUnprepareHeader (handle, &header, sizeof (header));
         throw;
     }
+}
+
+void Ctrl49WinMmOutput::sendShortMessage (const Bytes& bytes)
+{
+    if (bytes.empty() || bytes.size() > 3)
+        throw std::invalid_argument ("short MIDI message must be 1-3 bytes");
+
+    DWORD packed = 0;
+    for (std::size_t i = 0; i < bytes.size(); ++i)
+        packed |= static_cast<DWORD> (bytes[i]) << (8 * i);
+
+    check (midiOutShortMsg (static_cast<HMIDIOUT> (handle_), packed), "midiOutShortMsg");
+}
+
+void Ctrl49WinMmOutput::send (const Bytes& bytes)
+{
+    if (bytes.empty())
+        return;
+    if (bytes.front() == 0xF0)
+        sendSysEx (bytes);
+    else
+        sendShortMessage (bytes);
 }
 
 } // namespace ceditor::ctrl49

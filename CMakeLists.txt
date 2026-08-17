@@ -368,6 +368,20 @@ target_include_directories(CEditorCtrl49ReducerTests PRIVATE
 
 add_test(NAME Ctrl49Reducer COMMAND CEditorCtrl49ReducerTests)
 
+# CTRL49 Phase-4 seam: device-profile intent compiler turns an encoder value into the
+# exact synth bytes. Loads the shipped GAIA SH-01 profile; no hardware.
+add_executable(CEditorCtrl49SynthCompileTests
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    "${CE_ROOT}/tests/Ctrl49SynthCompileTests.cpp"
+)
+target_compile_features(CEditorCtrl49SynthCompileTests PRIVATE cxx_std_23)
+target_compile_definitions(CEditorCtrl49SynthCompileTests PRIVATE
+    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+target_include_directories(CEditorCtrl49SynthCompileTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorCtrl49SynthCompileTests PRIVATE juce::juce_core)
+add_test(NAME Ctrl49SynthCompile COMMAND CEditorCtrl49SynthCompileTests)
+
 # CTRL49 bare bridge demonstrator (Phase 2 end state). Windows-only transports; the
 # executable itself compiles everywhere (guarded), but the WinMM/KSPROPERTY backends are
 # only added on Windows. Not a test — build and run against real hardware.
@@ -397,6 +411,21 @@ if(WIN32)
     target_compile_features(Ctrl49KnobTest PRIVATE cxx_std_23)
     target_include_directories(Ctrl49KnobTest PRIVATE "${CE_ROOT}/src")
     target_link_libraries(Ctrl49KnobTest PRIVATE winmm)
+
+    # CTRL49 -> real synth first light (Phase 4): encoder 1 drives a device-profile
+    # parameter (GAIA cutoff) via the DeviceProfile intent compiler. Links juce_core.
+    add_executable(Ctrl49SynthTest
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49SynthTest.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    )
+    target_compile_features(Ctrl49SynthTest PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49SynthTest PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49SynthTest PRIVATE winmm juce::juce_core)
 endif()
 
 # --- Panel scripting runtime (Milestone 1): Lua (Sol3) + JavaScript (juce_javascript) ----------
