@@ -26,6 +26,7 @@
 #include <cmath>
 #include <cstdio>
 #include <map>
+#include <memory>
 #include <string>
 #include <thread>
 
@@ -108,43 +109,55 @@ int wmain (int argc, wchar_t** argv)
     logLine ("Assignment: " + std::string (assignment.name.toRawUTF8())
              + " (" + std::to_string (assignment.pages.size()) + " pages)");
 
-    ceditor::device::DeviceProfileEngine engine;
-    const juce::File profileFile = assignment.resolvedProfile (assignmentFile.getParentDirectory());
-    if (! engine.loadFromFile (profileFile, error))
+    // One engine (with its range map) per distinct device profile across the pages, so a
+    // rig spanning multiple synths routes each page to its own profile.
+    const juce::File baseDir = assignmentFile.getParentDirectory();
+    struct SynthEngine
     {
-        std::printf ("profile load failed (%s): %s\n",
-                     profileFile.getFullPathName().toRawUTF8(), error.toRawUTF8());
-        return 2;
-    }
-    logLine ("Profile: " + std::string (engine.getProfileName().toRawUTF8()));
-
-    // Range map from the profile descriptors, for scaling the encoder into each param.
-    std::map<juce::String, Range> ranges;
+        std::unique_ptr<ceditor::device::DeviceProfileEngine> engine;
+        std::map<juce::String, Range> ranges;
+    };
+    std::map<juce::String, SynthEngine> engines;  // keyed by profile full path
+    for (const auto& path : assignment.distinctProfilePaths (baseDir))
     {
-        const juce::var descriptors = engine.listParameterDescriptors();
+        SynthEngine se;
+        se.engine = std::make_unique<ceditor::device::DeviceProfileEngine>();
+        if (! se.engine->loadFromFile (juce::File (path), error))
+        {
+            std::printf ("profile load failed (%s): %s\n", path.toRawUTF8(), error.toRawUTF8());
+            return 2;
+        }
+        const juce::var descriptors = se.engine->listParameterDescriptors();
         if (const auto* arr = descriptors.getArray())
             for (const auto& d : *arr)
                 if (auto* o = d.getDynamicObject())
                 {
-                    const juce::String id = o->getProperty ("id").toString();
                     Range r;
                     if (auto* rangeObj = o->getProperty ("range").getDynamicObject())
                     {
                         r.min = static_cast<int> (rangeObj->getProperty ("min"));
                         r.max = static_cast<int> (rangeObj->getProperty ("max"));
                     }
-                    ranges[id] = r;
+                    se.ranges[o->getProperty ("id").toString()] = r;
                 }
+        logLine ("Profile: " + std::string (se.engine->getProfileName().toRawUTF8()));
+        engines[path] = std::move (se);
     }
 
-    // Verify every assigned parameter compiles before touching hardware.
-    for (const auto& page : assignment.pages)
-        for (const auto& slot : page.slots)
+    auto engineForPage = [&] (int pageIndex) -> SynthEngine& {
+        return engines[assignment.pageProfile (pageIndex, baseDir).getFullPathName()];
+    };
+
+    // Verify every assigned parameter compiles through its own page's engine before hardware.
+    for (int p = 0; p < static_cast<int> (assignment.pages.size()); ++p)
+    {
+        auto& se = engineForPage (p);
+        for (const auto& slot : assignment.pages[static_cast<std::size_t> (p)].slots)
         {
             if (slot.parameterId.isEmpty()) continue;
-            const Range r = ranges.count (slot.parameterId) ? ranges[slot.parameterId] : Range {};
-            const auto probe = engine.compileSetParameter (assignment.deviceRole, slot.parameterId,
-                                                           scaleToRange (64, r), false);
+            const Range r = se.ranges.count (slot.parameterId) ? se.ranges[slot.parameterId] : Range {};
+            const auto probe = se.engine->compileSetParameter (assignment.pageRole (p), slot.parameterId,
+                                                               scaleToRange (64, r), false);
             if (! probe.ok)
             {
                 std::printf ("parameter '%s' did not compile: %s\n",
@@ -152,7 +165,8 @@ int wmain (int argc, wchar_t** argv)
                 return 2;
             }
         }
-    logLine ("All assigned parameters compile.");
+    }
+    logLine ("All assigned parameters compile (across " + std::to_string (engines.size()) + " synth(s)).");
 
     // Load Lua + filmstrip.
     auto readFile = [] (const wchar_t* path, Bytes& out) -> bool
@@ -182,20 +196,34 @@ int wmain (int argc, wchar_t** argv)
         const auto ctrlPortId = Ctrl49WinMmOutput::findPort (Ctrl49WinMmOutput::kDefaultPortName);
         if (! ctrlPortId) throw std::runtime_error ("output port 'CTRL49 USB' not found");
 
-        std::wstring synthActual;
-        const auto synthPortId = Ctrl49WinMmOutput::findPort (synthPortName, &synthActual);
-        if (! synthPortId)
+        // Open one synth output per distinct page port. A page's port is pagePort() (its own
+        // override or the assignment default), falling back to the command-line port name.
+        const std::wstring cliPort = synthPortName;
+        auto portForPage = [&] (int pageIndex) -> std::wstring {
+            const juce::String p = assignment.pagePort (pageIndex);
+            return p.isNotEmpty() ? std::wstring (p.toWideCharPointer()) : cliPort;
+        };
+        std::map<std::wstring, std::unique_ptr<Ctrl49WinMmOutput>> synthOuts;
+        for (int p = 0; p < static_cast<int> (assignment.pages.size()); ++p)
         {
-            logLine ("Synth port '" + toUtf8 (synthPortName) + "' not found. Available:");
-            for (const auto& n : Ctrl49WinMmOutput::listOutputPortNames()) logLine ("    " + toUtf8 (n));
-            throw std::runtime_error ("re-run with a matching synth port name");
+            const std::wstring want = portForPage (p);
+            if (want.empty() || synthOuts.count (want)) continue;
+            std::wstring actual;
+            const auto id = Ctrl49WinMmOutput::findPort (want, &actual);
+            if (! id)
+            {
+                logLine ("Synth port '" + toUtf8 (want) + "' (page " + std::to_string (p + 1)
+                         + ") not found. Available:");
+                for (const auto& n : Ctrl49WinMmOutput::listOutputPortNames()) logLine ("    " + toUtf8 (n));
+                throw std::runtime_error ("re-run with matching synth port name(s)");
+            }
+            logLine ("Synth port (page " + std::to_string (p + 1) + "): " + toUtf8 (actual));
+            synthOuts[want] = std::make_unique<Ctrl49WinMmOutput> (*id);
         }
-        logLine ("Synth port: " + toUtf8 (synthActual));
 
         const std::wstring devicePath = Ctrl49PrivateInput::discoverDevicePath();
 
         Ctrl49WinMmOutput ctrlOut (*ctrlPortId);
-        Ctrl49WinMmOutput synthOut (*synthPortId);
         Ctrl49PrivateInput input;
 
         logLine ("Opening hidden cable-2 capture...");
@@ -224,19 +252,25 @@ int wmain (int argc, wchar_t** argv)
         };
         auto sendToSynth = [&] (int slot)
         {
-            const auto& page = assignment.pages[static_cast<std::size_t> (reducer.page())];
+            const int pageIndex = reducer.page();
+            const auto& page = assignment.pages[static_cast<std::size_t> (pageIndex)];
             const auto& binding = page.slots[static_cast<std::size_t> (slot)];
             if (binding.parameterId.isEmpty()) return;
+
+            auto& se = engineForPage (pageIndex);
             const int e = reducer.displayArguments()[6 + static_cast<std::size_t> (slot)];
-            const Range r = ranges.count (binding.parameterId) ? ranges[binding.parameterId] : Range {};
-            const auto result = engine.compileSetParameter (assignment.deviceRole, binding.parameterId,
-                                                           scaleToRange (e, r), false);
+            const Range r = se.ranges.count (binding.parameterId) ? se.ranges[binding.parameterId] : Range {};
+            const auto result = se.engine->compileSetParameter (assignment.pageRole (pageIndex),
+                                                                binding.parameterId, scaleToRange (e, r), false);
             if (! result.ok) return;
+
+            const auto outIt = synthOuts.find (portForPage (pageIndex));
+            if (outIt == synthOuts.end() || outIt->second == nullptr) return;
             for (const auto& msg : result.transaction.messages)
             {
                 Bytes bytes; bytes.reserve (static_cast<std::size_t> (msg.bytes.size()));
                 for (int b : msg.bytes) bytes.push_back (static_cast<std::uint8_t> (b & 0xFF));
-                synthOut.send (bytes);
+                outIt->second->send (bytes);
             }
         };
 

@@ -32,6 +32,7 @@ bool Assignment::fromJson (const juce::String& json, const juce::File& baseDir,
     }
     if (obj->hasProperty ("role"))
         out.deviceRole = obj->getProperty ("role").toString();
+    out.portName = obj->getProperty ("port").toString();
 
     const juce::var pages = obj->getProperty ("pages");
     const auto* pageArray = pages.getArray();
@@ -52,6 +53,9 @@ bool Assignment::fromJson (const juce::String& json, const juce::File& baseDir,
 
         AssignmentPage page;
         page.title = pageObj->getProperty ("title").toString();
+        page.profilePath = pageObj->getProperty ("profile").toString();  // optional per-page device
+        page.deviceRole = pageObj->getProperty ("role").toString();
+        page.portName = pageObj->getProperty ("port").toString();
 
         const juce::var slots = pageObj->getProperty ("slots");
         const auto* slotArray = slots.getArray();
@@ -101,6 +105,41 @@ juce::File Assignment::resolvedProfile (const juce::File& baseDir) const
     if (juce::File::isAbsolutePath (profilePath))
         return juce::File (profilePath);
     return baseDir.getChildFile (profilePath);
+}
+
+juce::File Assignment::pageProfile (int pageIndex, const juce::File& baseDir) const
+{
+    juce::String path = profilePath;
+    if (pageIndex >= 0 && pageIndex < static_cast<int> (pages.size()))
+        if (const juce::String& perPage = pages[static_cast<std::size_t> (pageIndex)].profilePath; perPage.isNotEmpty())
+            path = perPage;
+    if (juce::File::isAbsolutePath (path))
+        return juce::File (path);
+    return baseDir.getChildFile (path);
+}
+
+juce::String Assignment::pageRole (int pageIndex) const
+{
+    if (pageIndex >= 0 && pageIndex < static_cast<int> (pages.size()))
+        if (const juce::String& perPage = pages[static_cast<std::size_t> (pageIndex)].deviceRole; perPage.isNotEmpty())
+            return perPage;
+    return deviceRole;
+}
+
+juce::String Assignment::pagePort (int pageIndex) const
+{
+    if (pageIndex >= 0 && pageIndex < static_cast<int> (pages.size()))
+        if (const juce::String& perPage = pages[static_cast<std::size_t> (pageIndex)].portName; perPage.isNotEmpty())
+            return perPage;
+    return portName;
+}
+
+juce::StringArray Assignment::distinctProfilePaths (const juce::File& baseDir) const
+{
+    juce::StringArray paths;
+    for (int i = 0; i < static_cast<int> (pages.size()); ++i)
+        paths.addIfNotAlreadyThere (pageProfile (i, baseDir).getFullPathName());
+    return paths;
 }
 
 } // namespace ceditor::ctrl49

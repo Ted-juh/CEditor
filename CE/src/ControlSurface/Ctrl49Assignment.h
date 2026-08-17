@@ -26,13 +26,20 @@ struct AssignmentPage
 {
     juce::String title;
     std::array<SlotBinding, 8> slots;  // encoders 1..8
+
+    // Per-page device overrides for the multi-synth "whole rig" case: a page can target a
+    // different synth than the assignment default. Empty = inherit the Assignment's values.
+    juce::String profilePath;   // this page's device profile (overrides Assignment.profilePath)
+    juce::String deviceRole;    // this page's device role (overrides Assignment.deviceRole)
+    juce::String portName;      // this page's synth MIDI-out port name (overrides Assignment.portName)
 };
 
 struct Assignment
 {
     juce::String name;
-    juce::String profilePath;   // path to the .ceditor-device.json, relative to the file or absolute
+    juce::String profilePath;   // default device profile path, relative to the file or absolute
     juce::String deviceRole = "mainSynth";
+    juce::String portName;      // default synth MIDI-out port name (a page may override it)
     std::vector<AssignmentPage> pages;
 
     // Parses the JSON assignment. `error` is set and false returned on malformed input.
@@ -42,8 +49,16 @@ struct Assignment
 
     static bool fromFile (const juce::File& file, Assignment& out, juce::String& error);
 
-    // Resolved absolute profile file (profilePath against baseDir if relative).
+    // Resolved absolute default profile file (profilePath against baseDir if relative).
     juce::File resolvedProfile (const juce::File& baseDir) const;
+
+    // Per-page resolved device, applying page overrides then falling back to the defaults.
+    juce::File   pageProfile (int pageIndex, const juce::File& baseDir) const;
+    juce::String pageRole (int pageIndex) const;
+    juce::String pagePort (int pageIndex) const;
+
+    // Distinct resolved profile paths across all pages — one engine per distinct profile.
+    juce::StringArray distinctProfilePaths (const juce::File& baseDir) const;
 };
 
 } // namespace ceditor::ctrl49

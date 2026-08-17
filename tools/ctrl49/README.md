@@ -85,7 +85,27 @@ pages compile to real synth bytes through the named profile.
 
 First cut / known simplification: the knob value shown is the encoder position 0..127, not
 the parameter's native units (fine for the 0..127 params; a later pass adds value-space
-display). Multi-*synth* per page (different profile/port per page) is the next extension.
+display).
+
+## Phase 7: multi-synth "whole rig"
+
+An assignment page can target a **different synth** than the assignment default, via per-page
+`profile` / `role` / `port` fields (see `multi-synth-rig.assignment.json`: page 1 GAIA, page 2
+SH-201). `Ctrl49MultiTest` loads one engine per distinct profile, opens one output per distinct
+port, and routes each page's encoder sends to its own synth — so Page Left/Right walks the rig.
+
+```bash
+Ctrl49MultiTest.exe multi-synth-rig.assignment.json CEditor_MultiKnob.lua knob_strip.png <fallback-port>
+```
+
+The `<fallback-port>` is used for any page without its own `port`. Locked by the
+`Ctrl49MultiSynth` ctest (no hardware): the two pages resolve to different profiles and the
+same encoder value 64 compiles to GAIA bytes (`…41 12 10 00 01 0C 40 23…`) on page 1 and SH-201
+bytes (`…16 12 10 00 01 13 40 1C…`) on page 2 — different model ids, addresses, device ids.
+
+Preset browsing (read patch names via SysEx dump, scroll on the data dial, load on press) is
+the remaining piece; it is bounded by per-profile preset/dump data (SH-201 and AN1x carry dump
+definitions and patch-name params; the filter-only GAIA profile does not).
 
 ## Still requires hardware (open Phase-3 measurements)
 
