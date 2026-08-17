@@ -26,6 +26,7 @@
   import SettingsView from './SettingsView.svelte';
   import BehaviorDesigner from './BehaviorDesigner.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
+  import ScreenBuilderEditor from '../sections/ScreenBuilderEditor.svelte';
   import { addGuide, deleteSelectedGuide, selectedGuide } from '../stores/guides.js';
   import { activePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
@@ -40,6 +41,7 @@
   import Redo2 from 'lucide-svelte/icons/redo-2';
   import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
   import { createScriptWorkspaceDocument, scriptDocuments, updateScriptDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
+  import { createScreenDocument } from '../stores/screenBuilder.js';
   import { isSourceScript } from '../scripting/scriptModel.js';
   import { openNewPanelDialog } from '../stores/newPanelDialog.js';
   import { copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
@@ -559,6 +561,11 @@
     if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
   }
 
+  function createStandaloneScreen() {
+    const document = createScreenDocument();
+    if (document?.id) setActiveEditorTab({ type: 'screen', id: document.id });
+  }
+
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -720,6 +727,10 @@
         </div>
       {:else if $activeEditorTab?.type === 'settings'}
         <SettingsView />
+      {:else if $activeEditorTab?.type === 'screen'}
+        {#key $activeEditorTab.id}
+          <ScreenBuilderEditor documentId={$activeEditorTab.id} />
+        {/key}
       {:else if $activeEditorTab?.type === 'deviceProfile'}
         <DeviceProfileDesignerV2 profileId={$activeEditorTab.id} />
       {:else if $activeEditorTab?.type === 'script'}
@@ -816,6 +827,7 @@
             <button type="button" onclick={createStandaloneComponent}>New Custom Component</button>
             <button type="button" onclick={createStandaloneDeviceProfile}>New Device Profile</button>
             <button type="button" onclick={createStandaloneScriptWorkspace}>New Script Workspace</button>
+            <button type="button" onclick={createStandaloneScreen}>New Screen (CTRL49)</button>
             <button type="button" onclick={importDeviceProfile}>Import Device Profile</button>
           </div>
         </div>

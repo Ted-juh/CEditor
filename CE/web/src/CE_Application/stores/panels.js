@@ -51,6 +51,11 @@ import {
   scriptDocuments,
   setActiveScriptDocument,
 } from './scriptWorkspace.js';
+import {
+  closeScreenDocument,
+  screenDocuments,
+  setActiveScreenDocument,
+} from './screenBuilder.js';
 
 export { createPanel };
 
@@ -455,8 +460,8 @@ export const scriptRuntimePanelId = derived(
 
 /** All editor tabs shown in the top tab bar */
 export const editorTabs = derived(
-  [panels, settingsTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments],
-  ([$panels, $settingsTabOpen, $deviceProfileTabs, $componentDocuments, $scriptDocuments]) => {
+  [panels, settingsTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments, screenDocuments],
+  ([$panels, $settingsTabOpen, $deviceProfileTabs, $componentDocuments, $scriptDocuments, $screenDocuments]) => {
     const tabs = $panels.map(panel => ({
       id: panel.id,
       tabType: 'panel',
@@ -500,6 +505,15 @@ export const editorTabs = derived(
       });
     }
 
+    for (const screenDocument of $screenDocuments) {
+      tabs.push({
+        id: screenDocument.id,
+        tabType: 'screen',
+        name: screenDocument.name || 'Untitled Screen',
+        modified: screenDocument.modified === true,
+      });
+    }
+
     return tabs;
   }
 );
@@ -513,6 +527,7 @@ function resolvePanelSelection(list, activeId, tab) {
   // every panel-scoped command (undo, paste, insert) silently hit an
   // off-screen panel while a script workspace was in front.
   if (tab?.type === 'script') return null;
+  if (tab?.type === 'screen') return null;
 
   const panelFromTab = tab?.type === 'panel'
     ? list.find((panel) => panel.id === tab.id) ?? null
@@ -905,6 +920,14 @@ export function setActiveEditorTab(tab) {
     return;
   }
 
+  if (tab.tabType === 'screen' || tab.type === 'screen') {
+    const nextTab = { type: 'screen', id: tab.id };
+    activeEditorTab.set(nextTab);
+    setActiveScreenDocument(tab.id);
+    clearSelection();
+    return;
+  }
+
   const panelId = tab.id ?? null;
   if (panelId != null) {
     setActivePanel(panelId);
@@ -948,6 +971,16 @@ export function closeActiveEditorTab() {
     if (nextScriptId) {
       activeEditorTab.set({ type: 'script', id: nextScriptId });
     } else if (get(activePanelId) != null) {
+      activeEditorTab.set({ type: 'panel', id: get(activePanelId) });
+    } else {
+      activeEditorTab.set({ type: 'panel', id: null });
+    }
+    return;
+  }
+
+  if (tab.type === 'screen') {
+    closeScreenDocument(tab.id);
+    if (get(activePanelId) != null) {
       activeEditorTab.set({ type: 'panel', id: get(activePanelId) });
     } else {
       activeEditorTab.set({ type: 'panel', id: null });
@@ -1062,7 +1095,7 @@ function persistOpenPanelPaths() {
 
 function syncPanelSelection() {
   const tab = get(activeEditorTab);
-  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script') return;
+  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
 
   const list = get(panels);
   const activeId = get(activePanelId);
@@ -1107,7 +1140,7 @@ activePanelId.subscribe(() => {
 });
 
 activeEditorTab.subscribe((tab) => {
-  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script') return;
+  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
   syncPanelSelection();
 });
 

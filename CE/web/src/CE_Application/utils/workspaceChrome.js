@@ -5,13 +5,14 @@ export function classifyWorkspace({ activeTab = null, componentWorkspaceMode = '
   if (componentWorkspaceMode === 'surface' && (activeType === 'panel' || activeType === 'component')) return 'component';
   if (activeTab?.type === 'deviceProfile') return 'device';
   if (activeTab?.type === 'script') return 'script';
+  if (activeTab?.type === 'screen') return 'screen';
   if (activeTab?.type === 'component') return 'component';
   if (activeTab?.type === 'settings') return 'settings';
   return 'panel';
 }
 
 export function workspaceOwnsChrome(workspaceKind) {
-  return ['component', 'device', 'script'].includes(workspaceKind);
+  return ['component', 'device', 'script', 'screen'].includes(workspaceKind);
 }
 
 export function resolveWorkspaceChrome({
