@@ -335,6 +335,70 @@ target_link_libraries(CEditorPanelValueTests PRIVATE
 
 add_test(NAME PanelValueModel COMMAND CEditorPanelValueTests)
 
+# --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
+# Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.
+# Design record: tools/docs/screen-builder-design.md.
+add_executable(CEditorCtrl49ProtocolTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+    "${CE_ROOT}/tests/Ctrl49ProtocolTests.cpp"
+)
+
+target_compile_features(CEditorCtrl49ProtocolTests PRIVATE cxx_std_23)
+
+target_include_directories(CEditorCtrl49ProtocolTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+add_test(NAME Ctrl49Protocol COMMAND CEditorCtrl49ProtocolTests)
+
+# CTRL49 reducer + session-sequence tests. The reducer cases are the PowerShell unified
+# demo's C# self-test ported one-for-one. Still hardware-free (no WinMM / KSPROPERTY).
+add_executable(CEditorCtrl49ReducerTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+    "${CE_ROOT}/tests/Ctrl49ReducerTests.cpp"
+)
+
+target_compile_features(CEditorCtrl49ReducerTests PRIVATE cxx_std_23)
+
+target_include_directories(CEditorCtrl49ReducerTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+add_test(NAME Ctrl49Reducer COMMAND CEditorCtrl49ReducerTests)
+
+# CTRL49 bare bridge demonstrator (Phase 2 end state). Windows-only transports; the
+# executable itself compiles everywhere (guarded), but the WinMM/KSPROPERTY backends are
+# only added on Windows. Not a test — build and run against real hardware.
+if(WIN32)
+    add_executable(Ctrl49BridgeDemo
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49BridgeDemo.cpp"
+    )
+    target_compile_features(Ctrl49BridgeDemo PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49BridgeDemo PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49BridgeDemo PRIVATE winmm)
+
+    # CTRL49 filmstrip-knob beauty test (Phase 3): uploads a knob filmstrip + Lua page and
+    # maps encoder 1 to the knob value on real hardware.
+    add_executable(Ctrl49KnobTest
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49KnobTest.cpp"
+    )
+    target_compile_features(Ctrl49KnobTest PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49KnobTest PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49KnobTest PRIVATE winmm)
+endif()
+
 # --- Panel scripting runtime (Milestone 1): Lua (Sol3) + JavaScript (juce_javascript) ----------
 # OFF by default so the existing build is unaffected. Turn on with -DCEDITOR_SCRIPTING=ON.
 # After enabling, add `ceditor_scripting` to the link libraries of whichever target hosts scripts
