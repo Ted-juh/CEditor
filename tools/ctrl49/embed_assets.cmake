@@ -21,6 +21,7 @@ function(embed_file symbol path)
     set(CONTENT "${CONTENT}" PARENT_SCOPE)
 endfunction()
 
+embed_file(kBridgePageLua      "${ROOT}/tools/ctrl49/CEditor_Bridge.lua")
 embed_file(kKnobPageLua        "${ROOT}/tools/ctrl49/CEditor_MultiKnob.lua")
 embed_file(kPresetListLua      "${ROOT}/tools/ctrl49/CEditor_PresetList.lua")
 embed_file(kKnobStripPng       "${ROOT}/tools/ctrl49/knob_strip.png")

@@ -6,17 +6,22 @@ protocol ground truth is the external reverse-engineering handoff.
 
 ## The product exe: Ctrl49Bridge (start here)
 
-**`build/native/Debug/Ctrl49Bridge.exe`** is the self-contained bridge — every asset (Lua
-pages, filmstrip, default GAIA assignment, preset bank, GAIA profile) is embedded in the
-binary. No arguments, no files beside it, no CMD wrappers. Double-click it:
+**`build/native/Debug/Ctrl49Bridge.exe`** is the self-contained bridge — every asset (the
+merged display page, filmstrip, default GAIA assignment, preset bank, GAIA profile) is
+embedded in the binary. No arguments, no files beside it, no CMD wrappers. Double-click it
+and **both surfaces are live at once, switched from the keyboard's own mode buttons**:
 
-- **Default (knobs)**: eight filmstrip knobs bound to GAIA filter/amp parameters, two pages
-  (Page Left/Right). If the synth port isn't found it lists ports and asks.
-- **`--presets`**: the patch browser — data dial scrolls, dial-press loads the patch.
-- **`--selftest`**: verifies embedded assets and that every default binding compiles
-  (registered in ctest as `Ctrl49BridgeSelfTest`).
-- Optional overrides: `Ctrl49Bridge.exe my-rig.assignment.json "PORT NAME"` or
-  `Ctrl49Bridge.exe --presets my-bank.presetbank.json "PORT NAME"`.
+- **MAIN button → knobs**: eight filmstrip knobs bound to GAIA filter/amp parameters, two
+  pages (Page Left/Right).
+- **BROWSER button → presets**: the patch list — data dial (or cursor keys) scrolls,
+  pressing the dial loads the patch on the synth. Page L/R jumps by a screenful.
+- If the synth port isn't found it lists the available ports and asks.
+- **`--presets`** starts in the browser instead of the knobs.
+- **`--selftest`**: verifies embedded assets, the merged page's entry points, and that
+  every default binding compiles (in ctest as `Ctrl49BridgeSelfTest`).
+- Optional overrides: `Ctrl49Bridge.exe my-rig.assignment.json "PORT"` replaces the knobs
+  assignment; `Ctrl49Bridge.exe my-bank.presetbank.json "PORT"` replaces the preset bank
+  (recognised by the `presetbank` in its name). The other stays embedded.
 
 Connect the CTRL49, close VIP / your DAW, run. Ctrl+C (or closing the window) stops
 cleanly; the keyboard's watchdog restores its normal screen. When double-clicked, the

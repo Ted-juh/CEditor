@@ -8,6 +8,7 @@
 namespace ceditor::ctrl49::assets
 {
 
+extern const unsigned char kBridgePageLua[];      extern const unsigned int kBridgePageLuaSize;
 extern const unsigned char kKnobPageLua[];        extern const unsigned int kKnobPageLuaSize;
 extern const unsigned char kPresetListLua[];      extern const unsigned int kPresetListLuaSize;
 extern const unsigned char kKnobStripPng[];       extern const unsigned int kKnobStripPngSize;

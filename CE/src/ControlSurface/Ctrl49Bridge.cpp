@@ -1,14 +1,18 @@
-// CEditor CTRL49 Bridge — the self-contained product exe. Double-click and it turns the
-// CTRL49 into a control surface for a hardware synth: eight filmstrip knobs bound to real
-// device parameters (default: GAIA filter/amp), with Page Left/Right switching pages.
-// `--presets` runs the patch browser instead (data dial scrolls, dial-press loads).
+// CEditor CTRL49 Bridge — the self-contained product exe. Double-click and the CTRL49
+// becomes a control surface for a hardware synth, with BOTH surfaces live in one session,
+// switched from the keyboard's own mode buttons:
 //
-// Everything is embedded in the binary — Lua pages, filmstrip, default assignment, preset
-// bank, and the GAIA profile — so no files need to sit beside the exe. Optional overrides:
+//   MAIN    -> knobs:   eight filmstrip knobs bound to device parameters (default: GAIA
+//                       filter/amp), Page Left/Right switches assignment pages.
+//   BROWSER -> presets: the patch list — data dial scrolls, dial-press loads the patch.
 //
-//   Ctrl49Bridge.exe [assignment.json] [synth-port]
-//   Ctrl49Bridge.exe --presets [presetbank.json] [synth-port]
-//   Ctrl49Bridge.exe --selftest        (no hardware; verifies embedded assets + compile)
+// Everything is embedded in the binary — the merged display page, filmstrip, default
+// assignment, preset bank, and the GAIA profile — so no files sit beside the exe.
+// Optional overrides:
+//
+//   Ctrl49Bridge.exe [my.assignment.json | my.presetbank.json] [synth-port]
+//   Ctrl49Bridge.exe --presets           (start in the preset browser)
+//   Ctrl49Bridge.exe --selftest          (no hardware; verifies embedded assets + compile)
 //
 // If the synth port is not found, the bridge lists the available ports and asks. Close
 // VIP / your DAW first (they hold the CTRL49 hidden input). Ctrl+C stops cleanly; the
@@ -187,9 +191,12 @@ Bytes labelPayload (const AssignmentPage& page)
 }
 
 //==================================================================================================
-// Knobs mode: the multi-knob assignment surface (default).
+// The bridge surface: knobs and the preset browser in one session, switched live from the
+// keyboard — Main (CC35) shows the knobs, Browser (CC36) the patch list. The merged Lua
+// page handles both; the host owns which mode is active and what gets pushed.
 
-int runKnobs (const Assignment& assignment, const juce::File& baseDir, const std::wstring& portOverride)
+int runBridge (const Assignment& assignment, const juce::File& baseDir,
+               const PresetBank& bank, const std::wstring& portOverride, bool startInPresets)
 {
     juce::String error;
 
@@ -229,29 +236,36 @@ int runKnobs (const Assignment& assignment, const juce::File& baseDir, const std
     const auto ctrlPortId = Ctrl49WinMmOutput::findPort (Ctrl49WinMmOutput::kDefaultPortName);
     if (! ctrlPortId) { logLine ("CTRL49 not found: MIDI output 'CTRL49 USB' is missing. Is the keyboard connected?"); return 1; }
 
-    // One synth output per distinct page port (override wins over everything).
+    // One synth output per distinct port: the assignment pages' ports plus the preset
+    // bank's port (override wins over everything).
     auto portForPage = [&] (int p) -> std::wstring
     {
         if (! portOverride.empty()) return portOverride;
         const juce::String s = assignment.pagePort (p);
         return std::wstring (s.toWideCharPointer());
     };
+    const std::wstring bankPort = ! portOverride.empty()
+        ? portOverride : std::wstring (bank.portName.toWideCharPointer());
+
     std::map<std::wstring, std::unique_ptr<Ctrl49WinMmOutput>> synthOuts;
-    for (int p = 0; p < static_cast<int> (assignment.pages.size()); ++p)
+    auto ensurePort = [&] (const std::wstring& want, const char* what) -> bool
     {
-        const std::wstring want = portForPage (p);
-        if (synthOuts.count (want)) continue;
-        auto out = openSynthPort (want, "synth");
-        if (! out) return 1;
+        if (synthOuts.count (want)) return true;
+        auto out = openSynthPort (want, what);
+        if (! out) return false;
         synthOuts[want] = std::move (out);
-    }
+        return true;
+    };
+    for (int p = 0; p < static_cast<int> (assignment.pages.size()); ++p)
+        if (! ensurePort (portForPage (p), "synth")) return 1;
+    if (! bank.patches.empty() && ! ensurePort (bankPort, "preset synth")) return 1;
 
     Ctrl49WinMmOutput ctrlOut (*ctrlPortId);
     Ctrl49PrivateInput input;
     logLine ("Opening hidden cable-2 capture...");
     input.start (Ctrl49PrivateInput::discoverDevicePath());
 
-    Bytes rawLua = assetBytes (assets::kKnobPageLua, assets::kKnobPageLuaSize);
+    Bytes rawLua = assetBytes (assets::kBridgePageLua, assets::kBridgePageLuaSize);
     rawLua.push_back (0x00);
     std::vector<Ctrl49Session::PngAsset> pngs { { 0x0200, assetBytes (assets::kKnobStripPng, assets::kKnobStripPngSize) } };
 
@@ -290,10 +304,54 @@ int runKnobs (const Assignment& assignment, const juce::File& baseDir, const std
         }
     };
 
+    // Preset browser state + view push (mode 2 of the merged page).
+    PresetBrowser browser (std::max (1, static_cast<int> (bank.patches.size())));
+    auto pushPresetView = [&] ()
+    {
+        juce::String h = bank.name + "   " + juce::String (browser.index() + 1).paddedLeft ('0', 3)
+                       + "/" + juce::String (static_cast<int> (bank.patches.size())).paddedLeft ('0', 3);
+        Bytes header; for (int i = 0; i < h.length(); ++i) header.push_back (static_cast<std::uint8_t> (h[i] & 0x7F));
+        session.callLua ("set_header", header, false);
+
+        const int count = static_cast<int> (bank.patches.size());
+        const int rows = std::min (kVisibleRows, std::max (1, count));
+        int offset = std::max (0, std::min (browser.index() - 2, std::max (0, count - rows)));
+        Bytes payload;
+        payload.push_back (static_cast<std::uint8_t> (browser.index() - offset));
+        payload.push_back (static_cast<std::uint8_t> (std::min (rows, count)));
+        for (int r = 0; r < std::min (rows, count); ++r)
+        {
+            const juce::String name = bank.patches[static_cast<std::size_t> (offset + r)].name.substring (0, 28);
+            payload.push_back (static_cast<std::uint8_t> (name.length()));
+            for (int i = 0; i < name.length(); ++i) payload.push_back (static_cast<std::uint8_t> (name[i] & 0x7F));
+        }
+        session.callLua ("set_rows", payload, true);
+    };
+
+    enum class Mode { knobs, presets };
+    Mode mode = Mode::knobs;
+    auto switchMode = [&] (Mode next)
+    {
+        mode = next;
+        session.callLua ("set_mode", { static_cast<std::uint8_t> (next == Mode::presets ? 2 : 1) }, false);
+        if (next == Mode::presets)
+            pushPresetView();
+        else
+        {
+            sendLabels (reducer.page());
+            sendValues();
+        }
+    };
+
     int page = reducer.page();
     sendLabels (page);
     sendValues();
-    logLine ("Bridge ready: encoders 1-8 edit, Page Left/Right switches pages. Ctrl+C to stop.");
+    if (startInPresets && ! bank.patches.empty())
+        switchMode (Mode::presets);
+    logLine ("Bridge ready.");
+    logLine ("  MAIN    = knobs (encoders 1-8 edit, Page Left/Right switches pages)");
+    logLine ("  BROWSER = presets (data dial scrolls, press the dial to load)");
+    logLine ("Ctrl+C to stop.");
 
     auto lastSend = std::chrono::steady_clock::now();
     bool dirty = false;
@@ -307,6 +365,42 @@ int runKnobs (const Assignment& assignment, const juce::File& baseDir, const std
 
         for (auto msg = input.dequeue(); msg; msg = input.dequeue())
         {
+            if (msg->size() < 3 || (msg->at (0) & 0xF0) != 0xB0)
+                continue;
+            const int d1 = msg->at (1), d2 = msg->at (2);
+
+            // Mode buttons are the bridge's own vocabulary, intercepted before the reducer:
+            // Main -> knobs, Browser -> presets (matching the keyboard's printed labels).
+            if (d1 == 35 && d2 == 127) { if (mode != Mode::knobs) { switchMode (Mode::knobs); logLine ("Mode: knobs"); } continue; }
+            if (d1 == 36 && d2 == 127)
+            {
+                if (bank.patches.empty()) { logLine ("No preset bank loaded."); continue; }
+                if (mode != Mode::presets) { switchMode (Mode::presets); logLine ("Mode: presets"); }
+                continue;
+            }
+
+            if (mode == Mode::presets)
+            {
+                if (d1 == 34) { const int d = d2 == 0x7F ? -1 : (d2 == 0x01 ? 1 : 0); if (d) { browser.move (d); dirty = true; } }
+                else if (d1 == 30 && d2 == 127) { browser.move (1); dirty = true; }
+                else if (d1 == 32 && d2 == 127) { browser.move (-1); dirty = true; }
+                else if (d1 == 40 && d2 == 127) { browser.move (kVisibleRows); dirty = true; }
+                else if (d1 == 39 && d2 == 127) { browser.move (-kVisibleRows); dirty = true; }
+                else if (d1 == 33 && d2 == 127)
+                {
+                    const auto it = synthOuts.find (bankPort);
+                    if (it != synthOuts.end() && it->second)
+                    {
+                        for (const auto& m : bank.selectSequence (browser.index()))
+                            it->second->send (m);
+                        logLine ("Load: " + std::string (
+                            bank.patches[static_cast<std::size_t> (browser.index())].name.toRawUTF8()));
+                    }
+                }
+                continue;
+            }
+
+            // Knobs mode: feed the reducer.
             const auto action = reducer.process (msg->data(), msg->size());
             if (! action) continue;
             if (action->render) dirty = true;
@@ -315,7 +409,7 @@ int runKnobs (const Assignment& assignment, const juce::File& baseDir, const std
             else logLine (action->text);
         }
 
-        if (reducer.page() != page)
+        if (mode == Mode::knobs && reducer.page() != page)
         {
             page = reducer.page();
             sendLabels (page);
@@ -325,8 +419,13 @@ int runKnobs (const Assignment& assignment, const juce::File& baseDir, const std
         const auto now = std::chrono::steady_clock::now();
         if (dirty && now - lastSend >= std::chrono::milliseconds (20))
         {
-            if (pendingSlot >= 0) { sendToSynth (pendingSlot); pendingSlot = -1; }
-            sendValues();
+            if (mode == Mode::knobs)
+            {
+                if (pendingSlot >= 0) { sendToSynth (pendingSlot); pendingSlot = -1; }
+                sendValues();
+            }
+            else
+                pushPresetView();
             dirty = false;
             lastSend = now;
         }
@@ -337,101 +436,6 @@ int runKnobs (const Assignment& assignment, const juce::File& baseDir, const std
     session.stop();
     input.stop();
     logLine ("Bridge stopped; the keyboard returns to its normal screen shortly.");
-    return 0;
-}
-
-//==================================================================================================
-// Presets mode: the patch browser.
-
-int runPresets (const PresetBank& bank, const std::wstring& portOverride)
-{
-    const auto ctrlPortId = Ctrl49WinMmOutput::findPort (Ctrl49WinMmOutput::kDefaultPortName);
-    if (! ctrlPortId) { logLine ("CTRL49 not found: MIDI output 'CTRL49 USB' is missing. Is the keyboard connected?"); return 1; }
-
-    std::wstring want = portOverride;
-    if (want.empty()) want = std::wstring (bank.portName.toWideCharPointer());
-    auto synthOut = openSynthPort (want, "synth");
-    if (! synthOut) return 1;
-
-    Ctrl49WinMmOutput ctrlOut (*ctrlPortId);
-    Ctrl49PrivateInput input;
-    logLine ("Opening hidden cable-2 capture...");
-    input.start (Ctrl49PrivateInput::discoverDevicePath());
-
-    Bytes rawLua = assetBytes (assets::kPresetListLua, assets::kPresetListLuaSize);
-    rawLua.push_back (0x00);
-
-    Ctrl49SessionOptions options; options.log = logLine;
-    Ctrl49Session session (ctrlOut, rawLua, options);
-    logLine ("Starting display session...");
-    session.start();
-
-    PresetBrowser browser (static_cast<int> (bank.patches.size()));
-
-    auto pushView = [&] ()
-    {
-        juce::String h = bank.name + "   " + juce::String (browser.index() + 1).paddedLeft ('0', 3)
-                       + "/" + juce::String (static_cast<int> (bank.patches.size())).paddedLeft ('0', 3);
-        Bytes header; for (int i = 0; i < h.length(); ++i) header.push_back (static_cast<std::uint8_t> (h[i] & 0x7F));
-        session.callLua ("set_header", header, false);
-
-        const int count = static_cast<int> (bank.patches.size());
-        const int rows = std::min (kVisibleRows, count);
-        int offset = std::max (0, std::min (browser.index() - 2, std::max (0, count - rows)));
-        Bytes payload;
-        payload.push_back (static_cast<std::uint8_t> (browser.index() - offset));
-        payload.push_back (static_cast<std::uint8_t> (rows));
-        for (int r = 0; r < rows; ++r)
-        {
-            const juce::String name = bank.patches[static_cast<std::size_t> (offset + r)].name.substring (0, 28);
-            payload.push_back (static_cast<std::uint8_t> (name.length()));
-            for (int i = 0; i < name.length(); ++i) payload.push_back (static_cast<std::uint8_t> (name[i] & 0x7F));
-        }
-        session.callLua ("set_rows", payload, true);
-    };
-    pushView();
-    logLine ("Preset browser ready: data dial scrolls, press the dial to load. Ctrl+C to stop.");
-
-    auto lastRender = std::chrono::steady_clock::now();
-    bool dirty = false;
-
-    while (! g_quit.load())
-    {
-        if (! session.failure().empty()) { logLine ("ERROR: " + session.failure()); break; }
-        if (! input.failure().empty())   { logLine ("ERROR: " + input.failure()); break; }
-        if (! input.running())           { logLine ("ERROR: hidden input stopped"); break; }
-
-        for (auto msg = input.dequeue(); msg; msg = input.dequeue())
-        {
-            if (msg->size() < 3 || (msg->at (0) & 0xF0) != 0xB0) continue;
-            const int d1 = msg->at (1), d2 = msg->at (2);
-            if (d1 == 34) { const int d = d2 == 0x7F ? -1 : (d2 == 0x01 ? 1 : 0); if (d) { browser.move (d); dirty = true; } }
-            else if (d1 == 30 && d2 == 127) { browser.move (1); dirty = true; }
-            else if (d1 == 32 && d2 == 127) { browser.move (-1); dirty = true; }
-            else if (d1 == 40 && d2 == 127) { browser.move (kVisibleRows); dirty = true; }
-            else if (d1 == 39 && d2 == 127) { browser.move (-kVisibleRows); dirty = true; }
-            else if (d1 == 33 && d2 == 127)
-            {
-                for (const auto& m : bank.selectSequence (browser.index()))
-                    synthOut->send (m);
-                logLine ("Load: " + std::string (bank.patches[static_cast<std::size_t> (browser.index())].name.toRawUTF8()));
-            }
-        }
-
-        const auto now = std::chrono::steady_clock::now();
-        if (dirty && now - lastRender >= std::chrono::milliseconds (20))
-        {
-            pushView();
-            dirty = false;
-            lastRender = now;
-        }
-        std::this_thread::sleep_for (std::chrono::milliseconds (2));
-    }
-
-    logLine ("Stopping...");
-    session.stop();
-    input.stop();
-    logLine ("Preset browser stopped; the keyboard returns to its normal screen shortly.");
     return 0;
 }
 
@@ -448,8 +452,18 @@ int runSelfTest()
     };
 
     std::printf ("Ctrl49Bridge self-test\n----------------------\n");
+    check (assets::kBridgePageLuaSize > 2000, "bridge page Lua embedded");
     check (assets::kKnobPageLuaSize > 1000, "knob page Lua embedded");
     check (assets::kPresetListLuaSize > 500, "preset list Lua embedded");
+
+    // The merged page must expose every host entry point of both modes.
+    {
+        const juce::String lua = assetString (assets::kBridgePageLua, assets::kBridgePageLuaSize);
+        for (const char* fn : { "function init", "function set_mode", "function set_labels",
+                                "function set_values", "function set_header", "function set_rows",
+                                "function draw" })
+            check (lua.contains (fn), fn);
+    }
     check (assets::kKnobStripPngSize > 10000, "knob filmstrip embedded");
     check (assets::kGaiaProfileJsonSize > 1000, "GAIA profile embedded");
 
@@ -518,49 +532,53 @@ int wmain (int argc, wchar_t** argv)
     try
     {
         juce::String error;
-        if (presets)
+
+        // Both surfaces load every run: the knobs assignment and the preset bank. A .json
+        // argument overrides one of them — a *.presetbank.json replaces the bank, any other
+        // .json replaces the assignment. The other stays embedded.
+        Assignment assignment;
+        juce::File baseDir;
+        bool assignmentOk;
+        const bool fileIsBank = ! fileArg.empty() && fileArg.find (L"presetbank") != std::wstring::npos;
+        if (! fileArg.empty() && ! fileIsBank)
         {
-            PresetBank bank;
-            bool ok;
-            if (! fileArg.empty())
-            {
-                Bytes b;
-                ok = readFileBytes (fileArg.c_str(), b)
-                     && PresetBank::fromJson (juce::String::fromUTF8 (reinterpret_cast<const char*> (b.data()),
-                                                                     static_cast<int> (b.size())), bank, error);
-            }
-            else
-                ok = PresetBank::fromJson (assetString (assets::kDefaultPresetBank, assets::kDefaultPresetBankSize),
-                                           bank, error);
-            if (! ok) { logLine ("preset bank load failed: " + std::string (error.toRawUTF8())); }
-            else
-            {
-                logLine ("Bank: " + std::string (bank.name.toRawUTF8())
-                         + " (" + std::to_string (bank.patches.size()) + " patches)");
-                result = runPresets (bank, portArg);
-            }
+            const juce::File f (juce::String (fileArg.c_str()));
+            baseDir = f.getParentDirectory();
+            assignmentOk = Assignment::fromFile (f, assignment, error);
         }
         else
+            assignmentOk = Assignment::fromJson (assetString (assets::kDefaultAssignment, assets::kDefaultAssignmentSize),
+                                                 juce::File(), assignment, error);
+        if (! assignmentOk)
+            logLine ("assignment load failed: " + std::string (error.toRawUTF8()));
+
+        PresetBank bank;
+        bool bankOk;
+        if (fileIsBank)
         {
-            Assignment assignment;
-            juce::File baseDir;
-            bool ok;
-            if (! fileArg.empty())
-            {
-                const juce::File f (juce::String (fileArg.c_str()));
-                baseDir = f.getParentDirectory();
-                ok = Assignment::fromFile (f, assignment, error);
-            }
-            else
-                ok = Assignment::fromJson (assetString (assets::kDefaultAssignment, assets::kDefaultAssignmentSize),
-                                           juce::File(), assignment, error);
-            if (! ok) { logLine ("assignment load failed: " + std::string (error.toRawUTF8())); }
-            else
-            {
-                logLine ("Assignment: " + std::string (assignment.name.toRawUTF8())
-                         + " (" + std::to_string (assignment.pages.size()) + " pages)");
-                result = runKnobs (assignment, baseDir, portArg);
-            }
+            Bytes b;
+            bankOk = readFileBytes (fileArg.c_str(), b)
+                     && PresetBank::fromJson (juce::String::fromUTF8 (reinterpret_cast<const char*> (b.data()),
+                                                                     static_cast<int> (b.size())), bank, error);
+        }
+        else
+            bankOk = PresetBank::fromJson (assetString (assets::kDefaultPresetBank, assets::kDefaultPresetBankSize),
+                                           bank, error);
+        if (! bankOk)
+        {
+            // A missing bank only disables the Browser mode; the knobs still run.
+            logLine ("preset bank load failed (Browser mode disabled): " + std::string (error.toRawUTF8()));
+            bank = PresetBank {};
+        }
+
+        if (assignmentOk)
+        {
+            logLine ("Assignment: " + std::string (assignment.name.toRawUTF8())
+                     + " (" + std::to_string (assignment.pages.size()) + " pages)");
+            if (! bank.patches.empty())
+                logLine ("Bank: " + std::string (bank.name.toRawUTF8())
+                         + " (" + std::to_string (bank.patches.size()) + " patches)");
+            result = runBridge (assignment, baseDir, bank, portArg, presets);
         }
     }
     catch (const std::exception& e)
