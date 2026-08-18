@@ -10949,6 +10949,4358 @@
       "ui": {
         "preferredComponent": "Slider"
       }
+    },
+    {
+      "id": "scene2.scPolyMode",
+      "name": "Poly Mode (Scene 2)",
+      "group": "Oscillator",
+      "type": "choice",
+      "default": "poly",
+      "choices": [
+        {
+          "id": "poly",
+          "label": "Poly",
+          "value": 0
+        },
+        {
+          "id": "mono",
+          "label": "Mono",
+          "value": 1
+        },
+        {
+          "id": "legato",
+          "label": "Legato",
+          "value": 2
+        }
+      ],
+      "address": "10 11 00",
+      "display": {
+        "mode": "choice",
+        "shortLabel": "Poly Mode"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      }
+    },
+    {
+      "id": "scene2.scPbUp",
+      "name": "Pitch Bend Range Up (-24..+24) (Scene 2)",
+      "group": "Pitch",
+      "type": "integer",
+      "default": 44,
+      "range": {
+        "min": 44,
+        "max": 84
+      },
+      "address": "10 11 01",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Pitch Bend Range Up (-24..+24)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scPbDown",
+      "name": "Pitch Bend Range Down (-24..+24) (Scene 2)",
+      "group": "Pitch",
+      "type": "integer",
+      "default": 44,
+      "range": {
+        "min": 44,
+        "max": 84
+      },
+      "address": "10 11 02",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Pitch Bend Range Down (-24..+24)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scPegDecay",
+      "name": "PEG Decay (-64..+63) (Scene 2)",
+      "group": "Pitch",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 03",
+      "display": {
+        "mode": "number",
+        "shortLabel": "PEG Decay (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scPegDepth",
+      "name": "PEG Depth (-64..+63 semitones) (Scene 2)",
+      "group": "Pitch",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 04",
+      "display": {
+        "mode": "number",
+        "shortLabel": "PEG Depth (-64..+63 semitones)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scPegSwitch",
+      "name": "PEG Switch (Scene 2)",
+      "group": "Pitch",
+      "type": "choice",
+      "default": "vco1",
+      "choices": [
+        {
+          "id": "vco1",
+          "label": "VCO1",
+          "value": 1
+        },
+        {
+          "id": "vco2",
+          "label": "VCO2",
+          "value": 2
+        },
+        {
+          "id": "both",
+          "label": "Both",
+          "value": 3
+        }
+      ],
+      "address": "10 11 05",
+      "display": {
+        "mode": "choice",
+        "shortLabel": "PEG Switch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      }
+    },
+    {
+      "id": "scene2.scPortamentoMode",
+      "name": "Portamento Mode (full-time/fingered) (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 1
+      },
+      "address": "10 11 06",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Portamento Mode (full-time/fingered)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scPortamentoTime",
+      "name": "Portamento Time (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 07",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Portamento Time"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scLfoResetMode",
+      "name": "LFO Reset Mode (Scene 2)",
+      "group": "LFO",
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "Off",
+          "value": 0
+        },
+        {
+          "id": "keyon",
+          "label": "Key On",
+          "value": 1
+        }
+      ],
+      "address": "10 11 08",
+      "display": {
+        "mode": "choice",
+        "shortLabel": "LFO Reset Mode"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      }
+    },
+    {
+      "id": "scene2.scLfo1Wave",
+      "name": "LFO1 Wave (sine..offset-s/h2) (Scene 2)",
+      "group": "LFO",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 20
+      },
+      "address": "10 11 09",
+      "display": {
+        "mode": "number",
+        "shortLabel": "LFO1 Wave (sine..offset-s/h2)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scLfo1Speed",
+      "name": "LFO1 Speed (1..256) (Scene 2)",
+      "group": "LFO",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 255
+      },
+      "address": "10 11 0A",
+      "display": {
+        "mode": "number",
+        "shortLabel": "LFO1 Speed (1..256)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u14-msb-lsb"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scLfo1SpeedSync",
+      "name": "LFO1 Speed (sync) (Scene 2)",
+      "group": "LFO",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 0C",
+      "display": {
+        "mode": "number",
+        "shortLabel": "LFO1 Speed (sync)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scLfo2Speed",
+      "name": "LFO2 Speed (1..256) (Scene 2)",
+      "group": "LFO",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 255
+      },
+      "address": "10 11 0D",
+      "display": {
+        "mode": "number",
+        "shortLabel": "LFO2 Speed (1..256)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u14-msb-lsb"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVcoAlgorithm",
+      "name": "VCO Algorithm (Osc Sync & FM) (Scene 2)",
+      "group": "Oscillator",
+      "type": "choice",
+      "default": "syncoff_fmon",
+      "choices": [
+        {
+          "id": "syncoff_fmon",
+          "label": "Sync-off FM-on",
+          "value": 0
+        },
+        {
+          "id": "synon_fmboth",
+          "label": "Sync-on FM-both",
+          "value": 1
+        },
+        {
+          "id": "synon_fmmaster",
+          "label": "Sync-on FM-master",
+          "value": 2
+        },
+        {
+          "id": "synon_fmslave",
+          "label": "Sync-on FM-slave",
+          "value": 3
+        }
+      ],
+      "address": "10 11 0F",
+      "display": {
+        "mode": "choice",
+        "shortLabel": "VCO Algorithm (Osc Sync & FM)"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      }
+    },
+    {
+      "id": "scene2.scSyncPitch",
+      "name": "Sync Pitch (-64..+63) (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 10",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Sync Pitch (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scSyncPitchDepth",
+      "name": "Sync Pitch Depth (-64..+63) (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 11",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Sync Pitch Depth (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scSyncPitchSource",
+      "name": "Sync Pitch Source (Scene 2)",
+      "group": "Oscillator",
+      "type": "choice",
+      "default": "fixed",
+      "choices": [
+        {
+          "id": "fixed",
+          "label": "Fixed",
+          "value": 0
+        },
+        {
+          "id": "peg",
+          "label": "PEG",
+          "value": 1
+        },
+        {
+          "id": "feg",
+          "label": "FEG",
+          "value": 2
+        },
+        {
+          "id": "lfo1",
+          "label": "LFO1",
+          "value": 3
+        },
+        {
+          "id": "lfo2",
+          "label": "LFO2",
+          "value": 4
+        }
+      ],
+      "address": "10 11 12",
+      "display": {
+        "mode": "choice",
+        "shortLabel": "Sync Pitch Source"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      }
+    },
+    {
+      "id": "scene2.scSyncPitchModSwitch",
+      "name": "Sync Pitch Mod Switch (Scene 2)",
+      "group": "Oscillator",
+      "type": "choice",
+      "default": "master",
+      "choices": [
+        {
+          "id": "master",
+          "label": "Master",
+          "value": 1
+        },
+        {
+          "id": "slave",
+          "label": "Slave",
+          "value": 2
+        },
+        {
+          "id": "both",
+          "label": "Both",
+          "value": 3
+        }
+      ],
+      "address": "10 11 13",
+      "display": {
+        "mode": "choice",
+        "shortLabel": "Sync Pitch Mod Switch"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      }
+    },
+    {
+      "id": "scene2.scFmDepth",
+      "name": "FM Depth (-64..+63) (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 14",
+      "display": {
+        "mode": "number",
+        "shortLabel": "FM Depth (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scFmSource1",
+      "name": "FM Source 1 (Scene 2)",
+      "group": "Oscillator",
+      "type": "choice",
+      "default": "fixed",
+      "choices": [
+        {
+          "id": "fixed",
+          "label": "Fixed",
+          "value": 0
+        },
+        {
+          "id": "peg",
+          "label": "PEG",
+          "value": 1
+        },
+        {
+          "id": "feg",
+          "label": "FEG",
+          "value": 2
+        },
+        {
+          "id": "lfo1",
+          "label": "LFO1",
+          "value": 3
+        },
+        {
+          "id": "lfo2",
+          "label": "LFO2",
+          "value": 4
+        }
+      ],
+      "address": "10 11 15",
+      "display": {
+        "mode": "choice",
+        "shortLabel": "FM Source 1"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      }
+    },
+    {
+      "id": "scene2.scFmSource2",
+      "name": "FM Source 2 (Scene 2)",
+      "group": "Oscillator",
+      "type": "choice",
+      "default": "vco2",
+      "choices": [
+        {
+          "id": "vco2",
+          "label": "VCO2",
+          "value": 0
+        },
+        {
+          "id": "vco1",
+          "label": "VCO1",
+          "value": 1
+        },
+        {
+          "id": "vco1sub",
+          "label": "VCO1-sub",
+          "value": 2
+        },
+        {
+          "id": "peg",
+          "label": "PEG",
+          "value": 3
+        },
+        {
+          "id": "feg",
+          "label": "FEG",
+          "value": 4
+        },
+        {
+          "id": "lfo1",
+          "label": "LFO1",
+          "value": 5
+        },
+        {
+          "id": "lfo2",
+          "label": "LFO2",
+          "value": 6
+        }
+      ],
+      "address": "10 11 16",
+      "display": {
+        "mode": "choice",
+        "shortLabel": "FM Source 2"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      }
+    },
+    {
+      "id": "scene2.scVco1Wave",
+      "name": "VCO1 Wave (type-dependent set) (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 4
+      },
+      "address": "10 11 17",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Wave (type-dependent set)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco1PitchCoarse",
+      "name": "VCO1 Pitch Coarse (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 18",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Pitch Coarse"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco1PitchFine",
+      "name": "VCO1 Pitch Fine (-64..+63) (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 14,
+      "range": {
+        "min": 14,
+        "max": 114
+      },
+      "address": "10 11 19",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Pitch Fine (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco1Edge",
+      "name": "VCO1 Edge (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 1A",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Edge"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco1PulseWidth",
+      "name": "VCO1 Pulse Width (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 1B",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Pulse Width"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco1PwmDepth",
+      "name": "VCO1 PWM Depth (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 1C",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 PWM Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco1PwmSource",
+      "name": "VCO1 PWM Source (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 1D",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 PWM Source"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco1PitchModDepth",
+      "name": "VCO1 Pitch Mod Depth (-127..+127) (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 16383
+      },
+      "address": "10 11 1E",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Pitch Mod Depth (-127..+127)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u14-msb-lsb"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco2Wave",
+      "name": "VCO2 Wave (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 4
+      },
+      "address": "10 11 20",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Wave"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco2PitchCoarse",
+      "name": "VCO2 Pitch Coarse (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 21",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Pitch Coarse"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco2PitchFine",
+      "name": "VCO2 Pitch Fine (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 22",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Pitch Fine"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco2Edge",
+      "name": "VCO2 Edge (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 23",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Edge"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco2PulseWidth",
+      "name": "VCO2 Pulse Width (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 24",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Pulse Width"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco2PwmDepth",
+      "name": "VCO2 PWM Depth (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 25",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 PWM Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco2PwmSource",
+      "name": "VCO2 PWM Source (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 26",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 PWM Source"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVco2PitchModDepth",
+      "name": "VCO2 Pitch Mod Depth (-127..+127) (Scene 2)",
+      "group": "Oscillator",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 16383
+      },
+      "address": "10 11 27",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Pitch Mod Depth (-127..+127)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u14-msb-lsb"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scMixVco1",
+      "name": "Mixer VCO1 Level (Scene 2)",
+      "group": "Mixer",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 29",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Mixer VCO1 Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scMixVco2",
+      "name": "Mixer VCO2 Level (Scene 2)",
+      "group": "Mixer",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 2A",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Mixer VCO2 Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scMixRing",
+      "name": "Mixer Ring Mod Level (Scene 2)",
+      "group": "Mixer",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 2B",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Mixer Ring Mod Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scMixNoise",
+      "name": "Mixer Noise Level (Scene 2)",
+      "group": "Mixer",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 2C",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Mixer Noise Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scFegAttack",
+      "name": "Filter EG Attack Time (Scene 2)",
+      "group": "Filter EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 2D",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Filter EG Attack Time"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scFegDecay",
+      "name": "Filter EG Decay Time (Scene 2)",
+      "group": "Filter EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 2E",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Filter EG Decay Time"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scFegSustain",
+      "name": "Filter EG Sustain Level (Scene 2)",
+      "group": "Filter EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 2F",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Filter EG Sustain Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scFegRelease",
+      "name": "Filter EG Release Time (Scene 2)",
+      "group": "Filter EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 30",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Filter EG Release Time"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVcfHpfCutoff",
+      "name": "VCF HPF Cutoff Freq (Scene 2)",
+      "group": "Filter",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 31",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCF HPF Cutoff Freq"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVcfFilterType",
+      "name": "VCF Filter Type (Scene 2)",
+      "group": "Filter",
+      "type": "choice",
+      "default": "lpf24",
+      "choices": [
+        {
+          "id": "lpf24",
+          "label": "LPF -24dB",
+          "value": 0
+        },
+        {
+          "id": "lpf18",
+          "label": "LPF -18dB",
+          "value": 1
+        },
+        {
+          "id": "lpf12",
+          "label": "LPF -12dB",
+          "value": 2
+        },
+        {
+          "id": "bpf",
+          "label": "BPF",
+          "value": 3
+        },
+        {
+          "id": "hpf",
+          "label": "HPF -12dB",
+          "value": 4
+        },
+        {
+          "id": "bef",
+          "label": "BEF",
+          "value": 5
+        }
+      ],
+      "address": "10 11 32",
+      "display": {
+        "mode": "choice",
+        "shortLabel": "VCF Filter Type"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "RadioButtonGroup"
+      }
+    },
+    {
+      "id": "scene2.scVcfCutoff",
+      "name": "VCF Filter Cutoff (Scene 2)",
+      "group": "Filter",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 33",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCF Filter Cutoff"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVcfResonance",
+      "name": "VCF Filter Resonance (Scene 2)",
+      "group": "Filter",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 34",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCF Filter Resonance"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scFegDepth",
+      "name": "Filter EG Depth (-64..+63) (Scene 2)",
+      "group": "Filter EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 35",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Filter EG Depth (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scFegVelocity",
+      "name": "Filter EG Velocity Sens (-64..+63) (Scene 2)",
+      "group": "Filter EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 36",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Filter EG Velocity Sens (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVcfKbdTrack",
+      "name": "VCF Keyboard Track (-64..+63) (Scene 2)",
+      "group": "Filter",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 37",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCF Keyboard Track (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVcfFilterModDepth",
+      "name": "VCF Filter Mod Depth (Scene 2)",
+      "group": "Filter",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 38",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCF Filter Mod Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scAegAttack",
+      "name": "Amp EG Attack Time (Scene 2)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 39",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Amp EG Attack Time"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scAegDecay",
+      "name": "Amp EG Decay Time (Scene 2)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 3A",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Amp EG Decay Time"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scAegSustain",
+      "name": "Amp EG Sustain Level (Scene 2)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 3B",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Amp EG Sustain Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scAegRelease",
+      "name": "Amp EG Release Time (Scene 2)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 3C",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Amp EG Release Time"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVcaVolume",
+      "name": "VCA Volume (Scene 2)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 3D",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCA Volume"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scAegVelocity",
+      "name": "Amp EG Velocity Sens (-64..+63) (Scene 2)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 3E",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Amp EG Velocity Sens (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVcaFeedback",
+      "name": "VCA Feedback Level (-64..+63) (Scene 2)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 3F",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCA Feedback Level (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVcaAmpModDepth",
+      "name": "VCA Amp Mod Depth (-64..+63) (Scene 2)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 40",
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCA Amp Mod Depth (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scVariDryWet",
+      "name": "Variation Dry:Wet (D63>W..D<W63) (Scene 2)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 1,
+      "range": {
+        "min": 1,
+        "max": 127
+      },
+      "address": "10 11 41",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Variation Dry:Wet (D63>W..D<W63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource1",
+      "name": "Ctrl Matrix Source 1 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 44",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 1 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam1",
+      "name": "Ctrl Matrix Param 1 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 45",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 1 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth1",
+      "name": "Ctrl Matrix Depth 1 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 46",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 1 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource2",
+      "name": "Ctrl Matrix Source 2 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 47",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 2 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam2",
+      "name": "Ctrl Matrix Param 2 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 48",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 2 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth2",
+      "name": "Ctrl Matrix Depth 2 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 49",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 2 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource3",
+      "name": "Ctrl Matrix Source 3 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 4A",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 3 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam3",
+      "name": "Ctrl Matrix Param 3 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 4B",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 3 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth3",
+      "name": "Ctrl Matrix Depth 3 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 4C",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 3 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource4",
+      "name": "Ctrl Matrix Source 4 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 4D",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 4 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam4",
+      "name": "Ctrl Matrix Param 4 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 4E",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 4 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth4",
+      "name": "Ctrl Matrix Depth 4 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 4F",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 4 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource5",
+      "name": "Ctrl Matrix Source 5 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 50",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 5 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam5",
+      "name": "Ctrl Matrix Param 5 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 51",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 5 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth5",
+      "name": "Ctrl Matrix Depth 5 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 52",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 5 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource6",
+      "name": "Ctrl Matrix Source 6 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 53",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 6 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam6",
+      "name": "Ctrl Matrix Param 6 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 54",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 6 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth6",
+      "name": "Ctrl Matrix Depth 6 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 55",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 6 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource7",
+      "name": "Ctrl Matrix Source 7 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 56",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 7 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam7",
+      "name": "Ctrl Matrix Param 7 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 57",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 7 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth7",
+      "name": "Ctrl Matrix Depth 7 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 58",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 7 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource8",
+      "name": "Ctrl Matrix Source 8 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 59",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 8 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam8",
+      "name": "Ctrl Matrix Param 8 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 5A",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 8 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth8",
+      "name": "Ctrl Matrix Depth 8 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 5B",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 8 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource9",
+      "name": "Ctrl Matrix Source 9 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 5C",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 9 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam9",
+      "name": "Ctrl Matrix Param 9 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 5D",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 9 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth9",
+      "name": "Ctrl Matrix Depth 9 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 5E",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 9 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource10",
+      "name": "Ctrl Matrix Source 10 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 5F",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 10 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam10",
+      "name": "Ctrl Matrix Param 10 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 60",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 10 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth10",
+      "name": "Ctrl Matrix Depth 10 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 61",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 10 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource11",
+      "name": "Ctrl Matrix Source 11 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 62",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 11 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam11",
+      "name": "Ctrl Matrix Param 11 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 63",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 11 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth11",
+      "name": "Ctrl Matrix Depth 11 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 64",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 11 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource12",
+      "name": "Ctrl Matrix Source 12 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 65",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 12 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam12",
+      "name": "Ctrl Matrix Param 12 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 66",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 12 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth12",
+      "name": "Ctrl Matrix Depth 12 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 67",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 12 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource13",
+      "name": "Ctrl Matrix Source 13 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 68",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 13 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam13",
+      "name": "Ctrl Matrix Param 13 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 69",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 13 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth13",
+      "name": "Ctrl Matrix Depth 13 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 6A",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 13 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource14",
+      "name": "Ctrl Matrix Source 14 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 6B",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 14 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam14",
+      "name": "Ctrl Matrix Param 14 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 6C",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 14 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth14",
+      "name": "Ctrl Matrix Depth 14 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 6D",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 14 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource15",
+      "name": "Ctrl Matrix Source 15 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 6E",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 15 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam15",
+      "name": "Ctrl Matrix Param 15 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 6F",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 15 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth15",
+      "name": "Ctrl Matrix Depth 15 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 70",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 15 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmSource16",
+      "name": "Ctrl Matrix Source 16 (off..Knob8) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 114
+      },
+      "address": "10 11 71",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Source 16 (off..Knob8)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmParam16",
+      "name": "Ctrl Matrix Param 16 (off..Vari Dry:Wet) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 36
+      },
+      "address": "10 11 72",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Param 16 (off..Vari Dry:Wet)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene2.scCmDepth16",
+      "name": "Ctrl Matrix Depth 16 (-64..+63) (Scene 2)",
+      "group": "Mod Matrix",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "address": "10 11 73",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ctrl Matrix Depth 16 (-64..+63)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
     }
   ],
   "messageRecipes": [

@@ -94,9 +94,15 @@ export function buildDumpDefinitions(resolved) {
 }
 
 function legacyParam(p) {
+  // Instance 0 keeps its flat id — every existing panel and test binds `scMixVco1`, not
+  // `scene1.scMixVco1`. Later instances keep the resolved prefix, which is what makes them distinct
+  // ids at all; their names carry the instance too, because "Mixer VCO1 Level" twice in a parameter
+  // list answers no question anyone is asking.
+  const instanced = p.instance > 0;
   const out = {
-    id: flat(p.resolvedId),
-    name: p.name, group: p.group,
+    id: instanced ? p.resolvedId : flat(p.resolvedId),
+    name: instanced ? `${p.name} (${cap(p.scope)} ${p.instance + 1})` : p.name,
+    group: p.group,
     type: p.valueType === 'enum' ? 'choice' : 'integer',
   };
   if (p.valueType === 'enum') {
@@ -160,7 +166,12 @@ function shapeToRecipe(shape, resolved) {
 // resolveProfile (Node) / resolveModel (browser). `legacyId` defaults to `<id>-dpd`. When
 // `embedDpdModel` is given, the new-schema model is stamped in so the Designer can reload the edit.
 export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, log } = {}) {
-  const params = resolveParams(resolved).filter((p) => p.instance === 0); // tone 1 + global
+  // Every instance, not just the first. The scope machinery resolves them all — the AN1x's scene
+  // scope declares two instances a stride apart, the GAIA's tone scope three — and this line used
+  // to throw everything past instance 0 away. The AN1x is the instrument that makes that a lie a
+  // user meets: its whole voice is TWO scenes morphed against each other, so a profile with one
+  // scene can edit only half of any patch.
+  const params = resolveParams(resolved);
 
   // Sysex recipes from the manufacturer's message shapes, then one CC recipe per distinct controller.
   const messageRecipes = (resolved.messageShapes ?? []).map((s) => shapeToRecipe(s, resolved));

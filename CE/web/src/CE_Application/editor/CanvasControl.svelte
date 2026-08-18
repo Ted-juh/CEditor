@@ -1952,7 +1952,16 @@
     return { left, top, width: glyphWidth, height: glyphHeight };
   });
   let textUnrotatedOrigin = $derived.by(() => {
-    const width = Math.max(0, domTextGlyphSize.width);
+    // The DOM measurement, but never zero. This origin subtracts half the block's width from the
+    // centre, so a width of 0 puts the block's LEFT edge at the centre — and until the measuring
+    // effect has committed (or wherever it never does), that is exactly what happened: every
+    // centred label started at its box's midpoint and ran off the right edge, so "CATEGORY"
+    // rendered as "CATEG" and "LEVEL" as "LEV", cut mid-glyph. The layout engine has already
+    // measured the same lines itself — its lineBoxWidth is the width the span is styled to — so an
+    // unanswered DOM measurement falls back to that instead of to nothing.
+    const width = Math.max(0, domTextGlyphSize.width)
+      || Math.max(0, blockTextLayout.lineBoxWidth || 0)
+      || Math.max(0, textLayoutBounds.width || 0);
     const height = Math.max(0, domTextGlyphSize.height || numberOr(textFont?.size, 12));
     return {
       left: textAxisCenter.x - (width / 2),
