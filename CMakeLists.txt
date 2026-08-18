@@ -421,6 +421,21 @@ target_include_directories(CEditorCtrl49MultiSynthTests PRIVATE "${CE_ROOT}/src"
 target_link_libraries(CEditorCtrl49MultiSynthTests PRIVATE juce::juce_core)
 add_test(NAME Ctrl49MultiSynth COMMAND CEditorCtrl49MultiSynthTests)
 
+# CTRL49 preset bank: loads the sample bank, verifies patch -> Bank Select + Program Change
+# bytes across banks. No hardware.
+add_executable(CEditorCtrl49PresetBankTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49PresetBank.cpp"
+    "${CE_ROOT}/tests/Ctrl49PresetBankTests.cpp"
+)
+target_compile_features(CEditorCtrl49PresetBankTests PRIVATE cxx_std_23)
+target_compile_definitions(CEditorCtrl49PresetBankTests PRIVATE
+    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+target_include_directories(CEditorCtrl49PresetBankTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorCtrl49PresetBankTests PRIVATE juce::juce_core)
+add_test(NAME Ctrl49PresetBank COMMAND CEditorCtrl49PresetBankTests)
+
 # CTRL49 bare bridge demonstrator (Phase 2 end state). Windows-only transports; the
 # executable itself compiles everywhere (guarded), but the WinMM/KSPROPERTY backends are
 # only added on Windows. Not a test — build and run against real hardware.
@@ -481,6 +496,19 @@ if(WIN32)
     target_compile_features(Ctrl49MultiTest PRIVATE cxx_std_23)
     target_include_directories(Ctrl49MultiTest PRIVATE "${CE_ROOT}/src")
     target_link_libraries(Ctrl49MultiTest PRIVATE winmm juce::juce_core)
+
+    # CTRL49 preset browser (Phase 7): patch-list page + data-dial navigation + load on press.
+    add_executable(Ctrl49PresetTest
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PresetBank.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PresetTest.cpp"
+    )
+    target_compile_features(Ctrl49PresetTest PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49PresetTest PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49PresetTest PRIVATE winmm juce::juce_core)
 endif()
 
 # --- Panel scripting runtime (Milestone 1): Lua (Sol3) + JavaScript (juce_javascript) ----------

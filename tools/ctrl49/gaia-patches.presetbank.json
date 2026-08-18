@@ -1,0 +1,19 @@
+{
+  "name": "GAIA PATCHES",
+  "port": "SH-01",
+  "channel": 1,
+  "patches": [
+    { "name": "INIT SAW",      "bankMsb": 0, "bankLsb": 0, "program": 0 },
+    { "name": "FAT BASS",      "bankMsb": 0, "bankLsb": 0, "program": 1 },
+    { "name": "SUPER SAW LEAD", "bankMsb": 0, "bankLsb": 0, "program": 2 },
+    { "name": "SOFT PAD",      "bankMsb": 0, "bankLsb": 0, "program": 3 },
+    { "name": "PLUCK KEYS",    "bankMsb": 0, "bankLsb": 0, "program": 4 },
+    { "name": "ACID SEQ",      "bankMsb": 0, "bankLsb": 0, "program": 5 },
+    { "name": "BRASS STAB",    "bankMsb": 0, "bankLsb": 0, "program": 6 },
+    { "name": "SYNC LEAD",     "bankMsb": 0, "bankLsb": 0, "program": 7 },
+    { "name": "WARM STRINGS",  "bankMsb": 0, "bankLsb": 0, "program": 8 },
+    { "name": "DEEP SUB",      "bankMsb": 0, "bankLsb": 0, "program": 9 },
+    { "name": "USER 001",      "bankMsb": 0, "bankLsb": 1, "program": 0 },
+    { "name": "USER 002",      "bankMsb": 0, "bankLsb": 1, "program": 1 }
+  ]
+}

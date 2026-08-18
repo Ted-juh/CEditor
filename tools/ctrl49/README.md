@@ -103,9 +103,29 @@ The `<fallback-port>` is used for any page without its own `port`. Locked by the
 same encoder value 64 compiles to GAIA bytes (`…41 12 10 00 01 0C 40 23…`) on page 1 and SH-201
 bytes (`…16 12 10 00 01 13 40 1C…`) on page 2 — different model ids, addresses, device ids.
 
-Preset browsing (read patch names via SysEx dump, scroll on the data dial, load on press) is
-the remaining piece; it is bounded by per-profile preset/dump data (SH-201 and AN1x carry dump
-definitions and patch-name params; the filter-only GAIA profile does not).
+## Preset browser
+
+`Ctrl49PresetTest` uploads a list page (`CEditor_PresetList.lua`) showing a **preset bank** —
+a named list of patches with their Bank Select / Program Change addresses
+(`gaia-patches.presetbank.json`). The data dial (and cursor up/down, Page L/R) scroll the
+selection; pressing the data dial loads the patch on the synth's MIDI port.
+
+```bash
+tools/ctrl49/Start_CTRL49_Preset_Test.cmd            # prompts for a port override
+# or:
+Ctrl49PresetTest.exe gaia-patches.presetbank.json CEditor_PresetList.lua [synth-port]
+```
+
+The bank is authored JSON, so it works for any synth regardless of whether patch names can
+be read over SysEx. `buildPresetSelect` (Bank Select MSB/LSB + Program Change) and the
+`PresetBrowser` index math are covered by the `Ctrl49Preset` ctest; the bank loader and its
+patch->bytes mapping by `Ctrl49PresetBank`.
+
+Follow-up: auto-populating a bank from the synth (reading patch NAMES via SysEx dump request
++ parse) where the profile supports it — SH-201 and AN1x carry `dumpDefinitions` and
+`patch.nameCharNN` params; the filter-only GAIA profile does not. And a wasmoon preview of
+the list page in the Screen Builder (the device path is proven; VIP's own scripts use the
+same `args:sub` + `get_byte` list pattern).
 
 ## Still requires hardware (open Phase-3 measurements)
 
