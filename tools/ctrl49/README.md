@@ -1,8 +1,32 @@
-# CTRL49 control-surface tools (Phase 3)
+# CTRL49 control-surface tools
 
-Probe tooling and beauty-test assets for the CTRL49 screen integration. Design record:
+Probe tooling and assets for the CTRL49 screen integration. Design record:
 [`tools/docs/screen-builder-design.md`](../docs/screen-builder-design.md). Byte-level
 protocol ground truth is the external reverse-engineering handoff.
+
+## The product exe: Ctrl49Bridge (start here)
+
+**`build/native/Debug/Ctrl49Bridge.exe`** is the self-contained bridge — every asset (Lua
+pages, filmstrip, default GAIA assignment, preset bank, GAIA profile) is embedded in the
+binary. No arguments, no files beside it, no CMD wrappers. Double-click it:
+
+- **Default (knobs)**: eight filmstrip knobs bound to GAIA filter/amp parameters, two pages
+  (Page Left/Right). If the synth port isn't found it lists ports and asks.
+- **`--presets`**: the patch browser — data dial scrolls, dial-press loads the patch.
+- **`--selftest`**: verifies embedded assets and that every default binding compiles
+  (registered in ctest as `Ctrl49BridgeSelfTest`).
+- Optional overrides: `Ctrl49Bridge.exe my-rig.assignment.json "PORT NAME"` or
+  `Ctrl49Bridge.exe --presets my-bank.presetbank.json "PORT NAME"`.
+
+Connect the CTRL49, close VIP / your DAW, run. Ctrl+C (or closing the window) stops
+cleanly; the keyboard's watchdog restores its normal screen. When double-clicked, the
+window pauses before closing so messages stay readable.
+
+The per-phase `Ctrl49*Test.exe` tools and their `Start_*.cmd` launchers below remain as
+development harnesses for testing one layer in isolation; the bridge is what you actually
+run.
+
+---
 
 These are **Phase-3 probes**, not the production path. In the shipped feature, filmstrips
 are generated from CEditor's own renderer at bundle-compile time; this standalone Python

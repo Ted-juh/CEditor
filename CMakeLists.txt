@@ -497,6 +497,43 @@ if(WIN32)
     target_include_directories(Ctrl49MultiTest PRIVATE "${CE_ROOT}/src")
     target_link_libraries(Ctrl49MultiTest PRIVATE winmm juce::juce_core)
 
+    # CTRL49 Bridge — the self-contained product exe: knobs mode (default) + --presets, all
+    # assets (Lua pages, filmstrip, default assignment/bank, GAIA profile) embedded at build
+    # time by tools/ctrl49/embed_assets.cmake. No files needed beside the exe.
+    set(CTRL49_EMBED_OUT "${CMAKE_BINARY_DIR}/generated/Ctrl49EmbeddedAssets.cpp")
+    add_custom_command(
+        OUTPUT "${CTRL49_EMBED_OUT}"
+        COMMAND ${CMAKE_COMMAND}
+            -DROOT=${CMAKE_SOURCE_DIR}
+            -DOUT=${CTRL49_EMBED_OUT}
+            -P ${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake
+        DEPENDS
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake"
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_MultiKnob.lua"
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_PresetList.lua"
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/bridge-default.assignment.json"
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/gaia-patches.presetbank.json"
+            "${CMAKE_SOURCE_DIR}/CE/profiles/test/roland-gaia.ceditor-device.json"
+        COMMENT "Embedding CTRL49 bridge assets"
+    )
+    add_executable(Ctrl49Bridge
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Assignment.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PresetBank.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Bridge.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+        "${CTRL49_EMBED_OUT}"
+    )
+    target_compile_features(Ctrl49Bridge PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49Bridge PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49Bridge PRIVATE winmm juce::juce_core)
+    add_test(NAME Ctrl49BridgeSelfTest COMMAND Ctrl49Bridge --selftest)
+
     # CTRL49 preset browser (Phase 7): patch-list page + data-dial navigation + load on press.
     add_executable(Ctrl49PresetTest
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
