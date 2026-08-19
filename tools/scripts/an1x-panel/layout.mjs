@@ -316,6 +316,26 @@ export const PLAY_STRIP = {
       controls: [],
       transport: { x: 12, y: 40, w: 276, h: 70 },
     },
+    {
+      /**
+       * Selecting a sound, which no profile in this app could express.
+       *
+       * The engine compiles cc, nrpn and sysex and nothing else, so "select this voice" is not a
+       * thing a device profile can say. These are RAW bindings — sent as bytes rather than
+       * compiled — so they reach the instrument without the engine having to learn a message kind.
+       *
+       * Bank Select is CC 0 and CC 32 and Program Change is its own message, deliberately three
+       * separate controls rather than one clever one: what a bank number MEANS is per-instrument,
+       * and this panel would rather send exactly what you dial than guess a mapping.
+       */
+      title: 'VOICE', tint: TINT.ctrl, x: 1810, y: 0, w: 300, h: 178,
+      controls: [],
+      raw: [
+        { kind: 'knob', x: 16, y: 34, label: 'BANK MSB', message: 'cc', controller: 0, max: 127 },
+        { kind: 'knob', x: 104, y: 34, label: 'BANK LSB', message: 'cc', controller: 32, max: 127 },
+        { kind: 'knob', x: 200, y: 34, label: 'PROGRAM', message: 'programChange', max: 127 },
+      ],
+    },
   ],
 };
 

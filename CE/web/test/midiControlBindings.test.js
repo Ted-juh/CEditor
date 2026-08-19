@@ -334,3 +334,36 @@ test('the label reads the way a synth manual writes it', () => {
   assert.equal(midiControlLabel(nrpn({ channel: 3 })), 'NRPN 1:32 · ch 3');
   assert.equal(midiControlLabel({ kind: 'deviceParameter' }), '');
 });
+
+test('a program change selects a sound, in two bytes', () => {
+  // The gap that made "I can't select presets" true of every profile in the app: the engine's
+  // recipe vocabulary is cc, nrpn and sysex, so no profile can express "select this voice" at all.
+  // A raw binding is sent as bytes rather than compiled, so it does not have to.
+  const pc = (over = {}) => midiControlMessage({ ...midiControlBindingFrom({ message: 'programChange' }), ...over }, 0);
+  assert.equal(midiControlMessage(midiControlBindingFrom({ message: 'programChange', deviceRole: 'x' }), 7), 'C0 07');
+  assert.equal(pc({ channel: 16 }), 'CF 00', 'channel 16 is status CF');
+  assert.equal(pc({ channel: 0 }), 'C0 00', 'channel 0 means any, and sends on 1');
+});
+
+test('a program change carries no third byte', () => {
+  // Cn pp is a two-byte message. A trailing data byte would be read by the synth as the start of
+  // the next message and desynchronise everything after it.
+  const message = midiControlMessage(midiControlBindingFrom({ message: 'programChange' }), 42);
+  assert.equal(message.split(/\s+/).length, 2, message);
+  assert.equal(message, 'C0 2A');
+});
+
+test('a program number is clamped to a data byte', () => {
+  const send = (n) => midiControlMessage(midiControlBindingFrom({ message: 'programChange' }), n);
+  assert.equal(send(127), 'C0 7F');
+  assert.equal(send(200), 'C0 7F', 'above the range clamps rather than wrapping into another message');
+  assert.equal(send(-5), 'C0 00');
+});
+
+test('a program change is not offered as something to learn', () => {
+  // A program change arriving from a keyboard is that keyboard changing sound, not somebody
+  // offering a control to bind. Chips that offered it would be noise on every patch change.
+  const spec = MIDI_CONTROL_MESSAGES.find((m) => m.id === 'programChange');
+  assert.equal(spec.sends, true);
+  assert.equal(spec.learnable, false);
+});

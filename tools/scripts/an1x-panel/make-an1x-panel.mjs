@@ -22,6 +22,7 @@ import { SECTION_DEFAULTS } from '../../../CE/web/src/CE_Application/models/sect
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
 import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from '../gaia-panel/components.mjs';
+import { midiControlBindingFrom } from '../../../CE/web/src/CE_Application/utils/midiControlBindings.js';
 import { COMMON_STRIP, EFFECT_STRIP, PANEL_WIDTH, PATTERN_STRIP, PLAY_STRIP, SCENE_STRIP, SKIN, TINT } from './layout.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -380,6 +381,33 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
       controls.push(placeStatic(createControl('Transport', {
         Transport: { bpm: 120, clockOut: true },
       }), 'play_transport', { x: originX + box.x + t.x, y: originY + box.y + CONTENT_TOP + t.y, w: t.w, h: t.h }));
+    }
+
+    // Raw MIDI bindings: a message rather than a profile parameter. The only way to select a voice,
+    // because the engine's recipe vocabulary has no program change in it.
+    for (const spec of box.raw ?? []) {
+      const at = { x: originX + box.x + spec.x, y: originY + box.y + CONTENT_TOP + spec.y };
+      const control = createControl('CustomComponent', {});
+      const built = gaiaKnob({ size: SKIN.knob });
+      built._children.Core.id = nextId(`raw_${spec.label}`);
+      built._children.Core.name = spec.label;
+      Object.assign(built._children.Transform, { x: at.x, y: at.y, width: SKIN.knob, height: SKIN.knob });
+      const channel = built._children.ValueChannels?._children?.value;
+      if (channel) Object.assign(channel, { min: 0, max: spec.max ?? 127, step: 1, type: 'int', defaultValue: 0 });
+      built._children.DeviceBindings = {
+        _type: 'DeviceBindings',
+        enabled: true,
+        debug: false,
+        bindings: [midiControlBindingFrom({
+          message: spec.message,
+          controller: spec.controller,
+          port: 'value',
+          deviceRole: DEVICE_NAME,
+        })],
+      };
+      controls.push(built);
+      controls.push(label(spec.label, { x: at.x - 14, y: at.y + SKIN.knob + 5, w: SKIN.knob + 28, h: 16 }, { size: 9, colour: SKIN.label }));
+      void control;
     }
 
     if (box.matrix) {

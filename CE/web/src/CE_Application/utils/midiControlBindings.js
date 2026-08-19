@@ -64,6 +64,13 @@ export const MIDI_CONTROL_MESSAGES = [
   { id: 'bend', label: 'Pitch bend', eventKind: 'bend', sends: false, learnable: false },
   { id: 'nrpn', label: 'NRPN', eventKind: 'nrpn', sends: true, learnable: true, numbered: true },
   { id: 'rpn', label: 'RPN', eventKind: 'rpn', sends: true, learnable: true, numbered: true },
+  // Program Change, which is how nearly every synth ever made selects a sound. It is not in the
+  // engine's recipe vocabulary — DeviceProfileEngine compiles cc, nrpn and sysex and nothing else —
+  // so a profile cannot express "select this voice" at all. It does not need to: a raw binding is
+  // sent as bytes rather than compiled, so this reaches the instrument without the engine having to
+  // learn a new message kind. Not learnable, because a program change arriving from a keyboard is
+  // that keyboard changing sound, not somebody offering a control to bind.
+  { id: 'programChange', label: 'Program change', eventKind: 'programChange', sends: true, learnable: false },
 ];
 
 /**
@@ -162,6 +169,14 @@ export function midiControlMessage(binding, value) {
 
   if (spec.id === 'aftertouch') {
     return `${byte(0xd0 + channel - 1)} ${byte(Math.min(127, Math.max(0, number)))}`;   // one data byte
+  }
+
+  // Cn pp — two bytes, no data byte after the program number. Bank Select is deliberately not folded
+  // in here: it is CC 0 and CC 32, which the cc kind already sends, and a bank pair baked silently
+  // into every program change is a message the user did not ask for going to a synth that may not
+  // want it.
+  if (spec.id === 'programChange') {
+    return `${byte(0xc0 + channel - 1)} ${byte(Math.min(127, Math.max(0, number)))}`;
   }
 
   // Four CCs, in the order DeviceProfileEngine.cpp's recipe builder emits them, with the selector

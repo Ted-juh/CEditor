@@ -5353,8 +5353,16 @@
         [channelName]: nextValue,
       },
       customNormalizedValue: normalizeCustomChannelValue(channel, nextValue),
-      valueOverrideEnabled: channelName === 'mainValue',
-      valueOverride: channelName === 'mainValue' ? nextValue : sessionFor(control)?.valueOverride,
+      // Whatever the main channel is CALLED. customMainChannelName, three lines up, resolves it —
+      // `mainValue` when the component has one, otherwise its first channel — and this used to
+      // throw that answer away to compare against the literal string instead. A component whose
+      // channel is named `value`, which is what createValueChannel('value') and every generated
+      // GAIA/AN1x knob, fader and LED column produce, then published no value into the patch at
+      // all, so emitDeviceBindingsForPatch found undefined and sent nothing. Both panels' native
+      // controls sent and every drawn one was silent, which reads as "the panel isn't wired" and
+      // was one magic string.
+      valueOverrideEnabled: !!channelName,
+      valueOverride: channelName ? nextValue : sessionFor(control)?.valueOverride,
       focused: true,
       hover: true,
     });
@@ -5371,8 +5379,8 @@
         [channelName]: nextValue,
       },
       customNormalizedValue: normalizeCustomChannelValue(channel, nextValue),
-      valueOverrideEnabled: channelName === 'mainValue',
-      valueOverride: channelName === 'mainValue' ? nextValue : sessionFor(control)?.valueOverride,
+      valueOverrideEnabled: !!channelName,
+      valueOverride: channelName ? nextValue : sessionFor(control)?.valueOverride,
       focused: true,
       hover: true,
     });
