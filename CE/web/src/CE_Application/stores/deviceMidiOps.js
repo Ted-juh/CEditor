@@ -39,10 +39,26 @@ import { queueContinuousParameterSend } from './deviceMidiRuntime.js';
 import { initDeviceProfileBridge, normalizeSyncDirection, refreshProfileParameters } from './deviceProfileSession.js';
 import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
 
+/**
+ * Is this a profile the engine has?
+ *
+ * An EMPTY catalog means "nobody has asked yet", not "the profile is missing" — and reading it the
+ * second way refused every send in the app with "Not sent: unresolved profile for <role>". The
+ * catalog is only populated by listDeviceProfiles, which until now was called by the settings page
+ * and nothing else, so opening a panel and moving a control without visiting Settings first meant
+ * every knob on it was silently declined. projectDeviceSession.js's own profileExists already
+ * treats an empty catalog as "cannot say"; these two now agree.
+ *
+ * Being wrong the tolerant way costs a message the engine then refuses with a better error, since
+ * it is the one that actually knows which profiles it loaded. Being wrong the strict way costs the
+ * whole panel, silently.
+ */
 function profileExists(profileId) {
   const id = String(profileId ?? '');
   if (!id) return false;
-  return get(deviceProfiles).some((profile) => String(profile?.id ?? '') === id);
+  const catalog = get(deviceProfiles);
+  if (!Array.isArray(catalog) || catalog.length === 0) return true;
+  return catalog.some((profile) => String(profile?.id ?? '') === id);
 }
 
 function knownParameterMap(profileId) {

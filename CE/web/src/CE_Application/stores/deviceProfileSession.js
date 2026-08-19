@@ -773,6 +773,14 @@ export function initDeviceProfileBridge() {
   for (const mapping of Object.values(get(deviceRoleMappings) ?? {})) {
     if (mapping) setDeviceRoleMapping(mapping);
   }
+
+  // And ask for the profile catalog, which nothing did outside the settings page. The listener for
+  // the reply is registered above — this file's own header records the identical bug for the port
+  // list, "registers the LISTENER for the port-list reply; it never asks for the list", and the
+  // profile catalog had it too. Every send checks that catalog before compiling, so opening a panel
+  // without visiting Settings first meant every control on it was refused with "Not sent:
+  // unresolved profile for <role>".
+  listDeviceProfiles();
 }
 
 export function refreshProfileParameters(profileId, deviceRole = DEFAULT_DEVICE_ROLE, options = {}) {
