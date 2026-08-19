@@ -135,3 +135,70 @@ test('an RQ1 template carries the checksum the synth will expect', () => {
     assert.equal(bytes[15], roland(body), `${request.id}: wrong checksum`);
   }
 });
+
+/**
+ * Identity codes, checked against what the instruments actually answered.
+ *
+ * Every other assertion here reads a profile and agrees with it. These read a capture — the bytes a
+ * real synth put on the wire — and check the profile against that, which is the only direction that
+ * can catch an authored guess.
+ *
+ * It caught one. The AN1x's library entry declared family "02 1A"; the instrument answers family
+ * 00 41 with member 1A 02, so the authored value was the MEMBER code, in the wrong field, with its
+ * two bytes swapped. Test reported "Wrong instrument" at a correctly wired AN1x, and every part of
+ * the chain except the number was right.
+ */
+const IDENTITY_CAPTURES = [
+  {
+    profile: 'yamaha-an1x-dpd',
+    instrument: 'Yamaha AN1x',
+    reply: 'F0 7E 7F 06 02 43 00 41 1A 02 00 00 00 7E F7',
+  },
+  {
+    profile: 'roland-gaia-sh01',
+    instrument: 'Roland GAIA SH-01',
+    reply: 'F0 7E 10 06 02 41 41 02 00 00 00 03 00 01 F7',
+  },
+];
+
+/** The engine's own reading of an Identity Reply — DeviceProfileEngine::matchIdentityReply. */
+function readIdentityReply(hex) {
+  const bytes = hex.trim().split(/\s+/).map((h) => parseInt(h, 16));
+  const manufacturerLength = bytes[5] === 0x00 ? 3 : 1;      // 00 introduces a three-byte id
+  const family = 5 + manufacturerLength;
+  const member = family + 2;
+  const slice = (start, count) => bytes.slice(start, start + count)
+    .map((b) => b.toString(16).toUpperCase().padStart(2, '0'));
+
+  return {
+    manufacturerId: slice(5, manufacturerLength),
+    familyCode: slice(family, 2),
+    modelNumber: slice(member, 2),
+  };
+}
+
+for (const capture of IDENTITY_CAPTURES) {
+  test(`${capture.instrument} answers what its profile expects`, () => {
+    const profile = JSON.parse(readText(`${DIRECTORY}${capture.profile}.ceditor-device.json`));
+    const actual = readIdentityReply(capture.reply);
+    const declared = profile.identity ?? {};
+
+    // Only what the profile declares is compared — the engine ignores the rest, and a profile is
+    // allowed to identify an instrument by manufacturer and family alone.
+    for (const field of ['manufacturerId', 'familyCode', 'modelNumber']) {
+      if (!declared[field]) continue;
+      assert.deepEqual(declared[field], actual[field],
+        `${capture.instrument} sent ${actual[field].join(' ')} as ${field}, the profile expects ${declared[field].join(' ')}`);
+    }
+  });
+}
+
+test('a capture is a reply, not a request', () => {
+  // Guard for the table above: 06 02 is the reply, 06 01 the inquiry. Pasting the outgoing message
+  // by mistake would make every assertion above read the wrong bytes and still pass some of them.
+  for (const capture of IDENTITY_CAPTURES) {
+    const bytes = capture.reply.trim().split(/\s+/).map((h) => parseInt(h, 16));
+    assert.equal(bytes[4], 0x02, `${capture.instrument}: captured message is not an identity REPLY`);
+    assert.equal(bytes.length, 15, `${capture.instrument}: an identity reply with a one-byte maker id is 15 bytes`);
+  }
+});

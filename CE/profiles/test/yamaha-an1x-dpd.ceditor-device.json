@@ -15862,8 +15862,12 @@
       "43"
     ],
     "familyCode": [
-      "02",
-      "1A"
+      "00",
+      "41"
+    ],
+    "modelNumber": [
+      "1A",
+      "02"
     ],
     "timeoutMs": 1000,
     "retries": 0

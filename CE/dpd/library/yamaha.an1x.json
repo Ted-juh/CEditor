@@ -10,7 +10,9 @@
   "deviceId": "10",
   "identity": {
     "manufacturerId": "43",
-    "family": "02 1A"
+    "family": "00 41",
+    "member": "1A 02",
+    "capturedReply": "F0 7E 7F 06 02 43 00 41 1A 02 00 00 00 7E F7"
   },
   "messageShapes": [
     {

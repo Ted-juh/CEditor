@@ -181,8 +181,14 @@ section('legacy emit — device-agnostic');
     const an1x = buildLegacyProfile(resolveProfile('yamaha.an1x'), { legacyId: 'yamaha-an1x-dpd' });
     ok(an1x.identity !== undefined, 'AN1x identity emitted from schema keys');
     eq(JSON.stringify(an1x.identity.manufacturerId), JSON.stringify(['43']), 'AN1x manufacturer 43');
-    eq(JSON.stringify(an1x.identity.familyCode), JSON.stringify(['02', '1A']), 'AN1x family from identity.family');
-    ok(an1x.identity.modelNumber === undefined, 'no member captured -> none declared');
+    // From the instrument, not from the library: a real AN1x answered
+    //     F0 7E 7F 06 02 43 00 41 1A 02 00 00 00 7E F7
+    // which is manufacturer 43, family 00 41, member 1A 02, version 00 00 00 7E. The library had
+    // said family "02 1A" — the MEMBER code, in the wrong field and with its two bytes swapped —
+    // so Test reported "Wrong instrument" at a correctly wired AN1x. Authored codes are a guess
+    // until something answers; these are the answer.
+    eq(JSON.stringify(an1x.identity.familyCode), JSON.stringify(['00', '41']), 'AN1x family as the instrument reports it');
+    eq(JSON.stringify(an1x.identity.modelNumber), JSON.stringify(['1A', '02']), 'AN1x member as the instrument reports it');
     ok(an1x.identity.revision === undefined, 'firmware selects a variant; identity never pins it');
     // The inquiry must be broadcast. $deviceId is the manufacturer's own addressing byte — for
     // Yamaha the composite `1n` of a Parameter Change, 0x10 meaning "device 1" — and putting it in
