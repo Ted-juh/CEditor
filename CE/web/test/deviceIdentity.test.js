@@ -18,7 +18,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { describeIdentity, identityEventMatches, identityOutcome } from '../src/CE_Application/utils/deviceIdentity.js';
+import { describeIdentity, identityEventMatches, identityOutcome, identityTestBlocker } from '../src/CE_Application/utils/deviceIdentity.js';
 
 const reply = (over = {}) => ({
   ok: true,
@@ -119,4 +119,49 @@ test('a reply answers for the device it names and no other', () => {
   assert.equal(identityEventMatches(reply(), 'Elektron Digitakt'), false);
   assert.equal(identityEventMatches(null, 'Roland GAIA SH-01'), false);
   assert.equal(identityEventMatches(reply({ deviceRole: ' Roland GAIA SH-01 ' }), 'Roland GAIA SH-01'), true);
+});
+
+test('Test refuses to ask when nothing can leave the app', () => {
+  // Found on hardware. The card was left on Preview Only, so the engine compiled the inquiry and
+  // then declined to send it — "Not sent: MIDI destination is preview-only" — into the MIDI monitor,
+  // on another tab. The card said "Asking…", then that nothing came back. Every word true, the sum
+  // misleading: it reads as a synth that stayed quiet, and it was an app that never asked.
+  const blocked = identityTestBlocker({
+    midiDestination: { type: 'previewOnly', id: 'previewOnly', name: 'Preview Only' },
+    midiInput: { type: 'hardwareInput', id: 'ctrl49', name: 'CTRL49 MIDI' },
+  });
+  assert.match(blocked, /Preview Only/);
+  assert.match(blocked, /never leaves the app/);
+});
+
+test('and when there is nothing to hear the answer on', () => {
+  // An identity reply arrives on the MIDI input or not at all, so this is four seconds of waiting
+  // for a message with nowhere to land.
+  const blocked = identityTestBlocker({
+    midiDestination: { type: 'hardwareOutput', id: 'ctrl49', name: 'CTRL49 MIDI' },
+    midiInput: { type: 'none', id: 'none', name: 'No MIDI Input' },
+  });
+  assert.match(blocked, /Listen To/);
+});
+
+test('a device wired both ways has nothing standing in the way', () => {
+  assert.equal(identityTestBlocker({
+    midiDestination: { type: 'hardwareOutput', id: 'ctrl49out', name: 'CTRL49 MIDI' },
+    midiInput: { type: 'hardwareInput', id: 'ctrl49in', name: 'CTRL49 MIDI' },
+  }), '');
+});
+
+test('an unconfigured device is blocked, not crashed', () => {
+  // The state a freshly seeded card is in — the panel named a device, nobody has chosen its ports.
+  assert.match(identityTestBlocker({}), /Preview Only/);
+  assert.match(identityTestBlocker(), /Preview Only/);
+  assert.match(identityTestBlocker(null), /Preview Only/);
+});
+
+test('the destination is judged on its type, not its name', () => {
+  // A port called "Preview Only" that is genuinely hardware must not be refused, and the reverse.
+  assert.equal(identityTestBlocker({
+    midiDestination: { type: 'hardwareOutput', id: 'x', name: 'Preview Only' },
+    midiInput: { type: 'hardwareInput', id: 'y', name: 'anything' },
+  }), '');
 });

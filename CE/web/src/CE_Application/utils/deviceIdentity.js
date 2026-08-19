@@ -101,6 +101,41 @@ export function identityOutcome({ reply = null, timedOut = false, gaveUp = false
   return { outcome: 'waiting', ok: false, detail: 'Waiting for an answer…' };
 }
 
+/**
+ * Why this Test cannot possibly work, asked before it is sent.
+ *
+ * Both of these are knowable from the card itself, and both used to be discovered the long way. A
+ * device left on Preview Only compiles its inquiry perfectly and the engine then declines to send
+ * it — "Not sent: MIDI destination is preview-only", written to the MIDI monitor, on a different
+ * tab, in a log the person pressing Test has no reason to be reading. The card meanwhile said
+ * "Asking…" and then, four seconds later, that nothing came back. Every word of that was true and
+ * the sum of it was misleading: it reads as a synth that did not answer, and it was an app that
+ * never asked.
+ *
+ * The same for a device with no input: an identity reply arrives on the MIDI input or not at all,
+ * so Test without one is four seconds of waiting for a message that has nowhere to land.
+ *
+ * Returns the sentence to show, or '' when there is nothing standing in the way. Pure, because the
+ * decision is the interesting part and it should be checkable without a synth.
+ */
+export function identityTestBlocker(mapping) {
+  // The mapping's own field names, not shorter ones invented here: a rename at this boundary reads
+  // every port as absent and refuses every Test, which is exactly what the first draft did — and it
+  // still passed the preview-only case, because "no destination" and "preview-only destination"
+  // produce the same sentence. A test that passes for the wrong reason is how this survives.
+  const destinationType = text(mapping?.midiDestination?.type) || 'previewOnly';
+  if (destinationType !== 'hardwareOutput') {
+    return 'Send To is Preview Only, so the inquiry never leaves the app. Choose the port your instrument is connected to.';
+  }
+
+  const inputType = text(mapping?.midiInput?.type) || 'none';
+  if (inputType !== 'hardwareInput') {
+    return 'Listen To is not set, so there is nothing to hear the answer on. Choose the port the instrument sends back to.';
+  }
+
+  return '';
+}
+
 /** Does this event belong to the device being tested? Every payload carries the name. */
 export function identityEventMatches(event, deviceRole) {
   if (!event) return false;

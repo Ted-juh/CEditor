@@ -332,10 +332,13 @@ function initDeviceSessionPersistence() {
       applyingPersistedDeviceSession = false;
     }
 
-    if (initialized) {
-      for (const mapping of Object.values(roleMappings)) {
-        setDeviceRoleMapping(mapping);
-      }
+    // Unconditional. This was guarded by `if (initialized)`, which is false during the very first
+    // restore — this subscription is installed from the top of initDeviceProfileBridge, before that
+    // flag is set — so the one restore that matters, the one at launch, was the one that never
+    // reached the engine. setDeviceRoleMapping is an outbound emit and no-ops without a bridge, so
+    // there is nothing for the guard to protect.
+    for (const mapping of Object.values(roleMappings)) {
+      setDeviceRoleMapping(mapping);
     }
   });
 }
@@ -753,9 +756,22 @@ export function initDeviceProfileBridge() {
     latestProfileTestResult.set(payload);
   });
 
-  const currentMainSynth = get(deviceRoleMappings)?.mainSynth;
-  if (currentMainSynth) {
-    setDeviceRoleMapping(currentMainSynth);
+  // EVERY device, not just mainSynth — and this line is why a card could show "CTRL49 MIDI" while
+  // the engine refused the send with "Not sent: MIDI destination is preview-only".
+  //
+  // The restore above pushes its mappings to C++ only `if (initialized)`, and
+  // initDeviceSessionPersistence() is called at the TOP of this function, before initialized is set.
+  // A Svelte store subscription fires synchronously with the value it already holds, so on any
+  // launch where the saved settings are present the restore runs with initialized still false, the
+  // push is skipped, and the mappings land in the JS store and nowhere else.
+  //
+  // This line was the compensation for that, and it named one device: `mainSynth`, from before there
+  // could be more than one. Every other device — every role a panel names, which is all of them now
+  // — was restored into the UI and never mentioned to the engine, which then default-constructed a
+  // mapping for the unknown role with a preview-only destination. The settings page and the thing
+  // doing the sending disagreed, and only the settings page was on screen.
+  for (const mapping of Object.values(get(deviceRoleMappings) ?? {})) {
+    if (mapping) setDeviceRoleMapping(mapping);
   }
 }
 

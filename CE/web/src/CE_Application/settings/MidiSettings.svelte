@@ -49,7 +49,7 @@
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, isJuceAvailable } from '../bridge/bridge.js';
   import { panels, updatePanel } from '../stores/panels.js';
   import { deviceRoleRows, renameRoleInPanel } from '../utils/deviceRoles.js';
-  import { identityEventMatches, identityOutcome } from '../utils/deviceIdentity.js';
+  import { identityEventMatches, identityOutcome, identityTestBlocker } from '../utils/deviceIdentity.js';
 
   let hasBackend = $state(false);
   let refreshedAt = $state(null);
@@ -162,6 +162,17 @@
 
   function test(row) {
     const correlationId = `identity_${row.role}_${Date.now()}`;
+
+    // Asked before sending, because both answers are already on this card. Sending anyway meant the
+    // engine declined it ("Not sent: MIDI destination is preview-only") into the MIDI monitor on
+    // another tab, while this card said "Asking…" and then reported nothing came back — which reads
+    // as a silent instrument and was an app that never asked.
+    const blocked = identityTestBlocker(row.mapping ?? {});
+    if (blocked) {
+      testing = { ...testing, [row.role]: { at: Date.now(), correlationId, expired: false, blocked } };
+      return;
+    }
+
     testing = { ...testing, [row.role]: { at: Date.now(), correlationId, expired: false } };
     startDeviceSync({
       correlationId,
@@ -181,6 +192,7 @@
   function outcomeFor(row) {
     const session = testing[row.role];
     if (!session) return null;
+    if (session.blocked) return identityOutcome({ error: session.blocked });
     const reply = identityEventMatches($latestDeviceIdentityReply, row.role) ? $latestDeviceIdentityReply : null;
     const timedOut = identityEventMatches($latestDeviceRequestTimedOut, row.role);
     // A sync that never sent — "Profile has no identity declaration", no output port, a compile
@@ -290,7 +302,7 @@
               type="button"
               class="remove"
               aria-label="Test device"
-              title="Ask the instrument to identify itself"
+              title={identityTestBlocker(row.mapping ?? {}) || 'Ask the instrument to identify itself'}
               onclick={() => test(row)}
             >Test</button>
             <button
