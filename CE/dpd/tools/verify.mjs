@@ -184,6 +184,11 @@ section('legacy emit — device-agnostic');
     eq(JSON.stringify(an1x.identity.familyCode), JSON.stringify(['02', '1A']), 'AN1x family from identity.family');
     ok(an1x.identity.modelNumber === undefined, 'no member captured -> none declared');
     ok(an1x.identity.revision === undefined, 'firmware selects a variant; identity never pins it');
+    // The inquiry must be broadcast. $deviceId is the manufacturer's own addressing byte — for
+    // Yamaha the composite `1n` of a Parameter Change, 0x10 meaning "device 1" — and putting it in
+    // F0 7E <id> asks for device 17 instead, which nothing answers.
+    ok(an1x.identity.requestDeviceId === undefined,
+      'no requestDeviceId: the engine broadcasts to 7F, which every device answers');
   }
   eq(JSON.stringify(gaia.messageRecipes.find((r) => r.id === 'dt1').template),
     JSON.stringify(['F0', '41', '$deviceId', '00', '00', '41', '12', '$address', '$encodedValue', '$checksum', 'F7']),

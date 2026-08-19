@@ -227,7 +227,17 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
     const member = resolved.identity?.member ?? resolved.identity?.modelNumber;
     if (family || member) {
       legacy.identity = {
-        requestDeviceId: '$deviceId',
+        // No requestDeviceId, deliberately: compileIdentityRequest defaults to 0x7F, and 0x7F is
+        // the Universal Device Inquiry's ALL CALL — every instrument answers it whatever its own
+        // device number is set to. Addressing the inquiry to one specific device is backwards for
+        // a button whose entire job is to find out what is out there before anything is configured.
+        //
+        // This emitted `requestDeviceId: '$deviceId'`, and $deviceId is NOT a universal device id.
+        // For Yamaha it is the composite `1n` byte of a Parameter Change — the AN1x's 0x10 means
+        // "substatus 1, device 1", correct in F0 43 1n and meaningless in F0 7E <id>, where it
+        // reads as "device 17". So the inquiry went out addressed to a device that was not there,
+        // the AN1x quite correctly said nothing, and Test reported no answer at someone holding a
+        // working synth on a working cable.
         manufacturerId: toBytes(resolved.identity.manufacturerId ?? resolved.manufacturerId),
         ...(family ? { familyCode: toBytes(family) } : {}),
         ...(member ? { modelNumber: toBytes(member) } : {}),

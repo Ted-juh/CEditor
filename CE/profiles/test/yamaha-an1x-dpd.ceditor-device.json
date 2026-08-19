@@ -15858,7 +15858,6 @@
     }
   ],
   "identity": {
-    "requestDeviceId": "$deviceId",
     "manufacturerId": [
       "43"
     ],

@@ -389,7 +389,11 @@ export function buildProfile() {
     }],
     variables: { deviceId, channel: 1 },
     identity: {
-      requestDeviceId: '$deviceId',
+      // No requestDeviceId: the engine then addresses the inquiry to 0x7F, the Universal Device
+      // Inquiry's ALL CALL, which every instrument answers whatever its own device number is.
+      // This said '$deviceId' (0x10) and worked only because the GAIA it was tested against
+      // happened to be set to device 17 — its reply carried 0x10 in the same byte. Any GAIA on a
+      // different device number would have gone silent, and Test would have blamed the cable.
       manufacturerId: [MODEL.manufacturer],
       familyCode: ['41', '02'],
       modelNumber: ['00', '00'],

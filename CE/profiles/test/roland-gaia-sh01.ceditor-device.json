@@ -20,7 +20,6 @@
     "channel": 1
   },
   "identity": {
-    "requestDeviceId": "$deviceId",
     "manufacturerId": [
       "41"
     ],
