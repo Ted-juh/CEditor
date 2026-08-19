@@ -2431,9 +2431,28 @@
   // checks it, so closing a panel that never played stays silent instead of
   // firing 64 messages at the rig for no reason.
   let sentAnyNote = false;
+  /**
+   * Which device the panel's notes are played to.
+   *
+   * Resolved from the panel itself, exactly as the transport's clock already was — see
+   * resolveClockDevice, whose own comment records that this used to be the literal string
+   * 'mainSynth' in six places and that a panel naming any other device had its messages dropped
+   * with no way to find out. sendNoteBytes was the seventh, and it was still there: every
+   * note-playing control — the ribbon, the chord pad, the drum pads, the arp — played to a device
+   * called `mainSynth` whatever the panel was for. On the AN1x panel, whose device is "Yamaha
+   * AN1x", that is a device nobody configured, so the note resolved no mapping and went nowhere.
+   *
+   * A panel that names exactly one device is unambiguous; one that names several needs to be asked,
+   * and until there is somewhere to ask, sending to the first of them would be a guess with a synth
+   * on the end of it. Empty means nothing is sent, which is the honest outcome.
+   */
+  let noteDeviceRole = $derived(resolveClockDevice('', countRolesInPanels([panel]).keys()));
+
   function sendNoteBytes(bytes, actionId, sourceType = '', sourceId = '') {
     if ((bytes?.[0] & 0xF0) === 0x90) sentAnyNote = true;
-    triggerRawMidiAction({ deviceRole: 'mainSynth', actionId, message: bytesToHex(bytes), dryRun: false });
+    if (noteDeviceRole) {
+      triggerRawMidiAction({ deviceRole: noteDeviceRole, actionId, message: bytesToHex(bytes), dryRun: false });
+    }
     // Every note the panel plays passes through here, which is what makes
     // "record what I just played" one tap instead of six integrations.
     const tapped = noteOutputFromBytes(bytes, sourceType, sourceId);

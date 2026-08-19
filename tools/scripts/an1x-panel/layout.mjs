@@ -281,6 +281,44 @@ export const EFFECT_STRIP = {
   ],
 };
 
+/**
+ * Something to play, because the synth is not always within reach.
+ *
+ * The GAIA panel's notes say "No keyboard: this edits a patch, and the synth has its own keys",
+ * and that reasoning holds right up until the instrument is across the room — which is where it
+ * usually is, and which is the whole reason for editing it on a screen. Worse for this instrument
+ * than for most: an AN1x's arpeggiator and step sequencer do nothing at all until a key is held, so
+ * a panel with no keys cannot demonstrate half of what it edits.
+ *
+ * These are the app's own note-playing controls, which send through the same funnel a recorder taps.
+ * The transport is here for the arpeggiator and the step sequencer: both follow MIDI clock, so
+ * starting it from the panel is what makes them run in time with anything else.
+ */
+export const PLAY_STRIP = {
+  height: 190,
+  boxes: [
+    {
+      title: 'PLAY', tint: TINT.arp, x: 0, y: 0, w: 1180, h: 178,
+      controls: [],
+      // Three octaves from C2, wide enough to hold a chord with one hand and reach the bass the
+      // arpeggiator patterns are written around.
+      ribbon: { x: 12, y: 34, w: 1156, h: 118, baseNote: 36, octaves: 3 },
+    },
+    {
+      // Chords, because holding three notes with a mouse is not possible and an arpeggiator needs
+      // held notes to arpeggiate.
+      title: 'CHORDS', tint: TINT.arp, x: 1190, y: 0, w: 300, h: 178,
+      controls: [],
+      chords: { x: 12, y: 30, w: 276, h: 132 },
+    },
+    {
+      title: 'TRANSPORT', tint: TINT.arp, x: 1500, y: 0, w: 300, h: 178,
+      controls: [],
+      transport: { x: 12, y: 40, w: 276, h: 70 },
+    },
+  ],
+};
+
 /** Arpeggiator, Free EG and the step sequencer — the bottom third of the diagram. */
 export const PATTERN_STRIP = {
   height: 260,

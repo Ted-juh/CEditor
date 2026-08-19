@@ -22,7 +22,7 @@ import { SECTION_DEFAULTS } from '../../../CE/web/src/CE_Application/models/sect
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
 import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from '../gaia-panel/components.mjs';
-import { COMMON_STRIP, EFFECT_STRIP, PANEL_WIDTH, PATTERN_STRIP, SCENE_STRIP, SKIN, TINT } from './layout.mjs';
+import { COMMON_STRIP, EFFECT_STRIP, PANEL_WIDTH, PATTERN_STRIP, PLAY_STRIP, SCENE_STRIP, SKIN, TINT } from './layout.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -356,6 +356,32 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
         'step_seq_grid', { x: originX + box.x + g.x, y: originY + box.y + CONTENT_TOP + g.y, w: g.w, h: g.h }));
     }
 
+    // The note-playing controls. They carry no DeviceBindings — they emit notes rather than drive a
+    // parameter — so they are placed rather than bound, and the preview surface addresses them to
+    // the device this panel names.
+    if (box.ribbon) {
+      const r = box.ribbon;
+      controls.push(placeStatic(createControl('NoteRibbon', {
+        NoteRibbon: { mode: 'chromatic', baseNote: r.baseNote, octaves: r.octaves, channel: 1, velocity: 100 },
+      }), 'play_ribbon', { x: originX + box.x + r.x, y: originY + box.y + CONTENT_TOP + r.y, w: r.w, h: r.h }));
+    }
+
+    if (box.chords) {
+      const c = box.chords;
+      controls.push(placeStatic(createControl('ChordPad', {
+        ChordPad: { layout: 'grid', baseOctave: 3 },
+      }), 'play_chords', { x: originX + box.x + c.x, y: originY + box.y + CONTENT_TOP + c.y, w: c.w, h: c.h }));
+    }
+
+    if (box.transport) {
+      const t = box.transport;
+      // clockOut on, because the AN1x's arpeggiator and step sequencer follow MIDI clock and this
+      // panel is the only thing here that can start one.
+      controls.push(placeStatic(createControl('Transport', {
+        Transport: { bpm: 120, clockOut: true },
+      }), 'play_transport', { x: originX + box.x + t.x, y: originY + box.y + CONTENT_TOP + t.y, w: t.w, h: t.h }));
+    }
+
     if (box.matrix) {
       const built = buildMatrix(box, byId, resolve, originX, originY);
       controls.push(...built.controls);
@@ -470,7 +496,12 @@ export function buildAn1xPanel({ slim = true } = {}) {
   const pattern = buildStrip(PATTERN_STRIP, byId, { originX: 16, originY: y });
   controls.push(...pattern.controls);
   missing.push(...pattern.missing);
-  y += PATTERN_STRIP.height;
+  y += PATTERN_STRIP.height + 8;
+
+  const play = buildStrip(PLAY_STRIP, byId, { originX: 16, originY: y });
+  controls.push(...play.controls);
+  missing.push(...play.missing);
+  y += PLAY_STRIP.height;
 
   if (missing.length) {
     throw new Error(`layout.mjs places parameters the profile does not have:\n  ${[...new Set(missing)].join('\n  ')}`);
