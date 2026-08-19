@@ -8,6 +8,22 @@
 
 namespace ceditor::device
 {
+/**
+ * Is this one of the System Real-Time bytes an instrument sends on its own, forever?
+ *
+ * Active Sensing (FE) is a keep-alive — the AN1x emits one every ~262ms from the moment it is
+ * plugged in. Timing Clock (F8) is a metronome tick, twenty-four to the beat. Neither is something
+ * the instrument DID; both arrive whether anyone touched it or not.
+ *
+ * Matched on the whole message rather than its first byte, because these are single-byte messages:
+ * a longer message that happens to begin FE is not one of them.
+ */
+static bool isMidiHousekeeping (const juce::String& hex)
+{
+    auto trimmed = hex.trim();
+    return trimmed.equalsIgnoreCase ("FE") || trimmed.equalsIgnoreCase ("F8");
+}
+
 juce::var DeviceProfileService::compileParameterMessage (const juce::var& payload, bool updateState)
 {
     auto* obj = payload.getDynamicObject();
@@ -594,6 +610,24 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
                 updateRoleSessionState (role, "linked", "Incoming SysEx did not match a dump definition");
             }
         }
+    }
+    else if (isMidiHousekeeping (hex))
+    {
+        // Proof of life, not an event. A Yamaha AN1x sends Active Sensing (FE) every ~262ms whether
+        // anything is happening or not, and a sequencer sends Timing Clock (F8) twenty-four times a
+        // beat — 48/s at 120bpm. Logging them fills the 500-entry monitor with identical lines in
+        // about two minutes, so the one message somebody is actually looking for scrolls away
+        // before they can read it, and every heavy emit then ships 500 copies of nothing across the
+        // bridge.
+        //
+        // They still count as the link being alive, which is the one thing they genuinely tell us —
+        // the session goes "linked" here exactly as it would for real traffic. What they do not get
+        // is a line in a log whose whole purpose is to show what the instrument SAID.
+        //
+        // Start/Continue/Stop (FA/FB/FC) and System Reset (FF) are deliberately not in here: those
+        // are things that happened, they arrive when someone does something, and they belong in the
+        // log like any other message.
+        updateRoleSessionState (role, "linked", "Instrument connected");
     }
     else
     {

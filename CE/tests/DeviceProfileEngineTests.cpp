@@ -450,6 +450,34 @@ int runMonitorClearTests()
     }
 
     std::cout << "[PASS] DeviceProfileService :: clearing the monitor log stays cleared\n";
+
+    // Housekeeping the instrument sends on its own is not something it said.
+    //
+    // A Yamaha AN1x emits Active Sensing every ~262ms from the moment it is plugged in. Logged, it
+    // fills the 500-entry monitor with identical FE lines in about two minutes and pushes every
+    // real message out of it — reported from a live session as being "bombarded". Timing Clock is
+    // worse: twenty-four to the beat, 48/s at 120bpm.
+    service.clearMonitorEvents();
+    for (int i = 0; i < 20; ++i) { ingest ("FE"); ingest ("F8"); }
+    if (monitorCount() != 0)
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: active sensing and clock reached the monitor log ("
+                  << monitorCount() << " event(s)) — the log fills with keep-alives and the message"
+                  << " someone is looking for scrolls away\n";
+        return 1;
+    }
+
+    // But only those two. Start/Continue/Stop and System Reset are things that happened.
+    for (const auto* hex : { "FA", "FB", "FC", "FF" })
+        ingest (hex);
+    if (monitorCount() != 4)
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: transport real-time messages were swallowed too ("
+                  << monitorCount() << " of 4 logged)\n";
+        return 1;
+    }
+
+    std::cout << "[PASS] DeviceProfileService :: keep-alives stay out of the log, transport stays in\n";
     return 0;
 }
 
