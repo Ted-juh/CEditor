@@ -210,15 +210,30 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
 
   // Device-inquiry identity is OPTIONAL — only emitted when the profile actually carries the codes
   // (a captured Identity Reply). We don't invent placeholder codes.
-  if (resolved.identity?.familyCode || resolved.identity?.modelNumber) {
-    legacy.identity = {
-      requestDeviceId: '$deviceId',
-      manufacturerId: toBytes(resolved.identity.manufacturerId ?? resolved.manufacturerId),
-      familyCode: toBytes(resolved.identity.familyCode),
-      modelNumber: toBytes(resolved.identity.modelNumber),
-      revision: toBytes(resolved.identity.revision),
-      timeoutMs: 1000, retries: 0,
-    };
+  //
+  // The schema's key names are `family` and `member` (dpd.schema.json, identity), and this used to
+  // look only for the legacy engine's names, `familyCode` and `modelNumber` — which no
+  // schema-conformant profile can contain. So a profile whose family code WAS captured (the AN1x
+  // has carried "02 1A" all along) emitted no identity, and its Test button answered "Could not
+  // ask, profile has no identity declaration" at the person holding the actual instrument. Same
+  // boundary disease as `nibbles` emitted under `bytes`: right data, wrong key, silent nothing.
+  //
+  // The engine compares only the fields that are declared, so manufacturer + family alone is a
+  // legal identity that matches on what it names and reports the rest. No revision is emitted even
+  // when the schema's `firmware` is present: firmware selects a VARIANT, and pinning it in the
+  // identity made a genuine GAIA report "Wrong instrument" after a firmware update.
+  {
+    const family = resolved.identity?.family ?? resolved.identity?.familyCode;
+    const member = resolved.identity?.member ?? resolved.identity?.modelNumber;
+    if (family || member) {
+      legacy.identity = {
+        requestDeviceId: '$deviceId',
+        manufacturerId: toBytes(resolved.identity.manufacturerId ?? resolved.manufacturerId),
+        ...(family ? { familyCode: toBytes(family) } : {}),
+        ...(member ? { modelNumber: toBytes(member) } : {}),
+        timeoutMs: 1000, retries: 0,
+      };
+    }
   }
 
   // Bulk dumps -> legacy dumpDefinitions (get-patch / send-patch). Notes flag any C++ engine gaps.

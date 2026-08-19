@@ -15857,6 +15857,18 @@
       "value": "$encodedValue"
     }
   ],
+  "identity": {
+    "requestDeviceId": "$deviceId",
+    "manufacturerId": [
+      "43"
+    ],
+    "familyCode": [
+      "02",
+      "1A"
+    ],
+    "timeoutMs": 1000,
+    "retries": 0
+  },
   "dumpDefinitions": [
     {
       "id": "system",

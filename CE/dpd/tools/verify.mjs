@@ -173,6 +173,18 @@ section('legacy emit — device-agnostic');
   eq(gaia.manufacturer, 'Roland', 'GAIA manufacturer derived from inherits');
   eq(gaia.family, 'SH', 'GAIA family from model');
   ok(gaia.identity === undefined, 'GAIA identity omitted (no captured codes)');
+  // The AN1x's family code was captured under the SCHEMA's key names (identity.family), and the
+  // emitter used to look only for the legacy engine's (familyCode) — so the one profile that could
+  // answer a Test button never got an identity block. The engine compares only declared fields, so
+  // manufacturer + family without a member is a legal, matchable identity.
+  {
+    const an1x = buildLegacyProfile(resolveProfile('yamaha.an1x'), { legacyId: 'yamaha-an1x-dpd' });
+    ok(an1x.identity !== undefined, 'AN1x identity emitted from schema keys');
+    eq(JSON.stringify(an1x.identity.manufacturerId), JSON.stringify(['43']), 'AN1x manufacturer 43');
+    eq(JSON.stringify(an1x.identity.familyCode), JSON.stringify(['02', '1A']), 'AN1x family from identity.family');
+    ok(an1x.identity.modelNumber === undefined, 'no member captured -> none declared');
+    ok(an1x.identity.revision === undefined, 'firmware selects a variant; identity never pins it');
+  }
   eq(JSON.stringify(gaia.messageRecipes.find((r) => r.id === 'dt1').template),
     JSON.stringify(['F0', '41', '$deviceId', '00', '00', '41', '12', '$address', '$encodedValue', '$checksum', 'F7']),
     'GAIA dt1 recipe byte-identical (modelId expanded)');
