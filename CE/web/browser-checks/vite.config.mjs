@@ -19,7 +19,7 @@ export default defineConfig({
       // 93% of a 4m22s build there. It bit here the moment a harness imported Player.svelte and so
       // pulled in the whole app graph — the build went from 8s to not finishing inside 400s.
       treeshake: false,
-      input: ['sceneryGround', 'textPlacement', 'midi', 'monitor', 'strip', 'playerInbound', 'learnChips'].map(page),
+      input: ['sceneryGround', 'textPlacement', 'midi', 'monitor', 'strip', 'playerInbound', 'learnChips', 'panelShot'].map(page),
     },
   },
 });

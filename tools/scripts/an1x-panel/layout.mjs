@@ -111,13 +111,13 @@ export const SCENE_STRIP = {
       title: 'SYNC / FM', tint: TINT.flow, x: 834, y: 0, w: 252, h: 356,
       controls: [
         { p: 'scVcoAlgorithm', kind: 'leds', x: 12, y: 30, w: 228, label: 'ALGORITHM' },
-        { p: 'scSyncPitch', kind: 'knobSmall', x: 12, y: 122, label: 'SYNC PITCH' },
+        { p: 'scSyncPitch', kind: 'knobSmall', x: 16, y: 122, label: 'SYNC PITCH' },
         { p: 'scSyncPitchDepth', kind: 'knobSmall', x: 78, y: 122, label: 'SYNC DEPTH' },
         { p: 'scFmDepth', kind: 'knobSmall', x: 144, y: 122, label: 'FM DEPTH' },
         { p: 'scSyncPitchSource', kind: 'leds', x: 12, y: 208, w: 105, label: 'SYNC SRC' },
         { p: 'scSyncPitchModSwitch', kind: 'leds', x: 128, y: 208, w: 110, label: 'SYNC MOD' },
-        { p: 'scFmSource1', kind: 'knobSmall', x: 128, y: 290, label: 'FM SRC 1' },
-        { p: 'scFmSource2', kind: 'knobSmall', x: 194, y: 290, label: 'FM SRC 2' },
+        { p: 'scFmSource1', kind: 'knobSmall', x: 128, y: 276, label: 'FM SRC 1' },
+        { p: 'scFmSource2', kind: 'knobSmall', x: 194, y: 276, label: 'FM SRC 2' },
       ],
     },
     {
@@ -167,7 +167,7 @@ export const SCENE_STRIP = {
       // variation send — the last thing in the scene before the voice leaves for the effects.
       title: 'VCA', tint: TINT.flow, x: 2068, y: 0, w: 380, h: 356,
       controls: [
-        { p: 'scVcaVolume', kind: 'knobBig', x: 12, y: 32, label: 'VOLUME' },
+        { p: 'scVcaVolume', kind: 'knobBig', x: 16, y: 32, label: 'VOLUME' },
         { p: 'scVcaFeedback', kind: 'knobSmall', x: 88, y: 40, label: 'FEEDBACK' },
         { p: 'scAegVelocity', kind: 'knobSmall', x: 154, y: 40, label: 'VELO SENS' },
         { p: 'scAegAttack', kind: 'fader', x: 16, y: 196, label: 'A' },
@@ -223,7 +223,7 @@ export const COMMON_STRIP = {
       // The performance controllers the AN1x transmits as plain CCs — the live half of CTRL.
       title: 'MASTER / PLAY', tint: TINT.ctrl, x: 1130, y: 0, w: 520, h: 172,
       controls: [
-        { p: 'cc7-main-volume', kind: 'knob', x: 12, y: 34, label: 'VOLUME' },
+        { p: 'cc7-main-volume', kind: 'knob', x: 16, y: 34, label: 'VOLUME' },
         { p: 'cc10-panpot', kind: 'knobSmall', x: 80, y: 40, label: 'PAN' },
         { p: 'cc11-expression', kind: 'knobSmall', x: 146, y: 40, label: 'EXPRESSION' },
         { p: 'cc1-modulation', kind: 'knobSmall', x: 212, y: 40, label: 'MOD WHEEL' },
@@ -241,7 +241,7 @@ export const EFFECT_STRIP = {
     {
       title: 'VARIATION', tint: TINT.effect, x: 0, y: 0, w: 560, h: 116,
       controls: [
-        { p: 'vcVariType', kind: 'knobSmall', x: 12, y: 36, label: 'TYPE' },
+        { p: 'vcVariType', kind: 'knobSmall', x: 16, y: 36, label: 'TYPE' },
         { p: 'cc93-chorus-variation-depth', kind: 'knobSmall', x: 78, y: 36, label: 'DEPTH' },
         ...[1, 2, 3, 4, 5, 6].map((n) => (
           { p: `vcVariParam${n}`, kind: 'knobSmall', x: 144 + (n - 1) * 66, y: 36, label: `PARAM ${n}` }
@@ -251,7 +251,7 @@ export const EFFECT_STRIP = {
     {
       title: 'EQ', tint: TINT.effect, x: 570, y: 0, w: 560, h: 116,
       controls: [
-        { p: 'eqLowFreq', kind: 'knobSmall', x: 12, y: 36, label: 'LO FREQ' },
+        { p: 'eqLowFreq', kind: 'knobSmall', x: 16, y: 36, label: 'LO FREQ' },
         { p: 'eqLowGain', kind: 'knobSmall', x: 78, y: 36, label: 'LO GAIN' },
         { p: 'eqMidFreq', kind: 'knobSmall', x: 144, y: 36, label: 'MID FREQ' },
         { p: 'eqMidGain', kind: 'knobSmall', x: 210, y: 36, label: 'MID GAIN' },
@@ -263,7 +263,7 @@ export const EFFECT_STRIP = {
     {
       title: 'DELAY', tint: TINT.effect, x: 1140, y: 0, w: 810, h: 116,
       controls: [
-        { p: 'vcDlyType', kind: 'knobSmall', x: 12, y: 36, label: 'TYPE' },
+        { p: 'vcDlyType', kind: 'knobSmall', x: 16, y: 36, label: 'TYPE' },
         { p: 'vcDlyReturn', kind: 'knobSmall', x: 78, y: 36, label: 'RETURN' },
         { p: 'cc94-delay-depth', kind: 'knobSmall', x: 144, y: 36, label: 'DEPTH' },
         { p: 'vcDlyRevConnection', kind: 'leds', x: 210, y: 32, w: 96, label: 'DLY→REV' },
@@ -275,7 +275,7 @@ export const EFFECT_STRIP = {
     {
       title: 'REVERB', tint: TINT.effect, x: 1960, y: 0, w: 810, h: 116,
       controls: [
-        { p: 'vcRevType', kind: 'knobSmall', x: 12, y: 36, label: 'TYPE' },
+        { p: 'vcRevType', kind: 'knobSmall', x: 16, y: 36, label: 'TYPE' },
         { p: 'vcRevReturn', kind: 'knobSmall', x: 78, y: 36, label: 'RETURN' },
         { p: 'cc91-reverb-depth', kind: 'knobSmall', x: 144, y: 36, label: 'DEPTH' },
         ...[1, 2, 3, 4, 5, 6, 7].map((n) => (
@@ -346,10 +346,12 @@ export const PLAY_STRIP = {
 
 /** Arpeggiator, Free EG and the step sequencer — the bottom third of the diagram. */
 export const PATTERN_STRIP = {
-  height: 556,
+  height: 676,
   boxes: [
     {
-      title: 'ARPEGGIO / STEP SEQ', tint: TINT.arp, x: 0, y: 0, w: 1000, h: 130,
+      // One box, because the instrument treats them as one setting: ARPEGGIO or STEP SEQ, and the
+      // row beneath is whichever of the two you picked.
+      title: 'ARPEGGIO / STEP SEQ', tint: TINT.arp, x: 0, y: 0, w: 1000, h: 250,
       controls: [
         { p: 'arpOnOff', kind: 'leds', x: 12, y: 34, w: 86, label: 'ON' },
         { p: 'arpSelect', kind: 'leds', x: 110, y: 34, w: 110, label: 'MODE' },
@@ -361,7 +363,38 @@ export const PATTERN_STRIP = {
         { p: 'arpSwing', kind: 'knobSmall', x: 804, y: 40, label: 'SWING' },
         { p: 'arpVelocity', kind: 'knobSmall', x: 870, y: 40, label: 'VELOCITY' },
         { p: 'arpGateTime', kind: 'knobSmall', x: 936, y: 40, label: 'GATE' },
+        // The step sequencer's own settings, which had no place on the panel at all until the
+        // Current Pattern buffer (10 0E 00) was modelled.
+        { p: 'ssBaseUnit', kind: 'knobSmall', x: 14, y: 156, label: 'BASE UNIT' },
+        { p: 'ssLength', kind: 'knobSmall', x: 96, y: 156, label: 'STEPS' },
+        { p: 'ssLoopType', kind: 'combo', x: 172, y: 166, w: 140, label: 'LOOP' },
+        { p: 'ssCtrlChangeNo', kind: 'knobSmall', x: 336, y: 156, label: 'CC NUMBER' },
       ],
+    },
+    {
+      /**
+       * The step sequencer, sixteen steps deep and four values wide.
+       *
+       * It was a drawing. The GAIA's arpeggio grid was borrowed to stand in for it, publishing
+       * blocks through a pattern channel that reaches nothing, because at the time the AN1x's step
+       * data was not modelled at all. It is now — 70 parameters at 10 0E 00 — so every one of these
+       * 64 faders writes a real address, and the drawing is gone.
+       *
+       * Four lanes rather than a piano roll, because a step here is four independent values and a
+       * roll can only show one of them. Velocity 0 is the instrument's REST, which is why the
+       * velocity lane is the one to read first.
+       */
+      title: 'STEP SEQUENCER', tint: TINT.arp, x: 1010, y: 0, w: 1760, h: 250,
+      controls: [],
+      steps: {
+        count: 16, x: 78, pitch: 104, faderW: 30, faderH: 46, numberY: 20, gutterX: 12,
+        lanes: [
+          { prefix: 'ssNote', label: 'NOTE', y: 36 },
+          { prefix: 'ssVelocity', label: 'VEL', y: 86 },
+          { prefix: 'ssGateTime', label: 'GATE', y: 136 },
+          { prefix: 'ssCtrlValue', label: 'CC', y: 186 },
+        ],
+      },
     },
     {
       /**
@@ -378,14 +411,14 @@ export const PATTERN_STRIP = {
        * Volume and LFO1 Speed move at once, in shapes you drew, and reading that needs them
        * stacked against the same x.
        */
-      title: 'FREE EG', tint: TINT.feg, x: 0, y: 258, w: 2770, h: 290,
+      title: 'FREE EG', tint: TINT.feg, x: 0, y: 260, w: 2770, h: 408,
       controls: [
         { p: 'fegTrigger', kind: 'leds', x: 12, y: 26, w: 104, label: 'TRIGGER' },
         { p: 'fegLoopType', kind: 'combo', x: 12, y: 130, w: 104, label: 'LOOP' },
         { p: 'fegLength', kind: 'knobSmall', x: 140, y: 30, label: 'LENGTH' },
         { p: 'fegKbdTrack', kind: 'knobSmall', x: 206, y: 30, label: 'KBD TRK' },
         ...[1, 2, 3, 4].flatMap((n) => {
-          const y = 12 + (n - 1) * 64 + 16;
+          const y = 14 + (n - 1) * 94 + 30;
           return [
             { p: `fegTrkParam${n}`, kind: 'combo', x: 360, y, w: 210, label: n === 1 ? 'DESTINATION' : '' },
             { p: `fegTrkSceneSw${n}`, kind: 'combo', x: 582, y, w: 130, label: n === 1 ? 'SCENE' : '' },
@@ -394,14 +427,9 @@ export const PATTERN_STRIP = {
       ],
       // One lane per track: the recorded curve, editable, over the sequence length.
       curves: [1, 2, 3, 4].map((n) => ({
-        track: n, x: 726, y: 12 + (n - 1) * 64, w: 2020, h: 56,
+        track: n, x: 726, y: 14 + (n - 1) * 94, w: 2020, h: 86,
         label: `TRACK ${n}`, labelX: 290, colour: TRACK_TINT[n - 1],
       })),
-    },
-    {
-      title: 'STEP SEQUENCER', tint: TINT.arp, x: 1010, y: 0, w: 1760, h: 248,
-      controls: [],
-      grid: { x: 12, y: 26, w: 1856, h: 196, steps: 16 },
     },
   ],
 };

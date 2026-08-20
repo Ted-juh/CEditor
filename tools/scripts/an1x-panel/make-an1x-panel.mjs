@@ -427,32 +427,86 @@ function buildMatrix(box, byId, resolve, originX, originY) {
   return { controls, missing };
 }
 
+/**
+ * Everything a box contains has to fit inside the box it is drawn around.
+ *
+ * Written after a lane of sixteen faders hung four pixels out of the bottom of the step sequencer,
+ * which no structural check saw and only a screenshot showed. Layout arithmetic is the one thing
+ * here that is genuinely easy to get wrong — a row pitch and a row count multiply, and the box
+ * height was set by hand — so it gets an assertion rather than an eye.
+ */
+function boxOverflow(box, controls, originX, originY) {
+  const left = originX + box.x;
+  const top = originY + box.y;
+  const out = [];
+  for (const control of controls) {
+    const t = control._children.Transform;
+    const over = [];
+    if (t.x < left - 0.5) over.push(`${Math.round(left - t.x)}px left`);
+    if (t.y < top - 0.5) over.push(`${Math.round(top - t.y)}px above`);
+    if (t.x + t.width > left + box.w + 0.5) over.push(`${Math.round(t.x + t.width - left - box.w)}px right`);
+    if (t.y + t.height > top + box.h + 0.5) over.push(`${Math.round(t.y + t.height - top - box.h)}px below`);
+    if (over.length) {
+      out.push(`"${box.title}": ${control._children.Core.name} at ${t.x},${t.y} ${t.width}x${t.height}`
+        + ` sticks out ${over.join(' and ')}`);
+    }
+  }
+  return out;
+}
+
 function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p }) {
   const controls = [];
   const missing = [];
+  const overflow = [];
 
   for (const box of strip.boxes) {
+    const boxControls = [];
+    const add = (...cs) => { controls.push(...cs); boxControls.push(...cs); };
     controls.push(...sectionBox(box, originX, originY));
 
     for (const env of box.envelopes ?? []) {
       const x = originX + box.x + env.x;
       const y = originY + box.y + CONTENT_TOP + env.y;
-      controls.push(placeStatic(gaiaEnvelope({ stages: env.stages, width: env.w, height: env.h }),
+      add(placeStatic(gaiaEnvelope({ stages: env.stages, width: env.w, height: env.h }),
         `env_${env.bind}`, { x, y, w: env.w, h: env.h }));
     }
 
     if (box.grid) {
       const g = box.grid;
-      controls.push(placeStatic(gaiaArpGrid({ width: g.w, height: g.h, steps: g.steps, viewNote: 60 }),
+      add(placeStatic(gaiaArpGrid({ width: g.w, height: g.h, steps: g.steps, viewNote: 60 }),
         'step_seq_grid', { x: originX + box.x + g.x, y: originY + box.y + CONTENT_TOP + g.y, w: g.w, h: g.h }));
+    }
+
+    // The step sequencer: four lanes of sixteen, every fader a real address.
+    if (box.steps) {
+      const s = box.steps;
+      const x0 = originX + box.x;
+      const y0 = originY + box.y + CONTENT_TOP;
+      const columnX = (step) => x0 + s.x + step * s.pitch;
+
+      for (let step = 0; step < s.count; step++) {
+        add(label(String(step + 1), { x: columnX(step) - 8, y: y0 + s.numberY, w: s.faderW + 16, h: 13 },
+          { size: 8, colour: step % 4 === 0 ? SKIN.label : SKIN.labelDim, bold: step % 4 === 0 }));
+      }
+
+      for (const lane of s.lanes) {
+        add(label(lane.label, { x: x0 + s.gutterX, y: y0 + lane.y + s.faderH / 2 - 8, w: 54, h: 14 },
+          { size: 9, colour: SKIN.label, align: 'left' }));
+        for (let step = 0; step < s.count; step++) {
+          const parameter = byId.get(resolve(`${lane.prefix}${step + 1}`));
+          if (!parameter) { missing.push(resolve(`${lane.prefix}${step + 1}`)); continue; }
+          add(boundCustom(parameter, () => gaiaFader({ width: s.faderW, height: s.faderH, ticks: 5 }),
+            { x: columnX(step), y: y0 + lane.y, w: s.faderW, h: s.faderH }));
+        }
+      }
     }
 
     for (const lane of box.curves ?? []) {
       const x = originX + box.x + lane.x;
       const y = originY + box.y + CONTENT_TOP + lane.y;
-      controls.push(label(lane.label, { x: originX + box.x + lane.labelX, y: y + 10, w: 62, h: 16 },
+      add(label(lane.label, { x: originX + box.x + lane.labelX, y: y + 10, w: 62, h: 16 },
         { size: 10, bold: true, colour: lane.colour, align: 'left' }));
-      controls.push(curveLane(lane, { x, y }));
+      add(curveLane(lane, { x, y }));
     }
 
     // The note-playing controls. They carry no DeviceBindings — they emit notes rather than drive a
@@ -460,14 +514,14 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
     // the device this panel names.
     if (box.ribbon) {
       const r = box.ribbon;
-      controls.push(placeStatic(createControl('NoteRibbon', {
+      add(placeStatic(createControl('NoteRibbon', {
         NoteRibbon: { mode: 'chromatic', baseNote: r.baseNote, octaves: r.octaves, channel: 1, velocity: 100 },
       }), 'play_ribbon', { x: originX + box.x + r.x, y: originY + box.y + CONTENT_TOP + r.y, w: r.w, h: r.h }));
     }
 
     if (box.chords) {
       const c = box.chords;
-      controls.push(placeStatic(createControl('ChordPad', {
+      add(placeStatic(createControl('ChordPad', {
         ChordPad: { layout: 'grid', baseOctave: 3 },
       }), 'play_chords', { x: originX + box.x + c.x, y: originY + box.y + CONTENT_TOP + c.y, w: c.w, h: c.h }));
     }
@@ -476,7 +530,7 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
       const t = box.transport;
       // clockOut on, because the AN1x's arpeggiator and step sequencer follow MIDI clock and this
       // panel is the only thing here that can start one.
-      controls.push(placeStatic(createControl('Transport', {
+      add(placeStatic(createControl('Transport', {
         Transport: { bpm: 120, clockOut: true },
       }), 'play_transport', { x: originX + box.x + t.x, y: originY + box.y + CONTENT_TOP + t.y, w: t.w, h: t.h }));
     }
@@ -503,14 +557,14 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
           deviceRole: DEVICE_NAME,
         })],
       };
-      controls.push(built);
-      controls.push(label(spec.label, { x: at.x - 14, y: at.y + SKIN.knob + 5, w: SKIN.knob + 28, h: 16 }, { size: 9, colour: SKIN.label }));
+      add(built);
+      add(label(spec.label, { x: at.x - 14, y: at.y + SKIN.knob + 5, w: SKIN.knob + 28, h: 16 }, { size: 9, colour: SKIN.label }));
       void control;
     }
 
     if (box.matrix) {
       const built = buildMatrix(box, byId, resolve, originX, originY);
-      controls.push(...built.controls);
+      add(...built.controls);
       missing.push(...built.missing);
     }
 
@@ -520,17 +574,19 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
 
       const at = { x: originX + box.x + spec.x, y: originY + box.y + CONTENT_TOP + spec.y };
       const built = KINDS[spec.kind](parameter, spec, at);
-      controls.push(...built.controls);
+      add(...built.controls);
       if (built.caption) {
-        controls.push(label(built.caption.text, {
+        add(label(built.caption.text, {
           x: built.caption.x, y: built.caption.y, w: built.caption.w,
           h: built.caption.lines === 2 ? 26 : 16,
         }, { size: 9, colour: SKIN.label, align: built.caption.align ?? 'center' }));
       }
     }
+
+    overflow.push(...boxOverflow(box, boxControls, originX, originY));
   }
 
-  return { controls, missing };
+  return { controls, missing, overflow };
 }
 
 const NOTES = `Yamaha AN1x — editor panel.
@@ -588,6 +644,7 @@ export function buildAn1xPanel({ slim = true } = {}) {
   const panel = createPanel('Yamaha AN1x');
   const controls = [];
   const missing = [];
+  const overflow = [];
 
   const PLATE_INSET = 10;
   const plate = createControl('Background', {
@@ -607,6 +664,7 @@ export function buildAn1xPanel({ slim = true } = {}) {
   const common = buildStrip(COMMON_STRIP, byId, { originX: 16, originY: y });
   controls.push(...common.controls);
   missing.push(...common.missing);
+  overflow.push(...common.overflow);
   y += COMMON_STRIP.height + 8;
 
   for (const scene of [1, 2]) {
@@ -625,26 +683,37 @@ export function buildAn1xPanel({ slim = true } = {}) {
     );
     controls.push(...strip.controls);
     missing.push(...strip.missing);
+  overflow.push(...strip.overflow);
+    overflow.push(...strip.overflow);
     y += SCENE_STRIP.height + 30;
   }
 
   const effects = buildStrip(EFFECT_STRIP, byId, { originX: 16, originY: y });
   controls.push(...effects.controls);
   missing.push(...effects.missing);
+  overflow.push(...effects.overflow);
   y += EFFECT_STRIP.height + 8;
 
   const pattern = buildStrip(PATTERN_STRIP, byId, { originX: 16, originY: y });
   controls.push(...pattern.controls);
   missing.push(...pattern.missing);
+  overflow.push(...pattern.overflow);
   y += PATTERN_STRIP.height + 8;
 
   const play = buildStrip(PLAY_STRIP, byId, { originX: 16, originY: y });
   controls.push(...play.controls);
   missing.push(...play.missing);
+  overflow.push(...play.overflow);
   y += PLAY_STRIP.height;
 
   if (missing.length) {
     throw new Error(`layout.mjs places parameters the profile does not have:\n  ${[...new Set(missing)].join('\n  ')}`);
+  }
+  // Layout arithmetic is the one thing here that is genuinely easy to get wrong: a row pitch and a
+  // row count multiply, and the box height was set by hand. A lane of sixteen faders hung four
+  // pixels out of the step sequencer and no structural check saw it — only a screenshot did.
+  if (overflow.length) {
+    throw new Error(`layout.mjs puts controls outside their own box:\n  ${overflow.join('\n  ')}`);
   }
 
   // The wordmark, the way the instrument prints it: YAMAHA small, AN1x big and orange.
