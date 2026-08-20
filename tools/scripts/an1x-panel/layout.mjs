@@ -81,19 +81,19 @@ export const SCENE_STRIP = {
     {
       // LFO1 and LFO2, the two black spouts in the diagram. LFO1's wave list is 21 entries deep,
       // which is a knob, not a column — the display names them one at a time on the hardware too.
-      title: 'LFO', tint: TINT.flow, x: 262, y: 0, w: 236, h: 356,
+      title: 'LFO', tint: TINT.flow, x: 262, y: 0, w: 212, h: 356,
       controls: [
         { p: 'scLfo1Wave', kind: 'knobSmall', x: 14, y: 40, label: 'LFO1 WAVE' },
         { p: 'scLfo1Speed', kind: 'knob', x: 80, y: 34, label: 'LFO1 SPEED' },
-        { p: 'scLfo1Delay', kind: 'knobSmall', x: 158, y: 40, label: 'LFO1 DELAY' },
+        { p: 'scLfo1Delay', kind: 'knobSmall', x: 152, y: 40, label: 'LFO1 DELAY' },
         { p: 'scLfoResetMode', kind: 'leds', x: 14, y: 150, w: 88, label: 'RESET' },
         { p: 'scLfo2Speed', kind: 'knob', x: 120, y: 150, label: 'LFO2 SPEED' },
         { p: 'scVcfFilterModDepth', kind: 'knobSmall', x: 40, y: 250, label: 'FILT MOD' },
-        { p: 'scVcaAmpModDepth', kind: 'knobSmall', x: 130, y: 250, label: 'AMP MOD' },
+        { p: 'scVcaAmpModDepth', kind: 'knobSmall', x: 124, y: 250, label: 'AMP MOD' },
       ],
     },
     {
-      title: 'VCO 1', tint: TINT.flow, x: 508, y: 0, w: 316, h: 356,
+      title: 'VCO 1', tint: TINT.flow, x: 484, y: 0, w: 316, h: 356,
       controls: [
         { p: 'scVco1Wave', kind: 'leds', x: 12, y: 30, w: 104, label: 'WAVE', options: VCO1_WAVES },
         { p: 'scVco1PitchCoarse', kind: 'knobSmall', x: 128, y: 36, label: 'COARSE' },
@@ -108,7 +108,7 @@ export const SCENE_STRIP = {
     {
       // The MASTER→SLAVE sync and FM lines the diagram draws between the two VCOs, as a box
       // between the two VCOs.
-      title: 'SYNC / FM', tint: TINT.flow, x: 834, y: 0, w: 252, h: 356,
+      title: 'SYNC / FM', tint: TINT.flow, x: 810, y: 0, w: 252, h: 356,
       controls: [
         { p: 'scVcoAlgorithm', kind: 'leds', x: 12, y: 30, w: 228, label: 'ALGORITHM' },
         { p: 'scSyncPitch', kind: 'knobSmall', x: 16, y: 122, label: 'SYNC PITCH' },
@@ -121,7 +121,7 @@ export const SCENE_STRIP = {
       ],
     },
     {
-      title: 'VCO 2', tint: TINT.flow, x: 1096, y: 0, w: 316, h: 356,
+      title: 'VCO 2', tint: TINT.flow, x: 1072, y: 0, w: 316, h: 356,
       controls: [
         { p: 'scVco2Wave', kind: 'leds', x: 12, y: 30, w: 104, label: 'WAVE', options: VCO2_WAVES },
         { p: 'scVco2PitchCoarse', kind: 'knobSmall', x: 128, y: 36, label: 'COARSE' },
@@ -135,7 +135,7 @@ export const SCENE_STRIP = {
     },
     {
       // The MIX block, with the RING MOD and NOISE feeds the diagram pours into it.
-      title: 'MIX', tint: TINT.flow, x: 1422, y: 0, w: 196, h: 356,
+      title: 'MIX', tint: TINT.flow, x: 1398, y: 0, w: 196, h: 356,
       controls: [
         { p: 'scMixVco1', kind: 'fader', x: 16, y: 46, label: 'VCO 1' },
         { p: 'scMixVco2', kind: 'fader', x: 62, y: 46, label: 'VCO 2' },
@@ -146,13 +146,13 @@ export const SCENE_STRIP = {
     {
       // HPF and VCF share the box the way the diagram runs them together, FEG beneath as a fader
       // bank with its curve printed over it.
-      title: 'HPF / VCF', tint: TINT.flow, x: 1628, y: 0, w: 430, h: 356,
+      title: 'HPF / VCF', tint: TINT.flow, x: 1604, y: 0, w: 400, h: 356,
       controls: [
         { p: 'scVcfFilterType', kind: 'leds', x: 12, y: 30, w: 118, label: 'TYPE' },
         { p: 'scVcfCutoff', kind: 'knobBig', x: 146, y: 32, label: 'CUTOFF' },
         { p: 'scVcfResonance', kind: 'knob', x: 220, y: 36, label: 'RESONANCE' },
         { p: 'scVcfHpfCutoff', kind: 'knobSmall', x: 288, y: 40, label: 'HPF' },
-        { p: 'scVcfKbdTrack', kind: 'knobSmall', x: 346, y: 40, label: 'KBD TRK' },
+        { p: 'scVcfKbdTrack', kind: 'knobSmall', x: 340, y: 40, label: 'KBD TRK' },
         { p: 'scFegAttack', kind: 'fader', x: 16, y: 196, label: 'A' },
         { p: 'scFegDecay', kind: 'fader', x: 62, y: 196, label: 'D' },
         { p: 'scFegSustain', kind: 'fader', x: 108, y: 196, label: 'S' },
@@ -165,7 +165,7 @@ export const SCENE_STRIP = {
     {
       // VCA with its AEG bank, the FEEDBACK loop the diagram draws back under the mixer, and the
       // variation send — the last thing in the scene before the voice leaves for the effects.
-      title: 'VCA', tint: TINT.flow, x: 2068, y: 0, w: 380, h: 356,
+      title: 'VCA', tint: TINT.flow, x: 2014, y: 0, w: 292, h: 356,
       controls: [
         { p: 'scVcaVolume', kind: 'knobBig', x: 16, y: 32, label: 'VOLUME' },
         { p: 'scVcaFeedback', kind: 'knobSmall', x: 88, y: 40, label: 'FEEDBACK' },
@@ -181,18 +181,19 @@ export const SCENE_STRIP = {
     {
       // The CTRL bar, poured into the one place it actually lands: the scene's control matrix.
       // Sixteen sets exist; eight are laid out and the notes say where the rest live. SOURCE and
-      // One row per set: source knob, destination by name, depth knob. The destination list is the
-      // manual's own 46 entries now, so it reads as words; the source list (115 entries) is still a
-      // number, because this Data List does not enumerate it.
-      title: 'CTRL MATRIX', tint: TINT.ctrl, x: 2458, y: 0, w: 312, h: 356,
-      matrix: { sets: 8, x: 22, y: 26, rowH: 38 },
+      // All sixteen sets, two columns of eight: source knob, destination by name, depth knob. The
+      // destination list is the manual's own 46 entries, so it reads as words; the source list (115
+      // entries) is still a number, because this Data List does not enumerate it. Sets 9-16 used to
+      // be reachable only from the parameter browser — half of the instrument's headline feature.
+      title: 'CTRL MATRIX', tint: TINT.ctrl, x: 2316, y: 0, w: 454, h: 356,
+      matrix: { sets: 16, perColumn: 8, x: 24, y: 26, rowH: 38, colW: 214, comboW: 106 },
     },
   ],
 };
 
 /** The header: what belongs to the voice, not to either scene. */
 export const COMMON_STRIP = {
-  height: 184,
+  height: 316,
   boxes: [
     {
       title: 'VOICE', tint: TINT.ctrl, x: 0, y: 0, w: 300, h: 172,
@@ -217,6 +218,58 @@ export const COMMON_STRIP = {
       controls: [
         { p: 'vcPortamentoSwitch', kind: 'leds', x: 12, y: 34, w: 100, label: 'SWITCH' },
         { p: 'cc5-portamento-time', kind: 'knobSmall', x: 130, y: 40, label: 'TIME (CC5)' },
+      ],
+    },
+    {
+      /**
+       * The Common Control Matrix: two sets, the voice-wide counterpart of the scene matrix.
+       *
+       * It reaches six destinations rather than forty-six — Common Volume, Common Pan, Variation
+       * Param, Delay Return, Reverb Return — and it was not on the panel at all.
+       */
+      title: 'COMMON CTRL', tint: TINT.ctrl, x: 1660, y: 0, w: 620, h: 172,
+      controls: [
+        ...[1, 2].flatMap((n) => {
+          const x = 16 + (n - 1) * 300;
+          return [
+            { p: `vcCmSource${n}`, kind: 'knobSmall', x, y: 40, label: `SRC ${n}` },
+            { p: `vcCmParam${n}`, kind: 'combo', x: x + 66, y: 50, w: 140, label: 'DESTINATION' },
+            { p: `vcCmDepth${n}`, kind: 'knobSmall', x: x + 216, y: 40, label: 'DEPTH' },
+          ];
+        }),
+      ],
+    },
+    {
+      /**
+       * SYSTEM: the settings that belong to the instrument rather than to a voice.
+       *
+       * Every one of these — all twenty-seven — was missing from the panel. Master tune, transpose,
+       * the velocity curve, both receive channels, local on/off, the device number, and the fifteen
+       * assignments that decide which CC each physical controller sends. An editor that cannot
+       * reach them is an editor you have to put down and walk to the instrument to finish using.
+       */
+      title: 'SYSTEM', tint: TINT.ctrl, x: 0, y: 182, w: 2280, h: 126,
+      controls: [
+        { p: 'sysMasterTune', kind: 'knobSmall', x: 16, y: 28, label: 'TUNE' },
+        { p: 'sysKbdTranspose', kind: 'knobSmall', x: 82, y: 28, label: 'TRANSPOSE' },
+        { p: 'sysKbdFixedVelocity', kind: 'knobSmall', x: 148, y: 28, label: 'FIXED VELO' },
+        { p: 'sysKbdVelocityCurve', kind: 'combo', x: 214, y: 38, w: 118, label: 'VELO CURVE' },
+        { p: 'sysEffectBypass', kind: 'combo', x: 342, y: 38, w: 118, label: 'FX BYPASS' },
+        { p: 'sysMidiLocal', kind: 'combo', x: 470, y: 38, w: 80, label: 'LOCAL' },
+        { p: 'sysKbdTxChannel', kind: 'combo', x: 560, y: 38, w: 92, label: 'KBD TX CH' },
+        { p: 'sysArpTxChannel', kind: 'combo', x: 662, y: 38, w: 92, label: 'ARP TX CH' },
+        { p: 'sysRxChannel1', kind: 'combo', x: 764, y: 38, w: 92, label: 'RX CH 1' },
+        { p: 'sysRxChannel2', kind: 'combo', x: 866, y: 38, w: 92, label: 'RX CH 2' },
+        { p: 'sysDeviceNumber', kind: 'knobSmall', x: 972, y: 28, label: 'DEVICE No' },
+        // Which CC each physical controller sends. The AN1x lets you move all fifteen.
+        ...[
+          ['sysSceneCtrlNum', 'SCENE'], ['sysMwCtrlNum', 'MOD WHL'], ['sysFvCtrlNum', 'FOOT VOL'],
+          ['sysFcCtrlNum', 'FOOT CTL'], ['sysFsCtrlNum', 'FOOT SW'],
+          ['sysRibbonXCtrlNum', 'RIBBON X'], ['sysRibbonZCtrlNum', 'RIBBON Z'],
+        ].map(([p, label], i) => ({ p, kind: 'knobSmall', x: 1044 + i * 64, y: 28, label })),
+        ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+          { p: `sysKnob${n}CtrlNum`, kind: 'knobSmall', x: 1508 + (n - 1) * 64, y: 28, label: `KNOB ${n}` }
+        )),
       ],
     },
     {
@@ -267,7 +320,7 @@ export const EFFECT_STRIP = {
         { p: 'vcDlyReturn', kind: 'knobSmall', x: 78, y: 36, label: 'RETURN' },
         { p: 'cc94-delay-depth', kind: 'knobSmall', x: 144, y: 36, label: 'DEPTH' },
         { p: 'vcDlyRevConnection', kind: 'leds', x: 210, y: 32, w: 96, label: 'DLY→REV' },
-        ...[1, 2, 3, 4, 5, 6].map((n) => (
+        ...[1, 2, 3, 4, 5, 6, 7].map((n) => (
           { p: `vcDlyParam${n}`, kind: 'knobSmall', x: 330 + (n - 1) * 66, y: 36, label: `PARAM ${n}` }
         )),
       ],

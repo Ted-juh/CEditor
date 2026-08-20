@@ -392,16 +392,25 @@ function buildMatrix(box, byId, resolve, originX, originY) {
   const controls = [];
   const missing = [];
   const m = box.matrix;
+  const perColumn = m.perColumn ?? m.sets;
+  const colW = m.colW ?? 0;
+  const comboW = m.comboW ?? 176;
+  const depthX = 52 + comboW + 8;
   const x0 = originX + box.x + m.x;
   const y0 = originY + box.y + CONTENT_TOP + m.y;
 
-  // Column headings once, rather than a caption under all twenty-four knobs.
-  for (const [text, cx, cw, align] of [['SRC', 0, 40, 'center'], ['DESTINATION', 52, 176, 'left'], ['DEPTH', 240, 44, 'center']]) {
-    controls.push(label(text, { x: x0 + cx, y: y0 - 15, w: cw, h: 13 }, { size: 8, colour: SKIN.label, align }));
+  // Column headings once per column, rather than a caption under every knob.
+  for (let col = 0; col * perColumn < m.sets; col++) {
+    const cx = x0 + col * colW;
+    for (const [text, dx, dw, align] of [['SRC', 0, 40, 'center'], ['DESTINATION', 52, comboW, 'left'], ['DEPTH', depthX, 44, 'center']]) {
+      controls.push(label(text, { x: cx + dx, y: y0 - 15, w: dw, h: 13 }, { size: 8, colour: SKIN.label, align }));
+    }
   }
 
   for (let set = 1; set <= m.sets; set++) {
-    const y = y0 + (set - 1) * m.rowH;
+    const col = Math.floor((set - 1) / perColumn);
+    const cx = x0 + col * colW;
+    const y = y0 + ((set - 1) % perColumn) * m.rowH;
 
     const source = byId.get(resolve(`scCmSource${set}`));
     const destination = byId.get(resolve(`scCmParam${set}`));
@@ -411,30 +420,22 @@ function buildMatrix(box, byId, resolve, originX, originY) {
     }
     if (!source || !destination || !depth) continue;
 
-    controls.push(boundCustom(source, () => gaiaKnob({ size: SKIN.knobTiny }), { x: x0, y, w: SKIN.knobTiny, h: SKIN.knobTiny }));
+    controls.push(boundCustom(source, () => gaiaKnob({ size: SKIN.knobTiny }), { x: cx, y, w: SKIN.knobTiny, h: SKIN.knobTiny }));
     // The destination is a named list — 46 of them, from the manual's own Control Matrix List. It
     // was a knob for as long as the profile carried it as a bare integer; a number in a box is
     // what a knob can say, and "VCF Cutoff" is what the instrument's display says.
-    controls.push(bound(destination, 'Combobox', { x: x0 + 52, y: y + 7, w: 176, h: 22 }, {
+    controls.push(bound(destination, 'Combobox', { x: cx + 52, y: y + 7, w: comboW, h: 22 }, {
       'Text.content': '',
       'Text._children.Font.size': 9,
       'Background._children.Corners.radius': 3,
     }));
-    controls.push(boundCustom(depth, () => gaiaKnob({ size: SKIN.knobTiny }), { x: x0 + 240, y, w: SKIN.knobTiny, h: SKIN.knobTiny }));
-    controls.push(label(String(set), { x: x0 - 10, y: y + 12, w: 10, h: 12 }, { size: 8, colour: SKIN.labelDim }));
+    controls.push(boundCustom(depth, () => gaiaKnob({ size: SKIN.knobTiny }), { x: cx + depthX, y, w: SKIN.knobTiny, h: SKIN.knobTiny }));
+    controls.push(label(String(set), { x: cx - 17, y: y + 12, w: 15, h: 12 }, { size: 8, colour: SKIN.labelDim }));
   }
 
   return { controls, missing };
 }
 
-/**
- * Everything a box contains has to fit inside the box it is drawn around.
- *
- * Written after a lane of sixteen faders hung four pixels out of the bottom of the step sequencer,
- * which no structural check saw and only a screenshot showed. Layout arithmetic is the one thing
- * here that is genuinely easy to get wrong — a row pitch and a row count multiply, and the box
- * height was set by hand — so it gets an assertion rather than an eye.
- */
 function boxOverflow(box, controls, originX, originY) {
   const left = originX + box.x;
   const top = originY + box.y;
@@ -630,6 +631,16 @@ The step sequencer grid edits a pattern, not the synth
   now (10 0E 00 — sixteen each of note, velocity, gate and control value), so the grid could be
   bound step by step; nothing binds it today. The controls beside it — type, kbd mode, hold,
   scene, subdivide, swing, velocity, gate — are real addresses and fully wired.
+
+What the panel does NOT reach, and why
+  Every parameter the profile carries is bound here except five groups, each left out on purpose:
+  the 768 Free EG curve points (they ARE the four lanes), the 63-parameter Scene Ctrl buffer (the
+  morph result, which the Data List marks "effective only when Scene Ctrl is active"), the 64 MODE2
+  Control Changes not on MASTER / PLAY (every one duplicates a SysEx parameter already on the panel
+  — two controls for one value is worse than one), the six reserved bytes, and the ten voice-name
+  characters. That last one is a modelling gap rather than a layout choice: the name is ten separate
+  one-byte parameters, and ten text fields is not a name field. It belongs to the dump codec
+  (text-ascii) and the librarian, not to a knob.
 
 Named lists read as names
   Arpeggio type, keyboard mode, scene switch, Free EG destination, control-matrix destination and
