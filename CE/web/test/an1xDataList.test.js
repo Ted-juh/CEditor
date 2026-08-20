@@ -344,3 +344,167 @@ test('the control matrix can reach every destination the manual lists', () => {
   const track = LIBRARY.scopes.common.parameters.find((p) => p.id === 'fegTrkParam1');
   assert.equal(track.enum.length, 57, 'the Free EG track list runs 0..56 and there the table agrees');
 });
+
+/**
+ * The blocks the Data List documents and the profile used to ignore: the step sequencer, the Free
+ * EG curve, the Scene Ctrl buffer, and byte framing for all eight bulk dumps.
+ *
+ * These are transcriptions and arithmetic, both checkable. The arithmetic is what settles the one
+ * place the manual contradicts itself: it labels the last Free EG point of tracks 3 and 4
+ * "Data128", but the addresses it prints run each track to 192 points, and its own 668h total for
+ * the Common block only balances at 192 (104 named bytes + 4 x 192 x 2 = 1640).
+ */
+const BLOCK_SIZES = {
+  system: [0x00, 0x00, 0x00, 28],        // "Total size 1C"
+  voiceCommon: [0x10, 0x00, 0x00, 1640], // "TOTAL SIZE 668"
+  scene1: [0x10, 0x10, 0x00, 116],       // "Total size 74 : Scene 1, 2 Edit Buffer"
+  scene2: [0x10, 0x11, 0x00, 116],
+  sceneCtrl: [0x10, 0x12, 0x00, 68],     // "Total size 44 : Scene Ctrl Buffer"
+  stepSeq: [0x10, 0x0e, 0x00, 70],       // "TOAL SIZE 46"
+  userVoice: [0x11, null, 0x00, 1942],   // "TOTAL SIZE 796", mm = 00...7F
+  userPattern: [0x01, null, 0x00, 70],   // "TOTAL SIZE 46", mm = 00...7F
+};
+
+test('every bulk dump carries the Data List\'s address, byte count and checksum span', () => {
+  assert.equal(LIBRARY.dumps.length, 8, 'p13: "The following eight types of data are transmitted/received"');
+  for (const dump of LIBRARY.dumps) {
+    const [high, mid, low, size] = BLOCK_SIZES[dump.id];
+    const prefix = dump.message.matcher.prefix;
+    const where = `dump ${dump.id}`;
+
+    // F0 43 0n 5C <byte count MSB> <LSB> <address x3>, then data, checksum, F7.
+    assert.deepEqual(prefix.slice(0, 4), ['F0', '43', '00', '$modelId'], where);
+    assert.equal(parseInt(prefix[4], 16) * 128 + parseInt(prefix[5], 16), size,
+      `${where}: the byte count in the header must be the payload size`);
+    assert.equal(parseInt(prefix[6], 16), high, where);
+    assert.equal(prefix[7], mid === null ? '$slot' : mid.toString(16).padStart(2, '0').toUpperCase(), where);
+    assert.equal(parseInt(prefix[8], 16), low, where);
+
+    assert.equal(dump.message.payload.offset, 9, where);
+    assert.equal(dump.message.payload.size, size, where);
+    assert.equal(dump.message.checksum.type, 'roland-7bit', where);
+    assert.equal(dump.message.checksum.fromOffset, 4, `${where}: the span starts at the byte count`);
+    assert.equal(dump.message.checksum.toOffset, 9 + size - 1, `${where}: and ends at the last data byte`);
+    assert.equal(dump.message.checksum.byteOffset, 9 + size, where);
+    assert.equal(dump.message.completion.bytes, 9 + size + 2, `${where}: payload + checksum + F7`);
+    assert.ok(dump.layout?.length, `${where}: has no byte map`);
+  }
+});
+
+test('every bulk dump can be asked for', () => {
+  // p13 (3-5-5) DUMP REQUEST: F0 43 2n 5C <address x3> F7, one per block. The profile used to carry
+  // a single address-less request shape, which every dump pointed at — so no dump could be
+  // requested and nothing said so.
+  const shapes = Object.fromEntries(LIBRARY.messageShapes.map((s) => [s.id, s]));
+  for (const dump of LIBRARY.dumps) {
+    const shape = shapes[dump.requestShape];
+    assert.ok(shape, `${dump.id} names request shape ${dump.requestShape}, which does not exist`);
+    const [high, mid, low] = BLOCK_SIZES[dump.id];
+    assert.deepEqual(shape.template.slice(0, 4), ['F0', '43', '20', '$modelId'], shape.id);
+    assert.equal(parseInt(shape.template[4], 16), high, shape.id);
+    assert.equal(shape.template[5], mid === null ? '$slot' : mid.toString(16).padStart(2, '0').toUpperCase(), shape.id);
+    assert.equal(parseInt(shape.template[6], 16), low, shape.id);
+    assert.equal(shape.template[7], 'F7', shape.id);
+  }
+  // …and the engine has to find it: what it reads is `requests`, not the dumpDefinition's
+  // requestRecipe, which nothing in the codebase looks at.
+  const requests = Object.fromEntries(EMITTED.requests.map((r) => [r.id, r]));
+  for (const dump of LIBRARY.dumps) {
+    const request = requests[dump.requestShape];
+    assert.ok(request, `${dump.requestShape} is not in the emitted requests array`);
+    assert.deepEqual(request.response, { kind: 'bulkDump', dump: dump.id });
+  }
+});
+
+test('every block maps end to end, with no gap and no overlap', () => {
+  // A hole in a block is a byte the panel cannot write and a dump cannot decode; an overlap is two
+  // controls fighting over one byte. Both are silent.
+  const BLOCKS = { system: 28, common: 104, scene: 116, sceneCtrl: 68, stepSeq: 70, fegTrack: 384 };
+  for (const [scopeName, size] of Object.entries(BLOCKS)) {
+    const owner = new Map();
+    for (const parameter of LIBRARY.scopes[scopeName].parameters) {
+      const bytes = parameter.address.split(' ').map((b) => parseInt(b, 16));
+      const start = (bytes[0] << 14) | (bytes[1] << 7) | bytes[2];
+      for (let i = 0; i < (parameter.size ?? 1); i += 1) {
+        assert.ok(!owner.has(start + i),
+          `${scopeName}: ${parameter.id} and ${owner.get(start + i)} both claim byte ${start + i}`);
+        owner.set(start + i, parameter.id);
+      }
+    }
+    assert.equal(owner.size, size, `${scopeName} is ${size} bytes`);
+    for (let i = 0; i < size; i += 1) assert.ok(owner.has(i), `${scopeName}: byte ${i} is unmapped`);
+  }
+});
+
+test('the Free EG is four tracks of 192 points, whatever the manual labels them', () => {
+  const scope = LIBRARY.scopes.fegTrack;
+  assert.equal(scope.instances, 4);
+  assert.equal(scope.base, '10 00 68');
+  assert.equal(scope.stride, '00 03 00');   // 384 bytes per track, 7 bits per address byte
+  assert.equal(scope.parameters.length, 192);
+  for (const point of scope.parameters) {
+    assert.equal(point.size, 2, 'each point is an MSB/LSB pair');
+    assert.deepEqual(point.range, { min: 0, max: 255 });
+  }
+  // The arithmetic that settles it: 104 named Common bytes + 4 x 192 x 2 = 1640 = 668h, the total
+  // the Data List prints for the Common block.
+  const named = LIBRARY.scopes.common.parameters
+    .reduce((total, p) => total + (p.size ?? 1), 0);
+  assert.equal(named + 4 * 192 * 2, 1640);
+  const voiceCommon = LIBRARY.dumps.find((d) => d.id === 'voiceCommon');
+  assert.equal(voiceCommon.layout.length, LIBRARY.scopes.common.parameters.length + 768);
+  assert.equal(voiceCommon.layout.at(-1).offset, 104 + 3 * 384 + 191 * 2);
+  assert.equal(voiceCommon.layout.at(-1).offset + 1, 1639, 'the last curve byte is the last byte of the block');
+});
+
+test('the step sequencer is modelled, all 70 bytes of it', () => {
+  const step = LIBRARY.scopes.stepSeq;
+  assert.equal(step.base, '10 0E 00');
+  assert.equal(step.parameters.length, 70);
+  const byId = Object.fromEntries(step.parameters.map((p) => [p.id, p]));
+  // Sixteen of each, and the four arrays sit where the Data List puts them.
+  for (let n = 1; n <= 16; n += 1) {
+    assert.equal(lowByte(byId[`ssNote${n}`].address), 0x05 + n);
+    assert.equal(lowByte(byId[`ssVelocity${n}`].address), 0x15 + n);
+    assert.equal(lowByte(byId[`ssGateTime${n}`].address), 0x25 + n);
+    assert.equal(lowByte(byId[`ssCtrlValue${n}`].address), 0x35 + n);
+  }
+  // The Data List prints step 8's gate time at "1d", between 2c and 2e. It is 2d.
+  assert.equal(lowByte(byId.ssGateTime8.address), 0x2d);
+  assert.equal(byId.ssNote1.default, 60, 'C3 (3Ch)');
+  assert.equal(byId.ssVelocity1.default, 100);
+  assert.equal(byId.ssGateTime1.default, 60, '94% (3Ch)');
+  assert.deepEqual(byId.ssLength.range, { min: 1, max: 16 });
+  // The User Patterns are the same 70 bytes at a different address, so the pattern dump reuses them.
+  const pattern = LIBRARY.dumps.find((d) => d.id === 'userPattern');
+  assert.equal(pattern.layout.length, 70);
+  assert.ok(pattern.layout.every((e) => e.param.startsWith('stepSeq.')));
+});
+
+test('the Scene Ctrl buffer is a scene without its control matrix', () => {
+  const ctrl = LIBRARY.scopes.sceneCtrl;
+  assert.equal(ctrl.base, '10 12 00');
+  const highest = Math.max(...ctrl.parameters.map((p) => lowByte(p.address)));
+  assert.equal(highest, 0x43, 'the control matrix starts at 44h and is not part of this buffer');
+  const sceneUpTo43 = sceneParameters.filter((p) => lowByte(p.address) <= 0x43);
+  assert.equal(ctrl.parameters.length, sceneUpTo43.length);
+});
+
+test('an effect parameter is bounded by what its effect accepts', () => {
+  // Every one of these was 0..16383 — the capacity of a two-byte encoding, not a range the AN1x
+  // accepts. The Effect Parameter List (p6-p7) gives a Value column per parameter per type.
+  const byId = Object.fromEntries(LIBRARY.scopes.common.parameters.map((p) => [p.id, p]));
+  // The eight reverb types share one parameter list, so these are exact rather than a union.
+  const reverb = [[0, 69], [0, 14], [0, 10], [0, 999], [1, 127], [0, 52], [34, 60]];
+  reverb.forEach(([min, max], index) => {
+    assert.deepEqual(byId[`vcRevParam${index + 1}`].range, { min, max }, `vcRevParam${index + 1}`);
+  });
+  assert.deepEqual(byId.vcDlyParam1.range, { min: 0, max: 6599 }, 'the longest delay time on offer');
+  assert.deepEqual(byId.vcDlyParam7.range, { min: 34, max: 60 }, 'always the LPF, in all three types that have it');
+  assert.deepEqual(byId.vcVariParam4.range, { min: 0, max: 500 });
+  for (const id of Object.keys(byId)) {
+    if (!/^vc(Vari|Dly|Rev)Param\d$/.test(id)) continue;
+    assert.ok(byId[id].range.max <= 6599, `${id} is still unbounded`);
+    assert.ok(byId[id].note?.includes('Data List'), `${id} has no citation`);
+  }
+});

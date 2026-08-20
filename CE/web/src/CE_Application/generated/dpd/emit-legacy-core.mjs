@@ -93,6 +93,46 @@ export function buildDumpDefinitions(resolved) {
   return { dumpDefinitions, notes };
 }
 
+// A `requests` entry per dump that names a request shape.
+//
+// `requestRecipe` on a dumpDefinition is read by nothing — not the engine, not the web app — so a
+// dump could declare a requestShape, emit cleanly, and still be unaskable. What the engine reads is
+// the top-level `requests` array with `response: { kind: "bulkDump", dump: <id> }`, and until now
+// only the preset name-scan produced one. A block the profile can parse but cannot ask for is a
+// block the user can only capture by pressing buttons on the instrument.
+export function buildDumpRequests(resolved, modelBytes) {
+  const shapes = resolved.messageShapes ?? [];
+  const out = [];
+  for (const d of resolved.dumps ?? []) {
+    const shape = shapes.find((s) => s.id === d.requestShape);
+    if (!shape || out.some((r) => r.id === shape.id)) continue;
+    out.push({
+      id: shape.id,
+      name: `Request ${d.name ?? d.id}`,
+      kind: shape.kind ?? 'sysex',
+      template: (shape.template ?? []).flatMap((tok) => (tok === '$modelId' ? modelBytes : [tok])),
+      response: { kind: 'bulkDump', dump: d.id },
+      timeoutMs: 4000,
+      retries: 1,
+    });
+  }
+  return out;
+}
+
+/** Every `$name` a shape or matcher uses, so the emitted `variables` block can define them all. */
+export function templateVariables(resolved) {
+  const names = new Set();
+  const scan = (tokens) => {
+    for (const tok of tokens ?? []) if (typeof tok === 'string' && tok.startsWith('$')) names.add(tok.slice(1));
+  };
+  for (const s of resolved.messageShapes ?? []) scan(s.template);
+  for (const d of resolved.dumps ?? []) {
+    scan(d.message?.matcher?.prefix);
+    scan(d.message?.matcher?.suffix);
+  }
+  return names;
+}
+
 function legacyParam(p) {
   // Instance 0 keeps its flat id — every existing panel and test binds `scMixVco1`, not
   // `scene1.scMixVco1`. Later instances keep the resolved prefix, which is what makes them distinct
@@ -101,7 +141,7 @@ function legacyParam(p) {
   const instanced = p.instance > 0;
   const out = {
     id: instanced ? p.resolvedId : flat(p.resolvedId),
-    name: instanced ? `${p.name} (${cap(p.scope)} ${p.instance + 1})` : p.name,
+    name: instanced ? `${p.name} (${p.scopeLabel ?? cap(p.scope)} ${p.instance + 1})` : p.name,
     group: p.group,
     type: p.valueType === 'enum' ? 'choice' : 'integer',
   };
@@ -208,7 +248,15 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
     family: resolved.family ?? '',
     status: 'experimental',
     trust: 'local',
-    variables: { ...(resolved.deviceId != null ? { deviceId: hexToBytes(resolved.deviceId)[0] } : {}), channel: 1 },
+    // Every $name a template or matcher uses gets a home here. The engine resolves an undeclared
+    // one to nothing, so a request whose address carries a $slot silently addressed byte 0.
+    variables: {
+      ...Object.fromEntries([...templateVariables(resolved)]
+        .filter((n) => !['deviceId', 'modelId', 'manufacturerId', 'address', 'encodedValue', 'size', 'checksum', 'channel'].includes(n))
+        .map((n) => [n, 0])),
+      ...(resolved.deviceId != null ? { deviceId: hexToBytes(resolved.deviceId)[0] } : {}),
+      channel: 1,
+    },
     timing: { minDelayBetweenMessagesMs: 20 },
     parameters: params.map(legacyParam),
     messageRecipes,
@@ -256,6 +304,9 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   const { dumpDefinitions, notes } = buildDumpDefinitions(resolved);
   if (dumpDefinitions) legacy.dumpDefinitions = dumpDefinitions;
   if (notes.length && log) for (const n of notes) log('[dump] ' + n);
+
+  const dumpRequests = buildDumpRequests(resolved, toBytes(resolved.modelId));
+  if (dumpRequests.length) (legacy.requests ??= []).push(...dumpRequests);
 
   // Preset model: carried through verbatim (the librarian/selector reads it), plus the legacy
   // engine's scan plumbing derived from it — a `requests` entry synthesized from the referenced
