@@ -22,7 +22,11 @@ function legacyDumpCodec(codec, note) {
     case 's7': return { type: 's7', signedOffset: codec.signedOffset ?? 64 };
     case 'u14': return { type: 'u14-msb-lsb' };
     case 'u14-lsb': return { type: 'u14-lsb-msb' };
-    case 'nibbles': return { type: 'nibbled', bytes: codec.bytes ?? 2 };
+    // The engine's dump decoder reads the nibble count from a property called `nibbles`
+    // (propInt (encoding, "nibbles", 2)). Emitting it as `bytes` left the count unread, so every
+    // field wider than two nibbles silently decoded as two — the top byte of the value, and nothing
+    // else. Same key on both sides of the boundary now.
+    case 'nibbles': return { type: 'nibbled', nibbles: codec.bytes ?? 2 };
     case 'text-ascii': return { type: 'text-ascii', length: codec.length, pad: codec.pad ?? 32 };
     case 'text-nibbled-ascii': return { type: 'text-nibbled-ascii', length: codec.length, pad: codec.pad ?? 32 };
     case 'packed8to7': note?.(`packed8to7 per-field unsupported by the engine dump decoder`); return undefined;
@@ -90,36 +94,64 @@ export function buildDumpDefinitions(resolved) {
 }
 
 function legacyParam(p) {
+  // Instance 0 keeps its flat id — every existing panel and test binds `scMixVco1`, not
+  // `scene1.scMixVco1`. Later instances keep the resolved prefix, which is what makes them distinct
+  // ids at all; their names carry the instance too, because "Mixer VCO1 Level" twice in a parameter
+  // list answers no question anyone is asking.
+  const instanced = p.instance > 0;
   const out = {
-    id: flat(p.resolvedId),
-    name: p.name, group: p.group,
+    id: instanced ? p.resolvedId : flat(p.resolvedId),
+    name: instanced ? `${p.name} (${cap(p.scope)} ${p.instance + 1})` : p.name,
+    group: p.group,
     type: p.valueType === 'enum' ? 'choice' : 'integer',
   };
+  // The DEVICE's default when the profile records one. The fallbacks below are placeholders, not
+  // data: range.min is the bottom of the dial, and for a bipolar parameter that is the extreme, not
+  // the centre. An AN1x initialised from those fallbacks writes -100 cent master tune, -12 dB into
+  // all three EQ bands and a closed filter — so a profile that ships defaults must be preferred.
   if (p.valueType === 'enum') {
-    out.default = p.enum[0].id;
+    out.default = p.default ?? p.enum[0].id;
     out.choices = p.enum.map((e) => ({ id: e.id, label: e.label, value: e.wire }));
   } else {
-    out.default = p.range?.min ?? 0;
+    out.default = p.default ?? p.range?.min ?? 0;
     out.range = p.range ?? { min: 0, max: 127 };
   }
   if (p.absAddress) out.address = p.absAddress;
-  out.display = { mode: p.valueType === 'enum' ? 'choice' : 'number', shortLabel: p.name };
+  // shortLabel takes the INSTANCED name: two scenes of the same 110 parameters put "VCF Cutoff"
+  // twice in every picker otherwise, and the short label is the one the UI shows.
+  out.display = { mode: p.valueType === 'enum' ? 'choice' : 'number', shortLabel: out.name };
   out.normalization = { mode: p.valueType === 'enum' ? 'choiceIndex' : 'linear' };
   // DPD value-codec type -> the engine's single-parameter encoder vocabulary. s7 degrades to u7 (the
   // engine's send path has no signed encoder; profiles use raw wire ranges instead); u14 maps to the
-  // engine's canonical 'u14-msb-lsb' (and u14-lsb to 'u14-lsb-msb'), which it both sends and decodes.
+  // engine's canonical 'u14-msb-lsb' (and u14-lsb to 'u14-lsb-msb'), which it both sends and decodes;
+  // DPD's 'nibbles' is the engine's 'nibbled', with its count in the property the engine reads.
+  // That last one is not hypothetical tidying: the engine matches the encoder name as an exact
+  // string, so a parameter emitted as 'nibbles' fails its send with "Unsupported numeric encoder"
+  // and the knob does nothing. The GAIA profile reached 622 such parameters before this was found.
   const encType = p.valueType === 'enum' ? 'enum'
     : p.encoding?.type === 's7' ? 'u7'
     : p.encoding?.type === 'u14' ? 'u14-msb-lsb'
     : p.encoding?.type === 'u14-lsb' ? 'u14-lsb-msb'
+    : p.encoding?.type === 'nibbles' ? 'nibbled'
     : (p.encoding?.type ?? 'u7');
-  out.encoding = { type: encType };
+  out.encoding = encType === 'nibbled'
+    ? { type: 'nibbled', nibbles: p.encoding?.bytes ?? 2 }
+    : { type: encType };
   out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: true, source: 'singleParameter' };
   out.sendPolicy = { mode: p.valueType === 'enum' ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true };
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.
   out.messageRecipe = p.wires?.write?.msg === 'cc' ? ('cc' + p.wires.write.cc)
     : p.wires?.write?.msg === 'nrpn' ? ('nrpn' + String(p.wires.write.nrpn ?? '').replace(/\s+/g, ''))
     : (p.wires?.write?.msg ?? 'dt1');
+  // An rxLive wire is the message the instrument SENDS when its own control moves, which need not be
+  // the one the editor writes: a GAIA's filter knob is written as a DT1 to an address and transmitted
+  // as CC 102/103/104. Nothing derived from the write path can recognise those, so the inbound index
+  // needs it declared. This was resolved per instance and then dropped on the floor here, which is
+  // why the Player still carried a hand-written CC map. Only emitted when it differs from the write
+  // wire — when they are the same, the write path already describes the message.
+  const rx = p.wires?.rxLive;
+  const writeCc = p.wires?.write?.msg === 'cc' ? p.wires.write.cc : null;
+  if (rx?.msg === 'cc' && rx.cc != null && rx.cc !== writeCc) out.inbound = [{ kind: 'cc', controller: rx.cc }];
   out.ui = p.ui ?? { preferredComponent: p.valueType === 'enum' ? 'RadioButtonGroup' : 'Slider' };
   return out;
 }
@@ -140,7 +172,12 @@ function shapeToRecipe(shape, resolved) {
 // resolveProfile (Node) / resolveModel (browser). `legacyId` defaults to `<id>-dpd`. When
 // `embedDpdModel` is given, the new-schema model is stamped in so the Designer can reload the edit.
 export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, log } = {}) {
-  const params = resolveParams(resolved).filter((p) => p.instance === 0); // tone 1 + global
+  // Every instance, not just the first. The scope machinery resolves them all — the AN1x's scene
+  // scope declares two instances a stride apart, the GAIA's tone scope three — and this line used
+  // to throw everything past instance 0 away. The AN1x is the instrument that makes that a lie a
+  // user meets: its whole voice is TWO scenes morphed against each other, so a profile with one
+  // scene can edit only half of any patch.
+  const params = resolveParams(resolved);
 
   // Sysex recipes from the manufacturer's message shapes, then one CC recipe per distinct controller.
   const messageRecipes = (resolved.messageShapes ?? []).map((s) => shapeToRecipe(s, resolved));
@@ -179,15 +216,40 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
 
   // Device-inquiry identity is OPTIONAL — only emitted when the profile actually carries the codes
   // (a captured Identity Reply). We don't invent placeholder codes.
-  if (resolved.identity?.familyCode || resolved.identity?.modelNumber) {
-    legacy.identity = {
-      requestDeviceId: '$deviceId',
-      manufacturerId: toBytes(resolved.identity.manufacturerId ?? resolved.manufacturerId),
-      familyCode: toBytes(resolved.identity.familyCode),
-      modelNumber: toBytes(resolved.identity.modelNumber),
-      revision: toBytes(resolved.identity.revision),
-      timeoutMs: 1000, retries: 0,
-    };
+  //
+  // The schema's key names are `family` and `member` (dpd.schema.json, identity), and this used to
+  // look only for the legacy engine's names, `familyCode` and `modelNumber` — which no
+  // schema-conformant profile can contain. So a profile whose family code WAS captured (the AN1x
+  // has carried "02 1A" all along) emitted no identity, and its Test button answered "Could not
+  // ask, profile has no identity declaration" at the person holding the actual instrument. Same
+  // boundary disease as `nibbles` emitted under `bytes`: right data, wrong key, silent nothing.
+  //
+  // The engine compares only the fields that are declared, so manufacturer + family alone is a
+  // legal identity that matches on what it names and reports the rest. No revision is emitted even
+  // when the schema's `firmware` is present: firmware selects a VARIANT, and pinning it in the
+  // identity made a genuine GAIA report "Wrong instrument" after a firmware update.
+  {
+    const family = resolved.identity?.family ?? resolved.identity?.familyCode;
+    const member = resolved.identity?.member ?? resolved.identity?.modelNumber;
+    if (family || member) {
+      legacy.identity = {
+        // No requestDeviceId, deliberately: compileIdentityRequest defaults to 0x7F, and 0x7F is
+        // the Universal Device Inquiry's ALL CALL — every instrument answers it whatever its own
+        // device number is set to. Addressing the inquiry to one specific device is backwards for
+        // a button whose entire job is to find out what is out there before anything is configured.
+        //
+        // This emitted `requestDeviceId: '$deviceId'`, and $deviceId is NOT a universal device id.
+        // For Yamaha it is the composite `1n` byte of a Parameter Change — the AN1x's 0x10 means
+        // "substatus 1, device 1", correct in F0 43 1n and meaningless in F0 7E <id>, where it
+        // reads as "device 17". So the inquiry went out addressed to a device that was not there,
+        // the AN1x quite correctly said nothing, and Test reported no answer at someone holding a
+        // working synth on a working cable.
+        manufacturerId: toBytes(resolved.identity.manufacturerId ?? resolved.manufacturerId),
+        ...(family ? { familyCode: toBytes(family) } : {}),
+        ...(member ? { modelNumber: toBytes(member) } : {}),
+        timeoutMs: 1000, retries: 0,
+      };
+    }
   }
 
   // Bulk dumps -> legacy dumpDefinitions (get-patch / send-patch). Notes flag any C++ engine gaps.

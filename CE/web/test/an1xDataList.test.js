@@ -96,7 +96,6 @@ const STATED_RANGES = [
   ['scene', 'scVco1PitchModDepth', 1, 255],
   ['scene', 'scVco2PitchModDepth', 1, 255],
   ['scene', 'scVco1PwmDepth', 1, 127],
-  ['scene', 'scVco2Wave', 0, 3],          // VCO1 also has a 0..4 list, but only when Osc Sync is on
   ['common', 'vcTempo', 39, 240],         // 27h = follow MIDI clock, 28h...F0h = 40...240 BPM
 ];
 
@@ -144,4 +143,204 @@ test('the voice name is addressable, ten characters at the top of the common blo
     assert.equal(lowByte(parameter.address), index);
     assert.deepEqual(parameter.range, { min: 32, max: 127 });
   }
+});
+
+/**
+ * The MODE2 Control Change map, transcribed from the Data List p12.
+ *
+ * Two lists live on that page: "* TRANSMITTED CONTROL NUMBERS" / "* RECEIVED CONTROL NUMBER" for
+ * normal mode, and below them "In addition, the following CONTROL NUMBERs will be
+ * transmitted/received when Control Change Mode 2 is selected".
+ *
+ * The profile had every number from 50 upward shifted down — by 9, then 10, then 11 — which put
+ * Brightness on CC 64 (the sustain pedal) and Amp EG Decay on CC 65 (the portamento switch). A knob
+ * drag on either latched notes on the instrument. Nothing about the parameter list looked wrong:
+ * all 75 names were right, and the numbers were dense and plausible.
+ */
+const CONTROL_NUMBERS = {
+  1: 'Modulation', 3: 'Scene Select', 4: 'Foot Controller', 5: 'Portamento Time',
+  7: 'Main Volume', 8: 'Layer Mode', 9: 'Poly/Mono Mode', 10: 'Panpot', 11: 'Expression',
+  12: 'Ribbon Z Controller', 13: 'Ribbon X Controller', 14: 'LFO Reset Mode', 15: 'LFO1 Wave',
+  16: 'LFO1 Speed', 17: 'LFO2 Speed', 18: 'VCO1 Pitch Mod Depth', 19: 'VCF Filter Mod Depth',
+  20: 'LFO1 Delay', 21: 'VCO1 Pitch Coarse Tune', 22: 'VCO Sync Pitch', 23: 'VCO Sync Pitch Depth',
+  24: 'VCO Sync Pitch Source', 25: 'PEG Depth', 26: 'PEG Switch', 27: 'PEG Decay',
+  28: 'PEG Sustain Level', 29: 'Filter EG Release', 30: 'VCF Cutoff Keyboard Track',
+  31: 'Amp EG Sustain Level', 33: 'VCO Algorithm', 34: 'VCO Sync Pitch Mod Switch', 35: 'FM Depth',
+  36: 'FM Source1', 37: 'FM Source2', 39: 'Mixer Noise Level',
+  50: 'VCO1 Wave Type', 51: 'VCO2 Wave Type', 52: 'VCO2 Pitch Coarse Tune',
+  53: 'VCO2 Pitch Fine Tune', 54: 'VCO2 Edge', 55: 'VCO2 Pulse Width', 56: 'VCO2 PWM Depth',
+  57: 'VCO2 Pitch Mod Depth', 58: 'VCF HPF Cutoff', 59: 'VCF Filter Type',
+  60: 'Filter EG Velocity Sens', 61: 'Amp EG Velocity Sens', 62: 'VCA Volume',
+  63: 'VCA Feedback Level', 64: 'Sustain Switch', 65: 'Portamento Switch',
+  68: 'Mixer VCO1 Level', 69: 'Mixer VCO2 Level', 70: 'Ring Modulator Level',
+  71: 'Harmonic Content (VCF Resonance)', 72: 'Release Time (Amp EG Release)',
+  73: 'Attack Time (Amp EG Attack)', 74: 'Brightness (VCF Cutoff)', 75: 'Decay Time (Amp EG Decay)',
+  76: 'VCO1 Edge', 77: 'VCO1 Pitch Fine Tune', 78: 'VCO1 Pulse Width', 79: 'VCO1 PWM Depth',
+  80: 'VCA Amp Mod Depth', 81: 'Filter EG Depth', 82: 'Filter EG Attack', 83: 'Filter EG Decay',
+  85: 'Portamento Mode', 86: 'VCO1 PWM Source', 87: 'VCO2 PWM Source',
+  90: 'Arpeggio/Step Seq Switch', 91: 'Reverb Depth', 93: 'Chorus (Variation) Depth',
+  94: 'Delay Depth',
+};
+
+const ccParameters = LIBRARY.scopes.mode2cc.parameters;
+
+test('every Control Change carries the number the Data List gives it', () => {
+  const byNumber = new Map();
+  for (const parameter of ccParameters) {
+    const numbers = new Set(parameter.wires.map((w) => w.cc));
+    assert.equal(numbers.size, 1, `${parameter.id} spreads across CCs ${[...numbers].join(', ')}`);
+    const [number] = numbers;
+    assert.ok(!byNumber.has(number),
+      `CC ${number} is claimed by both ${byNumber.get(number)} and ${parameter.name}`);
+    byNumber.set(number, parameter.name);
+    assert.equal(parameter.name, CONTROL_NUMBERS[number],
+      `CC ${number} is "${parameter.name}" in the profile and "${CONTROL_NUMBERS[number]}" in the Data List`);
+    assert.ok(parameter.id.startsWith(`cc${number}-`),
+      `${parameter.id} encodes a CC number its wires do not use`);
+  }
+  assert.deepEqual([...byNumber.keys()].sort((a, b) => a - b),
+    Object.keys(CONTROL_NUMBERS).map(Number).sort((a, b) => a - b));
+});
+
+test('the two pedal CCs belong to the pedals', () => {
+  // The specific collision that made this audible: CC 64 latches notes on and never releases them,
+  // so a Brightness drag past halfway left the AN1x sustaining until something cleared it.
+  for (const [number, expected] of [[64, 'Sustain Switch'], [65, 'Portamento Switch']]) {
+    const owners = ccParameters.filter((p) => p.wires.some((w) => w.cc === number));
+    assert.equal(owners.length, 1, `CC ${number} has ${owners.length} owners`);
+    assert.equal(owners[0].name, expected);
+    assert.equal(owners[0].valueType, 'enum', `CC ${number} is a switch, not a dial`);
+    assert.deepEqual(owners[0].enum.map((e) => e.wire), [0, 127],
+      'p12: v = 0-63:OFF, 64-127:ON');
+  }
+});
+
+test('a CC the AN1x never sends is not decoded inbound', () => {
+  // p19's chart marks 5, 10, 11, 65 and 91, 93, 94 as x (transmitted) / o (recognized): the
+  // instrument accepts them but never originates them, so an rxLive wire there can never fire.
+  const receiveOnly = new Set([5, 10, 11, 65, 91, 93, 94]);
+  for (const parameter of ccParameters) {
+    const number = parameter.wires[0].cc;
+    const live = parameter.wires.some((w) => w.dir === 'rxLive');
+    assert.equal(live, !receiveOnly.has(number),
+      `CC ${number} (${parameter.name}) ${live ? 'has' : 'lacks'} an rxLive wire`);
+  }
+});
+
+test('the bulk-dump checksum is the one the Data List defines', async () => {
+  // p13 (3-5-4): "The Check sum is the value that results in a value of 0 for the lower 7 bits when
+  // the Byte Count, Start Address, Data and Check sum itself are added." Asserted as that property
+  // rather than by algorithm name, because assemble and parse share whichever function is named —
+  // dumpRoundTrip agreed with itself the whole time the algorithm was the wrong one.
+  const { resolveProfile } = await import('../../dpd/tools/dpd.mjs');
+  const { assembleDump } = await import('../../dpd/dumps.mjs');
+  const resolved = resolveProfile('yamaha.an1x');
+
+  for (const dump of LIBRARY.dumps) {
+    if (!dump.layout?.length) continue;
+    assert.equal(dump.message.checksum.type, 'roland-7bit', `${dump.id}`);
+    const bytes = assembleDump(dump, {}, resolved);
+    const { fromOffset, byteOffset } = dump.message.checksum;
+    const span = bytes.slice(fromOffset, byteOffset + 1);   // byte count .. data .. checksum itself
+    assert.equal(span.reduce((sum, b) => sum + b, 0) % 128, 0,
+      `${dump.id}: byte count + address + data + checksum must be 0 in the low 7 bits`);
+    assert.equal(bytes[0], 0xf0);
+    assert.equal(bytes.at(-1), 0xf7);
+  }
+});
+
+/**
+ * The Data List gives a default for every parameter. The profile carried none, and the emitter
+ * filled the hole with range.min — which for a bipolar parameter is the extreme, not the centre.
+ * An init/reset built from those fallbacks wrote -100 cent master tune, -12 dB into all three EQ
+ * bands and a shut filter.
+ */
+const STATED_DEFAULTS = [
+  ['system', 'sysMasterTune', 512],        // 200h = +0 cent
+  ['system', 'sysKbdVelocityCurve', 'wide'],
+  ['system', 'sysMidiLocal', 'on'],
+  ['common', 'vcTempo', 120],              // 78h
+  ['common', 'arpSceneSwitch', 'both'],    // 03h — unreachable while this was a 0..2 slider
+  ['common', 'eqLowGain', 64],             // 40h = +0 dB, not the -12 dB the fallback produced
+  ['common', 'eqMidGain', 64],
+  ['common', 'eqHighGain', 64],
+  ['scene', 'scVcfCutoff', 127],           // 7Fh
+  ['scene', 'scVcfResonance', 25],         // 19h = +0
+  ['scene', 'scFegDepth', 148],            // 94h = +20
+  ['scene', 'scPegSwitch', 'both'],        // 03h
+];
+
+test('defaults are the values the Data List prints, not the bottom of the range', () => {
+  for (const [scope, id, expected] of STATED_DEFAULTS) {
+    const parameter = LIBRARY.scopes[scope].parameters.find((p) => p.id === id);
+    assert.ok(parameter, `${scope}.${id} is missing`);
+    assert.equal(parameter.default, expected, `${scope}.${id}`);
+  }
+  const emitted = EMITTED.parameters.find((p) => p.id === 'sysMasterTune');
+  assert.equal(emitted.default, 512, 'the emitter must prefer the profile default over range.min');
+});
+
+test('every default a parameter declares is a value that parameter can hold', () => {
+  for (const [scopeName, scope] of Object.entries(LIBRARY.scopes)) {
+    for (const parameter of scope.parameters) {
+      if (parameter.default === undefined) continue;
+      const where = `${scopeName}.${parameter.id}`;
+      if (parameter.enum) {
+        assert.ok(parameter.enum.some((e) => e.id === parameter.default),
+          `${where}: default "${parameter.default}" is not one of its members`);
+      } else {
+        assert.ok(parameter.default >= parameter.range.min && parameter.default <= parameter.range.max,
+          `${where}: default ${parameter.default} is outside ${parameter.range.min}..${parameter.range.max}`);
+      }
+    }
+  }
+});
+
+/**
+ * Enums whose wire codes do not start at zero. The AN1x has several, and a member list numbered
+ * from 0 sends an undocumented byte for every position while making the factory default
+ * unreachable — a defect that survives every count-based check.
+ */
+test('enum members carry the Data List\'s own codes, including the ones that start at 1', () => {
+  const cases = [
+    ['scene', 'scPegSwitch', [1, 2, 3]],              // VCO1(1), VCO2(2), both(3)
+    ['scene', 'scSyncPitchModSwitch', [1, 2, 3]],     // master(1), slave(2), both(3)
+    ['common', 'arpSceneSwitch', [1, 2, 3]],          // Scene1(1), Scene2(2), both(3)
+    ['common', 'vcSceneSelect', [1, 2, 3]],           // Scene1(1), Scene2(2), Scene Ctrl(3)
+  ];
+  for (const [scope, id, wires] of cases) {
+    const parameter = LIBRARY.scopes[scope].parameters.find((p) => p.id === id);
+    assert.equal(parameter.valueType, 'enum', `${scope}.${id}`);
+    assert.deepEqual(parameter.enum.map((e) => e.wire), wires, `${scope}.${id}`);
+  }
+  // 7Fh means "off" for the four channel settings — it is not the 128th channel.
+  const channels = LIBRARY.scopes.system.parameters.find((p) => p.id === 'sysRxChannel1');
+  assert.equal(channels.enum.length, 17);
+  assert.deepEqual(channels.enum.at(-1), { id: 'off', label: 'Off', wire: 127 });
+});
+
+test('the effect type lists are as long as the Effect Type List says', () => {
+  // p6. The parameter table gives all three the same 00...0D range, which is right for exactly one
+  // of them; the remaining bytes select nothing on the hardware.
+  const lengths = { vcVariType: 14, vcDlyType: 5, vcRevType: 8 };
+  for (const [id, count] of Object.entries(lengths)) {
+    const parameter = LIBRARY.scopes.common.parameters.find((p) => p.id === id);
+    assert.equal(parameter.valueType, 'enum', id);
+    assert.equal(parameter.enum.length, count, id);
+    assert.deepEqual(parameter.enum.map((e) => e.wire), [...Array(count).keys()], id);
+  }
+});
+
+test('the control matrix can reach every destination the manual lists', () => {
+  // p10's Control Matrix List numbers its destinations 0..45 and ends at VarEF D:W. The parameter
+  // table says "00...24 off(0)...Vari-Ef Dry:Wet(24)", but 24h is FEG Depth in that list — the
+  // table's 24 is a misprint for 2D, and taking it literally hid the only effect destination.
+  for (let n = 1; n <= 16; n += 1) {
+    const parameter = LIBRARY.scopes.scene.parameters.find((p) => p.id === `scCmParam${n}`);
+    assert.equal(parameter.enum.length, 46, `scCmParam${n}`);
+    assert.equal(parameter.enum.at(-1).label, 'VarEF D:W');
+    assert.equal(parameter.enum.at(-1).wire, 45);
+  }
+  const track = LIBRARY.scopes.common.parameters.find((p) => p.id === 'fegTrkParam1');
+  assert.equal(track.enum.length, 57, 'the Free EG track list runs 0..56 and there the table agrees');
 });

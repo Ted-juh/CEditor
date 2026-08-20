@@ -105,15 +105,21 @@ function legacyParam(p) {
     group: p.group,
     type: p.valueType === 'enum' ? 'choice' : 'integer',
   };
+  // The DEVICE's default when the profile records one. The fallbacks below are placeholders, not
+  // data: range.min is the bottom of the dial, and for a bipolar parameter that is the extreme, not
+  // the centre. An AN1x initialised from those fallbacks writes -100 cent master tune, -12 dB into
+  // all three EQ bands and a closed filter — so a profile that ships defaults must be preferred.
   if (p.valueType === 'enum') {
-    out.default = p.enum[0].id;
+    out.default = p.default ?? p.enum[0].id;
     out.choices = p.enum.map((e) => ({ id: e.id, label: e.label, value: e.wire }));
   } else {
-    out.default = p.range?.min ?? 0;
+    out.default = p.default ?? p.range?.min ?? 0;
     out.range = p.range ?? { min: 0, max: 127 };
   }
   if (p.absAddress) out.address = p.absAddress;
-  out.display = { mode: p.valueType === 'enum' ? 'choice' : 'number', shortLabel: p.name };
+  // shortLabel takes the INSTANCED name: two scenes of the same 110 parameters put "VCF Cutoff"
+  // twice in every picker otherwise, and the short label is the one the UI shows.
+  out.display = { mode: p.valueType === 'enum' ? 'choice' : 'number', shortLabel: out.name };
   out.normalization = { mode: p.valueType === 'enum' ? 'choiceIndex' : 'linear' };
   // DPD value-codec type -> the engine's single-parameter encoder vocabulary. s7 degrades to u7 (the
   // engine's send path has no signed encoder; profiles use raw wire ranges instead); u14 maps to the

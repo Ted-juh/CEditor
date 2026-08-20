@@ -6,11 +6,20 @@
 // config). We resolve via mergeParamForId, which strips the instance prefix
 // (tone1.filter.cutoff -> filter.cutoff), so a panel's flat parameterId still matches.
 import gaiaRuntime from '../generated/roland.gaia.runtime.json';
+import an1xRuntime from '../generated/yamaha.an1x.runtime.json';
+import genericCcRuntime from '../generated/generic.cc.runtime.json';
 import dpdProfileMap from '../generated/dpdProfileMap.json';
 import { mergeParamForId, dpdBackingFor } from './dpdMergeOnDrop.js';
 
-// dpdSource -> bundled runtime. GAIA is the first shipped target; add more here as they land.
-const RUNTIMES = { 'roland.gaia': gaiaRuntime };
+// dpdSource -> bundled runtime. dpdProfileMap registers a profile as DPD-backed; if its runtime is
+// not ALSO in this table the app takes the DPD path and then finds nothing, which reads to the user
+// as "unresolved profile" rather than as a missing build artefact. dpdLibraryGuards.test.js keeps
+// the two in step.
+const RUNTIMES = {
+  'roland.gaia': gaiaRuntime,
+  'yamaha.an1x': an1xRuntime,
+  'generic.cc': genericCcRuntime,
+};
 
 function formatWire(wire) {
   if (!wire) return '';

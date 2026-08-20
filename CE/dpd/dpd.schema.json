@@ -57,7 +57,8 @@
         "manufacturerId": { "type": "string", "description": "Identity-Reply manufacturer id, space-hex (1 or 3 bytes)." },
         "family": { "type": "string", "description": "Device family code (2 bytes LSB MSB), space-hex." },
         "member": { "type": "string", "description": "Device family member code (2 bytes LSB MSB), space-hex." },
-        "firmware": { "type": "string", "description": "Firmware/version match for variant resolution." }
+        "firmware": { "type": "string", "description": "Firmware/version match for variant resolution." },
+        "capturedReply": { "type": "string", "description": "An Identity Reply captured from the real instrument, as space-hex — the evidence behind family/member. Never matched against; kept so a measured code can be told from an authored guess." }
       }
     },
     "checksum": { "$ref": "#/$defs/checksum" },
