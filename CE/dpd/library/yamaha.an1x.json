@@ -3379,6 +3379,336 @@
       "instances": 1,
       "parameters": [
         {
+          "id": "vcNameChar1",
+          "name": "Voice Name Char 1",
+          "group": "Common",
+          "valueType": "continuous",
+          "address": "00 00 00",
+          "size": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 32,
+            "max": 127
+          },
+          "note": "ASCII 20h..7Fh; the ten characters together are the voice name"
+        },
+        {
+          "id": "vcNameChar2",
+          "name": "Voice Name Char 2",
+          "group": "Common",
+          "valueType": "continuous",
+          "address": "00 00 01",
+          "size": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 32,
+            "max": 127
+          },
+          "note": "ASCII 20h..7Fh; the ten characters together are the voice name"
+        },
+        {
+          "id": "vcNameChar3",
+          "name": "Voice Name Char 3",
+          "group": "Common",
+          "valueType": "continuous",
+          "address": "00 00 02",
+          "size": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 32,
+            "max": 127
+          },
+          "note": "ASCII 20h..7Fh; the ten characters together are the voice name"
+        },
+        {
+          "id": "vcNameChar4",
+          "name": "Voice Name Char 4",
+          "group": "Common",
+          "valueType": "continuous",
+          "address": "00 00 03",
+          "size": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 32,
+            "max": 127
+          },
+          "note": "ASCII 20h..7Fh; the ten characters together are the voice name"
+        },
+        {
+          "id": "vcNameChar5",
+          "name": "Voice Name Char 5",
+          "group": "Common",
+          "valueType": "continuous",
+          "address": "00 00 04",
+          "size": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 32,
+            "max": 127
+          },
+          "note": "ASCII 20h..7Fh; the ten characters together are the voice name"
+        },
+        {
+          "id": "vcNameChar6",
+          "name": "Voice Name Char 6",
+          "group": "Common",
+          "valueType": "continuous",
+          "address": "00 00 05",
+          "size": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 32,
+            "max": 127
+          },
+          "note": "ASCII 20h..7Fh; the ten characters together are the voice name"
+        },
+        {
+          "id": "vcNameChar7",
+          "name": "Voice Name Char 7",
+          "group": "Common",
+          "valueType": "continuous",
+          "address": "00 00 06",
+          "size": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 32,
+            "max": 127
+          },
+          "note": "ASCII 20h..7Fh; the ten characters together are the voice name"
+        },
+        {
+          "id": "vcNameChar8",
+          "name": "Voice Name Char 8",
+          "group": "Common",
+          "valueType": "continuous",
+          "address": "00 00 07",
+          "size": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 32,
+            "max": 127
+          },
+          "note": "ASCII 20h..7Fh; the ten characters together are the voice name"
+        },
+        {
+          "id": "vcNameChar9",
+          "name": "Voice Name Char 9",
+          "group": "Common",
+          "valueType": "continuous",
+          "address": "00 00 08",
+          "size": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 32,
+            "max": 127
+          },
+          "note": "ASCII 20h..7Fh; the ten characters together are the voice name"
+        },
+        {
+          "id": "vcNameChar10",
+          "name": "Voice Name Char 10",
+          "group": "Common",
+          "valueType": "continuous",
+          "address": "00 00 09",
+          "size": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 32,
+            "max": 127
+          },
+          "note": "ASCII 20h..7Fh; the ten characters together are the voice name"
+        },
+        {
           "id": "vcCategory",
           "name": "Voice Category",
           "group": "Common",
@@ -3643,7 +3973,7 @@
             "preferredComponent": "Slider"
           },
           "range": {
-            "min": 0,
+            "min": 39,
             "max": 240
           }
         },
@@ -4650,6 +4980,38 @@
           }
         },
         {
+          "id": "vcDlyParam7",
+          "name": "Delay Param 7",
+          "group": "Common",
+          "valueType": "continuous",
+          "address": "00 00 3E",
+          "size": 2,
+          "encoding": {
+            "type": "u14"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 0,
+            "max": 16383
+          }
+        },
+        {
           "id": "vcRevType",
           "name": "Reverb Effect Type (see Effect Type List)",
           "group": "Common",
@@ -5013,7 +5375,7 @@
         },
         {
           "id": "arpType",
-          "name": "Arpeggio Type (UpDwn1..BassLineD)",
+          "name": "Arpeggio Type / Step Seq Pattern No",
           "group": "Arpeggio",
           "valueType": "continuous",
           "address": "00 00 52",
@@ -5045,14 +5407,11 @@
         },
         {
           "id": "arpStepPtnNo",
-          "name": "Step Seq Pattern No / Arp Kbd Mode",
+          "name": "Arp/Step Seq Keyboard Mode",
           "group": "Arpeggio",
-          "valueType": "continuous",
+          "valueType": "enum",
           "address": "00 00 53",
           "size": 1,
-          "encoding": {
-            "type": "u7"
-          },
           "access": {
             "read": false,
             "write": true
@@ -5068,23 +5427,28 @@
             }
           ],
           "ui": {
-            "preferredComponent": "Slider"
+            "preferredComponent": "RadioButtonGroup"
           },
-          "range": {
-            "min": 0,
-            "max": 127
-          }
+          "enum": [
+            {
+              "id": "chord",
+              "label": "Chord",
+              "wire": 0
+            },
+            {
+              "id": "chord-normal",
+              "label": "Chord & Normal",
+              "wire": 1
+            }
+          ]
         },
         {
           "id": "arpHold",
           "name": "Arp/Step Hold",
           "group": "Arpeggio",
-          "valueType": "continuous",
+          "valueType": "enum",
           "address": "00 00 54",
           "size": 1,
-          "encoding": {
-            "type": "u7"
-          },
           "access": {
             "read": false,
             "write": true
@@ -5100,12 +5464,20 @@
             }
           ],
           "ui": {
-            "preferredComponent": "Slider"
+            "preferredComponent": "ToggleButton"
           },
-          "range": {
-            "min": 0,
-            "max": 3
-          }
+          "enum": [
+            {
+              "id": "off",
+              "label": "Off",
+              "wire": 0
+            },
+            {
+              "id": "on",
+              "label": "On",
+              "wire": 1
+            }
+          ]
         },
         {
           "id": "arpSceneSwitch",
@@ -6492,7 +6864,8 @@
           "range": {
             "min": 0,
             "max": 4
-          }
+          },
+          "note": "0..3 (saw/pulse/saw2/mix) when Oscillator Sync is off; 0..4 (saw/pulse/inner1..3) when it is on"
         },
         {
           "id": "scVco1PitchCoarse",
@@ -6650,7 +7023,7 @@
             "preferredComponent": "Slider"
           },
           "range": {
-            "min": 0,
+            "min": 1,
             "max": 127
           }
         },
@@ -6658,12 +7031,9 @@
           "id": "scVco1PwmSource",
           "name": "VCO1 PWM Source",
           "group": "Oscillator",
-          "valueType": "continuous",
+          "valueType": "enum",
           "address": "00 00 1D",
           "size": 1,
-          "encoding": {
-            "type": "u7"
-          },
           "access": {
             "read": false,
             "write": true
@@ -6679,12 +7049,45 @@
             }
           ],
           "ui": {
-            "preferredComponent": "Slider"
+            "preferredComponent": "ComboBox"
           },
-          "range": {
-            "min": 0,
-            "max": 127
-          }
+          "enum": [
+            {
+              "id": "fixed",
+              "label": "Fixed",
+              "wire": 0
+            },
+            {
+              "id": "peg",
+              "label": "PEG",
+              "wire": 1
+            },
+            {
+              "id": "feg",
+              "label": "FEG",
+              "wire": 2
+            },
+            {
+              "id": "lfo1",
+              "label": "LFO1",
+              "wire": 3
+            },
+            {
+              "id": "lfo2",
+              "label": "LFO2",
+              "wire": 4
+            },
+            {
+              "id": "lfo2-phase",
+              "label": "LFO2-phase",
+              "wire": 5
+            },
+            {
+              "id": "lfo2-fast",
+              "label": "LFO2-fast",
+              "wire": 6
+            }
+          ]
         },
         {
           "id": "scVco1PitchModDepth",
@@ -6714,8 +7117,8 @@
             "preferredComponent": "Slider"
           },
           "range": {
-            "min": 0,
-            "max": 16383
+            "min": 1,
+            "max": 255
           }
         },
         {
@@ -6747,7 +7150,7 @@
           },
           "range": {
             "min": 0,
-            "max": 4
+            "max": 3
           }
         },
         {
@@ -6810,8 +7213,8 @@
             "preferredComponent": "Slider"
           },
           "range": {
-            "min": 0,
-            "max": 127
+            "min": 14,
+            "max": 114
           }
         },
         {
@@ -6914,12 +7317,9 @@
           "id": "scVco2PwmSource",
           "name": "VCO2 PWM Source",
           "group": "Oscillator",
-          "valueType": "continuous",
+          "valueType": "enum",
           "address": "00 00 26",
           "size": 1,
-          "encoding": {
-            "type": "u7"
-          },
           "access": {
             "read": false,
             "write": true
@@ -6935,12 +7335,45 @@
             }
           ],
           "ui": {
-            "preferredComponent": "Slider"
+            "preferredComponent": "ComboBox"
           },
-          "range": {
-            "min": 0,
-            "max": 127
-          }
+          "enum": [
+            {
+              "id": "fixed",
+              "label": "Fixed",
+              "wire": 0
+            },
+            {
+              "id": "peg",
+              "label": "PEG",
+              "wire": 1
+            },
+            {
+              "id": "feg",
+              "label": "FEG",
+              "wire": 2
+            },
+            {
+              "id": "lfo1",
+              "label": "LFO1",
+              "wire": 3
+            },
+            {
+              "id": "lfo2",
+              "label": "LFO2",
+              "wire": 4
+            },
+            {
+              "id": "lfo2-phase",
+              "label": "LFO2-phase",
+              "wire": 5
+            },
+            {
+              "id": "lfo2-fast",
+              "label": "LFO2-fast",
+              "wire": 6
+            }
+          ]
         },
         {
           "id": "scVco2PitchModDepth",
@@ -6970,8 +7403,8 @@
             "preferredComponent": "Slider"
           },
           "range": {
-            "min": 0,
-            "max": 16383
+            "min": 1,
+            "max": 255
           }
         },
         {
@@ -7353,7 +7786,7 @@
         },
         {
           "id": "scVcfResonance",
-          "name": "VCF Filter Resonance",
+          "name": "VCF Filter Resonance (-12..+102)",
           "group": "Filter",
           "valueType": "continuous",
           "address": "00 00 34",
@@ -7379,19 +7812,19 @@
             "preferredComponent": "Slider"
           },
           "range": {
-            "min": 0,
+            "min": 13,
             "max": 127
           }
         },
         {
           "id": "scFegDepth",
-          "name": "Filter EG Depth (-64..+63)",
+          "name": "Filter EG Depth (-128..+127)",
           "group": "Filter EG",
           "valueType": "continuous",
           "address": "00 00 35",
-          "size": 1,
+          "size": 2,
           "encoding": {
-            "type": "u7"
+            "type": "u14"
           },
           "access": {
             "read": false,
@@ -7412,45 +7845,13 @@
           },
           "range": {
             "min": 0,
-            "max": 127
+            "max": 255
           }
         },
         {
           "id": "scFegVelocity",
           "name": "Filter EG Velocity Sens (-64..+63)",
           "group": "Filter EG",
-          "valueType": "continuous",
-          "address": "00 00 36",
-          "size": 1,
-          "encoding": {
-            "type": "u7"
-          },
-          "access": {
-            "read": false,
-            "write": true
-          },
-          "wires": [
-            {
-              "dir": "write",
-              "msg": "dt1"
-            },
-            {
-              "dir": "rxLive",
-              "msg": "dt1"
-            }
-          ],
-          "ui": {
-            "preferredComponent": "Slider"
-          },
-          "range": {
-            "min": 0,
-            "max": 127
-          }
-        },
-        {
-          "id": "scVcfKbdTrack",
-          "name": "VCF Keyboard Track (-64..+63)",
-          "group": "Filter",
           "valueType": "continuous",
           "address": "00 00 37",
           "size": 1,
@@ -7480,11 +7881,43 @@
           }
         },
         {
+          "id": "scVcfKbdTrack",
+          "name": "VCF Keyboard Track (-32..+63)",
+          "group": "Filter",
+          "valueType": "continuous",
+          "address": "00 00 38",
+          "size": 1,
+          "encoding": {
+            "type": "u7"
+          },
+          "access": {
+            "read": false,
+            "write": true
+          },
+          "wires": [
+            {
+              "dir": "write",
+              "msg": "dt1"
+            },
+            {
+              "dir": "rxLive",
+              "msg": "dt1"
+            }
+          ],
+          "ui": {
+            "preferredComponent": "Slider"
+          },
+          "range": {
+            "min": 32,
+            "max": 127
+          }
+        },
+        {
           "id": "scVcfFilterModDepth",
           "name": "VCF Filter Mod Depth",
           "group": "Filter",
           "valueType": "continuous",
-          "address": "00 00 38",
+          "address": "00 00 39",
           "size": 1,
           "encoding": {
             "type": "u7"
@@ -7516,7 +7949,7 @@
           "name": "Amp EG Attack Time",
           "group": "Amp EG",
           "valueType": "continuous",
-          "address": "00 00 39",
+          "address": "00 00 3A",
           "size": 1,
           "encoding": {
             "type": "u7"
@@ -7548,7 +7981,7 @@
           "name": "Amp EG Decay Time",
           "group": "Amp EG",
           "valueType": "continuous",
-          "address": "00 00 3A",
+          "address": "00 00 3B",
           "size": 1,
           "encoding": {
             "type": "u7"
@@ -7580,7 +8013,7 @@
           "name": "Amp EG Sustain Level",
           "group": "Amp EG",
           "valueType": "continuous",
-          "address": "00 00 3B",
+          "address": "00 00 3C",
           "size": 1,
           "encoding": {
             "type": "u7"
@@ -7612,7 +8045,7 @@
           "name": "Amp EG Release Time",
           "group": "Amp EG",
           "valueType": "continuous",
-          "address": "00 00 3C",
+          "address": "00 00 3D",
           "size": 1,
           "encoding": {
             "type": "u7"
@@ -7644,7 +8077,7 @@
           "name": "VCA Volume",
           "group": "Amp EG",
           "valueType": "continuous",
-          "address": "00 00 3D",
+          "address": "00 00 3F",
           "size": 1,
           "encoding": {
             "type": "u7"
@@ -7676,7 +8109,7 @@
           "name": "Amp EG Velocity Sens (-64..+63)",
           "group": "Amp EG",
           "valueType": "continuous",
-          "address": "00 00 3E",
+          "address": "00 00 40",
           "size": 1,
           "encoding": {
             "type": "u7"
@@ -7708,7 +8141,7 @@
           "name": "VCA Feedback Level (-64..+63)",
           "group": "Amp EG",
           "valueType": "continuous",
-          "address": "00 00 3F",
+          "address": "00 00 3E",
           "size": 1,
           "encoding": {
             "type": "u7"
@@ -7740,7 +8173,7 @@
           "name": "VCA Amp Mod Depth (-64..+63)",
           "group": "Amp EG",
           "valueType": "continuous",
-          "address": "00 00 40",
+          "address": "00 00 41",
           "size": 1,
           "encoding": {
             "type": "u7"
@@ -7772,7 +8205,7 @@
           "name": "Variation Dry:Wet (D63>W..D<W63)",
           "group": "Amp EG",
           "valueType": "continuous",
-          "address": "00 00 41",
+          "address": "00 00 42",
           "size": 1,
           "encoding": {
             "type": "u7"
@@ -9733,51 +10166,51 @@
         },
         {
           "param": "scene.scFegVelocity",
-          "offset": 54
-        },
-        {
-          "param": "scene.scVcfKbdTrack",
           "offset": 55
         },
         {
-          "param": "scene.scVcfFilterModDepth",
+          "param": "scene.scVcfKbdTrack",
           "offset": 56
         },
         {
-          "param": "scene.scAegAttack",
+          "param": "scene.scVcfFilterModDepth",
           "offset": 57
         },
         {
-          "param": "scene.scAegDecay",
+          "param": "scene.scAegAttack",
           "offset": 58
         },
         {
-          "param": "scene.scAegSustain",
+          "param": "scene.scAegDecay",
           "offset": 59
         },
         {
-          "param": "scene.scAegRelease",
+          "param": "scene.scAegSustain",
           "offset": 60
         },
         {
-          "param": "scene.scVcaVolume",
+          "param": "scene.scAegRelease",
           "offset": 61
         },
         {
-          "param": "scene.scAegVelocity",
+          "param": "scene.scVcaFeedback",
           "offset": 62
         },
         {
-          "param": "scene.scVcaFeedback",
+          "param": "scene.scVcaVolume",
           "offset": 63
         },
         {
-          "param": "scene.scVcaAmpModDepth",
+          "param": "scene.scAegVelocity",
           "offset": 64
         },
         {
-          "param": "scene.scVariDryWet",
+          "param": "scene.scVcaAmpModDepth",
           "offset": 65
+        },
+        {
+          "param": "scene.scVariDryWet",
+          "offset": 66
         },
         {
           "param": "scene.scCmSource1",
@@ -10216,51 +10649,51 @@
         },
         {
           "param": "scene2.scFegVelocity",
-          "offset": 54
-        },
-        {
-          "param": "scene2.scVcfKbdTrack",
           "offset": 55
         },
         {
-          "param": "scene2.scVcfFilterModDepth",
+          "param": "scene2.scVcfKbdTrack",
           "offset": 56
         },
         {
-          "param": "scene2.scAegAttack",
+          "param": "scene2.scVcfFilterModDepth",
           "offset": 57
         },
         {
-          "param": "scene2.scAegDecay",
+          "param": "scene2.scAegAttack",
           "offset": 58
         },
         {
-          "param": "scene2.scAegSustain",
+          "param": "scene2.scAegDecay",
           "offset": 59
         },
         {
-          "param": "scene2.scAegRelease",
+          "param": "scene2.scAegSustain",
           "offset": 60
         },
         {
-          "param": "scene2.scVcaVolume",
+          "param": "scene2.scAegRelease",
           "offset": 61
         },
         {
-          "param": "scene2.scAegVelocity",
+          "param": "scene2.scVcaFeedback",
           "offset": 62
         },
         {
-          "param": "scene2.scVcaFeedback",
+          "param": "scene2.scVcaVolume",
           "offset": 63
         },
         {
-          "param": "scene2.scVcaAmpModDepth",
+          "param": "scene2.scAegVelocity",
           "offset": 64
         },
         {
-          "param": "scene2.scVariDryWet",
+          "param": "scene2.scVcaAmpModDepth",
           "offset": 65
+        },
+        {
+          "param": "scene2.scVariDryWet",
+          "offset": 66
         },
         {
           "param": "scene2.scCmSource1",
@@ -10502,6 +10935,152 @@
       "requestShape": "bulkRequest"
     }
   ],
+  "presets": {
+    "banks": [
+      {
+        "id": "preset",
+        "label": "Preset",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 0,
+        "slotCount": 128,
+        "programBase": 0,
+        "names": [
+          "Relaxx",
+          "Terraform",
+          "Celluloid",
+          "MajorBrass",
+          "Soar",
+          "Hardcore",
+          "Uni-Bass",
+          "MegaDrone",
+          "SyncLead",
+          "Legato",
+          "Alan",
+          "Mini",
+          "Chemical",
+          "SyncSweep",
+          "Caner",
+          "MorphEP",
+          "Doves",
+          "BPF Morph",
+          "Seismic",
+          "Earth",
+          "Vinnie",
+          "Detroit",
+          "Plastik",
+          "ChinaTech",
+          "Silence",
+          "Dog Bass",
+          "Slum",
+          "Loud",
+          "MiniLow",
+          "Kickbass",
+          "Sub Sub",
+          "Hardstep",
+          "Wonder",
+          "Duck Bass",
+          "Prophetic",
+          "Harmosync",
+          "Kangaroo",
+          "Acid 1",
+          "Acid 2",
+          "Acid 3",
+          "Soft Brass",
+          "Hard Brass",
+          "Bronze",
+          "Fatty",
+          "Quincy",
+          "CS80 Brass",
+          "Tangiers",
+          "Brassmorph",
+          "Analog",
+          "Lush",
+          "Chocolate",
+          "Stringz",
+          "String Pad",
+          "Billy",
+          "Fetish",
+          "P-5 Compy",
+          "Stakka",
+          "Dust",
+          "WarmPoly",
+          "Rhubarb",
+          "Susy",
+          "OB-8",
+          "Lucky",
+          "Earth Lead",
+          "HardSync",
+          "Chick",
+          "Stevie",
+          "Floyd75",
+          "Synchromes",
+          "High Sweep",
+          "Ice Pad",
+          "Sprinkler",
+          "GreatMorph",
+          "Church Bel",
+          "Deep Blue",
+          "Da Padd",
+          "Water Pad",
+          "Night Sky",
+          "Oberweich",
+          "PolyTen",
+          "PortPad",
+          "Sacred",
+          "Sweep&S/H",
+          "Slip",
+          "Polyswell",
+          "Padbells",
+          "DX E.Piano",
+          "Condenser",
+          "WhitneyEP",
+          "DrawOrgans",
+          "16+2.2/3",
+          "Garage",
+          "House",
+          "Pipes",
+          "Hi Q Reso",
+          "Koan",
+          "Woob",
+          "WelcomBk",
+          "Magic",
+          "Hypno",
+          "Soundtrack",
+          "Morphyum",
+          "WindString",
+          "Vangelizm",
+          "Chandelier",
+          "FreeEGRthm",
+          "Heaven",
+          "Mars",
+          "Porpoise",
+          "Jack",
+          "Microdot",
+          "Polaris",
+          "RhythmCity",
+          "CyberBag",
+          "CyberClock",
+          "Flutter",
+          "Industrial",
+          "Moment",
+          "We All Die",
+          "Cactus",
+          "Overdrive",
+          "Omega",
+          "Csus4",
+          "TekkLine",
+          "Highway",
+          "Saturn",
+          "Poptart",
+          "VirtlScene"
+        ]
+      }
+    ],
+    "recall": {
+      "kind": "pc"
+    }
+  },
   "provenance": {
     "source": "official",
     "verifiedRoundTrip": true,
@@ -10510,7 +11089,7 @@
     "confirmations": 0,
     "contributors": [],
     "importedFrom": null,
-    "note": "Transcribed from the official Yamaha AN1x Data List (MIDI Data Format). CC: full MODE2 per-parameter Control Change map (set the AN1x MIDI Control Mode to 2). SysEx parameter change F0 43 1n 5C addr3 data F7 (model 5C, no checksum): System block (00 00 00, complete), Voice Common (10 00 00: name in dump, effects/EQ/arp/free-EG config), Voice Scene 1/2 (10 10 00 / 10 11 00, full synth voice + 16-slot control matrix). Bulk dump F0 43 0n 5C bcMSB bcLSB addr3 data cs F7 with sum-7bit checksum; request F0 43 2n 5C addr3 F7. Full dump receive layouts verified for System and Scene buffers; Voice Common / Scene Ctrl / Step SEQ / User banks are request-only (their bulk-dump-only arrays, e.g. per-step Free EG data, are not transcribed). Device number assumed 0 for dump/request framing."
+    "note": "Transcribed from the official Yamaha AN1x Data List (MIDI Data Format). CC: full MODE2 per-parameter Control Change map (set the AN1x MIDI Control Mode to 2). SysEx parameter change F0 43 1n 5C addr3 data F7 (model 5C, no checksum): System block (00 00 00, complete), Voice Common (10 00 00: name in dump, effects/EQ/arp/free-EG config), Voice Scene 1/2 (10 10 00 / 10 11 00, full synth voice + 16-slot control matrix). Bulk dump F0 43 0n 5C bcMSB bcLSB addr3 data cs F7 with sum-7bit checksum; request F0 43 2n 5C addr3 F7. Full dump receive layouts verified for System and Scene buffers; Voice Common / Scene Ctrl / Step SEQ / User banks are request-only (their bulk-dump-only arrays, e.g. per-step Free EG data, are not transcribed). Device number assumed 0 for dump/request framing. Presets: the Data List's MIDI Implementation Chart marks Bank Select (CC 0 / CC 32) as neither transmitted nor recognized, so voices are selected by Program Change alone (0...127, transmitted and recognized). The 128 factory voice names are the Data List's Factory-set Voice List. The 128 User voices are addressable only by bulk dump (11 00 00...11 7F 00) and have no Program Change of their own, so they are not modelled as a bank: PRESET/USER is a front-panel choice the AN1x does not expose over MIDI."
   },
   "completeness": "partial"
 }

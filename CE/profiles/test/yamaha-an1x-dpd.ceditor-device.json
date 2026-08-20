@@ -3878,6 +3878,386 @@
       }
     },
     {
+      "id": "vcNameChar1",
+      "name": "Voice Name Char 1",
+      "group": "Common",
+      "type": "integer",
+      "default": 32,
+      "range": {
+        "min": 32,
+        "max": 127
+      },
+      "address": "10 00 00",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Voice Name Char 1"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcNameChar2",
+      "name": "Voice Name Char 2",
+      "group": "Common",
+      "type": "integer",
+      "default": 32,
+      "range": {
+        "min": 32,
+        "max": 127
+      },
+      "address": "10 00 01",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Voice Name Char 2"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcNameChar3",
+      "name": "Voice Name Char 3",
+      "group": "Common",
+      "type": "integer",
+      "default": 32,
+      "range": {
+        "min": 32,
+        "max": 127
+      },
+      "address": "10 00 02",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Voice Name Char 3"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcNameChar4",
+      "name": "Voice Name Char 4",
+      "group": "Common",
+      "type": "integer",
+      "default": 32,
+      "range": {
+        "min": 32,
+        "max": 127
+      },
+      "address": "10 00 03",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Voice Name Char 4"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcNameChar5",
+      "name": "Voice Name Char 5",
+      "group": "Common",
+      "type": "integer",
+      "default": 32,
+      "range": {
+        "min": 32,
+        "max": 127
+      },
+      "address": "10 00 04",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Voice Name Char 5"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcNameChar6",
+      "name": "Voice Name Char 6",
+      "group": "Common",
+      "type": "integer",
+      "default": 32,
+      "range": {
+        "min": 32,
+        "max": 127
+      },
+      "address": "10 00 05",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Voice Name Char 6"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcNameChar7",
+      "name": "Voice Name Char 7",
+      "group": "Common",
+      "type": "integer",
+      "default": 32,
+      "range": {
+        "min": 32,
+        "max": 127
+      },
+      "address": "10 00 06",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Voice Name Char 7"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcNameChar8",
+      "name": "Voice Name Char 8",
+      "group": "Common",
+      "type": "integer",
+      "default": 32,
+      "range": {
+        "min": 32,
+        "max": 127
+      },
+      "address": "10 00 07",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Voice Name Char 8"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcNameChar9",
+      "name": "Voice Name Char 9",
+      "group": "Common",
+      "type": "integer",
+      "default": 32,
+      "range": {
+        "min": 32,
+        "max": 127
+      },
+      "address": "10 00 08",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Voice Name Char 9"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcNameChar10",
+      "name": "Voice Name Char 10",
+      "group": "Common",
+      "type": "integer",
+      "default": 32,
+      "range": {
+        "min": 32,
+        "max": 127
+      },
+      "address": "10 00 09",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Voice Name Char 10"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
       "id": "vcCategory",
       "name": "Voice Category",
       "group": "Common",
@@ -4164,9 +4544,9 @@
       "name": "Common Tempo (midi=27h, 40..240)",
       "group": "Common",
       "type": "integer",
-      "default": 0,
+      "default": 39,
       "range": {
-        "min": 0,
+        "min": 39,
         "max": 240
       },
       "address": "10 00 10",
@@ -5392,6 +5772,44 @@
       }
     },
     {
+      "id": "vcDlyParam7",
+      "name": "Delay Param 7",
+      "group": "Common",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 16383
+      },
+      "address": "10 00 3E",
+      "display": {
+        "mode": "number",
+        "shortLabel": "Delay Param 7"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u14-msb-lsb"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "dt1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
       "id": "vcRevType",
       "name": "Reverb Effect Type (see Effect Type List)",
       "group": "Common",
@@ -5827,7 +6245,7 @@
     },
     {
       "id": "arpType",
-      "name": "Arpeggio Type (UpDwn1..BassLineD)",
+      "name": "Arpeggio Type / Step Seq Pattern No",
       "group": "Arpeggio",
       "type": "integer",
       "default": 0,
@@ -5838,7 +6256,7 @@
       "address": "10 00 52",
       "display": {
         "mode": "number",
-        "shortLabel": "Arpeggio Type (UpDwn1..BassLineD)"
+        "shortLabel": "Arpeggio Type / Step Seq Pattern No"
       },
       "normalization": {
         "mode": "linear"
@@ -5865,24 +6283,32 @@
     },
     {
       "id": "arpStepPtnNo",
-      "name": "Step Seq Pattern No / Arp Kbd Mode",
+      "name": "Arp/Step Seq Keyboard Mode",
       "group": "Arpeggio",
-      "type": "integer",
-      "default": 0,
-      "range": {
-        "min": 0,
-        "max": 127
-      },
+      "type": "choice",
+      "default": "chord",
+      "choices": [
+        {
+          "id": "chord",
+          "label": "Chord",
+          "value": 0
+        },
+        {
+          "id": "chord-normal",
+          "label": "Chord & Normal",
+          "value": 1
+        }
+      ],
       "address": "10 00 53",
       "display": {
-        "mode": "number",
-        "shortLabel": "Step Seq Pattern No / Arp Kbd Mode"
+        "mode": "choice",
+        "shortLabel": "Arp/Step Seq Keyboard Mode"
       },
       "normalization": {
-        "mode": "linear"
+        "mode": "choiceIndex"
       },
       "encoding": {
-        "type": "u7"
+        "type": "enum"
       },
       "access": {
         "canRead": false,
@@ -5891,36 +6317,44 @@
         "source": "singleParameter"
       },
       "sendPolicy": {
-        "mode": "continuous",
+        "mode": "onCommit",
         "coalesce": true,
         "minIntervalMs": 20,
         "sendFinalOnRelease": true
       },
       "messageRecipe": "dt1",
       "ui": {
-        "preferredComponent": "Slider"
+        "preferredComponent": "RadioButtonGroup"
       }
     },
     {
       "id": "arpHold",
       "name": "Arp/Step Hold",
       "group": "Arpeggio",
-      "type": "integer",
-      "default": 0,
-      "range": {
-        "min": 0,
-        "max": 3
-      },
+      "type": "choice",
+      "default": "off",
+      "choices": [
+        {
+          "id": "off",
+          "label": "Off",
+          "value": 0
+        },
+        {
+          "id": "on",
+          "label": "On",
+          "value": 1
+        }
+      ],
       "address": "10 00 54",
       "display": {
-        "mode": "number",
+        "mode": "choice",
         "shortLabel": "Arp/Step Hold"
       },
       "normalization": {
-        "mode": "linear"
+        "mode": "choiceIndex"
       },
       "encoding": {
-        "type": "u7"
+        "type": "enum"
       },
       "access": {
         "canRead": false,
@@ -5929,14 +6363,14 @@
         "source": "singleParameter"
       },
       "sendPolicy": {
-        "mode": "continuous",
+        "mode": "onCommit",
         "coalesce": true,
         "minIntervalMs": 20,
         "sendFinalOnRelease": true
       },
       "messageRecipe": "dt1",
       "ui": {
-        "preferredComponent": "Slider"
+        "preferredComponent": "ToggleButton"
       }
     },
     {
@@ -7735,9 +8169,9 @@
       "name": "VCO1 PWM Depth",
       "group": "Oscillator",
       "type": "integer",
-      "default": 0,
+      "default": 1,
       "range": {
-        "min": 0,
+        "min": 1,
         "max": 127
       },
       "address": "10 10 1C",
@@ -7772,22 +8206,55 @@
       "id": "scVco1PwmSource",
       "name": "VCO1 PWM Source",
       "group": "Oscillator",
-      "type": "integer",
-      "default": 0,
-      "range": {
-        "min": 0,
-        "max": 127
-      },
+      "type": "choice",
+      "default": "fixed",
+      "choices": [
+        {
+          "id": "fixed",
+          "label": "Fixed",
+          "value": 0
+        },
+        {
+          "id": "peg",
+          "label": "PEG",
+          "value": 1
+        },
+        {
+          "id": "feg",
+          "label": "FEG",
+          "value": 2
+        },
+        {
+          "id": "lfo1",
+          "label": "LFO1",
+          "value": 3
+        },
+        {
+          "id": "lfo2",
+          "label": "LFO2",
+          "value": 4
+        },
+        {
+          "id": "lfo2-phase",
+          "label": "LFO2-phase",
+          "value": 5
+        },
+        {
+          "id": "lfo2-fast",
+          "label": "LFO2-fast",
+          "value": 6
+        }
+      ],
       "address": "10 10 1D",
       "display": {
-        "mode": "number",
+        "mode": "choice",
         "shortLabel": "VCO1 PWM Source"
       },
       "normalization": {
-        "mode": "linear"
+        "mode": "choiceIndex"
       },
       "encoding": {
-        "type": "u7"
+        "type": "enum"
       },
       "access": {
         "canRead": false,
@@ -7796,14 +8263,14 @@
         "source": "singleParameter"
       },
       "sendPolicy": {
-        "mode": "continuous",
+        "mode": "onCommit",
         "coalesce": true,
         "minIntervalMs": 20,
         "sendFinalOnRelease": true
       },
       "messageRecipe": "dt1",
       "ui": {
-        "preferredComponent": "Slider"
+        "preferredComponent": "ComboBox"
       }
     },
     {
@@ -7811,10 +8278,10 @@
       "name": "VCO1 Pitch Mod Depth (-127..+127)",
       "group": "Oscillator",
       "type": "integer",
-      "default": 0,
+      "default": 1,
       "range": {
-        "min": 0,
-        "max": 16383
+        "min": 1,
+        "max": 255
       },
       "address": "10 10 1E",
       "display": {
@@ -7852,7 +8319,7 @@
       "default": 0,
       "range": {
         "min": 0,
-        "max": 4
+        "max": 3
       },
       "address": "10 10 20",
       "display": {
@@ -7925,10 +8392,10 @@
       "name": "VCO2 Pitch Fine",
       "group": "Oscillator",
       "type": "integer",
-      "default": 0,
+      "default": 14,
       "range": {
-        "min": 0,
-        "max": 127
+        "min": 14,
+        "max": 114
       },
       "address": "10 10 22",
       "display": {
@@ -8076,22 +8543,55 @@
       "id": "scVco2PwmSource",
       "name": "VCO2 PWM Source",
       "group": "Oscillator",
-      "type": "integer",
-      "default": 0,
-      "range": {
-        "min": 0,
-        "max": 127
-      },
+      "type": "choice",
+      "default": "fixed",
+      "choices": [
+        {
+          "id": "fixed",
+          "label": "Fixed",
+          "value": 0
+        },
+        {
+          "id": "peg",
+          "label": "PEG",
+          "value": 1
+        },
+        {
+          "id": "feg",
+          "label": "FEG",
+          "value": 2
+        },
+        {
+          "id": "lfo1",
+          "label": "LFO1",
+          "value": 3
+        },
+        {
+          "id": "lfo2",
+          "label": "LFO2",
+          "value": 4
+        },
+        {
+          "id": "lfo2-phase",
+          "label": "LFO2-phase",
+          "value": 5
+        },
+        {
+          "id": "lfo2-fast",
+          "label": "LFO2-fast",
+          "value": 6
+        }
+      ],
       "address": "10 10 26",
       "display": {
-        "mode": "number",
+        "mode": "choice",
         "shortLabel": "VCO2 PWM Source"
       },
       "normalization": {
-        "mode": "linear"
+        "mode": "choiceIndex"
       },
       "encoding": {
-        "type": "u7"
+        "type": "enum"
       },
       "access": {
         "canRead": false,
@@ -8100,14 +8600,14 @@
         "source": "singleParameter"
       },
       "sendPolicy": {
-        "mode": "continuous",
+        "mode": "onCommit",
         "coalesce": true,
         "minIntervalMs": 20,
         "sendFinalOnRelease": true
       },
       "messageRecipe": "dt1",
       "ui": {
-        "preferredComponent": "Slider"
+        "preferredComponent": "ComboBox"
       }
     },
     {
@@ -8115,10 +8615,10 @@
       "name": "VCO2 Pitch Mod Depth (-127..+127)",
       "group": "Oscillator",
       "type": "integer",
-      "default": 0,
+      "default": 1,
       "range": {
-        "min": 0,
-        "max": 16383
+        "min": 1,
+        "max": 255
       },
       "address": "10 10 27",
       "display": {
@@ -8596,18 +9096,18 @@
     },
     {
       "id": "scVcfResonance",
-      "name": "VCF Filter Resonance",
+      "name": "VCF Filter Resonance (-12..+102)",
       "group": "Filter",
       "type": "integer",
-      "default": 0,
+      "default": 13,
       "range": {
-        "min": 0,
+        "min": 13,
         "max": 127
       },
       "address": "10 10 34",
       "display": {
         "mode": "number",
-        "shortLabel": "VCF Filter Resonance"
+        "shortLabel": "VCF Filter Resonance (-12..+102)"
       },
       "normalization": {
         "mode": "linear"
@@ -8634,24 +9134,24 @@
     },
     {
       "id": "scFegDepth",
-      "name": "Filter EG Depth (-64..+63)",
+      "name": "Filter EG Depth (-128..+127)",
       "group": "Filter EG",
       "type": "integer",
       "default": 0,
       "range": {
         "min": 0,
-        "max": 127
+        "max": 255
       },
       "address": "10 10 35",
       "display": {
         "mode": "number",
-        "shortLabel": "Filter EG Depth (-64..+63)"
+        "shortLabel": "Filter EG Depth (-128..+127)"
       },
       "normalization": {
         "mode": "linear"
       },
       "encoding": {
-        "type": "u7"
+        "type": "u14-msb-lsb"
       },
       "access": {
         "canRead": false,
@@ -8680,7 +9180,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 10 36",
+      "address": "10 10 37",
       "display": {
         "mode": "number",
         "shortLabel": "Filter EG Velocity Sens (-64..+63)"
@@ -8710,18 +9210,18 @@
     },
     {
       "id": "scVcfKbdTrack",
-      "name": "VCF Keyboard Track (-64..+63)",
+      "name": "VCF Keyboard Track (-32..+63)",
       "group": "Filter",
       "type": "integer",
-      "default": 0,
+      "default": 32,
       "range": {
-        "min": 0,
+        "min": 32,
         "max": 127
       },
-      "address": "10 10 37",
+      "address": "10 10 38",
       "display": {
         "mode": "number",
-        "shortLabel": "VCF Keyboard Track (-64..+63)"
+        "shortLabel": "VCF Keyboard Track (-32..+63)"
       },
       "normalization": {
         "mode": "linear"
@@ -8756,7 +9256,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 10 38",
+      "address": "10 10 39",
       "display": {
         "mode": "number",
         "shortLabel": "VCF Filter Mod Depth"
@@ -8794,7 +9294,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 10 39",
+      "address": "10 10 3A",
       "display": {
         "mode": "number",
         "shortLabel": "Amp EG Attack Time"
@@ -8832,7 +9332,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 10 3A",
+      "address": "10 10 3B",
       "display": {
         "mode": "number",
         "shortLabel": "Amp EG Decay Time"
@@ -8870,7 +9370,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 10 3B",
+      "address": "10 10 3C",
       "display": {
         "mode": "number",
         "shortLabel": "Amp EG Sustain Level"
@@ -8908,7 +9408,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 10 3C",
+      "address": "10 10 3D",
       "display": {
         "mode": "number",
         "shortLabel": "Amp EG Release Time"
@@ -8946,7 +9446,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 10 3D",
+      "address": "10 10 3F",
       "display": {
         "mode": "number",
         "shortLabel": "VCA Volume"
@@ -8984,7 +9484,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 10 3E",
+      "address": "10 10 40",
       "display": {
         "mode": "number",
         "shortLabel": "Amp EG Velocity Sens (-64..+63)"
@@ -9022,7 +9522,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 10 3F",
+      "address": "10 10 3E",
       "display": {
         "mode": "number",
         "shortLabel": "VCA Feedback Level (-64..+63)"
@@ -9060,7 +9560,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 10 40",
+      "address": "10 10 41",
       "display": {
         "mode": "number",
         "shortLabel": "VCA Amp Mod Depth (-64..+63)"
@@ -9098,7 +9598,7 @@
         "min": 1,
         "max": 127
       },
-      "address": "10 10 41",
+      "address": "10 10 42",
       "display": {
         "mode": "number",
         "shortLabel": "Variation Dry:Wet (D63>W..D<W63)"
@@ -12087,9 +12587,9 @@
       "name": "VCO1 PWM Depth (Scene 2)",
       "group": "Oscillator",
       "type": "integer",
-      "default": 0,
+      "default": 1,
       "range": {
-        "min": 0,
+        "min": 1,
         "max": 127
       },
       "address": "10 11 1C",
@@ -12124,22 +12624,55 @@
       "id": "scene2.scVco1PwmSource",
       "name": "VCO1 PWM Source (Scene 2)",
       "group": "Oscillator",
-      "type": "integer",
-      "default": 0,
-      "range": {
-        "min": 0,
-        "max": 127
-      },
+      "type": "choice",
+      "default": "fixed",
+      "choices": [
+        {
+          "id": "fixed",
+          "label": "Fixed",
+          "value": 0
+        },
+        {
+          "id": "peg",
+          "label": "PEG",
+          "value": 1
+        },
+        {
+          "id": "feg",
+          "label": "FEG",
+          "value": 2
+        },
+        {
+          "id": "lfo1",
+          "label": "LFO1",
+          "value": 3
+        },
+        {
+          "id": "lfo2",
+          "label": "LFO2",
+          "value": 4
+        },
+        {
+          "id": "lfo2-phase",
+          "label": "LFO2-phase",
+          "value": 5
+        },
+        {
+          "id": "lfo2-fast",
+          "label": "LFO2-fast",
+          "value": 6
+        }
+      ],
       "address": "10 11 1D",
       "display": {
-        "mode": "number",
+        "mode": "choice",
         "shortLabel": "VCO1 PWM Source"
       },
       "normalization": {
-        "mode": "linear"
+        "mode": "choiceIndex"
       },
       "encoding": {
-        "type": "u7"
+        "type": "enum"
       },
       "access": {
         "canRead": false,
@@ -12148,14 +12681,14 @@
         "source": "singleParameter"
       },
       "sendPolicy": {
-        "mode": "continuous",
+        "mode": "onCommit",
         "coalesce": true,
         "minIntervalMs": 20,
         "sendFinalOnRelease": true
       },
       "messageRecipe": "dt1",
       "ui": {
-        "preferredComponent": "Slider"
+        "preferredComponent": "ComboBox"
       }
     },
     {
@@ -12163,10 +12696,10 @@
       "name": "VCO1 Pitch Mod Depth (-127..+127) (Scene 2)",
       "group": "Oscillator",
       "type": "integer",
-      "default": 0,
+      "default": 1,
       "range": {
-        "min": 0,
-        "max": 16383
+        "min": 1,
+        "max": 255
       },
       "address": "10 11 1E",
       "display": {
@@ -12204,7 +12737,7 @@
       "default": 0,
       "range": {
         "min": 0,
-        "max": 4
+        "max": 3
       },
       "address": "10 11 20",
       "display": {
@@ -12277,10 +12810,10 @@
       "name": "VCO2 Pitch Fine (Scene 2)",
       "group": "Oscillator",
       "type": "integer",
-      "default": 0,
+      "default": 14,
       "range": {
-        "min": 0,
-        "max": 127
+        "min": 14,
+        "max": 114
       },
       "address": "10 11 22",
       "display": {
@@ -12428,22 +12961,55 @@
       "id": "scene2.scVco2PwmSource",
       "name": "VCO2 PWM Source (Scene 2)",
       "group": "Oscillator",
-      "type": "integer",
-      "default": 0,
-      "range": {
-        "min": 0,
-        "max": 127
-      },
+      "type": "choice",
+      "default": "fixed",
+      "choices": [
+        {
+          "id": "fixed",
+          "label": "Fixed",
+          "value": 0
+        },
+        {
+          "id": "peg",
+          "label": "PEG",
+          "value": 1
+        },
+        {
+          "id": "feg",
+          "label": "FEG",
+          "value": 2
+        },
+        {
+          "id": "lfo1",
+          "label": "LFO1",
+          "value": 3
+        },
+        {
+          "id": "lfo2",
+          "label": "LFO2",
+          "value": 4
+        },
+        {
+          "id": "lfo2-phase",
+          "label": "LFO2-phase",
+          "value": 5
+        },
+        {
+          "id": "lfo2-fast",
+          "label": "LFO2-fast",
+          "value": 6
+        }
+      ],
       "address": "10 11 26",
       "display": {
-        "mode": "number",
+        "mode": "choice",
         "shortLabel": "VCO2 PWM Source"
       },
       "normalization": {
-        "mode": "linear"
+        "mode": "choiceIndex"
       },
       "encoding": {
-        "type": "u7"
+        "type": "enum"
       },
       "access": {
         "canRead": false,
@@ -12452,14 +13018,14 @@
         "source": "singleParameter"
       },
       "sendPolicy": {
-        "mode": "continuous",
+        "mode": "onCommit",
         "coalesce": true,
         "minIntervalMs": 20,
         "sendFinalOnRelease": true
       },
       "messageRecipe": "dt1",
       "ui": {
-        "preferredComponent": "Slider"
+        "preferredComponent": "ComboBox"
       }
     },
     {
@@ -12467,10 +13033,10 @@
       "name": "VCO2 Pitch Mod Depth (-127..+127) (Scene 2)",
       "group": "Oscillator",
       "type": "integer",
-      "default": 0,
+      "default": 1,
       "range": {
-        "min": 0,
-        "max": 16383
+        "min": 1,
+        "max": 255
       },
       "address": "10 11 27",
       "display": {
@@ -12948,18 +13514,18 @@
     },
     {
       "id": "scene2.scVcfResonance",
-      "name": "VCF Filter Resonance (Scene 2)",
+      "name": "VCF Filter Resonance (-12..+102) (Scene 2)",
       "group": "Filter",
       "type": "integer",
-      "default": 0,
+      "default": 13,
       "range": {
-        "min": 0,
+        "min": 13,
         "max": 127
       },
       "address": "10 11 34",
       "display": {
         "mode": "number",
-        "shortLabel": "VCF Filter Resonance"
+        "shortLabel": "VCF Filter Resonance (-12..+102)"
       },
       "normalization": {
         "mode": "linear"
@@ -12986,24 +13552,24 @@
     },
     {
       "id": "scene2.scFegDepth",
-      "name": "Filter EG Depth (-64..+63) (Scene 2)",
+      "name": "Filter EG Depth (-128..+127) (Scene 2)",
       "group": "Filter EG",
       "type": "integer",
       "default": 0,
       "range": {
         "min": 0,
-        "max": 127
+        "max": 255
       },
       "address": "10 11 35",
       "display": {
         "mode": "number",
-        "shortLabel": "Filter EG Depth (-64..+63)"
+        "shortLabel": "Filter EG Depth (-128..+127)"
       },
       "normalization": {
         "mode": "linear"
       },
       "encoding": {
-        "type": "u7"
+        "type": "u14-msb-lsb"
       },
       "access": {
         "canRead": false,
@@ -13032,7 +13598,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 11 36",
+      "address": "10 11 37",
       "display": {
         "mode": "number",
         "shortLabel": "Filter EG Velocity Sens (-64..+63)"
@@ -13062,18 +13628,18 @@
     },
     {
       "id": "scene2.scVcfKbdTrack",
-      "name": "VCF Keyboard Track (-64..+63) (Scene 2)",
+      "name": "VCF Keyboard Track (-32..+63) (Scene 2)",
       "group": "Filter",
       "type": "integer",
-      "default": 0,
+      "default": 32,
       "range": {
-        "min": 0,
+        "min": 32,
         "max": 127
       },
-      "address": "10 11 37",
+      "address": "10 11 38",
       "display": {
         "mode": "number",
-        "shortLabel": "VCF Keyboard Track (-64..+63)"
+        "shortLabel": "VCF Keyboard Track (-32..+63)"
       },
       "normalization": {
         "mode": "linear"
@@ -13108,7 +13674,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 11 38",
+      "address": "10 11 39",
       "display": {
         "mode": "number",
         "shortLabel": "VCF Filter Mod Depth"
@@ -13146,7 +13712,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 11 39",
+      "address": "10 11 3A",
       "display": {
         "mode": "number",
         "shortLabel": "Amp EG Attack Time"
@@ -13184,7 +13750,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 11 3A",
+      "address": "10 11 3B",
       "display": {
         "mode": "number",
         "shortLabel": "Amp EG Decay Time"
@@ -13222,7 +13788,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 11 3B",
+      "address": "10 11 3C",
       "display": {
         "mode": "number",
         "shortLabel": "Amp EG Sustain Level"
@@ -13260,7 +13826,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 11 3C",
+      "address": "10 11 3D",
       "display": {
         "mode": "number",
         "shortLabel": "Amp EG Release Time"
@@ -13298,7 +13864,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 11 3D",
+      "address": "10 11 3F",
       "display": {
         "mode": "number",
         "shortLabel": "VCA Volume"
@@ -13336,7 +13902,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 11 3E",
+      "address": "10 11 40",
       "display": {
         "mode": "number",
         "shortLabel": "Amp EG Velocity Sens (-64..+63)"
@@ -13374,7 +13940,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 11 3F",
+      "address": "10 11 3E",
       "display": {
         "mode": "number",
         "shortLabel": "VCA Feedback Level (-64..+63)"
@@ -13412,7 +13978,7 @@
         "min": 0,
         "max": 127
       },
-      "address": "10 11 40",
+      "address": "10 11 41",
       "display": {
         "mode": "number",
         "shortLabel": "VCA Amp Mod Depth (-64..+63)"
@@ -13450,7 +14016,7 @@
         "min": 1,
         "max": 127
       },
-      "address": "10 11 41",
+      "address": "10 11 42",
       "display": {
         "mode": "number",
         "shortLabel": "Variation Dry:Wet (D63>W..D<W63)"
@@ -16256,51 +16822,51 @@
         },
         {
           "parameter": "scFegVelocity",
-          "offset": 54
-        },
-        {
-          "parameter": "scVcfKbdTrack",
           "offset": 55
         },
         {
-          "parameter": "scVcfFilterModDepth",
+          "parameter": "scVcfKbdTrack",
           "offset": 56
         },
         {
-          "parameter": "scAegAttack",
+          "parameter": "scVcfFilterModDepth",
           "offset": 57
         },
         {
-          "parameter": "scAegDecay",
+          "parameter": "scAegAttack",
           "offset": 58
         },
         {
-          "parameter": "scAegSustain",
+          "parameter": "scAegDecay",
           "offset": 59
         },
         {
-          "parameter": "scAegRelease",
+          "parameter": "scAegSustain",
           "offset": 60
         },
         {
-          "parameter": "scVcaVolume",
+          "parameter": "scAegRelease",
           "offset": 61
         },
         {
-          "parameter": "scAegVelocity",
+          "parameter": "scVcaFeedback",
           "offset": 62
         },
         {
-          "parameter": "scVcaFeedback",
+          "parameter": "scVcaVolume",
           "offset": 63
         },
         {
-          "parameter": "scVcaAmpModDepth",
+          "parameter": "scAegVelocity",
           "offset": 64
         },
         {
-          "parameter": "scVariDryWet",
+          "parameter": "scVcaAmpModDepth",
           "offset": 65
+        },
+        {
+          "parameter": "scVariDryWet",
+          "offset": 66
         },
         {
           "parameter": "scCmSource1",
@@ -16734,51 +17300,51 @@
         },
         {
           "parameter": "scFegVelocity",
-          "offset": 54
-        },
-        {
-          "parameter": "scVcfKbdTrack",
           "offset": 55
         },
         {
-          "parameter": "scVcfFilterModDepth",
+          "parameter": "scVcfKbdTrack",
           "offset": 56
         },
         {
-          "parameter": "scAegAttack",
+          "parameter": "scVcfFilterModDepth",
           "offset": 57
         },
         {
-          "parameter": "scAegDecay",
+          "parameter": "scAegAttack",
           "offset": 58
         },
         {
-          "parameter": "scAegSustain",
+          "parameter": "scAegDecay",
           "offset": 59
         },
         {
-          "parameter": "scAegRelease",
+          "parameter": "scAegSustain",
           "offset": 60
         },
         {
-          "parameter": "scVcaVolume",
+          "parameter": "scAegRelease",
           "offset": 61
         },
         {
-          "parameter": "scAegVelocity",
+          "parameter": "scVcaFeedback",
           "offset": 62
         },
         {
-          "parameter": "scVcaFeedback",
+          "parameter": "scVcaVolume",
           "offset": 63
         },
         {
-          "parameter": "scVcaAmpModDepth",
+          "parameter": "scAegVelocity",
           "offset": 64
         },
         {
-          "parameter": "scVariDryWet",
+          "parameter": "scVcaAmpModDepth",
           "offset": 65
+        },
+        {
+          "parameter": "scVariDryWet",
+          "offset": 66
         },
         {
           "parameter": "scCmSource1",
@@ -16975,5 +17541,151 @@
       ],
       "requestRecipe": "bulkRequest"
     }
-  ]
+  ],
+  "presets": {
+    "banks": [
+      {
+        "id": "preset",
+        "label": "Preset",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 0,
+        "slotCount": 128,
+        "programBase": 0,
+        "names": [
+          "Relaxx",
+          "Terraform",
+          "Celluloid",
+          "MajorBrass",
+          "Soar",
+          "Hardcore",
+          "Uni-Bass",
+          "MegaDrone",
+          "SyncLead",
+          "Legato",
+          "Alan",
+          "Mini",
+          "Chemical",
+          "SyncSweep",
+          "Caner",
+          "MorphEP",
+          "Doves",
+          "BPF Morph",
+          "Seismic",
+          "Earth",
+          "Vinnie",
+          "Detroit",
+          "Plastik",
+          "ChinaTech",
+          "Silence",
+          "Dog Bass",
+          "Slum",
+          "Loud",
+          "MiniLow",
+          "Kickbass",
+          "Sub Sub",
+          "Hardstep",
+          "Wonder",
+          "Duck Bass",
+          "Prophetic",
+          "Harmosync",
+          "Kangaroo",
+          "Acid 1",
+          "Acid 2",
+          "Acid 3",
+          "Soft Brass",
+          "Hard Brass",
+          "Bronze",
+          "Fatty",
+          "Quincy",
+          "CS80 Brass",
+          "Tangiers",
+          "Brassmorph",
+          "Analog",
+          "Lush",
+          "Chocolate",
+          "Stringz",
+          "String Pad",
+          "Billy",
+          "Fetish",
+          "P-5 Compy",
+          "Stakka",
+          "Dust",
+          "WarmPoly",
+          "Rhubarb",
+          "Susy",
+          "OB-8",
+          "Lucky",
+          "Earth Lead",
+          "HardSync",
+          "Chick",
+          "Stevie",
+          "Floyd75",
+          "Synchromes",
+          "High Sweep",
+          "Ice Pad",
+          "Sprinkler",
+          "GreatMorph",
+          "Church Bel",
+          "Deep Blue",
+          "Da Padd",
+          "Water Pad",
+          "Night Sky",
+          "Oberweich",
+          "PolyTen",
+          "PortPad",
+          "Sacred",
+          "Sweep&S/H",
+          "Slip",
+          "Polyswell",
+          "Padbells",
+          "DX E.Piano",
+          "Condenser",
+          "WhitneyEP",
+          "DrawOrgans",
+          "16+2.2/3",
+          "Garage",
+          "House",
+          "Pipes",
+          "Hi Q Reso",
+          "Koan",
+          "Woob",
+          "WelcomBk",
+          "Magic",
+          "Hypno",
+          "Soundtrack",
+          "Morphyum",
+          "WindString",
+          "Vangelizm",
+          "Chandelier",
+          "FreeEGRthm",
+          "Heaven",
+          "Mars",
+          "Porpoise",
+          "Jack",
+          "Microdot",
+          "Polaris",
+          "RhythmCity",
+          "CyberBag",
+          "CyberClock",
+          "Flutter",
+          "Industrial",
+          "Moment",
+          "We All Die",
+          "Cactus",
+          "Overdrive",
+          "Omega",
+          "Csus4",
+          "TekkLine",
+          "Highway",
+          "Saturn",
+          "Poptart",
+          "VirtlScene"
+        ]
+      }
+    ],
+    "recall": {
+      "kind": "pc"
+    }
+  }
 }
