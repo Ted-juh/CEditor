@@ -139,17 +139,23 @@ function legacyParam(p) {
   // ids at all; their names carry the instance too, because "Mixer VCO1 Level" twice in a parameter
   // list answers no question anyone is asking.
   const instanced = p.instance > 0;
+  const isText = p.valueType === 'text';
   const out = {
     id: instanced ? p.resolvedId : flat(p.resolvedId),
     name: instanced ? `${p.name} (${p.scopeLabel ?? cap(p.scope)} ${p.instance + 1})` : p.name,
     group: p.group,
-    type: p.valueType === 'enum' ? 'choice' : 'integer',
+    type: p.valueType === 'enum' ? 'choice' : isText ? 'text' : 'integer',
   };
   // The DEVICE's default when the profile records one. The fallbacks below are placeholders, not
   // data: range.min is the bottom of the dial, and for a bipolar parameter that is the extreme, not
   // the centre. An AN1x initialised from those fallbacks writes -100 cent master tune, -12 dB into
   // all three EQ bands and a closed filter — so a profile that ships defaults must be preferred.
-  if (p.valueType === 'enum') {
+  if (isText) {
+    // A name has no range and no choices — its value IS the string, and the engine's text encoder
+    // reads `length` and `pad` off the encoding to lay it out. Emitting a range here would give it
+    // a slider's metadata and a slider's drag-fit colour.
+    out.default = typeof p.default === 'string' ? p.default : '';
+  } else if (p.valueType === 'enum') {
     out.default = p.default ?? p.enum[0].id;
     out.choices = p.enum.map((e) => ({ id: e.id, label: e.label, value: e.wire }));
   } else {
@@ -159,8 +165,9 @@ function legacyParam(p) {
   if (p.absAddress) out.address = p.absAddress;
   // shortLabel takes the INSTANCED name: two scenes of the same 110 parameters put "VCF Cutoff"
   // twice in every picker otherwise, and the short label is the one the UI shows.
-  out.display = { mode: p.valueType === 'enum' ? 'choice' : 'number', shortLabel: out.name };
-  out.normalization = { mode: p.valueType === 'enum' ? 'choiceIndex' : 'linear' };
+  out.display = { mode: p.valueType === 'enum' ? 'choice' : isText ? 'text' : 'number', shortLabel: out.name };
+  // A string has no normalized position — there is no 0..1 to put it on.
+  if (!isText) out.normalization = { mode: p.valueType === 'enum' ? 'choiceIndex' : 'linear' };
   // DPD value-codec type -> the engine's single-parameter encoder vocabulary. s7 degrades to u7 (the
   // engine's send path has no signed encoder; profiles use raw wire ranges instead); u14 maps to the
   // engine's canonical 'u14-msb-lsb' (and u14-lsb to 'u14-lsb-msb'), which it both sends and decodes;
@@ -169,16 +176,22 @@ function legacyParam(p) {
   // string, so a parameter emitted as 'nibbles' fails its send with "Unsupported numeric encoder"
   // and the knob does nothing. The GAIA profile reached 622 such parameters before this was found.
   const encType = p.valueType === 'enum' ? 'enum'
+    : isText ? (p.encoding?.type ?? 'text-ascii')
     : p.encoding?.type === 's7' ? 'u7'
     : p.encoding?.type === 'u14' ? 'u14-msb-lsb'
     : p.encoding?.type === 'u14-lsb' ? 'u14-lsb-msb'
     : p.encoding?.type === 'nibbles' ? 'nibbled'
     : (p.encoding?.type ?? 'u7');
+  // The engine's text encoder reads `length` and `pad` off the encoding — without them it defaults
+  // to one character and pads with spaces, which writes a one-byte name into a ten-byte field.
   out.encoding = encType === 'nibbled'
     ? { type: 'nibbled', nibbles: p.encoding?.bytes ?? 2 }
-    : { type: encType };
+    : isText
+      ? { type: encType, length: p.encoding?.length ?? 1, pad: p.encoding?.pad ?? 32 }
+      : { type: encType };
   out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: true, source: 'singleParameter' };
-  out.sendPolicy = { mode: p.valueType === 'enum' ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true };
+  // A name is committed, not dragged.
+  out.sendPolicy = { mode: p.valueType === 'enum' || isText ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true };
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.
   out.messageRecipe = p.wires?.write?.msg === 'cc' ? ('cc' + p.wires.write.cc)
     : p.wires?.write?.msg === 'nrpn' ? ('nrpn' + String(p.wires.write.nrpn ?? '').replace(/\s+/g, ''))

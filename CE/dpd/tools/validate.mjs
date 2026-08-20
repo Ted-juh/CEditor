@@ -2,7 +2,7 @@
 // (usable by ajv / editors); this is the dependency-free check the tools + the in-app Designer run,
 // kept in step with the schema's enums/required-fields so it's a real import gate (not a token check).
 const KINDS = ['manufacturer', 'model', 'variant', 'component'];
-const VALUE_TYPES = ['continuous', 'signed', 'enum', 'toggle', 'trigger'];
+const VALUE_TYPES = ['continuous', 'signed', 'enum', 'toggle', 'trigger', 'text'];
 const WIRE_DIRS = ['write', 'read', 'rxLive'];
 const WIRE_MSGS = ['dt1', 'rq1', 'cc', 'nrpn', 'raw'];
 const CHECKSUM_TYPES = ['roland-7bit', 'sum-7bit', 'xor', 'none'];
@@ -10,8 +10,13 @@ const ENCODING_TYPES = ['u7', 'u8', 's7', 'u14', 'u14-lsb', 'nibbles', 'packed8t
 const SHAPE_KINDS = ['sysex', 'cc', 'nrpn', 'raw'];
 const SCOPE_KINDS = ['global', 'tone', 'part', 'effect', 'drumMap', 'patch'];
 const DUMP_KINDS = ['patch', 'performance', 'bank'];
+// The two text codecs are parameter encodings as well as dump codecs. A patch name is ONE value —
+// ten bytes of ASCII at one address — and modelling it as ten one-byte parameters gives you ten
+// knobs where a name field belongs, and a librarian with nothing to read.
+const TEXT_CODEC_TYPES = ['text-ascii', 'text-nibbled-ascii'];
+const PARAM_ENCODING_TYPES = [...ENCODING_TYPES, ...TEXT_CODEC_TYPES];
 // per-offset dump codecs: the value-encoding set plus the two text (patch-name) codecs.
-const DUMP_CODEC_TYPES = [...ENCODING_TYPES, 'text-ascii', 'text-nibbled-ascii'];
+const DUMP_CODEC_TYPES = [...ENCODING_TYPES, ...TEXT_CODEC_TYPES];
 const ADDRESS_RE = /^([0-9A-Fa-f]{2})(\s[0-9A-Fa-f]{2})*$/;
 
 export function validateProfile(profile) {
@@ -50,8 +55,17 @@ export function validateProfile(profile) {
         });
       }
       if (p.encoding) {
-        if (!ENCODING_TYPES.includes(p.encoding.type)) E(`${sk}.${id}: bad encoding.type ${p.encoding.type}`);
+        if (!PARAM_ENCODING_TYPES.includes(p.encoding.type)) E(`${sk}.${id}: bad encoding.type ${p.encoding.type}`);
         if (p.encoding.type === 'bitslice' && !Array.isArray(p.encoding.slices)) E(`${sk}.${id}: bitslice encoding needs slices`);
+        if (TEXT_CODEC_TYPES.includes(p.encoding.type) && !(p.encoding.length > 0)) {
+          E(`${sk}.${id}: a text encoding needs a positive length`);
+        }
+      }
+      if (p.valueType === 'text' && !TEXT_CODEC_TYPES.includes(p.encoding?.type)) {
+        E(`${sk}.${id}: a text parameter needs a text encoding`);
+      }
+      if (p.valueType === 'text' && p.size != null && p.size !== (p.encoding?.type === 'text-nibbled-ascii' ? p.encoding.length * 2 : p.encoding?.length)) {
+        E(`${sk}.${id}: text size ${p.size} does not match its encoding length`);
       }
       if (p.address && !ADDRESS_RE.test(p.address)) E(`${sk}.${id}: bad address`);
       for (const w of [p.rxLive, ...(p.wires ?? [])].filter(Boolean)) {

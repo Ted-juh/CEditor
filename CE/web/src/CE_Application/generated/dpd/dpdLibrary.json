@@ -872,7 +872,7 @@
   "yamaha.an1x": {
     "schemaVersion": 1,
     "id": "yamaha.an1x",
-    "version": "3.2.0",
+    "version": "3.3.0",
     "kind": "model",
     "label": "Yamaha AN1x",
     "inherits": "yamaha",
@@ -4660,14 +4660,16 @@
         "instances": 1,
         "parameters": [
           {
-            "id": "vcNameChar1",
-            "name": "Voice Name Char 1",
+            "id": "vcName",
+            "name": "Voice Name",
             "group": "Common",
-            "valueType": "continuous",
+            "valueType": "text",
             "address": "00 00 00",
-            "size": 1,
+            "size": 10,
             "encoding": {
-              "type": "u7"
+              "type": "text-ascii",
+              "length": 10,
+              "pad": 32
             },
             "access": {
               "read": false,
@@ -4684,320 +4686,10 @@
               }
             ],
             "ui": {
-              "preferredComponent": "Slider"
+              "preferredComponent": "TextInput"
             },
-            "range": {
-              "min": 32,
-              "max": 127
-            },
-            "note": "ASCII 20h..7Fh; the ten characters together are the voice name",
-            "default": 73
-          },
-          {
-            "id": "vcNameChar2",
-            "name": "Voice Name Char 2",
-            "group": "Common",
-            "valueType": "continuous",
-            "address": "00 00 01",
-            "size": 1,
-            "encoding": {
-              "type": "u7"
-            },
-            "access": {
-              "read": false,
-              "write": true
-            },
-            "wires": [
-              {
-                "dir": "write",
-                "msg": "dt1"
-              },
-              {
-                "dir": "rxLive",
-                "msg": "dt1"
-              }
-            ],
-            "ui": {
-              "preferredComponent": "Slider"
-            },
-            "range": {
-              "min": 32,
-              "max": 127
-            },
-            "note": "ASCII 20h..7Fh; the ten characters together are the voice name",
-            "default": 110
-          },
-          {
-            "id": "vcNameChar3",
-            "name": "Voice Name Char 3",
-            "group": "Common",
-            "valueType": "continuous",
-            "address": "00 00 02",
-            "size": 1,
-            "encoding": {
-              "type": "u7"
-            },
-            "access": {
-              "read": false,
-              "write": true
-            },
-            "wires": [
-              {
-                "dir": "write",
-                "msg": "dt1"
-              },
-              {
-                "dir": "rxLive",
-                "msg": "dt1"
-              }
-            ],
-            "ui": {
-              "preferredComponent": "Slider"
-            },
-            "range": {
-              "min": 32,
-              "max": 127
-            },
-            "note": "ASCII 20h..7Fh; the ten characters together are the voice name",
-            "default": 105
-          },
-          {
-            "id": "vcNameChar4",
-            "name": "Voice Name Char 4",
-            "group": "Common",
-            "valueType": "continuous",
-            "address": "00 00 03",
-            "size": 1,
-            "encoding": {
-              "type": "u7"
-            },
-            "access": {
-              "read": false,
-              "write": true
-            },
-            "wires": [
-              {
-                "dir": "write",
-                "msg": "dt1"
-              },
-              {
-                "dir": "rxLive",
-                "msg": "dt1"
-              }
-            ],
-            "ui": {
-              "preferredComponent": "Slider"
-            },
-            "range": {
-              "min": 32,
-              "max": 127
-            },
-            "note": "ASCII 20h..7Fh; the ten characters together are the voice name",
-            "default": 116
-          },
-          {
-            "id": "vcNameChar5",
-            "name": "Voice Name Char 5",
-            "group": "Common",
-            "valueType": "continuous",
-            "address": "00 00 04",
-            "size": 1,
-            "encoding": {
-              "type": "u7"
-            },
-            "access": {
-              "read": false,
-              "write": true
-            },
-            "wires": [
-              {
-                "dir": "write",
-                "msg": "dt1"
-              },
-              {
-                "dir": "rxLive",
-                "msg": "dt1"
-              }
-            ],
-            "ui": {
-              "preferredComponent": "Slider"
-            },
-            "range": {
-              "min": 32,
-              "max": 127
-            },
-            "note": "ASCII 20h..7Fh; the ten characters together are the voice name",
-            "default": 78
-          },
-          {
-            "id": "vcNameChar6",
-            "name": "Voice Name Char 6",
-            "group": "Common",
-            "valueType": "continuous",
-            "address": "00 00 05",
-            "size": 1,
-            "encoding": {
-              "type": "u7"
-            },
-            "access": {
-              "read": false,
-              "write": true
-            },
-            "wires": [
-              {
-                "dir": "write",
-                "msg": "dt1"
-              },
-              {
-                "dir": "rxLive",
-                "msg": "dt1"
-              }
-            ],
-            "ui": {
-              "preferredComponent": "Slider"
-            },
-            "range": {
-              "min": 32,
-              "max": 127
-            },
-            "note": "ASCII 20h..7Fh; the ten characters together are the voice name",
-            "default": 111
-          },
-          {
-            "id": "vcNameChar7",
-            "name": "Voice Name Char 7",
-            "group": "Common",
-            "valueType": "continuous",
-            "address": "00 00 06",
-            "size": 1,
-            "encoding": {
-              "type": "u7"
-            },
-            "access": {
-              "read": false,
-              "write": true
-            },
-            "wires": [
-              {
-                "dir": "write",
-                "msg": "dt1"
-              },
-              {
-                "dir": "rxLive",
-                "msg": "dt1"
-              }
-            ],
-            "ui": {
-              "preferredComponent": "Slider"
-            },
-            "range": {
-              "min": 32,
-              "max": 127
-            },
-            "note": "ASCII 20h..7Fh; the ten characters together are the voice name",
-            "default": 114
-          },
-          {
-            "id": "vcNameChar8",
-            "name": "Voice Name Char 8",
-            "group": "Common",
-            "valueType": "continuous",
-            "address": "00 00 07",
-            "size": 1,
-            "encoding": {
-              "type": "u7"
-            },
-            "access": {
-              "read": false,
-              "write": true
-            },
-            "wires": [
-              {
-                "dir": "write",
-                "msg": "dt1"
-              },
-              {
-                "dir": "rxLive",
-                "msg": "dt1"
-              }
-            ],
-            "ui": {
-              "preferredComponent": "Slider"
-            },
-            "range": {
-              "min": 32,
-              "max": 127
-            },
-            "note": "ASCII 20h..7Fh; the ten characters together are the voice name",
-            "default": 109
-          },
-          {
-            "id": "vcNameChar9",
-            "name": "Voice Name Char 9",
-            "group": "Common",
-            "valueType": "continuous",
-            "address": "00 00 08",
-            "size": 1,
-            "encoding": {
-              "type": "u7"
-            },
-            "access": {
-              "read": false,
-              "write": true
-            },
-            "wires": [
-              {
-                "dir": "write",
-                "msg": "dt1"
-              },
-              {
-                "dir": "rxLive",
-                "msg": "dt1"
-              }
-            ],
-            "ui": {
-              "preferredComponent": "Slider"
-            },
-            "range": {
-              "min": 32,
-              "max": 127
-            },
-            "note": "ASCII 20h..7Fh; the ten characters together are the voice name",
-            "default": 97
-          },
-          {
-            "id": "vcNameChar10",
-            "name": "Voice Name Char 10",
-            "group": "Common",
-            "valueType": "continuous",
-            "address": "00 00 09",
-            "size": 1,
-            "encoding": {
-              "type": "u7"
-            },
-            "access": {
-              "read": false,
-              "write": true
-            },
-            "wires": [
-              {
-                "dir": "write",
-                "msg": "dt1"
-              },
-              {
-                "dir": "rxLive",
-                "msg": "dt1"
-              }
-            ],
-            "ui": {
-              "preferredComponent": "Slider"
-            },
-            "range": {
-              "min": 32,
-              "max": 127
-            },
-            "note": "ASCII 20h..7Fh; the ten characters together are the voice name",
-            "default": 108
+            "default": "InitNormal",
+            "note": "p14 common 00h..09h: ten ASCII bytes, 20h...7Fh. One parameter rather than ten, because a name is one value: the parameter change carries all ten data bytes at 10 00 00, and the dump reads them with the same text-ascii codec. Ten one-byte parameters gave the panel ten knobs where a name field belongs and gave the librarian nothing to read."
           },
           {
             "id": "vcCategory",
@@ -28733,44 +28425,8 @@
         },
         "layout": [
           {
-            "param": "common.vcNameChar1",
+            "param": "common.vcName",
             "offset": 0
-          },
-          {
-            "param": "common.vcNameChar2",
-            "offset": 1
-          },
-          {
-            "param": "common.vcNameChar3",
-            "offset": 2
-          },
-          {
-            "param": "common.vcNameChar4",
-            "offset": 3
-          },
-          {
-            "param": "common.vcNameChar5",
-            "offset": 4
-          },
-          {
-            "param": "common.vcNameChar6",
-            "offset": 5
-          },
-          {
-            "param": "common.vcNameChar7",
-            "offset": 6
-          },
-          {
-            "param": "common.vcNameChar8",
-            "offset": 7
-          },
-          {
-            "param": "common.vcNameChar9",
-            "offset": 8
-          },
-          {
-            "param": "common.vcNameChar10",
-            "offset": 9
           },
           {
             "param": "common.vcCategory",
@@ -32789,44 +32445,8 @@
         },
         "layout": [
           {
-            "param": "common.vcNameChar1",
+            "param": "common.vcName",
             "offset": 0
-          },
-          {
-            "param": "common.vcNameChar2",
-            "offset": 1
-          },
-          {
-            "param": "common.vcNameChar3",
-            "offset": 2
-          },
-          {
-            "param": "common.vcNameChar4",
-            "offset": 3
-          },
-          {
-            "param": "common.vcNameChar5",
-            "offset": 4
-          },
-          {
-            "param": "common.vcNameChar6",
-            "offset": 5
-          },
-          {
-            "param": "common.vcNameChar7",
-            "offset": 6
-          },
-          {
-            "param": "common.vcNameChar8",
-            "offset": 7
-          },
-          {
-            "param": "common.vcNameChar9",
-            "offset": 8
-          },
-          {
-            "param": "common.vcNameChar10",
-            "offset": 9
           },
           {
             "param": "common.vcCategory",

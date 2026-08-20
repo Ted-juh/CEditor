@@ -191,8 +191,8 @@
         "name": { "type": "string" },
         "group": { "type": "string", "description": "UI grouping, e.g. 'Filter'." },
         "valueType": {
-          "enum": ["continuous", "signed", "enum", "toggle", "trigger"],
-          "description": "Drives the panel red/orange/green drag-fit check and the value codec."
+          "enum": ["continuous", "signed", "enum", "toggle", "trigger", "text"],
+          "description": "Drives the panel red/orange/green drag-fit check and the value codec. text = a fixed-length string living at ONE address (a patch name), carried by a text-ascii or text-nibbled-ascii encoding — not N one-byte parameters."
         },
         "range": {
           "type": "object",
@@ -279,10 +279,12 @@
       "description": "How a logical value maps to/from wire bytes. The same primitive expresses simple u7 through Korg 8->7 block packing; round-trip (encode then decode) must be identity across the full range.",
       "properties": {
         "type": {
-          "enum": ["u7", "u8", "s7", "u14", "u14-lsb", "nibbles", "packed8to7", "bitslice"],
-          "description": "u7=1 byte 0-127. u8=1 byte 0-255. s7=signed centered. u14=14-bit value over two 7-bit bytes, MSB first (Yamaha/Roland 2-byte fields); u14-lsb=LSB first. nibbles=value split across N nibble bytes (high nibble first). packed8to7=Korg block packing. bitslice=value assembled from declared bit-slices."
+          "enum": ["u7", "u8", "s7", "u14", "u14-lsb", "nibbles", "packed8to7", "bitslice", "text-ascii", "text-nibbled-ascii"],
+          "description": "u7=1 byte 0-127. u8=1 byte 0-255. s7=signed centered. u14=14-bit value over two 7-bit bytes, MSB first (Yamaha/Roland 2-byte fields); u14-lsb=LSB first. nibbles=value split across N nibble bytes (high nibble first). packed8to7=Korg block packing. bitslice=value assembled from declared bit-slices. text-ascii=`length` ASCII bytes, padded with `pad`; text-nibbled-ascii=the same, each character split across two nibble bytes."
         },
         "bytes": { "type": "integer", "minimum": 1, "description": "Wire byte count for nibbles/u8." },
+        "length": { "type": "integer", "minimum": 1, "description": "Character count for the text codecs." },
+        "pad": { "type": "integer", "minimum": 0, "maximum": 127, "description": "Byte a text codec pads a short string with (default 32, a space)." },
         "signedOffset": { "type": "integer", "description": "For s7: wire = value + signedOffset (e.g. 64)." },
         "packOrder": {
           "enum": ["msb-high-first", "msb-low-first"],

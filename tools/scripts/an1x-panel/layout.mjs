@@ -198,9 +198,12 @@ export const COMMON_STRIP = {
     {
       title: 'VOICE', tint: TINT.ctrl, x: 0, y: 0, w: 300, h: 172,
       controls: [
-        { p: 'vcSceneSelect', kind: 'leds', x: 12, y: 34, w: 120, label: 'SCENE' },
-        { p: 'vcCategory', kind: 'knobSmall', x: 150, y: 40, label: 'CATEGORY' },
-        { p: 'vcTempo', kind: 'knobSmall', x: 216, y: 40, label: 'TEMPO' },
+        // The name, as a name. It is ten ASCII bytes at 10 00 00 and the profile carries it as one
+        // text parameter, so it is one field — ten knobs was never a name.
+        { p: 'vcName', kind: 'text', x: 12, y: 30, w: 276, label: 'VOICE NAME' },
+        { p: 'vcSceneSelect', kind: 'leds', x: 12, y: 76, w: 120, label: 'SCENE' },
+        { p: 'vcCategory', kind: 'knobSmall', x: 150, y: 82, label: 'CATEGORY' },
+        { p: 'vcTempo', kind: 'knobSmall', x: 216, y: 82, label: 'TEMPO' },
       ],
     },
     {

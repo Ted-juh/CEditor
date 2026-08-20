@@ -133,16 +133,57 @@ test('a voice is recalled by Program Change alone', () => {
     'a voice name is the ten characters at common 00h..09h');
 });
 
-test('the voice name is addressable, ten characters at the top of the common block', () => {
-  // Common 00h..09h, ASCII 20h...7Fh. Without these the profile can write a patch but cannot say
-  // — or read — what it is called, which is the one field a preset browser needs.
-  const common = LIBRARY.scopes.common.parameters;
-  for (let index = 0; index < 10; index += 1) {
-    const parameter = common.find((p) => p.id === `vcNameChar${index + 1}`);
-    assert.ok(parameter, `voice name character ${index + 1} is missing`);
-    assert.equal(lowByte(parameter.address), index);
-    assert.deepEqual(parameter.range, { min: 32, max: 127 });
+test('the voice name is one text field, not ten knobs', () => {
+  // Common 00h..09h, ASCII 20h...7Fh. It IS ten bytes, but it is ONE value: the parameter change
+  // carries all ten data bytes at 10 00 00 and the dump reads them with the same text-ascii codec.
+  // Modelled as ten one-byte parameters it gave the panel ten knobs where a name field belongs and
+  // gave the librarian nothing to read — the bytes were addressable and the name was not.
+  const name = LIBRARY.scopes.common.parameters.find((p) => p.id === 'vcName');
+  assert.ok(name, 'the common block has no name parameter');
+  assert.equal(lowByte(name.address), 0);
+  assert.equal(name.valueType, 'text');
+  assert.equal(name.size, 10);
+  assert.deepEqual(name.encoding, { type: 'text-ascii', length: 10, pad: 32 });
+  assert.equal(name.default, 'InitNormal');
+  assert.equal(LIBRARY.scopes.common.parameters.filter((p) => /^vcNameChar/.test(p.id)).length, 0,
+    'the per-character parameters should be gone, not shadowed');
+
+  // …and it survives the emitter, with the length and pad the engine's text encoder reads.
+  const emitted = EMITTED.parameters.find((p) => p.id === 'vcName');
+  assert.equal(emitted.type, 'text');
+  assert.equal(emitted.display.mode, 'text');
+  assert.equal(emitted.encoding.length, 10);
+  assert.equal(emitted.encoding.pad, 32);
+  assert.equal(emitted.normalization, undefined, 'a string has no 0..1 position');
+  assert.equal(emitted.messageRecipe, 'dt1');
+
+  // Both dumps that contain a Voice Common block read it as one field at offset 0.
+  for (const id of ['voiceCommon', 'userVoice']) {
+    const dump = LIBRARY.dumps.find((d) => d.id === id);
+    const entries = dump.layout.filter((e) => e.param.endsWith('.vcName'));
+    assert.equal(entries.length, 1, `${id} should map the name once`);
+    assert.equal(entries[0].offset, 0);
   }
+});
+
+test('a voice name round-trips through the dump as a string', async () => {
+  const { resolveProfile } = await import('../../dpd/tools/dpd.mjs');
+  const { assembleDump, parseDump } = await import('../../dpd/dumps.mjs');
+  const resolved = resolveProfile('yamaha.an1x');
+
+  for (const id of ['voiceCommon', 'userVoice']) {
+    const dump = LIBRARY.dumps.find((d) => d.id === id);
+    const bytes = assembleDump(dump, { 'common.vcName': 'BassMonstr' }, resolved);
+    assert.equal(bytes.slice(9, 19).map((b) => String.fromCharCode(b)).join(''), 'BassMonstr',
+      `${id}: the name should be ten ASCII bytes at the top of the payload`);
+    assert.equal(parseDump(dump, bytes, resolved).valuesById['common.vcName'], 'BassMonstr', id);
+  }
+
+  // Shorter than ten pads with spaces and comes back trimmed, which is what a librarian shows.
+  const dump = LIBRARY.dumps.find((d) => d.id === 'voiceCommon');
+  const short = assembleDump(dump, { 'common.vcName': 'Soar' }, resolved);
+  assert.deepEqual(short.slice(9, 19), [83, 111, 97, 114, 32, 32, 32, 32, 32, 32]);
+  assert.equal(parseDump(dump, short, resolved).valuesById['common.vcName'], 'Soar');
 });
 
 /**
@@ -288,6 +329,10 @@ test('every default a parameter declares is a value that parameter can hold', ()
       if (parameter.enum) {
         assert.ok(parameter.enum.some((e) => e.id === parameter.default),
           `${where}: default "${parameter.default}" is not one of its members`);
+      } else if (parameter.valueType === 'text') {
+        assert.equal(typeof parameter.default, 'string', `${where}: a text default is a string`);
+        assert.ok(parameter.default.length <= parameter.encoding.length,
+          `${where}: default "${parameter.default}" is longer than the field`);
       } else {
         assert.ok(parameter.default >= parameter.range.min && parameter.default <= parameter.range.max,
           `${where}: default ${parameter.default} is outside ${parameter.range.min}..${parameter.range.max}`);
@@ -449,7 +494,7 @@ test('the Free EG is four tracks of 192 points, whatever the manual labels them'
   // The arithmetic that settles it: 104 named Common bytes + 4 x 192 x 2 = 1640 = 668h, the total
   // the Data List prints for the Common block.
   const named = LIBRARY.scopes.common.parameters
-    .reduce((total, p) => total + (p.size ?? 1), 0);
+    .reduce((total, p) => total + (p.size ?? 1), 0);   // vcName counts once, for ten bytes
   assert.equal(named + 4 * 192 * 2, 1640);
   const voiceCommon = LIBRARY.dumps.find((d) => d.id === 'voiceCommon');
   assert.equal(voiceCommon.layout.length, LIBRARY.scopes.common.parameters.length + 768);

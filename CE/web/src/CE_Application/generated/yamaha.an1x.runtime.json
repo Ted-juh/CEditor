@@ -1,6 +1,6 @@
 {
   "profileId": "yamaha.an1x",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "deviceId": "10",
   "modelId": "5C",
   "sysexIn": {
@@ -31,16 +31,7 @@
     "00 00 19": "system.sysKnob7CtrlNum",
     "00 00 1A": "system.sysKnob8CtrlNum",
     "00 00 1B": "system.sysReserved",
-    "10 00 00": "common.vcNameChar1",
-    "10 00 01": "common.vcNameChar2",
-    "10 00 02": "common.vcNameChar3",
-    "10 00 03": "common.vcNameChar4",
-    "10 00 04": "common.vcNameChar5",
-    "10 00 05": "common.vcNameChar6",
-    "10 00 06": "common.vcNameChar7",
-    "10 00 07": "common.vcNameChar8",
-    "10 00 08": "common.vcNameChar9",
-    "10 00 09": "common.vcNameChar10",
+    "10 00 00": "common.vcName",
     "10 00 0A": "common.vcCategory",
     "10 00 0B": "common.vcSceneSelect",
     "10 00 0C": "common.vcLayerMode",
@@ -2107,74 +2098,11 @@
       "size": 1,
       "enum": null
     },
-    "common.vcNameChar1": {
-      "valueType": "continuous",
+    "common.vcName": {
+      "valueType": "text",
       "outAddress": "10 00 00",
       "outCc": null,
-      "size": 1,
-      "enum": null
-    },
-    "common.vcNameChar2": {
-      "valueType": "continuous",
-      "outAddress": "10 00 01",
-      "outCc": null,
-      "size": 1,
-      "enum": null
-    },
-    "common.vcNameChar3": {
-      "valueType": "continuous",
-      "outAddress": "10 00 02",
-      "outCc": null,
-      "size": 1,
-      "enum": null
-    },
-    "common.vcNameChar4": {
-      "valueType": "continuous",
-      "outAddress": "10 00 03",
-      "outCc": null,
-      "size": 1,
-      "enum": null
-    },
-    "common.vcNameChar5": {
-      "valueType": "continuous",
-      "outAddress": "10 00 04",
-      "outCc": null,
-      "size": 1,
-      "enum": null
-    },
-    "common.vcNameChar6": {
-      "valueType": "continuous",
-      "outAddress": "10 00 05",
-      "outCc": null,
-      "size": 1,
-      "enum": null
-    },
-    "common.vcNameChar7": {
-      "valueType": "continuous",
-      "outAddress": "10 00 06",
-      "outCc": null,
-      "size": 1,
-      "enum": null
-    },
-    "common.vcNameChar8": {
-      "valueType": "continuous",
-      "outAddress": "10 00 07",
-      "outCc": null,
-      "size": 1,
-      "enum": null
-    },
-    "common.vcNameChar9": {
-      "valueType": "continuous",
-      "outAddress": "10 00 08",
-      "outCc": null,
-      "size": 1,
-      "enum": null
-    },
-    "common.vcNameChar10": {
-      "valueType": "continuous",
-      "outAddress": "10 00 09",
-      "outCc": null,
-      "size": 1,
+      "size": 10,
       "enum": null
     },
     "common.vcCategory": {
@@ -16215,333 +16143,35 @@
         }
       }
     },
-    "common.vcNameChar1": {
-      "resolvedId": "common.vcNameChar1",
-      "paramId": "vcNameChar1",
-      "name": "Voice Name Char 1",
+    "common.vcName": {
+      "resolvedId": "common.vcName",
+      "paramId": "vcName",
+      "name": "Voice Name",
       "group": "Common",
-      "valueType": "continuous",
-      "range": {
-        "min": 32,
-        "max": 127
-      },
+      "valueType": "text",
+      "range": null,
       "enum": null,
       "encoding": {
-        "type": "u7"
+        "type": "text-ascii",
+        "length": 10,
+        "pad": 32
       },
       "access": {
         "read": false,
         "write": true
       },
-      "size": 1,
+      "size": 10,
       "absAddress": "10 00 00",
       "wires": {
         "write": {
           "msg": "dt1",
           "address": "10 00 00",
-          "size": 1
+          "size": 10
         },
         "rxLive": {
           "msg": "dt1",
           "address": "10 00 00",
-          "size": 1
-        }
-      }
-    },
-    "common.vcNameChar2": {
-      "resolvedId": "common.vcNameChar2",
-      "paramId": "vcNameChar2",
-      "name": "Voice Name Char 2",
-      "group": "Common",
-      "valueType": "continuous",
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "enum": null,
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "read": false,
-        "write": true
-      },
-      "size": 1,
-      "absAddress": "10 00 01",
-      "wires": {
-        "write": {
-          "msg": "dt1",
-          "address": "10 00 01",
-          "size": 1
-        },
-        "rxLive": {
-          "msg": "dt1",
-          "address": "10 00 01",
-          "size": 1
-        }
-      }
-    },
-    "common.vcNameChar3": {
-      "resolvedId": "common.vcNameChar3",
-      "paramId": "vcNameChar3",
-      "name": "Voice Name Char 3",
-      "group": "Common",
-      "valueType": "continuous",
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "enum": null,
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "read": false,
-        "write": true
-      },
-      "size": 1,
-      "absAddress": "10 00 02",
-      "wires": {
-        "write": {
-          "msg": "dt1",
-          "address": "10 00 02",
-          "size": 1
-        },
-        "rxLive": {
-          "msg": "dt1",
-          "address": "10 00 02",
-          "size": 1
-        }
-      }
-    },
-    "common.vcNameChar4": {
-      "resolvedId": "common.vcNameChar4",
-      "paramId": "vcNameChar4",
-      "name": "Voice Name Char 4",
-      "group": "Common",
-      "valueType": "continuous",
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "enum": null,
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "read": false,
-        "write": true
-      },
-      "size": 1,
-      "absAddress": "10 00 03",
-      "wires": {
-        "write": {
-          "msg": "dt1",
-          "address": "10 00 03",
-          "size": 1
-        },
-        "rxLive": {
-          "msg": "dt1",
-          "address": "10 00 03",
-          "size": 1
-        }
-      }
-    },
-    "common.vcNameChar5": {
-      "resolvedId": "common.vcNameChar5",
-      "paramId": "vcNameChar5",
-      "name": "Voice Name Char 5",
-      "group": "Common",
-      "valueType": "continuous",
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "enum": null,
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "read": false,
-        "write": true
-      },
-      "size": 1,
-      "absAddress": "10 00 04",
-      "wires": {
-        "write": {
-          "msg": "dt1",
-          "address": "10 00 04",
-          "size": 1
-        },
-        "rxLive": {
-          "msg": "dt1",
-          "address": "10 00 04",
-          "size": 1
-        }
-      }
-    },
-    "common.vcNameChar6": {
-      "resolvedId": "common.vcNameChar6",
-      "paramId": "vcNameChar6",
-      "name": "Voice Name Char 6",
-      "group": "Common",
-      "valueType": "continuous",
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "enum": null,
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "read": false,
-        "write": true
-      },
-      "size": 1,
-      "absAddress": "10 00 05",
-      "wires": {
-        "write": {
-          "msg": "dt1",
-          "address": "10 00 05",
-          "size": 1
-        },
-        "rxLive": {
-          "msg": "dt1",
-          "address": "10 00 05",
-          "size": 1
-        }
-      }
-    },
-    "common.vcNameChar7": {
-      "resolvedId": "common.vcNameChar7",
-      "paramId": "vcNameChar7",
-      "name": "Voice Name Char 7",
-      "group": "Common",
-      "valueType": "continuous",
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "enum": null,
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "read": false,
-        "write": true
-      },
-      "size": 1,
-      "absAddress": "10 00 06",
-      "wires": {
-        "write": {
-          "msg": "dt1",
-          "address": "10 00 06",
-          "size": 1
-        },
-        "rxLive": {
-          "msg": "dt1",
-          "address": "10 00 06",
-          "size": 1
-        }
-      }
-    },
-    "common.vcNameChar8": {
-      "resolvedId": "common.vcNameChar8",
-      "paramId": "vcNameChar8",
-      "name": "Voice Name Char 8",
-      "group": "Common",
-      "valueType": "continuous",
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "enum": null,
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "read": false,
-        "write": true
-      },
-      "size": 1,
-      "absAddress": "10 00 07",
-      "wires": {
-        "write": {
-          "msg": "dt1",
-          "address": "10 00 07",
-          "size": 1
-        },
-        "rxLive": {
-          "msg": "dt1",
-          "address": "10 00 07",
-          "size": 1
-        }
-      }
-    },
-    "common.vcNameChar9": {
-      "resolvedId": "common.vcNameChar9",
-      "paramId": "vcNameChar9",
-      "name": "Voice Name Char 9",
-      "group": "Common",
-      "valueType": "continuous",
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "enum": null,
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "read": false,
-        "write": true
-      },
-      "size": 1,
-      "absAddress": "10 00 08",
-      "wires": {
-        "write": {
-          "msg": "dt1",
-          "address": "10 00 08",
-          "size": 1
-        },
-        "rxLive": {
-          "msg": "dt1",
-          "address": "10 00 08",
-          "size": 1
-        }
-      }
-    },
-    "common.vcNameChar10": {
-      "resolvedId": "common.vcNameChar10",
-      "paramId": "vcNameChar10",
-      "name": "Voice Name Char 10",
-      "group": "Common",
-      "valueType": "continuous",
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "enum": null,
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "read": false,
-        "write": true
-      },
-      "size": 1,
-      "absAddress": "10 00 09",
-      "wires": {
-        "write": {
-          "msg": "dt1",
-          "address": "10 00 09",
-          "size": 1
-        },
-        "rxLive": {
-          "msg": "dt1",
-          "address": "10 00 09",
-          "size": 1
+          "size": 10
         }
       }
     },

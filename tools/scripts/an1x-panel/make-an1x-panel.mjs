@@ -228,6 +228,25 @@ const KINDS = {
     };
   },
 
+  // A name field. `parameterAdoptionRules` has no rule for a text parameter — it writes ranges and
+  // choice rows, and a string has neither — so the default goes in by hand.
+  text: (parameter, spec, at) => {
+    const w = spec.w ?? 200;
+    const control = bound(parameter, 'TextInput', { x: at.x, y: at.y, w, h: 26 }, {
+      'Text.content': String(parameter.default ?? ''),
+      'Text._children.Font.size': 13,
+      'Text._children.Font.letterSpacing': 1,
+      'Background._children.Fill.colour': 'FF11161C',
+      'Background._children.Corners.radius': 3,
+      'ContentLayout.horizontalAlign': 'left',
+      'ContentLayout.paddingLeft': 8,
+    });
+    return {
+      controls: [control],
+      caption: spec.label ? { text: spec.label, x: at.x, y: at.y - 13, w, align: 'left' } : null,
+    };
+  },
+
   toggle: (parameter, spec, at) => {
     const control = bound(parameter, 'ToggleButton', { x: at.x, y: at.y, w: spec.w ?? 80, h: 22 }, {
       'Text.content': spec.label,
@@ -642,15 +661,21 @@ The step sequencer grid edits a pattern, not the synth
   bound step by step; nothing binds it today. The controls beside it — type, kbd mode, hold,
   scene, subdivide, swing, velocity, gate — are real addresses and fully wired.
 
+The voice name is a name
+  Common 00h..09h is ten ASCII bytes, and the profile used to carry them as ten one-byte
+  parameters. That put ten knobs where a name field belongs and gave the librarian nothing to read:
+  the bytes were addressable and the NAME was not. It is one text parameter now, ten characters
+  of text-ascii at 10 00 00 — the parameter change carries all ten data bytes at once, and both
+  dumps that contain a Voice Common block read it back with the same codec. So the VOICE box leads
+  with a name field, which is what a voice has.
+
 What the panel does NOT reach, and why
-  Every parameter the profile carries is bound here except five groups, each left out on purpose:
+  Every parameter the profile carries is bound here except four groups, each left out on purpose:
   the 768 Free EG curve points (they ARE the four lanes), the 63-parameter Scene Ctrl buffer (the
   morph result, which the Data List marks "effective only when Scene Ctrl is active"), the 64 MODE2
   Control Changes not on MASTER / PLAY (every one duplicates a SysEx parameter already on the panel
-  — two controls for one value is worse than one), the six reserved bytes, and the ten voice-name
-  characters. That last one is a modelling gap rather than a layout choice: the name is ten separate
-  one-byte parameters, and ten text fields is not a name field. It belongs to the dump codec
-  (text-ascii) and the librarian, not to a knob.
+  — two controls for one value is worse than one), and the six reserved bytes, which have one legal
+  value each.
 
 Named lists read as names
   Arpeggio type, keyboard mode, scene switch, Free EG destination, control-matrix destination and

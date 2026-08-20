@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileVersion": "3.2.0",
+  "profileVersion": "3.3.0",
   "minCEditorVersion": "0.9.0",
   "id": "yamaha-an1x-dpd",
   "name": "Yamaha AN1x (from DPD)",
@@ -4190,25 +4190,20 @@
       }
     },
     {
-      "id": "vcNameChar1",
-      "name": "Voice Name Char 1",
+      "id": "vcName",
+      "name": "Voice Name",
       "group": "Common",
-      "type": "integer",
-      "default": 73,
-      "range": {
-        "min": 32,
-        "max": 127
-      },
+      "type": "text",
+      "default": "InitNormal",
       "address": "10 00 00",
       "display": {
-        "mode": "number",
-        "shortLabel": "Voice Name Char 1"
-      },
-      "normalization": {
-        "mode": "linear"
+        "mode": "text",
+        "shortLabel": "Voice Name"
       },
       "encoding": {
-        "type": "u7"
+        "type": "text-ascii",
+        "length": 10,
+        "pad": 32
       },
       "access": {
         "canRead": false,
@@ -4217,356 +4212,14 @@
         "source": "singleParameter"
       },
       "sendPolicy": {
-        "mode": "continuous",
+        "mode": "onCommit",
         "coalesce": true,
         "minIntervalMs": 20,
         "sendFinalOnRelease": true
       },
       "messageRecipe": "dt1",
       "ui": {
-        "preferredComponent": "Slider"
-      }
-    },
-    {
-      "id": "vcNameChar2",
-      "name": "Voice Name Char 2",
-      "group": "Common",
-      "type": "integer",
-      "default": 110,
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "address": "10 00 01",
-      "display": {
-        "mode": "number",
-        "shortLabel": "Voice Name Char 2"
-      },
-      "normalization": {
-        "mode": "linear"
-      },
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "canRead": false,
-        "canWrite": true,
-        "realtimeSafe": true,
-        "source": "singleParameter"
-      },
-      "sendPolicy": {
-        "mode": "continuous",
-        "coalesce": true,
-        "minIntervalMs": 20,
-        "sendFinalOnRelease": true
-      },
-      "messageRecipe": "dt1",
-      "ui": {
-        "preferredComponent": "Slider"
-      }
-    },
-    {
-      "id": "vcNameChar3",
-      "name": "Voice Name Char 3",
-      "group": "Common",
-      "type": "integer",
-      "default": 105,
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "address": "10 00 02",
-      "display": {
-        "mode": "number",
-        "shortLabel": "Voice Name Char 3"
-      },
-      "normalization": {
-        "mode": "linear"
-      },
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "canRead": false,
-        "canWrite": true,
-        "realtimeSafe": true,
-        "source": "singleParameter"
-      },
-      "sendPolicy": {
-        "mode": "continuous",
-        "coalesce": true,
-        "minIntervalMs": 20,
-        "sendFinalOnRelease": true
-      },
-      "messageRecipe": "dt1",
-      "ui": {
-        "preferredComponent": "Slider"
-      }
-    },
-    {
-      "id": "vcNameChar4",
-      "name": "Voice Name Char 4",
-      "group": "Common",
-      "type": "integer",
-      "default": 116,
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "address": "10 00 03",
-      "display": {
-        "mode": "number",
-        "shortLabel": "Voice Name Char 4"
-      },
-      "normalization": {
-        "mode": "linear"
-      },
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "canRead": false,
-        "canWrite": true,
-        "realtimeSafe": true,
-        "source": "singleParameter"
-      },
-      "sendPolicy": {
-        "mode": "continuous",
-        "coalesce": true,
-        "minIntervalMs": 20,
-        "sendFinalOnRelease": true
-      },
-      "messageRecipe": "dt1",
-      "ui": {
-        "preferredComponent": "Slider"
-      }
-    },
-    {
-      "id": "vcNameChar5",
-      "name": "Voice Name Char 5",
-      "group": "Common",
-      "type": "integer",
-      "default": 78,
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "address": "10 00 04",
-      "display": {
-        "mode": "number",
-        "shortLabel": "Voice Name Char 5"
-      },
-      "normalization": {
-        "mode": "linear"
-      },
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "canRead": false,
-        "canWrite": true,
-        "realtimeSafe": true,
-        "source": "singleParameter"
-      },
-      "sendPolicy": {
-        "mode": "continuous",
-        "coalesce": true,
-        "minIntervalMs": 20,
-        "sendFinalOnRelease": true
-      },
-      "messageRecipe": "dt1",
-      "ui": {
-        "preferredComponent": "Slider"
-      }
-    },
-    {
-      "id": "vcNameChar6",
-      "name": "Voice Name Char 6",
-      "group": "Common",
-      "type": "integer",
-      "default": 111,
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "address": "10 00 05",
-      "display": {
-        "mode": "number",
-        "shortLabel": "Voice Name Char 6"
-      },
-      "normalization": {
-        "mode": "linear"
-      },
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "canRead": false,
-        "canWrite": true,
-        "realtimeSafe": true,
-        "source": "singleParameter"
-      },
-      "sendPolicy": {
-        "mode": "continuous",
-        "coalesce": true,
-        "minIntervalMs": 20,
-        "sendFinalOnRelease": true
-      },
-      "messageRecipe": "dt1",
-      "ui": {
-        "preferredComponent": "Slider"
-      }
-    },
-    {
-      "id": "vcNameChar7",
-      "name": "Voice Name Char 7",
-      "group": "Common",
-      "type": "integer",
-      "default": 114,
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "address": "10 00 06",
-      "display": {
-        "mode": "number",
-        "shortLabel": "Voice Name Char 7"
-      },
-      "normalization": {
-        "mode": "linear"
-      },
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "canRead": false,
-        "canWrite": true,
-        "realtimeSafe": true,
-        "source": "singleParameter"
-      },
-      "sendPolicy": {
-        "mode": "continuous",
-        "coalesce": true,
-        "minIntervalMs": 20,
-        "sendFinalOnRelease": true
-      },
-      "messageRecipe": "dt1",
-      "ui": {
-        "preferredComponent": "Slider"
-      }
-    },
-    {
-      "id": "vcNameChar8",
-      "name": "Voice Name Char 8",
-      "group": "Common",
-      "type": "integer",
-      "default": 109,
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "address": "10 00 07",
-      "display": {
-        "mode": "number",
-        "shortLabel": "Voice Name Char 8"
-      },
-      "normalization": {
-        "mode": "linear"
-      },
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "canRead": false,
-        "canWrite": true,
-        "realtimeSafe": true,
-        "source": "singleParameter"
-      },
-      "sendPolicy": {
-        "mode": "continuous",
-        "coalesce": true,
-        "minIntervalMs": 20,
-        "sendFinalOnRelease": true
-      },
-      "messageRecipe": "dt1",
-      "ui": {
-        "preferredComponent": "Slider"
-      }
-    },
-    {
-      "id": "vcNameChar9",
-      "name": "Voice Name Char 9",
-      "group": "Common",
-      "type": "integer",
-      "default": 97,
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "address": "10 00 08",
-      "display": {
-        "mode": "number",
-        "shortLabel": "Voice Name Char 9"
-      },
-      "normalization": {
-        "mode": "linear"
-      },
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "canRead": false,
-        "canWrite": true,
-        "realtimeSafe": true,
-        "source": "singleParameter"
-      },
-      "sendPolicy": {
-        "mode": "continuous",
-        "coalesce": true,
-        "minIntervalMs": 20,
-        "sendFinalOnRelease": true
-      },
-      "messageRecipe": "dt1",
-      "ui": {
-        "preferredComponent": "Slider"
-      }
-    },
-    {
-      "id": "vcNameChar10",
-      "name": "Voice Name Char 10",
-      "group": "Common",
-      "type": "integer",
-      "default": 108,
-      "range": {
-        "min": 32,
-        "max": 127
-      },
-      "address": "10 00 09",
-      "display": {
-        "mode": "number",
-        "shortLabel": "Voice Name Char 10"
-      },
-      "normalization": {
-        "mode": "linear"
-      },
-      "encoding": {
-        "type": "u7"
-      },
-      "access": {
-        "canRead": false,
-        "canWrite": true,
-        "realtimeSafe": true,
-        "source": "singleParameter"
-      },
-      "sendPolicy": {
-        "mode": "continuous",
-        "coalesce": true,
-        "minIntervalMs": 20,
-        "sendFinalOnRelease": true
-      },
-      "messageRecipe": "dt1",
-      "ui": {
-        "preferredComponent": "Slider"
+        "preferredComponent": "TextInput"
       }
     },
     {
@@ -61621,44 +61274,8 @@
       },
       "mappings": [
         {
-          "parameter": "vcNameChar1",
+          "parameter": "vcName",
           "offset": 0
-        },
-        {
-          "parameter": "vcNameChar2",
-          "offset": 1
-        },
-        {
-          "parameter": "vcNameChar3",
-          "offset": 2
-        },
-        {
-          "parameter": "vcNameChar4",
-          "offset": 3
-        },
-        {
-          "parameter": "vcNameChar5",
-          "offset": 4
-        },
-        {
-          "parameter": "vcNameChar6",
-          "offset": 5
-        },
-        {
-          "parameter": "vcNameChar7",
-          "offset": 6
-        },
-        {
-          "parameter": "vcNameChar8",
-          "offset": 7
-        },
-        {
-          "parameter": "vcNameChar9",
-          "offset": 8
-        },
-        {
-          "parameter": "vcNameChar10",
-          "offset": 9
         },
         {
           "parameter": "vcCategory",
@@ -65663,44 +65280,8 @@
       },
       "mappings": [
         {
-          "parameter": "vcNameChar1",
+          "parameter": "vcName",
           "offset": 0
-        },
-        {
-          "parameter": "vcNameChar2",
-          "offset": 1
-        },
-        {
-          "parameter": "vcNameChar3",
-          "offset": 2
-        },
-        {
-          "parameter": "vcNameChar4",
-          "offset": 3
-        },
-        {
-          "parameter": "vcNameChar5",
-          "offset": 4
-        },
-        {
-          "parameter": "vcNameChar6",
-          "offset": 5
-        },
-        {
-          "parameter": "vcNameChar7",
-          "offset": 6
-        },
-        {
-          "parameter": "vcNameChar8",
-          "offset": 7
-        },
-        {
-          "parameter": "vcNameChar9",
-          "offset": 8
-        },
-        {
-          "parameter": "vcNameChar10",
-          "offset": 9
         },
         {
           "parameter": "vcCategory",
