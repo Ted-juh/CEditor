@@ -476,6 +476,44 @@ export function gaiaEnvelope({ stages = 'adsr', width = 200, height = 40 } = {})
   return component({ name: 'GAIA Envelope', width, height, parts });
 }
 
+/**
+ * One cell of a step sequencer: a well, and a bar that fills it from the bottom.
+ *
+ * NOT a short fader. A fader at this size is a 33px slot with a 13px cap in it, which reads as a
+ * switch and, sixteen of them in a row, as a scattering of matchsticks — you cannot see the shape
+ * of a pattern in it, and seeing the shape is the entire job of a step grid. A bar can be read
+ * across sixteen columns at a glance, which is how every step sequencer ever built draws one.
+ *
+ * `accent` tints the well so bars of four are visible without a ruler.
+ */
+export function stepCell({ width = 92, height = 40, colour = 'FF52B788', accent = false } = {}) {
+  const inset = 3;
+  const floor = height - inset;
+  const barW = width - inset * 2;
+
+  return component({
+    name: 'Step Cell',
+    width,
+    height,
+    parts: {
+      well: rect('well', { x: 0, y: 0, width, height }, accent ? 'FF1B222A' : 'FF141920', {
+        zIndex: 0, radius: 3, borderColour: '44000000', borderThickness: 1,
+      }),
+      // Grows upward from the floor: y walks up as the value rises, height grows to match, which
+      // is two bindings against one channel rather than one binding and a wish.
+      bar: rect('bar', { x: inset, y: floor - 2, width: barW, height: 2 }, `55${colour.slice(2)}`, { zIndex: 1, radius: 2 }),
+      cap: rect('cap', { x: inset, y: floor - 2, width: barW, height: 2 }, colour, { zIndex: 2, radius: 1 }),
+    },
+    behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'linear', role: 'slider', dragMode: 'vertical' }),
+    hitZone: createHitZone('grab', { targetBehavior: 'drive', targetValueChannel: 'value', action: 'setValue', bounds: { x: 0, y: 0, width: 100, height: 100, unit: 'percent' } }),
+    bindings: {
+      barY: binding('barY', 'channel.value.normalized', 'Parts.bar.Layout.y', { outputMin: floor - 2, outputMax: inset, round: true }),
+      barH: binding('barH', 'channel.value.normalized', 'Parts.bar.Layout.height', { outputMin: 2, outputMax: floor - inset, round: true }),
+      capY: binding('capY', 'channel.value.normalized', 'Parts.cap.Layout.y', { outputMin: floor - 2, outputMax: inset, round: true }),
+    },
+  });
+}
+
 /* ------------------------------------------------------------------ arpeggio grid */
 
 /**

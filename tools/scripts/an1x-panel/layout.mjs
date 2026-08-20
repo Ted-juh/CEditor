@@ -440,12 +440,14 @@ export const PATTERN_STRIP = {
       title: 'STEP SEQUENCER', tint: TINT.arp, x: 1010, y: 0, w: 1760, h: 250,
       controls: [],
       steps: {
-        count: 16, x: 78, pitch: 104, faderW: 30, faderH: 46, numberY: 20, gutterX: 12,
+        // A grid, not sixteen scattered faders: each cell is a bar in a well, 92 wide on a 103
+        // pitch, so a column is a column and a pattern has a shape you can read across.
+        count: 16, x: 84, pitch: 103, cellW: 92, numberY: 16, gutterX: 12, accentEvery: 4,
         lanes: [
-          { prefix: 'ssNote', label: 'NOTE', y: 36 },
-          { prefix: 'ssVelocity', label: 'VEL', y: 86 },
-          { prefix: 'ssGateTime', label: 'GATE', y: 136 },
-          { prefix: 'ssCtrlValue', label: 'CC', y: 186 },
+          { prefix: 'ssNote', label: 'NOTE', y: 32, h: 62, colour: 'FF7FD8B4' },
+          { prefix: 'ssVelocity', label: 'VEL', y: 100, h: 40, colour: 'FFE0A94A' },
+          { prefix: 'ssGateTime', label: 'GATE', y: 146, h: 40, colour: 'FF7FA7E8' },
+          { prefix: 'ssCtrlValue', label: 'CC', y: 192, h: 40, colour: 'FFD98AA8' },
         ],
       },
     },

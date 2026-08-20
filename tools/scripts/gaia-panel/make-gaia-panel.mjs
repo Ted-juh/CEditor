@@ -212,7 +212,15 @@ function boundCustom(parameter, build, box) {
       channel.step = parameter.type === 'float' ? (parameter.range.max - parameter.range.min) / 1000 : 1;
       channel.type = parameter.type === 'float' ? 'float' : 'int';
     }
-    if (typeof parameter.default === 'number') channel.defaultValue = parameter.default;
+    // BOTH, and this is the whole point: customChannelDefaultValue reads `currentValue ?? defaultValue`,
+    // and createValueChannel stamped currentValue from the factory default before this ran. Setting
+    // only defaultValue left currentValue at 0, so every knob and fader on the panel opened at the
+    // bottom of its range instead of at the value the instrument ships with — a filter shut, a
+    // master tune at -100 cent — and looked, convincingly, like a panel with no values in it.
+    if (typeof parameter.default === 'number') {
+      channel.defaultValue = parameter.default;
+      channel.currentValue = parameter.default;
+    }
   }
   return control;
 }

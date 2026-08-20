@@ -21,7 +21,7 @@ import { createControl } from '../../../CE/web/src/CE_Application/models/compone
 import { SECTION_DEFAULTS } from '../../../CE/web/src/CE_Application/models/sectionDefaults.js';
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
-import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from '../gaia-panel/components.mjs';
+import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds, stepCell } from '../gaia-panel/components.mjs';
 import { midiControlBindingFrom } from '../../../CE/web/src/CE_Application/utils/midiControlBindings.js';
 import { COMMON_STRIP, EFFECT_STRIP, PANEL_WIDTH, PATTERN_STRIP, PLAY_STRIP, SCENE_STRIP, SKIN, TINT } from './layout.mjs';
 
@@ -162,7 +162,15 @@ function boundCustom(parameter, build, box) {
       channel.step = 1;
       channel.type = 'int';
     }
-    if (typeof parameter.default === 'number') channel.defaultValue = parameter.default;
+    // BOTH, and this is the whole point: customChannelDefaultValue reads `currentValue ?? defaultValue`,
+    // and createValueChannel stamped currentValue from the factory default before this ran. Setting
+    // only defaultValue left currentValue at 0, so every knob and fader on the panel opened at the
+    // bottom of its range instead of at the value the instrument ships with — a filter shut, a
+    // master tune at -100 cent — and looked, convincingly, like a panel with no values in it.
+    if (typeof parameter.default === 'number') {
+      channel.defaultValue = parameter.default;
+      channel.currentValue = parameter.default;
+    }
   }
   return control;
 }
@@ -478,26 +486,28 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
         'step_seq_grid', { x: originX + box.x + g.x, y: originY + box.y + CONTENT_TOP + g.y, w: g.w, h: g.h }));
     }
 
-    // The step sequencer: four lanes of sixteen, every fader a real address.
+    // The step sequencer: four lanes of sixteen cells, every cell a real address.
     if (box.steps) {
       const s = box.steps;
       const x0 = originX + box.x;
       const y0 = originY + box.y + CONTENT_TOP;
       const columnX = (step) => x0 + s.x + step * s.pitch;
+      const accented = (step) => Math.floor(step / s.accentEvery) % 2 === 0;
 
       for (let step = 0; step < s.count; step++) {
-        add(label(String(step + 1), { x: columnX(step) - 8, y: y0 + s.numberY, w: s.faderW + 16, h: 13 },
-          { size: 8, colour: step % 4 === 0 ? SKIN.label : SKIN.labelDim, bold: step % 4 === 0 }));
+        add(label(String(step + 1), { x: columnX(step), y: y0 + s.numberY, w: s.cellW, h: 13 },
+          { size: 9, colour: step % s.accentEvery === 0 ? SKIN.label : SKIN.labelDim, bold: step % s.accentEvery === 0 }));
       }
 
       for (const lane of s.lanes) {
-        add(label(lane.label, { x: x0 + s.gutterX, y: y0 + lane.y + s.faderH / 2 - 8, w: 54, h: 14 },
+        add(label(lane.label, { x: x0 + s.gutterX, y: y0 + lane.y + lane.h / 2 - 8, w: 62, h: 14 },
           { size: 9, colour: SKIN.label, align: 'left' }));
         for (let step = 0; step < s.count; step++) {
           const parameter = byId.get(resolve(`${lane.prefix}${step + 1}`));
           if (!parameter) { missing.push(resolve(`${lane.prefix}${step + 1}`)); continue; }
-          add(boundCustom(parameter, () => gaiaFader({ width: s.faderW, height: s.faderH, ticks: 5 }),
-            { x: columnX(step), y: y0 + lane.y, w: s.faderW, h: s.faderH }));
+          add(boundCustom(parameter,
+            () => stepCell({ width: s.cellW, height: lane.h, colour: lane.colour, accent: accented(step) }),
+            { x: columnX(step), y: y0 + lane.y, w: s.cellW, h: lane.h }));
         }
       }
     }
