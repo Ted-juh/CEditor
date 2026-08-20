@@ -23,6 +23,9 @@ export const TINT = {
   feg: 'FF3FB0A0',
 };
 
+/** One colour per Free EG track, so four curves over one time axis stay tellable apart. */
+export const TRACK_TINT = ['FF4FC3B0', 'FFE0A94A', 'FF7FA7E8', 'FFD98AA8'];
+
 export const SKIN = {
   // The AN1x is a champagne-silver body with a dark control field and that orange wordmark.
   panelBg: 'FFE7E3DA',
@@ -34,6 +37,7 @@ export const SKIN = {
   knob: 54,
   knobBig: 62,
   knobSmall: 42,
+  knobTiny: 36,
   faderW: 26,
   faderH: 104,
   ledRow: 15,
@@ -81,7 +85,7 @@ export const SCENE_STRIP = {
       controls: [
         { p: 'scLfo1Wave', kind: 'knobSmall', x: 14, y: 40, label: 'LFO1 WAVE' },
         { p: 'scLfo1Speed', kind: 'knob', x: 80, y: 34, label: 'LFO1 SPEED' },
-        { p: 'scLfo1SpeedSync', kind: 'knobSmall', x: 158, y: 40, label: 'SYNC SPEED' },
+        { p: 'scLfo1Delay', kind: 'knobSmall', x: 158, y: 40, label: 'LFO1 DELAY' },
         { p: 'scLfoResetMode', kind: 'leds', x: 14, y: 150, w: 88, label: 'RESET' },
         { p: 'scLfo2Speed', kind: 'knob', x: 120, y: 150, label: 'LFO2 SPEED' },
         { p: 'scVcfFilterModDepth', kind: 'knobSmall', x: 40, y: 250, label: 'FILT MOD' },
@@ -177,10 +181,11 @@ export const SCENE_STRIP = {
     {
       // The CTRL bar, poured into the one place it actually lands: the scene's control matrix.
       // Sixteen sets exist; eight are laid out and the notes say where the rest live. SOURCE and
-      // PARAM are the manual's numbered lists (115 sources, 37 destinations) — a display picks
-      // them by name on the hardware, a knob picks them by number here.
+      // One row per set: source knob, destination by name, depth knob. The destination list is the
+      // manual's own 46 entries now, so it reads as words; the source list (115 entries) is still a
+      // number, because this Data List does not enumerate it.
       title: 'CTRL MATRIX', tint: TINT.ctrl, x: 2458, y: 0, w: 312, h: 356,
-      matrix: { sets: 8, x: 12, y: 34, colW: 150, rowH: 78 },
+      matrix: { sets: 8, x: 22, y: 26, rowH: 38 },
     },
   ],
 };
@@ -222,7 +227,7 @@ export const COMMON_STRIP = {
         { p: 'cc10-panpot', kind: 'knobSmall', x: 80, y: 40, label: 'PAN' },
         { p: 'cc11-expression', kind: 'knobSmall', x: 146, y: 40, label: 'EXPRESSION' },
         { p: 'cc1-modulation', kind: 'knobSmall', x: 212, y: 40, label: 'MOD WHEEL' },
-        { p: 'cc55-sustain-switch', kind: 'toggle', x: 278, y: 48, w: 84, label: 'SUSTAIN' },
+        { p: 'cc64-sustain-switch', kind: 'toggle', x: 278, y: 48, w: 84, label: 'SUSTAIN' },
         { p: 'cc3-scene-select', kind: 'knobSmall', x: 376, y: 40, label: 'SCENE (CC3)' },
       ],
     },
@@ -237,7 +242,7 @@ export const EFFECT_STRIP = {
       title: 'VARIATION', tint: TINT.effect, x: 0, y: 0, w: 560, h: 116,
       controls: [
         { p: 'vcVariType', kind: 'knobSmall', x: 12, y: 36, label: 'TYPE' },
-        { p: 'cc82-chorus-variation-depth', kind: 'knobSmall', x: 78, y: 36, label: 'DEPTH' },
+        { p: 'cc93-chorus-variation-depth', kind: 'knobSmall', x: 78, y: 36, label: 'DEPTH' },
         ...[1, 2, 3, 4, 5, 6].map((n) => (
           { p: `vcVariParam${n}`, kind: 'knobSmall', x: 144 + (n - 1) * 66, y: 36, label: `PARAM ${n}` }
         )),
@@ -260,7 +265,7 @@ export const EFFECT_STRIP = {
       controls: [
         { p: 'vcDlyType', kind: 'knobSmall', x: 12, y: 36, label: 'TYPE' },
         { p: 'vcDlyReturn', kind: 'knobSmall', x: 78, y: 36, label: 'RETURN' },
-        { p: 'cc83-delay-depth', kind: 'knobSmall', x: 144, y: 36, label: 'DEPTH' },
+        { p: 'cc94-delay-depth', kind: 'knobSmall', x: 144, y: 36, label: 'DEPTH' },
         { p: 'vcDlyRevConnection', kind: 'leds', x: 210, y: 32, w: 96, label: 'DLY→REV' },
         ...[1, 2, 3, 4, 5, 6].map((n) => (
           { p: `vcDlyParam${n}`, kind: 'knobSmall', x: 330 + (n - 1) * 66, y: 36, label: `PARAM ${n}` }
@@ -272,7 +277,7 @@ export const EFFECT_STRIP = {
       controls: [
         { p: 'vcRevType', kind: 'knobSmall', x: 12, y: 36, label: 'TYPE' },
         { p: 'vcRevReturn', kind: 'knobSmall', x: 78, y: 36, label: 'RETURN' },
-        { p: 'cc80-reverb-depth', kind: 'knobSmall', x: 144, y: 36, label: 'DEPTH' },
+        { p: 'cc91-reverb-depth', kind: 'knobSmall', x: 144, y: 36, label: 'DEPTH' },
         ...[1, 2, 3, 4, 5, 6, 7].map((n) => (
           { p: `vcRevParam${n}`, kind: 'knobSmall', x: 210 + (n - 1) * 66, y: 36, label: `PARAM ${n}` }
         )),
@@ -341,40 +346,60 @@ export const PLAY_STRIP = {
 
 /** Arpeggiator, Free EG and the step sequencer — the bottom third of the diagram. */
 export const PATTERN_STRIP = {
-  height: 260,
+  height: 556,
   boxes: [
     {
-      title: 'ARPEGGIO / STEP SEQ', tint: TINT.arp, x: 0, y: 0, w: 880, h: 130,
+      title: 'ARPEGGIO / STEP SEQ', tint: TINT.arp, x: 0, y: 0, w: 1000, h: 130,
       controls: [
         { p: 'arpOnOff', kind: 'leds', x: 12, y: 34, w: 86, label: 'ON' },
         { p: 'arpSelect', kind: 'leds', x: 110, y: 34, w: 110, label: 'MODE' },
-        { p: 'arpType', kind: 'knobSmall', x: 240, y: 40, label: 'ARP TYPE' },
-        { p: 'arpStepPtnNo', kind: 'knobSmall', x: 306, y: 40, label: 'PATTERN' },
-        { p: 'arpHold', kind: 'knobSmall', x: 372, y: 40, label: 'HOLD' },
-        { p: 'arpSceneSwitch', kind: 'knobSmall', x: 438, y: 40, label: 'SCENE' },
-        { p: 'arpSubdivide', kind: 'knobSmall', x: 504, y: 40, label: 'SUBDIV' },
-        { p: 'arpSwing', kind: 'knobSmall', x: 570, y: 40, label: 'SWING' },
-        { p: 'arpVelocity', kind: 'knobSmall', x: 636, y: 40, label: 'VELOCITY' },
-        { p: 'arpGateTime', kind: 'knobSmall', x: 702, y: 40, label: 'GATE' },
+        { p: 'arpType', kind: 'combo', x: 232, y: 44, w: 150, label: 'ARP TYPE' },
+        { p: 'arpKbdMode', kind: 'combo', x: 392, y: 44, w: 128, label: 'KBD MODE' },
+        { p: 'arpHold', kind: 'toggle', x: 530, y: 46, w: 74, label: 'HOLD' },
+        { p: 'arpSceneSwitch', kind: 'combo', x: 614, y: 44, w: 108, label: 'SCENE' },
+        { p: 'arpSubdivide', kind: 'knobSmall', x: 738, y: 40, label: 'SUBDIV' },
+        { p: 'arpSwing', kind: 'knobSmall', x: 804, y: 40, label: 'SWING' },
+        { p: 'arpVelocity', kind: 'knobSmall', x: 870, y: 40, label: 'VELOCITY' },
+        { p: 'arpGateTime', kind: 'knobSmall', x: 936, y: 40, label: 'GATE' },
       ],
     },
     {
-      // The Free EG: four hand-drawn control tracks. The four track curves themselves are bulk
-      // data (the userPattern dump, no byte layout yet) — what is editable by address is here.
-      title: 'FREE EG', tint: TINT.feg, x: 0, y: 142, w: 880, h: 106,
+      /**
+       * The Free EG, drawn as what it is: four assignable recorder tracks over one timeline.
+       *
+       * It was twelve knobs. That was wrong twice over. There was no curve anywhere — the thing the
+       * Free EG IS, a shape you draw over the length of the sequence, had no depiction at all — and
+       * the two knobs per track were a knob standing in for a 57-entry destination list and a
+       * four-way switch, because at the time the profile carried both as bare integers.
+       *
+       * Both are named lists now, so each track gets its destination and its scene switch as
+       * choosers, and its own lane on a shared time axis. Four lanes because the instrument has
+       * four tracks and they run together: the point of the Free EG is that VCF Cutoff and VCA
+       * Volume and LFO1 Speed move at once, in shapes you drew, and reading that needs them
+       * stacked against the same x.
+       */
+      title: 'FREE EG', tint: TINT.feg, x: 0, y: 258, w: 2770, h: 290,
       controls: [
-        { p: 'fegTrigger', kind: 'leds', x: 12, y: 30, w: 110, label: 'TRIGGER' },
-        { p: 'fegLoopType', kind: 'knobSmall', x: 134, y: 34, label: 'LOOP' },
-        { p: 'fegLength', kind: 'knobSmall', x: 200, y: 34, label: 'LENGTH' },
-        { p: 'fegKbdTrack', kind: 'knobSmall', x: 266, y: 34, label: 'KBD TRK' },
-        ...[1, 2, 3, 4].flatMap((n) => ([
-          { p: `fegTrkParam${n}`, kind: 'knobSmall', x: 340 + (n - 1) * 136, y: 34, label: `TRK ${n} PARAM` },
-          { p: `fegTrkSceneSw${n}`, kind: 'knobSmall', x: 406 + (n - 1) * 136, y: 34, label: `TRK ${n} SW` },
-        ])),
+        { p: 'fegTrigger', kind: 'leds', x: 12, y: 26, w: 104, label: 'TRIGGER' },
+        { p: 'fegLoopType', kind: 'combo', x: 12, y: 130, w: 104, label: 'LOOP' },
+        { p: 'fegLength', kind: 'knobSmall', x: 140, y: 30, label: 'LENGTH' },
+        { p: 'fegKbdTrack', kind: 'knobSmall', x: 206, y: 30, label: 'KBD TRK' },
+        ...[1, 2, 3, 4].flatMap((n) => {
+          const y = 12 + (n - 1) * 64 + 16;
+          return [
+            { p: `fegTrkParam${n}`, kind: 'combo', x: 360, y, w: 210, label: n === 1 ? 'DESTINATION' : '' },
+            { p: `fegTrkSceneSw${n}`, kind: 'combo', x: 582, y, w: 130, label: n === 1 ? 'SCENE' : '' },
+          ];
+        }),
       ],
+      // One lane per track: the recorded curve, editable, over the sequence length.
+      curves: [1, 2, 3, 4].map((n) => ({
+        track: n, x: 726, y: 12 + (n - 1) * 64, w: 2020, h: 56,
+        label: `TRACK ${n}`, labelX: 290, colour: TRACK_TINT[n - 1],
+      })),
     },
     {
-      title: 'STEP SEQUENCER', tint: TINT.arp, x: 890, y: 0, w: 1880, h: 248,
+      title: 'STEP SEQUENCER', tint: TINT.arp, x: 1010, y: 0, w: 1760, h: 248,
       controls: [],
       grid: { x: 12, y: 26, w: 1856, h: 196, steps: 16 },
     },

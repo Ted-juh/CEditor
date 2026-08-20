@@ -202,6 +202,24 @@ const KINDS = {
     return { controls: [control], caption: { text: spec.label, x: at.x - 14, y: at.y + SKIN.knobSmall + 3, w: SKIN.knobSmall + 28 } };
   },
 
+  // A named list, shown as a list. The profile carries the manual's own member names now — the
+  // 30 arpeggio types, the 57 Free EG destinations, the 46 control-matrix destinations — and a
+  // knob for any of those is a number where the instrument shows a word. `bound` adopts the
+  // choices into Value.rows, so the label the user picks and the byte the AN1x receives come from
+  // the same row.
+  combo: (parameter, spec, at) => {
+    const w = spec.w ?? 150;
+    const control = bound(parameter, 'Combobox', { x: at.x, y: at.y, w, h: 24 }, {
+      'Text.content': '',
+      'Text._children.Font.size': 10,
+      'Background._children.Corners.radius': 3,
+    });
+    return {
+      controls: [control],
+      caption: spec.label ? { text: spec.label, x: at.x, y: at.y - 13, w, align: 'left' } : null,
+    };
+  },
+
   toggle: (parameter, spec, at) => {
     const control = bound(parameter, 'ToggleButton', { x: at.x, y: at.y, w: spec.w ?? 80, h: 22 }, {
       'Text.content': spec.label,
@@ -293,6 +311,68 @@ function slimCustomParts(control) {
   return control;
 }
 
+/**
+ * One Free EG track: the recorded curve, drawn and editable, over the sequence length.
+ *
+ * An Envelope rather than a drawing, because the Free EG is not decoration — it is a shape the user
+ * makes. What it is NOT, yet, is transmitted. The instrument stores each track as 192 two-byte
+ * samples (10 00 68 for track 1, 384 bytes per track), and those addresses now exist in the
+ * profile; what does not exist is a binding kind that maps one curve onto an array of parameters.
+ * Until it does, this lane edits the panel's copy. The two ways to close that gap are both open
+ * now that the addresses are modelled: 192 parameter writes, or one voiceCommon bulk send.
+ *
+ * Saying so here rather than only in the notes, because a control that looks connected and is not
+ * is the single failure this panel has already shipped twice.
+ */
+function curveLane(lane, at) {
+  const flat = [
+    { id: 'p0', x: 0, y: 0.5, curve: 'linear', tension: 0 },
+    { id: 'p1', x: 0.5, y: 0.5, curve: 'linear', tension: 0 },
+    { id: 'p2', x: 1, y: 0.5, curve: 'linear', tension: 0 },
+  ];
+  const control = createControl('Envelope', {
+    Core: {
+      id: nextId(`feg_track_${lane.track}`),
+      name: `fegTrack${lane.track}Curve`,
+      description: `Free EG track ${lane.track} curve — 192 points at 10 0${(lane.track - 1) * 3} 68 `
+        + '(not transmitted: no binding maps a curve onto an array of parameters)',
+    },
+    Transform: { x: at.x, y: at.y, width: lane.w, height: lane.h },
+    Envelope: {
+      preset: 'free',
+      points: flat,
+      sustainIndex: -1,
+      editable: true,
+      addOnDoubleClick: true,
+      showGrid: true,
+      showPlayhead: false,
+      xLabel: '',
+      yLabel: '',
+      snapX: 0,
+      snapY: 0,
+      fillUnder: true,
+      // The Envelope section keeps its colours flat, not under a Curve/Grid child. Nesting them
+      // wrote four keys nothing reads and left every lane the stock blue.
+      lineColour: lane.colour,
+      fillColour: `28${lane.colour.slice(2)}`,
+      nodeColour: lane.colour,
+      gridColour: '14FFFFFF',
+      lineWidth: 1.6,
+      nodeRadius: 3,
+      gridX: 8,
+      gridY: 2,
+    },
+    Background: {
+      _children: {
+        Fill: { colour: 'FF161B21' },
+        Border: { enabled: true, thickness: 1, colour: '553F4A55' },
+        Corners: { radius: 3 },
+      },
+    },
+  });
+  return control;
+}
+
 function placeStatic(control, id, { x, y, w, h }) {
   control._children.Core.id = nextId(id);
   control._children.Core.name = id;
@@ -312,26 +392,36 @@ function buildMatrix(box, byId, resolve, originX, originY) {
   const controls = [];
   const missing = [];
   const m = box.matrix;
+  const x0 = originX + box.x + m.x;
+  const y0 = originY + box.y + CONTENT_TOP + m.y;
+
+  // Column headings once, rather than a caption under all twenty-four knobs.
+  for (const [text, cx, cw, align] of [['SRC', 0, 40, 'center'], ['DESTINATION', 52, 176, 'left'], ['DEPTH', 240, 44, 'center']]) {
+    controls.push(label(text, { x: x0 + cx, y: y0 - 15, w: cw, h: 13 }, { size: 8, colour: SKIN.label, align }));
+  }
 
   for (let set = 1; set <= m.sets; set++) {
-    const col = (set - 1) % 2;
-    const row = Math.floor((set - 1) / 2);
-    const baseX = originX + box.x + m.x + col * m.colW;
-    const baseY = originY + box.y + CONTENT_TOP + m.y + row * m.rowH;
+    const y = y0 + (set - 1) * m.rowH;
 
-    const triplet = [
-      [`scCmSource${set}`, `SRC ${set}`],
-      [`scCmParam${set}`, 'PRM'],
-      [`scCmDepth${set}`, 'DEPTH'],
-    ];
-    triplet.forEach(([id, cap], i) => {
-      const parameter = byId.get(resolve(id));
-      if (!parameter) { missing.push(resolve(id)); return; }
-      const at = { x: baseX + i * 48, y: baseY };
-      const built = KINDS.knobSmall(parameter, { label: cap }, at);
-      controls.push(...built.controls);
-      controls.push(label(cap, { x: at.x - 8, y: at.y + SKIN.knobSmall + 3, w: SKIN.knobSmall + 16, h: 14 }, { size: 8, colour: SKIN.label }));
-    });
+    const source = byId.get(resolve(`scCmSource${set}`));
+    const destination = byId.get(resolve(`scCmParam${set}`));
+    const depth = byId.get(resolve(`scCmDepth${set}`));
+    for (const [id, parameter] of [[`scCmSource${set}`, source], [`scCmParam${set}`, destination], [`scCmDepth${set}`, depth]]) {
+      if (!parameter) missing.push(resolve(id));
+    }
+    if (!source || !destination || !depth) continue;
+
+    controls.push(boundCustom(source, () => gaiaKnob({ size: SKIN.knobTiny }), { x: x0, y, w: SKIN.knobTiny, h: SKIN.knobTiny }));
+    // The destination is a named list — 46 of them, from the manual's own Control Matrix List. It
+    // was a knob for as long as the profile carried it as a bare integer; a number in a box is
+    // what a knob can say, and "VCF Cutoff" is what the instrument's display says.
+    controls.push(bound(destination, 'Combobox', { x: x0 + 52, y: y + 7, w: 176, h: 22 }, {
+      'Text.content': '',
+      'Text._children.Font.size': 9,
+      'Background._children.Corners.radius': 3,
+    }));
+    controls.push(boundCustom(depth, () => gaiaKnob({ size: SKIN.knobTiny }), { x: x0 + 240, y, w: SKIN.knobTiny, h: SKIN.knobTiny }));
+    controls.push(label(String(set), { x: x0 - 10, y: y + 12, w: 10, h: 12 }, { size: 8, colour: SKIN.labelDim }));
   }
 
   return { controls, missing };
@@ -355,6 +445,14 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
       const g = box.grid;
       controls.push(placeStatic(gaiaArpGrid({ width: g.w, height: g.h, steps: g.steps, viewNote: 60 }),
         'step_seq_grid', { x: originX + box.x + g.x, y: originY + box.y + CONTENT_TOP + g.y, w: g.w, h: g.h }));
+    }
+
+    for (const lane of box.curves ?? []) {
+      const x = originX + box.x + lane.x;
+      const y = originY + box.y + CONTENT_TOP + lane.y;
+      controls.push(label(lane.label, { x: originX + box.x + lane.labelX, y: y + 10, w: 62, h: 16 },
+        { size: 10, bold: true, colour: lane.colour, align: 'left' }));
+      controls.push(curveLane(lane, { x, y }));
     }
 
     // The note-playing controls. They carry no DeviceBindings — they emit notes rather than drive a
@@ -427,7 +525,7 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
         controls.push(label(built.caption.text, {
           x: built.caption.x, y: built.caption.y, w: built.caption.w,
           h: built.caption.lines === 2 ? 26 : 16,
-        }, { size: 9, colour: SKIN.label }));
+        }, { size: 9, colour: SKIN.label, align: built.caption.align ?? 'center' }));
       }
     }
   }
@@ -455,18 +553,32 @@ Two scenes, both on screen
 What the labels do not promise
   VCO wave names are the manual's standard set; the instrument re-labels waves 3..5 when the VCO
   algorithm changes, and this panel does not. The control matrix shows sets 1-8 of 16 — the other
-  eight are in the parameter browser. SOURCE and PARAM knobs pick from the manual's numbered
-  lists (115 sources, 37 destinations); the hardware names them on its display, a knob cannot.
+  eight are in the parameter browser. Its DESTINATION is the manual's own list of 46, by name; its
+  SOURCE is still a number, because this Data List does not enumerate the 115 sources.
+
+The Free EG is four tracks, not twelve knobs
+  It used to be twelve knobs and no curve at all, which described the Free EG about as well as a
+  list of ingredients describes a meal. It is four recorder tracks running together over one
+  timeline: each picks a destination out of 46, each has a scene switch, each holds a shape. So it
+  is drawn as four lanes against a shared x, one colour per track.
+
+  The destination and the scene switch are real addresses (10 00 60..67) and transmit. The CURVE
+  does not, yet. The instrument keeps each track as 192 two-byte samples — track 1 at 10 00 68,
+  384 bytes per track — and those addresses are in the profile now; what does not exist is a
+  binding kind that maps one curve onto an array of parameters. Two ways to close it, both open
+  now that the addresses are modelled: 192 parameter writes, or one voiceCommon bulk send.
 
 The step sequencer grid edits a pattern, not the synth
   Same honesty as the GAIA's arpeggio grid: the drawn blocks publish through the component's
-  pattern channel, but no pattern-to-parameter bridge exists yet, and the AN1x's step data is bulk
-  dump territory (the userPattern dump has no byte layout in the DPD yet). The transport controls
-  beside it — type, subdivide, swing, gate — are real addresses and fully wired.
+  pattern channel, and no pattern-to-parameter bridge exists yet. The 70 step parameters DO exist
+  now (10 0E 00 — sixteen each of note, velocity, gate and control value), so the grid could be
+  bound step by step; nothing binds it today. The controls beside it — type, kbd mode, hold,
+  scene, subdivide, swing, velocity, gate — are real addresses and fully wired.
 
-Free EG
-  The four track curves are bulk data too, so what is here is what single parameters reach:
-  trigger, loop, length, keyboard track, and each track's destination parameter and scene switch.`;
+Named lists read as names
+  Arpeggio type, keyboard mode, scene switch, Free EG destination, control-matrix destination and
+  the effect types are the manual's own lists now, so they are choosers rather than knobs. A knob
+  can show a number; only a list can show "BassLineD".`;
 
 export function buildAn1xPanel({ slim = true } = {}) {
   const profile = JSON.parse(readFileSync(PROFILE, 'utf8'));
