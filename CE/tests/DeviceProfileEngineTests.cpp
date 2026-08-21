@@ -30,6 +30,170 @@ juce::File profileRoot()
    #endif
 }
 
+/*
+ * The nibbled encoder, against the profile that actually uses it.
+ *
+ * WHY THIS EXISTS. 622 of the GAIA's 793 parameters are nibbled — every envelope, filter and LFO
+ * value the instrument has. They could not be SENT at all from the desktop build until the profile
+ * was taught the encoder's vocabulary, and inbound they were read as their top nibble alone. That
+ * fix was verified by reading DeviceProfileEngine.cpp and mirroring it in the JS runtime; nothing
+ * ever compiled the C++ and watched it produce bytes. This file had zero nibbled tests while the
+ * engine had nineteen references to them.
+ *
+ * WHAT IS ASSERTED IS THE FORMAT'S PROPERTY, not the implementation's shape: a nibbled field is the
+ * value in base 16, most significant nibble first, one nibble per byte. Every byte is therefore
+ * 0x0F or less — which is the whole point, since the bug was a value above 15 being written into a
+ * single byte. Checking `encodedValueHex` keeps the framing and the Roland checksum out of it;
+ * those have their own tests, and folding them in here would make a nibble test that fails for
+ * reasons that are not about nibbles.
+ */
+int runNibbledEncoderTests (const juce::File& file)
+{
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromFile (file, error))
+    {
+        std::cerr << "[FAIL] nibbled: could not load " << file.getFileName() << ": " << error << "\n";
+        return 1;
+    }
+
+    auto failures = 0;
+    const auto hexOf = [&engine] (const juce::String& id, const juce::var& value) -> juce::String
+    {
+        const auto result = engine.compileSetParameter ("mainSynth", id, value, true);
+        return result.ok ? result.transaction.encodedValueHex : juce::String ("!" + result.error);
+    };
+
+    // Base-16, high nibble first. 300 = 0x12C, and the profile gives Patch Tempo three nibbles.
+    struct Known { const char* id; int value; const char* expected; };
+    const Known known[] = {
+        { "common.patchTempo", 300, "01 02 0C" },   // 0x12C
+        { "common.patchTempo", 5,   "00 00 05" },   // the parameter's own minimum
+        { "common.patchTempo", 256, "01 00 00" },   // a carry across every nibble
+    };
+
+    for (const auto& k : known)
+    {
+        const auto actual = hexOf (k.id, k.value);
+        if (actual != k.expected)
+        {
+            std::cerr << "[FAIL] nibbled " << k.id << " = " << k.value
+                      << ": expected " << k.expected << ", got " << actual << "\n";
+            ++failures;
+        }
+    }
+    if (failures == 0)
+        std::cout << "[PASS] nibbled :: base-16 split, high nibble first (3-nibble Patch Tempo)\n";
+
+    // THE SWEEP. Every nibbled parameter, at the bottom, middle and top of its own range: it must
+    // encode at all (the "could not be sent" bug), it must produce exactly `nibbles` bytes, and
+    // none of them may exceed 0x0F.
+    //
+    // Read from the profile FILE rather than from listParameterDescriptors, which does not carry
+    // `encoding` — widening a shipped API so a test can see the field it wants to test would be the
+    // tail wagging the dog. This is the same document the engine just loaded.
+    const auto document = juce::JSON::parse (file.loadFileAsString());
+    auto* documentObject = document.getDynamicObject();
+    auto* list = documentObject != nullptr ? documentObject->getProperty ("parameters").getArray() : nullptr;
+    if (list == nullptr)
+    {
+        std::cerr << "[FAIL] nibbled: could not read parameters out of " << file.getFileName() << "\n";
+        return failures + 1;
+    }
+
+    auto nibbledSeen = 0, sweepFailures = 0;
+    for (const auto& descriptor : *list)
+    {
+        auto* object = descriptor.getDynamicObject();
+        if (object == nullptr)
+            continue;
+
+        auto encoding = object->getProperty ("encoding");
+        auto* encodingObject = encoding.getDynamicObject();
+        if (encodingObject == nullptr || encodingObject->getProperty ("type").toString() != "nibbled")
+            continue;
+
+        const auto id = object->getProperty ("id").toString();
+        const auto nibbles = (int) encodingObject->getProperty ("nibbles");
+        auto range = object->getProperty ("range");
+        auto* rangeObject = range.getDynamicObject();
+        if (rangeObject == nullptr)
+            continue;
+
+        const auto low = (int) rangeObject->getProperty ("min");
+        const auto high = (int) rangeObject->getProperty ("max");
+        ++nibbledSeen;
+
+        for (const auto value : { low, (low + high) / 2, high })
+        {
+            const auto result = engine.compileSetParameter ("mainSynth", id, value, true);
+            if (! result.ok)
+            {
+                if (sweepFailures < 5)
+                    std::cerr << "[FAIL] nibbled " << id << " = " << value << ": " << result.error << "\n";
+                ++sweepFailures;
+                continue;
+            }
+
+            juce::StringArray bytes;
+            bytes.addTokens (result.transaction.encodedValueHex, " ", "");
+            bytes.removeEmptyStrings();
+
+            if (bytes.size() != nibbles)
+            {
+                if (sweepFailures < 5)
+                    std::cerr << "[FAIL] nibbled " << id << " = " << value << ": expected "
+                              << nibbles << " bytes, got " << bytes.size() << "\n";
+                ++sweepFailures;
+                continue;
+            }
+
+            for (const auto& byte : bytes)
+            {
+                if (byte.getHexValue32() > 0x0f)
+                {
+                    if (sweepFailures < 5)
+                        std::cerr << "[FAIL] nibbled " << id << " = " << value
+                                  << ": byte " << byte << " is not a nibble\n";
+                    ++sweepFailures;
+                    break;
+                }
+            }
+        }
+    }
+
+    // A guard on the guard: if the descriptor walk stopped finding nibbled parameters, the sweep
+    // above would pass by doing nothing at all.
+    if (nibbledSeen < 600)
+    {
+        std::cerr << "[FAIL] nibbled: expected the GAIA's ~622 nibbled parameters, swept "
+                  << nibbledSeen << "\n";
+        ++failures;
+    }
+    else if (sweepFailures == 0)
+    {
+        std::cout << "[PASS] nibbled :: all " << nibbledSeen
+                  << " nibbled parameters encode at min/mid/max, every byte <= 0x0F\n";
+    }
+
+    failures += sweepFailures;
+
+    // Out of range must be refused rather than silently truncated: a 2-nibble field holds 0..255,
+    // and 256 wrapping to 00 00 would move the wrong parameter on the instrument.
+    const auto tooBig = engine.compileSetParameter ("mainSynth", "common.patchTempo", 4096, true);
+    if (tooBig.ok)
+    {
+        std::cerr << "[FAIL] nibbled: 4096 fits in three nibbles, apparently\n";
+        ++failures;
+    }
+    else
+    {
+        std::cout << "[PASS] nibbled :: a value past the field's width is refused\n";
+    }
+
+    return failures;
+}
+
 int runProfileTests (const juce::File& file)
 {
     ceditor::device::DeviceProfileEngine engine;
@@ -1379,6 +1543,7 @@ int main()
     failures += runServiceRequestTests();
     failures += runMidiCiTests();
     failures += runChecksumTableTests();
+    failures += runNibbledEncoderTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
 
     if (failures == 0)
     {
