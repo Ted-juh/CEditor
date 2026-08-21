@@ -615,13 +615,23 @@ test('a control a live one sits under is not folded, and the ground stays behind
     ['ground:Main', 'knob', 'over']);
 });
 
-test('a panel carrying scripts folds nothing, however it is asked', () => {
-  // A script can reach any control by id and set its text — see panelAllowsFold.
+test('a panel carrying scripts folds like any other', () => {
+  // It used not to: any script at all vetoed the whole panel, which cost the GAIA its entire fold.
+  // A script write goes through the document and the ground re-bakes — see sceneryScripts.test.js.
   const panel = panelWith([label('a', 'Main')], [createLayer('Main')]);
   panel.scripts = [{ id: 's', source: '' }];
-  assert.deepEqual(kindsOf(buildSceneryRenderPlan(panel, { fold: true }).items), ['a']);
+  assert.deepEqual(kindsOf(buildSceneryRenderPlan(panel, { fold: true }).items), ['ground:Main']);
 });
 
+test('a control a script has written to is kept live, and blocks what it covers', () => {
+  // The rate guard, reaching the plan. neverFold carries the ids from the script runtime.
+  const panel = panelWith([label('a', 'Main'), label('b', 'Main', { y: 40 })], [createLayer('Main')]);
+  assert.deepEqual(kindsOf(buildSceneryRenderPlan(panel, { fold: true }).items), ['ground:Main']);
+  assert.deepEqual(
+    kindsOf(buildSceneryRenderPlan(panel, { fold: true, neverFold: new Set(['a']) }).items),
+    ['ground:Main', 'a'],
+  );
+})
 test('fold:false is byte-for-byte the list that existed before the ground did', () => {
   // The migration promise, and the reason every other test in this file still reads as it did.
   const panel = panelWith(

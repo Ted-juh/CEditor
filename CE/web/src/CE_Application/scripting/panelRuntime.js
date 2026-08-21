@@ -20,6 +20,7 @@
 import { get } from 'svelte/store';
 import { panels, scriptRuntimePanelId, updatePanel } from '../stores/panels.js';
 import { updateControlProperty, removeControlNode } from '../stores/controls.js';
+import { noteScriptTouchedControl } from '../stores/scriptTouchedControls.js';
 import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -523,7 +524,12 @@ function setValue(path, value, formOrOpts = '') {
     wrote = true;
   } else {
     wrote = shape.writes;
-    if (wrote) updateControlProperty(control?._children?.Core?.id, modelPath, value);
+    if (wrote) {
+      // Out of the scenery ground, for good — see stores/scriptTouchedControls.js. A folded control
+      // a script writes to would otherwise re-bake the whole ground on every write.
+      noteScriptTouchedControl(control?._children?.Core?.id);
+      updateControlProperty(control?._children?.Core?.id, modelPath, value);
+    }
   }
 
   // A live value needs no `Value` section to move, so the fresh-key warning does not apply to it —
@@ -4748,6 +4754,9 @@ function panelApplyPatches(transforms, patches) {
     resolved.set(id, local);
   }
   if (!resolved.size) return 0;
+  // The arrangement verbs rewrite Transform for a whole list at once, without going through
+  // setValue, so they report their own.
+  for (const id of resolved.keys()) noteScriptTouchedControl(id);
 
   const apply = (list) => list.map((c) => {
     const id = c?._children?.Core?.id;
@@ -5783,6 +5792,7 @@ function deviceDefineDumpImpl(kind, spec, role) {
  */
 function writeControlProperty(control, path, value) {
   if (host) { host.writeValue(control, path, value); return; }
+  noteScriptTouchedControl(control?._children?.Core?.id);
   updateControlProperty(control?._children?.Core?.id, path, value);
 }
 

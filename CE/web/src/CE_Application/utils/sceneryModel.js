@@ -94,22 +94,31 @@ export function isScenery(control) {
   return true;
 }
 
-/**
- * Can a panel's scenery be folded at all?
+/*
+ * WHY A SCRIPTED PANEL FOLDS.
  *
- * A script can reach any control by id and set its text, colour or visibility, and nothing in the
- * script's shape says which ones it will touch. Reading the source and looking for ids would work
- * most of the time, and "most of the time" is not a property worth having in a renderer — a frozen
- * label that was supposed to animate is a bug nobody would think to look for here. So a panel with
- * any script keeps all its controls live.
+ * It used not to. Any panel carrying a script kept all of its controls live, on the reasoning that
+ * a script can reach any control by id and set its text, colour or visibility, and nothing in the
+ * script's shape says which ones it will touch. That cost the GAIA panel its entire fold — 193
+ * Labels and 27 Backgrounds — for two scripts that between them name one control, a grid.
  *
- * This is the conservative case most worth revisiting: per-id analysis would let scripted panels
- * fold everything the script demonstrably never names.
+ * The reasoning was wrong, and in an interesting way: it treated the ground as a snapshot. It is
+ * not. The ground is baked from the control document and re-baked whenever that document changes,
+ * so a script write that goes through the document simply appears. And for a control that can be
+ * folded, a script write ALWAYS goes through the document — setValue's other two doors are the
+ * player host and the live-value/channel path, and the live path requires a `Value` or
+ * `ValueChannels` section, which is a dynamic section, which means the control was never scenery.
+ * Nor can a script make a foldable control dynamic behind the ground's back: a control's sections
+ * come from its type, and both doors that could add one refuse — ce.panel.define answers "has no
+ * States section" and set() answers "not a section this control has". sceneryScripts.test.js pins
+ * all of it.
+ *
+ * What remains is a rate problem rather than a correctness one — an animation writing a folded
+ * label sixty times a second would re-bake the ground sixty times a second — and that is handled
+ * by dropping a control from the fold once a script has written to it. See
+ * stores/scriptTouchedControls.js, including why that is observed at runtime rather than read out
+ * of the script source, which cannot be done soundly.
  */
-export function panelAllowsFold(panel) {
-  const scripts = panel?.scripts;
-  return !Array.isArray(scripts) || scripts.length === 0;
-}
 
 function boxOf(control) {
   const t = control?._children?.Transform ?? {};
@@ -144,9 +153,15 @@ function overlaps(a, b) {
  * milliseconds, on every hover. The ground is a function of the panel alone. Holding a control live
  * is sceneryHoldSet's job, and it works by drawing over the ground rather than by changing it.
  */
-export function planSceneryFold(orderedControls) {
+export function planSceneryFold(orderedControls, neverFold = null) {
   const controls = orderedControls ?? [];
-  const isGroundCandidate = controls.map(isScenery);
+  // A control a script has written to is treated exactly as a dynamic one: it stays live, and it
+  // blocks anything it covers, so the overlap invariant below holds unchanged.
+  const isGroundCandidate = controls.map((control) => {
+    if (!isScenery(control)) return false;
+    const id = getControlCore(control)?.id;
+    return !(id != null && neverFold?.has(String(id)));
+  });
   const boxes = controls.map(boxOf);
 
   const ground = [];
