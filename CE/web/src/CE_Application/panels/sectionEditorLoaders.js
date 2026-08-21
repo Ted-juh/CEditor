@@ -22,6 +22,7 @@ const LAZY_COMPONENT_LOADERS = {
   mouse: () => import('../sections/MouseEditor.svelte'),
   text: () => import('../sections/TextEditor.svelte'),
   contentlayout: () => import('../sections/ContentLayoutEditor.svelte'),
+  children: () => import('../sections/ChildrenEditor.svelte'),
   icon: () => import('../sections/IconEditor.svelte'),
   effects: () => import('../sections/EffectsEditor.svelte'),
   behavior: () => import('../sections/BehaviorEditor.svelte'),

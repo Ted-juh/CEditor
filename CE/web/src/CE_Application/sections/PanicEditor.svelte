@@ -4,6 +4,10 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import Siren from 'lucide-svelte/icons/siren';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -18,13 +22,10 @@
   function clampInt(v, lo, hi, f) { const n = Math.round(num(v, f)); return n < lo ? lo : n > hi ? hi : n; }
 
   let count = $derived.by(() => { try { return panicMessages(control).length; } catch { return 0; } });
-
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const al = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${al}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if p}
-  <PropertySection title="Panic">
+  <PropertySection title="Panic" icon={Siren}>
     <PropertyCell label="Label" span={2} hint="Text on the button.">
       <input class="val" type="text" value={p.label ?? 'PANIC'} onchange={(e) => set('label', e.target.value)} />
     </PropertyCell>
@@ -34,8 +35,8 @@
       </select>
     </PropertyCell>
     {#if String(p.scope ?? 'all') === 'channel'}
-      <PropertyCell label="Channel" span={2} hint="The single channel to silence.">
-        <input class="val" type="number" min="1" max="16" step="1" value={num(p.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
+      <PropertyCell label="Channel" span={2} compact hint="The single channel to silence.">
+        <NumberCell label="Ch" min={1} max={16} step={1} value={num(p.channel, 1)} defaultValue={1} onchange={(v) => set('channel', clampInt(v, 1, 16, 1))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Reset CCs" span={1} hint="Also send CC 121 (reset all controllers), which releases a mod wheel or pedal left stuck up.">
@@ -55,21 +56,17 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
-    <PropertyCell label="Summary" span={1} hint="Show the second line saying what pressing it will do.">
+  <PropertySection title="Appearance" icon={Palette}>
+    <PropertyCell label="Summary" span={4} hint="Show the second line saying what pressing it will do.">
       <PropertyToggle value={p.showSummary !== false} onchange={() => set('showSummary', !(p.showSummary !== false))} />
     </PropertyCell>
-    <PropertyCell label="Face" span={1} hint="Button fill.">
-      <input class="cswatch" type="color" value={colRgb(p.faceColour, 'FF2A1416')} onchange={(e) => setCol('faceColour', p.faceColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Border" span={1} hint="Button outline.">
-      <input class="cswatch" type="color" value={colRgb(p.borderColour, 'FFE05C5C')} onchange={(e) => setCol('borderColour', p.borderColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Label" span={1} hint="Label colour.">
-      <input class="cswatch" type="color" value={colRgb(p.labelColour, 'FFF2C94C')} onchange={(e) => setCol('labelColour', p.labelColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Flash" span={2} hint="The colour it flashes when fired.">
-      <input class="cswatch" type="color" value={colRgb(p.flashColour, 'FFE05C5C')} onchange={(e) => setCol('flashColour', p.flashColour, e.target.value)} />
+    <PropertyCell label="Colours" span={4} hint="Button fill, outline, label, and the flash when fired. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'faceColour', label: 'Face', value: p.faceColour ?? 'FF2A1416', target: { type: 'control', controlId: core?.id, path: 'Panic.faceColour' } },
+        { key: 'borderColour', label: 'Border', value: p.borderColour ?? 'FFE05C5C', target: { type: 'control', controlId: core?.id, path: 'Panic.borderColour' } },
+        { key: 'labelColour', label: 'Label', value: p.labelColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Panic.labelColour' } },
+        { key: 'flashColour', label: 'Flash', value: p.flashColour ?? 'FFE05C5C', target: { type: 'control', controlId: core?.id, path: 'Panic.flashColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -77,6 +74,5 @@
 <style>
   .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
   .val:focus { border-color: #5B9BD5; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .note { font-size: 11px; color: #8a8a94; }
 </style>

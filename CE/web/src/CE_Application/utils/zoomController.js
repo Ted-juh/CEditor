@@ -21,12 +21,13 @@
  * viewport scale changes.
  */
 import {
+  computeAnchoredZoom,
   computeFitZoom,
   computeZoomToSelection,
   computeWheelZoom,
 } from './canvasInteractions.js';
 
-export function createZoomController({ getViewport, getPanel, getSelection, editorZoom, getZoom }) {
+export function createZoomController({ getViewport, getPanel, getSelection, editorZoom, getZoom, getZoomIncrement = null }) {
   let pendingScrollFrame = null;
   let pendingDeferredResult = null;
 
@@ -71,12 +72,34 @@ export function createZoomController({ getViewport, getPanel, getSelection, edit
     const el = getViewport();
     const panel = getPanel();
     if (!el || !panel) return;
+    // Plain wheel scrolls the viewport (the browser default every design tool
+    // keeps); Ctrl/Cmd+wheel — and a trackpad pinch, which arrives as
+    // ctrlKey+wheel — zooms at the cursor.
+    if (!(e.ctrlKey || e.metaKey)) return;
     e.preventDefault();
     // Defer the scroll write so the new zoomed layout exists before we adjust
     // the viewport, but compose repeated wheel events against the latest
     // pending view so the cursor anchor stays stable during rapid scrolling.
     apply(
-      computeWheelZoom(el, e, getZoom(), panel, 10, pendingDeferredResult),
+      computeWheelZoom(el, e, getZoom(), panel, 1.1, pendingDeferredResult),
+      /* scrollDeferred */ true,
+    );
+  }
+
+  /** Step zoom (buttons, Ctrl+= / Ctrl+-), anchored at the viewport centre so
+   *  the view stays put instead of drifting toward the top-left corner. Uses
+   *  the user-configurable increment. */
+  function zoomStep(direction) {
+    const el = getViewport();
+    const panel = getPanel();
+    if (!el || !panel) return;
+    const inc = Math.max(1, getZoomIncrement?.() ?? 10);
+    const base = pendingDeferredResult?.zoom ?? getZoom();
+    apply(
+      computeAnchoredZoom(
+        el, getZoom(), panel, base + direction * inc,
+        el.clientWidth / 2, el.clientHeight / 2, pendingDeferredResult,
+      ),
       /* scrollDeferred */ true,
     );
   }
@@ -85,7 +108,10 @@ export function createZoomController({ getViewport, getPanel, getSelection, edit
     const panel = getPanel();
     const el = getViewport();
     const z = computeFitZoom(panel, el);
-    if (z != null) editorZoom.set(z);
+    if (z == null) return;
+    // The fitted panel is fully visible, so any leftover scroll offset only
+    // shows empty stage — reset it along with the zoom.
+    apply({ zoom: z, scrollLeft: 0, scrollTop: 0 }, /* scrollDeferred */ true);
   }
 
   function zoomToSelection() {
@@ -94,5 +120,5 @@ export function createZoomController({ getViewport, getPanel, getSelection, edit
     apply(computeZoomToSelection(panel, el, getSelection()), /* scrollDeferred */ true);
   }
 
-  return { handleWheel, fitToWindow, zoomToSelection };
+  return { handleWheel, zoomStep, fitToWindow, zoomToSelection };
 }

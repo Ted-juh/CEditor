@@ -5,7 +5,11 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import Cable from 'lucide-svelte/icons/cable';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import ArrowRightLeft from 'lucide-svelte/icons/arrow-right-left';
 
   let { control = null } = $props();
 
@@ -113,7 +117,7 @@
 {#if multiEdit}
   <div class="placeholder">Binding tree editing is single-selection only right now.</div>
 {:else if bindings}
-  <PropertySection title="Binding List">
+  <PropertySection title="Binding List" icon={Cable}>
     <PropertyCell label="Add" span={3} hint="Create a new named binding.">
       <input class="val" type="text" bind:value={newBindingName} placeholder="Binding name" />
     </PropertyCell>
@@ -133,11 +137,14 @@
   </PropertySection>
 
   {#if selectedBinding}
-    <PropertySection title="Binding">
-      <PropertyCell label="Enabled" span={1} hint="Enable or disable this binding.">
-        <PropertyToggle value={selectedBinding.enabled !== false} onchange={() => setBindingProp('enabled', !(selectedBinding.enabled !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Source" span={1} hint="Runtime signal used as the input for this mapping.">
+    <PropertySection title="Binding" icon={Pencil}>
+      {#snippet tools()}
+        <HeaderPill value={selectedBinding.enabled !== false}
+                    title="Enable or disable this binding."
+                    onchange={() => setBindingProp('enabled', !(selectedBinding.enabled !== false))} />
+      {/snippet}
+      {#if selectedBinding.enabled !== false}
+      <PropertyCell label="Source" span={2} hint="Runtime signal used as the input for this mapping.">
         <select class="val" value={selectedBinding.source ?? 'value.normalized'} onchange={(e) => setBindingProp('source', e.target.value)}>
           {#each SOURCE_OPTIONS as option}
             <option value={option}>{option}</option>
@@ -161,21 +168,22 @@
       <PropertyCell label="Target" span={4} hint="Control or part path that receives the resolved output value.">
         <input class="val" type="text" value={selectedBinding.target ?? ''} onchange={(e) => setBindingProp('target', e.target.value)} />
       </PropertyCell>
+      {/if}
     </PropertySection>
 
     {#if selectedBinding.mapMode === 'range'}
-      <PropertySection title="Range Map">
-        <PropertyCell label="In Min" span={1} hint="Minimum input value for normalization.">
-          <NumberInput value={selectedBinding.inputMin ?? 0} step={0.01} onchange={(value) => setBindingProp('inputMin', value)} />
+      <PropertySection title="Range Map" icon={ArrowRightLeft}>
+        <PropertyCell label="In Min" span={1} compact hint="Minimum input value for normalization.">
+          <NumberCell label="InMin" value={selectedBinding.inputMin ?? 0} step={0.01} defaultValue={0} onchange={(value) => setBindingProp('inputMin', value)} />
         </PropertyCell>
-        <PropertyCell label="In Max" span={1} hint="Maximum input value for normalization.">
-          <NumberInput value={selectedBinding.inputMax ?? 1} step={0.01} onchange={(value) => setBindingProp('inputMax', value)} />
+        <PropertyCell label="In Max" span={1} compact hint="Maximum input value for normalization.">
+          <NumberCell label="InMax" value={selectedBinding.inputMax ?? 1} step={0.01} defaultValue={1} onchange={(value) => setBindingProp('inputMax', value)} />
         </PropertyCell>
-        <PropertyCell label="Out Min" span={1} hint="Minimum output value written to the target.">
-          <NumberInput value={selectedBinding.outputMin ?? 0} step={0.01} onchange={(value) => setBindingProp('outputMin', value)} />
+        <PropertyCell label="Out Min" span={1} compact hint="Minimum output value written to the target.">
+          <NumberCell label="OutMin" value={selectedBinding.outputMin ?? 0} step={0.01} defaultValue={0} onchange={(value) => setBindingProp('outputMin', value)} />
         </PropertyCell>
-        <PropertyCell label="Out Max" span={1} hint="Maximum output value written to the target.">
-          <NumberInput value={selectedBinding.outputMax ?? 100} step={0.01} onchange={(value) => setBindingProp('outputMax', value)} />
+        <PropertyCell label="Out Max" span={1} compact hint="Maximum output value written to the target.">
+          <NumberCell label="OutMax" value={selectedBinding.outputMax ?? 100} step={0.01} defaultValue={100} onchange={(value) => setBindingProp('outputMax', value)} />
         </PropertyCell>
         <PropertyCell label="Clamp" span={1} hint="Clamp the output to the configured range.">
           <PropertyToggle value={selectedBinding.clamp !== false} onchange={() => setBindingProp('clamp', !(selectedBinding.clamp !== false))} />
@@ -191,16 +199,16 @@
         </PropertyCell>
       </PropertySection>
     {:else if selectedBinding.mapMode === 'boolean'}
-      <PropertySection title="Boolean Map">
-        <PropertyCell label="False" span={2} hint="Output used when the source resolves to false.">
-          <NumberInput value={selectedBinding.falseValue ?? 0} step={0.01} onchange={(value) => setBindingProp('falseValue', value)} />
+      <PropertySection title="Boolean Map" icon={ArrowRightLeft}>
+        <PropertyCell label="False" span={2} compact hint="Output used when the source resolves to false.">
+          <NumberCell label="False" value={selectedBinding.falseValue ?? 0} step={0.01} defaultValue={0} onchange={(value) => setBindingProp('falseValue', value)} />
         </PropertyCell>
-        <PropertyCell label="True" span={2} hint="Output used when the source resolves to true.">
-          <NumberInput value={selectedBinding.trueValue ?? 100} step={0.01} onchange={(value) => setBindingProp('trueValue', value)} />
+        <PropertyCell label="True" span={2} compact hint="Output used when the source resolves to true.">
+          <NumberCell label="True" value={selectedBinding.trueValue ?? 100} step={0.01} defaultValue={100} onchange={(value) => setBindingProp('trueValue', value)} />
         </PropertyCell>
       </PropertySection>
     {:else if selectedBinding.mapMode === 'enum'}
-      <PropertySection title="Enum Map">
+      <PropertySection title="Enum Map" icon={ArrowRightLeft}>
         <PropertyCell label="Map" span={4} hint="JSON object mapping enum names to output values.">
           <textarea class="val code" rows="10" bind:value={enumMapDraft} onblur={commitEnumMap}></textarea>
         </PropertyCell>
@@ -212,7 +220,7 @@
         </PropertyCell>
       </PropertySection>
     {:else}
-      <PropertySection title="Direct Map">
+      <PropertySection title="Direct Map" icon={ArrowRightLeft}>
         <PropertyCell label="Pass-Through" span={4} hint="Write the source value directly to the target property without remapping.">
           <div class="placeholder-inline">Useful for string targets, such as Parts.valueField.Text.content</div>
         </PropertyCell>

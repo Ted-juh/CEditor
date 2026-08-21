@@ -48,7 +48,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { readText } from './support/readText.mjs';
+import { assertSameText, readText } from './support/readText.mjs';
 
 import { render } from 'svelte/server';
 
@@ -68,11 +68,51 @@ const UPDATING = process.env.UPDATE_GOLDEN === '1';
  * primitives and the path data that gives them their shape, and the transforms — which between
  * them are what all five bugs moved.
  */
-function paintSummary(body) {
+/**
+ * Unfold any baked static parts back into markup before summarising.
+ *
+ * Custom components compile their unchanging parts to one SVG data URL (staticPartBaking.js), and
+ * the moment that landed this gate went blind: the fader, knob, LED column and envelope all became
+ * "one element with a background-image", and the negative test that proves the gate bites — unpin
+ * every polyline pivot and watch the summary change — started passing while doing nothing.
+ *
+ * A gate that stops seeing what it was built to see is worse than no gate, because it still
+ * reports green. So the summary decodes the baked document and reads its shapes, which is the same
+ * geometry by another spelling: `<rect fill=...>` instead of a div with a background colour.
+ */
+function inlineBakedSvg(body) {
+  return body.replace(/data:image\/svg\+xml;base64,([A-Za-z0-9+/=]+)/g, (whole, base64) => {
+    try {
+      return Buffer.from(base64, 'base64').toString('utf8');
+    } catch {
+      return whole;
+    }
+  });
+}
+
+function paintSummary(rawBody) {
+  const body = inlineBakedSvg(rawBody);
   const strokes = [...body.matchAll(/stroke="([^"]+)"[^>]*?stroke-width="([^"]+)"/g)]
     .map(([, colour, width]) => `stroke ${colour} @ ${width}`);
   const fills = [...body.matchAll(/fill="(?!none)([^"]+)"/g)].map(([, colour]) => `fill ${colour}`);
   const backgrounds = [...body.matchAll(/background(?:-color)?:\s*([^;"]+)/g)].map(([, value]) => `bg ${value.trim()}`);
+
+  // A plain border is CSS now, not eight stroked paths (utils/plainBorderCSS.js). Without these two
+  // lines this gate goes blind to the exact three bugs it was built for — the double-width corner
+  // arcs, the thrown-away alpha, and the Label born inside a white rectangle — because all of them
+  // live in a `border:` declaration the stroke regex above cannot see. That is the same way baking
+  // blinded it once already, which is what inlineBakedSvg exists to undo.
+  const cssBorders = [...body.matchAll(/(?:^|[;"\s])border:\s*([^;"]+)/g)].map(([, value]) => `border ${value.trim()}`);
+  const cssRadii = [...body.matchAll(/border-radius:\s*([^;"]+)/g)].map(([, value]) => `radius ${value.trim()}`);
+
+  // How the glyphs are set, which is appearance in the same way a stroke width is. The block-text
+  // stack is five nested elements carrying font, mirror, spacing and alignment between them, and
+  // this gate could not see ANY of it — a caption that lost its letter-spacing, changed face, or
+  // stopped being centred read as no change at all. Collapsing that stack is the sort of edit that
+  // needs a witness, and "the summary captured colour and forgot geometry" is already the reason
+  // this file exists.
+  const typography = [...body.matchAll(/(font-family|font-size|font-weight|font-style|letter-spacing|word-spacing|text-align|line-height|white-space|font-variant-caps):\s*([^;"]+)/g)]
+    .map(([, prop, value]) => `${prop} ${value.trim()}`);
   const shapes = [...body.matchAll(/<(rect|circle|ellipse|path|polygon|line)\b/g)].map(([, kind]) => `shape ${kind}`);
 
   // Path data, because "shape path" says a path was drawn and nothing about what it is. Every
@@ -88,6 +128,12 @@ function paintSummary(body) {
   // the strokes and fills were identical, only the transform-origin was wrong.
   const transforms = [...body.matchAll(/transform:\s*([^;"]+)/g)].map(([, value]) => `transform ${value.trim()}`);
   const origins = [...body.matchAll(/transform-origin:\s*([^;"]+)/g)].map(([, value]) => `origin ${value.trim()}`);
+  // A baked part writes its geometry as SVG attributes rather than CSS, so the same facts arrive
+  // spelled differently. Without these two the unfolded document contributes almost nothing and
+  // the gate is blind in exactly the place baking made it blind.
+  const svgTransforms = [...body.matchAll(/ transform="([^"]+)"/g)].map(([, value]) => `svg-transform ${value.trim()}`);
+  const boxes = [...body.matchAll(/<rect x="([^"]*)" y="([^"]*)" width="([^"]*)" height="([^"]*)"/g)]
+    .map(([, x, y, w, h]) => `box ${x},${y} ${w}x${h}`);
 
   const tally = (entries) => {
     const counts = new Map();
@@ -98,9 +144,14 @@ function paintSummary(body) {
   return [
     ...tally(shapes),
     ...tally(paths),
+    ...tally(boxes),
+    ...tally(svgTransforms),
     ...tally(strokes),
     ...tally(fills),
     ...tally(backgrounds),
+    ...tally(cssBorders),
+    ...tally(cssRadii),
+    ...tally(typography),
     ...tally(transforms),
     ...tally(origins),
   ].join('\n');
@@ -177,9 +228,10 @@ for (const [name, build] of Object.entries(SPECIMENS)) {
       assert.fail(`no baseline for "${name}" — run: UPDATE_GOLDEN=1 npm test, then read the diff before committing it`);
     }
 
-    assert.equal(summary, baseline,
+    assertSameText(summary, baseline,
       `"${name}" paints differently than its baseline.\n`
-      + 'If the change is intended: UPDATE_GOLDEN=1 npm test, then READ the diff in the commit.\n');
+      + 'If the change is intended: UPDATE_GOLDEN=1 npm test, then READ the diff in the commit.',
+      { actual: 'painted now', expected: 'the committed baseline' });
   });
 }
 
@@ -244,6 +296,29 @@ test('the arpeggio grid draws its steps, rows and blocks', () => {
   assert.match(body, /\bC4\b/, 'no note labels — the piano-roll rows did not materialize');
   assert.match(body, /\b32\b/, 'no step 32 on the ruler — the step count did not reach the grid');
   assert.ok(body.length > 20000, `arpeggio grid rendered thin (${body.length} bytes) — rows or blocks are missing`);
+});
+
+test('a caption that loses its letter-spacing fails the gate', () => {
+  // The block-text stack collapsed from five nested elements to one, and nothing in this summary
+  // could see the difference — every declaration that decides how a caption is SET lived in it.
+  // Proven here rather than asserted, like every other clause above.
+  const control = SPECIMENS['label-default']();
+  const before = paintSummary(renderControl(control));
+
+  control._children.Text._children.Font.letterSpacing = 3;
+  const after = paintSummary(renderControl(control));
+
+  assert.notEqual(after, before, 'changing a caption\'s letter-spacing changed nothing in the paint summary');
+});
+
+test('a caption that loses its alignment fails the gate', () => {
+  const control = SPECIMENS['label-default']();
+  const before = paintSummary(renderControl(control));
+
+  control._children.Text._children.Position.justification = 'left';
+  const after = paintSummary(renderControl(control));
+
+  assert.notEqual(after, before, 'moving a caption\'s justification changed nothing in the paint summary');
 });
 
 test('a specimen that loses its alpha fails the gate', () => {

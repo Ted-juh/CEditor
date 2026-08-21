@@ -18,8 +18,13 @@ import { fileURLToPath } from 'node:url';
 import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
+import { createScript } from '../../../CE/web/src/CE_Application/scripting/scriptModel.js';
 import { ARP_STRIP, COMMON_STRIP, EFFECTS_STRIP, PANEL_WIDTH, SKIN, TONE_STRIP } from './layout.mjs';
 import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from './components.mjs';
+import { ARP_LANES, arpBridgeScript } from './arp-bridge.mjs';
+import { EFFECT_PARAMETER_NAMES, effectLabelScript } from './effect-parameters.mjs';
+import { effectProbeScript } from './effect-probe.mjs';
+import { readCommitted } from '../readCommitted.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -69,14 +74,16 @@ function setPath(control, dotted, value) {
   node[keys[keys.length - 1]] = value;
 }
 
-function label(text, { x, y, w, h = 16 }, { size = 9, colour = SKIN.labelDim, bold = false, align = 'center' } = {}) {
+function label(text, { x, y, w, h = 16 }, { size = 9, colour = SKIN.labelDim, bold = false, align = 'center', name = 'label' } = {}) {
   // maxLines follows the text, rather than always allowing two. Reserving a second line in a
   // single-line box pushed the block past the box height and clipped the glyph bottoms — "NAME"
   // rendered as "NAMF", "SHAPE" as "SHAPF". A capital E losing its bottom bar is not a subtle
   // failure; it just does not look like a word.
   const lines = String(text).includes('\n') ? 2 : 1;
   return createControl('Label', {
-    Core: { id: nextId('lbl'), name: 'label' },
+    // Captions are all called 'label' unless a caller needs to find one again — the effect
+    // parameter captions do, because a generated script renames them when the TYPE selector moves.
+    Core: { id: nextId('lbl'), name },
     Transform: { x, y, width: w, height: h },
     Text: {
       content: text,
@@ -135,7 +142,44 @@ function sectionBox(box, originX, originY) {
     ContentLayout: { mode: 'text_only', horizontalAlign: 'center', verticalAlign: 'center', paddingLeft: 8, paddingRight: 8, paddingTop: 1, paddingBottom: 1 },
   });
 
-  return [frame, tab];
+  // An optional printed caveat along the bottom of the box, where whoever is looking at the knobs
+  // will see it. The notepad already says this; the notepad is not where anyone is looking.
+  if (!box.note) return [frame, tab];
+  return [frame, tab, label(box.note, { x: x + 8, y: y + box.h - 15, w: box.w - 16, h: 12 },
+    { size: 7, colour: SKIN.labelDim, align: 'center' })];
+}
+
+/**
+ * What the effect-caption relabel script needs to address, resolved from the built panel.
+ *
+ * BY CONTROL ID, not by name. Every bound control here is named after its parameter —
+ * "distortion.type" — and the script path syntax splits on dots, so `get("distortion.type")` looks
+ * for a control called "distortion" and finds nothing. findControlByName matches ids as well, and
+ * the ids are dot-free, so those are what get baked in.
+ *
+ * Returns only the effects whose four captions AND type selector were all found: a partial block
+ * would produce a script that renames three captions and leaves the fourth reading whatever it was.
+ */
+function effectLabelBlocks(controls, byId) {
+  const byName = new Map();
+  for (const control of controls) {
+    const core = control?._children?.Core;
+    if (core?.name && !byName.has(core.name)) byName.set(core.name, core.id);
+  }
+
+  const blocks = {};
+  for (const effect of ['distortion', 'flanger', 'delay', 'reverb']) {
+    const typeControlId = byName.get(`${effect}.type`);
+    const captionIds = Array.from({ length: 4 }, (unused, i) => byName.get(`${effect}.parameter${i + 1}.caption`));
+    if (!typeControlId || captionIds.some((id) => !id)) continue;
+
+    // Wire value -> printed label, straight from the profile's own choice list, so the script does
+    // no label matching and cannot disagree with the profile about capitalisation.
+    const labelByValue = {};
+    for (const choice of byId.get(`${effect}.type`)?.choices ?? []) labelByValue[choice.value] = choice.label;
+    blocks[effect] = { captionIds, typeControlId, labelByValue };
+  }
+  return blocks;
 }
 
 /**
@@ -211,6 +255,10 @@ function boundCustom(parameter, build, box) {
       channel.max = parameter.range.max;
       channel.step = parameter.type === 'float' ? (parameter.range.max - parameter.range.min) / 1000 : 1;
       channel.type = parameter.type === 'float' ? 'float' : 'int';
+      // createValueChannel picked the precision from the type it was BUILT with (float, 2 decimals)
+      // and the type is being corrected here. Leaving it made every whole-numbered synth parameter
+      // read "64.00" the moment anything formatted it.
+      channel.format = { ...channel.format, precision: channel.type === 'float' ? 2 : 0 };
     }
     // BOTH, and this is the whole point: customChannelDefaultValue reads `currentValue ?? defaultValue`,
     // and createValueChannel stamped currentValue from the factory default before this ran. Setting
@@ -221,6 +269,18 @@ function boundCustom(parameter, build, box) {
       channel.defaultValue = parameter.default;
       channel.currentValue = parameter.default;
     }
+
+    // The range the INSTRUMENT prints, when it is not the range on the wire. Octave Shift is
+    // stored 61..67 and reads -3..+3; every MFX parameter is stored 12768..52768 and reads
+    // -20000..+20000. Without this a knob shows the wire number, which is not wrong by a rounding
+    // — it is wrong by a constant, on every bipolar parameter the machine has.
+    const displayMin = Number(parameter.display?.min);
+    const displayMax = Number(parameter.display?.max);
+    if (Number.isFinite(displayMin) && Number.isFinite(displayMax)
+      && (displayMin !== parameter.range?.min || displayMax !== parameter.range?.max)) {
+      channel.format = { ...channel.format, displayMin, displayMax };
+    }
+    if (parameter.display?.unit) channel.format = { ...channel.format, unit: String(parameter.display.unit) };
   }
   return control;
 }
@@ -403,7 +463,7 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
         controls.push(label(built.caption.text, {
           x: built.caption.x, y: built.caption.y, w: built.caption.w,
           h: built.caption.lines === 2 ? 26 : 16,
-        }, { size: 9, colour: SKIN.label }));
+        }, { size: 9, colour: SKIN.label, name: spec.captionName ?? 'label' }));
       }
     }
   }
@@ -448,12 +508,19 @@ The arpeggiator is a grid, because that is what it is
   controls", which was backwards: they are exactly what a step grid writes.
 
   So the bottom row is the engine's arpeggiator surface — draw a block, drag it, drag its right
-  edge to lengthen it. What is NOT wired: the drawn pattern is not written out to those 528
-  addresses. The arpPattern channel is read-only by design (customComponentArpeggiator.js: "a
-  channel write racing a grid edit has no clean precedence"), and no pattern-to-parameter bridge
-  exists yet. The addresses are here so that bridge has somewhere to land. Until it does, this
-  grid edits a pattern, not a synth. Its note rows are also a 12-row piano-roll view rather than
-  the hardware's sixteen fixed lanes.
+  edge to lengthen it. It reaches the synth: the panel script "Arpeggio pattern -> synth" turns
+  the blocks into the sixteen lanes the GAIA stores and writes them. A block of length 4 is one
+  velocity followed by three ties (128), not four velocities — four velocities is four retriggers,
+  and it sounds like a stutter rather than a held note.
+
+  Two things worth knowing about it. It writes only what CHANGED: 528 messages per pointer move
+  would be seconds of MIDI for dragging one block one step, so the script keeps the last lanes it
+  sent and diffs. And the GAIA has sixteen lanes while the grid does not stop you drawing a
+  seventeenth note — the extra notes are not sent, and the script says which ones in the console
+  rather than dropping them quietly.
+
+  The grid's note rows are still a 12-row piano-roll view rather than the hardware's sixteen fixed
+  lanes; the lanes are assigned by ascending note when the pattern is written.
 
 Not here
   No keyboard: this edits a patch, and the synth has its own keys.`;
@@ -534,6 +601,58 @@ export function buildGaiaPanel() {
   panel.description = 'Roland GAIA SH-01 — all three tones, laid out like the instrument';
   panel.requiredProfiles = [{ role: DEVICE_NAME, profileId: profile.id, version: '*' }];
   panel.notepad = { activeNoteIndex: 0, notes: [{ name: 'About this panel', content: NOTES }] };
+  // The grid actually reaches the synth now — see arp-bridge.mjs. A panel-scope script rather than
+  // a binding because 528 addresses driven by one array channel is not a shape bindings have, and
+  // because the write has to DIFF: sending all 528 on every pointer move during a drag is seconds
+  // of MIDI for moving one block one step.
+  panel.scripts = [createScript({
+    id: 'gaia_arp_pattern_bridge',
+    name: 'Arpeggio pattern → synth',
+    language: 'javascript',
+    scope: 'panel',
+    event: 'onPanelLoad',
+    target: '*',
+    description: 'Writes the drawn arpeggio grid to the GAIA\'s sixteen Patch Arpeggio Pattern blocks.',
+    source: arpBridgeScript('arp_pattern_grid', { lanes: ARP_LANES, steps: ARP_STRIP.boxes[0].grid.steps }),
+  })];
+
+  // The effect knobs' captions, IF anyone has filled in the names table. Null while it is empty,
+  // so the panel carries no dead script waiting for the owner's manual — see effect-parameters.mjs.
+  const relabel = effectLabelScript(effectLabelBlocks(controls, byId));
+  if (relabel) {
+    panel.scripts.push(createScript({
+      id: 'gaia_effect_parameter_labels',
+      name: 'Effect captions → selected type',
+      language: 'javascript',
+      scope: 'panel',
+      event: 'onPanelLoad',
+      target: '*',
+      description: 'Renames each effect block\'s four parameter captions when its TYPE selector moves.',
+      source: relabel,
+    }));
+  }
+
+  // And the probe that fills that table in, for whoever has the instrument. DISABLED: it is a
+  // diagnostic with three console actions, not something a panel should be running. The names it
+  // helps establish are the last thing standing between the effect knobs and real captions, and
+  // the MIDI implementation cannot supply them — but the hardware can, one knob at a time.
+  panel.scripts.push(createScript({
+    id: 'gaia_effect_probe',
+    name: 'Effect probe (diagnostic)',
+    language: 'javascript',
+    scope: 'panel',
+    event: 'onPanelLoad',
+    target: '*',
+    enabled: false,
+    description: 'Asks the GAIA which MFX Parameter each effect knob drives. Enable, run '
+      + 'fxProbe/fxMark/fxReport from the console, then disable again.',
+    source: effectProbeScript(Object.fromEntries(Object.keys(EFFECT_PARAMETER_NAMES).map((effect) => [effect, {
+      requestId: `request${effect[0].toUpperCase()}${effect.slice(1)}`,
+      parameterPrefix: `${effect}.parameter`,
+      // Counted from the profile rather than assumed: distortion has 32 slots, the other three 20.
+      slots: profile.parameters.filter((p) => p.id.startsWith(`${effect}.parameter`)).length,
+    }]))),
+  }));
   panel.panelGuid = 'a1a7c3e0-5f21-4b8e-9d44-6ca0f2b71e93';
   panel.scriptId = 'roland_gaia_sh01';
   panel.filePath = null;
@@ -552,9 +671,7 @@ function main() {
   const json = serializeGaiaPanel();
 
   if (check) {
-    let current = null;
-    try { current = readFileSync(out, 'utf8'); } catch { /* missing counts as stale */ }
-    if (current === json) { console.log('GAIA panel is up to date.'); return; }
+    if (readCommitted(out) === json) { console.log('GAIA panel is up to date.'); return; }
     console.error(`Stale: ${path.relative(REPO, out)} — run: node tools/scripts/gaia-panel/make-gaia-panel.mjs`);
     process.exitCode = 1;
     return;

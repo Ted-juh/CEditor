@@ -5,9 +5,17 @@
   import {
     envelopePreset, normalizePoints, envelopePointAdded, envelopePointRemoved,
   } from '../utils/envelopeLayout.js';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import Spline from 'lucide-svelte/icons/spline';
+  import CircleDot from 'lucide-svelte/icons/circle-dot';
+  import Repeat from 'lucide-svelte/icons/repeat';
+  import Play from 'lucide-svelte/icons/play';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -44,20 +52,10 @@
     const next = envelopePointRemoved(points, i);
     if (next) setPoints(next);
   }
-
-  function hexToInput(argb) {
-    const s = String(argb ?? '').replace(/^#/, '');
-    return /^[0-9a-fA-F]{8}$/.test(s) ? `#${s.slice(2)}` : (/^[0-9a-fA-F]{6}$/.test(s) ? `#${s}` : '#000000');
-  }
-  function inputToArgb(prev, hex) {
-    const rgb = String(hex ?? '').replace(/^#/, '').toUpperCase();
-    const alpha = /^[0-9a-fA-F]{8}$/.test(String(prev ?? '').replace(/^#/, '')) ? String(prev).replace(/^#/, '').slice(0, 2) : 'FF';
-    return `${alpha}${rgb}`;
-  }
 </script>
 
 {#if e}
-  <PropertySection title="Envelope">
+  <PropertySection title="Envelope" icon={Spline}>
     <PropertyCell label="Preset" span={4} hint="Seed a shape. ADSR / AR / AD / DAHDSR keep stages; MSEG / Free let every node move.">
       <select class="val" value={e.preset ?? 'adsr'} onchange={(ev) => applyPreset(ev.target.value)}>
         <option value="adsr">ADSR</option>
@@ -79,14 +77,17 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Nodes">
+  <PropertySection title="Nodes" icon={CircleDot}>
+    {#snippet tools()}
+      <button type="button" class="header-add-btn" title="Add node" onclick={addPoint}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Normalized position (0–1). Curve = the segment shape ending at that node.">
       <div class="nodes">
         {#each points as p, i (p.id ?? i)}
           <div class="nrow">
             <span class="nlabel">{i + 1}</span>
-            <input class="val nnum" type="number" min="0" max="1" step="0.01" title="Time (x)" value={num(p.x, 0)} onchange={(ev) => updatePoint(i, 'x', Math.max(0, Math.min(1, num(ev.target.value, 0))))} />
-            <input class="val nnum" type="number" min="0" max="1" step="0.01" title="Level (y)" value={num(p.y, 0)} onchange={(ev) => updatePoint(i, 'y', Math.max(0, Math.min(1, num(ev.target.value, 0))))} />
+            <span class="nnum nc-wrap" title="Time (x)"><NumberCell value={num(p.x, 0)} step={0.01} min={0} max={1} onchange={(v) => updatePoint(i, 'x', Math.max(0, Math.min(1, num(v, 0))))} /></span>
+            <span class="nnum nc-wrap" title="Level (y)"><NumberCell value={num(p.y, 0)} step={0.01} min={0} max={1} onchange={(v) => updatePoint(i, 'y', Math.max(0, Math.min(1, num(v, 0))))} /></span>
             <select class="val ncurve" title="Segment curve" value={p.curve ?? 'linear'} onchange={(ev) => updatePoint(i, 'curve', ev.target.value)}>
               <option value="linear">Linear</option>
               <option value="exp">Exp</option>
@@ -97,35 +98,36 @@
             <button type="button" class="action-btn danger" disabled={i === 0 || i === points.length - 1} onclick={() => removePoint(i)} title="Remove node">✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addPoint}>Add node</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Loop & snap">
+  <PropertySection title="Loop & snap" icon={Repeat}>
     <PropertyCell label="Loop" span={2} hint="Cycle a section (function-generator / looping envelope).">
       <PropertyToggle value={e.loopEnabled === true} onchange={() => toggle('loopEnabled')} />
     </PropertyCell>
     {#if e.loopEnabled === true}
-      <PropertyCell label="Loop start" span={1} hint="Node index the loop returns to.">
-        <input class="val" type="number" min="0" value={e.loopStart ?? 0} onchange={(ev) => set('loopStart', Math.max(0, Math.round(num(ev.target.value, 0))))} />
+      <PropertyCell label="Loop start" span={1} compact hint="Node index the loop returns to.">
+        <NumberCell label="Start" value={e.loopStart ?? 0} min={0} defaultValue={0} onchange={(v) => set('loopStart', Math.max(0, Math.round(num(v, 0))))} />
       </PropertyCell>
-      <PropertyCell label="Loop end" span={1} hint="Node index the loop repeats from.">
-        <input class="val" type="number" min="0" value={e.loopEnd ?? 0} onchange={(ev) => set('loopEnd', Math.max(0, Math.round(num(ev.target.value, 0))))} />
+      <PropertyCell label="Loop end" span={1} compact hint="Node index the loop repeats from.">
+        <NumberCell label="End" value={e.loopEnd ?? 0} min={0} defaultValue={0} onchange={(v) => set('loopEnd', Math.max(0, Math.round(num(v, 0))))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Snap X" span={2} hint="Grid snap for time when dragging (0 = free).">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={e.snapX ?? 0} onchange={(ev) => set('snapX', Math.max(0, Math.min(1, num(ev.target.value, 0))))} />
+    <PropertyCell label="Snap X" span={2} compact hint="Grid snap for time when dragging (0 = free).">
+      <NumberCell label="Snap X" value={e.snapX ?? 0} step={0.05} min={0} max={1} defaultValue={0} onchange={(v) => set('snapX', Math.max(0, Math.min(1, num(v, 0))))} />
     </PropertyCell>
-    <PropertyCell label="Snap Y" span={2} hint="Grid snap for level when dragging (0 = free).">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={e.snapY ?? 0} onchange={(ev) => set('snapY', Math.max(0, Math.min(1, num(ev.target.value, 0))))} />
+    <PropertyCell label="Snap Y" span={2} compact hint="Grid snap for level when dragging (0 = free).">
+      <NumberCell label="Snap Y" value={e.snapY ?? 0} step={0.05} min={0} max={1} defaultValue={0} onchange={(v) => set('snapY', Math.max(0, Math.min(1, num(v, 0))))} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Playhead">
-    <PropertyCell label="Show" span={2} hint="A moving dot along the curve at the current phase.">
-      <PropertyToggle value={e.showPlayhead === true} onchange={() => toggle('showPlayhead')} />
-    </PropertyCell>
+  <PropertySection title="Playhead" icon={Play}>
+    {#snippet tools()}
+      <HeaderPill value={e.showPlayhead === true}
+                  title="A moving dot along the curve at the current phase."
+                  onchange={() => toggle('showPlayhead')} />
+    {/snippet}
     {#if e.showPlayhead === true}
       <PropertyCell label="Phase source" span={4} hint="A knob / slider whose 0–1 value drives the playhead in preview.">
         <select class="val" value={e.phaseSourceId ?? ''} onchange={(ev) => set('phaseSourceId', ev.target.value)}>
@@ -134,37 +136,33 @@
         </select>
       </PropertyCell>
       {#if !e.phaseSourceId}
-        <PropertyCell label="Phase" span={2} hint="0–1 position of the playhead.">
-          <input class="val" type="number" min="0" max="1" step="0.01" value={e.phase ?? 0} onchange={(ev) => set('phase', Math.max(0, Math.min(1, num(ev.target.value, 0))))} />
+        <PropertyCell label="Phase" span={4} compact hint="0–1 position of the playhead.">
+          <NumberCell label="Phase" value={e.phase ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(v) => set('phase', Math.max(0, Math.min(1, num(v, 0))))} />
         </PropertyCell>
       {/if}
     {/if}
   </PropertySection>
 
-  <PropertySection title="Style">
+  <PropertySection title="Style" icon={Palette}>
     <PropertyCell label="Grid" span={1} hint="Draw a background grid.">
       <PropertyToggle value={e.showGrid !== false} onchange={() => set('showGrid', !(e.showGrid !== false))} />
     </PropertyCell>
-    <PropertyCell label="Cols" span={1} hint="Vertical grid divisions.">
-      <input class="val" type="number" min="0" max="32" value={e.gridX ?? 4} onchange={(ev) => set('gridX', Math.max(0, Math.round(num(ev.target.value, 4))))} />
+    <PropertyCell label="Cols" span={1} compact hint="Vertical grid divisions.">
+      <NumberCell label="Cols" value={e.gridX ?? 4} step={1} min={0} max={32} defaultValue={4} onchange={(v) => set('gridX', Math.max(0, Math.round(num(v, 4))))} />
     </PropertyCell>
-    <PropertyCell label="Rows" span={1} hint="Horizontal grid divisions.">
-      <input class="val" type="number" min="0" max="32" value={e.gridY ?? 4} onchange={(ev) => set('gridY', Math.max(0, Math.round(num(ev.target.value, 4))))} />
+    <PropertyCell label="Rows" span={1} compact hint="Horizontal grid divisions.">
+      <NumberCell label="Rows" value={e.gridY ?? 4} step={1} min={0} max={32} defaultValue={4} onchange={(v) => set('gridY', Math.max(0, Math.round(num(v, 4))))} />
     </PropertyCell>
     <PropertyCell label="Fill" span={1} hint="Shade the area under the curve.">
       <PropertyToggle value={e.fillUnder !== false} onchange={() => set('fillUnder', !(e.fillUnder !== false))} />
     </PropertyCell>
-    <PropertyCell label="Line" span={2} hint="Curve line colour.">
-      <input class="val color" type="color" value={hexToInput(e.lineColour)} onchange={(ev) => set('lineColour', inputToArgb(e.lineColour, ev.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Fill colour" span={2} hint="Area fill colour.">
-      <input class="val color" type="color" value={hexToInput(e.fillColour)} onchange={(ev) => set('fillColour', inputToArgb(e.fillColour, ev.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Nodes" span={2} hint="Node handle colour.">
-      <input class="val color" type="color" value={hexToInput(e.nodeColour)} onchange={(ev) => set('nodeColour', inputToArgb(e.nodeColour, ev.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Sustain" span={2} hint="Sustain marker + node colour.">
-      <input class="val color" type="color" value={hexToInput(e.sustainColour)} onchange={(ev) => set('sustainColour', inputToArgb(e.sustainColour, ev.target.value))} />
+    <PropertyCell label="Colours" span={4} hint="Curve line, area fill, node handles, sustain marker. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'lineColour', label: 'Line', value: e.lineColour, target: { type: 'control', controlId: core?.id, path: 'Envelope.lineColour' } },
+        { key: 'fillColour', label: 'Fill', value: e.fillColour, target: { type: 'control', controlId: core?.id, path: 'Envelope.fillColour' } },
+        { key: 'nodeColour', label: 'Nodes', value: e.nodeColour, target: { type: 'control', controlId: core?.id, path: 'Envelope.nodeColour' } },
+        { key: 'sustainColour', label: 'Sustain', value: e.sustainColour, target: { type: 'control', controlId: core?.id, path: 'Envelope.sustainColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -175,7 +173,6 @@
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
   }
   .val:focus { border-color: #5B9BD5; }
-  .val.color { padding: 1px 2px; height: 24px; cursor: pointer; }
   .nodes { display: flex; flex-direction: column; gap: 5px; }
   .nrow { display: flex; align-items: center; gap: 5px; }
   .nrow .nlabel { flex: 0 0 16px; color: #888; font-size: 11px; text-align: right; }
@@ -189,4 +186,10 @@
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:disabled { opacity: 0.35; cursor: default; }
   .action-btn.danger:not(:disabled):hover { border-color: #C96A6A; }
+  .header-add-btn {
+    height: 16px; padding: 0 8px; border-radius: 8px; border: 1px solid #333;
+    background: #252525; color: #777; font-size: 9px; font-family: inherit;
+    cursor: pointer; line-height: 1;
+  }
+  .header-add-btn:hover { color: #CCC; border-color: #4A6E8C; }
 </style>

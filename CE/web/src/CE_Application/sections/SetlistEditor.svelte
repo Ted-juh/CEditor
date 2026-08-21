@@ -9,6 +9,18 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import Send from 'lucide-svelte/icons/send';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import Gauge from 'lucide-svelte/icons/gauge';
+  import ListMusic from 'lucide-svelte/icons/list-music';
+  import Footprints from 'lucide-svelte/icons/footprints';
+  import Clapperboard from 'lucide-svelte/icons/clapperboard';
+  import Monitor from 'lucide-svelte/icons/monitor';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -21,12 +33,6 @@
   }
   function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
   function clampInt(v, lo, hi, f) { const n = Math.round(num(v, f)); return n < lo ? lo : n > hi ? hi : n; }
-  function colRgb(v, fb) { const t = String(v ?? fb).replace(/^#/, ''); return `#${t.length >= 6 ? t.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) {
-    const t = String(cur ?? '').replace(/^#/, '');
-    const al = /^[0-9a-fA-F]{8}$/.test(t) ? t.slice(0, 2) : 'FF';
-    set(prop, `${al}${hex.replace('#', '').toUpperCase()}`);
-  }
   function optInt(v, lo, hi) {
     const t = String(v ?? '').trim();
     if (!t) return null;                       // empty means "don't send one"
@@ -117,7 +123,7 @@
 </script>
 
 {#if p}
-  <PropertySection title="Setlist">
+  <PropertySection title="Setlist" icon={ListMusic}>
     <PropertyCell label="" span={4} hint="">
       <div class="note">
         {setlistCount(control)} {setlistCount(control) === 1 ? 'scene' : 'scenes'}{index >= 0 ? ` · on ${index + 1}` : ''}.
@@ -126,63 +132,73 @@
       </div>
     </PropertyCell>
 
-    <PropertyCell label="Loop" span={1} hint="Next at the end goes back to the first scene.">
+    <PropertyCell label="Loop" span={2} hint="Next at the end goes back to the first scene.">
       <PropertyToggle value={p.wrap === true} onchange={() => set('wrap', !(p.wrap === true))} />
     </PropertyCell>
-    <PropertyCell label="Send program" span={1} hint="Bank select then program change, in that order.">
-      <PropertyToggle value={p.sendProgram !== false} onchange={() => set('sendProgram', !(p.sendProgram !== false))} />
+    <PropertyCell label="Recall" span={2} hint="Send program, recall values, recall tempo. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'sendProgram', title: 'Send program — bank select then program change, in that order', on: p.sendProgram !== false, icon: Send },
+          { key: 'recallValues', title: "Recall values — write each scene's captured panel values on recall", on: p.recallValues !== false, icon: SlidersHorizontal },
+          { key: 'recallTempo', title: "Recall tempo — a scene's tempo drives the Transport", on: p.recallTempo !== false, icon: Gauge },
+        ]}
+        ontoggle={(key) => {
+          if (key === 'sendProgram') set('sendProgram', !(p.sendProgram !== false));
+          else if (key === 'recallValues') set('recallValues', !(p.recallValues !== false));
+          else if (key === 'recallTempo') set('recallTempo', !(p.recallTempo !== false));
+        }}
+      />
     </PropertyCell>
-    <PropertyCell label="Recall values" span={1} hint="Write each scene's captured panel values on recall.">
-      <PropertyToggle value={p.recallValues !== false} onchange={() => set('recallValues', !(p.recallValues !== false))} />
+    <PropertyCell label="Crossfade" span={1} compact hint="Milliseconds to slide panel values on a recall; 0 snaps. Only numbers interpolate; the rest switch at halfway.">
+      <NumberCell label="Fade" value={crossfadeMs(control)} step={50} min={0} max={10000} onchange={(value) => set('crossfadeMs', clampInt(value, 0, 10000, 0))} />
     </PropertyCell>
-    <PropertyCell label="Recall tempo" span={1} hint="A scene's tempo drives the Transport. Songs have tempos; that is most of what a setlist is for.">
-      <PropertyToggle value={p.recallTempo !== false} onchange={() => set('recallTempo', !(p.recallTempo !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Crossfade" span={1} hint="Milliseconds to slide panel values on a recall; 0 snaps. Only numbers interpolate; the rest switch at halfway.">
-      <input class="val" type="number" min="0" max="10000" step="50" value={crossfadeMs(control)} onchange={(e) => set('crossfadeMs', clampInt(e.target.value, 0, 10000, 0))} />
-    </PropertyCell>
-    <PropertyCell label="PC channel" span={1} hint="Where program change is sent.">
-      <input class="val" type="number" min="1" max="16" step="1" value={num(p.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
+    <PropertyCell label="PC channel" span={1} compact hint="Where program change is sent.">
+      <NumberCell label="Ch" value={num(p.channel, 1)} step={1} min={1} max={16} onchange={(value) => set('channel', clampInt(value, 1, 16, 1))} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Footswitch">
-    <PropertyCell label="" span={4} hint="">
-      <div class="note">
-        Steps on the <b>rising edge only</b>, so one press is one step.
-      </div>
-    </PropertyCell>
-    <PropertyCell label="Enabled" span={1} hint="">
-      <PropertyToggle value={p.footEnabled !== false} onchange={() => set('footEnabled', !(p.footEnabled !== false))} />
-    </PropertyCell>
-    <PropertyCell label="CC" span={1} hint="Footswitch CC number. 64 is the sustain pedal, which most footswitches send.">
-      <input class="val" type="number" min="0" max="127" step="1" value={num(p.footCc, 64)} onchange={(e) => set('footCc', clampInt(e.target.value, 0, 127, 64))} />
-    </PropertyCell>
-    <PropertyCell label="Channel" span={1} hint="0 listens on every channel.">
-      <input class="val" type="number" min="0" max="16" step="1" value={num(p.footChannel, 0)} onchange={(e) => set('footChannel', clampInt(e.target.value, 0, 16, 0))} />
-    </PropertyCell>
-    <PropertyCell label="Threshold" span={1} hint="Where 'pressed' starts. A sweeping expression pedal crosses it once on the way up, not thirty times.">
-      <input class="val" type="number" min="1" max="127" step="1" value={num(p.footThreshold, 64)} onchange={(e) => set('footThreshold', clampInt(e.target.value, 1, 127, 64))} />
-    </PropertyCell>
-    <PropertyCell label="Does" span={2} hint="">
-      <select class="val" value={p.footAction ?? 'next'} onchange={(e) => set('footAction', e.target.value)}>
-        {#each FOOT_ACTIONS as a (a)}<option value={a}>{FOOT_ACTION_LABELS[a] ?? a}</option>{/each}
-      </select>
-    </PropertyCell>
-    <PropertyCell label="Back pedal" span={1} hint="A second CC for 'previous'. Blank means no back pedal.">
-      <input class="val" type="number" min="0" max="127" step="1" placeholder="none" value={footswitchBackCc(control) ?? ''} onchange={(e) => set('footBackCc', e.target.value === '' ? null : clampInt(e.target.value, 0, 127, 65))} />
-    </PropertyCell>
-    {#if String(p.footAction ?? 'next') === 'goto'}
-      <PropertyCell label="Scene" span={1} hint="1-based, as the list shows it.">
-        <input class="val" type="number" min="1" max={Math.max(1, scenes.length)} step="1" value={num(p.footGoto, 0) + 1} onchange={(e) => set('footGoto', clampInt(e.target.value, 1, Math.max(1, scenes.length), 1) - 1)} />
+  <PropertySection title="Footswitch" icon={Footprints}>
+    {#snippet tools()}
+      <HeaderPill value={p.footEnabled !== false}
+                  onchange={() => set('footEnabled', !(p.footEnabled !== false))} />
+    {/snippet}
+    {#if p.footEnabled !== false}
+      <PropertyCell label="" span={4} hint="">
+        <div class="note">
+          Steps on the <b>rising edge only</b>, so one press is one step.
+        </div>
       </PropertyCell>
+      <PropertyCell label="CC" span={1} compact hint="Footswitch CC number. 64 is the sustain pedal, which most footswitches send.">
+        <NumberCell label="CC" value={num(p.footCc, 64)} step={1} min={0} max={127} onchange={(value) => set('footCc', clampInt(value, 0, 127, 64))} />
+      </PropertyCell>
+      <PropertyCell label="Channel" span={1} compact hint="0 listens on every channel.">
+        <NumberCell label="Ch" value={num(p.footChannel, 0)} step={1} min={0} max={16} onchange={(value) => set('footChannel', clampInt(value, 0, 16, 0))} />
+      </PropertyCell>
+      <PropertyCell label="Threshold" span={2} compact hint="Where 'pressed' starts. A sweeping expression pedal crosses it once on the way up, not thirty times.">
+        <NumberCell label="Thr" value={num(p.footThreshold, 64)} step={1} min={1} max={127} onchange={(value) => set('footThreshold', clampInt(value, 1, 127, 64))} />
+      </PropertyCell>
+      <PropertyCell label="Does" span={2} hint="">
+        <select class="val" value={p.footAction ?? 'next'} onchange={(e) => set('footAction', e.target.value)}>
+          {#each FOOT_ACTIONS as a (a)}<option value={a}>{FOOT_ACTION_LABELS[a] ?? a}</option>{/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Back pedal" span={1} compact hint="A second CC for 'previous'. Blank means no back pedal.">
+        <NumberCell label="Back" value={footswitchBackCc(control) ?? ''} step={1} min={0} max={127} onchange={(value) => set('footBackCc', value === '' ? null : clampInt(value, 0, 127, 65))} />
+      </PropertyCell>
+      {#if String(p.footAction ?? 'next') === 'goto'}
+        <PropertyCell label="Scene" span={1} compact hint="1-based, as the list shows it.">
+          <NumberCell label="Scene" value={num(p.footGoto, 0) + 1} step={1} min={1} max={Math.max(1, scenes.length)} onchange={(value) => set('footGoto', clampInt(value, 1, Math.max(1, scenes.length), 1) - 1)} />
+        </PropertyCell>
+      {/if}
     {/if}
   </PropertySection>
 
-  <PropertySection title="Scenes">
+  <PropertySection title="Scenes" icon={Clapperboard}>
+    {#snippet tools()}
+      <button type="button" class="header-add-btn" onclick={addScene} disabled={scenes.length >= MAX_SCENES}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Capture stores an explicit list of paths, not 'everything'.">
       <div class="rowhead">
-        <button type="button" class="btn" onclick={addScene} disabled={scenes.length >= MAX_SCENES}>Add scene</button>
         <button type="button" class="btn" onclick={captureAllPathsFromPanel}>Capture every control</button>
         <span class="hintline">{capturePaths.length} path{capturePaths.length === 1 ? '' : 's'} per capture</span>
       </div>
@@ -200,10 +216,10 @@
             <button type="button" class="mini danger" title="Remove" onclick={() => removeScene(i)}>×</button>
           </div>
           <div class="line">
-            <label class="lbl">PC<input class="val tiny" type="number" min="0" max="127" placeholder="—" value={s.program ?? ''} onchange={(e) => updateScene(i, { program: optInt(e.target.value, 0, 127) })} /></label>
-            <label class="lbl">Bank<input class="val tiny" type="number" min="0" max="127" placeholder="—" value={s.bankMsb ?? ''} onchange={(e) => updateScene(i, { bankMsb: optInt(e.target.value, 0, 127) })} /></label>
-            <label class="lbl">/<input class="val tiny" type="number" min="0" max="127" placeholder="—" value={s.bankLsb ?? ''} onchange={(e) => updateScene(i, { bankLsb: optInt(e.target.value, 0, 127) })} /></label>
-            <label class="lbl">BPM<input class="val tiny" type="number" min="20" max="300" placeholder="—" value={s.bpm ?? ''} onchange={(e) => updateScene(i, { bpm: e.target.value === '' ? null : clampInt(e.target.value, 20, 300, 120) })} /></label>
+            <label class="lbl">PC<span class="tiny nc-wrap"><NumberCell value={s.program ?? ''} step={1} min={0} max={127} onchange={(value) => updateScene(i, { program: optInt(value, 0, 127) })} /></span></label>
+            <label class="lbl">Bank<span class="tiny nc-wrap"><NumberCell value={s.bankMsb ?? ''} step={1} min={0} max={127} onchange={(value) => updateScene(i, { bankMsb: optInt(value, 0, 127) })} /></span></label>
+            <label class="lbl">/<span class="tiny nc-wrap"><NumberCell value={s.bankLsb ?? ''} step={1} min={0} max={127} onchange={(value) => updateScene(i, { bankLsb: optInt(value, 0, 127) })} /></span></label>
+            <label class="lbl">BPM<span class="tiny nc-wrap"><NumberCell value={s.bpm ?? ''} step={1} min={20} max={300} onchange={(value) => updateScene(i, { bpm: value === '' ? null : clampInt(value, 20, 300, 120) })} /></span></label>
             <button type="button" class="mini wide" onclick={() => capture(i)}>Capture</button>
           </div>
           <div class="line">
@@ -229,36 +245,46 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Display">
+  <PropertySection title="Display" icon={Monitor}>
     <PropertyCell label="Click a row" span={1} hint="Clicking a scene in preview jumps to it, through the same recall the pedal uses.">
       <PropertyToggle value={p.editable !== false} onchange={() => set('editable', !(p.editable !== false))} />
     </PropertyCell>
     <PropertyCell label="Header" span={1} hint="Position, current scene name and the pedal CC.">
       <PropertyToggle value={p.showHeader !== false} onchange={() => set('showHeader', !(p.showHeader !== false))} />
     </PropertyCell>
-    <PropertyCell label="Row height" span={1} hint="">
-      <input class="val" type="number" min="12" max="40" step="1" value={num(p.rowHeight, 18)} onchange={(e) => set('rowHeight', clampInt(e.target.value, 12, 40, 18))} />
+    <PropertyCell label="Row height" span={1} compact hint="">
+      <NumberCell label="Height" value={num(p.rowHeight, 18)} step={1} min={12} max={40} onchange={(value) => set('rowHeight', clampInt(value, 12, 40, 18))} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
-    <PropertyCell label="Face" span={1} hint=""><input class="col" type="color" value={colRgb(p.faceColour, 'FF141420')} oninput={(e) => setCol('faceColour', p.faceColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Row" span={1} hint=""><input class="col" type="color" value={colRgb(p.rowColour, 'FF20202C')} oninput={(e) => setCol('rowColour', p.rowColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Current" span={1} hint=""><input class="col" type="color" value={colRgb(p.currentColour, 'FF56CCF2')} oninput={(e) => setCol('currentColour', p.currentColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Text" span={1} hint=""><input class="col" type="color" value={colRgb(p.textColour, 'FFE8E8EE')} oninput={(e) => setCol('textColour', p.textColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Labels" span={1} hint=""><input class="col" type="color" value={colRgb(p.labelColour, 'FFB9B9B9')} oninput={(e) => setCol('labelColour', p.labelColour, e.target.value)} /></PropertyCell>
+  <PropertySection title="Appearance" icon={Palette}>
+    <PropertyCell label="Colours" span={4} hint="Face, row, current scene, text, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'faceColour', label: 'Face', value: p.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'Setlist.faceColour' } },
+        { key: 'rowColour', label: 'Row', value: p.rowColour ?? 'FF20202C', target: { type: 'control', controlId: core?.id, path: 'Setlist.rowColour' } },
+        { key: 'currentColour', label: 'Current', value: p.currentColour ?? 'FF56CCF2', target: { type: 'control', controlId: core?.id, path: 'Setlist.currentColour' } },
+        { key: 'textColour', label: 'Text', value: p.textColour ?? 'FFE8E8EE', target: { type: 'control', controlId: core?.id, path: 'Setlist.textColour' } },
+        { key: 'labelColour', label: 'Labels', value: p.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Setlist.labelColour' } },
+      ]} />
+    </PropertyCell>
   </PropertySection>
 {/if}
 
 <style>
   .val { width: 100%; background: #141420; border: 1px solid #2a2a36; color: #E8E8EE; font-size: 12px; padding: 3px 6px; border-radius: 4px; }
-  .val.tiny { width: 46px; }
+  /* Fixed-width shell around a NumberCell in a scene row: the cell fills the
+     span instead of flexing the row open. */
+  .nc-wrap { display: flex; }
+  .nc-wrap.tiny { width: 46px; flex: 0 0 auto; }
   .val.name { flex: 1; }
   .val.note-in { font-size: 11px; color: #9a9aa4; }
   .note { font-size: 11px; color: #9a9aa4; background: #141420; border: 1px solid #2a2a36; border-radius: 5px; padding: 5px 7px; line-height: 1.5; }
   .rowhead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .hintline { font-size: 10.5px; color: #7a7a84; }
   .btn { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+  .header-add-btn { height: 16px; font-size: 9px; padding: 0 8px; border-radius: 8px; background: #252525; border: 1px solid #333; color: #777; font-family: inherit; cursor: pointer; line-height: 1; }
+  .header-add-btn:hover:not(:disabled) { border-color: #4A6E8C; color: #CCC; }
+  .header-add-btn:disabled { opacity: 0.4; cursor: default; }
   .btn:hover:not(:disabled) { border-color: #4a4a58; color: #E8E8EE; }
   .btn:disabled { opacity: 0.4; cursor: default; }
   .scene { border: 1px solid #2a2a36; border-radius: 5px; padding: 5px 6px; display: flex; flex-direction: column; gap: 4px; background: #12121a; }
@@ -274,5 +300,4 @@
   .mini.danger:hover { border-color: #EB5757; color: #EB5757; }
   .meta { font-size: 10.5px; color: #7a7a84; padding-left: 18px; }
   .warn { color: #F2C94C; }
-  .col { width: 26px; height: 20px; padding: 0; border: 1px solid #2a2a36; background: #141420; border-radius: 3px; }
 </style>

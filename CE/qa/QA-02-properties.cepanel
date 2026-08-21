@@ -102,6 +102,10 @@
   "gridOriginX": 0,
   "gridOriginY": 0,
   "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
   "notepad": {
     "activeNoteIndex": 0,
     "notes": [
@@ -1544,6 +1548,15 @@
         }
       },
       "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
     }
   ]
 }

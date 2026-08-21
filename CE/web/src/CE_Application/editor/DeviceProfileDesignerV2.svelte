@@ -138,9 +138,9 @@
 </script>
 
 <div class="dpd-app">
+  <!-- Plain header — this is a tab inside CEditor, not an app of its own.
+       (The mockup's fake macOS traffic lights + wordmark shipped here once.) -->
   <div class="titlebar">
-    <div class="dots"><i></i><i></i><i></i></div>
-    <div class="name">CEditor</div>
     <div class="crumb">Device Profile Designer · <b>{model?.label ?? profileId ?? 'No profile'}</b></div>
     <div class="spacer"></div>
     {#if model}
@@ -155,9 +155,11 @@
         <div class="pm">{familyLabel} family · {paramCount} params · {dumpCount} dumps</div>
       </div>
 
+      <!-- Only screens that exist are navigable — a nav item that answers
+           "not built yet" is an advertisement for missing functionality. -->
       {#each nav as section (section.group)}
         <div class="treelbl">{section.group}</div>
-        {#each section.items as item (item.id)}
+        {#each section.items.filter((item) => realScreens.has(item.id)) as item (item.id)}
           <div
             class={['tnode', activeScreen === item.id && 'active']}
             role="button" tabindex="0"
@@ -205,14 +207,6 @@
           <DpdPresetsScreen {model} {merged} {profileId} />
         </div>
 
-        <!-- Placeholder screens (Detect / Share / Import / Presets / Packing — later) -->
-        {#each nav.flatMap((s) => s.items).filter((i) => !realScreens.has(i.id)) as item (item.id)}
-          <div class={['screen', activeScreen === item.id && 'active']}>
-            <div class="shead"><h1>{item.label}</h1></div>
-            <p class="sub">Coming next — this screen is part of a later stage of the Designer rebuild.</p>
-            <div class="placeholder">{item.label} — not built yet.</div>
-          </div>
-        {/each}
       {/if}
     </div>
   </div>

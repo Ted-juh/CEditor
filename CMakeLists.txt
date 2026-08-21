@@ -335,6 +335,219 @@ target_link_libraries(CEditorPanelValueTests PRIVATE
 
 add_test(NAME PanelValueModel COMMAND CEditorPanelValueTests)
 
+# --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
+# Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.
+# Design record: tools/docs/screen-builder-design.md.
+add_executable(CEditorCtrl49ProtocolTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+    "${CE_ROOT}/tests/Ctrl49ProtocolTests.cpp"
+)
+
+target_compile_features(CEditorCtrl49ProtocolTests PRIVATE cxx_std_23)
+
+target_include_directories(CEditorCtrl49ProtocolTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+add_test(NAME Ctrl49Protocol COMMAND CEditorCtrl49ProtocolTests)
+
+# CTRL49 reducer + session-sequence tests. The reducer cases are the PowerShell unified
+# demo's C# self-test ported one-for-one. Still hardware-free (no WinMM / KSPROPERTY).
+add_executable(CEditorCtrl49ReducerTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+    "${CE_ROOT}/tests/Ctrl49ReducerTests.cpp"
+)
+
+target_compile_features(CEditorCtrl49ReducerTests PRIVATE cxx_std_23)
+
+target_include_directories(CEditorCtrl49ReducerTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+add_test(NAME Ctrl49Reducer COMMAND CEditorCtrl49ReducerTests)
+
+# CTRL49 preset selection primitive: Bank Select + Program Change bytes + browser index math.
+add_executable(CEditorCtrl49PresetTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+    "${CE_ROOT}/tests/Ctrl49PresetTests.cpp"
+)
+target_compile_features(CEditorCtrl49PresetTests PRIVATE cxx_std_23)
+target_include_directories(CEditorCtrl49PresetTests PRIVATE "${CE_ROOT}/src")
+add_test(NAME Ctrl49Preset COMMAND CEditorCtrl49PresetTests)
+
+# CTRL49 Phase-4 seam: device-profile intent compiler turns an encoder value into the
+# exact synth bytes. Loads the shipped GAIA SH-01 profile; no hardware.
+add_executable(CEditorCtrl49SynthCompileTests
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    "${CE_ROOT}/tests/Ctrl49SynthCompileTests.cpp"
+)
+target_compile_features(CEditorCtrl49SynthCompileTests PRIVATE cxx_std_23)
+target_compile_definitions(CEditorCtrl49SynthCompileTests PRIVATE
+    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+target_include_directories(CEditorCtrl49SynthCompileTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorCtrl49SynthCompileTests PRIVATE juce::juce_core)
+add_test(NAME Ctrl49SynthCompile COMMAND CEditorCtrl49SynthCompileTests)
+
+# CTRL49 Phase-5 assignment model: loads the shipped GAIA assignment and verifies every
+# bound parameter on every page compiles through the named profile. No hardware.
+add_executable(CEditorCtrl49AssignmentTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Assignment.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    "${CE_ROOT}/tests/Ctrl49AssignmentTests.cpp"
+)
+target_compile_features(CEditorCtrl49AssignmentTests PRIVATE cxx_std_23)
+target_compile_definitions(CEditorCtrl49AssignmentTests PRIVATE
+    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+target_include_directories(CEditorCtrl49AssignmentTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorCtrl49AssignmentTests PRIVATE juce::juce_core)
+add_test(NAME Ctrl49Assignment COMMAND CEditorCtrl49AssignmentTests)
+
+# CTRL49 Phase-7 multi-synth: one assignment, pages targeting different synths; each page's
+# params compile through its own profile to the right per-device bytes. No hardware.
+add_executable(CEditorCtrl49MultiSynthTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Assignment.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    "${CE_ROOT}/tests/Ctrl49MultiSynthTests.cpp"
+)
+target_compile_features(CEditorCtrl49MultiSynthTests PRIVATE cxx_std_23)
+target_compile_definitions(CEditorCtrl49MultiSynthTests PRIVATE
+    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+target_include_directories(CEditorCtrl49MultiSynthTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorCtrl49MultiSynthTests PRIVATE juce::juce_core)
+add_test(NAME Ctrl49MultiSynth COMMAND CEditorCtrl49MultiSynthTests)
+
+# CTRL49 preset bank: loads the sample bank, verifies patch -> Bank Select + Program Change
+# bytes across banks. No hardware.
+add_executable(CEditorCtrl49PresetBankTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49PresetBank.cpp"
+    "${CE_ROOT}/tests/Ctrl49PresetBankTests.cpp"
+)
+target_compile_features(CEditorCtrl49PresetBankTests PRIVATE cxx_std_23)
+target_compile_definitions(CEditorCtrl49PresetBankTests PRIVATE
+    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+target_include_directories(CEditorCtrl49PresetBankTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorCtrl49PresetBankTests PRIVATE juce::juce_core)
+add_test(NAME Ctrl49PresetBank COMMAND CEditorCtrl49PresetBankTests)
+
+# CTRL49 bare bridge demonstrator (Phase 2 end state). Windows-only transports; the
+# executable itself compiles everywhere (guarded), but the WinMM/KSPROPERTY backends are
+# only added on Windows. Not a test — build and run against real hardware.
+if(WIN32)
+    add_executable(Ctrl49BridgeDemo
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49BridgeDemo.cpp"
+    )
+    target_compile_features(Ctrl49BridgeDemo PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49BridgeDemo PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49BridgeDemo PRIVATE winmm)
+
+    # CTRL49 filmstrip-knob beauty test (Phase 3): uploads a knob filmstrip + Lua page and
+    # maps encoder 1 to the knob value on real hardware.
+    add_executable(Ctrl49KnobTest
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49KnobTest.cpp"
+    )
+    target_compile_features(Ctrl49KnobTest PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49KnobTest PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49KnobTest PRIVATE winmm)
+
+    # CTRL49 -> real synth first light (Phase 4): encoder 1 drives a device-profile
+    # parameter (GAIA cutoff) via the DeviceProfile intent compiler. Links juce_core.
+    add_executable(Ctrl49SynthTest
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49SynthTest.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    )
+    target_compile_features(Ctrl49SynthTest PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49SynthTest PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49SynthTest PRIVATE winmm juce::juce_core)
+
+    # CTRL49 multi-knob page -> real synth (Phase 5): 8 encoders drive 8 assigned params
+    # across assignment pages, via the assignment model + DeviceProfile compiler.
+    add_executable(Ctrl49MultiTest
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Assignment.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49MultiTest.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    )
+    target_compile_features(Ctrl49MultiTest PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49MultiTest PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49MultiTest PRIVATE winmm juce::juce_core)
+
+    # CTRL49 Bridge — the self-contained product exe: knobs mode (default) + --presets, all
+    # assets (Lua pages, filmstrip, default assignment/bank, GAIA profile) embedded at build
+    # time by tools/ctrl49/embed_assets.cmake. No files needed beside the exe.
+    set(CTRL49_EMBED_OUT "${CMAKE_BINARY_DIR}/generated/Ctrl49EmbeddedAssets.cpp")
+    add_custom_command(
+        OUTPUT "${CTRL49_EMBED_OUT}"
+        COMMAND ${CMAKE_COMMAND}
+            -DROOT=${CMAKE_SOURCE_DIR}
+            -DOUT=${CTRL49_EMBED_OUT}
+            -P ${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake
+        DEPENDS
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake"
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_MultiKnob.lua"
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_PresetList.lua"
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/bridge-default.assignment.json"
+            "${CMAKE_SOURCE_DIR}/tools/ctrl49/gaia-patches.presetbank.json"
+            "${CMAKE_SOURCE_DIR}/CE/profiles/test/roland-gaia.ceditor-device.json"
+        COMMENT "Embedding CTRL49 bridge assets"
+    )
+    add_executable(Ctrl49Bridge
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Assignment.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PresetBank.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Bridge.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+        "${CTRL49_EMBED_OUT}"
+    )
+    target_compile_features(Ctrl49Bridge PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49Bridge PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49Bridge PRIVATE winmm juce::juce_core)
+    add_test(NAME Ctrl49BridgeSelfTest COMMAND Ctrl49Bridge --selftest)
+
+    # CTRL49 preset browser (Phase 7): patch-list page + data-dial navigation + load on press.
+    add_executable(Ctrl49PresetTest
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PresetBank.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PresetTest.cpp"
+    )
+    target_compile_features(Ctrl49PresetTest PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49PresetTest PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49PresetTest PRIVATE winmm juce::juce_core)
+endif()
+
 # --- Panel scripting runtime (Milestone 1): Lua (Sol3) + JavaScript (juce_javascript) ----------
 # OFF by default so the existing build is unaffected. Turn on with -DCEDITOR_SCRIPTING=ON.
 # After enabling, add `ceditor_scripting` to the link libraries of whichever target hosts scripts

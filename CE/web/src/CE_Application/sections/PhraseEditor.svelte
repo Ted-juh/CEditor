@@ -11,10 +11,17 @@
   import SongChainCells from '../properties/SongChainCells.svelte';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats } from '../utils/chordPadLayout.js';
   import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import Music from 'lucide-svelte/icons/music';
+  import Clock from 'lucide-svelte/icons/clock';
+  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+  import ListMusic from 'lucide-svelte/icons/list-music';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -110,16 +117,10 @@
     // The random seed wants randomness; everything else ignores the supplier.
     set('pattern', phraseSeedPattern(id, steps, rows, () => Math.random()));
   }
-  function colRgb(v, fb) { const t = String(v ?? fb).replace(/^#/, ''); return `#${t.length >= 6 ? t.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) {
-    const t = String(cur ?? '').replace(/^#/, '');
-    const al = /^[0-9a-fA-F]{8}$/.test(t) ? t.slice(0, 2) : 'FF';
-    set(prop, `${al}${hex.replace('#', '').toUpperCase()}`);
-  }
 </script>
 
 {#if p}
-  <PropertySection title="Phrase Sequencer">
+  <PropertySection title="Phrase Sequencer" icon={Music}>
     <PropertyCell label="Run" span={1} hint="Advance the sequence in preview / player. Stopped, the grid still shows the pattern.">
       <PropertyToggle value={p.running !== false} onchange={() => set('running', !(p.running !== false))} />
     </PropertyCell>
@@ -141,18 +142,18 @@
         </select>
       </PropertyCell>
     {/if}
-    <PropertyCell label="Octave" span={1} hint="Octave of row 0 (3 → C3).">
-      <input class="val" type="number" min="-1" max="8" step="1" value={num(p.baseOctave, 3)} onchange={(e) => set('baseOctave', clampInt(e.target.value, -1, 8, 3))} />
+    <PropertyCell label="Octave" span={1} compact hint="Octave of row 0 (3 → C3).">
+      <NumberCell label="Oct" value={num(p.baseOctave, 3)} step={1} min={-1} max={8} onchange={(v) => set('baseOctave', clampInt(v, -1, 8, 3))} />
     </PropertyCell>
-    <PropertyCell label="Transpose" span={1} hint="Semitones, applied after the row → pitch map. Use this to move the whole line without changing the key it is written in.">
-      <input class="val" type="number" min="-48" max="48" step="1" value={num(p.transpose, 0)} onchange={(e) => set('transpose', clampInt(e.target.value, -48, 48, 0))} />
+    <PropertyCell label="Transpose" span={1} compact hint="Semitones, applied after the row → pitch map. Use this to move the whole line without changing the key it is written in.">
+      <NumberCell label="Trans" value={num(p.transpose, 0)} step={1} min={-48} max={48} onchange={(v) => set('transpose', clampInt(v, -48, 48, 0))} />
     </PropertyCell>
 
-    <PropertyCell label="Steps" span={1} hint="Pattern length. Shrinking never destroys cells — they are kept and come back if you grow it again.">
-      <input class="val" type="number" min={MIN_STEPS} max={MAX_STEPS} step="1" value={num(p.steps, 16)} onchange={(e) => set('steps', clampInt(e.target.value, MIN_STEPS, MAX_STEPS, 16))} />
+    <PropertyCell label="Steps" span={1} compact hint="Pattern length. Shrinking never destroys cells — they are kept and come back if you grow it again.">
+      <NumberCell label="Steps" value={num(p.steps, 16)} step={1} min={MIN_STEPS} max={MAX_STEPS} onchange={(v) => set('steps', clampInt(v, MIN_STEPS, MAX_STEPS, 16))} />
     </PropertyCell>
-    <PropertyCell label="Rows" span={1} hint="How many degrees the grid shows. 8 gives an octave of a seven-note scale plus the tonic above.">
-      <input class="val" type="number" min={MIN_ROWS} max={MAX_ROWS} step="1" value={num(p.rows, 8)} onchange={(e) => set('rows', clampInt(e.target.value, MIN_ROWS, MAX_ROWS, 8))} />
+    <PropertyCell label="Rows" span={1} compact hint="How many degrees the grid shows. 8 gives an octave of a seven-note scale plus the tonic above.">
+      <NumberCell label="Rows" value={num(p.rows, 8)} step={1} min={MIN_ROWS} max={MAX_ROWS} onchange={(v) => set('rows', clampInt(v, MIN_ROWS, MAX_ROWS, 8))} />
     </PropertyCell>
     <PropertyCell label="Direction" span={2} hint="Ping-pong turns round at the ends without repeating them. Random repeats identically each pass — change the seed.">
       <select class="val" value={p.direction ?? 'forward'} onchange={(e) => set('direction', e.target.value)}>
@@ -160,8 +161,8 @@
       </select>
     </PropertyCell>
     {#if String(p.direction ?? 'forward') === 'random'}
-      <PropertyCell label="Seed" span={1} hint="Changes which order Random produces. Same seed, same order — every time.">
-        <input class="val" type="number" min="0" max="9999" step="1" value={num(p.seed, 0)} onchange={(e) => set('seed', clampInt(e.target.value, 0, 9999, 0))} />
+      <PropertyCell label="Seed" span={1} compact hint="Changes which order Random produces. Same seed, same order — every time.">
+        <NumberCell label="Seed" value={num(p.seed, 0)} step={1} min={0} max={9999} onchange={(v) => set('seed', clampInt(v, 0, 9999, 0))} />
       </PropertyCell>
     {/if}
 
@@ -176,7 +177,9 @@
     {/if}
     <PropertyCell label="Cell" span={2} hint="Which cell the fields below edit. Step is 1-based, as the grid counts it.">
       <div class="pair">
-        <input class="val" type="number" min="1" max={steps} step="1" value={selStep + 1} onchange={(e) => { selStep = clampInt(e.target.value, 1, steps, 1) - 1; }} />
+        <span class="nc-wrap">
+          <NumberCell value={selStep + 1} step={1} min={1} max={steps} onchange={(v) => { selStep = clampInt(v, 1, steps, 1) - 1; }} />
+        </span>
         <select class="val" value={String(selRow)} onchange={(e) => { selRow = clampInt(e.target.value, 0, rows - 1, 0); }}>
           {#each Array.from({ length: rows }, (_, i) => rows - 1 - i) as r (r)}
             <option value={String(r)}>{rowLabel(control, r)} — {noteLabel(rowToNote(control, r), phraseUseFlats(control))}</option>
@@ -188,20 +191,20 @@
       <div class="note">{selCell ? 'Editing that cell.' : 'Nothing there — place a note on the grid first.'}</div>
     </PropertyCell>
     {#if selCell}
-      <PropertyCell label="Chance" span={1} hint="How often the step plays, 0–100%. The same seed and position always give the same result.">
-        <input class="val" type="number" min="0" max="100" step="5" value={Math.round(cellChance(selCell) * 100)} onchange={(e) => patchCell({ chance: clampInt(e.target.value, 0, 100, 100) / 100 })} />
+      <PropertyCell label="Chance" span={1} compact hint="How often the step plays, 0–100%. The same seed and position always give the same result.">
+        <NumberCell label="Chance" value={Math.round(cellChance(selCell) * 100)} step={5} min={0} max={100} onchange={(v) => patchCell({ chance: clampInt(v, 0, 100, 100) / 100 })} />
       </PropertyCell>
-      <PropertyCell label="Ratchet" span={1} hint="How many times the step retriggers inside itself. A tied note is never ratcheted.">
-        <input class="val" type="number" min="1" max={MAX_RATCHET} step="1" value={cellRatchet(selCell)} onchange={(e) => patchCell({ ratchet: clampInt(e.target.value, 1, MAX_RATCHET, 1) })} />
+      <PropertyCell label="Ratchet" span={1} compact hint="How many times the step retriggers inside itself. A tied note is never ratcheted.">
+        <NumberCell label="Ratch" value={cellRatchet(selCell)} step={1} min={1} max={MAX_RATCHET} onchange={(v) => patchCell({ ratchet: clampInt(v, 1, MAX_RATCHET, 1) })} />
       </PropertyCell>
-      <PropertyCell label="Length" span={1} hint="This note's gate as a multiple of the step — 2 holds it for two steps. Blank uses the pattern gate.">
-        <input class="val" type="number" min="0.05" max="4" step="0.25" placeholder="—" value={cellLength(selCell) ?? ''} onchange={(e) => patchCell({ length: e.target.value === '' ? null : clampNum(e.target.value, 0.05, 4, 1) })} />
+      <PropertyCell label="Length" span={1} compact hint="This note's gate as a multiple of the step — 2 holds it for two steps. Blank uses the pattern gate.">
+        <NumberCell label="Len" value={cellLength(selCell) ?? 1} step={0.25} min={0.05} max={4} defaultValue={1} onchange={(v) => patchCell({ length: clampNum(v, 0.05, 4, 1) })} />
       </PropertyCell>
       <PropertyCell label="Tie" span={1} hint="Hold this note through from the step before. Needs a note on the same row in the previous step.">
         <PropertyToggle value={selCell.tie === true} onchange={() => patchCell({ tie: !(selCell.tie === true) })} />
       </PropertyCell>
-      <PropertyCell label="Velocity" span={1} hint="This cell's own velocity. Blank follows the pattern's.">
-        <input class="val" type="number" min="1" max="127" step="1" placeholder="—" value={selCell.velocity ?? ''} onchange={(e) => patchCell({ velocity: e.target.value === '' ? null : clampInt(e.target.value, 1, 127, 100) })} />
+      <PropertyCell label="Velocity" span={1} compact hint="This cell's own velocity. Blank follows the pattern's.">
+        <NumberCell label="Vel" value={selCell.velocity ?? 100} step={1} min={1} max={127} defaultValue={100} onchange={(v) => patchCell({ velocity: clampInt(v, 1, 127, 100) })} />
       </PropertyCell>
     {/if}
     {#if specialCells.length}
@@ -215,7 +218,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Timing">
+  <PropertySection title="Timing" icon={Clock}>
     <TransportSyncCells
       synced={p.syncToTransport === true}
       onchange={(v) => set('syncToTransport', v)}
@@ -231,12 +234,12 @@
       {/snippet}
     </TransportSyncCells>
     {#if p.syncToTransport !== true}
-      <PropertyCell label="Rate" span={1} hint="Steps per second.">
-        <input class="val" type="number" min="0.1" max="40" step="0.5" value={num(p.rate, 8)} onchange={(e) => set('rate', clampNum(e.target.value, 0.1, 40, 8))} />
+      <PropertyCell label="Rate" span={1} compact hint="Steps per second.">
+        <NumberCell label="Rate" value={num(p.rate, 8)} step={0.5} min={0.1} max={40} onchange={(v) => set('rate', clampNum(v, 0.1, 40, 8))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Gate" span={1} hint="Note length as a fraction of the step; 1 = legato. A note that the next step ties is exempt.">
-      <input class="val" type="number" min="0.05" max="1" step="0.05" value={num(p.gate, 0.8)} onchange={(e) => set('gate', clampNum(e.target.value, 0.05, 1, 0.8))} />
+    <PropertyCell label="Gate" span={1} compact hint="Note length as a fraction of the step; 1 = legato. A note that the next step ties is exempt.">
+      <NumberCell label="Gate" value={num(p.gate, 0.8)} step={0.05} min={0.05} max={1} onchange={(v) => set('gate', clampNum(v, 0.05, 1, 0.8))} />
     </PropertyCell>
     <PropertyCell label="Swing from" span={1} hint="Transport = inherit the clock's swing. Own = this sequencer's own setting. Free-running always uses its own.">
       <select class="val" value={p.swingSource ?? 'transport'} onchange={(e) => set('swingSource', e.target.value)}>
@@ -244,21 +247,21 @@
         <option value="own">Its own</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Swing" span={1} hint="Delays every odd step by up to half a step. Shares the Arpeggiator's swing setting.">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={num(p.swing, 0)} onchange={(e) => set('swing', clampNum(e.target.value, 0, 1, 0))} />
+    <PropertyCell label="Swing" span={1} compact hint="Delays every odd step by up to half a step. Shares the Arpeggiator's swing setting.">
+      <NumberCell label="Swing" value={num(p.swing, 0)} step={0.05} min={0} max={1} onchange={(v) => set('swing', clampNum(v, 0, 1, 0))} />
     </PropertyCell>
-    <PropertyCell label="Velocity" span={1} hint="The default a cell uses when it has none of its own.">
-      <input class="val" type="number" min="1" max="127" step="1" value={num(p.velocity, 100)} onchange={(e) => set('velocity', clampInt(e.target.value, 1, 127, 100))} />
+    <PropertyCell label="Velocity" span={1} compact hint="The default a cell uses when it has none of its own.">
+      <NumberCell label="Vel" value={num(p.velocity, 100)} step={1} min={1} max={127} onchange={(v) => set('velocity', clampInt(v, 1, 127, 100))} />
     </PropertyCell>
-    <PropertyCell label="Channel" span={1} hint="MIDI channel 1–16.">
-      <input class="val" type="number" min="1" max="16" step="1" value={num(p.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
+    <PropertyCell label="Channel" span={1} compact hint="MIDI channel 1–16.">
+      <NumberCell label="Ch" value={num(p.channel, 1)} step={1} min={1} max={16} onchange={(v) => set('channel', clampInt(v, 1, 16, 1))} />
     </PropertyCell>
-    <PropertyCell label="Bar line" span={1} hint="Shade every Nth step, so 16 steps read as four beats.">
-      <input class="val" type="number" min="1" max="16" step="1" value={num(p.accentEvery, 4)} onchange={(e) => set('accentEvery', clampInt(e.target.value, 1, 16, 4))} />
+    <PropertyCell label="Bar line" span={1} compact hint="Shade every Nth step, so 16 steps read as four beats.">
+      <NumberCell label="Every" value={num(p.accentEvery, 4)} step={1} min={1} max={16} onchange={(v) => set('accentEvery', clampInt(v, 1, 16, 4))} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Pattern">
+  <PropertySection title="Pattern" icon={LayoutGrid}>
     <PropertyCell label="Start from" span={4} hint="A blank grid is a blank page. These replace the pattern — the hardest part of a step sequencer is the first four notes.">
       <div class="seeds">
         {#each PHRASE_SEEDS as sd (sd.id)}
@@ -280,7 +283,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Patterns & song">
+  <PropertySection title="Patterns & song" icon={ListMusic}>
     <PropertyCell label="" span={4} hint="Storing and loading are copies, so editing the grid never rewrites a stored pattern behind your back.">
       <div class="slots">
         {#each Array.from({ length: MAX_PATTERNS }, (_, i) => i) as i (i)}
@@ -306,12 +309,16 @@
     />
   </PropertySection>
 
-  <PropertySection title="Appearance">
-    <PropertyCell label="Face" span={1} hint=""><input class="col" type="color" value={colRgb(p.faceColour, 'FF141420')} oninput={(e) => setCol('faceColour', p.faceColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Empty cell" span={1} hint=""><input class="col" type="color" value={colRgb(p.cellColour, 'FF20202C')} oninput={(e) => setCol('cellColour', p.cellColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Note" span={1} hint=""><input class="col" type="color" value={colRgb(p.noteColour, 'FF39D98A')} oninput={(e) => setCol('noteColour', p.noteColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Playhead" span={1} hint=""><input class="col" type="color" value={colRgb(p.playColour, 'FFF2C94C')} oninput={(e) => setCol('playColour', p.playColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Labels" span={1} hint=""><input class="col" type="color" value={colRgb(p.labelColour, 'FFB9B9B9')} oninput={(e) => setCol('labelColour', p.labelColour, e.target.value)} /></PropertyCell>
+  <PropertySection title="Appearance" icon={Palette}>
+    <PropertyCell label="Colours" span={4} hint="Face, empty cell, note, playhead, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'faceColour', label: 'Face', value: p.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'Phrase.faceColour' } },
+        { key: 'cellColour', label: 'Empty', value: p.cellColour ?? 'FF20202C', target: { type: 'control', controlId: core?.id, path: 'Phrase.cellColour' } },
+        { key: 'noteColour', label: 'Note', value: p.noteColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'Phrase.noteColour' } },
+        { key: 'playColour', label: 'Play', value: p.playColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Phrase.playColour' } },
+        { key: 'labelColour', label: 'Labels', value: p.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Phrase.labelColour' } },
+      ]} />
+    </PropertyCell>
   </PropertySection>
 {/if}
 
@@ -332,5 +339,4 @@
   .seed { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
   .seed:hover { border-color: #4a4a58; color: #E8E8EE; }
   .link { background: none; border: none; color: #8FC7F5; font-size: 11px; padding: 0 0 0 4px; cursor: pointer; text-decoration: underline; }
-  .col { width: 26px; height: 20px; padding: 0; border: 1px solid #2a2a36; background: #141420; border-radius: 3px; }
 </style>

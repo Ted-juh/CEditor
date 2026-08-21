@@ -58,7 +58,17 @@ try {
       expected: window.__scenery.groundIds,
       rendered: nodes.map((n) => n.getAttribute('data-control-id')),
       text: ground.textContent.replace(/\s+/g, ' ').trim(),
-      svgCount: ground.querySelectorAll('svg').length,
+      // What the border PAINTS, not what draws it. This counted `<svg>` elements until plain
+      // borders became one CSS declaration (utils/plainBorderCSS.js) and the count went to zero
+      // while every border still painted — a check that fails on a change of mechanism is a
+      // check nobody trusts the next time. Computed style answers the question either way.
+      borders: [...ground.querySelectorAll('*')]
+        .map((n) => getComputedStyle(n))
+        .filter((s) => s.borderTopStyle !== 'none' && parseFloat(s.borderTopWidth) > 0)
+        .map((s) => `${s.borderTopWidth} ${s.borderTopStyle} ${s.borderTopColor}`),
+      fills: [...ground.querySelectorAll('*')]
+        .map((n) => getComputedStyle(n).backgroundColor)
+        .filter((c) => c && c !== 'rgba(0, 0, 0, 0)'),
       pointerEvents: getComputedStyle(ground).pointerEvents,
       cacheSize: window.__scenery.cacheSize(),
       headingBox: [box.x, box.y, box.width, box.height],
@@ -67,7 +77,14 @@ try {
 
   assert.deepEqual(baked.rendered, baked.expected, 'the baked ground lost or reordered a control');
   assert.equal(baked.text, 'OSCILLATOR CUTOFF', `the labels did not survive the freeze: ${baked.text}`);
-  assert.ok(baked.svgCount >= 3, `borders did not survive the freeze (${baked.svgCount} svg elements)`);
+  assert.ok(
+    baked.borders.filter((b) => b === '2px solid rgb(255, 255, 255)').length >= 2,
+    `the labels' borders did not survive the freeze: ${JSON.stringify(baked.borders)}`,
+  );
+  assert.ok(
+    baked.fills.includes('rgb(16, 20, 24)'),
+    `the plate's fill did not survive the freeze: ${JSON.stringify(baked.fills)}`,
+  );
   assert.equal(baked.pointerEvents, 'none', 'the ground would swallow clicks meant for the surface');
   assert.deepEqual(baked.headingBox, [20, 10, 120, 16], 'a folded control is not where its Transform puts it');
   assert.equal(baked.cacheSize, 1, 'expected exactly one baked ground');

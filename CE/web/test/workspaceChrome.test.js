@@ -39,10 +39,14 @@ test('owned workspaces suppress global editor chrome', () => {
 
   assert.equal(state.workspaceKind, 'device');
   assert.equal(state.ownsChrome, true);
-  assert.equal(state.iconWidth, 0);
   assert.equal(state.showTreePanel, false);
   assert.equal(state.showDisplayPanel, false);
   assert.equal(state.showPropertiesPanel, false);
+  // The rail is part of the persistent shell: it stays, but may not insert
+  // into (or toggle panels over) a workspace that isn't the panel canvas.
+  assert.equal(state.iconWidth, 48);
+  assert.equal(state.railTogglesEnabled, false);
+  assert.equal(state.railInsertEnabled, false);
 });
 
 test('component workspace keeps the properties panel (author inspector)', () => {
@@ -75,10 +79,16 @@ test('compact panel view hides side chrome without changing ownership', () => {
   assert.equal(state.workspaceKind, 'panel');
   assert.equal(state.ownsChrome, false);
   assert.equal(state.compactPanel, true);
-  assert.equal(state.iconWidth, 0);
   assert.equal(state.showTreePanel, false);
   assert.equal(state.showDisplayPanel, false);
   assert.equal(state.showPropertiesPanel, false);
+  // Compact keeps the rail too — the old layout dropped it below the
+  // breakpoint, taking the only panel toggles down with it, so the state
+  // was inescapable without widening the window. Insertion stays live
+  // (the canvas is right there); only the panel toggles rest.
+  assert.equal(state.iconWidth, 48);
+  assert.equal(state.railTogglesEnabled, false);
+  assert.equal(state.railInsertEnabled, true);
 });
 
 test('wide panel view preserves requested global chrome', () => {
@@ -96,4 +106,25 @@ test('wide panel view preserves requested global chrome', () => {
   assert.equal(state.showTreePanel, true);
   assert.equal(state.showDisplayPanel, false);
   assert.equal(state.showPropertiesPanel, true);
+  assert.equal(state.railTogglesEnabled, true);
+  assert.equal(state.railInsertEnabled, true);
+});
+
+test('the component workspace keeps the rail but disarms insertion', () => {
+  // In surface mode a real panel sits hidden behind the designer, and
+  // resolvedActivePanelId still points at it — rail insertion must not
+  // silently drop controls into a document the user cannot see.
+  const state = resolveWorkspaceChrome({
+    activeTab: { type: 'panel' },
+    componentWorkspaceMode: 'surface',
+    viewportWidth: 1440,
+    showTreePanel: true,
+    showDisplayPanel: true,
+    showPropertiesPanel: true,
+  });
+
+  assert.equal(state.workspaceKind, 'component');
+  assert.equal(state.iconWidth, 48);
+  assert.equal(state.railTogglesEnabled, false);
+  assert.equal(state.railInsertEnabled, false);
 });

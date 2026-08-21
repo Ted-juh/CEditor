@@ -10,6 +10,7 @@
   import { listInteractiveArchetypes } from '../utils/customComponentFactory.js';
   import { numberOr } from '../utils/primitives.js';
   import PropertySection from '../properties/PropertySection.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import CustomValueChannelsEditor from './CustomValueChannelsEditor.svelte';
   import CustomBehaviorsEditor from './CustomBehaviorsEditor.svelte';
   import CustomHitZonesEditor from './CustomHitZonesEditor.svelte';
@@ -185,10 +186,10 @@
               {#if channel}
                 <div class="field-row">
                   <span class="field-name">{channelName}</span>
-                  <label><em>Min</em><input type="number" value={numberOr(channel.min, 0)} onchange={(event) => setChannelField(channelName, 'min', numeric(event))} /></label>
-                  <label><em>Max</em><input type="number" value={numberOr(channel.max, 1)} onchange={(event) => setChannelField(channelName, 'max', numeric(event, 1))} /></label>
-                  <label><em>Step</em><input type="number" step="any" value={numberOr(channel.step, 0.01)} onchange={(event) => setChannelField(channelName, 'step', numeric(event, 0.01))} /></label>
-                  <label><em>Default</em><input type="number" step="any" value={numberOr(channel.defaultValue, 0)} onchange={(event) => setChannelField(channelName, 'defaultValue', numeric(event))} /></label>
+                  <label><em>Min</em><span class="nc-wrap"><NumberCell value={numberOr(channel.min, 0)} defaultValue={0} onchange={(v) => setChannelField(channelName, 'min', v)} /></span></label>
+                  <label><em>Max</em><span class="nc-wrap"><NumberCell value={numberOr(channel.max, 1)} defaultValue={1} onchange={(v) => setChannelField(channelName, 'max', v)} /></span></label>
+                  <label><em>Step</em><span class="nc-wrap"><NumberCell value={numberOr(channel.step, 0.01)} defaultValue={0.01} onchange={(v) => setChannelField(channelName, 'step', v)} /></span></label>
+                  <label><em>Default</em><span class="nc-wrap"><NumberCell value={numberOr(channel.defaultValue, 0)} defaultValue={0} onchange={(v) => setChannelField(channelName, 'defaultValue', v)} /></span></label>
                 </div>
               {/if}
             {/each}
@@ -229,8 +230,8 @@
                   <span class="tag">generated</span>
                 {:else if zone}
                   <span class="readout wide">{zoneSourceLabel(zone)}</span>
-                  <label><em>Grow</em><input type="number" value={numberOr(zone.inflate?.x, 0)} title="Inflate the grab area (px each side)" onchange={(event) => { const value = numeric(event); setZoneField(entry.name, 'inflate', { x: value, y: value, unit: 'px' }); }} /></label>
-                  <label><em>Min px</em><input type="number" value={numberOr(zone.minTouch, 0)} title="Minimum touch size (finger floor)" onchange={(event) => setZoneField(entry.name, 'minTouch', numeric(event))} /></label>
+                  <label title="Inflate the grab area (px each side)"><em>Grow</em><span class="nc-wrap"><NumberCell value={numberOr(zone.inflate?.x, 0)} defaultValue={0} onchange={(v) => setZoneField(entry.name, 'inflate', { x: v, y: v, unit: 'px' })} /></span></label>
+                  <label title="Minimum touch size (finger floor)"><em>Min px</em><span class="nc-wrap"><NumberCell value={numberOr(zone.minTouch, 0)} defaultValue={0} onchange={(v) => setZoneField(entry.name, 'minTouch', v)} /></span></label>
                 {/if}
                 {#if entry.shared}<span class="tag shared">shared</span>{/if}
               </div>
@@ -483,9 +484,13 @@
     font-style: normal;
   }
 
-  .field-row input,
-  .field-row select {
+  .field-row .nc-wrap {
+    display: flex;
     width: 62px;
+  }
+
+  .field-row select {
+    width: auto;
     background: #1A1A1A;
     border: 1px solid #333;
     border-radius: 3px;
@@ -497,11 +502,6 @@
     box-sizing: border-box;
   }
 
-  .field-row select {
-    width: auto;
-  }
-
-  .field-row input:focus,
   .field-row select:focus {
     border-color: #5B9BD5;
   }

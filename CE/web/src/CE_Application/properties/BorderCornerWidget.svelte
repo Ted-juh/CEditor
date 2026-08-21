@@ -1,5 +1,5 @@
 <script>
-  import NumberInput from '../sections/NumberInput.svelte';
+  import NumberCell from './NumberCell.svelte';
   import LineTypeGrid from './LineTypeGrid.svelte';
   import CornerGradientModePicker from './CornerGradientModePicker.svelte';
   import CornerShapeCenter from './CornerShapeCenter.svelte';
@@ -390,9 +390,12 @@
           class:on={isCornerBorderEnabled(cell.id)} class:sel={selected === cell.id}
           onclick={() => toggleCornerBorder(cell.id)}
           oncontextmenu={(e) => handleContext(cell.id, e)}>
-          <input class="corner-input" type="number" value={getCorner(cell.id).radius} min={0} step={1}
-            onfocus={selectAll} onclick={(e) => e.stopPropagation()}
-            onchange={(e) => setCornerRadius(cell.id, Number(e.target.value))} />
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <span class="corner-input nc-wrap" onclick={(e) => e.stopPropagation()}>
+            <NumberCell value={getCorner(cell.id).radius} min={0} step={1}
+              onchange={(v) => setCornerRadius(cell.id, v)} />
+          </span>
         </div>
       {:else if cell.kind === 'side'}
         <!-- svelte-ignore a11y_consider_explicit_label -->
@@ -425,7 +428,7 @@
 
     <div class="edit-row">
       <span class="edit-label">Thick</span>
-      <NumberInput value={d?.thickness ?? ctx.defaultThickness} min={0} step={1}
+      <NumberCell value={d?.thickness ?? ctx.defaultThickness} min={0} step={1}
         onchange={(v) => thickGapAll ? setAllThickness(v) : setSelectedProp('thickness', v)} />
       <button class="all-sep-btn" class:active={thickGapAll}
         title={thickGapAll ? 'Editing all sides + corners' : `Editing this ${ctx.kind} only`}
@@ -492,14 +495,14 @@
     {#if d?.[ctx.styleProp] === 'double'}
       <div class="edit-row">
         <span class="edit-label">Gap</span>
-        <NumberInput value={d?.doubleGap ?? 2} min={0} step={1}
+        <NumberCell value={d?.doubleGap ?? 2} min={0} step={1} defaultValue={2}
           onchange={(v) => thickGapAll ? setAllDoubleGap(v) : setSelectedProp('doubleGap', v)} />
       </div>
     {/if}
     {#if d?.[ctx.styleProp] === 'dotted'}
       <div class="edit-row">
         <span class="edit-label">Dot R</span>
-        <NumberInput value={d?.dotRadius ?? 2} min={1} step={1} onchange={(v) => setSelectedProp('dotRadius', v)} />
+        <NumberCell value={d?.dotRadius ?? 2} min={1} step={1} defaultValue={2} onchange={(v) => setSelectedProp('dotRadius', v)} />
       </div>
     {/if}
   {/if}
@@ -554,24 +557,10 @@
   .corner-cell.sel { outline: 2px solid #E5A029; outline-offset: -2px; }
 
   .corner-input {
-    width: 30px;
-    height: 16px;
-    background: #111;
-    border: 1px solid #444;
-    border-radius: 2px;
-    color: #DDD;
-    font-size: 9px;
-    font-family: inherit;
-    text-align: center;
-    outline: none;
-    padding: 0 1px;
-    cursor: text;
-    appearance: textfield;
-    -moz-appearance: textfield;
+    width: 44px;
+    max-width: 100%;
   }
-  .corner-input::-webkit-inner-spin-button,
-  .corner-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-  .corner-input:focus { border-color: #5B9BD5; background: #1A1A1A; }
+  .nc-wrap { display: flex; }
 
   /* Edit rows */
   .edit-row {

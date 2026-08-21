@@ -16,8 +16,13 @@ const SNAP_THRESHOLD = 5;
  *   otherControls — array of control objects
  *   rulerGuides   — { horizontal: number[], vertical: number[] }
  *   getSection    — (ctrl, name) => section (injected so utility stays pure)
+ *   panelSize     — { width, height } to also snap against panel edges/centre
+ *   threshold     — snap distance in PANEL units. Pass screenPx / scale so the
+ *                   sticky zone feels the same at every zoom level; a fixed
+ *                   panel-unit threshold is a 20-screen-px magnet at 400% and
+ *                   barely one pixel at 25%.
  */
-export function findAlignmentSnap(rect, selfId, otherControls, rulerGuides, getSection, panelSize = null) {
+export function findAlignmentSnap(rect, selfId, otherControls, rulerGuides, getSection, panelSize = null, threshold = SNAP_THRESHOLD) {
   const { x, y, w, h } = rect;
   const result = { x, y, guides: [] };
   let xIsCenter = false;
@@ -35,8 +40,8 @@ export function findAlignmentSnap(rect, selfId, otherControls, rulerGuides, getS
     { offset: h,     val: y + h },     // bottom
   ];
 
-  let bestDx = SNAP_THRESHOLD;
-  let bestDy = SNAP_THRESHOLD;
+  let bestDx = threshold;
+  let bestDy = threshold;
   let bestSnapX = null;
   let bestSnapY = null;
   let xGuidePos = null;

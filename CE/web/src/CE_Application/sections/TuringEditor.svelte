@@ -1,10 +1,15 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
+  import Dices from 'lucide-svelte/icons/dices';
+  import LogOut from 'lucide-svelte/icons/log-out';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -35,15 +40,10 @@
     set('steps', steps);
   }
   let rndPct = $derived(Math.round(clamp01(num(tr?.randomness, 0)) * 100));
-
-  // Accent-colour swatches: the native picker edits RGB; we preserve each
-  // colour's original alpha so faint elements keep their transparency.
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if tr}
-  <PropertySection title="Turing Modulator">
+  <PropertySection title="Turing Modulator" icon={Dices}>
     <PropertyCell label="Run" span={1} hint="Advance the sequence in preview / player.">
       <PropertyToggle value={tr.running !== false} onchange={() => set('running', !(tr.running !== false))} />
     </PropertyCell>
@@ -62,12 +62,12 @@
       {/snippet}
     </TransportSyncCells>
     {#if tr.syncToTransport !== true}
-      <PropertyCell label="Rate" span={1} hint="Steps per second.">
-        <input class="val" type="number" min="0.1" max="30" step="0.5" value={tr.rate ?? 2} onchange={(e) => set('rate', Math.max(0.1, num(e.target.value, 2)))} />
+      <PropertyCell label="Rate" span={1} compact hint="Steps per second.">
+        <NumberCell label="Rate" value={tr.rate ?? 2} min={0.1} max={30} step={0.5} defaultValue={2} onchange={(v) => set('rate', Math.max(0.1, num(v, 2)))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Length" span={2} hint="Loop length in steps (2–64).">
-      <input class="val" type="number" min="2" max="64" step="1" value={tr.length ?? 8} onchange={(e) => setLength(e.target.value)} />
+    <PropertyCell label="Length" span={2} compact hint="Loop length in steps (2–64).">
+      <NumberCell label="Len" value={tr.length ?? 8} min={2} max={64} step={1} defaultValue={8} onchange={(v) => setLength(v)} />
     </PropertyCell>
     <PropertyCell label="Randomness" span={4} hint="0% = a locked loop; 100% = a new value every step; in between, the sequence slowly evolves.">
       <div class="rangewrap">
@@ -75,11 +75,11 @@
         <span class="pctlbl">{rndPct === 0 ? 'locked' : rndPct === 100 ? 'chaos' : `${rndPct}%`}</span>
       </div>
     </PropertyCell>
-    <PropertyCell label="Quantize" span={2} hint="Snap step values to N discrete levels (0 = continuous). Try 2 for on/off, 5 for a scale-like feel.">
-      <input class="val" type="number" min="0" max="24" step="1" value={tr.quantizeLevels ?? 0} onchange={(e) => set('quantizeLevels', Math.max(0, Math.min(24, Math.round(num(e.target.value, 0)))))} />
+    <PropertyCell label="Quantize" span={2} compact hint="Snap step values to N discrete levels (0 = continuous). Try 2 for on/off, 5 for a scale-like feel.">
+      <NumberCell label="Quant" value={tr.quantizeLevels ?? 0} min={0} max={24} step={1} defaultValue={0} onchange={(v) => set('quantizeLevels', Math.max(0, Math.min(24, Math.round(num(v, 0)))))} />
     </PropertyCell>
-    <PropertyCell label="Gate at" span={1} hint="The Gate port fires when a step's value is at/above this threshold.">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={tr.gateThreshold ?? 0.5} onchange={(e) => set('gateThreshold', clamp01(num(e.target.value, 0.5)))} />
+    <PropertyCell label="Gate at" span={1} compact hint="The Gate port fires when a step's value is at/above this threshold.">
+      <NumberCell label="Gate" value={tr.gateThreshold ?? 0.5} min={0} max={1} step={0.05} defaultValue={0.5} onchange={(v) => set('gateThreshold', clamp01(num(v, 0.5)))} />
     </PropertyCell>
     <PropertyCell label="Edit" span={1} hint="Drag the step bars in preview to seed the sequence.">
       <PropertyToggle value={tr.editable !== false} onchange={() => set('editable', !(tr.editable !== false))} />
@@ -91,11 +91,11 @@
       <PropertyToggle value={tr.showDivisions === true} onchange={() => set('showDivisions', !(tr.showDivisions === true))} />
     </PropertyCell>
     {#if tr.showDivisions === true}
-      <PropertyCell label="Major" span={1} hint="Major division lines across the value range (same as a slider's Major Count).">
-        <input class="val" type="number" min="2" max="21" step="1" value={tr.majorTickCount ?? 5} onchange={(e) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(e.target.value, 5)))))} />
+      <PropertyCell label="Major" span={1} compact hint="Major division lines across the value range (same as a slider's Major Count).">
+        <NumberCell label="Major" value={tr.majorTickCount ?? 5} min={2} max={21} step={1} defaultValue={5} onchange={(v) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(v, 5)))))} />
       </PropertyCell>
-      <PropertyCell label="Minor / gap" span={1} hint="Minor lines inserted between each pair of majors (same as a slider's Minor / Gap).">
-        <input class="val" type="number" min="0" max="8" step="1" value={tr.minorTickCount ?? 0} onchange={(e) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(e.target.value, 0)))))} />
+      <PropertyCell label="Minor / gap" span={1} compact hint="Minor lines inserted between each pair of majors (same as a slider's Minor / Gap).">
+        <NumberCell label="Minor" value={tr.minorTickCount ?? 0} min={0} max={8} step={1} defaultValue={0} onchange={(v) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(v, 0)))))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Seed" span={3} hint="Regenerate the step values. Drag the bars in preview for a hand-drawn sequence.">
@@ -106,22 +106,18 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
-    <PropertyCell label="Bars" span={1} hint="Step value bar colour.">
-      <input class="cswatch" type="color" value={colRgb(tr.barColour, 'FF39D98A')} onchange={(e) => setCol('barColour', tr.barColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Head" span={1} hint="The live (current) step colour.">
-      <input class="cswatch" type="color" value={colRgb(tr.headColour, 'FFF2C94C')} onchange={(e) => setCol('headColour', tr.headColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Field" span={1} hint="Sequence background colour.">
-      <input class="cswatch" type="color" value={colRgb(tr.fieldColour, 'FF0E0E13')} onchange={(e) => setCol('fieldColour', tr.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Hint text colour.">
-      <input class="cswatch" type="color" value={colRgb(tr.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', tr.labelColour, e.target.value)} />
+  <PropertySection title="Appearance" icon={Palette}>
+    <PropertyCell label="Colours" span={4} hint="Step bars, live head step, field background, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'barColour', label: 'Bars', value: tr.barColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'Turing.barColour' } },
+        { key: 'headColour', label: 'Head', value: tr.headColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Turing.headColour' } },
+        { key: 'fieldColour', label: 'Field', value: tr.fieldColour ?? 'FF0E0E13', target: { type: 'control', controlId: core?.id, path: 'Turing.fieldColour' } },
+        { key: 'labelColour', label: 'Labels', value: tr.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Turing.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Outputs">
+  <PropertySection title="Outputs" icon={LogOut}>
     <PropertyCell label="" span={4} hint="Ports: Value = the current step's level; Gate = 1 above the threshold; Inverse = 1 − Value.">
       <div class="ports">
         <span class="chip"><i style="background:#39D98A"></i>Value</span>
@@ -138,7 +134,6 @@
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
   }
   .val:focus { border-color: #5B9BD5; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .rangewrap { display: flex; align-items: center; gap: 10px; }
   .range { flex: 1 1 auto; accent-color: #39D98A; }
   .pctlbl { font-size: 11px; color: #B9B9B9; min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; }

@@ -59,7 +59,7 @@ test('computeWheelZoom keeps the hovered panel point under the cursor', () => {
     rectTop: 30,
   });
   const panel = { width: 1400, height: 900 };
-  const event = { clientX: 280, clientY: 250, deltaY: -120 };
+  const event = { clientX: 280, clientY: 250, deltaY: -120, ctrlKey: true };
   const cursorVpX = event.clientX - 20;
   const cursorVpY = event.clientY - 30;
 
@@ -98,7 +98,7 @@ test('computeWheelZoom keeps the cursor anchor stable while centered offsets cha
     scrollTop: 0,
   });
   const panel = { width: 300, height: 180 };
-  const event = { clientX: 560, clientY: 360, deltaY: -120 };
+  const event = { clientX: 560, clientY: 360, deltaY: -120, ctrlKey: true };
   const cursorVpX = event.clientX;
   const cursorVpY = event.clientY;
 
@@ -164,17 +164,19 @@ test('createZoomController composes repeated wheel zooms against the pending vie
       clientX: 260,
       clientY: 220,
       deltaY: -120,
+      ctrlKey: true,
       preventDefault() {},
     };
     const secondEvent = {
       clientX: 260,
       clientY: 220,
       deltaY: -120,
+      ctrlKey: true,
       preventDefault() {},
     };
 
     const firstResult = computeWheelZoom(viewport, firstEvent, 100, panel);
-    const secondResult = computeWheelZoom(viewport, secondEvent, firstResult.zoom, panel, 10, firstResult);
+    const secondResult = computeWheelZoom(viewport, secondEvent, firstResult.zoom, panel, 1.1, firstResult);
 
     controller.handleWheel(firstEvent);
     controller.handleWheel(secondEvent);
@@ -191,5 +193,65 @@ test('createZoomController composes repeated wheel zooms against the pending vie
   } finally {
     globalThis.requestAnimationFrame = originalRAF;
     globalThis.cancelAnimationFrame = originalCancelRAF;
+  }
+});
+
+test('plain wheel is left to the browser (scroll), only ctrl/cmd wheel zooms', () => {
+  const viewport = makeViewport();
+  const panel = { width: 1400, height: 1000 };
+  let zoom = 100;
+  let prevented = false;
+  const originalRAF = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = () => 1;
+
+  const controller = createZoomController({
+    getViewport: () => viewport,
+    getPanel: () => panel,
+    getSelection: () => new Set(),
+    editorZoom: { set(value) { zoom = value; } },
+    getZoom: () => zoom,
+  });
+
+  controller.handleWheel({ clientX: 100, clientY: 100, deltaY: -120, ctrlKey: false, preventDefault() { prevented = true; } });
+  assert.equal(zoom, 100, 'plain wheel must not zoom');
+  assert.equal(prevented, false, 'plain wheel must not be preventDefaulted');
+
+  try {
+    controller.handleWheel({ clientX: 100, clientY: 100, deltaY: -120, ctrlKey: true, preventDefault() { prevented = true; } });
+    assert.equal(zoom, 110, 'ctrl+wheel zooms multiplicatively (100 × 1.1)');
+    assert.equal(prevented, true);
+  } finally {
+    globalThis.requestAnimationFrame = originalRAF;
+  }
+});
+
+test('zoom steps are anchored at the viewport centre', () => {
+  const viewport = makeViewport({ clientWidth: 800, clientHeight: 600, scrollLeft: 200, scrollTop: 150 });
+  const panel = { width: 2000, height: 1500 };
+  let zoom = 100;
+  let frameCallback = null;
+  const originalRAF = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = (cb) => { frameCallback = cb; return 1; };
+  try {
+    const controller = createZoomController({
+      getViewport: () => viewport,
+      getPanel: () => panel,
+      getSelection: () => new Set(),
+      editorZoom: { set(value) { zoom = value; } },
+      getZoom: () => zoom,
+      getZoomIncrement: () => 20,
+    });
+
+    // The panel point at the viewport centre before the step...
+    const centreBefore = panelPointFromCursor(viewport, panel, 100, 200, 150, 400, 300);
+    controller.zoomStep(1);
+    assert.equal(zoom, 120, 'step uses the configured increment');
+    frameCallback();
+    // ...is still at the viewport centre after it.
+    const centreAfter = cursorFromPanelPoint(viewport, panel, 120, viewport.scrollLeft, viewport.scrollTop, centreBefore);
+    assert.equal(Math.round(centreAfter.x), 400);
+    assert.equal(Math.round(centreAfter.y), 300);
+  } finally {
+    globalThis.requestAnimationFrame = originalRAF;
   }
 });

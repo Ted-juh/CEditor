@@ -3,7 +3,19 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import CheckSquare from 'lucide-svelte/icons/square-check';
+  import Bug from 'lucide-svelte/icons/bug';
+  import Brackets from 'lucide-svelte/icons/brackets';
+  import Hash from 'lucide-svelte/icons/hash';
+  import Workflow from 'lucide-svelte/icons/workflow';
+  import LinkIcon from 'lucide-svelte/icons/link';
+  import Eye from 'lucide-svelte/icons/eye';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import StickyNote from 'lucide-svelte/icons/sticky-note';
   import ConditionBuilder from './ConditionBuilder.svelte';
   import { activePanel } from '../stores/panels.js';
   import {
@@ -301,16 +313,22 @@
 </script>
 
 {#if links}
-  <PropertySection title="Logic">
-    <PropertyCell label="Enabled" span={2} hint="Enable internal and external logic links for this component.">
-      <PropertyToggle value={links.enabled !== false} onchange={() => setRoot('enabled', !(links.enabled !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Debug" span={2} hint="Show link debug information in the test bench later.">
-      <PropertyToggle value={links.debug === true} onchange={() => setRoot('debug', !(links.debug === true))} />
+  <PropertySection title="Logic" icon={Workflow}>
+    <PropertyCell label="Logic" span={2} hint="Enable logic links, show link debug information. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'enabled', title: 'Enabled — enable internal and external logic links for this component', on: links.enabled !== false, icon: CheckSquare },
+          { key: 'debug', title: 'Debug — show link debug information in the test bench later', on: links.debug === true, icon: Bug },
+        ]}
+        ontoggle={(key) => {
+          if (key === 'enabled') setRoot('enabled', !(links.enabled !== false));
+          else if (key === 'debug') setRoot('debug', !(links.debug === true));
+        }}
+      />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Links">
+  <PropertySection title="Links" icon={LinkIcon}>
     <PropertyCell label="Add" span={3} hint="Create a link between internal values, behaviors, visual properties, or external component API values.">
       <input class="val" type="text" bind:value={newName} placeholder="linkName" />
     </PropertyCell>
@@ -329,7 +347,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Link Preview">
+  <PropertySection title="Link Preview" icon={Eye}>
     <PropertyCell label="Flow" span={4} hint="Visual route for the selected link.">
       <div class="link-flow-card" class:disabled={selected?.enabled === false}>
         <div class="flow-node">
@@ -469,11 +487,14 @@
   </PropertySection>
 
   {#if selected}
-    <PropertySection title="Link Definition">
-      <PropertyCell label="Enabled" span={1} hint="Enable this link.">
-        <PropertyToggle value={selected.enabled !== false} onchange={() => set('enabled', !(selected.enabled !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Type" span={3} hint="Link operation.">
+    <PropertySection title="Link Definition" icon={Pencil}>
+      {#snippet tools()}
+        <HeaderPill value={selected.enabled !== false}
+                    title="Enable this link."
+                    onchange={() => set('enabled', !(selected.enabled !== false))} />
+      {/snippet}
+      {#if selected.enabled !== false}
+      <PropertyCell label="Type" span={4} hint="Link operation.">
         <select class="val" value={selected.type ?? 'map'} onchange={(event) => set('type', event.target.value)}>
           {#each TYPES as type}
             <option value={type}>{type}</option>
@@ -499,39 +520,46 @@
       <PropertyCell label="Condition" span={4} hint="When this link runs. Leave empty to always run.">
         <ConditionBuilder value={selected.condition ?? ''} channels={channelNames} onChange={(next) => set('condition', next)} placeholder="link always runs" />
       </PropertyCell>
+      {/if}
     </PropertySection>
 
     {#if ['map', 'offset', 'clamp', 'condition', 'switch', 'enable-disable', 'show-hide'].includes(String(selected.type ?? 'map'))}
-      <PropertySection title="Link Options">
+      <PropertySection title="Link Options" icon={SlidersHorizontal}>
         {#if selected.type === 'map'}
-          <PropertyCell label="Input Min" span={1} hint="Lowest source value for the mapping.">
-            <NumberInput value={selected.inputMin ?? 0} step={0.01} onchange={(value) => set('inputMin', value)} />
+          <PropertyCell label="Input Min" span={1} compact hint="Lowest source value for the mapping.">
+            <NumberCell label="In Min" value={selected.inputMin ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('inputMin', value)} />
           </PropertyCell>
-          <PropertyCell label="Input Max" span={1} hint="Highest source value for the mapping.">
-            <NumberInput value={selected.inputMax ?? 1} step={0.01} onchange={(value) => set('inputMax', value)} />
+          <PropertyCell label="Input Max" span={1} compact hint="Highest source value for the mapping.">
+            <NumberCell label="In Max" value={selected.inputMax ?? 1} step={0.01} defaultValue={1} onchange={(value) => set('inputMax', value)} />
           </PropertyCell>
-          <PropertyCell label="Output Min" span={1} hint="Lowest target value after mapping.">
-            <NumberInput value={selected.outputMin ?? 0} step={0.01} onchange={(value) => set('outputMin', value)} />
+          <PropertyCell label="Output Min" span={1} compact hint="Lowest target value after mapping.">
+            <NumberCell label="OutMin" value={selected.outputMin ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('outputMin', value)} />
           </PropertyCell>
-          <PropertyCell label="Output Max" span={1} hint="Highest target value after mapping.">
-            <NumberInput value={selected.outputMax ?? 1} step={0.01} onchange={(value) => set('outputMax', value)} />
+          <PropertyCell label="Output Max" span={1} compact hint="Highest target value after mapping.">
+            <NumberCell label="OutMax" value={selected.outputMax ?? 1} step={0.01} defaultValue={1} onchange={(value) => set('outputMax', value)} />
           </PropertyCell>
-          <PropertyCell label="Clamp" span={2} hint="Keep mapped values inside the output range.">
-            <PropertyToggle value={selected.clamp !== false} onchange={() => set('clamp', !(selected.clamp !== false))} />
-          </PropertyCell>
-          <PropertyCell label="Round" span={2} hint="Round mapped values to whole numbers before snapping.">
-            <PropertyToggle value={selected.round === true} onchange={() => set('round', !(selected.round === true))} />
+          <PropertyCell label="Clamp / Round" span={2} hint="Clamp mapped values to the output range, round to whole numbers before snapping. Hover a chip for its name.">
+            <FlagStrip
+              flags={[
+                { key: 'clamp', title: 'Clamp — keep mapped values inside the output range', on: selected.clamp !== false, icon: Brackets },
+                { key: 'round', title: 'Round — round mapped values to whole numbers before snapping', on: selected.round === true, icon: Hash },
+              ]}
+              ontoggle={(key) => {
+                if (key === 'clamp') set('clamp', !(selected.clamp !== false));
+                else if (key === 'round') set('round', !(selected.round === true));
+              }}
+            />
           </PropertyCell>
         {:else if selected.type === 'offset'}
-          <PropertyCell label="Amount" span={2} hint="Amount added to the source before writing the target.">
-            <NumberInput value={selected.amount ?? 0} step={0.01} onchange={(value) => set('amount', value)} />
+          <PropertyCell label="Amount" span={2} compact hint="Amount added to the source before writing the target.">
+            <NumberCell label="Amt" value={selected.amount ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('amount', value)} />
           </PropertyCell>
         {:else if selected.type === 'clamp'}
-          <PropertyCell label="Min" span={2} hint="Lowest allowed routed value.">
-            <NumberInput value={selected.min ?? 0} step={0.01} onchange={(value) => set('min', value)} />
+          <PropertyCell label="Min" span={2} compact hint="Lowest allowed routed value.">
+            <NumberCell label="Min" value={selected.min ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('min', value)} />
           </PropertyCell>
-          <PropertyCell label="Max" span={2} hint="Highest allowed routed value.">
-            <NumberInput value={selected.max ?? 1} step={0.01} onchange={(value) => set('max', value)} />
+          <PropertyCell label="Max" span={2} compact hint="Highest allowed routed value.">
+            <NumberCell label="Max" value={selected.max ?? 1} step={0.01} defaultValue={1} onchange={(value) => set('max', value)} />
           </PropertyCell>
         {:else if selected.type === 'condition'}
           <PropertyCell label="Expression" span={4} hint="Condition picking the true/false value below.">
@@ -561,7 +589,7 @@
       </PropertySection>
     {/if}
 
-    <PropertySection title="Notes">
+    <PropertySection title="Notes" icon={StickyNote}>
       <PropertyCell label="Notes" span={4} hint="Freeform implementation notes for this link.">
         <textarea class="val code" rows="3" value={selected.notes ?? ''} onchange={(event) => set('notes', event.target.value)}></textarea>
       </PropertyCell>

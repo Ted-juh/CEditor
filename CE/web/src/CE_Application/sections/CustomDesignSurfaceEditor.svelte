@@ -24,6 +24,7 @@
   import { getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { setActiveEditorTab } from '../stores/panels.js';
   import EditorRuler from '../editor/EditorRuler.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
   import {
@@ -3143,27 +3144,31 @@
           </label>
           <label class="paint-number">
             <span>W</span>
-            <input
-              type="number"
-              min="0"
-              max="32"
-              step="1"
-              value={numberOr(selectedBorder?.thickness, 0)}
-              disabled={!canPaintLayer}
-              onchange={(event) => setLayerProperty('Background.Border.thickness', numericInputValue(event, 0))}
-            />
+            <span class="nc-wrap">
+              <NumberCell
+                min={0}
+                max={32}
+                step={1}
+                value={numberOr(selectedBorder?.thickness, 0)}
+                defaultValue={0}
+                disabled={!canPaintLayer}
+                onchange={(value) => setLayerProperty('Background.Border.thickness', value)}
+              />
+            </span>
           </label>
           <label class="paint-number">
             <span>R</span>
-            <input
-              type="number"
-              min="0"
-              max="999"
-              step="1"
-              value={numberOr(selectedCorners?.radius, 0)}
-              disabled={!canPaintLayer}
-              onchange={(event) => setLayerProperty('Background.Corners.radius', numericInputValue(event, 0))}
-            />
+            <span class="nc-wrap">
+              <NumberCell
+                min={0}
+                max={999}
+                step={1}
+                value={numberOr(selectedCorners?.radius, 0)}
+                defaultValue={0}
+                disabled={!canPaintLayer}
+                onchange={(value) => setLayerProperty('Background.Corners.radius', value)}
+              />
+            </span>
           </label>
         {/if}
 
@@ -3179,15 +3184,17 @@
           </label>
           <label class="paint-number text-size">
             <span>Size</span>
-            <input
-              type="number"
-              min="6"
-              max="144"
-              step="1"
-              value={numberOr(selectedTextFont?.size, 12)}
-              disabled={!canPaintLayer}
-              onchange={(event) => setLayerProperty('Text.Font.size', numericInputValue(event, 12))}
-            />
+            <span class="nc-wrap">
+              <NumberCell
+                min={6}
+                max={144}
+                step={1}
+                value={numberOr(selectedTextFont?.size, 12)}
+                defaultValue={12}
+                disabled={!canPaintLayer}
+                onchange={(value) => setLayerProperty('Text.Font.size', value)}
+              />
+            </span>
           </label>
           <label class="text-content-field">
             <span>Content</span>
@@ -3287,68 +3294,74 @@
       <div class="precision-strip" aria-label="Selection precision controls">
         <label>
           <span>X</span>
-          <input
-            type="number"
-            value={Math.round(activeSelectionFrame.left)}
-            disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-            onchange={(event) => {
-              const frame = { ...activeSelectionFrame, left: numericInputValue(event, activeSelectionFrame.left) };
-              if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-              else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-            }}
-          />
+          <span class="nc-wrap">
+            <NumberCell
+              value={Math.round(activeSelectionFrame.left)}
+              disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
+              onchange={(value) => {
+                const frame = { ...activeSelectionFrame, left: value };
+                if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
+                else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
+              }}
+            />
+          </span>
         </label>
         <label>
           <span>Y</span>
-          <input
-            type="number"
-            value={Math.round(activeSelectionFrame.top)}
-            disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-            onchange={(event) => {
-              const frame = { ...activeSelectionFrame, top: numericInputValue(event, activeSelectionFrame.top) };
-              if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-              else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-            }}
-          />
+          <span class="nc-wrap">
+            <NumberCell
+              value={Math.round(activeSelectionFrame.top)}
+              disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
+              onchange={(value) => {
+                const frame = { ...activeSelectionFrame, top: value };
+                if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
+                else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
+              }}
+            />
+          </span>
         </label>
         <label>
           <span>W</span>
-          <input
-            type="number"
-            min="1"
-            value={Math.round(activeSelectionFrame.width)}
-            disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-            onchange={(event) => {
-              const frame = { ...activeSelectionFrame, width: Math.max(1, numericInputValue(event, activeSelectionFrame.width)) };
-              if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-              else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-            }}
-          />
+          <span class="nc-wrap">
+            <NumberCell
+              min={1}
+              value={Math.round(activeSelectionFrame.width)}
+              disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
+              onchange={(value) => {
+                const frame = { ...activeSelectionFrame, width: Math.max(1, value) };
+                if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
+                else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
+              }}
+            />
+          </span>
         </label>
         <label>
           <span>H</span>
-          <input
-            type="number"
-            min="1"
-            value={Math.round(activeSelectionFrame.height)}
-            disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-            onchange={(event) => {
-              const frame = { ...activeSelectionFrame, height: Math.max(1, numericInputValue(event, activeSelectionFrame.height)) };
-              if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-              else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-            }}
-          />
+          <span class="nc-wrap">
+            <NumberCell
+              min={1}
+              value={Math.round(activeSelectionFrame.height)}
+              disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
+              onchange={(value) => {
+                const frame = { ...activeSelectionFrame, height: Math.max(1, value) };
+                if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
+                else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
+              }}
+            />
+          </span>
         </label>
         {#if activeSelectionKind === 'layer'}
           <label>
             <span>Rot</span>
-            <input
-              type="number"
-              step="1"
-              value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.rotation, 0))}
-              disabled={!selectedPartEditable}
-              onchange={(event) => setLayerLayoutProperty('rotation', normalizeRotation(numericInputValue(event, 0)))}
-            />
+            <span class="nc-wrap">
+              <NumberCell
+                step={1}
+                value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.rotation, 0))}
+                defaultValue={0}
+                disabled={!selectedPartEditable}
+                onchange={(value) => setLayerLayoutProperty('rotation', normalizeRotation(value))}
+              />
+            </span>
           </label>
         {/if}
         <button type="button" onclick={() => alignSelection('left')} title="Align left">Left</button>
@@ -3365,38 +3378,44 @@
         <strong>Arc</strong>
         <label>
           <span>Start</span>
-          <input
-            type="number"
-            step="1"
-            value={Math.round(numberOr(selectedArcMeta?.startAngle, -135))}
-            onchange={(event) => setArcMetaProperty('startAngle', normalizeRotation(numericInputValue(event, -135)))}
-          />
+          <span class="nc-wrap">
+            <NumberCell
+              step={1}
+              value={Math.round(numberOr(selectedArcMeta?.startAngle, -135))}
+              defaultValue={-135}
+              onchange={(value) => setArcMetaProperty('startAngle', normalizeRotation(value))}
+            />
+          </span>
         </label>
         <label>
           <span>Sweep</span>
-          <input
-            type="number"
-            min="1"
-            max="360"
-            step="1"
-            value={Math.round(numberOr(selectedArcMeta?.sweepAngle, 270))}
-            onchange={(event) => setArcMetaProperty('sweepAngle', Math.max(1, Math.min(360, numericInputValue(event, 270))))}
-          />
+          <span class="nc-wrap">
+            <NumberCell
+              min={1}
+              max={360}
+              step={1}
+              value={Math.round(numberOr(selectedArcMeta?.sweepAngle, 270))}
+              defaultValue={270}
+              onchange={(value) => setArcMetaProperty('sweepAngle', Math.max(1, Math.min(360, value)))}
+            />
+          </span>
         </label>
         <label>
           <span>Thick</span>
-          <input
-            type="number"
-            min="1"
-            max="48"
-            step="1"
-            value={Math.round(numberOr(selectedArcMeta?.thickness, 4))}
-            onchange={(event) => {
-              const thickness = Math.max(1, Math.min(48, numericInputValue(event, 4)));
-              setArcMetaProperty('thickness', thickness);
-              setLayerProperty('Background.Border.thickness', thickness);
-            }}
-          />
+          <span class="nc-wrap">
+            <NumberCell
+              min={1}
+              max={48}
+              step={1}
+              value={Math.round(numberOr(selectedArcMeta?.thickness, 4))}
+              defaultValue={4}
+              onchange={(value) => {
+                const thickness = Math.max(1, Math.min(48, value));
+                setArcMetaProperty('thickness', thickness);
+                setLayerProperty('Background.Border.thickness', thickness);
+              }}
+            />
+          </span>
         </label>
         <label>
           <span>Colour</span>
@@ -3506,15 +3525,16 @@
       </label>
       <label class="snap-size">
         <span>Grid</span>
-        <input
-          type="number"
-          min="1"
-          max="64"
-          step="1"
-          value={snapSize}
-          disabled={!snapEnabled}
-          onchange={(event) => setSnapSize(event.currentTarget.value)}
-        />
+        <span class="nc-wrap">
+          <NumberCell
+            min={1}
+            max={64}
+            step={1}
+            value={snapSize}
+            disabled={!snapEnabled}
+            onchange={(value) => setSnapSize(value)}
+          />
+        </span>
       </label>
       <label class="toggle-option" title="Snap to other parts' edges and the artboard (Alt bypasses)">
         <input type="checkbox" checked={smartSnapEnabled} onchange={(event) => { smartSnapEnabled = event.currentTarget.checked; }} />
@@ -3544,15 +3564,15 @@
       {#if arpeggiatorEnabled}
         <label class="snap-size">
           <span>Steps</span>
-          <input
-            type="number"
-            min="1"
-            max="256"
-            step="1"
-            value={arpStepCount}
-            oninput={(event) => setArpStepCount(event.currentTarget.value)}
-            onchange={(event) => setArpStepCount(event.currentTarget.value)}
-          />
+          <span class="nc-wrap">
+            <NumberCell
+              min={1}
+              max={256}
+              step={1}
+              value={arpStepCount}
+              onchange={(value) => setArpStepCount(value)}
+            />
+          </span>
         </label>
         <div class="zone-mode-control" aria-label="Arpeggiator octave">
           <button type="button" onclick={() => shiftArpOctave(-1)} title="Show lower octave">Oct -</button>
@@ -3579,7 +3599,7 @@
         {/if}
         <button type="button" class="szb-btn" onclick={() => zoomStep(surfaceZoomIncrement)} title="Zoom in">+</button>
         <span class="szb-inc-label">Dec/Inc</span>
-        <input class="szb-inc-input" type="number" value={surfaceZoomIncrement} onchange={(event) => setZoomIncrement(event.currentTarget.value)} min="1" max="100" />
+        <span class="szb-inc-input nc-wrap"><NumberCell value={surfaceZoomIncrement} onchange={(value) => setZoomIncrement(value)} min={1} max={100} /></span>
         <div class="szb-divider"></div>
         <button type="button" class="szb-btn icon" onclick={() => setZoom(1)} title="Reset to 100%">⊡</button>
         <button type="button" class="szb-btn icon" onclick={fitArtboardToView} title="Fit to window"><Maximize size={12} strokeWidth={1.6} /></button>
@@ -3670,15 +3690,16 @@
           </div>
           <label class="palette-stepper">
             <span>Size</span>
-            <input
-              type="number"
-              min="1"
-              max="24"
-              value={Math.round(numberOr(selectedBorder?.thickness, 1))}
-              disabled={!canPaintLayer}
-              onfocus={(event) => event.target.select()}
-              onchange={(event) => setLayerProperty('Background.Border.thickness', numericInputValue(event, 1))}
-            />
+            <span class="nc-wrap">
+              <NumberCell
+                min={1}
+                max={24}
+                value={Math.round(numberOr(selectedBorder?.thickness, 1))}
+                defaultValue={1}
+                disabled={!canPaintLayer}
+                onchange={(value) => setLayerProperty('Background.Border.thickness', value)}
+              />
+            </span>
             <strong>px</strong>
           </label>
         </section>
@@ -3694,15 +3715,16 @@
             ></button>
             <code>{selectedFill?.colour ? `#${String(selectedFill.colour).slice(-6)}` : '#14B8A6'}</code>
             <span class="swatch-num" title="Layer opacity (lower = more transparent)">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}
-                disabled={!canPaintLayer || !selectedBackground}
-                onfocus={(event) => event.target.select()}
-                onchange={(event) => setLayerProperty('opacity', Math.max(0, Math.min(1, numericInputValue(event, 100) / 100)))}
-              />%
+              <span class="nc-wrap">
+                <NumberCell
+                  min={0}
+                  max={100}
+                  value={Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}
+                  defaultValue={100}
+                  disabled={!canPaintLayer || !selectedBackground}
+                  onchange={(value) => setLayerProperty('opacity', Math.max(0, Math.min(1, value / 100)))}
+                />
+              </span>%
             </span>
           </label>
         </section>
@@ -3738,15 +3760,16 @@
               ></button>
             <code>{selectedBorder?.colour ? `#${String(selectedBorder.colour).slice(-6)}` : '#FFFFFF'}</code>
             <span class="swatch-num" title="Stroke thickness">
-              <input
-                type="number"
-                min="0"
-                max="999"
-                value={Math.round(numberOr(selectedBorder?.thickness, 1))}
-                disabled={!canPaintLayer || !selectedBackground}
-                onfocus={(event) => event.target.select()}
-                onchange={(event) => setLayerProperty('Background.Border.thickness', numericInputValue(event, 1))}
-              />px
+              <span class="nc-wrap">
+                <NumberCell
+                  min={0}
+                  max={999}
+                  value={Math.round(numberOr(selectedBorder?.thickness, 1))}
+                  defaultValue={1}
+                  disabled={!canPaintLayer || !selectedBackground}
+                  onchange={(value) => setLayerProperty('Background.Border.thickness', value)}
+                />
+              </span>px
             </span>
           </label>
         </section>
@@ -3776,14 +3799,16 @@
         <section class="palette-group">
           <span>Corner</span>
           <label class="palette-corner">
-            <input
-              type="number"
-              min="0"
-              max="999"
-              value={numberOr(selectedCorners?.radius, 0)}
-              disabled={!canPaintLayer || !selectedBackground}
-              onchange={(event) => setLayerProperty('Background.Corners.radius', numericInputValue(event, 0))}
-            />
+            <span class="nc-wrap">
+              <NumberCell
+                min={0}
+                max={999}
+                value={numberOr(selectedCorners?.radius, 0)}
+                defaultValue={0}
+                disabled={!canPaintLayer || !selectedBackground}
+                onchange={(value) => setLayerProperty('Background.Corners.radius', value)}
+              />
+            </span>
             <strong>radius</strong>
           </label>
         </section>
@@ -4433,22 +4458,20 @@
                   <div class="dock-number-grid">
                     <label>
                       <span>W</span>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
+                      <NumberCell
+                        min={1}
+                        step={1}
                         value={Math.round(artboardWidth)}
-                        onchange={(event) => setArtboardSize('width', numericInputValue(event, artboardWidth))}
+                        onchange={(value) => setArtboardSize('width', value)}
                       />
                     </label>
                     <label>
                       <span>H</span>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
+                      <NumberCell
+                        min={1}
+                        step={1}
                         value={Math.round(artboardHeight)}
-                        onchange={(event) => setArtboardSize('height', numericInputValue(event, artboardHeight))}
+                        onchange={(value) => setArtboardSize('height', value)}
                       />
                     </label>
                   </div>
@@ -4586,12 +4609,11 @@
                     <div class="dock-number-grid">
                       <label>
                         <span>X</span>
-                        <input
-                          type="number"
+                        <NumberCell
                           value={Math.round(activeSelectionFrame.left)}
                           disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(event) => {
-                            const frame = { ...activeSelectionFrame, left: numericInputValue(event, activeSelectionFrame.left) };
+                          onchange={(value) => {
+                            const frame = { ...activeSelectionFrame, left: value };
                             if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
                             else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
                           }}
@@ -4599,12 +4621,11 @@
                       </label>
                       <label>
                         <span>Y</span>
-                        <input
-                          type="number"
+                        <NumberCell
                           value={Math.round(activeSelectionFrame.top)}
                           disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(event) => {
-                            const frame = { ...activeSelectionFrame, top: numericInputValue(event, activeSelectionFrame.top) };
+                          onchange={(value) => {
+                            const frame = { ...activeSelectionFrame, top: value };
                             if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
                             else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
                           }}
@@ -4612,13 +4633,12 @@
                       </label>
                       <label>
                         <span>W</span>
-                        <input
-                          type="number"
-                          min="1"
+                        <NumberCell
+                          min={1}
                           value={Math.round(activeSelectionFrame.width)}
                           disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(event) => {
-                            const frame = { ...activeSelectionFrame, width: Math.max(1, numericInputValue(event, activeSelectionFrame.width)) };
+                          onchange={(value) => {
+                            const frame = { ...activeSelectionFrame, width: Math.max(1, value) };
                             if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
                             else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
                           }}
@@ -4626,13 +4646,12 @@
                       </label>
                       <label>
                         <span>H</span>
-                        <input
-                          type="number"
-                          min="1"
+                        <NumberCell
+                          min={1}
                           value={Math.round(activeSelectionFrame.height)}
                           disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(event) => {
-                            const frame = { ...activeSelectionFrame, height: Math.max(1, numericInputValue(event, activeSelectionFrame.height)) };
+                          onchange={(value) => {
+                            const frame = { ...activeSelectionFrame, height: Math.max(1, value) };
                             if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
                             else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
                           }}
@@ -4641,32 +4660,32 @@
                       {#if activeSelectionKind === 'layer'}
                         <label>
                           <span>Rot</span>
-                          <input
-                            type="number"
-                            step="1"
+                          <NumberCell
+                            step={1}
                             value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.rotation, 0))}
+                            defaultValue={0}
                             disabled={!selectedPartEditable}
-                            onchange={(event) => setLayerLayoutProperty('rotation', normalizeRotation(numericInputValue(event, 0)))}
+                            onchange={(value) => setLayerLayoutProperty('rotation', normalizeRotation(value))}
                           />
                         </label>
                         <label>
                           <span>Pivot X</span>
-                          <input
-                            type="number"
-                            step="1"
+                          <NumberCell
+                            step={1}
                             value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.pivotX, 50))}
+                            defaultValue={50}
                             disabled={!selectedPartEditable}
-                            onchange={(event) => setLayerLayoutProperty('pivotX', numericInputValue(event, 50))}
+                            onchange={(value) => setLayerLayoutProperty('pivotX', value)}
                           />
                         </label>
                         <label>
                           <span>Pivot Y</span>
-                          <input
-                            type="number"
-                            step="1"
+                          <NumberCell
+                            step={1}
                             value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.pivotY, 50))}
+                            defaultValue={50}
                             disabled={!selectedPartEditable}
-                            onchange={(event) => setLayerLayoutProperty('pivotY', numericInputValue(event, 50))}
+                            onchange={(value) => setLayerLayoutProperty('pivotY', value)}
                           />
                         </label>
                       {/if}
@@ -4724,11 +4743,11 @@
                       </label>
                       <label>
                         <span>Stroke W</span>
-                        <input type="number" min="0" max="32" step="1" value={numberOr(selectedBorder?.thickness, 0)} disabled={!canPaintLayer} onchange={(event) => setLayerProperty('Background.Border.thickness', numericInputValue(event, 0))} />
+                        <NumberCell min={0} max={32} step={1} value={numberOr(selectedBorder?.thickness, 0)} defaultValue={0} disabled={!canPaintLayer} onchange={(value) => setLayerProperty('Background.Border.thickness', value)} />
                       </label>
                       <label>
                         <span>Radius</span>
-                        <input type="number" min="0" max="999" step="1" value={numberOr(selectedCorners?.radius, 0)} disabled={!canPaintLayer} onchange={(event) => setLayerProperty('Background.Corners.radius', numericInputValue(event, 0))} />
+                        <NumberCell min={0} max={999} step={1} value={numberOr(selectedCorners?.radius, 0)} defaultValue={0} disabled={!canPaintLayer} onchange={(value) => setLayerProperty('Background.Corners.radius', value)} />
                       </label>
                     </div>
                   {/if}
@@ -4744,7 +4763,7 @@
                       </label>
                       <label>
                         <span>Size</span>
-                        <input type="number" min="6" max="144" step="1" value={numberOr(selectedTextFont?.size, 12)} disabled={!canPaintLayer} onchange={(event) => setLayerProperty('Text.Font.size', numericInputValue(event, 12))} />
+                        <NumberCell min={6} max={144} step={1} value={numberOr(selectedTextFont?.size, 12)} defaultValue={12} disabled={!canPaintLayer} onchange={(value) => setLayerProperty('Text.Font.size', value)} />
                       </label>
                     </div>
                   {/if}
@@ -4761,22 +4780,22 @@
                     <div class="dock-number-grid">
                       <label>
                         <span>Start</span>
-                        <input type="number" step="1" value={Math.round(numberOr(selectedArcMeta?.startAngle, -135))} onchange={(event) => setArcMetaProperty('startAngle', normalizeRotation(numericInputValue(event, -135)))} />
+                        <NumberCell step={1} value={Math.round(numberOr(selectedArcMeta?.startAngle, -135))} defaultValue={-135} onchange={(value) => setArcMetaProperty('startAngle', normalizeRotation(value))} />
                       </label>
                       <label>
                         <span>Sweep</span>
-                        <input type="number" min="1" max="360" step="1" value={Math.round(numberOr(selectedArcMeta?.sweepAngle, 270))} onchange={(event) => setArcMetaProperty('sweepAngle', Math.max(1, Math.min(360, numericInputValue(event, 270))))} />
+                        <NumberCell min={1} max={360} step={1} value={Math.round(numberOr(selectedArcMeta?.sweepAngle, 270))} defaultValue={270} onchange={(value) => setArcMetaProperty('sweepAngle', Math.max(1, Math.min(360, value)))} />
                       </label>
                       <label>
                         <span>Thick</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="48"
-                          step="1"
+                        <NumberCell
+                          min={1}
+                          max={48}
+                          step={1}
                           value={Math.round(numberOr(selectedArcMeta?.thickness, 4))}
-                          onchange={(event) => {
-                            const thickness = Math.max(1, Math.min(48, numericInputValue(event, 4)));
+                          defaultValue={4}
+                          onchange={(value) => {
+                            const thickness = Math.max(1, Math.min(48, value));
                             setArcMetaProperty('thickness', thickness);
                             setLayerProperty('Background.Border.thickness', thickness);
                           }}
@@ -4816,7 +4835,7 @@
                   </label>
                   <label class="dock-field">
                     <span>Priority</span>
-                    <input type="number" value={numberOr(selectedZone?.priority, 0)} disabled={!selectedZoneEditable} onchange={(event) => setHitZoneProperty('priority', numericInputValue(event, 0))} />
+                    <NumberCell value={numberOr(selectedZone?.priority, 0)} defaultValue={0} disabled={!selectedZoneEditable} onchange={(value) => setHitZoneProperty('priority', value)} />
                   </label>
                 </div>
               {:else}
@@ -5476,22 +5495,8 @@
     white-space: nowrap;
   }
 
-  .swatch-num input {
-    width: 34px;
-    height: 22px;
-    padding: 0 2px;
-    border: 1px solid #34444F;
-    border-radius: 4px;
-    background: #0D1419;
-    color: #E8EEF5;
-    font: inherit;
-    font-size: 11px;
-    text-align: center;
-  }
-
-  .swatch-num input:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+  .swatch-num .nc-wrap {
+    width: 44px;
   }
 
   .mini-gradient-btn {
@@ -5514,19 +5519,15 @@
     cursor: not-allowed;
   }
 
-  .paint-number input {
-    width: 46px;
-    height: 20px;
-    box-sizing: border-box;
-    border: 1px solid #3B4650;
-    border-radius: 3px;
-    background: #111518;
-    color: #E8EEF5;
-    font: inherit;
-    font-size: 10px;
+  .nc-wrap {
+    display: flex;
   }
 
-  .paint-number.text-size input {
+  .paint-number .nc-wrap {
+    width: 46px;
+  }
+
+  .paint-number.text-size .nc-wrap {
     width: 54px;
   }
 
@@ -5685,16 +5686,9 @@
     white-space: nowrap;
   }
 
-  .precision-strip input {
+  .precision-strip .nc-wrap {
     width: 54px;
     min-width: 0;
-    box-sizing: border-box;
-    border: 1px solid #3B4650;
-    border-radius: 3px;
-    background: #111518;
-    color: #E8EEF5;
-    font: inherit;
-    font-size: 10px;
   }
 
   .precision-strip button {
@@ -5705,11 +5699,6 @@
     border-color: #5B9BD5;
     background: #173449;
     color: #EAF5FF;
-  }
-
-  .precision-strip input:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
   }
 
   .arc-strip {
@@ -5763,16 +5752,9 @@
     white-space: nowrap;
   }
 
-  .arc-strip input {
+  .arc-strip .nc-wrap {
     width: 58px;
     min-width: 0;
-    box-sizing: border-box;
-    border: 1px solid #3B4650;
-    border-radius: 3px;
-    background: #111518;
-    color: #E8EEF5;
-    font: inherit;
-    font-size: 10px;
   }
 
   .surface-options-strip {
@@ -5862,15 +5844,8 @@
     accent-color: #5B9BD5;
   }
 
-  .surface-options-strip .snap-size input {
-    width: 44px;
-    box-sizing: border-box;
-    border: 1px solid #3B4650;
-    border-radius: 3px;
-    background: #111518;
-    color: #E8EEF5;
-    font: inherit;
-    font-size: 10px;
+  .surface-options-strip .snap-size .nc-wrap {
+    width: 52px;
   }
 
   .tool-icon {
@@ -6305,9 +6280,7 @@
   }
 
   .dock-field input,
-  .dock-field select,
-  .dock-number-grid input,
-  .paint-grid input {
+  .dock-field select {
     min-width: 0;
     box-sizing: border-box;
     border: 1px solid #3B4650;
@@ -6319,9 +6292,7 @@
   }
 
   .dock-field input:not([type='checkbox']):not([type='range']),
-  .dock-field select,
-  .dock-number-grid input,
-  .paint-grid input:not([type='color']) {
+  .dock-field select {
     width: 100%;
     height: 25px;
     padding: 0 7px;
@@ -6415,8 +6386,7 @@
   .dock-button-grid button:disabled,
   .pivot-actions button:disabled,
   .dock-field input:disabled,
-  .dock-field select:disabled,
-  .paint-grid input:disabled {
+  .dock-field select:disabled {
     cursor: not-allowed;
     opacity: 0.45;
   }
@@ -7760,27 +7730,7 @@
   }
 
   .surface-zoombar .szb-inc-input {
-    width: 34px;
-    background: #0D1419;
-    border: 1px solid #2D3A44;
-    border-radius: 3px;
-    color: #E8EEF5;
-    font-size: 10px;
-    text-align: center;
-    padding: 2px;
-    outline: none;
-    appearance: textfield;
-    -moz-appearance: textfield;
-  }
-
-  .surface-zoombar .szb-inc-input::-webkit-inner-spin-button,
-  .surface-zoombar .szb-inc-input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-
-  .surface-zoombar .szb-inc-input:focus {
-    border-color: #14B8A6;
+    width: 44px;
   }
 
   .szb-divider {
@@ -8008,9 +7958,7 @@
     color: #F3FFFD;
   }
 
-  .palette-grid button:disabled,
-  .palette-stepper input:disabled,
-  .palette-corner input:disabled {
+  .palette-grid button:disabled {
     cursor: not-allowed;
     opacity: 0.45;
   }
@@ -8145,17 +8093,9 @@
     white-space: nowrap;
   }
 
-  .palette-corner input,
-  .palette-stepper input {
+  .palette-corner .nc-wrap,
+  .palette-stepper .nc-wrap {
     width: 60px;
-    height: 28px;
-    border: 1px solid #34444F;
-    border-radius: 4px;
-    background: #0D1419;
-    color: #E8EEF5;
-    font: inherit;
-    font-size: 11px;
-    text-align: center;
   }
 
   .surface-scroll {
@@ -8338,9 +8278,7 @@
   }
 
   .dock-field input,
-  .dock-field select,
-  .dock-number-grid input,
-  .paint-grid input {
+  .dock-field select {
     border-color: #33434E;
     background: #0D1419;
   }

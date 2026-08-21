@@ -1,6 +1,6 @@
 <script>
   import { generalSettings, updateGeneralSettings } from '../stores/appSettings.js';
-  import NumberInput from '../sections/NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let general = $derived($generalSettings);
 
@@ -57,7 +57,7 @@
         <span>Seconds to wait after edits before writing the recovery snapshot.</span>
       </div>
       <div class="number-wrap">
-        <NumberInput
+        <NumberCell
           value={general.autosaveIntervalSeconds}
           min={5}
           max={600}
@@ -88,7 +88,7 @@
         <span>Initial grid size for newly created panels.</span>
       </div>
       <div class="number-wrap">
-        <NumberInput
+        <NumberCell
           value={general.defaultGridSize}
           min={1}
           max={400}
@@ -159,7 +159,7 @@
     <div class="settings-grid">
       <div class="mini-setting">
         <span>Insert Offset</span>
-        <NumberInput
+        <NumberCell
           value={general.insertOffset}
           min={0}
           max={400}
@@ -170,7 +170,7 @@
 
       <div class="mini-setting">
         <span>Duplicate Offset</span>
-        <NumberInput
+        <NumberCell
           value={general.duplicateOffset}
           min={0}
           max={400}
@@ -181,7 +181,7 @@
 
       <div class="mini-setting">
         <span>Arrow Nudge</span>
-        <NumberInput
+        <NumberCell
           value={general.keyboardNudgeSmall}
           min={1}
           max={200}
@@ -192,7 +192,7 @@
 
       <div class="mini-setting">
         <span>Shift+Arrow Nudge</span>
-        <NumberInput
+        <NumberCell
           value={general.keyboardNudgeLarge}
           min={1}
           max={400}

@@ -3,12 +3,18 @@
   import LayoutDashboard from 'lucide-svelte/icons/layout-dashboard';
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
   import X from 'lucide-svelte/icons/x';
+  import Share2 from 'lucide-svelte/icons/share-2';
+  import LogIn from 'lucide-svelte/icons/log-in';
+  import LogOut from 'lucide-svelte/icons/log-out';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import CircleOff from 'lucide-svelte/icons/circle-off';
   import { getSection, applyControlPatch, updateControlProperty } from '../stores/controls.js';
   import { valueAtPath } from '../stores/controlTreeUtils.js';
   import { fingerprintCustomComponent } from '../utils/customComponentPackage.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
 
   let { control = null } = $props();
 
@@ -169,20 +175,6 @@
     return valueAtPath(control, path);
   }
 
-  function toCssHex(value) {
-    const raw = String(value ?? '').trim().replace(/^#/, '');
-    if (/^[0-9a-fA-F]{8}$/.test(raw)) return `#${raw.slice(2)}`;
-    if (/^[0-9a-fA-F]{6}$/.test(raw)) return `#${raw}`;
-    return '#000000';
-  }
-
-  function fromCssHex(hex, previousValue) {
-    const clean = String(hex ?? '').trim().replace(/^#/, '').toUpperCase();
-    if (!/^[0-9A-F]{6}$/.test(clean)) return String(previousValue ?? '');
-    const previous = String(previousValue ?? '').trim().replace(/^#/, '').toUpperCase();
-    return /^[0-9A-F]{8}$/.test(previous) ? `${previous.slice(0, 2)}${clean}` : clean;
-  }
-
   async function setPropertyFile(entry, file) {
     const path = String(entry?.path ?? '').trim();
     if (!core?.id || !path || !file) return;
@@ -230,7 +222,7 @@
   }
 </script>
 
-<PropertySection title="Public API">
+<PropertySection title="Public API" icon={Share2}>
   <PropertyCell label="Name" span={1} hint="The name this component is addressed by when a panel places it.">
     <div class="contract-card">
       <strong>{contractLabel}</strong>
@@ -298,7 +290,7 @@
 </PropertySection>
 
 {#if inputEntries.length}
-  <PropertySection title="Published Inputs">
+  <PropertySection title="Published Inputs" icon={LogIn}>
     {#each inputEntries as [name, entry] (name)}
       {@const channel = channelEntry(entry.channel)}
       {@const type = String(entry.type ?? channel?.type ?? 'float').trim().toLowerCase()}
@@ -316,12 +308,9 @@
               {/each}
             </select>
           {:else if type === 'color' || type === 'colour'}
-            <input
-              class="color-swatch"
-              type="color"
-              value={toCssHex(channelValue(entry.channel))}
-              onchange={(event) => setChannelValue(entry.channel, fromCssHex(event.target.value, channelValue(entry.channel)))}
-            />
+            <SwatchCluster swatches={[
+              { key: `input_${name}`, label: 'Colour', value: channelValue(entry.channel), target: { type: 'callback', apply: (hex) => setChannelValue(entry.channel, hex) } },
+            ]} />
             <input
               class="val"
               type="text"
@@ -349,7 +338,7 @@
 {/if}
 
 {#if propertyEntries.length}
-  <PropertySection title="Editable Properties">
+  <PropertySection title="Editable Properties" icon={Pencil}>
     {#each propertyEntries as [name, entry] (name)}
       {@const type = String(entry.type ?? 'text').trim().toLowerCase()}
       {@const path = String(entry.path ?? '').trim()}
@@ -367,12 +356,9 @@
               {/each}
             </select>
           {:else if type === 'color' || type === 'colour'}
-            <input
-              class="color-swatch"
-              type="color"
-              value={toCssHex(propertyValue(path))}
-              onchange={(event) => setPropertyValue(path, fromCssHex(event.target.value, propertyValue(path)), type, entry.defaultValue)}
-            />
+            <SwatchCluster swatches={[
+              { key: `prop_${name}`, label: 'Colour', value: propertyValue(path), target: { type: 'callback', apply: (hex) => setPropertyValue(path, hex, type, entry.defaultValue) } },
+            ]} />
             <input
               class="val"
               type="text"
@@ -413,7 +399,7 @@
 {/if}
 
 {#if outputEntries.length}
-  <PropertySection title="Published Outputs">
+  <PropertySection title="Published Outputs" icon={LogOut}>
     <PropertyCell label="Available" span={4} hint="Published output values can be linked to other custom components and panel routes.">
       <div class="output-list">
         {#each outputEntries as [name, entry] (name)}
@@ -428,7 +414,7 @@
 {/if}
 
 {#if !surfaceCount}
-  <PropertySection title="Nothing exposed">
+  <PropertySection title="Nothing exposed" icon={CircleOff}>
     <PropertyCell label="" span={4} hint="This component exposes no public inputs, outputs, or editable properties.">
       <div class="empty-state">No public controls exposed.</div>
     </PropertyCell>
@@ -573,17 +559,6 @@
   .val {
     width: 100%;
     min-width: 0;
-  }
-
-  .color-swatch {
-    width: 32px;
-    height: 28px;
-    min-width: 32px;
-    border: 1px solid #3B4A53;
-    border-radius: 5px;
-    background: #10161A;
-    padding: 2px;
-    cursor: pointer;
   }
 
   .file-input {

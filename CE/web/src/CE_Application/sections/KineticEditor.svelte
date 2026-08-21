@@ -3,7 +3,11 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import Orbit from 'lucide-svelte/icons/orbit';
+  import Palette from 'lucide-svelte/icons/palette';
+  import LogOut from 'lucide-svelte/icons/log-out';
 
   let { control = null } = $props();
 
@@ -22,13 +26,10 @@
     set('initial', { x: 0.5, y: 0.72, vx: (Math.round(Math.random() * 140) - 70) / 100, vy: Math.round(Math.random() * 60) / 100 });
   }
 
-  // Accent-colour swatches: the picker edits RGB; we preserve each colour's alpha.
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if k}
-  <PropertySection title="Kinetic">
+  <PropertySection title="Kinetic" icon={Orbit}>
     <PropertyCell label="Run" span={1} hint="Integrate the physics in preview / player.">
       <PropertyToggle value={k.running !== false} onchange={() => set('running', !(k.running !== false))} />
     </PropertyCell>
@@ -64,22 +65,18 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
-    <PropertyCell label="Field" span={1} hint="Box background colour.">
-      <input class="cswatch" type="color" value={colRgb(k.fieldColour, 'FF0D0D12')} onchange={(e) => setCol('fieldColour', k.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Ball" span={1} hint="Ball + trail colour.">
-      <input class="cswatch" type="color" value={colRgb(k.ballColour, 'FF39D98A')} onchange={(e) => { setCol('ballColour', k.ballColour, e.target.value); setCol('trailColour', k.trailColour, e.target.value); }} />
-    </PropertyCell>
-    <PropertyCell label="Walls" span={1} hint="Wall colour (stays faint — its transparency is kept).">
-      <input class="cswatch" type="color" value={colRgb(k.wallColour, 'FF2A6BA8')} onchange={(e) => setCol('wallColour', k.wallColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Hint colour.">
-      <input class="cswatch" type="color" value={colRgb(k.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', k.labelColour, e.target.value)} />
+  <PropertySection title="Appearance" icon={Palette}>
+    <PropertyCell label="Colours" span={4} hint="Field background, ball + trail, walls, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'fieldColour', label: 'Field', value: k.fieldColour ?? 'FF0D0D12', target: { type: 'control', controlId: core?.id, path: 'Kinetic.fieldColour' } },
+        { key: 'ballColour', label: 'Ball', value: k.ballColour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => { set('ballColour', hex); set('trailColour', hex); } } },
+        { key: 'wallColour', label: 'Walls', value: k.wallColour ?? 'FF2A6BA8', target: { type: 'control', controlId: core?.id, path: 'Kinetic.wallColour' } },
+        { key: 'labelColour', label: 'Labels', value: k.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Kinetic.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Outputs">
+  <PropertySection title="Outputs" icon={LogOut}>
     <PropertyCell label="" span={4} hint="Ports: X, Y, Speed, and a Bounce gate that pulses on each wall hit. Bind them in Device Bindings.">
       <div class="ports">
         <span class="chip"><i style="background:#39D98A"></i>X</span>
@@ -95,7 +92,6 @@
   .rangewrap { display: flex; align-items: center; gap: 10px; }
   .range { flex: 1 1 auto; accent-color: #39D98A; }
   .lbl { font-size: 11px; color: #B9B9B9; min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .ports { display: flex; gap: 10px; flex-wrap: wrap; }
   .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #C8C8CE; }
   .chip i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }

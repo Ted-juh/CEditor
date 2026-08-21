@@ -3,7 +3,14 @@
   import { matrixRows, matrixCols, matrixAmounts, matrixIndex } from '../utils/matrixLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
+  import LogIn from 'lucide-svelte/icons/log-in';
+  import LogOut from 'lucide-svelte/icons/log-out';
+  import Hash from 'lucide-svelte/icons/hash';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -66,19 +73,10 @@
   }
   function clearAmounts() { set('amounts', amounts.map(() => 0)); }
 
-  function hexToInput(argb) {
-    const s = String(argb ?? '').replace(/^#/, '');
-    return /^[0-9a-fA-F]{8}$/.test(s) ? `#${s.slice(2)}` : (/^[0-9a-fA-F]{6}$/.test(s) ? `#${s}` : '#000000');
-  }
-  function inputToArgb(prev, hex) {
-    const rgb = String(hex ?? '').replace(/^#/, '').toUpperCase();
-    const alpha = /^[0-9a-fA-F]{8}$/.test(String(prev ?? '').replace(/^#/, '')) ? String(prev).replace(/^#/, '').slice(0, 2) : 'FF';
-    return `${alpha}${rgb}`;
-  }
 </script>
 
 {#if m}
-  <PropertySection title="Matrix">
+  <PropertySection title="Matrix" icon={Grid3x3}>
     <PropertyCell label="Cell style" span={2} hint="How each cell shows its amount.">
       <select class="val" value={m.cellStyle ?? 'bar'} onchange={(e) => set('cellStyle', e.target.value)}>
         <option value="bar">Bar</option>
@@ -98,15 +96,18 @@
     <PropertyCell label="Values" span={1} hint="Print the amount in each cell.">
       <PropertyToggle value={m.showValues === true} onchange={() => toggle('showValues')} />
     </PropertyCell>
-    <PropertyCell label="Snap" span={1} hint="Cell amount snap step (0 = free).">
-      <input class="val" type="number" min="0" max="1" step="0.05" value={m.step ?? 0} onchange={(e) => set('step', Math.max(0, Math.min(1, num(e.target.value, 0))))} />
+    <PropertyCell label="Snap" span={1} compact hint="Cell amount snap step (0 = free).">
+      <NumberCell label="Snap" min={0} max={1} step={0.05} value={m.step ?? 0} defaultValue={0} onchange={(v) => set('step', Math.max(0, Math.min(1, v)))} />
     </PropertyCell>
     <PropertyCell label="Clear" span={1} hint="Reset all amounts to zero.">
       <button type="button" class="action-btn" onclick={clearAmounts}>Clear</button>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Sources">
+  <PropertySection title="Sources" icon={LogIn}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add source" onclick={addRow}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Modulation sources — the grid's rows. Each cell is a bindable 'Source → Destination' port.">
       <div class="lst">
         {#each rows as label, i (i)}
@@ -115,12 +116,14 @@
             <button type="button" class="action-btn danger" disabled={rows.length <= 1} onclick={() => removeRow(i)}>✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addRow}>Add source</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Destinations">
+  <PropertySection title="Destinations" icon={LogOut}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add destination" onclick={addCol}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Modulation destinations — the grid's columns.">
       <div class="lst">
         {#each cols as label, i (i)}
@@ -129,12 +132,11 @@
             <button type="button" class="action-btn danger" disabled={cols.length <= 1} onclick={() => removeCol(i)}>✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addCol}>Add destination</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Amounts">
+  <PropertySection title="Amounts" icon={Hash}>
     <PropertyCell label="" span={4} hint="Set routing amounts numerically (or drag cells in preview).">
       <div class="grid" style={`grid-template-columns: 46px repeat(${cols.length}, minmax(0, 1fr));`}>
         <div class="ghdr"></div>
@@ -142,27 +144,25 @@
         {#each rows as rlabel, r (`row${r}`)}
           <div class="ghdr rlab" title={rlabel}>{rlabel}</div>
           {#each cols as _, c (`cell${r}_${c}`)}
-            <input class="val cell" type="number" min={m.bipolar !== false ? -1 : 0} max="1" step="0.05"
-                   value={amounts[matrixIndex(r, c, cols.length)] ?? 0}
-                   onchange={(e) => setAmount(r, c, num(e.target.value, 0))} />
+            <span class="cell nc-wrap">
+              <NumberCell min={m.bipolar !== false ? -1 : 0} max={1} step={0.05}
+                          value={amounts[matrixIndex(r, c, cols.length)] ?? 0} defaultValue={0}
+                          onchange={(v) => setAmount(r, c, v)} />
+            </span>
           {/each}
         {/each}
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Style">
-    <PropertyCell label="Positive" span={2} hint="Colour for positive amounts.">
-      <input class="val color" type="color" value={hexToInput(m.posColour)} onchange={(e) => set('posColour', inputToArgb(m.posColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Negative" span={2} hint="Colour for negative amounts.">
-      <input class="val color" type="color" value={hexToInput(m.negColour)} onchange={(e) => set('negColour', inputToArgb(m.negColour, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Cell bg" span={2} hint="Cell background.">
-      <input class="val color" type="color" value={hexToInput(m.cellBg)} onchange={(e) => set('cellBg', inputToArgb(m.cellBg, e.target.value))} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={2} hint="Label text colour.">
-      <input class="val color" type="color" value={hexToInput(m.labelColour)} onchange={(e) => set('labelColour', inputToArgb(m.labelColour, e.target.value))} />
+  <PropertySection title="Style" icon={Palette}>
+    <PropertyCell label="Colours" span={4} hint="Positive amounts, negative amounts, cell background, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'posColour', label: 'Pos', value: m.posColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'Matrix.posColour' } },
+        { key: 'negColour', label: 'Neg', value: m.negColour ?? 'FFEB5757', target: { type: 'control', controlId: core?.id, path: 'Matrix.negColour' } },
+        { key: 'cellBg', label: 'Cells', value: m.cellBg ?? 'FF161616', target: { type: 'control', controlId: core?.id, path: 'Matrix.cellBg' } },
+        { key: 'labelColour', label: 'Labels', value: m.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Matrix.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 {/if}
@@ -173,14 +173,14 @@
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
   }
   .val:focus { border-color: #5B9BD5; }
-  .val.color { padding: 1px 2px; height: 24px; cursor: pointer; }
   .lst { display: flex; flex-direction: column; gap: 5px; }
   .lrow { display: flex; align-items: center; gap: 5px; }
   .lrow .val { flex: 1 1 auto; }
   .grid { display: grid; gap: 3px; align-items: center; }
   .ghdr { color: #9a9a9a; font-size: 10px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ghdr.rlab { text-align: right; padding-right: 3px; }
-  .cell { padding: 2px 3px; font-size: 11px; text-align: center; }
+  .cell { min-width: 0; }
+  .nc-wrap { display: flex; }
   .action-btn {
     background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD;
     font-size: 11px; padding: 4px 8px; cursor: pointer; align-self: flex-start;
@@ -189,4 +189,10 @@
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:disabled { opacity: 0.35; cursor: default; }
   .action-btn.danger:not(:disabled):hover { border-color: #C96A6A; }
+  .hdr-btn {
+    height: 16px; font-size: 9px; padding: 0 8px; border-radius: 8px;
+    background: #252525; border: 1px solid #333; color: #777;
+    font-family: inherit; cursor: pointer; line-height: 1;
+  }
+  .hdr-btn:hover { border-color: #4A6E8C; color: #CCC; }
 </style>

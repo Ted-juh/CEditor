@@ -23,6 +23,8 @@
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { planSceneryFold, panelAllowsFold, sceneryHoldSet } from '../utils/sceneryModel.js';
   import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
+  import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
+  import { buildSceneryRenderPlan } from '../utils/sceneryRenderPlan.js';
   import SceneryGround from './SceneryGround.svelte';
   import { flatControls } from '../utils/containment.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
@@ -269,23 +271,45 @@
 
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
 
-  let orderedControls = $derived(sortControlsForRender(panel?.controls ?? []));
+  // The panel's own layer order, not one inferred from array position. Inferring it meant
+  // deleting an unrelated control could restack the whole panel — see utils/panelLayers.js.
+  let panelLayers = $derived(normalizePanelLayers(panel?.layers, panel?.controls ?? []));
+  let orderedLayerNames = $derived(layerNames(panelLayers));
+  let hiddenLayers = $derived(new Set(panelLayers.filter((l) => l.visible === false).map((l) => l.name)));
+  let orderedControls = $derived(
+    sortControlsForRender(panel?.controls ?? [], orderedLayerNames)
+      .filter((control) => !hiddenLayers.has(normalizeLayerName(control?._children?.Core?.layer)))
+  );
+  // What to PAINT — same decision the editor surface makes, from the same module, except that here
+  // a scenery layer compiles whether or not it is locked: there is nothing to edit in preview, so
+  // the lock has no meaning and holding the DOM elements open would buy nothing. `orderedControls`
+  // is untouched, because every other thing in this file that reads it is asking about behaviour
+  // rather than about paint.
+  let previewPlan = $derived(buildSceneryRenderPlan(panel, { preview: true }));
 
   /**
-   * Scenery folded out of the render loop.
+   * Scenery folded out of the render loop, for the controls the plan did NOT compile.
    *
-   * Preview is where this is unambiguously safe: a folded control is inert here by definition, and
-   * nothing in preview can select or drag it. The one thing preview does do to a scenery control is
-   * ring it when it is the inspected one, so that control is held live — which is exactly what
-   * keepLive exists for, and cheaper than teaching the ground about a highlight that changes.
+   * The two mechanisms are the same pair the editor surface reconciles: the plan folds a layer its
+   * author declared, this folds what the component model proves inert. A panel that compiled a
+   * layer is left to the plan alone — see PanelSurface.svelte for why folding twice restacks.
+   *
+   * Preview is where the inferred fold is unambiguously safe: a folded control is inert here by
+   * definition, and nothing in preview can select or drag it. The one thing preview does do to a
+   * scenery control is ring it when it is the inspected one, so that control is held live — which
+   * is exactly what sceneryHoldSet exists for, and cheaper than teaching the ground about a
+   * highlight that changes.
    *
    * A panel carrying scripts folds nothing; see panelAllowsFold.
    */
+  let previewPlanControls = $derived(
+    previewPlan.items.filter((item) => item.type === 'control').map((item) => item.control)
+  );
+  let foldEnabled = $derived(previewPlan.scenery.size === 0 && panelAllowsFold(panel));
   let sceneryFold = $derived(
-    panelAllowsFold(panel) ? planSceneryFold(orderedControls) : { ground: [], live: orderedControls },
+    foldEnabled ? planSceneryFold(previewPlanControls) : { ground: [], live: previewPlanControls },
   );
   let groundControls = $derived(sceneryFold.ground);
-  let liveControls = $derived(sceneryFold.live);
 
   // The inspected control is drawn live over the ground so it can carry the inspect ring, which is
   // the one thing preview does to a scenery control that the ground cannot show.
@@ -293,6 +317,21 @@
     groundControls,
     (c) => getControlId(c) === $previewInspectedControlId,
   ));
+
+  // The plan's own items, with the folded ones removed and the held ones moved to the front. Same
+  // shape and the same wrapper-identity contract as the editor surface's foldedItems.
+  let renderItems = $derived.by(() => {
+    if (!foldEnabled || groundControls.length === 0) return previewPlan.items;
+    const folded = new Set(groundControls);
+    const heldControls = new Set(sceneryHeld.held);
+    const held = [];
+    const rest = [];
+    for (const item of previewPlan.items) {
+      if (item.type !== 'control' || !folded.has(item.control)) rest.push(item);
+      else if (heldControls.has(item.control)) held.push(item);
+    }
+    return [...held, ...rest];
+  });
   /**
    * Id -> control, over the WHOLE tree.
    *
@@ -6932,7 +6971,11 @@
     />
   {/if}
 
-  {#each [...sceneryHeld.held, ...liveControls] as control (control._children?.Core?.id)}
+  {#each renderItems as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.control._children?.Core?.id)}
+    {#if item.type === 'scenery'}
+      <img class="scenery-layer" src={item.url} width={panel.width} height={panel.height} alt="" />
+    {:else}
+    {@const control = item.control}
     <CanvasControl
       {control}
       {scale}
@@ -6969,6 +7012,7 @@
         {/each}
       </div>
     {/if}
+    {/if}
   {/each}
 </div>
 
@@ -6991,6 +7035,16 @@
     inset: 0;
     pointer-events: none;
     z-index: 0;
+  }
+
+  /* Compiled scenery. No z-index on purpose: it stacks by document order, at the depth the render
+     plan gave its layer. A number here would flatten every scenery layer into one band. */
+  .scenery-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+    pointer-events: none;
   }
 
   .grid-overlay {

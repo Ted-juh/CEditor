@@ -2,9 +2,12 @@ import { derived, get } from 'svelte/store';
 import { panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, keyObjectId } from './panels.js';
 import { createControl as createControlFromType, getSection, hasSection } from '../models/componentTypes.js';
 import { insertOffset, duplicateOffset } from './runtimePreferences.js';
+import { viewportPanelCenter } from './editorView.js';
+import { recordInsertUse } from './insertRecents.js';
 import { stateEditScope } from './stateEditScope.js';
 import { deepClone } from '../utils/deepClone.js';
 import {
+  collectControlNames,
   collectSubtreeIds,
   controlPanelRect,
   findControlById,
@@ -16,12 +19,14 @@ import {
   remintControlIds,
   removeControlFromTree,
   selectionRoots,
+  uniqueCopyName,
 } from '../utils/containment.js';
 import { instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
 import { isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../utils/selectGroupUtils.js';
 import { deleteNestedValue, setNestedValue, valueAtPath } from './controlTreeUtils.js';
 import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, updatePanelInList } from './panelDocumentHelpers.js';
 import { mutateComponentDocumentControl } from './componentWorkspace.js';
+import { targetLayerName } from './panelLayerActions.js';
 
 // Re-export for convenience
 export { getSection, hasSection };
@@ -150,30 +155,108 @@ export function updateSelectedProperty(path, value) {
 }
 
 /**
- * Add a new control to the active panel.
+ * Where a new control of size w×h should land: centred on the visible part
+ * of the canvas (falling back to the panel centre), clamped inside the panel,
+ * stepped off anything already sitting at that exact spot so repeated inserts
+ * don't stack invisibly. The old behaviour — a blind +offset cascade from the
+ * origin — walked new controls straight off the panel around the 20th insert.
+ */
+function resolveInsertPosition(panel, w, h) {
+  const panelW = panel.width ?? 600;
+  const panelH = panel.height ?? 400;
+  const center = get(viewportPanelCenter);
+  const clampX = (v) => Math.max(0, Math.min(v, Math.max(0, panelW - w)));
+  const clampY = (v) => Math.max(0, Math.min(v, Math.max(0, panelH - h)));
+  let x = clampX(Math.round((center?.x ?? panelW / 2) - w / 2));
+  let y = clampY(Math.round((center?.y ?? panelH / 2) - h / 2));
+
+  const occupiedAt = (px, py) => panel.controls.some((c) => {
+    const t = c._children?.Transform;
+    return t && Math.abs(t.x - px) < 2 && Math.abs(t.y - py) < 2;
+  });
+  const step = Math.max(4, get(insertOffset) || 16);
+  for (let i = 0; i < 20 && occupiedAt(x, y); i++) {
+    const nx = clampX(x + step);
+    const ny = clampY(y + step);
+    if (nx === x && ny === y) break;
+    x = nx;
+    y = ny;
+  }
+  return { x, y };
+}
+
+/** Exactly one selected container → new controls insert into it. */
+function selectedContainerParentId(panel) {
+  const sel = get(selectedComponentIds);
+  if (sel.size !== 1) return null;
+  const selId = [...sel][0];
+  const selected = findControlById(panel.controls, selId);
+  return selected && isContainerControl(selected) ? selId : null;
+}
+
+/**
+ * Add a new control to the active panel — centred in the current view (or on
+ * an explicit drop point), and into the selected container when there is one.
  * @param {string} type - Component type (e.g., 'Background', 'Label', 'Button')
  * @param {object} overrides - Optional per-section property overrides
+ * @param {object} options - { at: {x, y} } — panel-space point to centre the
+ *   new control on (drag-and-drop from the Insert panel); skips the stagger
+ *   and the selected-container targeting, the drop point is the intent.
  * @returns {object|null} The created control, or null if no panel is active
  */
-export function addControl(type, overrides = {}) {
+export function addControl(type, overrides = {}, { at = null } = {}) {
   const panelId = get(resolvedActivePanelId);
   if (panelId == null) return null;
 
-  // Stagger position so new controls don't stack at 0,0
   const panel = get(panels).find(p => p.id === panelId);
-  if (panel && !overrides.Transform) {
-    const baseOffset = get(insertOffset);
-    const offset = panel.controls.length * baseOffset;
-    overrides = { ...overrides, Transform: { x: baseOffset + offset, y: baseOffset + offset } };
+  // Land on the layer the dock is pointing at. Without this every control lands on Main and working
+  // on any other layer means drawing, selecting, and re-assigning by hand — one at a time. An
+  // explicit Core.layer in `overrides` still wins: a caller that named a layer meant it.
+  // (The old length-based insert stagger is gone — resolveInsertPosition below places controls.)
+  if (overrides.Core?.layer == null) {
+    overrides = { ...overrides, Core: { ...(overrides.Core ?? {}), layer: targetLayerName() } };
   }
 
   const control = createControlFromType(type, overrides);
   const id = control._children.Core.id;
 
+  let parentId = null;
+  if (panel && !overrides.Transform && control._children.Transform) {
+    const t = control._children.Transform;
+    const w = t.width ?? 100;
+    const h = t.height ?? 40;
+
+    if (at) {
+      const panelW = panel.width ?? 600;
+      const panelH = panel.height ?? 400;
+      t.x = Math.max(0, Math.min(Math.round(at.x - w / 2), Math.max(0, panelW - w)));
+      t.y = Math.max(0, Math.min(Math.round(at.y - h / 2), Math.max(0, panelH - h)));
+    } else {
+      const pos = resolveInsertPosition(panel, w, h);
+
+      parentId = selectedContainerParentId(panel);
+      if (parentId) {
+        const parent = findControlById(panel.controls, parentId);
+        const parentW = parent?._children?.Transform?.width ?? w;
+        const parentH = parent?._children?.Transform?.height ?? h;
+        const local = panelToLocalPoint(panel.controls, parentId, pos.x, pos.y);
+        t.x = Math.max(0, Math.min(Math.round(local.x), Math.max(0, parentW - w)));
+        t.y = Math.max(0, Math.min(Math.round(local.y), Math.max(0, parentH - h)));
+      } else {
+        t.x = pos.x;
+        t.y = pos.y;
+      }
+    }
+  }
+  recordInsertUse(type);
+
   panels.update(list =>
     list.map(p => {
       if (p.id !== panelId) return p;
-      return { ...p, controls: [...p.controls, control], modified: true };
+      const controls = parentId
+        ? insertControlIntoTree(p.controls, parentId, control)
+        : [...p.controls, control];
+      return { ...p, controls, modified: true };
     })
   );
 
@@ -190,9 +273,9 @@ export function addCustomComponentPackage(value, overrides = {}) {
   const nextId = `ctrl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   let transformOverrides = overrides.Transform ?? overrides.transform ?? null;
   if (panel && !transformOverrides) {
-    const baseOffset = get(insertOffset);
-    const offset = panel.controls.length * baseOffset;
-    transformOverrides = { x: baseOffset + offset, y: baseOffset + offset };
+    // The package's own size isn't known until instantiation — assume a
+    // typical footprint for centring; the clamp keeps it on the panel.
+    transformOverrides = resolveInsertPosition(panel, 120, 120);
   }
 
   const control = instantiateCustomComponentPackageControl(value, {
@@ -202,6 +285,10 @@ export function addCustomComponentPackage(value, overrides = {}) {
   });
   if (!control?._children?.Core?.id) return null;
   const id = control._children.Core.id;
+  // Same rule as addControl: a component dropped from the library lands on the layer being worked
+  // on, not always on Main. The instantiated control always carries Core.layer (it is a section
+  // default), so the test is on what the CALLER asked for, not on what came out.
+  if (overrides.Core?.layer == null) control._children.Core.layer = targetLayerName();
 
   panels.update(list =>
     list.map(p => {
@@ -272,14 +359,17 @@ export function duplicateControl(ids) {
   // container — the descendant rides along in the subtree copy.
   const rootIds = selectionRoots(panel.controls, idList);
 
+  const existingNames = collectControlNames(panel.controls);
   const clones = [];
   for (const id of rootIds) {
     const source = findControlById(panel.controls, id);
     if (!source) continue;
 
-    // Fresh ids for the control and every descendant
+    // Fresh ids for the control and every descendant; a unique name for the
+    // root (names are script handles — same rule as paste).
     const clone = remintControlIds(source);
-    clone._children.Core.name = `${clone._children.Core.name}_copy`;
+    clone._children.Core.name = uniqueCopyName(existingNames, clone._children.Core.name);
+    existingNames.add(clone._children.Core.name);
 
     if (clone._children.Transform) {
       const offset = get(duplicateOffset);
@@ -311,6 +401,52 @@ export function duplicateControl(ids) {
   // Select all duplicated controls
   const newIds = new Set(clones.map(({ clone }) => clone._children.Core.id));
   selectedComponentIds.set(newIds);
+
+  return clones.map(({ clone }) => clone);
+}
+
+/**
+ * Duplicate controls at their exact positions, leaving the selection alone.
+ * Backs the Alt+drag gesture: the dragged originals move on, and these clones
+ * stay behind where the gesture started.
+ * @param {string|string[]|Set<string>} ids
+ * @returns {object[]|null} The clones, or null
+ */
+export function duplicateControlsInPlace(ids) {
+  const panelId = get(resolvedActivePanelId);
+  if (panelId == null) return null;
+
+  const idList = typeof ids === 'string' ? [ids] : [...ids];
+  const panel = get(panels).find(p => p.id === panelId);
+  if (!panel) return null;
+
+  const rootIds = selectionRoots(panel.controls, idList);
+  const existingNames = collectControlNames(panel.controls);
+  const clones = [];
+  for (const id of rootIds) {
+    const source = findControlById(panel.controls, id);
+    if (!source) continue;
+    const clone = remintControlIds(source);
+    clone._children.Core.name = uniqueCopyName(existingNames, clone._children.Core.name);
+    existingNames.add(clone._children.Core.name);
+    if (isExclusiveSelectBehavior(clone?._children?.Behavior) && clone._children.Behavior.defaultValue === true) {
+      clone._children.Behavior.defaultValue = false;
+    }
+    const parent = findParentOfControl(panel.controls, id);
+    clones.push({ clone, parentId: parent?._children?.Core?.id ?? null });
+  }
+  if (clones.length === 0) return null;
+
+  panels.update(list =>
+    list.map(p => {
+      if (p.id !== panelId) return p;
+      let controls = p.controls;
+      for (const { clone, parentId } of clones) {
+        controls = insertControlIntoTree(controls, parentId, clone);
+      }
+      return { ...p, controls, modified: true };
+    })
+  );
 
   return clones.map(({ clone }) => clone);
 }
@@ -597,8 +733,15 @@ export function groupSelectionIntoContainer(padding = 12) {
   const maxX = Math.max(...rects.map(({ rect }) => rect.x + rect.w)) + padding;
   const maxY = Math.max(...rects.map(({ rect }) => rect.y + rect.h)) + padding;
 
+  // The container's layer governs the whole subtree — children render inside it, not by their own
+  // layer — so a container built from controls that all share a layer has to join them. Landing on
+  // Main instead moved the group to a different paint band, and nothing about the action said so.
+  const memberLayers = new Set(rects
+    .map(({ id }) => findControlById(panel.controls, id)?._children?.Core?.layer)
+    .filter((name) => typeof name === 'string' && name));
   const container = createControlFromType('Container', {
     Transform: { x: Math.round(minX), y: Math.round(minY), width: Math.round(maxX - minX), height: Math.round(maxY - minY) },
+    ...(memberLayers.size === 1 ? { Core: { layer: [...memberLayers][0] } } : {}),
   });
   const containerId = container._children.Core.id;
 

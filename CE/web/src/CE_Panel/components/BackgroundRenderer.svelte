@@ -1,14 +1,19 @@
 <script>
   import { gradientToCSS } from '../../CE_Application/utils/gradientCSS.js';
-  import { buildLayerStyle } from '../../CE_Application/utils/backgroundCSS.js';
   import { normalizeCorner } from '../../CE_Application/utils/cornerNormalization.js';
-  import { buildFillClipPath, buildInsetFillClipPath } from '../../CE_Application/utils/cornerPaths.js';
+  import { buildInsetFillClipPath } from '../../CE_Application/utils/cornerPaths.js';
   import { gradientCoords } from '../../CE_Application/utils/gradientGeometry.js';
   import { buildBorderSegments, getDoubleGap } from '../../CE_Application/utils/borderSegments.js';
+  import { plainBorderCSS } from '../../CE_Application/utils/plainBorderCSS.js';
   import { fileCache, loadFile } from '../../CE_Application/stores/fileCache.js';
   import { resolveStroke } from '../../CE_Application/utils/strokeResolver.js';
+  import { fillShapeCSS, imageLayerStyle } from '../../CE_Application/utils/plainFillCSS.js';
 
-  let { background = null, width = 0, height = 0 } = $props();
+  // `absorbFill` — the caller has already painted this fill as `background` on an element it was
+  // going to render anyway (utils/plainFillCSS.js), so drawing it here as well would double it.
+  // Only ever passed true when plainFillCSS returned a style, and that only happens when exactly
+  // one layer is visible — which is why this drops the whole loop rather than skipping one entry.
+  let { background = null, width = 0, height = 0, absorbFill = false } = $props();
 
   let fill = $derived(background?._children?.Fill);
   let border = $derived(background?._children?.Border);
@@ -62,32 +67,9 @@
     return `background: #${hex.slice(-6)}; mix-blend-mode: ${blend};`;
   }
 
-  function buildImageFillStyle(layerId, src) {
-    const isImage = layerId === 'image';
-    const pseudoPanel = {
-      width,
-      height,
-      [`bg${isImage ? 'Image' : 'Texture'}Enabled`]: true,
-      [`bg${isImage ? 'Image' : 'Texture'}`]: src,
-      [`bg${isImage ? 'Image' : 'Texture'}Fit`]: fill?.[`${isImage ? 'image' : 'overlay'}Fit`] ?? (isImage ? 'fill' : 'tile'),
-      [`bg${isImage ? 'Image' : 'Texture'}Align`]: fill?.[`${isImage ? 'image' : 'overlay'}Align`] ?? 'center',
-      [`bg${isImage ? 'Image' : 'Texture'}OffsetX`]: fill?.[`${isImage ? 'image' : 'overlay'}OffsetX`] ?? 0,
-      [`bg${isImage ? 'Image' : 'Texture'}OffsetY`]: fill?.[`${isImage ? 'image' : 'overlay'}OffsetY`] ?? 0,
-      [`bg${isImage ? 'Image' : 'Texture'}Blend`]: fill?.[`${isImage ? 'image' : 'overlay'}Blend`] ?? 'normal',
-      [`bg${isImage ? 'Image' : 'Texture'}Opacity`]: fill?.[`${isImage ? 'image' : 'overlay'}Opacity`] ?? 100,
-      [`bg${isImage ? 'Image' : 'Texture'}Blur`]: fill?.[`${isImage ? 'image' : 'overlay'}Blur`] ?? 0,
-      [`bg${isImage ? 'Image' : 'Texture'}Tint`]: fill?.[`${isImage ? 'image' : 'overlay'}Tint`] ?? 'FFFFFF',
-      [`bg${isImage ? 'Image' : 'Texture'}FlipH`]: fill?.[`${isImage ? 'image' : 'overlay'}FlipH`] ?? false,
-      [`bg${isImage ? 'Image' : 'Texture'}FlipV`]: fill?.[`${isImage ? 'image' : 'overlay'}FlipV`] ?? false,
-      [`bg${isImage ? 'Image' : 'Texture'}Rotation`]: fill?.[`${isImage ? 'image' : 'overlay'}Rotation`] ?? 0,
-      [`bg${isImage ? 'Image' : 'Texture'}Grayscale`]: fill?.[`${isImage ? 'image' : 'overlay'}Grayscale`] ?? false,
-      [`bg${isImage ? 'Image' : 'Texture'}Saturation`]: fill?.[`${isImage ? 'image' : 'overlay'}Saturation`] ?? 100,
-      [`bg${isImage ? 'Image' : 'Texture'}Brightness`]: fill?.[`${isImage ? 'image' : 'overlay'}Brightness`] ?? 100,
-      [`bg${isImage ? 'Image' : 'Texture'}Contrast`]: fill?.[`${isImage ? 'image' : 'overlay'}Contrast`] ?? 100,
-      [`bg${isImage ? 'Image' : 'Texture'}TileScale`]: fill?.[`${isImage ? 'image' : 'overlay'}TileScale`] ?? 1.0,
-    };
-    return buildLayerStyle(pseudoPanel, isImage ? 'Image' : 'Texture', src);
-  }
+  // The pseudo-panel translation lives in utils/plainFillCSS.js so the layered path and the
+  // absorbed one build the same style from the same fields — see fillShapeCSS for the same reason.
+  const buildImageFillStyle = (layerId, src) => imageLayerStyle(fill, layerId, src, width, height);
 
   function resolvedFillSource(src) {
     if (!src) return null;
@@ -137,22 +119,13 @@
     }
   });
 
-  let fillCornerCSS = $derived.by(() => {
-    if (!corners || width <= 0 || height <= 0) return '';
-    const tl = getCornerNorm('tl'), tr = getCornerNorm('tr'), br = getCornerNorm('br'), bl = getCornerNorm('bl');
-    const anyClip = [tl, tr, br, bl].some(c => {
-      if (c.radius <= 0) return false;
-      return c.style === 'chamfer' || c.style === 'notch' || (c.style === 'rounded' && c.direction === 'inward');
-    });
-    if (anyClip) return buildFillClipPath({ tl, tr, br, bl }, width, height);
-    const r = (c) => (c.radius > 0 && c.style === 'rounded' && c.direction !== 'inward') ? c.radius : 0;
-    const tlR = r(tl), trR = r(tr), brR = r(br), blR = r(bl);
-    if (tlR === 0 && trR === 0 && brR === 0 && blR === 0) return '';
-    return `border-radius: ${tlR}px ${trR}px ${brR}px ${blR}px;`;
-  });
+  // Shared with the absorbed path rather than kept local, so a fill painted on a wrapper and one
+  // drawn as a layer are shaped by the same function instead of by two meant to agree.
+  let fillCornerCSS = $derived(fillShapeCSS(corners, width, height));
 
   let fillLayerStyles = $derived.by(() => {
     const styles = {};
+    if (absorbFill) return styles;
     for (const layerId of fillLayerOrder()) {
       let layerStyle = null;
       if (layerId === 'solid' && fillLayerVisible('solid') && fill?.colour) {
@@ -172,21 +145,36 @@
     return styles;
   });
 
+  // Only the layers that actually draw something, in paint order.
+  //
+  // The template used to walk all four layer slots and put an `{#if}` inside the loop, which meant
+  // a control with one solid fill — or none at all, because the caller absorbed it onto its own
+  // wrapper — still cost an each-block, four keyed items and four branch effects. Measured across
+  // the GAIA panel: 826 BackgroundRenderer instances at nine effects each, ~7,400 effects to draw
+  // nothing. Filtering here leaves one effect per layer that exists, and one for the loop.
+  let visibleFillLayers = $derived(fillLayerOrder().filter((layerId) => fillLayerStyles[layerId]));
+
   // ============ BORDER (SVG) ============
 
   let hasBorder = $derived(border?.enabled && width > 0 && height > 0);
 
+  // A uniform solid outline is one CSS declaration on one div. The eleven-element segment path
+  // below exists for the borders that genuinely need it — per-side, dashed, gradient-filled,
+  // chamfered, double — and this short-circuits the overwhelming majority that do not. See
+  // utils/plainBorderCSS.js for why the two draw the identical band of pixels.
+  let cssBorder = $derived(hasBorder ? plainBorderCSS(border, corners, width, height) : null);
+
   // ============ BUILD SEGMENTS ============
 
   let outerSegments = $derived.by(() =>
-    hasBorder
+    hasBorder && !cssBorder
       ? buildBorderSegments(width, height, border, corners).map((seg, idx) => ({ ...seg, _ring: 'outer', _flowId: `outer-${idx}` }))
       : []
   );
 
   // Inner border segments for double (same border, smaller box, translated)
   let innerSegments = $derived.by(() => {
-    if (!hasBorder) return [];
+    if (!hasBorder || cssBorder) return [];
     const gap = getDoubleGap(border);
     if (gap <= 0) return [];
     const innerW = width - 2 * gap;
@@ -596,12 +584,15 @@
 
 </script>
 
-<!-- Fill -->
-{#each fillLayerOrder() as layerId (layerId)}
-  {#if fillLayerStyles[layerId]}
-    <div class="bg-fill-layer" style={fillLayerStyles[layerId]}></div>
-  {/if}
+<!-- Fill. Only the layers that draw — see `visibleFillLayers`. -->
+{#each visibleFillLayers as layerId (layerId)}
+  <div class="bg-fill-layer" style={fillLayerStyles[layerId]}></div>
 {/each}
+
+<!-- Border (CSS) — the plain case, one element instead of eleven -->
+{#if cssBorder}
+  <div class="bg-border-css" style={cssBorder}></div>
+{/if}
 
 <!-- Border (SVG) -->
 {#if hasBorder && (outerSegments.length > 0 || innerSegments.length > 0)}

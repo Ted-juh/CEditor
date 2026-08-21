@@ -1,0 +1,24 @@
+# Line endings.
+#
+# Several gates assert that a committed file is byte-identical to what its generator produces —
+# the GAIA panel and profile, the three QA sheets, the visual goldens. Generators write LF. Git on
+# Windows checks a text file out as CRLF by default, so on a Windows clone every one of those gates
+# failed with a diff in which actual and expected were otherwise identical.
+#
+# The tests fold CRLF themselves (CE/web/test/support/readText.mjs) so a clone made before this
+# file existed still passes. This keeps the working tree LF so the two never drift apart again, and
+# so regenerating on Windows produces no phantom whole-file diff.
+
+* text=auto eol=lf
+
+# Generated artefacts and goldens: never touched by hand, compared byte for byte.
+*.cepanel                     text eol=lf
+*.ceditor-device.json         text eol=lf
+CE/web/test/golden/*.txt      text eol=lf
+
+# Binaries, so nothing tries to normalize them.
+*.png    binary
+*.jpg    binary
+*.ico    binary
+*.wasm   binary
+*.exe    binary

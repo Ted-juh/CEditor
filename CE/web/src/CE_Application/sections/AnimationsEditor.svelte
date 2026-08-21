@@ -4,8 +4,12 @@
   import { setDebugDock } from '../stores/debugDock.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
-  import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import Play from 'lucide-svelte/icons/play';
+  import Target from 'lucide-svelte/icons/target';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Zap from 'lucide-svelte/icons/zap';
 
   let { control = null } = $props();
 
@@ -193,7 +197,7 @@
 {#if multiEdit}
   <div class="placeholder">Animation editing is single-selection only right now.</div>
 {:else if animations}
-  <PropertySection title="Animation List">
+  <PropertySection title="Animation List" icon={Play}>
     <PropertyCell label="Add" span={3} hint="Create a new animation node.">
       <input class="val" type="text" bind:value={newAnimationName} placeholder="Animation name" />
     </PropertyCell>
@@ -214,7 +218,7 @@
 
   {#if selectedAnimation}
     {#if partNames.length}
-      <PropertySection title="Target">
+      <PropertySection title="Target" icon={Target}>
         <PropertyCell label="Part" span={2} hint="Layer/part this animation target should affect.">
           <select class="val" bind:value={targetPart}>
             {#each partNames as name}
@@ -249,18 +253,21 @@
       </PropertySection>
     {/if}
 
-    <PropertySection title="Animation">
-      <PropertyCell label="Enabled" span={1} hint="Enable or disable this animation.">
-        <PropertyToggle value={selectedAnimation.enabled !== false} onchange={() => setAnimationProp('enabled', !(selectedAnimation.enabled !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Kind" span={1} hint="Animation family. Transition is the only runtime kind in this slice.">
+    <PropertySection title="Animation" icon={Pencil}>
+      {#snippet tools()}
+        <HeaderPill value={selectedAnimation.enabled !== false}
+                    title="Enable or disable this animation."
+                    onchange={() => setAnimationProp('enabled', !(selectedAnimation.enabled !== false))} />
+      {/snippet}
+      {#if selectedAnimation.enabled !== false}
+      <PropertyCell label="Kind" span={2} hint="Animation family. Transition is the only runtime kind in this slice.">
         <input class="val" type="text" value={selectedAnimation.kind ?? 'transition'} onchange={(e) => setAnimationProp('kind', e.target.value)} />
       </PropertyCell>
-      <PropertyCell label="Duration" span={1} hint="Transition duration in milliseconds.">
-        <NumberInput value={selectedAnimation.duration ?? 120} step={1} min={0} onchange={(value) => setAnimationProp('duration', value)} />
+      <PropertyCell label="Duration" span={1} compact hint="Transition duration in milliseconds.">
+        <NumberCell label="Dur" value={selectedAnimation.duration ?? 120} step={1} min={0} defaultValue={120} onchange={(value) => setAnimationProp('duration', value)} />
       </PropertyCell>
-      <PropertyCell label="Delay" span={1} hint="Transition delay in milliseconds.">
-        <NumberInput value={selectedAnimation.delay ?? 0} step={1} min={0} onchange={(value) => setAnimationProp('delay', value)} />
+      <PropertyCell label="Delay" span={1} compact hint="Transition delay in milliseconds.">
+        <NumberCell label="Delay" value={selectedAnimation.delay ?? 0} step={1} min={0} defaultValue={0} onchange={(value) => setAnimationProp('delay', value)} />
       </PropertyCell>
       <PropertyCell label="Easing" span={2} hint="Named easing curve, mapped to a CSS timing function.">
         <select class="val" value={selectedAnimation.easing ?? 'outQuad'} onchange={(e) => setAnimationProp('easing', e.target.value)}>
@@ -276,10 +283,11 @@
           {/each}
         </select>
       </PropertyCell>
+      {/if}
     </PropertySection>
 
     {#if selectedAnimation.trigger?.type === 'stateChange'}
-      <PropertySection title="State Trigger">
+      <PropertySection title="State Trigger" icon={Zap}>
         <PropertyCell label="From" span={2} hint="Comma-separated previous states. Use * to match any state set.">
           <input class="val" type="text" value={(selectedAnimation.trigger?.from ?? []).join(', ')} onchange={(e) => handleTriggerList('from', e.target.value)} />
         </PropertyCell>
@@ -288,14 +296,14 @@
         </PropertyCell>
       </PropertySection>
     {:else}
-      <PropertySection title="Value Trigger">
+      <PropertySection title="Value Trigger" icon={Zap}>
         <PropertyCell label="Source" span={4} hint="Value source that should be smoothed by this transition.">
           <input class="val" type="text" value={selectedAnimation.trigger?.source ?? 'value.normalized'} onchange={(e) => setAnimationProp('trigger.source', e.target.value)} />
         </PropertyCell>
       </PropertySection>
     {/if}
 
-    <PropertySection title="Targets">
+    <PropertySection title="Targets" icon={Target}>
       <PropertyCell label="Targets" span={4} hint="JSON array of target descriptors. Each item can provide a path and optional property hints.">
         <textarea class="val code" rows="12" bind:value={targetsDraft} onblur={commitTargets}></textarea>
       </PropertyCell>

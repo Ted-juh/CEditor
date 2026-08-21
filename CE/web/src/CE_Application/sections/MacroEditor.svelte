@@ -2,6 +2,7 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { macroSlots, macroValue } from '../utils/macroLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
@@ -32,8 +33,8 @@
 
 {#if m}
   <PropertySection title="Macro">
-    <PropertyCell label="Position" span={2} hint="Knob value (0–1). Drag the knob in preview.">
-      <input class="val" type="number" min="0" max="1" step="0.01" value={m.value ?? 0.5} onchange={(e) => set('value', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} />
+    <PropertyCell label="Position" span={2} compact hint="Knob value (0–1). Drag the knob in preview.">
+      <NumberCell label="Pos" value={m.value ?? 0.5} min={0} max={1} step={0.01} defaultValue={0.5} onchange={(v) => set('value', Math.max(0, Math.min(1, num(v, 0.5))))} />
     </PropertyCell>
     <PropertyCell label="Editable" span={1} hint="Turn the knob in preview.">
       <PropertyToggle value={m.editable !== false} onchange={() => set('editable', !(m.editable !== false))} />
@@ -51,11 +52,11 @@
       <PropertyToggle value={m.showDivisions === true} onchange={() => set('showDivisions', !(m.showDivisions === true))} />
     </PropertyCell>
     {#if m.showDivisions === true}
-      <PropertyCell label="Major" span={1} hint="Major tick count (same as a slider's Major Count).">
-        <input class="val" type="number" min="2" max="21" step="1" value={m.majorTickCount ?? 5} onchange={(e) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(e.target.value, 5)))))} />
+      <PropertyCell label="Major" span={1} compact hint="Major tick count (same as a slider's Major Count).">
+        <NumberCell label="Major" value={m.majorTickCount ?? 5} min={2} max={21} step={1} defaultValue={5} onchange={(v) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(v, 5)))))} />
       </PropertyCell>
-      <PropertyCell label="Minor / gap" span={1} hint="Minor ticks between each pair of majors (same as a slider's Minor / Gap).">
-        <input class="val" type="number" min="0" max="8" step="1" value={m.minorTickCount ?? 0} onchange={(e) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(e.target.value, 0)))))} />
+      <PropertyCell label="Minor / gap" span={1} compact hint="Minor ticks between each pair of majors (same as a slider's Minor / Gap).">
+        <NumberCell label="Minor" value={m.minorTickCount ?? 0} min={0} max={8} step={1} defaultValue={0} onchange={(v) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(v, 0)))))} />
       </PropertyCell>
     {/if}
   </PropertySection>
@@ -75,7 +76,7 @@
             </div>
             <div class="srow2">
               <label class="fld"><span>Depth</span>
-                <input class="val" type="number" min="-100" max="100" step="5" value={depthPct(s)} onchange={(e) => updateSlot(i, 'depth', Math.max(-1, Math.min(1, num(e.target.value, 100) / 100)))} />
+                <NumberCell value={depthPct(s)} min={-100} max={100} step={5} onchange={(v) => updateSlot(i, 'depth', Math.max(-1, Math.min(1, num(v, 100) / 100)))} />
               </label>
               <label class="fld"><span>Curve</span>
                 <select class="val" value={s.curve ?? 'linear'} onchange={(e) => updateSlot(i, 'curve', e.target.value)}>
@@ -86,10 +87,10 @@
                 </select>
               </label>
               <label class="fld"><span>Min</span>
-                <input class="val" type="number" min="0" max="1" step="0.05" value={s.min ?? 0} onchange={(e) => updateSlot(i, 'min', Math.max(0, Math.min(1, num(e.target.value, 0))))} />
+                <NumberCell value={s.min ?? 0} min={0} max={1} step={0.05} defaultValue={0} onchange={(v) => updateSlot(i, 'min', Math.max(0, Math.min(1, num(v, 0))))} />
               </label>
               <label class="fld"><span>Max</span>
-                <input class="val" type="number" min="0" max="1" step="0.05" value={s.max ?? 1} onchange={(e) => updateSlot(i, 'max', Math.max(0, Math.min(1, num(e.target.value, 1))))} />
+                <NumberCell value={s.max ?? 1} min={0} max={1} step={0.05} defaultValue={1} onchange={(v) => updateSlot(i, 'max', Math.max(0, Math.min(1, num(v, 1))))} />
               </label>
             </div>
           </div>

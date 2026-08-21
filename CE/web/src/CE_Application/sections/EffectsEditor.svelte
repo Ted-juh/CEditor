@@ -4,7 +4,15 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Copy from 'lucide-svelte/icons/copy';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Haze from 'lucide-svelte/icons/haze';
+  import WandSparkles from 'lucide-svelte/icons/wand-sparkles';
+  import Box from 'lucide-svelte/icons/box';
+  import Type from 'lucide-svelte/icons/type';
+  import ImageIcon from 'lucide-svelte/icons/image';
 
   let { control = null } = $props();
 
@@ -34,7 +42,7 @@
 </script>
 
 {#if effects}
-  <PropertySection title="Effects Target">
+  <PropertySection title="Effects Target" icon={WandSparkles}>
     <PropertyCell label="Target" span={4} hint="Centralized effects editing for component, text, and icon.">
       <div class="target-row">
         {#each TARGETS as target}
@@ -47,18 +55,18 @@
   </PropertySection>
 
   {#if selectedTarget === 'component'}
-    <PropertySection title="Component Effects">
+    <PropertySection title="Component Effects" icon={Box}>
       <PropertyCell label="Shadow" span={1} hint="Enable the first component drop shadow.">
         <PropertyToggle
           value={effects?._children?.Shadows?.items?.[0]?.enabled === true}
           onchange={() => set('Effects.Shadows.items.0.enabled', !(effects?._children?.Shadows?.items?.[0]?.enabled === true))}
         />
       </PropertyCell>
-      <PropertyCell label="Blur" span={1} hint="Overall component blur.">
-        <NumberInput value={effects?._children?.Filters?.blur ?? 0} step={0.5} min={0} onchange={(value) => set('Effects.Filters.blur', value)} />
+      <PropertyCell label="Blur" span={1} compact hint="Overall component blur.">
+        <NumberCell label="Blur" value={effects?._children?.Filters?.blur ?? 0} step={0.5} min={0} defaultValue={0} onchange={(value) => set('Effects.Filters.blur', value)} />
       </PropertyCell>
-      <PropertyCell label="Bright" span={1} hint="Overall component brightness.">
-        <NumberInput value={effects?._children?.Filters?.brightness ?? 100} step={1} min={0} onchange={(value) => set('Effects.Filters.brightness', value)} />
+      <PropertyCell label="Bright" span={1} compact hint="Overall component brightness.">
+        <NumberCell label="Bright" value={effects?._children?.Filters?.brightness ?? 100} step={1} min={0} defaultValue={100} onchange={(value) => set('Effects.Filters.brightness', value)} />
       </PropertyCell>
       <PropertyCell label="Blend" span={1} hint="Blend mode for the component.">
         <select class="val" value={effects?._children?.Blend?.mode ?? 'normal'} onchange={(event) => set('Effects.Blend.mode', event.target.value)}>
@@ -69,54 +77,56 @@
       </PropertyCell>
     </PropertySection>
   {:else if selectedTarget === 'text' && textEffects}
-    <PropertySection title="Text Effects">
-      <PropertyCell label="Shadow" span={1} hint="Enable text shadow.">
-        <PropertyToggle value={textEffects.shadowEnabled === true} onchange={() => set('Text.Effects.shadowEnabled', !(textEffects.shadowEnabled === true))} />
+    <PropertySection title="Text Effects" icon={Type}>
+      <PropertyCell label="Enable" span={2} hint="Text shadow, glow, blur. Hover a chip for its name.">
+        <FlagStrip
+          flags={[
+            { key: 'Text.Effects.shadowEnabled', title: 'Shadow — enable text shadow', on: textEffects.shadowEnabled === true, icon: Copy },
+            { key: 'Text.Effects.glowEnabled', title: 'Glow — enable text glow', on: textEffects.glowEnabled === true, icon: Sparkles },
+            { key: 'Text.Effects.blurEnabled', title: 'Blur — enable text blur', on: textEffects.blurEnabled === true, icon: Haze },
+          ]}
+          ontoggle={(key, next) => set(key, next)}
+        />
       </PropertyCell>
-      <PropertyCell label="Glow" span={1} hint="Enable text glow.">
-        <PropertyToggle value={textEffects.glowEnabled === true} onchange={() => set('Text.Effects.glowEnabled', !(textEffects.glowEnabled === true))} />
+      <PropertyCell label="Blur Amt" span={1} compact hint="Text blur amount.">
+        <NumberCell label="Amt" value={textEffects.blurAmount ?? 1} step={0.5} min={0} defaultValue={1} onchange={(value) => set('Text.Effects.blurAmount', value)} />
       </PropertyCell>
-      <PropertyCell label="Blur" span={1} hint="Enable text blur.">
-        <PropertyToggle value={textEffects.blurEnabled === true} onchange={() => set('Text.Effects.blurEnabled', !(textEffects.blurEnabled === true))} />
+      <PropertyCell label="Shadow X" span={1} compact hint="Text shadow horizontal offset.">
+        <NumberCell label="X" value={textEffects.shadowOffsetX ?? 1} step={1} defaultValue={1} onchange={(value) => set('Text.Effects.shadowOffsetX', value)} />
       </PropertyCell>
-      <PropertyCell label="Blur Amt" span={1} hint="Text blur amount.">
-        <NumberInput value={textEffects.blurAmount ?? 1} step={0.5} min={0} onchange={(value) => set('Text.Effects.blurAmount', value)} />
+      <PropertyCell label="Shadow Y" span={1} compact hint="Text shadow vertical offset.">
+        <NumberCell label="Y" value={textEffects.shadowOffsetY ?? 1} step={1} defaultValue={1} onchange={(value) => set('Text.Effects.shadowOffsetY', value)} />
       </PropertyCell>
-      <PropertyCell label="Shadow X" span={1} hint="Text shadow horizontal offset.">
-        <NumberInput value={textEffects.shadowOffsetX ?? 1} step={1} onchange={(value) => set('Text.Effects.shadowOffsetX', value)} />
-      </PropertyCell>
-      <PropertyCell label="Shadow Y" span={1} hint="Text shadow vertical offset.">
-        <NumberInput value={textEffects.shadowOffsetY ?? 1} step={1} onchange={(value) => set('Text.Effects.shadowOffsetY', value)} />
-      </PropertyCell>
-      <PropertyCell label="Glow Size" span={1} hint="Text glow size.">
-        <NumberInput value={textEffects.glowSize ?? 4} step={0.5} min={0} onchange={(value) => set('Text.Effects.glowSize', value)} />
+      <PropertyCell label="Glow Size" span={2} compact hint="Text glow size.">
+        <NumberCell label="Size" value={textEffects.glowSize ?? 4} step={0.5} min={0} defaultValue={4} onchange={(value) => set('Text.Effects.glowSize', value)} />
       </PropertyCell>
       <PropertyCell label="Outline" span={1} hint="Enable text outline.">
         <PropertyToggle value={textEffects.outlineEnabled === true} onchange={() => set('Text.Effects.outlineEnabled', !(textEffects.outlineEnabled === true))} />
       </PropertyCell>
     </PropertySection>
   {:else if selectedTarget === 'icon' && iconEffects}
-    <PropertySection title="Icon Effects">
-      <PropertyCell label="Shadow" span={1} hint="Enable icon drop shadow.">
-        <PropertyToggle value={iconEffects.shadowEnabled === true} onchange={() => set('Icon.Effects.shadowEnabled', !(iconEffects.shadowEnabled === true))} />
+    <PropertySection title="Icon Effects" icon={ImageIcon}>
+      <PropertyCell label="Enable" span={2} hint="Icon shadow, glow, blur. Hover a chip for its name.">
+        <FlagStrip
+          flags={[
+            { key: 'Icon.Effects.shadowEnabled', title: 'Shadow — enable icon drop shadow', on: iconEffects.shadowEnabled === true, icon: Copy },
+            { key: 'Icon.Effects.glowEnabled', title: 'Glow — enable icon glow', on: iconEffects.glowEnabled === true, icon: Sparkles },
+            { key: 'Icon.Effects.blurEnabled', title: 'Blur — enable icon blur', on: iconEffects.blurEnabled === true, icon: Haze },
+          ]}
+          ontoggle={(key, next) => set(key, next)}
+        />
       </PropertyCell>
-      <PropertyCell label="Glow" span={1} hint="Enable icon glow.">
-        <PropertyToggle value={iconEffects.glowEnabled === true} onchange={() => set('Icon.Effects.glowEnabled', !(iconEffects.glowEnabled === true))} />
+      <PropertyCell label="Amount" span={1} compact hint="Icon blur amount.">
+        <NumberCell label="Amt" value={iconEffects.blurAmount ?? 0} step={0.5} min={0} defaultValue={0} onchange={(value) => set('Icon.Effects.blurAmount', value)} />
       </PropertyCell>
-      <PropertyCell label="Blur" span={1} hint="Enable icon blur.">
-        <PropertyToggle value={iconEffects.blurEnabled === true} onchange={() => set('Icon.Effects.blurEnabled', !(iconEffects.blurEnabled === true))} />
+      <PropertyCell label="Shadow X" span={1} compact hint="Icon shadow horizontal offset.">
+        <NumberCell label="X" value={iconEffects.shadowOffsetX ?? 0} step={1} defaultValue={0} onchange={(value) => set('Icon.Effects.shadowOffsetX', value)} />
       </PropertyCell>
-      <PropertyCell label="Amount" span={1} hint="Icon blur amount.">
-        <NumberInput value={iconEffects.blurAmount ?? 0} step={0.5} min={0} onchange={(value) => set('Icon.Effects.blurAmount', value)} />
+      <PropertyCell label="Shadow Y" span={1} compact hint="Icon shadow vertical offset.">
+        <NumberCell label="Y" value={iconEffects.shadowOffsetY ?? 2} step={1} defaultValue={2} onchange={(value) => set('Icon.Effects.shadowOffsetY', value)} />
       </PropertyCell>
-      <PropertyCell label="Shadow X" span={1} hint="Icon shadow horizontal offset.">
-        <NumberInput value={iconEffects.shadowOffsetX ?? 0} step={1} onchange={(value) => set('Icon.Effects.shadowOffsetX', value)} />
-      </PropertyCell>
-      <PropertyCell label="Shadow Y" span={1} hint="Icon shadow vertical offset.">
-        <NumberInput value={iconEffects.shadowOffsetY ?? 2} step={1} onchange={(value) => set('Icon.Effects.shadowOffsetY', value)} />
-      </PropertyCell>
-      <PropertyCell label="Glow Size" span={1} hint="Icon glow size.">
-        <NumberInput value={iconEffects.glowSize ?? 4} step={0.5} min={0} onchange={(value) => set('Icon.Effects.glowSize', value)} />
+      <PropertyCell label="Glow Size" span={2} compact hint="Icon glow size.">
+        <NumberCell label="Size" value={iconEffects.glowSize ?? 4} step={0.5} min={0} defaultValue={4} onchange={(value) => set('Icon.Effects.glowSize', value)} />
       </PropertyCell>
       <PropertyCell label="Tint" span={1} hint="Primary icon tint still lives in Icon.">
         <input class="val" type="text" value={icon?.tint ?? 'FFFFFFFF'} onchange={(event) => set('Icon.tint', event.target.value)} />

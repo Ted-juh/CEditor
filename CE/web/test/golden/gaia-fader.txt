@@ -1,25 +1,35 @@
-16x shape path
-1x path M 0.5 12 L 0.5 1
-1x path M 0.5 2 A 1.5 1.5 0 0 1 2 0.5
-1x path M 0.5 4 A 3.5 3.5 0 0 1 4 0.5
-1x path M 0.5 93 L 0.5 3
-1x path M 1 0.5 L 25 0.5
-1x path M 2 12.5 A 1.5 1.5 0 0 1 0.5 11
-1x path M 24 0.5 A 1.5 1.5 0 0 1 25.5 2
-1x path M 25 12.5 L 1 12.5
-1x path M 25.5 1 L 25.5 12
-1x path M 25.5 11 A 1.5 1.5 0 0 1 24 12.5
-1x path M 3 0.5 L 5 0.5
-1x path M 4 0.5 A 3.5 3.5 0 0 1 7.5 4
-1x path M 4 95.5 A 3.5 3.5 0 0 1 0.5 92
-1x path M 5 95.5 L 3 95.5
-1x path M 7.5 3 L 7.5 93
-1x path M 7.5 92 A 3.5 3.5 0 0 1 4 95.5
-8x stroke #00000066 @ 1
-8x stroke #FFFFFF @ 1
-1x bg #000000
-1x bg #0C0F11
-1x bg #3D4C57
-16x bg #5C666F
-6x bg #9AA6B0
-1x bg #E7ECF0
+24x shape rect
+1x box 11,4 8x96
+1x box 11.5,4.5 7x95
+1x box 21,17.2 3x1
+1x box 21,25.9 3x1
+1x box 21,34.6 3x1
+1x box 21,43.3 3x1
+1x box 21,52 5x1
+1x box 21,60.7 3x1
+1x box 21,69.4 3x1
+1x box 21,78.1 3x1
+1x box 21,8.5 5x1
+1x box 21,86.8 3x1
+1x box 21,95.5 5x1
+1x box 4,52 5x1
+1x box 4,8.5 5x1
+1x box 4,95.5 5x1
+1x box 6,17.2 3x1
+1x box 6,25.9 3x1
+1x box 6,34.6 3x1
+1x box 6,43.3 3x1
+1x box 6,60.7 3x1
+1x box 6,69.4 3x1
+1x box 6,78.1 3x1
+1x box 6,86.8 3x1
+1x stroke #000000 @ 1
+1x fill #0C0F11
+16x fill #5C666F
+6x fill #9AA6B0
+1x bg #00000055
+1x bg #3D4C57FF
+1x bg #E7ECF0FF
+1x border 1px solid #FFFFFF
+2x radius 2px 2px 2px 2px
+1x radius 3px 3px 3px 3px

@@ -1,7 +1,11 @@
 <script>
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Eye from 'lucide-svelte/icons/eye';
+  import CheckSquare from 'lucide-svelte/icons/square-check';
+  import Lock from 'lucide-svelte/icons/lock';
 
   let { control = null } = $props();
 
@@ -58,29 +62,19 @@
              onfocus={selectAll} onchange={(e) => handleInput('stylePreset', e)} />
     </div>
     <div class="prop-row">
-      <span class="lbl">Visible</span>
-      <button class="toggle-val" class:on={core.visible}
-              onclick={() => handleToggle('visible')}>
-        {core.visible ? 'On' : 'Off'}
-      </button>
-    </div>
-    <div class="prop-row">
-      <span class="lbl">Enabled</span>
-      <button class="toggle-val" class:on={core.enabled}
-              onclick={() => handleToggle('enabled')}>
-        {core.enabled ? 'On' : 'Off'}
-      </button>
-    </div>
-    <div class="prop-row">
-      <span class="lbl">Locked</span>
-      <button class="toggle-val" class:on={core.locked}
-              onclick={() => handleToggle('locked')}>
-        {core.locked ? 'On' : 'Off'}
-      </button>
+      <span class="lbl">State</span>
+      <FlagStrip
+        flags={[
+          { key: 'visible', title: 'Visible', on: !!core.visible, icon: Eye },
+          { key: 'enabled', title: 'Enabled', on: !!core.enabled, icon: CheckSquare },
+          { key: 'locked', title: 'Locked', on: !!core.locked, icon: Lock },
+        ]}
+        ontoggle={(key) => handleToggle(key)}
+      />
     </div>
     <div class="prop-row">
       <span class="lbl">Z-Index</span>
-      <NumberInput value={core.zIndex} step={1} min={0} onchange={(v) => set('zIndex', v)} />
+      <NumberCell value={core.zIndex} step={1} min={0} onchange={(v) => set('zIndex', v)} />
     </div>
     <div class="prop-row">
       <span class="lbl">Layer</span>
@@ -98,7 +92,4 @@
   .val { color: #DDD; font-size: 11px; background: #1A1A1A; padding: 4px 6px; border-radius: 3px; border: 1px solid #333; flex: 1; min-width: 0; font-family: inherit; outline: none; }
   .val:focus { border-color: #5B9BD5; }
   .val.readonly { background: transparent; border-color: transparent; color: #666; }
-  .toggle-val { background: #1A1A1A; border: 1px solid #333; color: #888; font-size: 11px; padding: 3px 10px; border-radius: 3px; cursor: pointer; font-family: inherit; min-width: 40px; text-align: center; }
-  .toggle-val.on { background: #094771; border-color: #0B6EB5; color: #DDD; }
-  .toggle-val:hover { border-color: #5B9BD5; }
 </style>

@@ -3,6 +3,21 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import MousePointer from 'lucide-svelte/icons/mouse-pointer';
+  import Settings2 from 'lucide-svelte/icons/settings-2';
+  import Eye from 'lucide-svelte/icons/eye';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Hash from 'lucide-svelte/icons/hash';
+  import StickyNote from 'lucide-svelte/icons/sticky-note';
+  import Keyboard from 'lucide-svelte/icons/keyboard';
+  import Mouse from 'lucide-svelte/icons/mouse';
+  import Magnet from 'lucide-svelte/icons/magnet';
+  import MoveHorizontal from 'lucide-svelte/icons/move-horizontal';
+  import FlipHorizontal from 'lucide-svelte/icons/flip-horizontal-2';
+  import FlipVertical from 'lucide-svelte/icons/flip-vertical-2';
   import { createBehaviorModule } from '../utils/customComponentFactory.js';
 
   let { control = null } = $props();
@@ -212,7 +227,7 @@
 </script>
 
 {#if behaviors}
-  <PropertySection title="Behavior Modules">
+  <PropertySection title="Behavior Modules" icon={Settings2}>
     <PropertyCell label="Add" span={3} hint="Create a behavior module such as slider, button, grid, piano bar, scroll, or filmstrip control.">
       <input class="val" type="text" bind:value={newName} placeholder="behaviorName" />
     </PropertyCell>
@@ -232,7 +247,7 @@
   </PropertySection>
 
   {#if selected}
-    <PropertySection title="Behavior Preview">
+    <PropertySection title="Behavior Preview" icon={Eye}>
       <PropertyCell label="Preview" span={2} hint="Visual sketch of how this behavior responds to input.">
         <div class={`behavior-preview ${behaviorPreviewClass}`} class:disabled={selected?.enabled === false}>
           <span class="preview-stage">
@@ -271,10 +286,13 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Definition">
-      <PropertyCell label="Enabled" span={1} hint="Enable or disable this internal behavior module.">
-        <PropertyToggle value={selected.enabled !== false} onchange={() => set('enabled', !(selected.enabled !== false))} />
-      </PropertyCell>
+    <PropertySection title="Definition" icon={Pencil}>
+      {#snippet tools()}
+        <HeaderPill value={selected.enabled !== false}
+                    title="Enable or disable this internal behavior module."
+                    onchange={() => set('enabled', !(selected.enabled !== false))} />
+      {/snippet}
+      {#if selected.enabled !== false}
       <PropertyCell label="Type" span={2} hint="Behavior type decides what interaction rules are available.">
         <select class="val" value={selected.type ?? 'slider'} onchange={(event) => handleTypeChange(event.target.value)}>
           {#each TYPE_OPTIONS as option}
@@ -303,23 +321,27 @@
           {/each}
         </select>
       </PropertyCell>
+      {/if}
     </PropertySection>
 
-    <PropertySection title="Interaction">
-      <PropertyCell label="Pointer" span={1} hint="Allow pointer or touch input.">
-        <PropertyToggle value={selected.interaction?.pointer !== false} onchange={() => set('interaction.pointer', !(selected.interaction?.pointer !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Keyboard" span={1} hint="Allow keyboard input.">
-        <PropertyToggle value={selected.interaction?.keyboard !== false} onchange={() => set('interaction.keyboard', !(selected.interaction?.keyboard !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Wheel" span={1} hint="Allow mouse wheel input.">
-        <PropertyToggle value={selected.interaction?.wheel === true} onchange={() => set('interaction.wheel', !(selected.interaction?.wheel === true))} />
-      </PropertyCell>
-      <PropertyCell label="Snap" span={1} hint="Use channel snap/tick/grid rules.">
-        <PropertyToggle value={selected.interaction?.snap !== false} onchange={() => set('interaction.snap', !(selected.interaction?.snap !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Reverse Mouse" span={2} hint="Invert pointer and wheel value direction for this behavior module while leaving the artwork unchanged.">
-        <PropertyToggle value={selected.reverseMouseDirection === true} onchange={() => set('reverseMouseDirection', !(selected.reverseMouseDirection === true))} />
+    <PropertySection title="Interaction" icon={MousePointer}>
+      <PropertyCell label="Input" span={4} hint="Pointer, keyboard, wheel, snap, reverse mouse. Hover a chip for its name.">
+        <FlagStrip
+          flags={[
+            { key: 'pointer', title: 'Pointer — allow pointer or touch input', on: selected.interaction?.pointer !== false, icon: MousePointer },
+            { key: 'keyboard', title: 'Keyboard — allow keyboard input', on: selected.interaction?.keyboard !== false, icon: Keyboard },
+            { key: 'wheel', title: 'Wheel — allow mouse wheel input', on: selected.interaction?.wheel === true, icon: Mouse },
+            { key: 'snap', title: 'Snap — use channel snap/tick/grid rules', on: selected.interaction?.snap !== false, icon: Magnet },
+            { key: 'reverse', title: 'Reverse mouse — invert pointer and wheel value direction, artwork unchanged', on: selected.reverseMouseDirection === true, icon: MoveHorizontal },
+          ]}
+          ontoggle={(key) => {
+            if (key === 'pointer') set('interaction.pointer', !(selected.interaction?.pointer !== false));
+            else if (key === 'keyboard') set('interaction.keyboard', !(selected.interaction?.keyboard !== false));
+            else if (key === 'wheel') set('interaction.wheel', !(selected.interaction?.wheel === true));
+            else if (key === 'snap') set('interaction.snap', !(selected.interaction?.snap !== false));
+            else if (key === 'reverse') set('reverseMouseDirection', !(selected.reverseMouseDirection === true));
+          }}
+        />
       </PropertyCell>
       <PropertyCell label="Drag Mode" span={2} hint="How pointer movement changes value. Auto follows geometry; vertical is the usual knob/plugin drag.">
         <select class="val" value={selected.dragMode ?? 'auto'} onchange={(event) => set('dragMode', event.target.value)}>
@@ -328,14 +350,20 @@
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Sensitivity" span={2} hint="Multiplier for vertical, horizontal, or both drag modes. 1 means one control height/width covers the full value range.">
-        <input class="val" type="number" min="0.01" max="10" step="0.05" value={selected.dragSensitivity ?? 1} onchange={(event) => set('dragSensitivity', Math.max(0.01, Math.min(10, Number(event.target.value) || 1)))} />
+      <PropertyCell label="Sensitivity" span={2} compact hint="Multiplier for vertical, horizontal, or both drag modes. 1 means one control height/width covers the full value range.">
+        <NumberCell label="Sens" min={0.01} max={10} step={0.05} value={selected.dragSensitivity ?? 1} defaultValue={1} onchange={(v) => set('dragSensitivity', Math.max(0.01, Math.min(10, v || 1)))} />
       </PropertyCell>
-      <PropertyCell label="Invert X" span={1} hint="Flip the horizontal drag direction for this behavior only.">
-        <PropertyToggle value={selected.invertX === true} onchange={() => set('invertX', !(selected.invertX === true))} />
-      </PropertyCell>
-      <PropertyCell label="Invert Y" span={1} hint="Flip the vertical drag direction for this behavior only.">
-        <PropertyToggle value={selected.invertY === true} onchange={() => set('invertY', !(selected.invertY === true))} />
+      <PropertyCell label="Invert" span={2} hint="Flip the horizontal or vertical drag direction for this behavior only. Hover a chip for its name.">
+        <FlagStrip
+          flags={[
+            { key: 'invertX', title: 'Invert X — flip the horizontal drag direction', on: selected.invertX === true, icon: FlipHorizontal },
+            { key: 'invertY', title: 'Invert Y — flip the vertical drag direction', on: selected.invertY === true, icon: FlipVertical },
+          ]}
+          ontoggle={(key) => {
+            if (key === 'invertX') set('invertX', !(selected.invertX === true));
+            else if (key === 'invertY') set('invertY', !(selected.invertY === true));
+          }}
+        />
       </PropertyCell>
       {#if selected.dragMode === 'both' || selected.dragMode === 'free'}
         <PropertyCell label="Advanced" span={2} hint="How the two drag axes merge into one value — combine mode, per-axis weights, and the increase direction.">
@@ -349,21 +377,21 @@
               {/each}
             </select>
           </PropertyCell>
-          <PropertyCell label="Weight X" span={1} hint="Relative contribution of horizontal motion.">
-            <input class="val" type="number" min="0" max="4" step="0.1" value={selected.weightX ?? 1} onchange={(event) => set('weightX', Math.max(0, Math.min(4, Number(event.target.value) || 1)))} />
+          <PropertyCell label="Weight X" span={1} compact hint="Relative contribution of horizontal motion.">
+            <NumberCell label="X" min={0} max={4} step={0.1} value={selected.weightX ?? 1} defaultValue={1} onchange={(v) => set('weightX', Math.max(0, Math.min(4, v || 1)))} />
           </PropertyCell>
-          <PropertyCell label="Weight Y" span={1} hint="Relative contribution of vertical motion.">
-            <input class="val" type="number" min="0" max="4" step="0.1" value={selected.weightY ?? 1} onchange={(event) => set('weightY', Math.max(0, Math.min(4, Number(event.target.value) || 1)))} />
+          <PropertyCell label="Weight Y" span={1} compact hint="Relative contribution of vertical motion.">
+            <NumberCell label="Y" min={0} max={4} step={0.1} value={selected.weightY ?? 1} defaultValue={1} onchange={(v) => set('weightY', Math.max(0, Math.min(4, v || 1)))} />
           </PropertyCell>
-          <PropertyCell label="Increase Angle" span={2} hint="Direction treated as increase, in degrees: 0 is right, 90 is up, 45 is the up-right default.">
-            <input class="val" type="number" min="0" max="90" step="5" value={selected.increaseAngle ?? 45} onchange={(event) => set('increaseAngle', Math.max(0, Math.min(90, Number(event.target.value) || 45)))} />
+          <PropertyCell label="Increase Angle" span={2} compact hint="Direction treated as increase, in degrees: 0 is right, 90 is up, 45 is the up-right default.">
+            <NumberCell label="Angle" min={0} max={90} step={5} value={selected.increaseAngle ?? 45} defaultValue={45} onchange={(v) => set('increaseAngle', Math.max(0, Math.min(90, v || 45)))} />
           </PropertyCell>
         {/if}
       {/if}
     </PropertySection>
 
     {#if selected.type === 'xy-pad' || selected.role === 'xyPad' || selected.role === 'xy-pad' || selected.geometry === 'xy' || selected.geometry === 'grid'}
-      <PropertySection title="XY Channels">
+      <PropertySection title="XY Channels" icon={Hash}>
         <PropertyCell label="X Channel" span={2} hint="Horizontal value controlled by this XY behavior.">
           <select class="val" value={selectedValueChannels[0] ?? selected.valueChannel ?? ''} onchange={(event) => setValueChannelAt(0, event.target.value)}>
             <option value="">none</option>
@@ -394,7 +422,7 @@
       </PropertySection>
     {/if}
 
-    <PropertySection title="Notes">
+    <PropertySection title="Notes" icon={StickyNote}>
       <PropertyCell label="Purpose" span={4} hint="Short design note for collaborators and downloaded components.">
         <textarea class="val code" rows="4" value={selected.description ?? ''} onchange={(event) => set('description', event.target.value)}></textarea>
       </PropertyCell>

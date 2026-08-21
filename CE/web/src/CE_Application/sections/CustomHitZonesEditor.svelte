@@ -2,8 +2,15 @@
   import { getSection, updateControlProperty, removeControlNode } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
-  import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Segmented from '../properties/Segmented.svelte';
+  import CheckSquare from 'lucide-svelte/icons/square-check';
+  import Eye from 'lucide-svelte/icons/eye';
+  import SquareDashed from 'lucide-svelte/icons/square-dashed';
+  import MapIcon from 'lucide-svelte/icons/map';
+  import Target from 'lucide-svelte/icons/target';
+  import Move from 'lucide-svelte/icons/move';
   import ConditionBuilder from './ConditionBuilder.svelte';
   import { createHitZone } from '../utils/customComponentFactory.js';
 
@@ -150,7 +157,7 @@
 </script>
 
 {#if zones}
-  <PropertySection title="Hit Zones">
+  <PropertySection title="Hit Zones" icon={SquareDashed}>
     <PropertyCell label="Add" span={3} hint="Create an interaction area independent from visible layers.">
       <input class="val" type="text" bind:value={newName} placeholder="hitZoneName" />
     </PropertyCell>
@@ -171,7 +178,7 @@
   </PropertySection>
 
   {#if selected}
-    <PropertySection title="Hit Zone Map">
+    <PropertySection title="Hit Zone Map" icon={MapIcon}>
       <PropertyCell label="Map" span={2} hint="Scaled overview of authored hit zones.">
         <div class="zone-map">
           <div class="map-stage">
@@ -226,12 +233,18 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Target">
-      <PropertyCell label="Enabled" span={1} hint="Enable or disable this interaction zone.">
-        <PropertyToggle value={selected.enabled !== false} onchange={() => set('enabled', !(selected.enabled !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Editor" span={1} hint="Show this zone in designer/debug overlays.">
-        <PropertyToggle value={selected.visibleInEditor !== false} onchange={() => set('visibleInEditor', !(selected.visibleInEditor !== false))} />
+    <PropertySection title="Target" icon={Target}>
+      <PropertyCell label="State" span={2} hint="Zone enabled, visible in designer/debug overlays. Hover a chip for its name.">
+        <FlagStrip
+          flags={[
+            { key: 'enabled', title: 'Enabled — enable or disable this interaction zone', on: selected.enabled !== false, icon: CheckSquare },
+            { key: 'editor', title: 'Editor — show this zone in designer/debug overlays', on: selected.visibleInEditor !== false, icon: Eye },
+          ]}
+          ontoggle={(key) => {
+            if (key === 'enabled') set('enabled', !(selected.enabled !== false));
+            else if (key === 'editor') set('visibleInEditor', !(selected.visibleInEditor !== false));
+          }}
+        />
       </PropertyCell>
       <PropertyCell label="Shape" span={2} hint="Shape used for hit testing.">
         <select class="val" value={selected.shape ?? 'rectangle'} onchange={(event) => set('shape', event.target.value)}>
@@ -263,32 +276,37 @@
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Priority" span={1} hint="Higher priority wins overlapping hit zones.">
-        <NumberInput value={selected.priority ?? 0} step={1} onchange={(value) => set('priority', Math.round(value))} />
+      <PropertyCell label="Priority" span={1} compact hint="Higher priority wins overlapping hit zones.">
+        <NumberCell label="Prio" value={selected.priority ?? 0} step={1} defaultValue={0} onchange={(value) => set('priority', Math.round(value))} />
       </PropertyCell>
       <PropertyCell label="Cursor" span={1} hint="Cursor shown over this zone.">
         <input class="val" type="text" value={selected.cursor ?? 'pointer'} onchange={(event) => set('cursor', event.target.value)} />
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Bounds">
-      <PropertyCell label="X" span={1} hint="Zone X in its configured unit.">
-        <NumberInput value={selected.bounds?.x ?? 0} step={1} onchange={(value) => set('bounds.x', value)} />
+    <PropertySection title="Bounds" icon={Move}>
+      <PropertyCell label="X" span={1} compact hint="Zone X in its configured unit.">
+        <NumberCell label="X" value={selected.bounds?.x ?? 0} step={1} defaultValue={0} onchange={(value) => set('bounds.x', value)} />
       </PropertyCell>
-      <PropertyCell label="Y" span={1} hint="Zone Y in its configured unit.">
-        <NumberInput value={selected.bounds?.y ?? 0} step={1} onchange={(value) => set('bounds.y', value)} />
+      <PropertyCell label="Y" span={1} compact hint="Zone Y in its configured unit.">
+        <NumberCell label="Y" value={selected.bounds?.y ?? 0} step={1} defaultValue={0} onchange={(value) => set('bounds.y', value)} />
       </PropertyCell>
-      <PropertyCell label="W" span={1} hint="Zone width.">
-        <NumberInput value={selected.bounds?.width ?? 100} step={1} min={0} onchange={(value) => set('bounds.width', value)} />
+      <PropertyCell label="W" span={1} compact hint="Zone width.">
+        <NumberCell label="W" value={selected.bounds?.width ?? 100} step={1} min={0} defaultValue={100} onchange={(value) => set('bounds.width', value)} />
       </PropertyCell>
-      <PropertyCell label="H" span={1} hint="Zone height.">
-        <NumberInput value={selected.bounds?.height ?? 100} step={1} min={0} onchange={(value) => set('bounds.height', value)} />
+      <PropertyCell label="H" span={1} compact hint="Zone height.">
+        <NumberCell label="H" value={selected.bounds?.height ?? 100} step={1} min={0} defaultValue={100} onchange={(value) => set('bounds.height', value)} />
       </PropertyCell>
       <PropertyCell label="Unit" span={2} hint="Percent keeps zones responsive; px keeps them fixed.">
-        <select class="val" value={selected.bounds?.unit ?? 'percent'} onchange={(event) => set('bounds.unit', event.target.value)}>
-          <option value="percent">percent</option>
-          <option value="px">px</option>
-        </select>
+        <Segmented
+          ariaLabel="Bounds unit"
+          value={selected.bounds?.unit ?? 'percent'}
+          options={[
+            { value: 'percent', label: 'percent' },
+            { value: 'px', label: 'px' },
+          ]}
+          onchange={(v) => set('bounds.unit', v)}
+        />
       </PropertyCell>
       <PropertyCell label="Condition" span={4} hint="When this zone is active. Leave empty for always.">
         <ConditionBuilder value={selected.condition ?? ''} channels={channelNames} onChange={(next) => set('condition', next)} placeholder="zone always active" />

@@ -3,7 +3,14 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
+  import Play from 'lucide-svelte/icons/play';
+  import Hash from 'lucide-svelte/icons/hash';
+  import SquareDashed from 'lucide-svelte/icons/square-dashed';
+  import GitBranch from 'lucide-svelte/icons/git-branch';
+  import Activity from 'lucide-svelte/icons/activity';
+  import Factory from 'lucide-svelte/icons/factory';
   import {
     extractDetachedGeneratedHitZones,
     extractDetachedGeneratedParts,
@@ -555,9 +562,9 @@
 </script>
 
 {#if designer}
-  <PropertySection title="Simulation">
+  <PropertySection title="Simulation" icon={Play}>
     <PropertyCell label="Test Value" span={2} hint="Normalized preview value for value-driven bindings and recipes.">
-      <NumberInput value={preview.testValue ?? 0.5} step={0.01} min={0} max={1} onchange={(value) => setPreview('testValue', value)} />
+      <PropertyScrub value={preview.testValue ?? 0.5} step={0.01} min={0} max={1} defaultValue={0.5} onchange={(value) => setPreview('testValue', value)} />
     </PropertyCell>
     <PropertyCell label="State" span={2} hint="Preview state label for future state simulation.">
       <select class="val" value={preview.state ?? 'base'} onchange={(event) => setPreview('state', event.target.value)}>
@@ -592,7 +599,14 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Channels">
+  <PropertySection title="Channels" icon={Hash}>
+    {#snippet tools()}
+      <button class="header-action-btn"
+              type="button"
+              title="Clear all bench channel overrides and return to the component defaults."
+              onclick={resetAllChannelTestValues}
+              disabled={!Object.keys(preview.channelValues ?? {}).length}>Reset</button>
+    {/snippet}
     <PropertyCell label="Controls" span={4} hint="Drive each custom value channel directly while the bench evaluates links, generated output, and public surface.">
       <div class="channel-rig">
         {#each channelDiagnostics as channel (channel.name)}
@@ -644,11 +658,12 @@
                   {/each}
                 </div>
               {:else}
-                <NumberInput
+                <NumberCell
                   value={Number(seededValues?.[channel.name] ?? definition?.defaultValue ?? 0)}
                   step={Number(definition?.step ?? (type === 'int' ? 1 : 0.01))}
                   min={Number(definition?.min ?? 0)}
                   max={Number(definition?.max ?? 1)}
+                  defaultValue={Number(definition?.defaultValue ?? 0)}
                   onchange={(value) => setChannelTestValue(channel.name, value)}
                 />
               {/if}
@@ -661,12 +676,9 @@
         {#if channelDiagnostics.length === 0}<div class="empty-row">No value channels.</div>{/if}
       </div>
     </PropertyCell>
-    <PropertyCell label="Reset" span={4} hint="Clear all bench channel overrides and return to the component defaults.">
-      <button class="action-btn" type="button" onclick={resetAllChannelTestValues} disabled={!Object.keys(preview.channelValues ?? {}).length}>Reset channels</button>
-    </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Hit Zones">
+  <PropertySection title="Hit Zones" icon={SquareDashed}>
     <PropertyCell label="Triggers" span={4} hint="Fire authored or generated hit zones directly into the channel rig.">
       <div class="probe-groups">
         {#each probeGroups as group (group.source)}
@@ -711,7 +723,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="States">
+  <PropertySection title="States" icon={GitBranch}>
     <PropertyCell label="States" span={4} hint="Preview authored state rules and see which visual patches they apply.">
       <div class="state-list">
         {#each stateDiagnostics as state (state.name)}
@@ -738,7 +750,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Counts">
+  <PropertySection title="Counts" icon={Activity}>
     <PropertyCell label="Layers" span={1} hint="Visible/internal parts."><div class="metric">{performance.layers}</div></PropertyCell>
     <PropertyCell label="Zones" span={1} hint="Hit zones."><div class="metric">{performance.hitZones}</div></PropertyCell>
     <PropertyCell label="Gen" span={1} hint="Generators."><div class="metric">{performance.generated}</div></PropertyCell>
@@ -753,7 +765,7 @@
     <PropertyCell label="Gen Zones" span={1} hint="Runtime hit zones created by enabled generators."><div class="metric">{performance.generatedZones}</div></PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Generators">
+  <PropertySection title="Generators" icon={Factory}>
     <PropertyCell label="Sources" span={4} hint="Enabled generators currently producing runtime parts or hit zones.">
       <div class="generated-source-list">
         {#each generatedSourceDiagnostics as source (source.source)}
@@ -973,31 +985,42 @@
     color: #82B8E5;
     font-size: 10px;
   }
-  .mini-btn,
-  .action-btn {
+  /* Header-slot action: compact button living in the section header (W6). */
+  .header-action-btn {
+    height: 16px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #252525;
+    color: #777;
+    font-size: 9px;
+    font-family: inherit;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .header-action-btn:hover:not(:disabled) {
+    color: #CCC;
+    border-color: #4A6E8C;
+  }
+  .header-action-btn:disabled {
+    opacity: 0.42;
+    cursor: default;
+  }
+  .mini-btn {
     background: #252525;
     border: 1px solid #3B3B3B;
     border-radius: 4px;
     color: #DDD;
     cursor: pointer;
     font-family: inherit;
-  }
-  .mini-btn {
     min-height: 24px;
     font-size: 10px;
   }
-  .action-btn {
-    width: 100%;
-    min-height: 28px;
-    font-size: 11px;
-  }
-  .mini-btn:hover:not(:disabled),
-  .action-btn:hover:not(:disabled) {
+  .mini-btn:hover:not(:disabled) {
     border-color: #5B9BD5;
     color: #FFF;
   }
-  .mini-btn:disabled,
-  .action-btn:disabled {
+  .mini-btn:disabled {
     opacity: 0.42;
     cursor: default;
   }

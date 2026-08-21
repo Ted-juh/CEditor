@@ -147,3 +147,56 @@ test('undo works in a standalone component tab even when mode is not surface', (
 
   activeEditorTab.set({ type: 'panel', id: null });
 });
+
+test('an edit made just before a context switch survives in history', () => {
+  initHistory();
+
+  componentDocuments.set([makeDoc('docX', 0), makeDoc('docY', 100)]);
+  componentWorkspaceMode.set('surface');
+  activeComponentDocumentId.set('docX');
+  commit();
+
+  // Edit docX, then switch context BEFORE the 400ms debounce fires.
+  // The switch must flush the pending snapshot, not erase it.
+  mutate('docX', 42);
+  activeComponentDocumentId.set('docY');
+
+  // Return to docX: the pre-switch edit is one undo step.
+  activeComponentDocumentId.set('docX');
+  assert.equal(canUndo(), true, 'pre-switch edit must be recorded');
+  undo();
+  assert.equal(valueOf('docX'), 0);
+
+  activeEditorTab.set({ type: 'panel', id: null });
+});
+
+test('undo restores the selection that went with the state', async () => {
+  const { panels, activePanelId, selectedComponentIds } = await import('../src/CE_Application/stores/panels.js');
+  const { createPanel } = await import('../src/CE_Application/stores/panelModel.js');
+
+  initHistory();
+  componentWorkspaceMode.set('panel');
+  componentDocuments.set([]);
+  activeComponentDocumentId.set(null);
+
+  const panel = createPanel('Selection Panel');
+  panel.controls = [{ _children: { Core: { id: 'ctrl_a', name: 'A' }, Transform: { x: 0, y: 0, width: 10, height: 10 } } }];
+  panels.set([panel]);
+  activePanelId.set(panel.id);
+  activeEditorTab.set({ type: 'panel', id: panel.id });
+  selectedComponentIds.set(new Set(['ctrl_a']));
+  commit();
+
+  // Delete the control (selection clears with it), commit, then undo.
+  panels.update((list) => list.map((p) => (p.id === panel.id ? { ...p, controls: [] } : p)));
+  selectedComponentIds.set(new Set());
+  commit();
+
+  undo();
+  const restored = get(panels).find((p) => p.id === panel.id);
+  assert.equal(restored.controls.length, 1, 'undo restores the deleted control');
+  assert.deepEqual([...get(selectedComponentIds)], ['ctrl_a'], 'undo restores the selection too');
+
+  panels.set([]);
+  activeEditorTab.set({ type: 'panel', id: null });
+});

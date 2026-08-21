@@ -1,11 +1,25 @@
 import { get } from 'svelte/store';
-import { panels, resolvedActivePanelId, selectedComponentIds, selectComponent, clearSelection } from './panels.js';
+import { panels, resolvedActivePanelId, selectedComponentIds } from './panels.js';
 import { removeControl } from './controls.js';
-import { controlPanelRect, findControlById, flatControls, remintControlIds, selectionRoots } from '../utils/containment.js';
+import {
+  collectControlNames,
+  controlPanelRect,
+  findControlById,
+  findParentOfControl,
+  flatControls,
+  insertControlIntoTree,
+  remintControlIds,
+  selectionRoots,
+  uniqueCopyName,
+} from '../utils/containment.js';
 
 /**
- * Internal clipboard buffer — array of serialised control objects.
- * Not using a Svelte store since nothing needs to reactively read it.
+ * Internal clipboard buffer. Each entry keeps the control with its ORIGINAL
+ * local coordinates plus enough context to paste like duplicate does:
+ *   control  — deep clone, Transform still parent-relative
+ *   parentId — the container it lived in (null = top level)
+ *   panelX/Y — its panel-space position, for pasting where the parent is gone
+ * Not a Svelte store; nothing reads it reactively.
  */
 let buffer = [];
 
@@ -20,36 +34,47 @@ export function copySelection() {
   if (!panel) return;
 
   // Copy selection roots only (a selected child inside a selected container
-  // rides along in the subtree). Positions are captured in panel space so a
-  // nested child pastes where it visually was.
+  // rides along in the subtree).
   buffer = selectionRoots(panel.controls, ids)
     .map(id => {
       const source = findControlById(panel.controls, id);
       if (!source) return null;
-      const clone = JSON.parse(JSON.stringify(source));
       const rect = controlPanelRect(panel.controls, id);
-      if (clone._children?.Transform && rect) {
-        clone._children.Transform.x = rect.x;
-        clone._children.Transform.y = rect.y;
-      }
-      return clone;
+      const parent = findParentOfControl(panel.controls, id);
+      return {
+        control: JSON.parse(JSON.stringify(source)),
+        parentId: parent?._children?.Core?.id ?? null,
+        panelX: rect?.x ?? source._children?.Transform?.x ?? 0,
+        panelY: rect?.y ?? source._children?.Transform?.y ?? 0,
+      };
     })
     .filter(Boolean);
 }
 
 /**
- * Cut = copy + delete.
+ * Cut = copy + delete. Deletes the selection ROOTS, mirroring what copy
+ * captured — a selected child of a selected container is one subtree
+ * operation, not two removals.
  */
 export function cutSelection() {
   copySelection();
-  const ids = [...get(selectedComponentIds)];
-  for (const id of ids) removeControl(id);
+  const panel = get(panels).find(p => p.id === get(resolvedActivePanelId));
+  const ids = get(selectedComponentIds);
+  const roots = panel ? selectionRoots(panel.controls, ids) : [...ids];
+  for (const id of roots) removeControl(id);
 }
 
 /**
  * Paste clipboard buffer into the active panel.
- * @param {{ x: number, y: number } | null} position — if provided, paste centred on
- *   this panel-space coordinate; otherwise offset +20px from the copied position.
+ *
+ * Same structural semantics as duplicate: a control copied out of a container
+ * pastes back INTO that container (when it still exists in the target panel),
+ * offset +20/+20 in its local frame. When the container is gone — cross-panel
+ * paste, deleted parent — it lands at top level at its old panel-space spot.
+ * An explicit position ("Paste Here") always pastes at top level centred on
+ * the point; the click location is the intent.
+ *
+ * @param {{ x: number, y: number } | null} position
  */
 export function pasteSelection(position = null) {
   if (buffer.length === 0) return;
@@ -70,13 +95,13 @@ export function pasteSelection(position = null) {
 
       if (position) {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (const src of buffer) {
-          const t = src._children?.Transform;
+        for (const entry of buffer) {
+          const t = entry.control._children?.Transform;
           if (!t) continue;
-          minX = Math.min(minX, t.x);
-          minY = Math.min(minY, t.y);
-          maxX = Math.max(maxX, t.x + (t.width || 0));
-          maxY = Math.max(maxY, t.y + (t.height || 0));
+          minX = Math.min(minX, entry.panelX);
+          minY = Math.min(minY, entry.panelY);
+          maxX = Math.max(maxX, entry.panelX + (t.width || 0));
+          maxY = Math.max(maxY, entry.panelY + (t.height || 0));
         }
         const cx = (minX + maxX) / 2;
         const cy = (minY + maxY) / 2;
@@ -84,24 +109,46 @@ export function pasteSelection(position = null) {
         offsetY = position.y - cy;
       }
 
-      const clones = buffer.map(src => {
-        // Fresh ids for the control and its whole subtree
-        const clone = remintControlIds(src);
-        clone._children.Core.name = clone._children.Core.name.replace(/_copy$/, '') + '_copy';
+      let controls = p.controls;
+      const existingNames = collectControlNames(controls);
+      const nextBuffer = [];
 
+      for (const entry of buffer) {
+        // Fresh ids for the control and its whole subtree
+        const clone = remintControlIds(entry.control);
+        const name = uniqueCopyName(existingNames, clone._children.Core.name);
+        clone._children.Core.name = name;
+        existingNames.add(name);
+
+        const parentAlive = !position && entry.parentId != null && !!findControlById(controls, entry.parentId);
         if (clone._children.Transform) {
-          clone._children.Transform.x += offsetX;
-          clone._children.Transform.y += offsetY;
+          if (parentAlive) {
+            // Local coords are already in the clone — just stagger.
+            clone._children.Transform.x += offsetX;
+            clone._children.Transform.y += offsetY;
+          } else {
+            clone._children.Transform.x = entry.panelX + offsetX;
+            clone._children.Transform.y = entry.panelY + offsetY;
+          }
         }
 
+        controls = parentAlive
+          ? insertControlIntoTree(controls, entry.parentId, clone)
+          : [...controls, clone];
+
         newIds.push(clone._children.Core.id);
-        return clone;
-      });
 
-      // Update buffer positions so successive pastes keep staggering
-      buffer = clones.map(c => JSON.parse(JSON.stringify(c)));
+        // Successive pastes keep staggering from the last paste.
+        nextBuffer.push({
+          ...entry,
+          control: JSON.parse(JSON.stringify(clone)),
+          panelX: entry.panelX + offsetX,
+          panelY: entry.panelY + offsetY,
+        });
+      }
 
-      return { ...p, controls: [...p.controls, ...clones], modified: true };
+      buffer = nextBuffer;
+      return { ...p, controls, modified: true };
     })
   );
 

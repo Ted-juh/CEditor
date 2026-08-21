@@ -1,12 +1,14 @@
 <script>
-  import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, addPanel, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel } from '../stores/panels.js';
-  import { getSection, removeControl, duplicateControl, updateControlProperty, selectedControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
+  import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel } from '../stores/panels.js';
+  import { addControl, addCustomComponentPackage, getSection, removeControl, duplicateControl, updateControlProperty, selectedControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
+  import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { enumerateLeafPaths } from '../stores/controlTreeUtils.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../utils/backgroundCSS.js';
   import { computeGridOrigin, buildGridStyle } from '../utils/gridCSS.js';
   import { handleEditorShortcut } from '../utils/editorShortcuts.js';
   import { findControlsInRect, findControlAtPoint } from '../utils/canvasSelection.js';
+  import { normalizePanelLayers } from '../utils/panelLayers.js';
   import { createPanController, createMarqueeController } from '../utils/canvasInteractions.js';
   import { DragScrub, presets } from '../scrub/dragScrub';
   import { scrubSample } from '../utils/scrubRuntime.js';
@@ -25,11 +27,12 @@
   import { isTextEntryTarget } from '../utils/textEntry.js';
   import BehaviorDesigner from './BehaviorDesigner.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
-  import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
+  import ScreenBuilderEditor from '../sections/ScreenBuilderEditor.svelte';
+  import { addGuide, deleteSelectedGuide, selectedGuide } from '../stores/guides.js';
   import { activePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
-  import { zoomToSelectionSignal } from '../stores/editorCommands.js';
-  import { showRulers } from '../stores/editorView.js';
+  import { fitToWindowSignal, zoomStepSignal, zoomToSelectionSignal } from '../stores/editorCommands.js';
+  import { showRulers, viewportPanelCenter } from '../stores/editorView.js';
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
   import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
@@ -38,7 +41,10 @@
   import Redo2 from 'lucide-svelte/icons/redo-2';
   import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
   import { createScriptWorkspaceDocument, scriptDocuments, updateScriptDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
+  import { createScreenDocument } from '../stores/screenBuilder.js';
   import { isSourceScript } from '../scripting/scriptModel.js';
+  import { openNewPanelDialog } from '../stores/newPanelDialog.js';
+  import { copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
@@ -121,6 +127,19 @@
   // --- Ruler scroll/size tracking ---
   let metrics = $state({ scrollLeft: 0, scrollTop: 0, width: 0, height: 0, contentLeft: 40, contentTop: 40 });
   $effect(() => trackViewportMetrics(metrics, () => viewportEl, () => zoomContainerEl));
+
+  // Publish the panel-space point at the viewport centre — new controls
+  // insert there (stores/controls.js) instead of cascading from the origin.
+  $effect(() => {
+    if (!canvasPanel || !viewportEl) {
+      viewportPanelCenter.set(null);
+      return;
+    }
+    viewportPanelCenter.set({
+      x: (metrics.scrollLeft + metrics.width / 2 - metrics.contentLeft) / scale,
+      y: (metrics.scrollTop + metrics.height / 2 - metrics.contentTop) / scale,
+    });
+  });
 
   // Re-measure panel-surface offset when zoom or panel size changes — the
   // panel surface uses a CSS transform so its layout box doesn't resize, so
@@ -272,11 +291,22 @@
     getSurface: () => panelSurfaceEl,
     getScale: () => scale,
     isBlocked: () => pan.spaceHeld,
-    onSelect: (rect) => {
-      // Only select if the marquee has a meaningful size (not just a click)
-      if (rect.w < 3 && rect.h < 3) { clearSelection(); return; }
+    onSelect: (rect, e) => {
+      // Only select if the marquee has a meaningful size (not just a click).
+      // rect is in panel units — compare against SCREEN pixels so a click
+      // doesn't count as a marquee at 25% zoom, nor a real 10px drag at 400%.
+      const clickSize = 3 / (scale || 1);
+      if (rect.w < clickSize && rect.h < clickSize) {
+        if (!e?.shiftKey) clearSelection();
+        return;
+      }
       const ids = canvasPanel ? findControlsInRect(canvasPanel.controls, rect, getSection) : new Set();
-      selectedComponentIds.set(ids);
+      // Shift extends: a selection can be built out of several passes.
+      if (e?.shiftKey) {
+        selectedComponentIds.update((current) => new Set([...current, ...ids]));
+      } else {
+        selectedComponentIds.set(ids);
+      }
     },
   });
 
@@ -288,14 +318,37 @@
     getPanel: () => canvasPanel,
     getSelection: () => $selectedComponentIds,
     getZoom: () => $editorZoom,
+    getZoomIncrement: () => $editorZoomIncrement,
     editorZoom,
   });
+
+  // Wheel must be non-passive so Ctrl+wheel zoom can suppress the host's own
+  // ctrl-zoom; plain wheel is left alone and scrolls the viewport natively.
+  function nonPassiveWheel(node, handler) {
+    node.addEventListener('wheel', handler, { passive: false });
+    return { destroy() { node.removeEventListener('wheel', handler); } };
+  }
 
   // React to global zoom-to-selection signal (from Ctrl+Shift+P in App.svelte)
   let lastZoomSignal = 0;
   $effect(() => {
     const sig = $zoomToSelectionSignal;
     if (sig > lastZoomSignal) { lastZoomSignal = sig; zoomCtrl.zoomToSelection(); }
+  });
+
+  // React to global fit-to-window requests (menu, zoom bar, shortcuts) — this
+  // controller owns the only fit implementation.
+  let lastFitSignal = 0;
+  $effect(() => {
+    const sig = $fitToWindowSignal;
+    if (sig > lastFitSignal) { lastFitSignal = sig; zoomCtrl.fitToWindow(); }
+  });
+
+  // React to global zoom-step requests (menu, zoom bar, keyboard fallback).
+  let lastZoomStepSignal = 0;
+  $effect(() => {
+    const sig = $zoomStepSignal;
+    if (sig.n > lastZoomStepSignal) { lastZoomStepSignal = sig.n; zoomCtrl.zoomStep(sig.direction); }
   });
 
   function handlePreviewShortcut(e) {
@@ -310,12 +363,12 @@
 
     if (mod && (e.key === '=' || e.key === '+')) {
       e.preventDefault();
-      editorZoom.update((value) => Math.min(400, value + $editorZoomIncrement));
+      zoomCtrl.zoomStep(1);
       return;
     }
     if (mod && e.key === '-') {
       e.preventDefault();
-      editorZoom.update((value) => Math.max(10, value - $editorZoomIncrement));
+      zoomCtrl.zoomStep(-1);
       return;
     }
     if (mod && e.key === '0') {
@@ -331,9 +384,10 @@
 
   function handleEditorKeyDown(e) {
     if (componentSurfaceWorkspaceActive) return;
-    // The Settings view renders INSIDE this wrapper, so every keystroke in a settings text box
-    // arrives here too. Without this, Backspace in a field never reached the field — and if a
-    // control happened to be selected, deleted it. Ctrl+A/C/X/V/D were swallowed the same way.
+    // Text fields inside the canvas chrome keep their keys — Delete in an input must never delete
+    // controls. The Settings view also renders INSIDE this wrapper, so every keystroke in a settings
+    // text box arrives here too. Without this, Backspace in a field never reached the field — and if
+    // a control happened to be selected, deleted it. Ctrl+A/C/X/V/D were swallowed the same way.
     if (isTextEntryTarget(e.target)) return;
 
     if ($previewModeEnabled) {
@@ -344,13 +398,16 @@
     panCtrl.handleKeyDown(e);
     handleEditorShortcut(e, {
       panel: canvasPanel, panelLocked, gridSize,
-      editorZoom, editorZoomIncrement: $editorZoomIncrement,
       selectedComponentIds: $selectedComponentIds,
+      zoomIn: () => zoomCtrl.zoomStep(1),
+      zoomOut: () => zoomCtrl.zoomStep(-1),
       fitToWindow: zoomCtrl.fitToWindow,
       zoomToSelection: zoomCtrl.zoomToSelection,
       selectAll, pasteSelection, copySelection, cutSelection, duplicateControl,
       removeControl, updateControlProperty, deleteSelectedGuide,
       groupSelectionIntoContainer, ungroupContainer,
+      selectComponent, clearSelection,
+      copyControlStyle, applyStyleToSelection,
     });
   }
 
@@ -366,6 +423,7 @@
     if (pan.spaceHeld) return;
     if (e.target === e.currentTarget || e.target.classList.contains('panel-surface')) {
       clearSelection();
+      selectedGuide.set(null);
     }
   }
 
@@ -384,10 +442,52 @@
     const panelX = (screenX - rect.left) / scale;
     const panelY = (screenY - rect.top) / scale;
     // If right-clicking on a control that isn't selected, select it
-    const clickedCtrl = findControlAtPoint(canvasPanel.controls, panelX, panelY);
+    const clickedCtrl = findControlAtPoint(canvasPanel.controls, panelX, panelY,
+      normalizePanelLayers(canvasPanel.layers, canvasPanel.controls));
     const cid = clickedCtrl?._children?.Core?.id;
     if (cid && !$selectedComponentIds.has(cid)) selectComponent(cid);
     ctxMenu = { screenX, screenY, panelX, panelY };
+  }
+
+  // --- Insert-panel drag-to-place ---
+  // The Insert panel writes a payload on dragstart; dropping on the panel
+  // surface lands the component centred on the drop point.
+  const INSERT_DRAG_MIME = 'application/x-ceditor-insert';
+
+  function handleInsertDragOver(e) {
+    if (!Array.from(e.dataTransfer?.types ?? []).includes(INSERT_DRAG_MIME)) return;
+    if ($previewModeEnabled || panelLocked) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }
+
+  function handleInsertDrop(e) {
+    const raw = e.dataTransfer?.getData(INSERT_DRAG_MIME);
+    if (!raw || $previewModeEnabled || panelLocked || !panelSurfaceEl) return;
+
+    let payload = null;
+    try { payload = JSON.parse(raw); } catch { return; }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = panelSurfaceEl.getBoundingClientRect();
+    const at = {
+      x: (e.clientX - rect.left) / scale,
+      y: (e.clientY - rect.top) / scale,
+    };
+
+    if (payload.kind === 'type' && payload.type) {
+      addControl(payload.type, {}, { at });
+      return;
+    }
+    if (payload.kind === 'package' && payload.id) {
+      const entry = ($customComponentLibrary ?? []).find((candidate) => candidate.id === payload.id);
+      if (entry?.envelope) {
+        addCustomComponentPackage(entry.envelope, { Transform: { x: Math.round(at.x - 60), y: Math.round(at.y - 60) } });
+        customComponentLibrary.markUsed(entry.id);
+      }
+    }
   }
 
   function buildEditorSplitStyle(split, deviceFirst, designerSize, panelSize) {
@@ -461,6 +561,11 @@
   function createStandaloneScriptWorkspace() {
     const document = getOrCreateScriptDocForPanel($activePanel?.id, $activePanel?.name);
     if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
+  }
+
+  function createStandaloneScreen() {
+    const document = createScreenDocument();
+    if (document?.id) setActiveEditorTab({ type: 'screen', id: document.id });
   }
 
 </script>
@@ -563,7 +668,7 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div class="canvas-viewport designer-split-viewport" class:with-rulers={$showRulers} use:bindViewport class:panel-active={canvasPanel}
                  onclick={handleCanvasClick} oncontextmenu={handleContextMenu}
-                 onmousedown={panCtrl.handleMouseDown} onwheel={zoomCtrl.handleWheel}>
+                 onmousedown={panCtrl.handleMouseDown} use:nonPassiveWheel={zoomCtrl.handleWheel}>
               <div class="canvas-stage">
                 <div
                   class="zoom-container"
@@ -595,6 +700,8 @@
                       onclick={handleCanvasClick}
                       onmousedown={marqueeCtrl.handleMouseDown}
                       oncontextmenu={handleContextMenu}
+                      ondragover={handleInsertDragOver}
+                      ondrop={handleInsertDrop}
                     />
                   {/if}
                   {#if $previewModeEnabled}
@@ -622,6 +729,10 @@
         </div>
       {:else if $activeEditorTab?.type === 'settings'}
         <SettingsView />
+      {:else if $activeEditorTab?.type === 'screen'}
+        {#key $activeEditorTab.id}
+          <ScreenBuilderEditor documentId={$activeEditorTab.id} />
+        {/key}
       {:else if $activeEditorTab?.type === 'deviceProfile'}
         <DeviceProfileDesignerV2 profileId={$activeEditorTab.id} />
       {:else if $activeEditorTab?.type === 'script'}
@@ -655,7 +766,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="canvas-viewport" class:with-rulers={$showRulers} use:bindViewport class:panel-active={canvasPanel}
              onclick={handleCanvasClick} oncontextmenu={handleContextMenu}
-             onmousedown={panCtrl.handleMouseDown} onwheel={zoomCtrl.handleWheel}>
+             onmousedown={panCtrl.handleMouseDown} use:nonPassiveWheel={zoomCtrl.handleWheel}>
           <div class="canvas-stage">
             <div
               class="zoom-container"
@@ -687,6 +798,8 @@
                   onclick={handleCanvasClick}
                   onmousedown={marqueeCtrl.handleMouseDown}
                   oncontextmenu={handleContextMenu}
+                  ondragover={handleInsertDragOver}
+                  ondrop={handleInsertDrop}
                 />
               {/if}
               {#if $previewModeEnabled}
@@ -711,11 +824,12 @@
           <strong>No document open</strong>
           <span>Each opens in its own workspace.</span>
           <div class="workspace-empty-actions">
-            <button type="button" onclick={() => addPanel()}>New Panel</button>
+            <button type="button" onclick={() => openNewPanelDialog()}>New Panel</button>
             <button type="button" onclick={openPanelFromFile}>Open Panel</button>
             <button type="button" onclick={createStandaloneComponent}>New Custom Component</button>
             <button type="button" onclick={createStandaloneDeviceProfile}>New Device Profile</button>
             <button type="button" onclick={createStandaloneScriptWorkspace}>New Script Workspace</button>
+            <button type="button" onclick={createStandaloneScreen}>New Screen (CTRL49)</button>
             <button type="button" onclick={importDeviceProfile}>Import Device Profile</button>
           </div>
         </div>

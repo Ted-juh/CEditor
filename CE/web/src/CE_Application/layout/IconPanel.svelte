@@ -1,66 +1,43 @@
 <script>
-  import BadgeCheck from 'lucide-svelte/icons/badge-check';
-  import CircleDot from 'lucide-svelte/icons/circle-dot';
   import Container from 'lucide-svelte/icons/container';
-  import ArrowLeftRight from 'lucide-svelte/icons/arrow-left-right';
-  import CircleDashed from 'lucide-svelte/icons/circle-dashed';
-  import Orbit from 'lucide-svelte/icons/orbit';
-  import AudioWaveform from 'lucide-svelte/icons/audio-waveform';
-  import Waypoints from 'lucide-svelte/icons/waypoints';
-  import Palette from 'lucide-svelte/icons/palette';
-  import BarChart3 from 'lucide-svelte/icons/bar-chart-3';
-  import Circle from 'lucide-svelte/icons/circle';
-  import Sparkle from 'lucide-svelte/icons/sparkle';
-  import Link2 from 'lucide-svelte/icons/link-2';
-  import Music from 'lucide-svelte/icons/music';
-  import ListMusic from 'lucide-svelte/icons/list-music';
-  import Piano from 'lucide-svelte/icons/piano';
-  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
-  import OctagonAlert from 'lucide-svelte/icons/octagon-alert';
-  import SplitSquareHorizontal from 'lucide-svelte/icons/split-square-horizontal';
-  import Grid2x2Check from 'lucide-svelte/icons/grid-2x2-check';
-  import Disc3 from 'lucide-svelte/icons/disc-3';
-  import Layers from 'lucide-svelte/icons/layers';
-  import ListOrdered from 'lucide-svelte/icons/list-ordered';
-  import Timer from 'lucide-svelte/icons/timer';
-  import Gauge from 'lucide-svelte/icons/gauge';
-  import Spline from 'lucide-svelte/icons/spline';
-  import Grid2x2 from 'lucide-svelte/icons/grid-2x2';
-  import Crosshair from 'lucide-svelte/icons/crosshair';
-  import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
   import Library from 'lucide-svelte/icons/library';
-  import Monitor from 'lucide-svelte/icons/monitor';
   import Pin from 'lucide-svelte/icons/pin';
   import Plus from 'lucide-svelte/icons/plus';
   import Search from 'lucide-svelte/icons/search';
-  import RectangleHorizontal from 'lucide-svelte/icons/rectangle-horizontal';
-  import RefreshCw from 'lucide-svelte/icons/refresh-cw';
-  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
-  import SlidersVertical from 'lucide-svelte/icons/sliders-vertical';
-  import Square from 'lucide-svelte/icons/square';
-  import ListCollapse from 'lucide-svelte/icons/list-collapse';
-  import List from 'lucide-svelte/icons/list';
-  import TextCursorInput from 'lucide-svelte/icons/text-cursor-input';
-  import TimerReset from 'lucide-svelte/icons/timer-reset';
-  import ToggleLeft from 'lucide-svelte/icons/toggle-left';
-  import Type from 'lucide-svelte/icons/type';
   import PanelBottom from 'lucide-svelte/icons/panel-bottom';
   import PanelRight from 'lucide-svelte/icons/panel-right';
   import PanelLeftClose from 'lucide-svelte/icons/panel-left-close';
-  import { addControl, addCustomComponentPackage } from '../stores/controls.js';
+  import { addCustomComponentPackage } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
+  import InsertPanel from './InsertPanel.svelte';
 
   let {
     showDisplayPanel = true,
     showPropertiesPanel = true,
     showTreePanel = true,
+    // The rail is part of the persistent shell — it renders in every
+    // workspace. These gates say what it may DO there (workspaceChrome.js).
+    togglesEnabled = true,
+    insertEnabled = true,
     onToggleDisplay = () => {},
     onToggleProperties = () => {},
     onToggleTree = () => {},
   } = $props();
 
-  let hasActivePanel = $derived(!!$activePanel);
+  // Insertion needs an open panel AND a workspace whose canvas is that
+  // panel — the component/script/device workspaces sit over a hidden panel
+  // that must not silently receive controls.
+  let hasActivePanel = $derived(!!$activePanel && insertEnabled);
+
+  // Close the drawers when leaving the panel workspace: their click-to-insert
+  // items would be dead there.
+  $effect(() => {
+    if (!insertEnabled) {
+      insertPanelOpen = false;
+      customLibraryOpen = false;
+    }
+  });
   let customLibraryOpen = $state(false);
   let customLibraryQuery = $state('');
   let customLibraryKind = $state('all');
@@ -108,145 +85,27 @@
       .slice(0, 3);
   });
 
-  // One button per category; the components live in a flyout beside it, so
-  // the column stays short as the palette grows.
-  const insertCategories = [
-    {
-      id: 'layout',
-      label: 'Layout & Display',
-      icon: Monitor,
-      items: [
-        { type: 'Background',      icon: Square,             label: 'Insert Background' },
-        { type: 'Label',           icon: Type,               label: 'Insert Label' },
-        { type: 'TextInput',       icon: TextCursorInput,    label: 'Insert Text Input' },
-        { type: 'Container',       icon: Container,          label: 'Insert Container' },
-        { type: 'Group',           icon: Container,          label: 'Insert Group / Frame' },
-        { type: 'Image',           icon: Square,             label: 'Insert Image' },
-        { type: 'LcdDisplay',      icon: Monitor,            label: 'Insert LCD Display' },
-        { type: 'PixelDisplay',    icon: Grid3x3,            label: 'Insert Pixel Display' },
-        { type: 'Meter',           icon: Gauge,              label: 'Insert Meter' },
-      ],
-    },
-    {
-      id: 'buttons',
-      label: 'Buttons & Choices',
-      icon: ToggleLeft,
-      items: [
-        { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },
-        { type: 'ToggleButton',    icon: ToggleLeft,          label: 'Insert Toggle Button' },
-        { type: 'RadioButtonGroup', icon: CircleDot,          label: 'Insert Radio Button Group' },
-        { type: 'CyclicButton',    icon: RefreshCw,           label: 'Insert Cyclic Button' },
-        { type: 'Combobox',        icon: ListCollapse,        label: 'Insert Combobox' },
-        { type: 'Listbox',         icon: List,                label: 'Insert Listbox' },
-        { type: 'TimedButton',     icon: TimerReset,          label: 'Insert Timed Button' },
-        { type: 'OneShotButton',   icon: BadgeCheck,          label: 'Insert One-Shot Button' },
-      ],
-    },
-    {
-      id: 'values',
-      label: 'Values & Sliders',
-      icon: SlidersVertical,
-      items: [
-        { type: 'Slider',          icon: SlidersVertical,     label: 'Insert Slider' },
-        { type: 'Knob',            icon: CircleDot,           label: 'Insert Knob' },
-        { type: 'Range',           icon: SlidersHorizontal,   label: 'Insert Range' },
-        { type: 'Number',          icon: RectangleHorizontal, label: 'Insert Number' },
-        { type: 'Crossfader',      icon: ArrowLeftRight,     label: 'Insert Crossfader' },
-        { type: 'Ribbon',          icon: SlidersVertical,    label: 'Insert Ribbon / Wheel' },
-        { type: 'Macro',           icon: CircleDashed,       label: 'Insert Macro' },
-        { type: 'VectorJoystick',  icon: Crosshair,          label: 'Insert Vector Joystick' },
-        { type: 'CustomComponent', icon: Container,           label: 'Insert Custom Component' },
-      ],
-    },
-    {
-      id: 'modulation',
-      label: 'Modulation & Routing',
-      icon: Orbit,
-      items: [
-        { type: 'Envelope',        icon: Spline,             label: 'Insert Envelope' },
-        { type: 'Matrix',          icon: Grid2x2,            label: 'Insert Mod Matrix' },
-        { type: 'Orbit',           icon: Orbit,              label: 'Insert Orbit Modulator' },
-        { type: 'Looper',          icon: AudioWaveform,      label: 'Insert Gesture Looper' },
-        { type: 'Router',          icon: Waypoints,          label: 'Insert Expression Router' },
-        { type: 'Timbre',          icon: Palette,            label: 'Insert Timbre Space' },
-        { type: 'Turing',          icon: BarChart3,          label: 'Insert Turing Modulator' },
-        { type: 'Kinetic',         icon: Circle,             label: 'Insert Kinetic Modulator' },
-        { type: 'Constellation',   icon: Sparkle,            label: 'Insert Preset Constellation' },
-        { type: 'Constraint',      icon: Link2,              label: 'Insert Constraint Cell' },
-      ],
-    },
-    {
-      id: 'music',
-      label: 'Music & Performance',
-      icon: Music,
-      items: [
-        { type: 'ChordPad',        icon: Music,              label: 'Insert Chord Pad' },
-        { type: 'Arp',             icon: ListMusic,          label: 'Insert Arpeggiator' },
-        { type: 'NoteRibbon',      icon: Piano,              label: 'Insert Ribbon Keyboard' },
-        { type: 'DrumPads',        icon: LayoutGrid,         label: 'Insert Drum Pads' },
-        { type: 'Phrase',          icon: Grid2x2Check,       label: 'Insert Phrase Sequencer (note grid)' },
-        { type: 'Recorder',        icon: Disc3,              label: 'Insert Phrase Recorder (record + loop notes)' },
-        { type: 'Harmoniser',      icon: Layers,             label: 'Insert Harmoniser (one finger, full chord)' },
-        { type: 'SplitZone',       icon: SplitSquareHorizontal, label: 'Insert Zone Splitter (keyboard split)' },
-        { type: 'Setlist',         icon: ListOrdered,        label: 'Insert Setlist (scenes on a footswitch)' },
-        { type: 'Transport',       icon: Timer,              label: 'Insert Transport (master clock)' },
-        { type: 'Panic',           icon: OctagonAlert,       label: 'Insert Panic button' },
-      ],
-    },
-  ];
-
-  function itemName(item) {
-    return item.label.replace(/^Insert /, '');
-  }
-
   const customLibraryKinds = ['all', 'button', 'slider', 'multi', 'grid', 'piano', 'filmstrip', 'linked'];
 
-  let openCategoryId = $state('');
-  let flyoutTop = $state(0);
+  // One + button opens the Insert panel — the searchable, categorised,
+  // drag-enabled palette (layout/InsertPanel.svelte). It replaces the five
+  // per-category hover flyouts. Only one drawer at a time.
+  let insertPanelOpen = $state(false);
 
-  function toggleCategory(category, event) {
-    if (openCategoryId === category.id) {
-      openCategoryId = '';
-      return;
-    }
-    openCategoryId = category.id;
-    positionFlyout(event);
+  function toggleInsertPanel() {
+    insertPanelOpen = !insertPanelOpen;
+    if (insertPanelOpen) customLibraryOpen = false;
   }
 
-  function switchCategoryOnHover(category, event) {
-    // Menubar feel: once one flyout is open, hovering a sibling switches to it.
-    if (!openCategoryId || openCategoryId === category.id) return;
-    openCategoryId = category.id;
-    positionFlyout(event);
-  }
-
-  function positionFlyout(event) {
-    const rect = event?.currentTarget?.getBoundingClientRect?.();
-    const top = rect ? rect.top : 48;
-    // Keep the tallest flyout on screen; it scrolls internally past 60vh.
-    flyoutTop = Math.max(8, Math.min(top, window.innerHeight * 0.4));
-  }
-
-  function closeCategory() {
-    openCategoryId = '';
-  }
-
-  function handleWindowPointerDown(event) {
-    if (!openCategoryId) return;
-    if (event.target?.closest?.('.category-flyout, .category-btn')) return;
-    closeCategory();
+  function openLibraryFromInsert() {
+    insertPanelOpen = false;
+    customLibraryOpen = true;
   }
 
   function handleWindowKeydown(event) {
-    if (event.key === 'Escape' && openCategoryId) closeCategory();
-  }
-
-  let openCategory = $derived(insertCategories.find((category) => category.id === openCategoryId) ?? null);
-
-  function handleInsert(type) {
-    if (!hasActivePanel) return;
-    addControl(type);
-    closeCategory();
+    if (event.key !== 'Escape') return;
+    if (insertPanelOpen) insertPanelOpen = false;
+    else if (customLibraryOpen) customLibraryOpen = false;
   }
 
   function handleInsertPackage(entry) {
@@ -257,6 +116,7 @@
 
   function toggleCustomLibrary() {
     customLibraryOpen = !customLibraryOpen;
+    if (customLibraryOpen) insertPanelOpen = false;
   }
 
   function thumbnailPartStyle(part) {
@@ -306,24 +166,20 @@
   }
 </script>
 
-<svelte:window onpointerdown={handleWindowPointerDown} onkeydown={handleWindowKeydown} />
+<svelte:window onkeydown={handleWindowKeydown} />
 
 <div class="icon-panel">
   <div class="insert-section">
-    {#each insertCategories as category (category.id)}
-      <button
-        class="icon-btn category-btn"
-        class:active={openCategoryId === category.id}
-        title={category.label}
-        aria-haspopup="menu"
-        aria-expanded={openCategoryId === category.id}
-        onclick={(event) => toggleCategory(category, event)}
-        onmouseenter={(event) => switchCategoryOnHover(category, event)}
-      >
-        <category.icon size={18} strokeWidth={1.5} />
-        <i class="flyout-marker" aria-hidden="true"></i>
-      </button>
-    {/each}
+    <button
+      class="icon-btn insert-btn"
+      class:active={insertPanelOpen}
+      title="Insert a component (search, browse, drag to place)"
+      aria-haspopup="dialog"
+      aria-expanded={insertPanelOpen}
+      onclick={toggleInsertPanel}
+    >
+      <Plus size={20} strokeWidth={1.8} />
+    </button>
   </div>
 
   {#if ($customComponentLibrary ?? []).length}
@@ -360,24 +216,27 @@
   <div class="panel-toggles">
     <button
       class="icon-btn"
-      class:active={showDisplayPanel}
-      title="Toggle Display Panel"
+      class:active={togglesEnabled && showDisplayPanel}
+      title={togglesEnabled ? 'Toggle Display Panel' : 'Panels are unavailable in this workspace'}
+      disabled={!togglesEnabled}
       onclick={onToggleDisplay}
     >
       <PanelBottom size={18} strokeWidth={1.5} />
     </button>
     <button
       class="icon-btn"
-      class:active={showTreePanel}
-      title="Toggle Component Tree"
+      class:active={togglesEnabled && showTreePanel}
+      title={togglesEnabled ? 'Toggle Component Tree' : 'Panels are unavailable in this workspace'}
+      disabled={!togglesEnabled}
       onclick={onToggleTree}
     >
       <PanelLeftClose size={18} strokeWidth={1.5} />
     </button>
     <button
       class="icon-btn"
-      class:active={showPropertiesPanel}
-      title="Toggle Properties Panel"
+      class:active={togglesEnabled && showPropertiesPanel}
+      title={togglesEnabled ? 'Toggle Properties Panel' : 'Panels are unavailable in this workspace'}
+      disabled={!togglesEnabled}
       onclick={onToggleProperties}
     >
       <PanelRight size={18} strokeWidth={1.5} />
@@ -385,22 +244,12 @@
   </div>
 </div>
 
-{#if openCategory}
-  <div class="category-flyout" role="menu" aria-label={openCategory.label} style={`top:${flyoutTop}px;`}>
-    <div class="flyout-title">{openCategory.label}</div>
-    {#each openCategory.items as item (item.type)}
-      <button
-        class="flyout-item"
-        role="menuitem"
-        title={hasActivePanel ? item.label : `${item.label} (open a panel first)`}
-        onclick={() => handleInsert(item.type)}
-        disabled={!hasActivePanel}
-      >
-        <item.icon size={16} strokeWidth={1.5} />
-        <span>{itemName(item)}</span>
-      </button>
-    {/each}
-  </div>
+{#if insertPanelOpen}
+  <InsertPanel
+    {hasActivePanel}
+    onclose={() => insertPanelOpen = false}
+    onopenlibrary={openLibraryFromInsert}
+  />
 {/if}
 
 {#if customLibraryOpen}
@@ -613,66 +462,8 @@
     color: #D9A58A;
   }
 
-  .flyout-marker {
-    position: absolute;
-    right: 3px;
-    bottom: 3px;
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-bottom: 4px solid currentColor;
-    opacity: 0.55;
-  }
-
-  .category-flyout {
-    position: fixed;
-    left: 46px;
-    z-index: 90;
-    min-width: 180px;
-    max-height: 60vh;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    padding: 6px;
-    background: #242424;
-    border: 1px solid #3A3A3A;
-    border-radius: 6px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  }
-
-  .flyout-title {
-    padding: 4px 8px 6px;
-    color: #9A9A9A;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .flyout-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    background: none;
-    border: none;
-    border-radius: 4px;
-    color: #CCC;
-    font-size: 11px;
-    text-align: left;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .flyout-item:hover:not(:disabled) {
-    background: #094771;
-    color: #FFF;
-  }
-
-  .flyout-item:disabled {
-    color: #5A5A5A;
-    cursor: not-allowed;
+  .insert-btn {
+    color: #8FB8DC;
   }
 
   .custom-library-drawer {

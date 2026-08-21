@@ -2,8 +2,18 @@
   import { applyControlPatch, getSection, updateControlProperty, removeControlNode } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
-  import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import HeaderPill from '../properties/HeaderPill.svelte';
+  import Cable from 'lucide-svelte/icons/cable';
+  import Magnet from 'lucide-svelte/icons/magnet';
+  import Hash from 'lucide-svelte/icons/hash';
+  import Eye from 'lucide-svelte/icons/eye';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Brackets from 'lucide-svelte/icons/brackets';
+  import Share2 from 'lucide-svelte/icons/share-2';
+  import Type from 'lucide-svelte/icons/type';
   import { createValueChannel } from '../utils/customComponentFactory.js';
   import { normalizeCustomChannelValue, snapCustomChannelValue } from '../utils/customComponentInteraction.js';
 
@@ -194,7 +204,7 @@
 </script>
 
 {#if channels}
-  <PropertySection title="Channels">
+  <PropertySection title="Channels" icon={Hash}>
     <PropertyCell label="Add" span={3} hint="Create a named value channel for sliders, grids, modes, note selections, scroll offsets, and external links.">
       <input class="val" type="text" bind:value={newName} placeholder="channelName" />
     </PropertyCell>
@@ -214,7 +224,7 @@
   </PropertySection>
 
   {#if selected}
-    <PropertySection title="Channel Preview">
+    <PropertySection title="Channel Preview" icon={Eye}>
       <PropertyCell label="Signal" span={2} hint="Default value shown as normalized 0..1 signal.">
         <div class="signal-card">
           <div class="signal-track">
@@ -252,7 +262,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Definition">
+    <PropertySection title="Definition" icon={Pencil}>
       <PropertyCell label="Label" span={2} hint="Friendly label shown in the designer and public API.">
         <input class="val" type="text" value={selected.label ?? selectedName} onchange={(event) => set('label', event.target.value)} />
       </PropertyCell>
@@ -265,17 +275,17 @@
       </PropertyCell>
 
       {#if selectedNumeric}
-        <PropertyCell label="Min" span={1} hint="Minimum numeric value.">
-          <NumberInput value={selected.min ?? 0} step={1} onchange={(value) => set('min', value)} />
+        <PropertyCell label="Min" span={1} compact hint="Minimum numeric value.">
+          <NumberCell label="Min" value={selected.min ?? 0} step={1} defaultValue={0} onchange={(value) => set('min', value)} />
         </PropertyCell>
-        <PropertyCell label="Max" span={1} hint="Maximum numeric value.">
-          <NumberInput value={selected.max ?? 1} step={1} onchange={(value) => set('max', value)} />
+        <PropertyCell label="Max" span={1} compact hint="Maximum numeric value.">
+          <NumberCell label="Max" value={selected.max ?? 1} step={1} defaultValue={1} onchange={(value) => set('max', value)} />
         </PropertyCell>
-        <PropertyCell label="Step" span={1} hint="Legal increment for snapping and keyboard changes.">
-          <NumberInput value={selected.step ?? 0.01} step={0.01} min={0} onchange={(value) => set('step', value)} />
+        <PropertyCell label="Step" span={1} compact hint="Legal increment for snapping and keyboard changes.">
+          <NumberCell label="Step" value={selected.step ?? 0.01} step={0.01} min={0} defaultValue={0.01} onchange={(value) => set('step', value)} />
         </PropertyCell>
-        <PropertyCell label="Default" span={1} hint="Initial value when the component is inserted.">
-          <NumberInput value={selected.defaultValue ?? 0} step={selected.step ?? 0.01} onchange={(value) => set('defaultValue', value)} />
+        <PropertyCell label="Default" span={1} compact hint="Initial value when the component is inserted.">
+          <NumberCell label="Def" value={selected.defaultValue ?? 0} step={selected.step ?? 0.01} defaultValue={0} onchange={(value) => set('defaultValue', value)} />
         </PropertyCell>
       {:else}
         <PropertyCell label="Default" span={4} hint="Initial value for this non-numeric channel.">
@@ -290,10 +300,13 @@
     </PropertySection>
 
     {#if selectedNumeric}
-      <PropertySection title="Constraints">
-        <PropertyCell label="Enabled" span={1} hint="Clamp this channel before bindings, states, links, and preview output use the value.">
-          <PropertyToggle value={selected.constraints?.enabled !== false} onchange={() => set('constraints.enabled', !(selected.constraints?.enabled !== false))} />
-        </PropertyCell>
+      <PropertySection title="Constraints" icon={Brackets}>
+        {#snippet tools()}
+          <HeaderPill value={selected.constraints?.enabled !== false}
+                      title="Clamp this channel before bindings, states, links, and preview output use the value."
+                      onchange={() => set('constraints.enabled', !(selected.constraints?.enabled !== false))} />
+        {/snippet}
+        {#if selected.constraints?.enabled !== false}
         <PropertyCell label="Lower From" span={1} hint="Optional channel this value cannot go below. Use this for value >= min.">
           <select class="val" value={lowerConstraintChannel} onchange={(event) => setConstraintChannel('constraints.normalizedMin', event.target.value, 0)}>
             <option value="">Fixed minimum</option>
@@ -310,39 +323,46 @@
             {/each}
           </select>
         </PropertyCell>
-        <PropertyCell label="Range" span={1} hint="Raw normalized clamp range currently configured for this channel.">
+        <PropertyCell label="Range" span={2} hint="Raw normalized clamp range currently configured for this channel.">
           <div class="constraint-readout">
             <span>{String(selected.constraints?.normalizedMin ?? 0)}</span>
             <span>{String(selected.constraints?.normalizedMax ?? 1)}</span>
           </div>
         </PropertyCell>
         <PropertyCell label="Lower Gap" span={2} hint="Minimum normalized distance above the lower source. For max, set this to keep it above min.">
-          <NumberInput value={selected.constraints?.normalizedMinGap ?? 0} step={0.01} min={0} max={1} onchange={(value) => set('constraints.normalizedMinGap', value)} />
+          <PropertyScrub value={selected.constraints?.normalizedMinGap ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(value) => set('constraints.normalizedMinGap', value)} />
         </PropertyCell>
         <PropertyCell label="Upper Gap" span={2} hint="Minimum normalized distance below the upper source. For min, set this to keep it below max.">
-          <NumberInput value={selected.constraints?.normalizedMaxGap ?? 0} step={0.01} min={0} max={1} onchange={(value) => set('constraints.normalizedMaxGap', value)} />
+          <PropertyScrub value={selected.constraints?.normalizedMaxGap ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(value) => set('constraints.normalizedMaxGap', value)} />
         </PropertyCell>
+        {/if}
       </PropertySection>
     {/if}
 
-    <PropertySection title="Public API">
+    <PropertySection title="Public API" icon={Share2}>
       <PropertyCell label="Published" span={2} hint="Edited in the Publish tab. The channel flags follow it automatically.">
         <div class="published-chip" class:none={!publishedAsLabel}>
           <strong>{publishedAsLabel || 'not published'}</strong>
           <button type="button" onclick={jumpToPublish}>Edit in Publish</button>
         </div>
       </PropertyCell>
-      <PropertyCell label="Device" span={1} hint="Allow MIDI/device binding for this value.">
-        <PropertyToggle value={selected.deviceBindable !== false} onchange={() => set('deviceBindable', !(selected.deviceBindable !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Snap" span={1} hint="Snap this value to its defined step/ticks/grid.">
-        <PropertyToggle value={selected.snap?.enabled !== false} onchange={() => set('snap.enabled', !(selected.snap?.enabled !== false))} />
+      <PropertyCell label="Device / Snap" span={2} hint="Allow MIDI/device binding, snap the value to its defined step/ticks/grid. Hover a chip for its name.">
+        <FlagStrip
+          flags={[
+            { key: 'device', title: 'Device — allow MIDI/device binding for this value', on: selected.deviceBindable !== false, icon: Cable },
+            { key: 'snap', title: 'Snap — snap this value to its defined step/ticks/grid', on: selected.snap?.enabled !== false, icon: Magnet },
+          ]}
+          ontoggle={(key) => {
+            if (key === 'device') set('deviceBindable', !(selected.deviceBindable !== false));
+            else if (key === 'snap') set('snap.enabled', !(selected.snap?.enabled !== false));
+          }}
+        />
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Formatting & Mapping">
-      <PropertyCell label="Precision" span={1} hint="Displayed decimal precision.">
-        <NumberInput value={selected.format?.precision ?? 2} step={1} min={0} max={6} onchange={(value) => set('format.precision', Math.max(0, Math.round(value)))} />
+    <PropertySection title="Formatting & Mapping" icon={Type}>
+      <PropertyCell label="Precision" span={1} compact hint="Displayed decimal precision.">
+        <NumberCell label="Prec" value={selected.format?.precision ?? 2} step={1} min={0} max={6} defaultValue={2} onchange={(value) => set('format.precision', Math.max(0, Math.round(value)))} />
       </PropertyCell>
       <PropertyCell label="Prefix" span={1} hint="Text before formatted values.">
         <input class="val" type="text" value={selected.format?.prefix ?? ''} onchange={(event) => set('format.prefix', event.target.value)} />
@@ -360,11 +380,11 @@
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Dead Zone" span={1} hint="Optional dead-zone amount for value mapping.">
-        <NumberInput value={selected.curve?.deadZone ?? 0} step={0.01} min={0} max={1} onchange={(value) => set('curve.deadZone', value)} />
+      <PropertyCell label="Dead Zone" span={1} compact hint="Optional dead-zone amount for value mapping.">
+        <NumberCell label="DZ" value={selected.curve?.deadZone ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(value) => set('curve.deadZone', value)} />
       </PropertyCell>
-      <PropertyCell label="Hysteresis" span={1} hint="Optional hysteresis amount for stable stepped controls.">
-        <NumberInput value={selected.curve?.hysteresis ?? 0} step={0.01} min={0} max={1} onchange={(value) => set('curve.hysteresis', value)} />
+      <PropertyCell label="Hysteresis" span={1} compact hint="Optional hysteresis amount for stable stepped controls.">
+        <NumberCell label="Hys" value={selected.curve?.hysteresis ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(value) => set('curve.hysteresis', value)} />
       </PropertyCell>
     </PropertySection>
   {/if}

@@ -5,6 +5,7 @@
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
   import ImagePlus from 'lucide-svelte/icons/image-plus';
   import Pipette from 'lucide-svelte/icons/pipette';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let { getViewerRef, statusMessage = '', hoverColor = null } = $props();
 
@@ -38,22 +39,11 @@
     return getViewerRef?.()?.isEyedropper?.() ?? false;
   })());
 
-  function handleZoomInput(e) {
-    const val = parseInt(e.target.value, 10);
+  function handleZoomChange(v) {
+    const val = parseInt(v, 10);
     if (!isNaN(val)) {
       getViewerRef?.()?.setZoom?.(val);
     }
-  }
-
-  function handleZoomKey(e) {
-    if (e.key === 'Enter') {
-      e.target.blur();
-      handleZoomInput(e);
-    }
-  }
-
-  function selectAll(e) {
-    e.target.select();
   }
 </script>
 
@@ -86,16 +76,9 @@
   <div class="section">
     <div class="section-label">Zoom</div>
     <div class="zoom-display">
-      <input
-        type="number"
-        class="zoom-input"
-        value={zoomDisplay}
-        min="10"
-        max="1600"
-        onfocus={selectAll}
-        onkeydown={handleZoomKey}
-        onchange={handleZoomInput}
-      />
+      <span class="zoom-input nc-wrap">
+        <NumberCell min={10} max={1600} value={zoomDisplay} onchange={handleZoomChange} />
+      </span>
       <span class="zoom-pct">%</span>
     </div>
     <div class="toolbar-row">
@@ -163,20 +146,13 @@
     margin-bottom: 6px;
   }
 
+  /* Sizing wrapper around the zoom NumberCell. */
   .zoom-input {
-    width: 54px;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    color: #DDD;
-    font-size: 11px;
-    padding: 3px 4px;
-    border-radius: 3px;
-    text-align: center;
-    font-family: inherit;
+    width: 66px;
+    flex-shrink: 0;
   }
-  .zoom-input:focus {
-    border-color: #5B9BD5;
-    outline: none;
+  .nc-wrap {
+    display: flex;
   }
 
   .zoom-pct {

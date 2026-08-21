@@ -4,7 +4,6 @@
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
   import { ZONE_SHOW_KINDS, WIDGET_ZONE_KINDS, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
-  import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
   import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
   import { setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
   // Reset only appearance (never content: layouts/zones/text/sources).
@@ -17,7 +16,26 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Segmented from '../properties/Segmented.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Ghost from 'lucide-svelte/icons/ghost';
+  import ScanLine from 'lucide-svelte/icons/scan-line';
+  import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Monitor from 'lucide-svelte/icons/monitor';
+  import Type from 'lucide-svelte/icons/type';
+  import Hash from 'lucide-svelte/icons/hash';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+  import Files from 'lucide-svelte/icons/files';
+  import Film from 'lucide-svelte/icons/film';
+  import Palette from 'lucide-svelte/icons/palette';
+  import Lamp from 'lucide-svelte/icons/lamp';
+  import Play from 'lucide-svelte/icons/play';
+  import Square from 'lucide-svelte/icons/square';
 
   let { control = null } = $props();
 
@@ -285,7 +303,7 @@
 
 {#if display}
   <div class="lcd-inspector">
-  <PropertySection title="Screen">
+  <PropertySection title="Screen" icon={Monitor}>
     <PropertyCell label="Panel Type" span={String(display.panelType ?? '') === 'graphic' ? 4 : 2} hint="Character cells, a 7/14/16-segment display, or a graphic (free-pixel) dot-matrix.">
       <select class="val" value={display.panelType ?? 'character'} onchange={(event) => set('panelType', event.target.value)}>
         <option value="character">Character</option>
@@ -305,11 +323,11 @@
       </PropertyCell>
     {/if}
     {#if String(display.panelType ?? '') === 'graphic'}
-      <PropertyCell label="Pixels W" span={2} hint="Graphic pixel columns (0 = auto from Columns).">
-        <NumberInput value={display.pixelWidth ?? 0} step={1} min={0} max={512} onchange={(value) => set('pixelWidth', Math.round(value))} />
+      <PropertyCell label="Pixels W" span={2} compact hint="Graphic pixel columns (0 = auto from Columns).">
+        <NumberCell label="W" value={display.pixelWidth ?? 0} defaultValue={0} step={1} min={0} max={512} onchange={(value) => set('pixelWidth', Math.round(value))} />
       </PropertyCell>
-      <PropertyCell label="Pixels H" span={2} hint="Graphic pixel rows (0 = auto from Rows).">
-        <NumberInput value={display.pixelHeight ?? 0} step={1} min={0} max={512} onchange={(value) => set('pixelHeight', Math.round(value))} />
+      <PropertyCell label="Pixels H" span={2} compact hint="Graphic pixel rows (0 = auto from Rows).">
+        <NumberCell label="H" value={display.pixelHeight ?? 0} defaultValue={0} step={1} min={0} max={512} onchange={(value) => set('pixelHeight', Math.round(value))} />
       </PropertyCell>
       <PropertyCell label="Image" span={3} hint="Optional image dithered onto the grid (overrides text). Clear to show text.">
         <input class="val" type="file" accept="image/*" onchange={onPickImage} />
@@ -330,15 +348,15 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Columns" span={2} hint="Characters per line.">
-      <NumberInput value={display.cols ?? 16} step={1} min={1} max={64} onchange={(value) => set('cols', Math.round(value))} />
+    <PropertyCell label="Columns" span={2} compact hint="Characters per line.">
+      <NumberCell label="Cols" value={display.cols ?? 16} defaultValue={16} step={1} min={1} max={64} onchange={(value) => set('cols', Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Rows" span={2} hint="Number of text lines.">
-      <NumberInput value={display.rows ?? 2} step={1} min={1} max={16} onchange={(value) => set('rows', Math.round(value))} />
+    <PropertyCell label="Rows" span={2} compact hint="Number of text lines.">
+      <NumberCell label="Rows" value={display.rows ?? 2} defaultValue={2} step={1} min={1} max={16} onchange={(value) => set('rows', Math.round(value))} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Text">
+  <PropertySection title="Text" icon={Type}>
     {#each Array.from({ length: rows }) as _, index}
       <PropertyCell label={`Line ${index + 1}`} span={4} hint="Text for this row, padded or truncated to the column count. Value tokens in braces: value, pct, bar, bar:N.">
         <input class="val" type="text" value={lines[index] ?? ''} oninput={(event) => setLine(index, event.target.value)} />
@@ -346,7 +364,10 @@
     {/each}
   </PropertySection>
 
-  <PropertySection title="Value">
+  <PropertySection title="Value" icon={Hash}>
+    {#snippet tools()}
+      <button class="hdr-add" type="button" title="Add an extra value field, addressed as v2/p2/b2, v3/... in the lines." onclick={() => addField()}>+ Add</button>
+    {/snippet}
     <PropertyCell label="Source" span={4} hint="Drive the value live from another control (slider / knob / number) in preview. None = use the static value below.">
       <select class="val" value={display.valueSourceId ?? ''} onchange={(event) => setValueSource(event.target.value)}>
         <option value="">None (static value)</option>
@@ -355,17 +376,17 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Value" span={4} hint="Static value that drives the tokens (ignored in preview when a Source is set).">
-      <NumberInput value={display.value ?? 0} step={1} min={display.valueMin ?? 0} max={display.valueMax ?? 127} onchange={(value) => set('value', value)} />
+    <PropertyCell label="Value" span={4} compact hint="Static value that drives the tokens (ignored in preview when a Source is set).">
+      <NumberCell label="Val" value={display.value ?? 0} defaultValue={0} step={1} min={display.valueMin ?? 0} max={display.valueMax ?? 127} onchange={(value) => set('value', value)} />
     </PropertyCell>
-    <PropertyCell label="Min" span={2} hint="Value range minimum (for the pct and bar tokens).">
-      <NumberInput value={display.valueMin ?? 0} step={1} onchange={(value) => set('valueMin', value)} />
+    <PropertyCell label="Min" span={2} compact hint="Value range minimum (for the pct and bar tokens).">
+      <NumberCell label="Min" value={display.valueMin ?? 0} defaultValue={0} step={1} onchange={(value) => set('valueMin', value)} />
     </PropertyCell>
-    <PropertyCell label="Max" span={2} hint="Value range maximum (for the pct and bar tokens).">
-      <NumberInput value={display.valueMax ?? 127} step={1} onchange={(value) => set('valueMax', value)} />
+    <PropertyCell label="Max" span={2} compact hint="Value range maximum (for the pct and bar tokens).">
+      <NumberCell label="Max" value={display.valueMax ?? 127} defaultValue={127} step={1} onchange={(value) => set('valueMax', value)} />
     </PropertyCell>
-    <PropertyCell label="Precision" span={2} hint="Decimal places for the value token.">
-      <NumberInput value={display.valuePrecision ?? 0} step={1} min={0} max={6} onchange={(value) => set('valuePrecision', Math.round(value))} />
+    <PropertyCell label="Precision" span={2} compact hint="Decimal places for the value token.">
+      <NumberCell label="Prec" value={display.valuePrecision ?? 0} defaultValue={0} step={1} min={0} max={6} onchange={(value) => set('valuePrecision', Math.round(value))} />
     </PropertyCell>
     <PropertyCell label="Prefix" span={1} hint="Text before the value token.">
       <input class="val" type="text" value={display.valuePrefix ?? ''} oninput={(event) => set('valuePrefix', event.target.value)} />
@@ -383,18 +404,15 @@
               <option value={src.id}>{src.name}</option>
             {/each}
           </select>
-          <input class="val num" type="number" value={f.min ?? 0} onchange={(event) => setField(i, 'min', Number(event.target.value))} title="Min" />
-          <input class="val num" type="number" value={f.max ?? 127} onchange={(event) => setField(i, 'max', Number(event.target.value))} title="Max" />
+          <span class="num nc-wrap" title="Min"><NumberCell value={f.min ?? 0} defaultValue={0} step={1} onchange={(value) => setField(i, 'min', value)} /></span>
+          <span class="num nc-wrap" title="Max"><NumberCell value={f.max ?? 127} defaultValue={127} step={1} onchange={(value) => setField(i, 'max', value)} /></span>
           <button class="val rm" type="button" onclick={() => removeField(i)} title="Remove field">✕</button>
         </div>
       </PropertyCell>
     {/each}
-    <PropertyCell label="Fields" span={4} hint="Add an extra value field, addressed as v2/p2/b2, v3/... in the lines.">
-      <button class="val add-field" type="button" onclick={() => addField()}>+ Add value field</button>
-    </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Edit Field">
+  <PropertySection title="Edit Field" icon={Pencil}>
     <PropertyCell label="Text" span={4} hint="Editable text such as a preset name. Bind a zone with Show = edit to '✎ This screen's text'.">
       <input class="val" type="text" value={display.editText ?? ''} oninput={(event) => set('editText', event.target.value)} />
     </PropertyCell>
@@ -406,17 +424,20 @@
         <option value="digits">Digits</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Max Length" span={2} hint="Maximum characters (0 = unbounded). Usually match the zone width.">
-      <NumberInput value={display.editMaxLength ?? 16} step={1} min={0} max={64} onchange={(value) => set('editMaxLength', Math.round(value))} />
+    <PropertyCell label="Max Length" span={2} compact hint="Maximum characters (0 = unbounded). Usually match the zone width.">
+      <NumberCell label="Len" value={display.editMaxLength ?? 16} defaultValue={16} step={1} min={0} max={64} onchange={(value) => set('editMaxLength', Math.round(value))} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Layouts">
-    {#if layouts.length === 0}
-      <PropertyCell label="Layouts" span={4} hint="Compose the display from bound regions instead of the lines above. Add a layout to switch modes.">
-        <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts</button>
-      </PropertyCell>
-    {:else}
+  <PropertySection title="Layouts" icon={LayoutGrid}>
+    {#snippet tools()}
+      {#if layouts.length === 0}
+        <button class="hdr-add" type="button" title="Compose the display from bound regions instead of the lines above. Add a layout to switch modes." onclick={() => addLayout()}>+ Enable</button>
+      {:else}
+        <button class="hdr-add" type="button" title="Add a region to this layout." onclick={() => addZone()}>+ Zone</button>
+      {/if}
+    {/snippet}
+    {#if layouts.length > 0}
       <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Zones table edits and previews. Runtime switching is set by the Pages rules.">
         <div class="field-row">
           <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => selectEditLayout(event.target.value)}>
@@ -453,9 +474,9 @@
         {#each (editLayout.zones ?? []) as z, i (z.id ?? i)}
           <div class="zone-cell">
             <span class="zone-num" title="Zone">#{i + 1}</span>
-            <input class="val zn" type="number" min="1" title="Row" value={z.row ?? 1} onchange={(event) => setZone(i, 'row', Math.round(Number(event.target.value)))} />
-            <input class="val zn" type="number" min="1" title="Col start" value={z.colStart ?? 1} onchange={(event) => setZone(i, 'colStart', Math.round(Number(event.target.value)))} />
-            <input class="val zn" type="number" min="1" title="Col end" value={z.colEnd ?? cols} onchange={(event) => setZone(i, 'colEnd', Math.round(Number(event.target.value)))} />
+            <span class="zn nc-wrap" title="Row"><NumberCell value={z.row ?? 1} defaultValue={1} step={1} min={1} onchange={(value) => setZone(i, 'row', Math.round(value))} /></span>
+            <span class="zn nc-wrap" title="Col start"><NumberCell value={z.colStart ?? 1} defaultValue={1} step={1} min={1} onchange={(value) => setZone(i, 'colStart', Math.round(value))} /></span>
+            <span class="zn nc-wrap" title="Col end"><NumberCell value={z.colEnd ?? cols} defaultValue={cols} step={1} min={1} onchange={(value) => setZone(i, 'colEnd', Math.round(value))} /></span>
             <select class="val zsel" title="Show" value={z.show ?? 'static'} onchange={(event) => setZone(i, 'show', event.target.value)}>
               {#each ZONE_SHOW_KINDS as kind}
                 <option value={kind}>{kind}</option>
@@ -514,7 +535,7 @@
               <span class="zx-lab">Suf</span>
               <input class="val zn2" type="text" title="Suffix text" value={z.suffix ?? ''} oninput={(event) => setZone(i, 'suffix', event.target.value)} />
               <span class="zx-lab">Dec</span>
-              <input class="val zn" type="number" min="0" max="6" title="Decimal places (value kind)" value={z.precision ?? 0} onchange={(event) => setZone(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
+              <span class="zn nc-wrap" title="Decimal places (value kind)"><NumberCell value={z.precision ?? 0} defaultValue={0} step={1} min={0} max={6} onchange={(value) => setZone(i, 'precision', Math.max(0, Math.round(value)))} /></span>
               <span class="zx-lab">Lbl</span>
               <input class="val ztext" type="text" title="Custom label (name kind; empty = source name)" placeholder="(source name)" value={z.label ?? ''} oninput={(event) => setZone(i, 'label', event.target.value)} />
               <span class="zx-lab">Vis</span>
@@ -524,7 +545,7 @@
               </select>
               {#if WIDGET_ZONE_KINDS.has(z.show)}
                 <span class="zx-lab">Rows</span>
-                <input class="val zn" type="number" min="1" max="16" title="Rows tall (graphic panels)" value={z.rowSpan ?? 1} onchange={(event) => setZone(i, 'rowSpan', Math.max(1, Math.round(Number(event.target.value))))} />
+                <span class="zn nc-wrap" title="Rows tall (graphic panels)"><NumberCell value={z.rowSpan ?? 1} defaultValue={1} step={1} min={1} max={16} onchange={(value) => setZone(i, 'rowSpan', Math.max(1, Math.round(value)))} /></span>
                 <span class="zx-lab">Frame</span>
                 <select class="val zn2" title="Outline frame" value={z.frame === true ? 'on' : 'off'} onchange={(event) => setZone(i, 'frame', event.target.value === 'on')}>
                   <option value="off">off</option>
@@ -552,15 +573,17 @@
             </div>
           {/if}
         {/each}
-        <PropertyCell label="Zones" span={4} hint="Add a region to this layout.">
-          <button class="val add-field" type="button" onclick={() => addZone()}>+ Add zone</button>
-        </PropertyCell>
       {/if}
     {/if}
   </PropertySection>
 
   {#if layouts.length > 0}
-    <PropertySection title="Pages">
+    <PropertySection title="Pages" icon={Files}>
+      {#snippet tools()}
+        <button class="hdr-add" type="button" title="Add a selector value/range → layout rule. Rules match top-to-bottom; put specific ones first." onclick={() => addSelectorRow()}>+ Rule</button>
+        <button class="hdr-add" type="button" title="Add a transient page shown on a control change (for N ms, or until a change)." onclick={() => addOverlay()}>+ Overlay</button>
+        <button class="hdr-add" type="button" title="Add a control that @active is allowed to follow." onclick={() => addScope()}>+ Scope</button>
+      {/snippet}
       <PropertyCell label="Selector" span={4} hint="A control whose value selects the resting layout (e.g. a mode/preset combobox).">
         <select class="val" value={pages.selectorSourceId ?? ''} onchange={(event) => setPageProp('selectorSourceId', event.target.value)}>
           <option value="">None (always default)</option>
@@ -599,9 +622,9 @@
             {:else if op === 'eq' || op === 'ne'}
               <input class="val zn" type="text" title="Selector value" placeholder="value" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
             {:else}
-              <input class="val zn" type="number" title="Threshold" placeholder="a" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
+              <span class="zn nc-wrap" title="Threshold"><NumberCell value={m.when ?? ''} step={1} onchange={(value) => setSelectorRow(i, 'when', value)} /></span>
               {#if op === 'between'}
-                <input class="val zn" type="number" title="Upper bound" placeholder="b" value={m.when2 ?? ''} oninput={(event) => setSelectorRow(i, 'when2', event.target.value)} />
+                <span class="zn nc-wrap" title="Upper bound"><NumberCell value={m.when2 ?? ''} step={1} onchange={(value) => setSelectorRow(i, 'when2', value)} /></span>
               {/if}
             {/if}
             <select class="val" title="Layout" value={String(m.layoutId ?? '')} onchange={(event) => setSelectorRow(i, 'layoutId', event.target.value)}>
@@ -613,9 +636,6 @@
           </div>
         </PropertyCell>
       {/each}
-      <PropertyCell label="Map" span={4} hint="Add a selector value/range → layout rule. Rules match top-to-bottom; put specific ones first.">
-        <button class="val add-field" type="button" onclick={() => addSelectorRow()}>+ Add page rule</button>
-      </PropertyCell>
 
       {#each (pages.overlays ?? []) as ov, i (ov.id ?? i)}
         <PropertyCell label={`Overlay ${i + 1}`} span={4} hint="Transiently show a layout when a control changes.">
@@ -636,15 +656,12 @@
               <option value="untilChange">until</option>
             </select>
             {#if (ov.dismiss ?? 'timer') === 'timer'}
-              <input class="val zn" type="number" min="0" title="Duration ms" value={ov.duration ?? 800} onchange={(event) => setOverlay(i, 'duration', Math.round(Number(event.target.value)))} />
+              <span class="zn nc-wrap" title="Duration ms"><NumberCell value={ov.duration ?? 800} defaultValue={800} step={1} min={0} onchange={(value) => setOverlay(i, 'duration', Math.round(value))} /></span>
             {/if}
             <button class="val rm" type="button" onclick={() => removeOverlay(i)} title="Remove">✕</button>
           </div>
         </PropertyCell>
       {/each}
-      <PropertyCell label="Overlays" span={4} hint="Add a transient page shown on a control change (for N ms, or until a change).">
-        <button class="val add-field" type="button" onclick={() => addOverlay()}>+ Add overlay page</button>
-      </PropertyCell>
 
       <PropertyCell label="@active scope" span={4} hint="Restrict the @active source to these controls only. Empty = any control counts as active.">
         <span class="hint-note">{activeScope.length === 0 ? 'Any control' : `${activeScope.length} control(s)`}</span>
@@ -662,14 +679,11 @@
           </div>
         </PropertyCell>
       {/each}
-      <PropertyCell label="Scope" span={4} hint="Add a control that @active is allowed to follow.">
-        <button class="val add-field" type="button" onclick={() => addScope()}>+ Add to @active scope</button>
-      </PropertyCell>
     </PropertySection>
   {/if}
 
   {#if String(display.panelType ?? '') === 'graphic'}
-    <PropertySection title="Animation">
+    <PropertySection title="Animation" icon={Film}>
       <PropertyCell label="Mode" span={4} hint="Dot-matrix animation played behind the zones/text. File = GIF/APNG or a sprite sheet; Preset = built-in effects.">
         <select class="val" value={display.animMode ?? 'off'} onchange={(event) => set('animMode', event.target.value)}>
           <option value="off">Off</option>
@@ -681,11 +695,11 @@
         <PropertyCell label="File" span={4} hint="Animated GIF/APNG/WebP (decoded frame-by-frame), or one image holding sprite frames side-by-side.">
           <input class="val" type="file" accept="image/*" onchange={onPickAnim} />
         </PropertyCell>
-        <PropertyCell label="Frames" span={2} hint="Sprite-sheet frame count (frames laid out horizontally). 0 = the file is an animated GIF/APNG.">
-          <NumberInput value={display.animFrames ?? 0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
+        <PropertyCell label="Frames" span={2} compact hint="Sprite-sheet frame count (frames laid out horizontally). 0 = the file is an animated GIF/APNG.">
+          <NumberCell label="Frames" value={display.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
         </PropertyCell>
-        <PropertyCell label="FPS" span={1} hint="Sprite-sheet playback rate (animated files use their own frame timing).">
-          <NumberInput value={display.animFps ?? 12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />
+        <PropertyCell label="FPS" span={1} compact hint="Sprite-sheet playback rate (animated files use their own frame timing).">
+          <NumberCell label="FPS" value={display.animFps ?? 12} defaultValue={12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />
         </PropertyCell>
         <PropertyCell label="Loop" span={1} hint="Loop forever, or hold the last frame.">
           <PropertyToggle value={display.animLoop !== false} onchange={() => toggle('animLoop', true)} />
@@ -708,48 +722,36 @@
           </select>
         </PropertyCell>
         <PropertyCell label="Speed" span={2} hint="Preset speed multiplier.">
-          <NumberInput value={display.animSpeed ?? 1} step={0.1} min={0.1} max={5} onchange={(value) => set('animSpeed', value)} />
+          <PropertyScrub value={display.animSpeed ?? 1} step={0.1} min={0.1} max={5} defaultValue={1} onchange={(value) => set('animSpeed', value)} />
         </PropertyCell>
       {/if}
     </PropertySection>
   {/if}
 
-  {#snippet colourField(prop, current, fallback)}
-    <div class="field-row">
-      <input class="val cswatch" type="color" title="Pick RGB (keeps the current alpha)" value={aarrggbbToHex(current ?? fallback)} oninput={(event) => set(prop, mergeHexKeepAlpha(current ?? fallback, event.target.value))} />
-      <input class="val" type="text" title="AARRGGBB (alpha + RGB)" value={current ?? fallback} onchange={(event) => set(prop, event.target.value.trim())} />
-    </div>
-  {/snippet}
-  <PropertySection title="Colour">
-    <PropertyCell label="Lit" span={2} hint="Foreground (lit segment) colour, AARRGGBB.">
-      {@render colourField('litColour', display.litColour, 'FF2BE86A')}
-    </PropertyCell>
-    <PropertyCell label="Unlit" span={2} hint="Faint unlit 'ghost' segment colour, AARRGGBB.">
-      {@render colourField('unlitColour', display.unlitColour, '242BE86A')}
-    </PropertyCell>
-    <PropertyCell label="Screen" span={2} hint="Screen substrate behind the pixels, AARRGGBB.">
-      {@render colourField('screenColour', display.screenColour, 'FF06371C')}
-    </PropertyCell>
-    <PropertyCell label="Backlight" span={2} hint="Backlight wash colour, AARRGGBB.">
-      {@render colourField('backlightColour', display.backlightColour, 'FF0E5A2E')}
-    </PropertyCell>
-    <PropertyCell label="Glass" span={2} hint="Glass sheen overlay colour, AARRGGBB (low alpha = subtle).">
-      {@render colourField('glassTint', display.glassTint, '14FFFFFF')}
+  <PropertySection title="Colour" icon={Palette}>
+    <PropertyCell label="Screen colours" span={4} hint="Lit, unlit ghost, screen substrate, backlight wash, glass sheen. Click a swatch to edit it (with alpha) in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'litColour', label: 'Lit', value: display.litColour ?? 'FF2BE86A', target: { type: 'control', controlId: core?.id, path: 'Display.litColour' } },
+        { key: 'unlitColour', label: 'Unlit', value: display.unlitColour ?? '242BE86A', target: { type: 'control', controlId: core?.id, path: 'Display.unlitColour' } },
+        { key: 'screenColour', label: 'Screen', value: display.screenColour ?? 'FF06371C', target: { type: 'control', controlId: core?.id, path: 'Display.screenColour' } },
+        { key: 'backlightColour', label: 'Backlt', value: display.backlightColour ?? 'FF0E5A2E', target: { type: 'control', controlId: core?.id, path: 'Display.backlightColour' } },
+        { key: 'glassTint', label: 'Glass', value: display.glassTint ?? '14FFFFFF', target: { type: 'control', controlId: core?.id, path: 'Display.glassTint' } },
+      ]} />
     </PropertyCell>
     <PropertyCell label="Reset" span={4} hint="Restore the default look (colours, brightness, ghost). Leaves layouts, zones and text untouched.">
       <button class="val add-field" type="button" onclick={() => resetAppearance()}>↺ Reset appearance</button>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Lighting">
+  <PropertySection title="Lighting" icon={Lamp}>
     <PropertyCell label="Backlight" span={2} hint="Turn the backlight wash on or off.">
       <PropertyToggle value={display.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>
-    <PropertyCell label="Brightness" span={2} hint="Foreground intensity (0–100).">
-      <NumberInput value={display.brightness ?? 100} step={5} min={0} max={100} onchange={(value) => set('brightness', value)} />
+    <PropertyCell label="Brightness" span={2} hint="Foreground intensity (0–100). Drag the track, type a value, or step with ▴▾.">
+      <PropertyScrub value={display.brightness ?? 100} step={1} min={0} max={100} defaultValue={100} onchange={(value) => set('brightness', value)} />
     </PropertyCell>
-    <PropertyCell label="Contrast" span={2} hint="LCD trim-pot feel — ghost/backlight strength (0–100).">
-      <NumberInput value={display.contrast ?? 55} step={5} min={0} max={100} onchange={(value) => set('contrast', value)} />
+    <PropertyCell label="Contrast" span={2} hint="LCD trim-pot feel — ghost/backlight strength (0–100). Drag, type, or step.">
+      <PropertyScrub value={display.contrast ?? 55} step={1} min={0} max={100} defaultValue={55} onchange={(value) => set('contrast', value)} />
     </PropertyCell>
     <PropertyCell label="Bright Src" span={2} hint="Drive Brightness live from a slider/knob/number in preview (its range maps to 0–100).">
       <select class="val" value={display.brightnessSourceId ?? ''} onchange={(event) => set('brightnessSourceId', event.target.value)}>
@@ -767,64 +769,78 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Ghost dots" span={2} hint="Faint unlit cells behind the text (realism cue).">
-      <PropertyToggle value={display.showGhost !== false} onchange={() => toggle('showGhost', true)} />
-    </PropertyCell>
-    <PropertyCell label="Scanlines" span={2} hint="Horizontal scanline overlay.">
-      <PropertyToggle value={display.showScanlines === true} onchange={() => toggle('showScanlines', false)} />
-    </PropertyCell>
-    <PropertyCell label="Cell grid" span={2} hint="Faint pixel/cell grid lines.">
-      <PropertyToggle value={display.showGrid === true} onchange={() => toggle('showGrid', false)} />
-    </PropertyCell>
-    <PropertyCell label="Glass sheen" span={2} hint="Diagonal glass reflection overlay (colour set under Colour ▸ Glass).">
-      <PropertyToggle value={display.showGlass !== false} onchange={() => toggle('showGlass', true)} />
+    <PropertyCell label="Overlays" span={2} hint="Ghost dots, scanlines, cell grid, glass sheen. Hover a chip for its name; glass colour is under Colour ▸ Glass.">
+      <FlagStrip
+        flags={[
+          { key: 'showGhost', title: 'Ghost dots — faint unlit cells behind the text', on: display.showGhost !== false, icon: Ghost },
+          { key: 'showScanlines', title: 'Scanlines — horizontal scanline overlay', on: display.showScanlines === true, icon: ScanLine },
+          { key: 'showGrid', title: 'Cell grid — faint pixel/cell grid lines', on: display.showGrid === true, icon: Grid3x3 },
+          { key: 'showGlass', title: 'Glass sheen — diagonal reflection overlay', on: display.showGlass !== false, icon: Sparkles },
+        ]}
+        ontoggle={(key) => toggle(key, key === 'showGhost' || key === 'showGlass')}
+      />
     </PropertyCell>
     {#if String(display.panelType ?? '') === 'character'}
       <PropertyCell label="Dot Matrix" span={2} hint="Render character glyphs as a dot grid for a dot-matrix LCD look.">
         <PropertyToggle value={display.dotMatrix === true} onchange={() => toggle('dotMatrix', false)} />
       </PropertyCell>
-      <PropertyCell label="Dot Pitch" span={2} hint="Dot spacing in px (0 = auto from cell size).">
-        <NumberInput value={display.dotPitch ?? 0} step={1} min={0} max={20} onchange={(value) => set('dotPitch', Math.round(value))} />
+      <PropertyCell label="Dot Pitch" span={2} compact hint="Dot spacing in px (0 = auto from cell size).">
+        <NumberCell label="Pitch" value={display.dotPitch ?? 0} defaultValue={0} step={1} min={0} max={20} onchange={(value) => set('dotPitch', Math.round(value))} />
       </PropertyCell>
     {/if}
     {#if String(display.panelType ?? '') !== 'segment'}
       <PropertyCell label="Dot Shape" span={2} hint="Round (LCD/OLED) or square (blockier) dots. Applies to dot-matrix and graphic mode.">
-        <select class="val" value={display.dotShape ?? 'round'} onchange={(event) => set('dotShape', event.target.value)}>
-          <option value="round">Round</option>
-          <option value="square">Square</option>
-        </select>
+        <Segmented
+          ariaLabel="Dot shape"
+          value={display.dotShape ?? 'round'}
+          options={[
+            { value: 'round', label: 'Round' },
+            { value: 'square', label: 'Square' },
+          ]}
+          onchange={(v) => set('dotShape', v)}
+        />
       </PropertyCell>
     {/if}
   </PropertySection>
 
-  <PropertySection title="Motion">
+  <PropertySection title="Motion" icon={Play}>
     <PropertyCell label="Scroll" span={2} hint="Marquee a line that's longer than the column count.">
-      <select class="val" value={display.scroll ?? 'off'} onchange={(event) => set('scroll', event.target.value)}>
-        <option value="off">Off</option>
-        <option value="left">Left</option>
-        <option value="right">Right</option>
-      </select>
+      <Segmented
+        ariaLabel="Scroll direction"
+        value={display.scroll ?? 'off'}
+        options={[
+          { value: 'off', label: 'Off' },
+          { value: 'left', label: 'Left' },
+          { value: 'right', label: 'Right' },
+        ]}
+        onchange={(v) => set('scroll', v)}
+      />
     </PropertyCell>
     <PropertyCell label="Scroll Mode" span={2} hint="Loop wraps around; bounce ping-pongs back and forth.">
-      <select class="val" value={display.scrollMode ?? 'loop'} onchange={(event) => set('scrollMode', event.target.value)}>
-        <option value="loop">Loop</option>
-        <option value="bounce">Bounce</option>
-      </select>
+      <Segmented
+        ariaLabel="Scroll mode"
+        value={display.scrollMode ?? 'loop'}
+        options={[
+          { value: 'loop', label: 'Loop' },
+          { value: 'bounce', label: 'Bounce' },
+        ]}
+        onchange={(v) => set('scrollMode', v)}
+      />
     </PropertyCell>
     <PropertyCell label="Speed" span={2} hint="Scroll speed in characters per second.">
-      <NumberInput value={display.scrollSpeed ?? 4} step={1} min={0} max={60} onchange={(value) => set('scrollSpeed', value)} />
+      <PropertyScrub value={display.scrollSpeed ?? 4} step={1} min={0} max={60} defaultValue={4} onchange={(value) => set('scrollSpeed', value)} />
     </PropertyCell>
-    <PropertyCell label="Gap" span={2} hint="Blank characters between loop repeats.">
-      <NumberInput value={display.scrollGap ?? 3} step={1} min={0} onchange={(value) => set('scrollGap', Math.round(value))} />
+    <PropertyCell label="Gap" span={2} compact hint="Blank characters between loop repeats.">
+      <NumberCell label="Gap" value={display.scrollGap ?? 3} defaultValue={3} step={1} min={0} onchange={(value) => set('scrollGap', Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Repeat" span={2} hint="Number of times to scroll, then settle. 0 = loop forever.">
-      <NumberInput value={display.scrollRepeat ?? 0} step={1} min={0} onchange={(value) => set('scrollRepeat', Math.round(value))} />
+    <PropertyCell label="Repeat" span={2} compact hint="Number of times to scroll, then settle. 0 = loop forever.">
+      <NumberCell label="Rep" value={display.scrollRepeat ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('scrollRepeat', Math.round(value))} />
     </PropertyCell>
     <PropertyCell label="Blink" span={2} hint="Blink the lit text on and off.">
       <PropertyToggle value={display.blink === true} onchange={() => toggle('blink', false)} />
     </PropertyCell>
-    <PropertyCell label="Blink Rate" span={2} hint="Milliseconds per blink half-cycle.">
-      <NumberInput value={display.blinkRate ?? 500} step={50} min={60} onchange={(value) => set('blinkRate', value)} />
+    <PropertyCell label="Blink Rate" span={2} compact hint="Milliseconds per blink half-cycle.">
+      <NumberCell label="Rate" value={display.blinkRate ?? 500} defaultValue={500} step={50} min={60} onchange={(value) => set('blinkRate', value)} />
     </PropertyCell>
     <PropertyCell label="Cursor" span={2} hint="Show a cursor cell.">
       <select class="val" value={display.cursor ?? 'off'} onchange={(event) => set('cursor', event.target.value)}>
@@ -836,26 +852,26 @@
     <PropertyCell label="Cursor Blink" span={2} hint="Blink the cursor.">
       <PropertyToggle value={display.cursorBlink !== false} onchange={() => toggle('cursorBlink', true)} />
     </PropertyCell>
-    <PropertyCell label="Cursor Row" span={2} hint="Cursor row (0-based).">
-      <NumberInput value={display.cursorRow ?? 0} step={1} min={0} onchange={(value) => set('cursorRow', Math.round(value))} />
+    <PropertyCell label="Cursor Row" span={2} compact hint="Cursor row (0-based).">
+      <NumberCell label="Row" value={display.cursorRow ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('cursorRow', Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Cursor Col" span={2} hint="Cursor column (0-based).">
-      <NumberInput value={display.cursorCol ?? 0} step={1} min={0} onchange={(value) => set('cursorCol', Math.round(value))} />
+    <PropertyCell label="Cursor Col" span={2} compact hint="Cursor column (0-based).">
+      <NumberCell label="Col" value={display.cursorCol ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('cursorCol', Math.round(value))} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Layout">
-    <PropertyCell label="Padding" span={2} hint="Inset from the bezel to the screen (px).">
-      <NumberInput value={display.padding ?? 10} step={1} min={0} onchange={(value) => set('padding', value)} />
+  <PropertySection title="Layout" icon={Square}>
+    <PropertyCell label="Padding" span={2} compact hint="Inset from the bezel to the screen (px).">
+      <NumberCell label="Pad" value={display.padding ?? 10} defaultValue={10} step={1} min={0} onchange={(value) => set('padding', value)} />
     </PropertyCell>
     <PropertyCell label="Font Scale" span={2} hint="Relative glyph size.">
-      <NumberInput value={display.fontScale ?? 1} step={0.05} min={0.3} max={3} onchange={(value) => set('fontScale', value)} />
+      <PropertyScrub value={display.fontScale ?? 1} step={0.05} min={0.3} max={3} defaultValue={1} onchange={(value) => set('fontScale', value)} />
     </PropertyCell>
-    <PropertyCell label="Char Gap" span={2} hint="Extra spacing between characters (px).">
-      <NumberInput value={display.charSpacing ?? 1} step={1} min={0} onchange={(value) => set('charSpacing', value)} />
+    <PropertyCell label="Char Gap" span={2} compact hint="Extra spacing between characters (px).">
+      <NumberCell label="Gap" value={display.charSpacing ?? 1} defaultValue={1} step={1} min={0} onchange={(value) => set('charSpacing', value)} />
     </PropertyCell>
-    <PropertyCell label="Line Gap" span={2} hint="Extra spacing between rows (px).">
-      <NumberInput value={display.lineSpacing ?? 3} step={1} min={0} onchange={(value) => set('lineSpacing', value)} />
+    <PropertyCell label="Line Gap" span={2} compact hint="Extra spacing between rows (px).">
+      <NumberCell label="Gap" value={display.lineSpacing ?? 3} defaultValue={3} step={1} min={0} onchange={(value) => set('lineSpacing', value)} />
     </PropertyCell>
   </PropertySection>
   </div>
@@ -906,23 +922,43 @@
     flex: 0 0 auto;
   }
 
+  /* Fixed-width shell around a NumberCell in rows/tables: the cell fills the
+     span instead of flexing the column open. */
+  .nc-wrap {
+    display: flex;
+  }
+
   .field-row .rm {
     width: 30px;
     flex: 0 0 auto;
     cursor: pointer;
   }
 
-  .field-row .cswatch {
-    width: 30px;
-    flex: 0 0 auto;
-    padding: 1px;
-    height: 24px;
-    cursor: pointer;
-  }
-
   .add-field {
     cursor: pointer;
     text-align: center;
+  }
+
+  /* Compact add-buttons in the section header's tools slot (HeaderPill palette). */
+  .hdr-add {
+    height: 16px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #252525;
+    color: #777;
+    font-size: 9px;
+    font-family: inherit;
+    cursor: pointer;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  .hdr-add:hover {
+    color: #CCC;
+    border-color: #4A6E8C;
   }
 
   .hint-note {

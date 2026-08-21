@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { readText } from './support/readText.mjs';
+import { assertSameText, readText } from './support/readText.mjs';
 
 import { render } from 'svelte/server';
 import CanvasControl from '../src/CE_Application/editor/CanvasControl.svelte';
@@ -82,6 +82,44 @@ test('no two interactive controls overlap', () => {
   assert.deepEqual(collisions.slice(0, 8), [], `overlapping controls:\n  ${collisions.slice(0, 8).join('\n  ')}`);
 });
 
+test('no two captions overlap each other', () => {
+  // The overlap gate above deliberately exempts labels, because a caption is drawn over the box it
+  // belongs to. That exemption was too wide: two CAPTIONS on top of each other is never by design,
+  // and it is invisible in a diff — you get two words in the same box and read neither. This caught
+  // a printed caveat landing on the effect knobs' captions the day it was added.
+  //
+  // INK, NOT BOXES. A caption's box is deliberately generous — 70px under a 42px knob — and centred,
+  // so adjacent knobs' caption boxes touch by design and always have. Comparing boxes flagged seven
+  // pairs that are nowhere near each other on screen. So the rects compared here are the estimated
+  // TEXT extents: centred in the box, about 0.6em per character, which is close enough for "are
+  // these two words in the same place" and wrong in the safe direction for anything else.
+  const ink = (control) => {
+    const t = control._children.Transform;
+    const text = String(control._children?.Text?.content ?? '');
+    const longest = Math.max(...text.split('\n').map((line) => line.length), 0);
+    const size = Number(control._children?.Text?._children?.Font?.size ?? 9);
+    const width = Math.min(t.width, longest * size * 0.6);
+    return { x: t.x + (t.width - width) / 2, y: t.y, width, height: t.height };
+  };
+
+  const captions = panel.controls
+    .filter((c) => String(c._children?.Core?.controlType) === 'Label'
+      && (c._children?.DeviceBindings?.bindings ?? []).length === 0
+      && String(c._children?.Text?.content ?? '').trim())
+    .map((c) => ({ id: `${c._children.Core.id} "${String(c._children.Text.content).replace(/\n/g, ' ')}"`, ...ink(c) }));
+
+  const collisions = [];
+  for (let i = 0; i < captions.length; i++) {
+    for (let j = i + 1; j < captions.length; j++) {
+      const a = captions[i], b = captions[j];
+      if (a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height) {
+        collisions.push(`${a.id} over ${b.id}`);
+      }
+    }
+  }
+  assert.deepEqual(collisions.slice(0, 8), [], `overlapping captions:\n  ${collisions.slice(0, 8).join('\n  ')}`);
+});
+
 test('every control renders', () => {
   const controls = JSON.parse(serializeGaiaPanel()).controls.map(expandControl);
   const failures = [];
@@ -97,6 +135,7 @@ test('every control renders', () => {
 });
 
 test('the committed panel matches the generator', () => {
-  assert.equal(readText(PANEL), serializeGaiaPanel(),
-    'CE/panels/Roland GAIA SH-01.cepanel is stale — run: node tools/scripts/gaia-panel/make-gaia-panel.mjs');
+  assertSameText(readText(PANEL), serializeGaiaPanel(),
+    'CE/panels/Roland GAIA SH-01.cepanel is stale — run: node tools/scripts/gaia-panel/make-gaia-panel.mjs',
+    { actual: 'committed', expected: 'the generator' });
 });

@@ -7,9 +7,26 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import PropertyScrub from '../properties/PropertyScrub.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import Segmented from '../properties/Segmented.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Grip from 'lucide-svelte/icons/grip';
+  import Palette from 'lucide-svelte/icons/palette';
+  import Ghost from 'lucide-svelte/icons/ghost';
+  import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
+  import ScanLine from 'lucide-svelte/icons/scan-line';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Monitor from 'lucide-svelte/icons/monitor';
+  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+  import Files from 'lucide-svelte/icons/files';
+  import Shapes from 'lucide-svelte/icons/shapes';
+  import Film from 'lucide-svelte/icons/film';
+  import Lamp from 'lucide-svelte/icons/lamp';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Type from 'lucide-svelte/icons/type';
   import { isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
-  import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
   import { ICON_GLYPHS } from '../utils/pixelFont.js';
   import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
   const ICON_NAMES = Object.keys(ICON_GLYPHS);
@@ -318,12 +335,12 @@
 
 {#if pixel}
   <div class="lcd-inspector">
-  <PropertySection title="Screen">
-    <PropertyCell label="Pixels W" span={2} hint="Grid resolution: pixel columns. All element coordinates refer to this grid.">
-      <NumberInput value={pixel.pixelsW ?? 128} step={1} min={8} max={1024} onchange={(value) => set('pixelsW', Math.round(value))} />
+  <PropertySection title="Screen" icon={Monitor}>
+    <PropertyCell label="Pixels W" span={2} compact hint="Grid resolution: pixel columns. All element coordinates refer to this grid.">
+      <NumberCell label="W" value={pixel.pixelsW ?? 128} defaultValue={128} step={1} min={8} max={1024} onchange={(value) => set('pixelsW', Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Pixels H" span={2} hint="Grid resolution: pixel rows.">
-      <NumberInput value={pixel.pixelsH ?? 64} step={1} min={8} max={1024} onchange={(value) => set('pixelsH', Math.round(value))} />
+    <PropertyCell label="Pixels H" span={2} compact hint="Grid resolution: pixel rows.">
+      <NumberCell label="H" value={pixel.pixelsH ?? 64} defaultValue={64} step={1} min={8} max={1024} onchange={(value) => set('pixelsH', Math.round(value))} />
     </PropertyCell>
     <PropertyCell label="Grid" span={2} hint="The working resolution all X/Y/W/H values refer to.">
       <span class="hint-note">{pixelsW} × {pixelsH} px</span>
@@ -338,11 +355,14 @@
     <PropertyCell label="Image" span={3} hint="Static image dithered onto the grid (drawn behind the elements). Clear to remove.">
       <input class="val" type="file" accept="image/*" onchange={onPickImage} />
     </PropertyCell>
-    <PropertyCell label="Dither" span={1} hint="Floyd–Steinberg dither vs hard threshold.">
-      <PropertyToggle value={pixel.imageDither !== false} onchange={() => toggle('imageDither', true)} />
-    </PropertyCell>
-    <PropertyCell label="Img Colour" span={2} hint="Keep the image's colours (posterized, LED-panel look) instead of 1-bit dots.">
-      <PropertyToggle value={pixel.imageColour === true} onchange={() => toggle('imageColour', false)} />
+    <PropertyCell label="Render" span={1} hint="Dither and keep-colour for the image. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'imageDither', title: 'Dither — Floyd–Steinberg dither vs hard threshold', on: pixel.imageDither !== false, icon: Grip },
+          { key: 'imageColour', title: "Colour — keep the image's colours (posterized, LED-panel look) instead of 1-bit dots", on: pixel.imageColour === true, icon: Palette },
+        ]}
+        ontoggle={(key) => toggle(key, key === 'imageDither')}
+      />
     </PropertyCell>
     {#if pixel.imageSrc}
       <PropertyCell label="Clear Image" span={4} hint="Remove the image.">
@@ -351,12 +371,13 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Layouts">
-    {#if layouts.length === 0}
-      <PropertyCell label="Layouts" span={4} hint="Multiple element scenes for one screen, switched by the Pages rules. Enabling moves current elements into Layout 1.">
-        <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts</button>
-      </PropertyCell>
-    {:else}
+  <PropertySection title="Layouts" icon={LayoutGrid}>
+    {#snippet tools()}
+      {#if layouts.length === 0}
+        <button class="hdr-add" type="button" title="Multiple element scenes for one screen, switched by the Pages rules. Enabling moves current elements into Layout 1." onclick={() => addLayout()}>+ Enable</button>
+      {/if}
+    {/snippet}
+    {#if layouts.length > 0}
       <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Elements table edits and previews. Runtime switching follows the Pages rules.">
         <div class="field-row">
           <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => selectEditLayout(event.target.value)}>
@@ -373,20 +394,29 @@
         <input class="val" type="text" value={editLayout?.name ?? ''} oninput={(event) => renameLayout(editLayout?.id, event.target.value)} />
       </PropertyCell>
       <PropertyCell label="Transition" span={2} hint="Animate the new layout in when switching (runtime preview).">
-        <select class="val" value={pixel.layoutTransition ?? 'none'} onchange={(event) => set('layoutTransition', event.target.value)}>
-          <option value="none">None</option>
-          <option value="fade">Fade in</option>
-          <option value="slide">Slide in</option>
-        </select>
+        <Segmented
+          ariaLabel="Layout transition"
+          value={pixel.layoutTransition ?? 'none'}
+          options={[
+            { value: 'none', label: 'None' },
+            { value: 'fade', label: 'Fade in' },
+            { value: 'slide', label: 'Slide in' },
+          ]}
+          onchange={(v) => set('layoutTransition', v)}
+        />
       </PropertyCell>
       <PropertyCell label="Duration" span={2} hint="Transition length (ms).">
-        <NumberInput value={pixel.transitionMs ?? 250} step={50} min={0} max={2000} onchange={(value) => set('transitionMs', Math.max(0, Math.round(value)))} />
+        <PropertyScrub value={pixel.transitionMs ?? 250} step={50} min={0} max={2000} defaultValue={250} onchange={(value) => set('transitionMs', Math.max(0, Math.round(value)))} />
       </PropertyCell>
     {/if}
   </PropertySection>
 
   {#if layouts.length > 0}
-    <PropertySection title="Pages">
+    <PropertySection title="Pages" icon={Files}>
+      {#snippet tools()}
+        <button class="hdr-add" type="button" title="Add a selector value/range → layout rule. Rules match top-to-bottom; put specific ones first." onclick={() => addSelectorRow()}>+ Rule</button>
+        <button class="hdr-add" type="button" title="Add a transient page shown on a control change (for N ms, or until a change)." onclick={() => addOverlay()}>+ Overlay</button>
+      {/snippet}
       <PropertyCell label="Selector" span={4} hint="A control whose value selects the resting layout (e.g. a mode/preset combobox).">
         <select class="val" value={pages.selectorSourceId ?? ''} onchange={(event) => setPageProp('selectorSourceId', event.target.value)}>
           <option value="">None (always default)</option>
@@ -425,9 +455,9 @@
             {:else if op === 'eq' || op === 'ne'}
               <input class="val en" type="text" title="Selector value" placeholder="value" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
             {:else}
-              <input class="val en" type="number" title="Threshold" placeholder="a" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
+              <span class="en nc-wrap" title="Threshold"><NumberCell value={m.when ?? ''} step={1} onchange={(value) => setSelectorRow(i, 'when', value)} /></span>
               {#if op === 'between'}
-                <input class="val en" type="number" title="Upper bound" placeholder="b" value={m.when2 ?? ''} oninput={(event) => setSelectorRow(i, 'when2', event.target.value)} />
+                <span class="en nc-wrap" title="Upper bound"><NumberCell value={m.when2 ?? ''} step={1} onchange={(value) => setSelectorRow(i, 'when2', value)} /></span>
               {/if}
             {/if}
             <select class="val" title="Layout" value={String(m.layoutId ?? '')} onchange={(event) => setSelectorRow(i, 'layoutId', event.target.value)}>
@@ -439,9 +469,6 @@
           </div>
         </PropertyCell>
       {/each}
-      <PropertyCell label="Map" span={4} hint="Add a selector value/range → layout rule. Rules match top-to-bottom; put specific ones first.">
-        <button class="val add-field" type="button" onclick={() => addSelectorRow()}>+ Add page rule</button>
-      </PropertyCell>
 
       {#each (pages.overlays ?? []) as ov, i (ov.id ?? i)}
         <PropertyCell label={`Overlay ${i + 1}`} span={4} hint="Transiently show a layout when a control changes.">
@@ -462,19 +489,20 @@
               <option value="untilChange">until</option>
             </select>
             {#if (ov.dismiss ?? 'timer') === 'timer'}
-              <input class="val en" type="number" min="0" title="Duration ms" value={ov.duration ?? 800} onchange={(event) => setOverlay(i, 'duration', Math.round(Number(event.target.value)))} />
+              <span class="en nc-wrap" title="Duration ms"><NumberCell value={ov.duration ?? 800} defaultValue={800} step={1} min={0} onchange={(value) => setOverlay(i, 'duration', Math.round(value))} /></span>
             {/if}
             <button class="val erm" type="button" onclick={() => removeOverlay(i)} title="Remove">✕</button>
           </div>
         </PropertyCell>
       {/each}
-      <PropertyCell label="Overlays" span={4} hint="Add a transient page shown on a control change (for N ms, or until a change).">
-        <button class="val add-field" type="button" onclick={() => addOverlay()}>+ Add overlay page</button>
-      </PropertyCell>
     </PropertySection>
   {/if}
 
-  <PropertySection title="Elements">
+  <PropertySection title="Elements" icon={Shapes}>
+    {#snippet tools()}
+      <button class="hdr-add" type="button" title="Add a pixel-addressed element. Text kinds draw at X/Y with font height H; widgets fill the X/Y/W/H rect." onclick={() => addElement()}>+ Element</button>
+      <button class="hdr-add" type="button" title="Add a control that ★ Active may follow." onclick={() => addScope()}>+ Scope</button>
+    {/snippet}
     {#if elements.length > 0}
       <div class="el-head">
         <span class="el-num">#</span>
@@ -496,10 +524,10 @@
             <option value={kind}>{kind}</option>
           {/each}
         </select>
-        <input class="val en" type="number" title="X (px)" value={el.x ?? 0} onchange={(event) => setElement(i, 'x', Math.round(Number(event.target.value)))} />
-        <input class="val en" type="number" title="Y (px)" value={el.y ?? 0} onchange={(event) => setElement(i, 'y', Math.round(Number(event.target.value)))} />
-        <input class="val en" type="number" title="Width (px); for text: alignment/clip box (0 = none)" value={el.w ?? 0} onchange={(event) => setElement(i, 'w', Math.round(Number(event.target.value)))} />
-        <input class="val en" type="number" title="Height (px); for text: font height" value={el.h ?? 8} onchange={(event) => setElement(i, 'h', Math.round(Number(event.target.value)))} />
+        <span class="en nc-wrap" title="X (px)"><NumberCell value={el.x ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'x', Math.round(value))} /></span>
+        <span class="en nc-wrap" title="Y (px)"><NumberCell value={el.y ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'y', Math.round(value))} /></span>
+        <span class="en nc-wrap" title="Width (px); for text: alignment/clip box (0 = none)"><NumberCell value={el.w ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'w', Math.round(value))} /></span>
+        <span class="en nc-wrap" title="Height (px); for text: font height"><NumberCell value={el.h ?? 8} defaultValue={8} step={1} onchange={(value) => setElement(i, 'h', Math.round(value))} /></span>
         {#if el.kind === 'static'}
           <input class="val etext" type="text" placeholder="caption text" value={el.text ?? ''} oninput={(event) => setElement(i, 'text', event.target.value)} />
         {:else if el.kind === 'icon'}
@@ -550,7 +578,9 @@
           {#if el.kind === 'bitmap'}
             {@const bd = bitmapDims(el)}
             <div class="ex-row">
-              <input class="val cswatch" type="color" title="Bitmap colour" value={aarrggbbToHex(el.colour || 'FF2BE86A')} oninput={(event) => setElement(i, 'colour', mergeHexKeepAlpha(el.colour || 'FF000000', event.target.value))} />
+              <span class="elcol"><SwatchCluster swatches={[
+                { key: 'colour', label: 'Colour', value: el.colour || 'FF2BE86A', target: { type: 'callback', apply: (hex) => setElement(i, 'colour', hex) } },
+              ]} /></span>
               <button class="val add-field" type="button" onclick={() => clearPaint(i)}>Clear</button>
               <button class="val add-field" type="button" onclick={() => invertPaint(i, el)}>Invert</button>
               <span class="ex-lab">{bd.w}×{bd.h}</span>
@@ -572,9 +602,9 @@
             {#if el.kind === 'anim'}
               {#if (el.animMode ?? 'preset') === 'file'}
                 <input class="val ex-fill" type="file" accept="image/*" title="Animated GIF/APNG/WebP, or a sprite sheet" onchange={(event) => onPickElementAnim(i, event)} />
-                <input class="val en" type="number" min="0" max="180" title="Sprite frame count (0 = animated file)" placeholder="frames" value={el.animFrames ?? 0} onchange={(event) => setElement(i, 'animFrames', Math.max(0, Math.round(Number(event.target.value))))} />
-                <input class="val en" type="number" min="0" max="64" title="Sprite columns (0 = single horizontal strip)" placeholder="cols" value={el.animSpriteCols ?? 0} onchange={(event) => setElement(i, 'animSpriteCols', Math.max(0, Math.round(Number(event.target.value))))} />
-                <input class="val en" type="number" min="1" max="60" title="Sprite FPS" value={el.animFps ?? 12} onchange={(event) => setElement(i, 'animFps', Math.max(1, Math.round(Number(event.target.value))))} />
+                <span class="en nc-wrap" title="Sprite frame count (0 = animated file)"><NumberCell value={el.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => setElement(i, 'animFrames', Math.max(0, Math.round(value)))} /></span>
+                <span class="en nc-wrap" title="Sprite columns (0 = single horizontal strip)"><NumberCell value={el.animSpriteCols ?? 0} defaultValue={0} step={1} min={0} max={64} onchange={(value) => setElement(i, 'animSpriteCols', Math.max(0, Math.round(value)))} /></span>
+                <span class="en nc-wrap" title="Sprite FPS"><NumberCell value={el.animFps ?? 12} defaultValue={12} step={1} min={1} max={60} onchange={(value) => setElement(i, 'animFps', Math.max(1, Math.round(value)))} /></span>
                 <label class="ex-chk" title="Loop, or hold the last frame"><input type="checkbox" checked={el.animLoop !== false} onchange={(event) => setElement(i, 'animLoop', event.target.checked)} />Loop</label>
                 <label class="ex-chk" title="Keep the file's colours (posterized) instead of 1-bit dither"><input type="checkbox" checked={el.animColour === true} onchange={(event) => setElement(i, 'animColour', event.target.checked)} />Clr</label>
               {:else}
@@ -586,7 +616,7 @@
                   <option value="spinner">Spinner</option>
                   <option value="plasma">Plasma</option>
                 </select>
-                <input class="val en" type="number" min="0.1" max="5" step="0.1" title="Speed multiplier" value={el.animSpeed ?? 1} onchange={(event) => setElement(i, 'animSpeed', Number(event.target.value))} />
+                <span class="en nc-wrap" title="Speed multiplier"><NumberCell value={el.animSpeed ?? 1} defaultValue={1} step={0.1} min={0.1} max={5} onchange={(value) => setElement(i, 'animSpeed', value)} /></span>
                 <label class="ex-chk" title="Hue-cycling colour"><input type="checkbox" checked={el.animColour === true} onchange={(event) => setElement(i, 'animColour', event.target.checked)} />Clr</label>
               {/if}
             {:else}
@@ -597,7 +627,7 @@
               </select>
               <input class="val en" type="text" title="Prefix text" placeholder="pre" value={el.prefix ?? ''} oninput={(event) => setElement(i, 'prefix', event.target.value)} />
               <input class="val en" type="text" title="Suffix text" placeholder="suf" value={el.suffix ?? ''} oninput={(event) => setElement(i, 'suffix', event.target.value)} />
-              <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
+              <span class="en nc-wrap" title="Decimal places (value kind)"><NumberCell value={el.precision ?? 0} defaultValue={0} step={1} min={0} max={6} onchange={(value) => setElement(i, 'precision', Math.max(0, Math.round(value)))} /></span>
               <input class="val ex-fill" type="text" title="Caption under the widget, or the name override for name kind" placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
               <label class="ex-chk" title="Marquee-scroll the text when it overflows the W box"><input type="checkbox" checked={el.scroll === true} onchange={(event) => setElement(i, 'scroll', event.target.checked)} />Scrl</label>
               <label class="ex-chk" title="Word-wrap into stacked lines (overrides scroll)"><input type="checkbox" checked={el.wrap === true} onchange={(event) => setElement(i, 'wrap', event.target.checked)} />Wrap</label>
@@ -611,7 +641,9 @@
                 <label class="ex-chk" title="Show the MIDI value in hexadecimal (00–7F)"><input type="checkbox" checked={el.radix === 'hex'} onchange={(event) => setElement(i, 'radix', event.target.checked ? 'hex' : 'dec')} />Hex</label>
               {/if}
             {/if}
-            <input class="val cswatch" type="color" title="Pick element colour (keeps alpha)" value={aarrggbbToHex(el.colour || 'FF2BE86A')} oninput={(event) => setElement(i, 'colour', mergeHexKeepAlpha(el.colour || 'FF000000', event.target.value))} />
+            <span class="elcol"><SwatchCluster swatches={[
+              { key: 'colour', label: 'Colour', value: el.colour || 'FF2BE86A', target: { type: 'callback', apply: (hex) => setElement(i, 'colour', hex) } },
+            ]} /></span>
             <input class="val ecol" type="text" title="Element colour AARRGGBB or RRGGBB (empty = panel lit colour)" placeholder="colour" value={el.colour ?? ''} onchange={(event) => setElement(i, 'colour', event.target.value.trim())} />
             <label class="ex-chk" title="Element visible"><input type="checkbox" checked={el.visible !== false} onchange={(event) => setElement(i, 'visible', event.target.checked)} />Vis</label>
             <label class="ex-chk" title="Blink this element on/off (~530ms)"><input type="checkbox" checked={el.blink === true} onchange={(event) => setElement(i, 'blink', event.target.checked)} />Blk</label>
@@ -634,11 +666,11 @@
                 <option value="square">sqr</option>
               </select>
               <span class="ex-lab">Cyc</span>
-              <input class="val en" type="number" min="0.25" max="16" step="0.25" title="Cycles shown across the width" value={el.waveCycles ?? 2} onchange={(event) => setElement(i, 'waveCycles', Number(event.target.value))} />
+              <span class="en nc-wrap" title="Cycles shown across the width"><NumberCell value={el.waveCycles ?? 2} defaultValue={2} step={0.25} min={0.25} max={16} onchange={(value) => setElement(i, 'waveCycles', value)} /></span>
               <span class="ex-lab">Spd</span>
-              <input class="val en" type="number" min="0" max="10" step="0.1" title="Phase scroll speed" value={el.waveSpeed ?? 1} onchange={(event) => setElement(i, 'waveSpeed', Number(event.target.value))} />
+              <span class="en nc-wrap" title="Phase scroll speed"><NumberCell value={el.waveSpeed ?? 1} defaultValue={1} step={0.1} min={0} max={10} onchange={(value) => setElement(i, 'waveSpeed', value)} /></span>
               <span class="ex-lab">Dep</span>
-              <input class="val en" type="number" min="0" max="1" step="0.05" title="LFO wobble depth (needs an LFO source)" value={el.waveDepth ?? 0.5} onchange={(event) => setElement(i, 'waveDepth', Number(event.target.value))} />
+              <span class="en nc-wrap" title="LFO wobble depth (needs an LFO source)"><NumberCell value={el.waveDepth ?? 0.5} defaultValue={0.5} step={0.05} min={0} max={1} onchange={(value) => setElement(i, 'waveDepth', value)} /></span>
               <span class="ex-lab">Frm</span>
               <input type="checkbox" class="ex-chk" title="Outline frame" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />
               <span class="ex-lab">Cut</span>
@@ -706,7 +738,7 @@
             {/if}
             {#if el.kind === 'scope'}
               <span class="ex-lab">Secs</span>
-              <input class="val en" type="number" min="0.25" max="60" step="0.25" title="Time window the trace spans" value={el.scopeSecs ?? 3} onchange={(event) => setElement(i, 'scopeSecs', Number(event.target.value))} />
+              <span class="en nc-wrap" title="Time window the trace spans"><NumberCell value={el.scopeSecs ?? 3} defaultValue={3} step={0.25} min={0.25} max={60} onchange={(value) => setElement(i, 'scopeSecs', value)} /></span>
               <label class="ex-chk" title="Fill under the trace"><input type="checkbox" checked={el.scopeFill === true} onchange={(event) => setElement(i, 'scopeFill', event.target.checked)} />Fill</label>
               <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
               <label class="ex-chk" title="Colour the trace by level (green/yellow/red)"><input type="checkbox" checked={el.meterColours === true} onchange={(event) => setElement(i, 'meterColours', event.target.checked)} />Clr</label>
@@ -718,9 +750,6 @@
         </div>
       {/if}
     {/each}
-    <PropertyCell label="Elements" span={4} hint="Add a pixel-addressed element. Text kinds draw at X/Y with font height H; widgets fill the X/Y/W/H rect.">
-      <button class="val add-field" type="button" onclick={() => addElement()}>+ Add element</button>
-    </PropertyCell>
 
     {#each groupNames as g (g)}
       <PropertyCell label={`Group “${g}”`} span={4} hint="Elements in this group drag together on screen; toggle to show/hide them all.">
@@ -744,12 +773,9 @@
         </div>
       </PropertyCell>
     {/each}
-    <PropertyCell label="Scope" span={4} hint="Add a control that ★ Active may follow.">
-      <button class="val add-field" type="button" onclick={() => addScope()}>+ Add to @active scope</button>
-    </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Animation">
+  <PropertySection title="Animation" icon={Film}>
     <PropertyCell label="Mode" span={4} hint="Dot-matrix animation played behind the elements. File = GIF/APNG or a sprite sheet; Preset = built-in effects.">
       <select class="val" value={pixel.animMode ?? 'off'} onchange={(event) => set('animMode', event.target.value)}>
         <option value="off">Off</option>
@@ -761,14 +787,14 @@
       <PropertyCell label="File" span={4} hint="Animated GIF/APNG/WebP (decoded frame-by-frame), or one image holding sprite frames side-by-side.">
         <input class="val" type="file" accept="image/*" onchange={onPickAnim} />
       </PropertyCell>
-      <PropertyCell label="Frames" span={2} hint="Sprite-sheet frame count. 0 = the file is an animated GIF/APNG.">
-        <NumberInput value={pixel.animFrames ?? 0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
+      <PropertyCell label="Frames" span={2} compact hint="Sprite-sheet frame count. 0 = the file is an animated GIF/APNG.">
+        <NumberCell label="Frames" value={pixel.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
       </PropertyCell>
-      <PropertyCell label="Cols" span={1} hint="Sprite columns. 0 = single horizontal strip; set for a grid or vertical (cols=1) sheet.">
-        <NumberInput value={pixel.animSpriteCols ?? 0} step={1} min={0} max={64} onchange={(value) => set('animSpriteCols', Math.round(value))} />
+      <PropertyCell label="Cols" span={1} compact hint="Sprite columns. 0 = single horizontal strip; set for a grid or vertical (cols=1) sheet.">
+        <NumberCell label="Cols" value={pixel.animSpriteCols ?? 0} defaultValue={0} step={1} min={0} max={64} onchange={(value) => set('animSpriteCols', Math.round(value))} />
       </PropertyCell>
-      <PropertyCell label="FPS" span={1} hint="Sprite-sheet playback rate.">
-        <NumberInput value={pixel.animFps ?? 12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />
+      <PropertyCell label="FPS" span={1} compact hint="Sprite-sheet playback rate.">
+        <NumberCell label="FPS" value={pixel.animFps ?? 12} defaultValue={12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />
       </PropertyCell>
       <PropertyCell label="Loop" span={1} hint="Loop forever, or hold the last frame.">
         <PropertyToggle value={pixel.animLoop !== false} onchange={() => toggle('animLoop', true)} />
@@ -794,7 +820,7 @@
         </select>
       </PropertyCell>
       <PropertyCell label="Speed" span={2} hint="Preset speed multiplier.">
-        <NumberInput value={pixel.animSpeed ?? 1} step={0.1} min={0.1} max={5} onchange={(value) => set('animSpeed', value)} />
+        <PropertyScrub value={pixel.animSpeed ?? 1} step={0.1} min={0.1} max={5} defaultValue={1} onchange={(value) => set('animSpeed', value)} />
       </PropertyCell>
       <PropertyCell label="Colour" span={2} hint="Hue-cycling colour for the preset.">
         <PropertyToggle value={pixel.animColour === true} onchange={() => toggle('animColour', false)} />
@@ -802,51 +828,42 @@
     {/if}
   </PropertySection>
 
-  {#snippet colourField(prop, current, fallback)}
-    <div class="field-row">
-      <input class="val cswatch" type="color" title="Pick RGB (keeps the current alpha)" value={aarrggbbToHex(current ?? fallback)} oninput={(event) => set(prop, mergeHexKeepAlpha(current ?? fallback, event.target.value))} />
-      <input class="val" type="text" title="AARRGGBB (alpha + RGB)" value={current ?? fallback} onchange={(event) => set(prop, event.target.value.trim())} />
-    </div>
-  {/snippet}
-  <PropertySection title="Colour">
-    <PropertyCell label="Lit" span={2} hint="Lit dot colour, AARRGGBB.">
-      {@render colourField('litColour', pixel.litColour, 'FFF2F2F2')}
-    </PropertyCell>
-    <PropertyCell label="Unlit" span={2} hint="Faint unlit 'ghost' dot colour, AARRGGBB.">
-      {@render colourField('unlitColour', pixel.unlitColour, '14FFFFFF')}
-    </PropertyCell>
-    <PropertyCell label="Screen" span={2} hint="Screen substrate behind the dots, AARRGGBB.">
-      {@render colourField('screenColour', pixel.screenColour, 'FF000000')}
-    </PropertyCell>
-    <PropertyCell label="Backlight" span={2} hint="Backlight wash colour, AARRGGBB.">
-      {@render colourField('backlightColour', pixel.backlightColour, '4D0E5A2E')}
-    </PropertyCell>
-    <PropertyCell label="Glass" span={2} hint="Glass sheen overlay colour, AARRGGBB.">
-      {@render colourField('glassTint', pixel.glassTint, '14FFFFFF')}
+  <PropertySection title="Colour" icon={Palette}>
+    <PropertyCell label="Screen colours" span={4} hint="Lit dots, unlit ghost dots, screen substrate, backlight wash, glass sheen. Click a swatch to edit it (with alpha) in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'litColour', label: 'Lit', value: pixel.litColour ?? 'FFF2F2F2', target: { type: 'control', controlId: core?.id, path: 'Pixel.litColour' } },
+        { key: 'unlitColour', label: 'Unlit', value: pixel.unlitColour ?? '14FFFFFF', target: { type: 'control', controlId: core?.id, path: 'Pixel.unlitColour' } },
+        { key: 'screenColour', label: 'Screen', value: pixel.screenColour ?? 'FF000000', target: { type: 'control', controlId: core?.id, path: 'Pixel.screenColour' } },
+        { key: 'backlightColour', label: 'Backlt', value: pixel.backlightColour ?? '4D0E5A2E', target: { type: 'control', controlId: core?.id, path: 'Pixel.backlightColour' } },
+        { key: 'glassTint', label: 'Glass', value: pixel.glassTint ?? '14FFFFFF', target: { type: 'control', controlId: core?.id, path: 'Pixel.glassTint' } },
+      ]} />
     </PropertyCell>
     <PropertyCell label="Reset" span={4} hint="Restore the default look (colours, brightness, dots, glass). Leaves elements, layouts and text untouched.">
       <button class="val add-field" type="button" onclick={() => resetAppearance()}>↺ Reset appearance</button>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Lighting">
+  <PropertySection title="Lighting" icon={Lamp}>
     <PropertyCell label="Backlight" span={2} hint="Turn the backlight wash on or off.">
       <PropertyToggle value={pixel.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>
     <PropertyCell label="Brightness" span={2} hint="Dot intensity (0–100).">
-      <NumberInput value={pixel.brightness ?? 100} step={5} min={0} max={100} onchange={(value) => set('brightness', value)} />
+      <PropertyScrub value={pixel.brightness ?? 100} step={1} min={0} max={100} defaultValue={100} onchange={(value) => set('brightness', value)} />
     </PropertyCell>
     <PropertyCell label="Contrast" span={2} hint="Ghost/backlight strength (0–100).">
-      <NumberInput value={pixel.contrast ?? 55} step={5} min={0} max={100} onchange={(value) => set('contrast', value)} />
+      <PropertyScrub value={pixel.contrast ?? 55} step={1} min={0} max={100} defaultValue={55} onchange={(value) => set('contrast', value)} />
     </PropertyCell>
-    <PropertyCell label="Ghost dots" span={2} hint="Faint unlit dots (realism cue).">
-      <PropertyToggle value={pixel.showGhost !== false} onchange={() => toggle('showGhost', true)} />
+    <PropertyCell label="Show" span={2} hint="Ghost dots and the design grid. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'showGhost', title: 'Ghost dots — faint unlit dots (realism cue)', on: pixel.showGhost !== false, icon: Ghost },
+          { key: 'showGrid', title: 'Design grid — grid overlay while editing (editor aid, never painted at runtime)', on: pixel.showGrid === true, icon: Grid3x3 },
+        ]}
+        ontoggle={(key) => toggle(key, key === 'showGhost')}
+      />
     </PropertyCell>
-    <PropertyCell label="Design grid" span={2} hint="Show a grid overlay while editing (editor aid — never painted at runtime).">
-      <PropertyToggle value={pixel.showGrid === true} onchange={() => toggle('showGrid', false)} />
-    </PropertyCell>
-    <PropertyCell label="Snap" span={2} hint="Snap element drags to this pixel step (0 = free). Also sets the grid spacing.">
-      <NumberInput value={pixel.snapGrid ?? 0} step={1} min={0} max={64} onchange={(value) => set('snapGrid', Math.max(0, Math.round(value)))} />
+    <PropertyCell label="Snap" span={2} compact hint="Snap element drags to this pixel step (0 = free). Also sets the grid spacing.">
+      <NumberCell label="Snap" value={pixel.snapGrid ?? 0} defaultValue={0} step={1} min={0} max={64} onchange={(value) => set('snapGrid', Math.max(0, Math.round(value)))} />
     </PropertyCell>
     <PropertyCell label="Bright Src" span={2} hint="Drive Brightness live from a slider/knob/number in preview.">
       <select class="val" value={pixel.brightnessSourceId ?? ''} onchange={(event) => set('brightnessSourceId', event.target.value)}>
@@ -864,30 +881,38 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Scanlines" span={2} hint="Horizontal scanline overlay.">
-      <PropertyToggle value={pixel.showScanlines === true} onchange={() => toggle('showScanlines', false)} />
-    </PropertyCell>
-    <PropertyCell label="Glass sheen" span={2} hint="Diagonal glass reflection overlay.">
-      <PropertyToggle value={pixel.showGlass !== false} onchange={() => toggle('showGlass', true)} />
+    <PropertyCell label="Overlays" span={2} hint="Scanlines and glass sheen. Hover a chip for its name.">
+      <FlagStrip
+        flags={[
+          { key: 'showScanlines', title: 'Scanlines — horizontal scanline overlay', on: pixel.showScanlines === true, icon: ScanLine },
+          { key: 'showGlass', title: 'Glass sheen — diagonal glass reflection overlay', on: pixel.showGlass !== false, icon: Sparkles },
+        ]}
+        ontoggle={(key) => toggle(key, key === 'showGlass')}
+      />
     </PropertyCell>
     <PropertyCell label="Dot Shape" span={2} hint="Round (LCD/OLED) or square (blockier) dots.">
-      <select class="val" value={pixel.dotShape ?? 'round'} onchange={(event) => set('dotShape', event.target.value)}>
-        <option value="round">Round</option>
-        <option value="square">Square</option>
-      </select>
+      <Segmented
+        ariaLabel="Dot shape"
+        value={pixel.dotShape ?? 'round'}
+        options={[
+          { value: 'round', label: 'Round' },
+          { value: 'square', label: 'Square' },
+        ]}
+        onchange={(v) => set('dotShape', v)}
+      />
     </PropertyCell>
     <PropertyCell label="Gamma" span={2} hint="Brightness response curve. 1 = linear; >1 lifts mid-tones, <1 crushes them.">
-      <NumberInput value={pixel.gamma ?? 1} step={0.1} min={0.2} max={4} onchange={(value) => set('gamma', value)} />
+      <PropertyScrub value={pixel.gamma ?? 1} step={0.1} min={0.2} max={4} defaultValue={1} onchange={(value) => set('gamma', value)} />
     </PropertyCell>
     <PropertyCell label="Glow" span={2} hint="Bloom halo under lit dots (0 = crisp, 1 = strong glow).">
-      <NumberInput value={pixel.glow ?? 0} step={0.1} min={0} max={1} onchange={(value) => set('glow', value)} />
+      <PropertyScrub value={pixel.glow ?? 0} step={0.1} min={0} max={1} defaultValue={0} onchange={(value) => set('glow', value)} />
     </PropertyCell>
-    <PropertyCell label="Padding" span={2} hint="Inset from the bezel to the screen (px).">
-      <NumberInput value={pixel.padding ?? 8} step={1} min={0} onchange={(value) => set('padding', value)} />
+    <PropertyCell label="Padding" span={2} compact hint="Inset from the bezel to the screen (px).">
+      <NumberCell label="Pad" value={pixel.padding ?? 8} defaultValue={8} step={1} min={0} onchange={(value) => set('padding', value)} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="On-screen text">
+  <PropertySection title="On-screen text" icon={Pencil}>
     <PropertyCell label="Edit text" span={4} hint="The string shown by an 'edit' element bound to ✎ This screen's text.">
       <input class="val" type="text" value={pixel.editText ?? 'INIT'} oninput={(event) => set('editText', event.target.value)} />
     </PropertyCell>
@@ -899,27 +924,27 @@
         <option value="digits">0–9</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Max length" span={2} hint="Cap on the edited string (0 = unbounded).">
-      <NumberInput value={pixel.editMaxLength ?? 16} step={1} min={0} max={256} onchange={(value) => set('editMaxLength', Math.max(0, Math.round(value)))} />
+    <PropertyCell label="Max length" span={2} compact hint="Cap on the edited string (0 = unbounded).">
+      <NumberCell label="Len" value={pixel.editMaxLength ?? 16} defaultValue={16} step={1} min={0} max={256} onchange={(value) => set('editMaxLength', Math.max(0, Math.round(value)))} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Custom font">
+  <PropertySection title="Custom font" icon={Type}>
     <PropertyCell label="Glyph sheet" span={4} hint="An image of glyph cells in a grid, left-to-right then top-to-bottom. Text elements set Font → Custom to use it.">
       <input class="val" type="file" accept="image/*" onchange={onPickCustomFont} />
     </PropertyCell>
     {#if pixel.customFont?.src}
-      <PropertyCell label="Cell W" span={1} hint="Glyph cell width (px).">
-        <NumberInput value={pixel.customFont?.glyphW ?? 6} step={1} min={2} max={64} onchange={(value) => setCustomFont({ glyphW: Math.max(2, Math.round(value)) })} />
+      <PropertyCell label="Cell W" span={1} compact hint="Glyph cell width (px).">
+        <NumberCell label="W" value={pixel.customFont?.glyphW ?? 6} defaultValue={6} step={1} min={2} max={64} onchange={(value) => setCustomFont({ glyphW: Math.max(2, Math.round(value)) })} />
       </PropertyCell>
-      <PropertyCell label="Cell H" span={1} hint="Glyph cell height (px).">
-        <NumberInput value={pixel.customFont?.glyphH ?? 8} step={1} min={2} max={64} onchange={(value) => setCustomFont({ glyphH: Math.max(2, Math.round(value)) })} />
+      <PropertyCell label="Cell H" span={1} compact hint="Glyph cell height (px).">
+        <NumberCell label="H" value={pixel.customFont?.glyphH ?? 8} defaultValue={8} step={1} min={2} max={64} onchange={(value) => setCustomFont({ glyphH: Math.max(2, Math.round(value)) })} />
       </PropertyCell>
-      <PropertyCell label="Cols" span={1} hint="Glyph columns per row in the sheet.">
-        <NumberInput value={pixel.customFont?.cols ?? 16} step={1} min={1} max={64} onchange={(value) => setCustomFont({ cols: Math.max(1, Math.round(value)) })} />
+      <PropertyCell label="Cols" span={1} compact hint="Glyph columns per row in the sheet.">
+        <NumberCell label="Cols" value={pixel.customFont?.cols ?? 16} defaultValue={16} step={1} min={1} max={64} onchange={(value) => setCustomFont({ cols: Math.max(1, Math.round(value)) })} />
       </PropertyCell>
-      <PropertyCell label="First" span={1} hint="Char code of the first glyph (32 = space, 65 = 'A').">
-        <NumberInput value={pixel.customFont?.first ?? 32} step={1} min={0} max={255} onchange={(value) => setCustomFont({ first: Math.max(0, Math.round(value)) })} />
+      <PropertyCell label="First" span={1} compact hint="Char code of the first glyph (32 = space, 65 = 'A').">
+        <NumberCell label="First" value={pixel.customFont?.first ?? 32} defaultValue={32} step={1} min={0} max={255} onchange={(value) => setCustomFont({ first: Math.max(0, Math.round(value)) })} />
       </PropertyCell>
       <PropertyCell label="Remove" span={4} hint="Drop the custom font (elements fall back to the built-in face).">
         <button class="val add-field" type="button" onclick={() => set('customFont', null)}>Remove custom font</button>
@@ -955,12 +980,9 @@
     align-items: center;
   }
 
-  .cswatch {
-    width: 26px;
-    flex: 0 0 auto;
-    padding: 1px;
-    height: 22px;
-    cursor: pointer;
+  .elcol {
+    flex: 0 0 56px;
+    display: flex;
   }
 
   .bitmap-hint {
@@ -1002,6 +1024,28 @@
   .add-field {
     cursor: pointer;
     text-align: center;
+  }
+
+  /* Compact add-buttons in the section header's tools slot (HeaderPill palette). */
+  .hdr-add {
+    height: 16px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #252525;
+    color: #777;
+    font-size: 9px;
+    font-family: inherit;
+    cursor: pointer;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  .hdr-add:hover {
+    color: #CCC;
+    border-color: #4A6E8C;
   }
 
   .hint-note {
@@ -1049,6 +1093,12 @@
     width: 44px;
     flex: 0 0 auto;
     text-align: center;
+  }
+
+  /* Fixed-width shell around a NumberCell in rows/tables: the cell fills the
+     span instead of flexing the column open. */
+  .nc-wrap {
+    display: flex;
   }
 
   .el-extra .en {

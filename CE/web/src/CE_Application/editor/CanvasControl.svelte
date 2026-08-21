@@ -5,7 +5,11 @@
   import { getChildControls, computeFlowLayout, controlPanelRect, panelToLocalPoint, selectionRoots, collectSubtreeIds, findControlById, buildControlIndex, getAncestorIds, flatControlsWithPanelRects } from '../utils/containment.js';
   import { containerDropTargetId } from '../stores/containerDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
+  import { anchoredPositions, axisIsDerived, fitSettings, fitsAnyAxis, fittedSizeDeep } from '../utils/containerFit.js';
+  import { plainFillCSS } from '../utils/plainFillCSS.js';
+  import { observeElementMetrics } from '../utils/batchedElementMetrics.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
+  import { bakeStaticPartEntries } from '../utils/staticPartBaking.js';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import PixelDisplayRenderer from './PixelDisplayRenderer.svelte';
@@ -38,13 +42,16 @@
   import TransportRenderer from './TransportRenderer.svelte';
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
-  import { applyControlPatchesById, getSection, updateControlProperty, reparentControls } from '../stores/controls.js';
+  import { layerTints } from '../stores/panelLayerActions.js';
+  import { normalizeLayerName } from '../utils/panelLayers.js';
+  import { applyControlPatchesById, duplicateControlsInPlace, getSection, updateControlProperty, reparentControls } from '../stores/controls.js';
+  import { pushSnapshot } from '../stores/history.js';
   import { adoptParameterMetadata } from '../utils/parameterAdoption.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
   import { get } from 'svelte/store';
   import { showDistances } from '../stores/editorView.js';
-  import { guides } from '../stores/guides.js';
+  import { guides, selectedGuide } from '../stores/guides.js';
   import { fileCache, loadFile } from '../stores/fileCache.js';
   import { findAlignmentSnap, computeDistances } from '../utils/canvasSnapping.js';
   import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
@@ -103,10 +110,11 @@
     resolveRadioShapeRadius,
   } from '../utils/radioSegmentStyle.js';
   import {
-    computeResizedRect, snapRectToGrid, snapToGridAxis,
+    computeResizedRect, computeRotatedResizedRect, snapRectToGrid, snapToGridAxis,
     clientToPanelPoint, angleFromCenter, computeRotation, normalizeRotation,
     resizeHandleStyle,
   } from '../utils/transformMath.js';
+  import { sortControlsForHitTest } from '../utils/controlOrder.js';
 
   let {
     control,
@@ -354,12 +362,29 @@
     String(sourceBehavior?.family ?? behavior?.family ?? '').trim().toLowerCase() === 'range'
     && String(sourceBehavior?.role ?? behavior?.role ?? '').trim().toLowerCase() === 'slider'
   );
-  let renderedPartEntries = $derived.by(() => (
+  let visiblePartEntries = $derived.by(() => (
     isSliderControl
       ? renderPartEntries.filter(([partName]) => !SLIDER_SEMANTIC_PARTS.has(String(partName)))
       : renderPartEntries
   ));
+  // Parts that nothing can ever change are compiled to one SVG and drawn as a single element.
+  // On the GAIA panel that is 2,821 of 3,295 parts: 12,025 surface DOM nodes become 5,509 and the
+  // load halves. bakeStaticPartEntries returns its input untouched whenever it cannot help, so
+  // this needs no condition of its own — the rules all live in staticPartBaking.js.
+  //
+  // Note where this ISN'T: the component creator renders parts through InteractivePartRenderer
+  // directly rather than through CanvasControl, so authoring always sees real, separate layers.
+  // That is not an accident of this code, but it is load-bearing, and componentCreatorParts.test.js
+  // is what stops it becoming one.
+  let renderedPartEntries = $derived.by(() =>
+    bakeStaticPartEntries(renderControl, visiblePartEntries, displayW, displayH));
   let isSelected = $derived(core?.id != null && $selectedComponentIds.has(core.id));
+  // The layer's colour code, if it has one. This is where colour coding actually earns its keep:
+  // in the dock you already know which layer you are looking at, on the canvas you do not, and
+  // "why won't this move" answers itself when the outline is the locked layer's colour.
+  let layerTint = $derived($layerTints.size === 0
+    ? null
+    : ($layerTints.get(normalizeLayerName(core?.layer)) ?? null));
   let isKeyObject = $derived(core?.id != null && $keyObjectId === core.id && $selectedComponentIds.size > 1);
   let isLocked = $derived(core?.locked === true);
   let isVisible = $derived(core?.visible !== false);
@@ -457,6 +482,19 @@
   let isDragging = $state(false);
   let dragStartMouse = $state({ x: 0, y: 0 });
   let dragStartPos = $state({ x: 0, y: 0 });
+  // A drag only engages after the pointer travels a few SCREEN pixels.
+  // Without the threshold, the hand jitter inside an ordinary click moves the
+  // control — by whole panel units when zoomed out — and dirties the document.
+  const DRAG_ENGAGE_SCREEN_PX = 4;
+  let dragEngaged = $state(false);
+  // Space held during a drag keeps the control in its current parent
+  // (Figma's convention). Alt is busy: Alt+drag leaves a copy behind.
+  // Space isn't a MouseEvent modifier, so it's tracked via key listeners
+  // that live only for the duration of the drag.
+  let dragSpaceHeld = false;
+  function handleDragSpaceKey(e) {
+    if (e.key === ' ') dragSpaceHeld = e.type === 'keydown';
+  }
   let rootElement = $state(null);
 
   // --- Resize state ---
@@ -490,26 +528,61 @@
 
   let displayX = $derived(layoutPosition ? layoutPosition.x : (transientX ?? transform?.x ?? 0) + multiDragOffsetX);
   let displayY = $derived(layoutPosition ? layoutPosition.y : (transientY ?? transform?.y ?? 0) + multiDragOffsetY);
-  let displayW = $derived(transientW ?? transform?.width ?? 100);
-  let displayH = $derived(transientH ?? transform?.height ?? 40);
+  // A section whose size comes from its contents (utils/containerFit.js). Deep, because a section
+  // holding another fitted section cannot know its own size until the inner one does. The derived
+  // size wins over the stored Transform on a fitted axis; a transient drag still wins over both, so
+  // a half-fitted container drags on its locked axis and refuses on the other.
+  let fittedSelf = $derived(fitsAnyAxis(control) ? fittedSizeDeep(control) : null);
+  let displayW = $derived(transientW ?? fittedSelf?.width ?? transform?.width ?? 100);
+  let displayH = $derived(transientH ?? fittedSelf?.height ?? transform?.height ?? 40);
 
   // --- Container children (nesting). All empty/false for non-containers, so a
   // control with no Children section renders exactly as before. ---
   let childrenSection = $derived(getSection(control, 'Children'));
   let isContainer = $derived(!!childrenSection);
   let childControls = $derived(isContainer ? sortControlsForRender(getChildControls(control)) : []);
-  let childrenPadding = $derived(Number(childrenSection?.padding ?? 0));
+  // WHERE A CHILD'S 0,0 IS. Everything else in the app answers this with containment.contentOrigin
+  // — hit-testing, controlPanelRect, the fit measurement, the scenery compiler — and that function
+  // prefers paddingLeft/paddingTop over the shared `padding`. This component used the shared number
+  // alone, which agreed with it only while the two were the same. The moment a per-side value
+  // differed, the drawn position of every child and its MODELLED position disagreed by that
+  // difference: marquee selection, alignment guides and drag-to-reparent all targeting a box that
+  // is not where the child is on screen, and a scenery layer visibly sliding its contents on lock.
+  // Nothing could write a per-side value before the Children editor existed, which is why it went
+  // unnoticed; the same reason it had to be fixed alongside it.
+  let childrenPad = $derived(fitSettings(control).padding);
   let childrenGap = $derived(Number(childrenSection?.gap ?? 0));
   let childrenClip = $derived(childrenSection?.clip === true);
+  // The container's own corner radius, so a clip follows the curve rather than the border box.
+  // Clamped to half the shorter side exactly as boxElement clamps it, so the two never disagree.
+  let childrenClipRadius = $derived(Math.min(
+    Number(getSection(control, 'Background')?._children?.Corners?.radius ?? 0) || 0,
+    Math.min(displayW, displayH) / 2,
+  ));
   let childrenLayoutMode = $derived(String(childrenSection?.layout ?? 'none'));
   let childFlowPositions = $derived(
     childrenLayoutMode !== 'none' && childControls.length
-      ? computeFlowLayout(childControls, displayW, childrenGap, childrenPadding)
+      // The row width a flow layout wraps at is the CONTENT width, so it comes off the same
+      // per-side padding rather than doubling the shared one.
+      ? computeFlowLayout(childControls, displayW - childrenPad.left - childrenPad.right, childrenGap, 0)
       : null
   );
+  // Anchored children, resolved against this container's CONTENT box. A child cannot do this
+  // itself — it has no way to ask its parent how wide the parent turned out to be, especially when
+  // the parent's width is derived from the children. So the parent places them, through the same
+  // `layoutPosition` prop flow layout already uses.
+  let childAnchoredPositions = $derived.by(() => {
+    if (!childControls.length) return null;
+    return anchoredPositions(childControls,
+      displayW - childrenPad.left - childrenPad.right,
+      displayH - childrenPad.top - childrenPad.bottom);
+  });
+  // Flow layout wins where both apply: it is an explicit "the container places everything" mode,
+  // and an anchor inside it would be a control opting out of the layout it was put in.
+  let childPositions = $derived(childFlowPositions ?? childAnchoredPositions);
   let childParentOffset = $derived({
-    x: parentOffset.x + displayX + childrenPadding,
-    y: parentOffset.y + displayY + childrenPadding,
+    x: parentOffset.x + displayX + childrenPad.left,
+    y: parentOffset.y + displayY + childrenPad.top,
   });
   let childParentChainIds = $derived([...parentChainIds, core?.id].filter(Boolean));
   let myGridSection = $derived(getSection(control, 'Grid') ?? null);
@@ -534,6 +607,8 @@
     const align = findAlignmentSnap(
       { x, y, w, h }, core?.id, allControls, $guides, getSection,
       { width: panelWidth, height: panelHeight },
+      // 5 screen px of stickiness at every zoom level.
+      5 / (scale || 1),
     );
     // Publish the live guides so the panel rulers can mirror them (parity with
     // the component editor). Cleared on drag/resize end.
@@ -555,14 +630,80 @@
     );
   }
 
+  // --- Double-click: drill into containers, edit text in place ---
+  // The Figma model: double-clicking a container selects the child under the
+  // pointer (one level per double-click); double-clicking a text-bearing
+  // control edits its text right on the canvas. A selected child becomes
+  // directly interactive (see the .children-origin .selected CSS rule), so
+  // after drilling it can be dragged and resized without a properties trip.
+  let inlineTextEditing = $state(false);
+  let inlineTextValue = $state('');
+
+  function startInlineTextEdit() {
+    const txt = getSection(control, 'Text');
+    if (!txt || !core?.id) return false;
+    inlineTextValue = String(txt.content ?? '');
+    inlineTextEditing = true;
+    return true;
+  }
+
+  function commitInlineTextEdit() {
+    if (!inlineTextEditing) return;
+    inlineTextEditing = false;
+    const txt = getSection(control, 'Text');
+    if (String(txt?.content ?? '') !== inlineTextValue) {
+      updateControlProperty(core.id, 'Text.content', inlineTextValue);
+      pushSnapshot();   // one text edit, one undo step
+    }
+  }
+
+  function handleInlineTextKey(e) {
+    e.stopPropagation();
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      commitInlineTextEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      inlineTextEditing = false;   // discard
+    }
+  }
+
+  function drillIntoChildAt(px, py) {
+    const local = panelToLocalPoint(panelControls, core?.id, px, py);
+    const child = sortControlsForHitTest(getChildControls(sourceControl ?? control)).find((candidate) => {
+      const t = candidate._children?.Transform;
+      return t && local.x >= t.x && local.x <= t.x + t.width && local.y >= t.y && local.y <= t.y + t.height;
+    });
+    const childId = child?._children?.Core?.id;
+    if (!childId) return false;
+    selectComponent(childId, false);
+    return true;
+  }
+
+  function handleDoubleClick(e) {
+    if (!editorInteractionEnabled || isEditorLocked || inlineTextEditing) return;
+    e.stopPropagation();
+    if (childControls.length) {
+      const p = surfacePointFromClient(e.clientX, e.clientY);
+      if (p && drillIntoChildAt(p.x, p.y)) return;
+    }
+    startInlineTextEdit();
+  }
+
   // --- Click to select ---
   function handleMouseDown(e) {
     if (e.button !== 0) return;
     e.stopPropagation();
 
-    const multiKey = e.ctrlKey || e.metaKey;
+    // Selecting a control ends any guide selection — a stale selected guide
+    // used to hijack the next Delete press away from the controls.
+    selectedGuide.set(null);
+
+    // Shift+click is the industry-standard extend gesture; Ctrl/Cmd+click
+    // does the same for muscle memory from file managers.
+    const multiKey = e.ctrlKey || e.metaKey || e.shiftKey;
     if (multiKey) {
-      // Ctrl+click: toggle this component in/out of selection
+      // Toggle this component in/out of selection
       selectComponent(core?.id, true);
     } else if (!isSelected) {
       // Normal click on unselected: replace selection with just this one
@@ -582,6 +723,11 @@
 
     // Start drag
     isDragging = true;
+    dragEngaged = false;
+    dragSpaceHeld = false;
+    // The document and the selection are fixed for the length of the gesture, so the drop targets
+    // are worked out here rather than on every move. Cleared in handleDragEnd.
+    dropCandidates = buildDropCandidates();
     dragStartMouse = { x: e.clientX, y: e.clientY };
     dragStartPos = { x: transform?.x ?? 0, y: transform?.y ?? 0 };
     transientX = dragStartPos.x;
@@ -590,6 +736,8 @@
 
     window.addEventListener('mousemove', handleDragMove);
     window.addEventListener('mouseup', handleDragEnd);
+    window.addEventListener('keydown', handleDragSpaceKey);
+    window.addEventListener('keyup', handleDragSpaceKey);
   }
 
   function parseDeviceParameterDrag(event) {
@@ -754,7 +902,20 @@
   // The container currently under the pointer that this drag could drop into —
   // deepest container whose panel-space AABB contains the point, excluding the
   // dragged subtree(s) and any locked/hidden container (or one under one).
-  function dropCandidateAt(panelX, panelY) {
+  /**
+   * The containers this drag could drop into, as flat rects — computed ONCE per gesture.
+   *
+   * Everything here is a property of the document and the selection, and a drag changes neither:
+   * the move handler only writes transientX/transientY, and the document is not patched until
+   * mouseup. Only the pointer moves, and the pointer is the query, not the data.
+   *
+   * It used to be rebuilt on every mousemove: buildControlIndex over the whole tree,
+   * flatControlsWithPanelRects shallow-copying all 413 controls with a fresh Transform each, and
+   * a getAncestorIds walk per candidate. Roughly twelve hundred objects allocated per mouse move,
+   * sixty times a second — which is most of the garbage collector time in a drag profile, and it
+   * bought an answer that could not have changed since the drag began.
+   */
+  function buildDropCandidates() {
     const ids = get(selectedComponentIds);
     const movingRoots = ids.size > 1 && ids.has(core?.id) ? selectionRoots(panelControls, ids) : [core?.id];
     const excluded = new Set();
@@ -762,10 +923,11 @@
       const rootControl = findControlById(panelControls, rootId);
       if (rootControl) for (const subId of collectSubtreeIds(rootControl)) excluded.add(subId);
     }
+
     const index = buildControlIndex(panelControls);
-    let best = null;
-    // Consider every container in the tree (panel-space rects), so a component
-    // can be dropped into a nested container, not just a top-level one.
+    const candidates = [];
+    // Every container in the tree, in panel space, so a component can be dropped into a nested
+    // container and not just a top-level one.
     for (const entry of flatControlsWithPanelRects(panelControls)) {
       const entryCore = entry._children?.Core;
       const entryTransform = entry._children?.Transform;
@@ -776,30 +938,64 @@
         const ancestorCore = index.get(ancestorId)?.control?._children?.Core;
         return ancestorCore?.locked === true || ancestorCore?.visible === false;
       })) continue;
-      if (panelX < entryTransform.x || panelX > entryTransform.x + entryTransform.width) continue;
-      if (panelY < entryTransform.y || panelY > entryTransform.y + entryTransform.height) continue;
-      const depth = index.get(entryCore.id)?.depth ?? 0;
-      if (!best || depth >= best.depth) best = { id: entryCore.id, depth };
+      candidates.push({
+        id: entryCore.id,
+        depth: index.get(entryCore.id)?.depth ?? 0,
+        x: entryTransform.x,
+        y: entryTransform.y,
+        right: entryTransform.x + entryTransform.width,
+        bottom: entryTransform.y + entryTransform.height,
+      });
+    }
+    return candidates;
+  }
+
+  // Held for the length of one gesture; null whenever no gesture is in flight.
+  let dropCandidates = null;
+
+  function dropCandidateAt(panelX, panelY) {
+    const candidates = dropCandidates ?? buildDropCandidates();
+    let best = null;
+    for (const entry of candidates) {
+      if (panelX < entry.x || panelX > entry.right) continue;
+      if (panelY < entry.y || panelY > entry.bottom) continue;
+      if (!best || entry.depth >= best.depth) best = entry;
     }
     return best?.id ?? null;
   }
 
   function handleDragMove(e) {
     if (!isDragging) return;
-    const dx = (e.clientX - dragStartMouse.x) / scale;
-    const dy = (e.clientY - dragStartMouse.y) / scale;
+    if (!dragEngaged) {
+      const screenDist = Math.hypot(e.clientX - dragStartMouse.x, e.clientY - dragStartMouse.y);
+      if (screenDist < DRAG_ENGAGE_SCREEN_PX) return;
+      dragEngaged = true;
+    }
+    let dx = (e.clientX - dragStartMouse.x) / scale;
+    let dy = (e.clientY - dragStartMouse.y) / scale;
+
+    // Shift constrains the move to the dominant axis.
+    if (e.shiftKey) {
+      if (Math.abs(dx) >= Math.abs(dy)) dy = 0;
+      else dx = 0;
+    }
 
     let newX = dragStartPos.x + dx;
     let newY = dragStartPos.y + dy;
 
+    // Holding Ctrl/Cmd suspends every snap for the duration — the only way
+    // to place something 2px off a neighbour's edge without a settings trip.
+    const snapSuspended = e.ctrlKey || e.metaKey;
+
     // Grid snap first
-    if (snapToGrid && gridSize > 0) {
+    if (!snapSuspended && snapToGrid && gridSize > 0) {
       newX = snapToGridX(newX);
       newY = snapToGridY(newY);
     }
 
     // Alignment snap overrides grid when within threshold
-    const align = alignSnap(newX, newY, displayW, displayH);
+    const align = snapSuspended ? { x: newX, y: newY, guides: [] } : alignSnap(newX, newY, displayW, displayH);
+    if (snapSuspended) setActivePanelSnapGuides([]);
     transientX = Math.round(align.x);
     transientY = Math.round(align.y);
     snapGuides = align.guides;
@@ -811,10 +1007,11 @@
       multiDragDelta.set({ x: transientX - dragStartPos.x, y: transientY - dragStartPos.y, active: true });
     }
 
-    // Highlight the container under the pointer as the drop target (Alt suppresses).
+    // Highlight the container under the pointer as the drop target
+    // (holding Space keeps the current parent).
     const currentParentId = parentChainIds[0] ?? null;
     const surfacePoint = surfacePointFromClient(e.clientX, e.clientY);
-    const target = (!e.altKey && surfacePoint) ? dropCandidateAt(surfacePoint.x, surfacePoint.y) : currentParentId;
+    const target = (!dragSpaceHeld && surfacePoint) ? dropCandidateAt(surfacePoint.x, surfacePoint.y) : currentParentId;
     containerDropTargetId.set(target !== currentParentId ? target : null);
   }
 
@@ -822,6 +1019,8 @@
     if (!isDragging) return;
     window.removeEventListener('mousemove', handleDragMove);
     window.removeEventListener('mouseup', handleDragEnd);
+    window.removeEventListener('keydown', handleDragSpaceKey);
+    window.removeEventListener('keyup', handleDragSpaceKey);
     containerDropTargetId.set(null);
 
     const dx = transientX - dragStartPos.x;
@@ -830,10 +1029,17 @@
     const ids = get(selectedComponentIds);
     const isMultiDrag = ids.size > 1 && ids.has(core?.id);
 
+    // Alt held at drop: leave a copy of the moved controls where the gesture
+    // started — Alt+drag-duplicate, done before the originals move so the
+    // clones inherit the start positions.
+    if (moved && e?.altKey === true) {
+      duplicateControlsInPlace(isMultiDrag ? ids : [core?.id]);
+    }
+
     // Where did the drag end — over which container (or top level)?
     const currentParentId = parentChainIds[0] ?? null;
     let targetParentId = currentParentId;
-    if (moved && e?.altKey !== true) {
+    if (moved && !dragSpaceHeld) {
       const surfacePoint = surfacePointFromClient(e?.clientX, e?.clientY);
       if (surfacePoint) targetParentId = dropCandidateAt(surfacePoint.x, surfacePoint.y);
     }
@@ -892,7 +1098,13 @@
     // Clear multi-drag delta
     multiDragDelta.set({ x: 0, y: 0, active: false });
 
+    // One gesture = one undo step, committed at the boundary instead of
+    // letting the 400ms debounce merge it with whatever comes next.
+    if (moved) pushSnapshot();
+
     isDragging = false;
+    dragEngaged = false;
+    dropCandidates = null;
     transientX = null;
     transientY = null;
     snapGuides = [];
@@ -938,21 +1150,44 @@
     const dx = (e.clientX - resizeStartMouse.x) / scale;
     const dy = (e.clientY - resizeStartMouse.y) / scale;
 
-    // Resize geometry (deltas + aspect lock + min/max clamping)
-    let rect = computeResizedRect(resizeStartRect, resizeHandle, dx, dy, {
+    const rotation = Number(transform?.rotation ?? 0) % 360;
+    const resizeOpts = {
       aspectLock: e.shiftKey || (transform?.aspectLock === true),
       aspectRatio: resizeStartRect.w / resizeStartRect.h,
       minW: Math.max(MIN_SIZE, transform?.minWidth || 0),
       minH: Math.max(MIN_SIZE, transform?.minHeight || 0),
       maxW: transform?.maxWidth || 0,
       maxH: transform?.maxHeight || 0,
-    });
+    };
+
+    // Rotated controls resize in their own frame (the handles are rotated
+    // with the box, so the drag must be too), with the opposite point held
+    // fixed on screen. Axis-aligned snapping is meaningless there, so it is
+    // skipped for them.
+    if (rotation) {
+      const rect = computeRotatedResizedRect(resizeStartRect, resizeHandle, dx, dy, rotation, resizeOpts);
+      transientX = Math.round(rect.x);
+      transientY = Math.round(rect.y);
+      transientW = Math.round(rect.w);
+      transientH = Math.round(rect.h);
+      snapGuides = [];
+      setActivePanelSnapGuides([]);
+      distanceLabels = [];
+      return;
+    }
+
+    // Resize geometry (deltas + aspect lock + min/max clamping)
+    let rect = computeResizedRect(resizeStartRect, resizeHandle, dx, dy, resizeOpts);
+
+    // Holding Ctrl/Cmd suspends snapping during resize, matching drag.
+    const snapSuspended = e.ctrlKey || e.metaKey;
 
     // Grid snap
-    if (snapToGrid) rect = snapRectToGrid(rect, gridSize, snapToGridX, snapToGridY);
+    if (!snapSuspended && snapToGrid) rect = snapRectToGrid(rect, gridSize, snapToGridX, snapToGridY);
 
     // Alignment snap overrides grid when within threshold
-    const align = alignSnap(rect.x, rect.y, rect.w, rect.h);
+    const align = snapSuspended ? { x: rect.x, y: rect.y, guides: [] } : alignSnap(rect.x, rect.y, rect.w, rect.h);
+    if (snapSuspended) setActivePanelSnapGuides([]);
     transientX = Math.round(align.x);
     transientY = Math.round(align.y);
     transientW = Math.round(rect.w);
@@ -976,6 +1211,7 @@
           'Transform.height': transientH,
         },
       ]]));
+      pushSnapshot();   // gesture boundary — one resize, one undo step
     }
 
     isResizing = false;
@@ -1038,6 +1274,7 @@
 
     if (core?.id && transientRotation !== rotateStartRotation) {
       updateControlProperty(core.id, 'Transform.rotation', normalizeRotation(transientRotation));
+      pushSnapshot();   // gesture boundary — one rotation, one undo step
     }
 
     isRotating = false;
@@ -1072,7 +1309,7 @@
   });
 
   // Resize handle definitions: [id, cursor, css-position]
-  const handles = [
+  const ALL_HANDLES = [
     { id: 'tl', cursor: 'nwse-resize' },
     { id: 't',  cursor: 'ns-resize' },
     { id: 'tr', cursor: 'nesw-resize' },
@@ -1083,12 +1320,38 @@
     { id: 'br', cursor: 'nwse-resize' },
   ];
 
-  const handleStyle = resizeHandleStyle;
+  // A derived axis has no handle. Offering one that snaps back the instant you let go is worse
+  // than offering none — the control looks broken rather than deliberate. Corners disappear when
+  // EITHER of their axes is derived, since a corner drags both.
+  let handles = $derived.by(() => {
+    if (!fittedSelf) return ALL_HANDLES;
+    const w = axisIsDerived(control, 'width');
+    const h = axisIsDerived(control, 'height');
+    return ALL_HANDLES.filter(({ id }) => {
+      const dragsWidth = id.includes('l') || id.includes('r');
+      const dragsHeight = id.includes('t') || id.includes('b');
+      return !((dragsWidth && w) || (dragsHeight && h));
+    });
+  });
+
+  // Screen-constant handles: the overlay lives inside the scaled surface, so
+  // sizes are pre-divided by the zoom scale (see resizeHandleStyle).
+  let handleStyle = $derived((id) => resizeHandleStyle(id, 1 / (scale || 1)));
 
   // --- Effects CSS (applied to .canvas-control and .control-content) ---
   let shadowCSS = $derived(buildShadowCSS(effects));
   let blendCSS  = $derived(buildBlendCSS(effects));
   let filterCSS = $derived(buildFilterCSS(effects));
+
+  // A flat colour or a single gradient paints on `.control-content` itself instead of on a child
+  // div. That element is `inset: 0` — the control's whole box — and an element's background paints
+  // below every one of its children, which is exactly where the fill layer sat as the first of
+  // them. See utils/plainFillCSS.js for what is refused and why.
+  //
+  // The one thing this does move: `.control-content` carries `overflow: hidden`, so a rounded fill
+  // now rounds the clip as well as the paint. Content in the corner of a rounded control used to
+  // be drawn outside its own visible shape; it is cut to it instead.
+  let absorbedFillCSS = $derived(background ? plainFillCSS(background, displayW, displayH) : null);
 
   function textShapeMaskId(kind = 'block') {
     return `text-shape-mask-${svgIdSeed}-${kind}`;
@@ -2237,23 +2500,33 @@
     return blockTextLineEntryFor(index)?.fillWidthApplied === true;
   }
 
-  function blockLineDomStyleFor(index) {
-    if (usesCustomTextFlow) return '';
-
+  /**
+   * The declarations a line needs wherever it is drawn: how it sits in its box and how its glyphs
+   * are spaced. Split out from the element's own `display` because a line folded into the span
+   * must NOT bring that with it — the span is an inline-block, and blockifying it would change how
+   * the line box around it is built for a saving of nothing.
+   */
+  function blockLinePaintStyles(index) {
     const styles = [
-      'display:block',
       'white-space:pre',
       `text-align:${blockLineFillWidthApplied(index) ? 'left' : blockLineEffectiveAlign(index)}`,
       `letter-spacing:${blockLineLetterSpacingFor(index)}px`,
       `word-spacing:${blockLineWordSpacingFor(index)}px`,
     ];
-
-    if (blockTextLayout.lineBoxWidth > 0) {
-      styles.push(`width:${blockTextLayout.lineBoxWidth}px`);
-    }
-
-    return styles.join('; ');
+    if (blockTextLayout.lineBoxWidth > 0) styles.push(`width:${blockTextLayout.lineBoxWidth}px`);
+    return styles;
   }
+
+  function blockLineDomStyleFor(index) {
+    if (usesCustomTextFlow) return '';
+    return ['display:block', ...blockLinePaintStyles(index)].join('; ');
+  }
+
+  // A caption is usually one line, and one line needs no box of its own: alignment and spacing say
+  // the same thing on the span that carries the face. Two or more do need their own, because each
+  // can hold its own alignment and its own justification spacing.
+  let foldsSoleLine = $derived(!usesCustomTextFlow && svgTextLines.length === 1);
+  let soleLineStyle = $derived(foldsSoleLine ? blockLinePaintStyles(0).join('; ') : '');
 
   function blockLineDomText(line) {
     return line === '' ? '\u200B' : line;
@@ -2327,6 +2600,17 @@
     if (textShadowValue) styles.push(`text-shadow:${textShadowValue}`);
     return styles.join('; ');
   });
+  /**
+   * The glyph box's declarations and, when there is only one line, that line's as well.
+   *
+   * Joined with `'; '` and with the empty fragments dropped, which is the whole point of it being
+   * a derived rather than three interpolations in the markup. Writing `"{a} {b}"` in the attribute
+   * concatenates two lists that do not end in a semicolon, so the last declaration of one fuses
+   * with the first of the next — `width:104px  white-space:pre` — and the CSS parser discards the
+   * pair. Both of those are invisible in the server-rendered string a golden baseline reads; only
+   * the browser's parse shows the loss.
+   */
+  let textGlyphAndLineStyle = $derived([textGlyphStyle, soleLineStyle].filter(Boolean).join('; '));
   let hasLineDecorations = $derived(
     textFont?.underline === true || textFont?.strikethrough === true || textFont?.overline === true
   );
@@ -2371,18 +2655,15 @@
 
     if (!textGlyphElement || !controlContentElement) return;
 
-    const syncMetrics = () => {
-      domTextGlyphSize = {
+    // Reads only. Every control's measure runs before any control's commit — see
+    // utils/batchedElementMetrics.js for why that matters at 413 controls.
+    const measure = () => {
+      const size = {
         width: textGlyphElement.offsetWidth ?? 0,
         height: textGlyphElement.offsetHeight ?? 0,
       };
 
-      if (!showBlockLineDecorations) {
-        if (domGlyphCharacterRects.length > 0) {
-          domGlyphCharacterRects = [];
-        }
-        return;
-      }
+      if (!showBlockLineDecorations) return { size, rects: null };
 
       const range = document.createRange();
       const nextRects = [];
@@ -2414,20 +2695,26 @@
         textNode = walker.nextNode();
       }
 
-      domGlyphCharacterRects = nextRects;
+      return { size, rects: nextRects };
     };
 
-    const frame = requestAnimationFrame(syncMetrics);
-    const observer = new ResizeObserver(() => syncMetrics());
-    observer.observe(textGlyphElement);
-    if (showBlockLineDecorations) {
-      observer.observe(controlContentElement);
-    }
-
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
+    // Writes only.
+    const commit = ({ size, rects }) => {
+      domTextGlyphSize = size;
+      if (rects === null) {
+        if (domGlyphCharacterRects.length > 0) domGlyphCharacterRects = [];
+        return;
+      }
+      domGlyphCharacterRects = rects;
     };
+
+    // No separate requestAnimationFrame: observing an element delivers an initial callback, which
+    // is the first measurement. The old code did both, so every control measured twice on mount.
+    return observeElementMetrics({
+      targets: showBlockLineDecorations ? [textGlyphElement, controlContentElement] : [textGlyphElement],
+      measure,
+      commit,
+    });
   });
   $effect(() => {
     hasText;
@@ -2762,8 +3049,9 @@
   class:device-drop-incompatible={deviceDropStatus === 'incompatible'}
   class:mouse-transparent={mouseBlocksPointer}
   class:mouse-focus-outline={mouseFocusOutline}
-  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
+  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; --inv-scale:{1 / (scale || 1)}; {layerTint ? `--layer-tint:${layerTint};` : ''} {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
+  ondblclick={editorInteractionEnabled ? handleDoubleClick : undefined}
   ondragover={editorInteractionEnabled ? handleDeviceParameterDragOver : undefined}
   ondrop={editorInteractionEnabled ? handleDeviceParameterDrop : undefined}
   onpointerenter={previewInteractive ? onpreviewpointerenter : undefined}
@@ -2787,9 +3075,9 @@
   aria-valuemax={previewInteractive ? previewAriaValueMax : undefined}
   aria-valuetext={previewInteractive ? previewAriaValueText : undefined}
 >
-  <div bind:this={controlContentElement} class="control-content" style="{filterCSS}">
+  <div bind:this={controlContentElement} class="control-content" style="{filterCSS} {absorbedFillCSS ?? ''}">
     {#if background}
-      <BackgroundRenderer {background} width={displayW} height={displayH} />
+      <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} />
     {/if}
 
     {#if isLcdDisplay}
@@ -3295,16 +3583,32 @@
 
     {#if hasText && !usesCustomTextFlow && (!shouldUseNativeTextPreview || !nativePreviewData || showBlockTextVisual)}
       <div class="text-content" style={textStyle}>
+        <!--
+          Two elements, not three and not one. The placement and the face share `.text-span`,
+          because an anchor around them bought nothing and cost the placement: an inline-block is
+          baseline-aligned inside its parent's line box, which pushed short text down (see
+          textAnchorStyle). The mirror, the small-caps and the text-shadow stay on their own
+          `.text-glyphs` inside it, because `transform` cannot be written twice on one element —
+          the mirror would replace the rotation and the fit-scale rather than compose with them.
+
+          A LINE IS FOLDED IN when there is only one of it, which is most captions. The per-line
+          styles are alignment and spacing, and on a single line they say the same thing one level
+          up — 225 labels on the GAIA panel is 225 elements saved.
+        -->
         <span class="text-span" style="{textAnchorStyle}; {textSpanStyle}">
           <span
             bind:this={textGlyphElement}
             class="text-glyphs"
             class:hidden-glyphs={(shouldUseNativeTextPreview && nativePreviewData) || showBlockTextVisual}
-            style={textGlyphStyle}
+            style={textGlyphAndLineStyle}
           >
-            {#each svgTextLines as line, index}
-              <span class="text-line" style={blockLineDomStyleFor(index)}>{blockLineDomText(line)}</span>
-            {/each}
+            {#if foldsSoleLine}
+              {blockLineDomText(svgTextLines[0])}
+            {:else}
+              {#each svgTextLines as line, index}
+                <span class="text-line" style={blockLineDomStyleFor(index)}>{blockLineDomText(line)}</span>
+              {/each}
+            {/if}
           </span>
         </span>
       </div>
@@ -3491,8 +3795,9 @@
     <!-- Nested children: DOM nesting makes their Transform.x/y parent-relative
          for free. The clip/origin layers carry no pointer events; children
          re-enable their own. -->
-    <div class="children-clip" class:clipped={childrenClip} class:children-interactive={mouseChildrenTakePointer}>
-      <div class="children-origin" style="left:{childrenPadding}px; top:{childrenPadding}px;">
+    <div class="children-clip" class:clipped={childrenClip} class:children-interactive={mouseChildrenTakePointer}
+      style={childrenClip && childrenClipRadius ? `border-radius:${childrenClipRadius}px;` : ''}>
+      <div class="children-origin" style="left:{childrenPad.left}px; top:{childrenPad.top}px;">
         {#each childControls as child (child._children?.Core?.id)}
           <CanvasControlNested
             control={child}
@@ -3513,7 +3818,7 @@
             parentOffset={childParentOffset}
             parentChainIds={childParentChainIds}
             parentGrid={myGridSection}
-            layoutPosition={childFlowPositions?.get(child._children?.Core?.id) ?? null}
+            layoutPosition={childPositions?.get(child._children?.Core?.id) ?? null}
             {...(childPreviewPropsFor?.(child) ?? {})}
           />
         {/each}
@@ -3521,8 +3826,22 @@
     </div>
   {/if}
 
+  {#if inlineTextEditing}
+    <!-- svelte-ignore a11y_autofocus -->
+    <textarea
+      class="inline-text-editor"
+      bind:value={inlineTextValue}
+      autofocus
+      onfocus={(e) => e.target.select()}
+      onblur={commitInlineTextEdit}
+      onkeydown={handleInlineTextKey}
+      onmousedown={(e) => e.stopPropagation()}
+      ondblclick={(e) => e.stopPropagation()}
+    ></textarea>
+  {/if}
+
   <CanvasControlSelectionOverlay
-    showHandles={editorInteractionEnabled && isSelected && !isEditorLocked}
+    showHandles={editorInteractionEnabled && isSelected && !isEditorLocked && $selectedComponentIds.size <= 1 && !inlineTextEditing}
     {handles}
     {handleStyle}
     onResizeStart={handleResizeStart}
@@ -3531,6 +3850,7 @@
     {snapGuides}
     {distanceLabels}
     {isKeyObject}
+    angleLabel={isRotating && transientRotation != null ? `${normalizeRotation(transientRotation)}°` : null}
     overlayOffsetX={displayX + parentOffset.x}
     overlayOffsetY={displayY + parentOffset.y}
   />
@@ -3581,6 +3901,12 @@
   }
   .children-clip.clipped {
     overflow: hidden;
+    /* Rounded with the container it is clipping to. `overflow: hidden` on its own clips to the
+       BORDER BOX, which is square — so a child overhanging a rounded corner stayed visible in the
+       little triangle outside the curve, while the scenery compiler's <clipPath> (which rebuilds
+       the same radius) cut it away. The two disagreed on exactly the pixels a corner radius is
+       for, and a scenery layer locking made the difference appear. The radius is set inline
+       alongside this, from the container's own Corners. */
   }
   .children-origin {
     position: absolute;
@@ -3597,10 +3923,41 @@
     pointer-events: auto;
   }
 
+  /* A SELECTED child is directly interactive in the editor too: double-click
+     drills into a container (selecting the child under the pointer), and from
+     then on the child can be dragged/resized itself. Deselect (Esc steps back
+     out to the parent) and the container is one draggable unit again. */
+  .children-origin :global(.canvas-control.selected) {
+    pointer-events: auto;
+  }
+
+  /* In-place text editor (double-click a text-bearing control). Sized by the
+     control, screen-legible at every zoom via --inv-scale. */
+  .inline-text-editor {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    background: rgba(12, 20, 28, 0.85);
+    border: calc(1px * var(--inv-scale, 1)) solid #5B9BD5;
+    border-radius: 2px;
+    color: #FFF;
+    font-family: inherit;
+    font-size: calc(12px * var(--inv-scale, 1));
+    text-align: center;
+    padding: calc(2px * var(--inv-scale, 1));
+    resize: none;
+    outline: none;
+    overflow: hidden;
+    z-index: 20;
+    pointer-events: auto;
+  }
+
   /* Container highlighted as the live drop target during a canvas drag. */
   .canvas-control.drop-target {
-    outline: 2px dashed #5B9BD5;
-    outline-offset: 1px;
+    outline: calc(2px * var(--inv-scale, 1)) dashed #5B9BD5;
+    outline-offset: calc(1px * var(--inv-scale, 1));
     background: rgba(91, 155, 213, 0.10);
   }
 
@@ -3880,6 +4237,11 @@
     word-break: break-word;
   }
 
+  /*
+   * The glyph box, and — when there is only one line — that line as well. `display:block` either
+   * way: the folded line needs it, and blockLinePaintStyles deliberately leaves it out so that a
+   * line folded onto an inline-block would not blockify it.
+   */
   .text-glyphs {
     display: block;
   }
@@ -3919,8 +4281,10 @@
     pointer-events: none;
   }
 
+  /* Selection/hover/drop outlines are screen-space UI drawn inside the scaled
+     surface — widths ride --inv-scale so they read the same at every zoom. */
   .canvas-control:hover:not(.locked) {
-    outline: 1px solid rgba(91, 155, 213, 0.4);
+    outline: calc(1px * var(--inv-scale, 1)) solid rgba(91, 155, 213, 0.4);
   }
 
   .canvas-control.preview-surface:hover:not(.locked) {
@@ -3969,9 +4333,12 @@
     border: 1px dashed rgba(255, 196, 84, 0.7);
   }
 
+  /* Tinted by the control's layer when that layer has a colour code, blue otherwise. The key-object
+     rule below still wins, because "this is the one the others align to" is a stronger thing to say
+     than "this is on the scenery layer". */
   .canvas-control.selected {
-    outline: 2px solid #5B9BD5;
-    outline-offset: -1px;
+    outline: calc(2px * var(--inv-scale, 1)) solid var(--layer-tint, #5B9BD5);
+    outline-offset: calc(-1px * var(--inv-scale, 1));
   }
 
   .canvas-control.selected.key-object {
@@ -3980,7 +4347,7 @@
 
   .canvas-control.hidden-component {
     opacity: 0.25 !important;
-    outline: 1px dashed #666;
+    outline: calc(1px * var(--inv-scale, 1)) dashed #666;
   }
 
   /* A custom component with no visible background renders transparent, so in

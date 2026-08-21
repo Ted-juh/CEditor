@@ -1,7 +1,7 @@
 <script>
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyColor from '../properties/PropertyColor.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
 
   let {
     title = 'Underline',
@@ -35,16 +35,16 @@
   <div class="effect-divider"></div>
 </PropertyCell>
 <PropertyCell label={yLabel} span={1} hint={`Offset for the ${title.toLowerCase()} line. Positive moves up, negative moves down.`}>
-  <NumberInput value={displayedY} step={0.5} onchange={onChangeY} />
+  <NumberCell value={displayedY} step={0.5} onchange={onChangeY} />
 </PropertyCell>
 <PropertyCell label={thicknessLabel} span={1} hint={`${title} line thickness in pixels.`}>
-  <NumberInput value={thickness} min={1} step={0.5} onchange={onChangeThickness} />
+  <NumberCell value={thickness} min={1} step={0.5} onchange={onChangeThickness} />
 </PropertyCell>
 <PropertyCell label={colorLabel} span={2} hint={`AARRGGBB colour for the ${title.toLowerCase()} line.`}>
   <PropertyColor value={colorValue} onchange={onChangeColor} onswatchclick={onColorSwatch} />
 </PropertyCell>
 <PropertyCell label={leftLabel} span={1} hint={`Left inset for the ${title.toLowerCase()} line.`}>
-  <NumberInput value={displayedLeft} step={0.5} onchange={onChangeLeft} />
+  <NumberCell value={displayedLeft} step={0.5} onchange={onChangeLeft} />
 </PropertyCell>
 <PropertyCell label="Width" span={2} hint={`Snap the ${title.toLowerCase()} line to the border, or fit it to the word width.`}>
   <div class="mini-action-row">
@@ -54,7 +54,7 @@
   </div>
 </PropertyCell>
 <PropertyCell label={rightLabel} span={1} hint={`Right inset for the ${title.toLowerCase()} line.`}>
-  <NumberInput value={displayedRight} step={0.5} onchange={onChangeRight} />
+  <NumberCell value={displayedRight} step={0.5} onchange={onChangeRight} />
 </PropertyCell>
 <PropertyCell label="Layer" span={2} hint={`Choose whether the ${title.toLowerCase()} line is drawn behind or in front of the text.`}>
   <div class="style-row">
@@ -62,8 +62,8 @@
     <button class="style-btn" class:active={layerValue === 'front'} onclick={() => onSetLayer('front')}>Front</button>
   </div>
 </PropertyCell>
-<PropertyCell label="Gap" span={2} hint={`Clearance around letters when the ${title.toLowerCase()} line overlaps the text.`}>
-  <NumberInput value={gap} min={0} step={0.5} onchange={onChangeGap} />
+<PropertyCell label="Gap" span={2} compact hint={`Clearance around letters when the ${title.toLowerCase()} line overlaps the text.`}>
+  <NumberCell label="Gap" value={gap} min={0} step={0.5} onchange={onChangeGap} />
 </PropertyCell>
 
 <style>

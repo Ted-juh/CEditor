@@ -1,0 +1,34 @@
+{
+  "name": "GAIA Filter + Amp",
+  "profile": "embedded:roland-gaia",
+  "role": "mainSynth",
+  "port": "SH-01",
+  "pages": [
+    {
+      "title": "FILTER",
+      "slots": [
+        { "label": "CUTOFF",  "param": "filter.cutoff" },
+        { "label": "RESO",    "param": "filter.resonance" },
+        { "label": "ENV DEP", "param": "filter.envDepth" },
+        { "label": "KEYFOL",  "param": "filter.cutoffKeyfollow" },
+        { "label": "ATTACK",  "param": "filter.envAttack" },
+        { "label": "DECAY",   "param": "filter.envDecay" },
+        { "label": "SUSTAIN", "param": "filter.envSustain" },
+        { "label": "RELEASE", "param": "filter.envRelease" }
+      ]
+    },
+    {
+      "title": "FILTER 2 + AMP",
+      "slots": [
+        { "label": "VEL SEN", "param": "filter.envVelocitySens" },
+        { "label": "CUTOFF",  "param": "filter.cutoff" },
+        { "label": "RESO",    "param": "filter.resonance" },
+        { "label": "LEVEL",   "param": "amp.level" },
+        { "label": "ATTACK",  "param": "filter.envAttack" },
+        { "label": "DECAY",   "param": "filter.envDecay" },
+        { "label": "SUSTAIN", "param": "filter.envSustain" },
+        { "label": "RELEASE", "param": "filter.envRelease" }
+      ]
+    }
+  ]
+}

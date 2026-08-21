@@ -1,0 +1,36 @@
+{
+  "name": "Rig: GAIA + SH-201",
+  "profile": "../../CE/profiles/test/roland-gaia.ceditor-device.json",
+  "role": "gaia",
+  "pages": [
+    {
+      "title": "GAIA FILTER",
+      "slots": [
+        { "label": "CUTOFF",  "param": "filter.cutoff" },
+        { "label": "RESO",    "param": "filter.resonance" },
+        { "label": "ENV DEP", "param": "filter.envDepth" },
+        { "label": "KEYFOL",  "param": "filter.cutoffKeyfollow" },
+        { "label": "ATTACK",  "param": "filter.envAttack" },
+        { "label": "DECAY",   "param": "filter.envDecay" },
+        { "label": "SUSTAIN", "param": "filter.envSustain" },
+        { "label": "RELEASE", "param": "filter.envRelease" }
+      ]
+    },
+    {
+      "title": "SH-201",
+      "profile": "../../CE/profiles/test/roland-sh-201.ceditor-device.json",
+      "role": "sh201",
+      "port": "SH-201",
+      "slots": [
+        { "label": "CUTOFF",  "param": "upper.filter.cutoff" },
+        { "label": "RESO",    "param": "upper.filter.resonance" },
+        { "label": "ATTACK",  "param": "upper.filterEnv.attack" },
+        { "label": "OSC1 PW", "param": "upper.osc1.pulseWidth" },
+        { "label": "OSC2 PW", "param": "upper.osc2.pulseWidth" },
+        { "label": "PATCH LV","param": "patch.level" },
+        { "label": "MASTER",  "param": "system.masterLevel" },
+        { "label": "PROGRAM", "param": "system.patchProgram" }
+      ]
+    }
+  ]
+}

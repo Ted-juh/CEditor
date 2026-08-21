@@ -5,7 +5,7 @@ import { writable } from 'svelte/store';
  *
  * The Look bar shows one facet's quick controls at a time (Text, Fill, Box, …)
  * instead of a flat cumulative strip. `activeFacet` is the user's chosen/last
- * facet — the AppearanceBar falls back to the first applicable facet when this
+ * facet — the context bar falls back to the first applicable facet when this
  * one doesn't apply to the current selection.
  *
  * The facet is also the hook other entry points point at: a right-click

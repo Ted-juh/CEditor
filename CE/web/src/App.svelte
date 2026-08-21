@@ -10,13 +10,19 @@
   import StatusBar from './CE_Application/layout/StatusBar.svelte';
   import ComponentTree from './CE_Application/panels/ComponentTree.svelte';
   import ShortcutsOverlay from './CE_Application/layout/ShortcutsOverlay.svelte';
-  import AppearanceBar from './CE_Application/layout/AppearanceBar.svelte';
-  import FunctionBar from './CE_Application/layout/FunctionBar.svelte';
-  import ZoomBar from './CE_Application/layout/ZoomBar.svelte';
+  import ContextBar from './CE_Application/layout/ContextBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
-  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel } from './CE_Application/stores/panels.js';
-  import { isTextEntryTarget } from './CE_Application/utils/textEntry.js';
+  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, clearSelection, closeActiveEditorTab, openPanelFromFile, saveActivePanel, saveActivePanelAs, selectComponent, selectedComponentIds } from './CE_Application/stores/panels.js';
+  import { get } from 'svelte/store';
+  import { duplicateControl, groupSelectionIntoContainer, removeControl, ungroupContainer, updateControlProperty } from './CE_Application/stores/controls.js';
+  import { copySelection, cutSelection, pasteSelection, selectAll } from './CE_Application/stores/clipboard.js';
+  import { deleteSelectedGuide } from './CE_Application/stores/guides.js';
+  import { applyStyleToSelection, copyControlStyle } from './CE_Application/stores/styleClipboard.js';
+  import { previewModeEnabled } from './CE_Application/stores/interactionPreview.js';
+  import { saveActiveScriptWorkspace, saveActiveScriptWorkspaceAs } from './CE_Application/stores/scriptWorkspace.js';
+  import { handleEditorShortcut } from './CE_Application/utils/editorShortcuts.js';
+  import { isEditableTarget, resolveGlobalShortcut } from './CE_Application/utils/globalShortcuts.js';
   import { initScriptWorkspaceBridge } from './CE_Application/stores/scriptWorkspace.js';
   import { initAppSettingsBridge } from './CE_Application/stores/appSettings.js';
   import { initConsoleBridge } from './CE_Application/stores/console.js';
@@ -24,11 +30,13 @@
   import { initScriptModules } from './CE_Application/stores/scriptModules.js';
   import ScriptNotifications from './CE_Application/layout/ScriptNotifications.svelte';
   import ScriptDialog from './CE_Application/layout/ScriptDialog.svelte';
+  import NewPanelDialog from './CE_Application/layout/NewPanelDialog.svelte';
+  import { openNewPanelDialog } from './CE_Application/stores/newPanelDialog.js';
   import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
   import { initPresetChoiceSync } from './CE_Application/stores/presetChoiceSync.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
-  import { requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
+  import { requestFitToWindow, requestZoomStep, requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
   import { componentWorkspaceMode } from './CE_Application/stores/componentWorkspace.js';
   import { colorTarget } from './CE_Application/stores/colorTarget.js';
   import { gradientTarget } from './CE_Application/stores/gradientTarget.js';
@@ -75,34 +83,64 @@
     initPresetChoiceSync(); // preset-sourced selector rows follow scans + profile sources
   }
 
+  function saveActiveTab({ saveAs = false } = {}) {
+    if (get(activeEditorTab)?.type === 'script') {
+      if (saveAs) saveActiveScriptWorkspaceAs(); else saveActiveScriptWorkspace();
+      return;
+    }
+    if (saveAs) saveActivePanelAs(); else saveActivePanel();
+  }
+
   function handleGlobalKeyDown(e) {
     if (isCutoutDebug || isBehaviorDebug) return;
 
-    if (e.key === 'F1') {
+    const editableTarget = isEditableTarget(e.target);
+    const command = resolveGlobalShortcut(e, { editableTarget });
+
+    if (command) {
       e.preventDefault();
-      showShortcuts = !showShortcuts;
+      switch (command) {
+        case 'toggle-shortcuts': showShortcuts = !showShortcuts; break;
+        case 'save': saveActiveTab(); break;
+        case 'save-as': saveActiveTab({ saveAs: true }); break;
+        case 'new-panel': openNewPanelDialog(); break;
+        case 'open-panel': openPanelFromFile(); break;
+        case 'close-tab': closeActiveEditorTab(); break;
+        case 'open-settings': openSettingsTab(); break;
+        case 'zoom-to-selection': requestZoomToSelection(); break;
+        case 'undo': undo(); break;
+        case 'redo': redo(); break;
+      }
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
-      e.preventDefault();
-      requestZoomToSelection();
-      return;
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === ',') {
-      e.preventDefault();
-      openSettingsTab();
-      return;
-    }
-    // Undo/redo only — the shortcuts above have no text-field meaning, but these do: while typing,
-    // Ctrl+Z belongs to the field. Taking it would undo a panel edit and leave the typing intact.
-    if (isTextEntryTarget(e.target)) return;
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-      e.preventDefault();
-      undo();
-    } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-      e.preventDefault();
-      redo();
-    }
+
+    // Fallback for the canvas editing shortcuts (Delete, Ctrl+D/C/X/V/A/G,
+    // arrows). EditorCanvas dispatches these itself while focus sits inside
+    // the canvas wrapper; the moment focus wanders (tree click, toolbar
+    // click, marquee mousedown that suppressed the focus transfer) the
+    // wrapper handler goes silent and this window-level pass keeps the
+    // selection editable. Skipped when the wrapper already handled the key
+    // (defaultPrevented), while typing, and in workspaces without a canvas.
+    if (e.defaultPrevented || editableTarget) return;
+    if ($previewModeEnabled || $componentWorkspaceMode === 'surface') return;
+    const panel = get(activePanel);
+    if (!panel) return;
+
+    handleEditorShortcut(e, {
+      panel,
+      panelLocked: panel.locked ?? false,
+      gridSize: panel.gridSize ?? 10,
+      selectedComponentIds: get(selectedComponentIds),
+      zoomIn: () => requestZoomStep(1),
+      zoomOut: () => requestZoomStep(-1),
+      fitToWindow: requestFitToWindow,
+      zoomToSelection: requestZoomToSelection,
+      selectAll, pasteSelection, copySelection, cutSelection, duplicateControl,
+      removeControl, updateControlProperty, deleteSelectedGuide,
+      groupSelectionIntoContainer, ungroupContainer,
+      selectComponent, clearSelection,
+      copyControlStyle, applyStyleToSelection,
+    });
   }
 
   const MIN_PROPERTIES_PANEL_WIDTH = 600;
@@ -159,7 +197,6 @@
   let componentDesignerWorkspaceActive = $derived(workspaceChrome.workspaceKind === 'component');
   let scriptWorkspaceActive = $derived(workspaceChrome.workspaceKind === 'script');
   let chromeWorkspaceActive = $derived(workspaceChrome.chromeWorkspaceActive);
-  let workspaceOwnsChrome = $derived(workspaceChrome.ownsChrome);
   let effectiveShowPropertiesPanel = $derived(workspaceChrome.showPropertiesPanel);
   let effectiveShowTreePanel = $derived(workspaceChrome.showTreePanel);
   let effectiveShowDisplayPanel = $derived(workspaceChrome.showDisplayPanel);
@@ -287,30 +324,30 @@
     </div>
 
     <div class="icon-panel-area">
-      {#if !workspaceOwnsChrome && !workspaceChrome.compactPanel}
-        <IconPanel
-          {showDisplayPanel}
-          {showPropertiesPanel}
-          {showTreePanel}
-          onToggleDisplay={() => {
-            showDisplayPanel = !showDisplayPanel;
-          }}
-          onToggleProperties={() => {
-            showPropertiesPanel = !showPropertiesPanel;
-          }}
-          onToggleTree={() => {
-            showTreePanel = !showTreePanel;
-          }}
-        />
-      {/if}
+      <IconPanel
+        {showDisplayPanel}
+        {showPropertiesPanel}
+        {showTreePanel}
+        togglesEnabled={workspaceChrome.railTogglesEnabled}
+        insertEnabled={workspaceChrome.railInsertEnabled}
+        onToggleDisplay={() => {
+          showDisplayPanel = !showDisplayPanel;
+        }}
+        onToggleProperties={() => {
+          showPropertiesPanel = !showPropertiesPanel;
+        }}
+        onToggleTree={() => {
+          showTreePanel = !showTreePanel;
+        }}
+      />
     </div>
 
     <div class="center-area">
       <div class="editor-top-row">
         <div class="editor-canvas-col">
           {#if !isSettingsTab && !chromeWorkspaceActive}
-            <div class="look-bar-area">
-              <AppearanceBar />
+            <div class="context-bar-area">
+              <ContextBar />
             </div>
           {/if}
           <div class="editor-canvas-area">
@@ -318,14 +355,6 @@
               <EditorCanvas />
             </ErrorBoundary>
           </div>
-          {#if !isSettingsTab && !chromeWorkspaceActive}
-            <div class="common-bar-area">
-              <FunctionBar />
-            </div>
-            <div class="zoom-bar-area">
-              <ZoomBar />
-            </div>
-          {/if}
         </div>
         {#if effectiveShowTreePanel}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -339,7 +368,7 @@
       <div class="display-resize-handle" role="separator" aria-orientation="horizontal" class:active={isResizingDisplay} use:dragScrub={displayResizeScrub} style="display: {effectiveShowDisplayPanel ? 'block' : 'none'}"></div>
       <div class="display-panel-area" style="flex: 0 0 {displayPanelBasis}; display: {effectiveShowDisplayPanel ? 'block' : 'none'}">
         <ErrorBoundary label="The display panel">
-          <DisplayPanel onTabChange={handleDisplayTabChange} />
+          <DisplayPanel onTabChange={handleDisplayTabChange} visible={effectiveShowDisplayPanel} />
         </ErrorBoundary>
       </div>
     </div>
@@ -367,6 +396,8 @@
   <!-- ce.ui.dialog() modals. Root-mounted for the same reason, and above everything: a question
        that can be scrolled out of view is a script left waiting for an answer. -->
   <ScriptDialog />
+
+  <NewPanelDialog />
 
   {#if showShortcuts}
     <ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />
@@ -452,18 +483,12 @@
     min-height: 0;
     overflow: hidden;
   }
-  .look-bar-area {
-    flex: 0 0 60px;
+  /* One context bar replaces the old Look (60px) + Function (56px) + Zoom
+     (24px) stack — auto height (~64px, less with nothing selected), giving
+     the canvas the difference. Zoom and view toggles live in the status bar. */
+  .context-bar-area {
+    flex: 0 0 auto;
     border-bottom: 1px solid #333;
-  }
-  .common-bar-area {
-    flex: 0 0 56px;
-    border-top: 1px solid #333;
-  }
-
-  .zoom-bar-area {
-    flex: 0 0 24px;
-    border-top: 1px solid #2A2A2A;
   }
   .display-panel-area {
     border-top: 1px solid #333;

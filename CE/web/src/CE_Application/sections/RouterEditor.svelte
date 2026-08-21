@@ -6,9 +6,14 @@
   import { learnCandidateLabel } from '../utils/midiNoteInput.js';
   import { midiLearnState, startMidiLearn, stopMidiLearn } from '../stores/noteInput.js';
   import { onDestroy } from 'svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Route from 'lucide-svelte/icons/route';
+  import LogOut from 'lucide-svelte/icons/log-out';
+  import Palette from 'lucide-svelte/icons/palette';
 
   import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
@@ -59,15 +64,10 @@
   function depthPct(d) { return Math.round(num(d?.depth, 1) * 100); }
   // Which standard sources are "external" (need the synth/controller to send them).
   const EXTERNAL = new Set(['aftertouch', 'breath', 'foot', 'velocity']);
-
-  // Accent-colour swatches: the native picker edits RGB; we preserve each
-  // colour's original alpha so faint grids keep their transparency.
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if r}
-  <PropertySection title="Expression Router">
+  <PropertySection title="Expression Router" icon={Route}>
     <PropertyCell label="Source" span={2} hint="The incoming signal to shape. Aftertouch, Breath, Foot and Velocity only work if your gear sends them.">
       <select class="val" value={r.source ?? 'modwheel'} onchange={(e) => set('source', e.target.value)}>
         {#each ROUTER_INPUT_SOURCES as s (s.id)}
@@ -96,8 +96,8 @@
         </button>
       </PropertyCell>
       {#if String(r.source ?? '') === 'cc'}
-        <PropertyCell label="CC number" span={2} hint="Which controller number to follow (0–127).">
-          <input class="val" type="number" min="0" max="127" step="1" value={num(r.ccNumber, 1)} onchange={(e) => set('ccNumber', Math.max(0, Math.min(127, Math.round(num(e.target.value, 1)))))} />
+        <PropertyCell label="CC number" span={2} compact hint="Which controller number to follow (0–127).">
+          <NumberCell label="CC" value={num(r.ccNumber, 1)} step={1} min={0} max={127} onchange={(v) => set('ccNumber', Math.max(0, Math.min(127, Math.round(num(v, 1)))))} />
         </PropertyCell>
       {/if}
       {#if String(r.source ?? '') === 'polyAftertouch'}
@@ -108,51 +108,48 @@
           </select>
         </PropertyCell>
       {/if}
-      <PropertyCell label="In channel" span={1} hint="Which MIDI channel to take this controller from. 0 = omni (any channel).">
-        <input class="val" type="number" min="0" max="16" step="1" value={num(r.inputChannel, 0)} onchange={(e) => set('inputChannel', Math.max(0, Math.min(16, Math.round(num(e.target.value, 0)))))} />
+      <PropertyCell label="In channel" span={1} compact hint="Which MIDI channel to take this controller from. 0 = omni (any channel).">
+        <NumberCell label="Ch" value={num(r.inputChannel, 0)} step={1} min={0} max={16} onchange={(v) => set('inputChannel', Math.max(0, Math.min(16, Math.round(num(v, 0)))))} />
       </PropertyCell>
-      <PropertyCell label="Test in" span={1} hint="Stand-in value (0–1) until that controller sends something. The header reads Live once real data arrives.">
-        <input class="val" type="number" min="0" max="1" step="0.01" value={r.testInput ?? 0.5} onchange={(e) => set('testInput', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} />
+      <PropertyCell label="Test in" span={1} compact hint="Stand-in value (0–1) until that controller sends something. The header reads Live once real data arrives.">
+        <NumberCell label="Test" value={r.testInput ?? 0.5} step={0.01} min={0} max={1} defaultValue={0.5} onchange={(v) => set('testInput', Math.max(0, Math.min(1, num(v, 0.5))))} />
       </PropertyCell>
       <PropertyCell label="" span={4} hint="The controller is read from the hardware MIDI input on the device role.">
         <div class="note">Reads {String(r.source ?? '') === 'cc' ? `CC ${num(r.ccNumber, 1)}` : routerSourceLabel(r.source ?? 'modwheel')} from the MIDI input{num(r.inputChannel, 0) > 0 ? ` · ch ${num(r.inputChannel, 0)}` : ' · omni'}{String(r.source ?? '') === 'polyAftertouch' ? ` · ${String(r.polyMode ?? 'highest') === 'last' ? 'most recent key' : 'hardest key'}` : ''}</div>
       </PropertyCell>
     {/if}
-    <PropertyCell label="Dead-zone" span={2} hint="Ignore the bottom of the input range; the rest rescales to fill 0–1 (0 = off).">
-      <input class="val" type="number" min="0" max="0.9" step="0.02" value={r.deadzone ?? 0} onchange={(e) => set('deadzone', Math.max(0, Math.min(0.9, num(e.target.value, 0))))} />
+    <PropertyCell label="Dead-zone" span={2} compact hint="Ignore the bottom of the input range; the rest rescales to fill 0–1 (0 = off).">
+      <NumberCell label="Dz" value={r.deadzone ?? 0} step={0.02} min={0} max={0.9} defaultValue={0} onchange={(v) => set('deadzone', Math.max(0, Math.min(0.9, num(v, 0))))} />
     </PropertyCell>
     <PropertyCell label="Divisions" span={1} hint="Draw value-scale ticks along each destination meter, using the same major/minor tick generator as the sliders.">
       <PropertyToggle value={r.showDivisions === true} onchange={() => set('showDivisions', !(r.showDivisions === true))} />
     </PropertyCell>
     {#if r.showDivisions === true}
-      <PropertyCell label="Major" span={1} hint="Major tick count (same as a slider's Major Count).">
-        <input class="val" type="number" min="2" max="21" step="1" value={r.majorTickCount ?? 5} onchange={(e) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(e.target.value, 5)))))} />
+      <PropertyCell label="Major" span={1} compact hint="Major tick count (same as a slider's Major Count).">
+        <NumberCell label="Major" value={r.majorTickCount ?? 5} step={1} min={2} max={21} defaultValue={5} onchange={(v) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(v, 5)))))} />
       </PropertyCell>
-      <PropertyCell label="Minor / gap" span={1} hint="Minor ticks between each pair of majors (same as a slider's Minor / Gap).">
-        <input class="val" type="number" min="0" max="8" step="1" value={r.minorTickCount ?? 0} onchange={(e) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(e.target.value, 0)))))} />
+      <PropertyCell label="Minor / gap" span={1} compact hint="Minor ticks between each pair of majors (same as a slider's Minor / Gap).">
+        <NumberCell label="Minor" value={r.minorTickCount ?? 0} step={1} min={0} max={8} defaultValue={0} onchange={(v) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(v, 0)))))} />
       </PropertyCell>
     {/if}
   </PropertySection>
 
-  <PropertySection title="Appearance">
-    <PropertyCell label="Curve" span={1} hint="The transfer-curve line colour.">
-      <input class="cswatch" type="color" value={colRgb(r.curveColour, 'FF39D98A')} onchange={(e) => setCol('curveColour', r.curveColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Input" span={1} hint="The live input bar + crosshair colour.">
-      <input class="cswatch" type="color" value={colRgb(r.inputColour, 'FFF2C94C')} onchange={(e) => setCol('inputColour', r.inputColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Field" span={1} hint="Curve-area background colour.">
-      <input class="cswatch" type="color" value={colRgb(r.fieldColour, 'FF0A0A0F')} onchange={(e) => setCol('fieldColour', r.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Grid" span={1} hint="Grid lines (stays faint — its transparency is kept).">
-      <input class="cswatch" type="color" value={colRgb(r.gridColour, 'FFFFFFFF')} onchange={(e) => setCol('gridColour', r.gridColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Label colour.">
-      <input class="cswatch" type="color" value={colRgb(r.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', r.labelColour, e.target.value)} />
+  <PropertySection title="Appearance" icon={Palette}>
+    <PropertyCell label="Colours" span={4} hint="Transfer curve, live input bar, field background, grid lines, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'curveColour', label: 'Curve', value: r.curveColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'Router.curveColour' } },
+        { key: 'inputColour', label: 'Input', value: r.inputColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Router.inputColour' } },
+        { key: 'fieldColour', label: 'Field', value: r.fieldColour ?? 'FF0A0A0F', target: { type: 'control', controlId: core?.id, path: 'Router.fieldColour' } },
+        { key: 'gridColour', label: 'Grid', value: r.gridColour ?? 'FFFFFFFF', target: { type: 'control', controlId: core?.id, path: 'Router.gridColour' } },
+        { key: 'labelColour', label: 'Labels', value: r.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Router.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Destinations">
+  <PropertySection title="Destinations" icon={LogOut}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add destination" onclick={addDest}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each destination maps the curve to one bound parameter: depth (−100…+100%) and output range.">
       <div class="dests">
         {#if dests.length === 0}
@@ -162,24 +159,25 @@
           <div class="dest" class:off={d.enabled === false}>
             <div class="drow">
               <input class="val name" type="text" value={d.label ?? ''} placeholder="Destination" onchange={(e) => updateDest(i, 'label', e.target.value)} />
-              <input class="swatch" type="color" value={`#${String(d.colour ?? 'FF39D98A').slice(-6)}`} onchange={(e) => updateDest(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+              <span class="dcol"><SwatchCluster swatches={[
+                { key: 'colour', label: 'Colour', value: d.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateDest(i, 'colour', hex) } },
+              ]} /></span>
               <label class="flag"><input type="checkbox" checked={d.enabled !== false} onchange={(e) => updateDest(i, 'enabled', e.currentTarget.checked)} /><span>On</span></label>
               <button type="button" class="action-btn danger" onclick={() => removeDest(i)} title="Remove">✕</button>
             </div>
             <div class="drow2">
               <label class="fld"><span>Depth</span>
-                <input class="val" type="number" min="-100" max="100" step="5" value={depthPct(d)} onchange={(e) => updateDest(i, 'depth', Math.max(-1, Math.min(1, num(e.target.value, 100) / 100)))} />
+                <NumberCell value={depthPct(d)} step={5} min={-100} max={100} onchange={(v) => updateDest(i, 'depth', Math.max(-1, Math.min(1, num(v, 100) / 100)))} />
               </label>
               <label class="fld"><span>Min</span>
-                <input class="val" type="number" min="0" max="1" step="0.05" value={d.min ?? 0} onchange={(e) => updateDest(i, 'min', Math.max(0, Math.min(1, num(e.target.value, 0))))} />
+                <NumberCell value={d.min ?? 0} step={0.05} min={0} max={1} defaultValue={0} onchange={(v) => updateDest(i, 'min', Math.max(0, Math.min(1, num(v, 0))))} />
               </label>
               <label class="fld"><span>Max</span>
-                <input class="val" type="number" min="0" max="1" step="0.05" value={d.max ?? 1} onchange={(e) => updateDest(i, 'max', Math.max(0, Math.min(1, num(e.target.value, 1))))} />
+                <NumberCell value={d.max ?? 1} step={0.05} min={0} max={1} defaultValue={1} onchange={(v) => updateDest(i, 'max', Math.max(0, Math.min(1, num(v, 1))))} />
               </label>
             </div>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addDest}>Add destination</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -203,8 +201,7 @@
   .dest.off { opacity: 0.55; }
   .drow { display: flex; align-items: center; gap: 8px; }
   .drow .name { flex: 1 1 auto; }
-  .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
+  .dcol { flex: 0 0 52px; display: flex; }
   .drow2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #8a8a8a; }
@@ -217,4 +214,10 @@
   .action-btn:hover { border-color: #5B9BD5; }
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:hover { border-color: #C96A6A; }
+  .hdr-btn {
+    height: 16px; font-size: 9px; padding: 0 8px; border-radius: 8px;
+    background: #252525; border: 1px solid #333; color: #777;
+    font-family: inherit; cursor: pointer; line-height: 1;
+  }
+  .hdr-btn:hover { border-color: #4A6E8C; color: #CCC; }
 </style>

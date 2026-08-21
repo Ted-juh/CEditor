@@ -24,6 +24,9 @@ import {
 } from './runtimePreferences.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 import { fileDataByteSize, fileDataText } from '../utils/fileDataPayload.js';
+import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
+import { runWhenIdle } from '../utils/runWhenIdle.js';
+import { equalityWritable } from '../utils/equalityStore.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { createPanel, deserializePanel, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
 import {
@@ -49,6 +52,11 @@ import {
   scriptDocuments,
   setActiveScriptDocument,
 } from './scriptWorkspace.js';
+import {
+  closeScreenDocument,
+  screenDocuments,
+  setActiveScreenDocument,
+} from './screenBuilder.js';
 
 export { createPanel };
 
@@ -249,8 +257,16 @@ function scheduleUnsavedSessionAutosave() {
   }
 
   autosaveTimer = setTimeout(() => {
-    persistUnsavedSessionSnapshot();
     autosaveTimer = null;
+    // WHEN THE BROWSER IS FREE, not when the timer happens to fire. Serialising the document is
+    // measured in hundreds of milliseconds on a large panel, and a bare setTimeout drops that on
+    // whatever the author is doing five seconds after an edit — which is a freeze in the middle of
+    // a drag with no visible cause. requestIdleCallback waits for a gap instead, and its `timeout`
+    // guarantees the snapshot still happens on a busy editor rather than being starved.
+    //
+    // flushUnsavedSessionSnapshot stays synchronous: it runs before destructive actions and on the
+    // way out, where the point is that the write has finished.
+    runWhenIdle(persistUnsavedSessionSnapshot, 2000);
   }, Math.max(5, get(autosaveIntervalSeconds)) * 1000);
 }
 
@@ -334,8 +350,19 @@ export function isSelected(id) {
   return get(selectedComponentIds).has(id);
 }
 
-/** Active multi-drag delta — applied visually to all selected components during drag */
-export const multiDragDelta = writable({ x: 0, y: 0, active: false });
+/**
+ * Active multi-drag delta — applied visually to all selected components during drag.
+ *
+ * Object-valued, and set to the idle value at the end of EVERY drag whether or not a multi-drag
+ * happened — which a plain writable turns into a notification, because safe_not_equal cannot see
+ * that two objects hold the same numbers. The same defect that made selecting a control cost
+ * 200 ms (utils/equalityStore.js); here it is worth a single callback, and it is fixed because it
+ * is the same bug rather than because the measurement demanded it.
+ */
+export const multiDragDelta = equalityWritable(
+  { x: 0, y: 0, active: false },
+  (a, b) => a?.x === b?.x && a?.y === b?.y && a?.active === b?.active,
+);
 
 /** Editor zoom state */
 export const editorZoom = writable(100);
@@ -382,10 +409,27 @@ export const resolvedActivePanelId = derived(
     resolvePanelSelection($panels, $activePanelId, $activeEditorTab)?.id ?? null
 );
 
+/** Panel targeted by the script RUNTIME. On a script tab this is the script
+ *  document's bound panel — an explicit binding, not "whatever panel tab sits
+ *  behind the workspace". Everywhere else it matches resolvedActivePanelId.
+ *  Panel-editing commands (undo, paste, insert) must keep using
+ *  resolvedActivePanelId, which is null on script tabs. */
+export const scriptRuntimePanelId = derived(
+  [panels, activePanelId, activeEditorTab, scriptDocuments],
+  ([$panels, $activePanelId, $tab, $scriptDocuments]) => {
+    if ($tab?.type === 'script') {
+      const doc = $scriptDocuments.find((d) => d.id === $tab.id);
+      const boundId = doc?.panelId ?? null;
+      return $panels.find((p) => String(p.id) === String(boundId))?.id ?? null;
+    }
+    return resolvePanelSelection($panels, $activePanelId, $tab)?.id ?? null;
+  }
+);
+
 /** All editor tabs shown in the top tab bar */
 export const editorTabs = derived(
-  [panels, settingsTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments],
-  ([$panels, $settingsTabOpen, $deviceProfileTabs, $componentDocuments, $scriptDocuments]) => {
+  [panels, settingsTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments, screenDocuments],
+  ([$panels, $settingsTabOpen, $deviceProfileTabs, $componentDocuments, $scriptDocuments, $screenDocuments]) => {
     const tabs = $panels.map(panel => ({
       id: panel.id,
       tabType: 'panel',
@@ -429,6 +473,15 @@ export const editorTabs = derived(
       });
     }
 
+    for (const screenDocument of $screenDocuments) {
+      tabs.push({
+        id: screenDocument.id,
+        tabType: 'screen',
+        name: screenDocument.name || 'Untitled Screen',
+        modified: screenDocument.modified === true,
+      });
+    }
+
     return tabs;
   }
 );
@@ -438,6 +491,11 @@ function resolvePanelSelection(list, activeId, tab) {
   if (tab?.type === 'settings') return null;
   if (tab?.type === 'component') return null;
   if (tab?.type === 'deviceProfile') return null;
+  // Script tabs edit script documents, not panels. Falling through here made
+  // every panel-scoped command (undo, paste, insert) silently hit an
+  // off-screen panel while a script workspace was in front.
+  if (tab?.type === 'script') return null;
+  if (tab?.type === 'screen') return null;
 
   const panelFromTab = tab?.type === 'panel'
     ? list.find((panel) => panel.id === tab.id) ?? null
@@ -740,8 +798,12 @@ function normalizeEditorTabDescriptor(tab) {
   };
 }
 
-/** Close a panel by id */
+/** Close a panel by id. Prompts when the panel has unsaved changes; returns
+ *  false when the user keeps the panel open. */
 export function closePanel(id) {
+  const closing = get(panels).find((p) => p.id === id);
+  if (closing?.modified && !confirmDiscardUnsaved(closing.name)) return false;
+
   panelDesignerSplits.update((splits) => {
     if (!splits || !(id in splits)) return splits;
     const next = { ...splits };
@@ -783,6 +845,7 @@ export function closePanel(id) {
   // Update persisted open panel paths
   persistOpenPanelPaths();
   flushUnsavedSessionSnapshot();
+  return true;
 }
 
 /** Switch to a panel by id */
@@ -821,6 +884,14 @@ export function setActiveEditorTab(tab) {
     const nextTab = { type: 'script', id: tab.id };
     activeEditorTab.set(nextTab);
     setActiveScriptDocument(tab.id);
+    clearSelection();
+    return;
+  }
+
+  if (tab.tabType === 'screen' || tab.type === 'screen') {
+    const nextTab = { type: 'screen', id: tab.id };
+    activeEditorTab.set(nextTab);
+    setActiveScreenDocument(tab.id);
     clearSelection();
     return;
   }
@@ -868,6 +939,16 @@ export function closeActiveEditorTab() {
     if (nextScriptId) {
       activeEditorTab.set({ type: 'script', id: nextScriptId });
     } else if (get(activePanelId) != null) {
+      activeEditorTab.set({ type: 'panel', id: get(activePanelId) });
+    } else {
+      activeEditorTab.set({ type: 'panel', id: null });
+    }
+    return;
+  }
+
+  if (tab.type === 'screen') {
+    closeScreenDocument(tab.id);
+    if (get(activePanelId) != null) {
       activeEditorTab.set({ type: 'panel', id: get(activePanelId) });
     } else {
       activeEditorTab.set({ type: 'panel', id: null });
@@ -982,7 +1063,7 @@ function persistOpenPanelPaths() {
 
 function syncPanelSelection() {
   const tab = get(activeEditorTab);
-  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script') return;
+  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
 
   const list = get(panels);
   const activeId = get(activePanelId);
@@ -1027,7 +1108,7 @@ activePanelId.subscribe(() => {
 });
 
 activeEditorTab.subscribe((tab) => {
-  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script') return;
+  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
   syncPanelSelection();
 });
 

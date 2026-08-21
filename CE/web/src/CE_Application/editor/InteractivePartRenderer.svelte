@@ -3,6 +3,7 @@
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { polygonPoints, polygonToSvgPoints } from '../utils/shapeGeometry.js';
   import { numberOr } from '../utils/primitives.js';
+  import { plainFillCSS } from '../utils/plainFillCSS.js';
 
   let {
     part = null,
@@ -166,8 +167,21 @@
       shadowCSS,
       blendCSS,
       filterCSS,
+      // A flat colour or a single gradient paints here rather than on a child of its own. This
+      // element exists either way; the div it replaces did not. `.interactive-part` has no
+      // overflow clip unless a part asks for one, so a border-radius here shapes the background
+      // and touches nothing else.
+      absorbedFillCSS ?? '',
     ].filter(Boolean).join('; ');
   });
+
+  // 2,821 of the GAIA panel's parts are static art already folded into one image per component,
+  // and the 474 that are left over still wanted a div each just to hold a colour.
+  let absorbedFillCSS = $derived(
+    background && !usesSimpleBackground && !rendersVectorShape
+      ? plainFillCSS(background, frame.width, frame.height)
+      : null,
+  );
 
   function justifyContentFor(value) {
     switch (String(value ?? 'centred').toLowerCase()) {
@@ -470,7 +484,7 @@
     {#if background && usesSimpleBackground && !rendersVectorShape}
       <div class="interactive-simple-background" style={simpleBackgroundStyle}></div>
     {:else if background && !rendersVectorShape}
-      <BackgroundRenderer {background} width={frame.width} height={frame.height} />
+      <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} />
     {/if}
 
     {#if rendersVectorShape && vectorShapeSvg}

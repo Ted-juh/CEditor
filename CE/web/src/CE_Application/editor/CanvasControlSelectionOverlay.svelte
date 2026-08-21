@@ -9,10 +9,15 @@
     snapGuides = [],
     distanceLabels = [],
     isKeyObject = false,
+    angleLabel = null,
     overlayOffsetX = 0,
     overlayOffsetY = 0,
   } = $props();
 </script>
+
+{#if angleLabel}
+  <div class="dist-label angle-label">{angleLabel}</div>
+{/if}
 
 {#if showHandles}
   {#each handles as handle (handle.id)}
@@ -71,18 +76,22 @@
 {/if}
 
 <style>
+  /* Every fixed length in this overlay is multiplied by --inv-scale (1/zoom,
+     set by CanvasControl on the control root): the overlay renders inside the
+     CSS-scaled panel surface, and these are screen-space UI, not panel
+     content. Without it, handles and outlines shrink to invisibility zoomed
+     out and swallow the control zoomed in. */
   .resize-handle {
     position: absolute;
     background: #5B9BD5;
-    border: 1px solid #FFF;
-    border-radius: 2px;
+    border: solid #FFF;
     z-index: 10;
   }
 
   .resize-handle::after {
     content: '';
     position: absolute;
-    inset: -5px;
+    inset: calc(-5px * var(--inv-scale, 1));
   }
 
   .resize-handle:hover {
@@ -101,8 +110,8 @@
 
   .rotate-zone {
     position: absolute;
-    width: 16px;
-    height: 16px;
+    width: calc(16px * var(--inv-scale, 1));
+    height: calc(16px * var(--inv-scale, 1));
     z-index: 9;
     cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpath d='M21 12a9 9 0 1 1-3-6.7'/%3E%3Cpath d='M21 3v5h-5'/%3E%3C/svg%3E") 10 10, crosshair;
   }
@@ -110,13 +119,13 @@
   .rotate-zone::after {
     content: '';
     position: absolute;
-    inset: -3px;
+    inset: calc(-3px * var(--inv-scale, 1));
   }
 
-  .rotate-tl { top: -18px; left: -18px; }
-  .rotate-tr { top: -18px; right: -18px; }
-  .rotate-bl { bottom: -18px; left: -18px; }
-  .rotate-br { bottom: -18px; right: -18px; }
+  .rotate-tl { top: calc(-18px * var(--inv-scale, 1)); left: calc(-18px * var(--inv-scale, 1)); }
+  .rotate-tr { top: calc(-18px * var(--inv-scale, 1)); right: calc(-18px * var(--inv-scale, 1)); }
+  .rotate-bl { bottom: calc(-18px * var(--inv-scale, 1)); left: calc(-18px * var(--inv-scale, 1)); }
+  .rotate-br { bottom: calc(-18px * var(--inv-scale, 1)); right: calc(-18px * var(--inv-scale, 1)); }
 
   .snap-guide {
     position: absolute;
@@ -127,25 +136,25 @@
   .snap-guide.vertical {
     top: 0;
     bottom: 0;
-    width: 1px;
-    border-left: 1px dashed #5B9BD5;
+    width: calc(1px * var(--inv-scale, 1));
+    border-left: calc(1px * var(--inv-scale, 1)) dashed #5B9BD5;
   }
 
   .snap-guide.horizontal {
     left: 0;
     right: 0;
-    height: 1px;
-    border-top: 1px dashed #5B9BD5;
+    height: calc(1px * var(--inv-scale, 1));
+    border-top: calc(1px * var(--inv-scale, 1)) dashed #5B9BD5;
   }
 
   /* Panel-centre alignment reads distinct (amber, solid) — matches the
      component editor's centre guide. */
   .snap-guide.center.vertical {
-    border-left: 2px solid #FACC15;
+    border-left: calc(2px * var(--inv-scale, 1)) solid #FACC15;
   }
 
   .snap-guide.center.horizontal {
-    border-top: 2px solid #FACC15;
+    border-top: calc(2px * var(--inv-scale, 1)) solid #FACC15;
   }
 
   .dist-line {
@@ -156,24 +165,24 @@
 
   .dist-h {
     height: 0;
-    border-top: 1px solid #E5A029;
-    transform: translateY(-0.5px);
+    border-top: calc(1px * var(--inv-scale, 1)) solid #E5A029;
+    transform: translateY(calc(-0.5px * var(--inv-scale, 1)));
   }
 
   .dist-v {
     width: 0;
-    border-left: 1px solid #E5A029;
-    transform: translateX(-0.5px);
+    border-left: calc(1px * var(--inv-scale, 1)) solid #E5A029;
+    transform: translateX(calc(-0.5px * var(--inv-scale, 1)));
   }
 
   .dist-h::before,
   .dist-h::after {
     content: '';
     position: absolute;
-    width: 1px;
-    height: 7px;
+    width: calc(1px * var(--inv-scale, 1));
+    height: calc(7px * var(--inv-scale, 1));
     background: #E5A029;
-    top: -3px;
+    top: calc(-3px * var(--inv-scale, 1));
   }
 
   .dist-h::before { left: 0; }
@@ -183,14 +192,22 @@
   .dist-v::after {
     content: '';
     position: absolute;
-    height: 1px;
-    width: 7px;
+    height: calc(1px * var(--inv-scale, 1));
+    width: calc(7px * var(--inv-scale, 1));
     background: #E5A029;
-    left: -3px;
+    left: calc(-3px * var(--inv-scale, 1));
   }
 
   .dist-v::before { top: 0; }
   .dist-v::after { bottom: 0; }
+
+  /* Live angle readout during rotation, floated above the control. */
+  .angle-label {
+    left: 50%;
+    top: calc(-16px * var(--inv-scale, 1));
+    background: #5B9BD5;
+    color: #FFF;
+  }
 
   .dist-label {
     position: absolute;
@@ -198,10 +215,10 @@
     z-index: 102;
     background: #E5A029;
     color: #000;
-    font-size: 9px;
+    font-size: calc(9px * var(--inv-scale, 1));
     font-weight: 600;
-    padding: 1px 4px;
-    border-radius: 3px;
+    padding: calc(1px * var(--inv-scale, 1)) calc(4px * var(--inv-scale, 1));
+    border-radius: calc(3px * var(--inv-scale, 1));
     white-space: nowrap;
     transform: translate(-50%, -50%);
     font-family: inherit;

@@ -3,7 +3,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import NumberInput from './NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import { bakeCustomComponentFilmstrip, estimateFilmstripBake, normalizeFilmstripBakeOptions } from '../utils/customComponentFilmstripBaker.js';
 
   let { control = null } = $props();
@@ -439,17 +439,17 @@
         {/each}
       </datalist>
     </PropertyCell>
-    <PropertyCell label="Frames" span={1} hint="Number of frames to bake into the strip.">
-      <NumberInput value={bakeFrameCount} step={1} min={1} onchange={(value) => bakeFrameCount = Math.max(1, Math.round(value))} />
+    <PropertyCell label="Frames" span={1} compact hint="Number of frames to bake into the strip.">
+      <NumberCell label="Frames" value={bakeFrameCount} step={1} min={1} onchange={(value) => bakeFrameCount = Math.max(1, Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Frame W" span={1} hint="Single-frame width. Zero uses the component width.">
-      <NumberInput value={bakeFrameWidth} step={1} min={0} onchange={(value) => bakeFrameWidth = Math.max(0, Math.round(value))} />
+    <PropertyCell label="Frame W" span={1} compact hint="Single-frame width. Zero uses the component width.">
+      <NumberCell label="W" value={bakeFrameWidth} step={1} min={0} onchange={(value) => bakeFrameWidth = Math.max(0, Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Frame H" span={1} hint="Single-frame height. Zero uses the component height.">
-      <NumberInput value={bakeFrameHeight} step={1} min={0} onchange={(value) => bakeFrameHeight = Math.max(0, Math.round(value))} />
+    <PropertyCell label="Frame H" span={1} compact hint="Single-frame height. Zero uses the component height.">
+      <NumberCell label="H" value={bakeFrameHeight} step={1} min={0} onchange={(value) => bakeFrameHeight = Math.max(0, Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Scale" span={1} hint="Output pixel scale. 2x gives crisper baked assets but larger strips.">
-      <NumberInput value={bakeOutputScale} step={0.5} min={1} max={4} onchange={(value) => bakeOutputScale = Math.max(1, Math.min(4, value))} />
+    <PropertyCell label="Scale" span={1} compact hint="Output pixel scale. 2x gives crisper baked assets but larger strips.">
+      <NumberCell label="Scale" value={bakeOutputScale} step={0.5} min={1} max={4} onchange={(value) => bakeOutputScale = Math.max(1, Math.min(4, value))} />
     </PropertyCell>
     <PropertyCell label="Axis" span={1} hint="Bake frames vertically or horizontally.">
       <select class="val" bind:value={bakeOrientation}>
@@ -491,14 +491,14 @@
       <PropertyCell label="Source" span={4} hint="Data URL or future packaged file reference.">
         <input class="val" type="text" value={filmstrip.source ?? ''} onchange={(event) => setFilmstrip('source', event.target.value)} placeholder="data:image/png;base64,..." />
       </PropertyCell>
-      <PropertyCell label="Frames" span={1} hint="Total frame count.">
-        <NumberInput value={filmstrip.frameCount ?? 128} step={1} min={1} onchange={(value) => setFilmstrip('frameCount', Math.max(1, Math.round(value)))} />
+      <PropertyCell label="Frames" span={1} compact hint="Total frame count.">
+        <NumberCell label="Frames" value={filmstrip.frameCount ?? 128} step={1} min={1} defaultValue={128} onchange={(value) => setFilmstrip('frameCount', Math.max(1, Math.round(value)))} />
       </PropertyCell>
-      <PropertyCell label="Frame W" span={1} hint="Frame width. Zero means detect later.">
-        <NumberInput value={filmstrip.frameWidth ?? 0} step={1} min={0} onchange={(value) => setFilmstrip('frameWidth', Math.max(0, Math.round(value)))} />
+      <PropertyCell label="Frame W" span={1} compact hint="Frame width. Zero means detect later.">
+        <NumberCell label="W" value={filmstrip.frameWidth ?? 0} step={1} min={0} defaultValue={0} onchange={(value) => setFilmstrip('frameWidth', Math.max(0, Math.round(value)))} />
       </PropertyCell>
-      <PropertyCell label="Frame H" span={1} hint="Frame height. Zero means detect later.">
-        <NumberInput value={filmstrip.frameHeight ?? 0} step={1} min={0} onchange={(value) => setFilmstrip('frameHeight', Math.max(0, Math.round(value)))} />
+      <PropertyCell label="Frame H" span={1} compact hint="Frame height. Zero means detect later.">
+        <NumberCell label="H" value={filmstrip.frameHeight ?? 0} step={1} min={0} defaultValue={0} onchange={(value) => setFilmstrip('frameHeight', Math.max(0, Math.round(value)))} />
       </PropertyCell>
       <PropertyCell label="Axis" span={1} hint="Filmstrip direction.">
         <select class="val" value={filmstrip.orientation ?? 'vertical'} onchange={(event) => setFilmstrip('orientation', event.target.value)}>

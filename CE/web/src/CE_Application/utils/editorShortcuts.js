@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { keyboardNudgeSmall, keyboardNudgeLarge } from '../stores/runtimePreferences.js';
-import { flatControls, isContainerControl } from './containment.js';
+import { findParentOfControl, flatControls, isContainerControl } from './containment.js';
 
 /**
  * Editor canvas keyboard shortcuts.
@@ -12,8 +12,8 @@ import { flatControls, isContainerControl } from './containment.js';
 export function handleEditorShortcut(e, ctx) {
   const {
     panel, panelLocked, gridSize,
-    editorZoom, editorZoomIncrement, selectedComponentIds,
-    fitToWindow, zoomToSelection,
+    selectedComponentIds,
+    zoomIn, zoomOut, fitToWindow, zoomToSelection,
     selectAll, pasteSelection, copySelection, cutSelection, duplicateControl,
     removeControl, updateControlProperty, deleteSelectedGuide,
     groupSelectionIntoContainer, ungroupContainer,
@@ -26,12 +26,12 @@ export function handleEditorShortcut(e, ctx) {
   // --- Zoom shortcuts (work regardless of selection) ---
   if (mod && (e.key === '=' || e.key === '+')) {
     e.preventDefault();
-    editorZoom.update(z => Math.min(400, z + editorZoomIncrement));
+    zoomIn?.();
     return;
   }
   if (mod && e.key === '-') {
     e.preventDefault();
-    editorZoom.update(z => Math.max(10, z - editorZoomIncrement));
+    zoomOut?.();
     return;
   }
   if (mod && e.key === '0') {
@@ -46,8 +46,9 @@ export function handleEditorShortcut(e, ctx) {
   }
 
   // --- Select All / Paste (work regardless of selection) ---
+  // Plain paste only — Ctrl+Alt+V is the format painter, handled below.
   if (mod && e.key === 'a') { e.preventDefault(); selectAll(); return; }
-  if (mod && e.key === 'v') { e.preventDefault(); pasteSelection(); return; }
+  if (mod && e.key === 'v' && !e.altKey) { e.preventDefault(); pasteSelection(); return; }
 
   // --- Delete guide line first (falls through to component delete if none) ---
   if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -57,8 +58,26 @@ export function handleEditorShortcut(e, ctx) {
   const ids = selectedComponentIds;
   if (ids.size === 0) return;
 
+  // --- Escape: step out of the drill-down (or deselect) ---
+  // The inverse of double-click-into-a-container: a single selected child
+  // hands selection back to its parent; anything else deselects.
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    const firstId = [...ids][0];
+    const parentId = ids.size === 1
+      ? findParentOfControl(panel.controls, firstId)?._children?.Core?.id
+      : null;
+    if (parentId != null) ctx.selectComponent?.(parentId);
+    else ctx.clearSelection?.();
+    return;
+  }
+
   const selectedCtrls = flatControls(panel.controls).filter(c => ids.has(c._children?.Core?.id));
   if (selectedCtrls.length === 0) return;
+
+  // --- Format painter (before plain copy/paste — same letters plus Alt) ---
+  if (mod && e.altKey && e.key === 'c') { e.preventDefault(); ctx.copyControlStyle?.(); return; }
+  if (mod && e.altKey && e.key === 'v') { e.preventDefault(); ctx.applyStyleToSelection?.(); return; }
 
   // --- Clipboard / destructive ops ---
   if (mod && e.key === 'c') { e.preventDefault(); copySelection(); return; }

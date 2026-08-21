@@ -9,7 +9,12 @@
   import { midiNoteLabel } from '../utils/arpLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Piano from 'lucide-svelte/icons/piano';
+  import SquareDashed from 'lucide-svelte/icons/square-dashed';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -106,23 +111,12 @@
     [list[i], list[j]] = [list[j], list[i]];
     set('zones', list);
   }
-  function colRgb(v, fb) { const t = String(v ?? fb).replace(/^#/, ''); return `#${t.length >= 6 ? t.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) {
-    const t = String(cur ?? '').replace(/^#/, '');
-    const al = /^[0-9a-fA-F]{8}$/.test(t) ? t.slice(0, 2) : 'FF';
-    set(prop, `${al}${hex.replace('#', '').toUpperCase()}`);
-  }
-  function setZoneCol(i, cur, hex) {
-    const t = String(cur ?? '').replace(/^#/, '');
-    const al = /^[0-9a-fA-F]{8}$/.test(t) ? t.slice(0, 2) : 'FF';
-    setZone(i, 'colour', `${al}${hex.replace('#', '').toUpperCase()}`);
-  }
 </script>
 
 {#if s}
-  <PropertySection title="Zone Splitter">
-    <PropertyCell label="In channel" span={1} hint="Which MIDI channel to take notes from. 0 = omni (any channel).">
-      <input class="val" type="number" min="0" max="16" step="1" value={num(s.inputChannel, 0)} onchange={(e) => set('inputChannel', clampInt(e.target.value, 0, 16, 0))} />
+  <PropertySection title="Zone Splitter" icon={Piano}>
+    <PropertyCell label="In channel" span={1} compact hint="Which MIDI channel to take notes from. 0 = omni (any channel).">
+      <NumberCell label="Ch" min={0} max={16} step={1} value={num(s.inputChannel, 0)} defaultValue={0} onchange={(v) => set('inputChannel', clampInt(v, 0, 16, 0))} />
     </PropertyCell>
     <PropertyCell label="No zone" span={2} hint="What happens to a note no zone claims: drop it or pass it through.">
       <select class="val" value={String(s.unmatched ?? 'drop')} onchange={(e) => set('unmatched', e.target.value)}>
@@ -131,15 +125,15 @@
       </select>
     </PropertyCell>
     {#if String(s.unmatched ?? 'drop') === 'pass'}
-      <PropertyCell label="Pass ch" span={1} hint="The channel unclaimed notes are passed on.">
-        <input class="val" type="number" min="1" max="16" step="1" value={num(s.passChannel, 1)} onchange={(e) => set('passChannel', clampInt(e.target.value, 1, 16, 1))} />
+      <PropertyCell label="Pass ch" span={1} compact hint="The channel unclaimed notes are passed on.">
+        <NumberCell label="Ch" min={1} max={16} step={1} value={num(s.passChannel, 1)} defaultValue={1} onchange={(v) => set('passChannel', clampInt(v, 1, 16, 1))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Show from" span={1} hint="Lowest note on the drawn keyboard. Snapped out to a white key, so it never starts on a floating black one.">
-      <input class="val" type="number" min={MIN_NOTE} max={MAX_NOTE} step="1" value={num(s.lowNote, 36)} onchange={(e) => set('lowNote', clampInt(e.target.value, MIN_NOTE, MAX_NOTE, 36))} />
+    <PropertyCell label="Show from" span={1} compact hint="Lowest note on the drawn keyboard. Snapped out to a white key, so it never starts on a floating black one.">
+      <NumberCell label="From" min={MIN_NOTE} max={MAX_NOTE} step={1} value={num(s.lowNote, 36)} defaultValue={36} onchange={(v) => set('lowNote', clampInt(v, MIN_NOTE, MAX_NOTE, 36))} />
     </PropertyCell>
-    <PropertyCell label="…to" span={1} hint="Highest note on the drawn keyboard.">
-      <input class="val" type="number" min={MIN_NOTE} max={MAX_NOTE} step="1" value={num(s.highNote, 96)} onchange={(e) => set('highNote', clampInt(e.target.value, MIN_NOTE, MAX_NOTE, 96))} />
+    <PropertyCell label="…to" span={1} compact hint="Highest note on the drawn keyboard.">
+      <NumberCell label="To" min={MIN_NOTE} max={MAX_NOTE} step={1} value={num(s.highNote, 96)} defaultValue={96} onchange={(v) => set('highNote', clampInt(v, MIN_NOTE, MAX_NOTE, 96))} />
     </PropertyCell>
     <PropertyCell label="" span={2} hint="The range actually drawn, after snapping to whole white keys.">
       <div class="note">{midiNoteLabel(range.lowNote)} – {midiNoteLabel(range.highNote)}</div>
@@ -191,7 +185,10 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Zones">
+  <PropertySection title="Zones" icon={SquareDashed}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add zone" onclick={addZone}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Zones may overlap — a note inside two is sent twice, on two channels. Drag the split points in preview.">
       <div class="tablewrap">
         <table class="zt">
@@ -213,19 +210,23 @@
                 <td><input type="checkbox" checked={z.enabled} onchange={(e) => setZone(i, 'enabled', e.target.checked)} /></td>
                 <td><input class="cell name" type="text" value={z.label} onchange={(e) => setZone(i, 'label', e.target.value)} /></td>
                 <td>
-                  <input class="cell n" type="number" min={MIN_NOTE} max={MAX_NOTE} value={z.lowNote}
-                         onchange={(e) => setZone(i, 'lowNote', clampInt(e.target.value, MIN_NOTE, MAX_NOTE, 0))} />
+                  <span class="n nc-wrap">
+                    <NumberCell min={MIN_NOTE} max={MAX_NOTE} value={z.lowNote}
+                                onchange={(v) => setZone(i, 'lowNote', clampInt(v, MIN_NOTE, MAX_NOTE, 0))} />
+                  </span>
                   <span class="nl">{midiNoteLabel(z.lowNote)}</span>
                 </td>
                 <td>
-                  <input class="cell n" type="number" min={MIN_NOTE} max={MAX_NOTE} value={z.highNote}
-                         onchange={(e) => setZone(i, 'highNote', clampInt(e.target.value, MIN_NOTE, MAX_NOTE, 127))} />
+                  <span class="n nc-wrap">
+                    <NumberCell min={MIN_NOTE} max={MAX_NOTE} value={z.highNote}
+                                onchange={(v) => setZone(i, 'highNote', clampInt(v, MIN_NOTE, MAX_NOTE, 127))} />
+                  </span>
                   <span class="nl">{midiNoteLabel(z.highNote)}</span>
                 </td>
-                <td><input class="cell n" type="number" min="1" max="16" value={z.channel}
-                           onchange={(e) => setZone(i, 'channel', clampInt(e.target.value, 1, 16, 1))} /></td>
-                <td><input class="cell n" type="number" min="-48" max="48" value={z.transpose}
-                           onchange={(e) => setZone(i, 'transpose', clampInt(e.target.value, -48, 48, 0))} /></td>
+                <td><span class="n nc-wrap"><NumberCell min={1} max={16} value={z.channel}
+                           onchange={(v) => setZone(i, 'channel', clampInt(v, 1, 16, 1))} /></span></td>
+                <td><span class="n nc-wrap"><NumberCell min={-48} max={48} value={z.transpose}
+                           onchange={(v) => setZone(i, 'transpose', clampInt(v, -48, 48, 0))} /></span></td>
                 <td>
                   <select class="cell sel" value={z.curve} onchange={(e) => setZone(i, 'curve', e.target.value)}>
                     {#each VELOCITY_CURVES as c (c)}<option value={c}>{VELOCITY_CURVE_LABELS[c] ?? c}</option>{/each}
@@ -233,20 +234,30 @@
                 </td>
                 <td>
                   {#if z.curve === 'fixed'}
-                    <input class="cell n" type="number" min="1" max="127" value={z.fixedVelocity}
-                           onchange={(e) => setZone(i, 'fixedVelocity', clampInt(e.target.value, 1, 127, 100))} />
+                    <span class="n nc-wrap">
+                      <NumberCell min={1} max={127} value={z.fixedVelocity}
+                                  onchange={(v) => setZone(i, 'fixedVelocity', clampInt(v, 1, 127, 100))} />
+                    </span>
                   {:else}
-                    <input class="cell n" type="number" min="1" max="127" value={z.velLow}
-                           onchange={(e) => setZone(i, 'velLow', clampInt(e.target.value, 1, 127, 1))} />
-                    <input class="cell n" type="number" min="1" max="127" value={z.velHigh}
-                           onchange={(e) => setZone(i, 'velHigh', clampInt(e.target.value, 1, 127, 127))} />
+                    <span class="n nc-wrap">
+                      <NumberCell min={1} max={127} value={z.velLow}
+                                  onchange={(v) => setZone(i, 'velLow', clampInt(v, 1, 127, 1))} />
+                    </span>
+                    <span class="n nc-wrap">
+                      <NumberCell min={1} max={127} value={z.velHigh}
+                                  onchange={(v) => setZone(i, 'velHigh', clampInt(v, 1, 127, 127))} />
+                    </span>
                   {/if}
                 </td>
                 <td class:switched={zoneSwitchesOnVelocity(z)}>
-                  <input class="cell n" type="number" min="1" max="127" value={z.velSwitchLow}
-                         onchange={(e) => setZone(i, 'velSwitchLow', clampInt(e.target.value, 1, 127, 1))} />
-                  <input class="cell n" type="number" min="1" max="127" value={z.velSwitchHigh}
-                         onchange={(e) => setZone(i, 'velSwitchHigh', clampInt(e.target.value, 1, 127, 127))} />
+                  <span class="n nc-wrap">
+                    <NumberCell min={1} max={127} value={z.velSwitchLow}
+                                onchange={(v) => setZone(i, 'velSwitchLow', clampInt(v, 1, 127, 1))} />
+                  </span>
+                  <span class="n nc-wrap">
+                    <NumberCell min={1} max={127} value={z.velSwitchHigh}
+                                onchange={(v) => setZone(i, 'velSwitchHigh', clampInt(v, 1, 127, 127))} />
+                  </span>
                 </td>
                 <td>
                   <select class="cell selsm" value={z.ccMode} onchange={(e) => setZone(i, 'ccMode', e.target.value)}>
@@ -269,7 +280,9 @@
                   </select>
                 </td>
                 <td><input type="checkbox" checked={z.polyPressure !== false} onchange={(e) => setZone(i, 'polyPressure', e.target.checked)} /></td>
-                <td><input class="col" type="color" value={colRgb(z.colour, 'FF5B9BD5')} oninput={(e) => setZoneCol(i, z.colour, e.target.value)} /></td>
+                <td><SwatchCluster swatches={[
+                  { key: `zoneColour_${z.id}`, label: 'Col', value: z.colour ?? 'FF5B9BD5', target: { type: 'callback', apply: (hex) => setZone(i, 'colour', hex) } },
+                ]} /></td>
                 <td class="acts">
                   <button type="button" title="Move up" onclick={() => moveZone(i, -1)} disabled={i === 0}>↑</button>
                   <button type="button" title="Move down" onclick={() => moveZone(i, 1)} disabled={i === zones.length - 1}>↓</button>
@@ -290,18 +303,19 @@
         claimed the most recent note-on; <b>While sounding</b> = every zone currently holding a note.
       </div>
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="">
-      <button type="button" class="action-btn" onclick={addZone}>Add zone</button>
-    </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
-    <PropertyCell label="Face" span={1} hint="Panel behind the keyboard."><input class="col" type="color" value={colRgb(s.faceColour, 'FF141420')} oninput={(e) => setCol('faceColour', s.faceColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="White keys" span={1} hint=""><input class="col" type="color" value={colRgb(s.whiteColour, 'FFE8E8EE')} oninput={(e) => setCol('whiteColour', s.whiteColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Black keys" span={1} hint=""><input class="col" type="color" value={colRgb(s.blackColour, 'FF1A1A22')} oninput={(e) => setCol('blackColour', s.blackColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Held" span={1} hint="Colour of a key currently sounding."><input class="col" type="color" value={colRgb(s.litColour, 'FFF2C94C')} oninput={(e) => setCol('litColour', s.litColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Gap" span={1} hint="Colour of a key no zone claims."><input class="col" type="color" value={colRgb(s.gapColour, 'FF3A3A46')} oninput={(e) => setCol('gapColour', s.gapColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Labels" span={1} hint=""><input class="col" type="color" value={colRgb(s.labelColour, 'FFB9B9B9')} oninput={(e) => setCol('labelColour', s.labelColour, e.target.value)} /></PropertyCell>
+  <PropertySection title="Appearance" icon={Palette}>
+    <PropertyCell label="Colours" span={4} hint="Face, white keys, black keys, held key, unclaimed-key gap, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'faceColour', label: 'Face', value: s.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'SplitZone.faceColour' } },
+        { key: 'whiteColour', label: 'White', value: s.whiteColour ?? 'FFE8E8EE', target: { type: 'control', controlId: core?.id, path: 'SplitZone.whiteColour' } },
+        { key: 'blackColour', label: 'Black', value: s.blackColour ?? 'FF1A1A22', target: { type: 'control', controlId: core?.id, path: 'SplitZone.blackColour' } },
+        { key: 'litColour', label: 'Held', value: s.litColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'SplitZone.litColour' } },
+        { key: 'gapColour', label: 'Gap', value: s.gapColour ?? 'FF3A3A46', target: { type: 'control', controlId: core?.id, path: 'SplitZone.gapColour' } },
+        { key: 'labelColour', label: 'Labels', value: s.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'SplitZone.labelColour' } },
+      ]} />
+    </PropertyCell>
   </PropertySection>
 {/if}
 
@@ -316,7 +330,8 @@
   .zt td { padding: 2px 4px; vertical-align: middle; white-space: nowrap; }
   .zt tr.off { opacity: 0.45; }
   .cell { background: #141420; border: 1px solid #2a2a36; color: #E8E8EE; font-size: 11px; padding: 2px 4px; border-radius: 3px; }
-  .cell.n { width: 46px; }
+  .nc-wrap { display: inline-flex; vertical-align: middle; }
+  .nc-wrap.n { width: 46px; }
   .cell.name { width: 82px; }
   .cell.sel { width: 96px; }
   .cell.selsm { width: 78px; }
@@ -326,8 +341,12 @@
   .preset { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
   .preset:hover { border-color: #4a4a58; color: #E8E8EE; }
   .nl { color: #6f6f78; font-size: 10px; margin-left: 3px; }
-  .col { width: 26px; height: 20px; padding: 0; border: 1px solid #2a2a36; background: #141420; border-radius: 3px; }
   .acts button { background: #1A1A1A; border: 1px solid #333; color: #888; font-size: 11px; padding: 1px 5px; border-radius: 3px; cursor: pointer; }
   .acts button:disabled { opacity: 0.3; cursor: default; }
-  .action-btn { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+  .hdr-btn {
+    height: 16px; font-size: 9px; padding: 0 8px; border-radius: 8px;
+    background: #252525; border: 1px solid #333; color: #777;
+    font-family: inherit; cursor: pointer; line-height: 1;
+  }
+  .hdr-btn:hover { border-color: #4A6E8C; color: #CCC; }
 </style>

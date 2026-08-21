@@ -1924,3 +1924,4 @@ Source/CPanel_Build/modules/juce_gui_basics/windows/juce_TopLevelWindow.h
 Source/CPanel_Build/modules/juce_gui_basics/windows/juce_VBlankAttachment.cpp
 Source/CPanel_Build/modules/juce_gui_basics/windows/juce_VBlankAttachment.h
 Source/CPanel_Build/modules/juce_gui_basics/windows/juce_WindowUtils.h
+build-installer.log

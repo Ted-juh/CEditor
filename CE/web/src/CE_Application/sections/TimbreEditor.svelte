@@ -8,6 +8,12 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import Blend from 'lucide-svelte/icons/blend';
+  import Target from 'lucide-svelte/icons/target';
+  import Anchor from 'lucide-svelte/icons/anchor';
+  import Palette from 'lucide-svelte/icons/palette';
 
   import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
@@ -82,22 +88,18 @@
     setAnchors(anchors.map((a, idx) => idx === i ? { ...a, values: { ...(a.values ?? {}), ...captured } } : a));
   }
 
-  // Accent-colour swatches: the native picker edits RGB; we preserve each
-  // colour's original alpha so faint elements keep their transparency.
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if tb}
-  <PropertySection title="Timbre Space">
+  <PropertySection title="Timbre Space" icon={Blend}>
     <PropertyCell label="X axis" span={2} hint="Name the horizontal musical direction (e.g. dark → bright).">
       <input class="val" type="text" value={tb.axisX ?? ''} onchange={(e) => set('axisX', e.target.value)} />
     </PropertyCell>
     <PropertyCell label="Y axis" span={2} hint="Name the vertical musical direction (e.g. soft → aggressive).">
       <input class="val" type="text" value={tb.axisY ?? ''} onchange={(e) => set('axisY', e.target.value)} />
     </PropertyCell>
-    <PropertyCell label="Blend" span={2} hint="Sharpness of the blend — higher makes the nearest anchor dominate sooner.">
-      <input class="val" type="number" min="1" max="6" step="0.5" value={tb.power ?? 2} onchange={(e) => set('power', Math.max(1, Math.min(6, num(e.target.value, 2))))} />
+    <PropertyCell label="Blend" span={2} compact hint="Sharpness of the blend — higher makes the nearest anchor dominate sooner.">
+      <NumberCell label="Blend" min={1} max={6} step={0.5} value={tb.power ?? 2} defaultValue={2} onchange={(v) => set('power', Math.max(1, Math.min(6, v)))} />
     </PropertyCell>
     <PropertyCell label="Editable" span={1} hint="Drag the puck / anchors in preview.">
       <PropertyToggle value={tb.editable !== false} onchange={() => set('editable', !(tb.editable !== false))} />
@@ -115,35 +117,40 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Appearance">
-    <PropertyCell label="Field" span={1} hint="Pad background colour (behind the anchor heat).">
-      <input class="cswatch" type="color" value={colRgb(tb.fieldColour, 'FF0C0C12')} onchange={(e) => setCol('fieldColour', tb.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Puck" span={1} hint="The blend puck colour.">
-      <input class="cswatch" type="color" value={colRgb(tb.puckColour, 'FFF2C94C')} onchange={(e) => setCol('puckColour', tb.puckColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={2} hint="Axis + anchor label colour.">
-      <input class="cswatch" type="color" value={colRgb(tb.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', tb.labelColour, e.target.value)} />
+  <PropertySection title="Appearance" icon={Palette}>
+    <PropertyCell label="Colours" span={2} hint="Field background, blend puck, axis + anchor labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'fieldColour', label: 'Field', value: tb.fieldColour ?? 'FF0C0C12', target: { type: 'control', controlId: core?.id, path: 'Timbre.fieldColour' } },
+        { key: 'puckColour', label: 'Puck', value: tb.puckColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Timbre.puckColour' } },
+        { key: 'labelColour', label: 'Labels', value: tb.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Timbre.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Targets">
+  <PropertySection title="Targets" icon={Target}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add target" onclick={addTarget}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each target is one parameter the anchors morph. Bind its 'Target' port in Device Bindings.">
       <div class="rows">
         {#if targets.length === 0}<div class="empty">No targets yet. Add one, then bind its port.</div>{/if}
         {#each targets as t, i (t.id ?? i)}
           <div class="trow">
             <input class="val name" type="text" value={t.label ?? ''} placeholder="Target" onchange={(e) => updateTarget(i, 'label', e.target.value)} />
-            <input class="swatch" type="color" value={`#${String(t.colour ?? 'FF39D98A').slice(-6)}`} onchange={(e) => updateTarget(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+            <SwatchCluster swatches={[
+              { key: `targetColour_${t.id ?? i}`, label: 'Colour', value: t.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateTarget(i, 'colour', hex) } },
+            ]} />
             <button type="button" class="action-btn danger" onclick={() => removeTarget(i)} title="Remove">✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addTarget}>Add target</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Anchors">
+  <PropertySection title="Anchors" icon={Anchor}>
+    {#snippet tools()}
+      <button type="button" class="hdr-btn" title="Add anchor" onclick={addAnchor}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each anchor is a named patch at X/Y (0–1) storing a value per target. Capture stamps the panel's current values.">
       <div class="rows">
         {#if anchors.length === 0}<div class="empty">No anchors yet. Add one and set its per-target values.</div>{/if}
@@ -151,26 +158,27 @@
           <div class="anchor">
             <div class="arow">
               <input class="val name" type="text" value={a.label ?? ''} placeholder="Patch name" onchange={(e) => updateAnchor(i, 'label', e.target.value)} />
-              <input class="swatch" type="color" value={`#${String(a.colour ?? 'FF5B9BD5').slice(-6)}`} onchange={(e) => updateAnchor(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+              <SwatchCluster swatches={[
+                { key: `anchorColour_${a.id ?? i}`, label: 'Colour', value: a.colour ?? 'FF5B9BD5', target: { type: 'callback', apply: (hex) => updateAnchor(i, 'colour', hex) } },
+              ]} />
               <button type="button" class="action-btn" onclick={() => captureAnchor(i)} disabled={capturable === 0} title={capturable ? `Set this anchor's values from the panel's current bound controls (${capturable})` : 'Bind targets to device parameters that panel controls also drive, then capture'}>Capture</button>
               <button type="button" class="action-btn danger" onclick={() => removeAnchor(i)} title="Remove">✕</button>
             </div>
             <div class="arow2">
-              <label class="fld"><span>X</span><input class="val" type="number" min="0" max="1" step="0.05" value={num(a.x, 0.5)} onchange={(e) => updateAnchor(i, 'x', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} /></label>
-              <label class="fld"><span>Y</span><input class="val" type="number" min="0" max="1" step="0.05" value={num(a.y, 0.5)} onchange={(e) => updateAnchor(i, 'y', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} /></label>
+              <label class="fld"><span>X</span><NumberCell min={0} max={1} step={0.05} value={num(a.x, 0.5)} defaultValue={0.5} onchange={(v) => updateAnchor(i, 'x', Math.max(0, Math.min(1, v)))} /></label>
+              <label class="fld"><span>Y</span><NumberCell min={0} max={1} step={0.05} value={num(a.y, 0.5)} defaultValue={0.5} onchange={(v) => updateAnchor(i, 'y', Math.max(0, Math.min(1, v)))} /></label>
             </div>
             {#if targets.length}
               <div class="grid">
                 {#each targets as t (t.id)}
                   <label class="fld"><span>{t.label}</span>
-                    <input class="val" type="number" min="0" max="1" step="0.05" value={av(a, t.id)} onchange={(e) => updateAnchorValue(i, t.id, Math.max(0, Math.min(1, num(e.target.value, 0))))} />
+                    <NumberCell min={0} max={1} step={0.05} value={av(a, t.id)} defaultValue={0} onchange={(v) => updateAnchorValue(i, t.id, Math.max(0, Math.min(1, v)))} />
                   </label>
                 {/each}
               </div>
             {/if}
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addAnchor}>Add anchor</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -190,8 +198,6 @@
   .arow .name { flex: 1 1 auto; }
   .arow2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; border-top: 1px solid #2a2a2a; padding-top: 7px; }
-  .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .03em; color: #8a8a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .note { font-size: 11px; color: #8a8a94; }
@@ -205,4 +211,10 @@
   .action-btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: #3B3B3B; }
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:hover { border-color: #C96A6A; }
+  .hdr-btn {
+    height: 16px; font-size: 9px; padding: 0 8px; border-radius: 8px;
+    background: #252525; border: 1px solid #333; color: #777;
+    font-family: inherit; cursor: pointer; line-height: 1;
+  }
+  .hdr-btn:hover { border-color: #4A6E8C; color: #CCC; }
 </style>

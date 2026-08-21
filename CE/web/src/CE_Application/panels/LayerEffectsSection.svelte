@@ -12,7 +12,10 @@
   import PropertyColor from '../properties/PropertyColor.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import AlignmentPicker from '../properties/AlignmentPicker.svelte';
-  import NumberInput from '../sections/NumberInput.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
+  import Segmented from '../properties/Segmented.svelte';
+  import ImageIcon from 'lucide-svelte/icons/image';
+  import BrickWall from 'lucide-svelte/icons/brick-wall';
   import BlendModeSelect from '../properties/BlendModeSelect.svelte';
   import FitModeSelect from '../properties/FitModeSelect.svelte';
 
@@ -51,7 +54,14 @@
   let clipMode = $derived(get('ClipMode', 'shape'));
 </script>
 
-<PropertySection title={label} {collapsed} ontoggle={(v) => oncollapsetoggle?.(v)}>
+<PropertySection title={label} icon={prefix === 'Texture' ? BrickWall : ImageIcon} {collapsed} ontoggle={(v) => oncollapsetoggle?.(v)}>
+  {#snippet tools()}
+    <button class="layer-tool-btn" class:active={soloActive} title="Solo layer" onclick={() => onsolo?.()}>S</button>
+    <button class="layer-tool-btn" class:active={muteActive} title="Mute layer" onclick={() => onmute?.()}>M</button>
+    <button class="layer-tool-btn" title="Reset layer" onclick={() => onreset?.()}>R</button>
+    <button class="layer-tool-btn" title="Copy layer settings" onclick={() => oncopy?.()}>C</button>
+    <button class="layer-tool-btn" disabled={!canPaste} title="Paste layer settings" onclick={() => onpaste?.()}>P</button>
+  {/snippet}
   <div class="bg-file-row">
     <button class="bg-browse-btn" title="Browse..." onclick={() => onbrowse?.()}>...</button>
     <input class="val"
@@ -64,13 +74,6 @@
 </PropertySection>
 
 {#if !collapsed}
-  <div class="layer-tools-row">
-    <button class="layer-tool-btn" class:active={soloActive} title="Solo layer" onclick={() => onsolo?.()}>S</button>
-    <button class="layer-tool-btn" class:active={muteActive} title="Mute layer" onclick={() => onmute?.()}>M</button>
-    <button class="layer-tool-btn" title="Reset layer" onclick={() => onreset?.()}>R</button>
-    <button class="layer-tool-btn" title="Copy layer settings" onclick={() => oncopy?.()}>C</button>
-    <button class="layer-tool-btn" disabled={!canPaste} title="Paste layer settings" onclick={() => onpaste?.()}>P</button>
-  </div>
 
   <PropertySection title="Geometry">
     <div class="bg-props-layout">
@@ -83,13 +86,13 @@
         <PropertyCell label="Fit" span={1} hint="How the {label.toLowerCase()} fills the panel area">
           <FitModeSelect value={fit} onchange={(v) => set('Fit', v)} />
         </PropertyCell>
-        <PropertyCell label="Offset X" span={1} hint="Horizontal offset from anchor in pixels">
-          <NumberInput value={get('OffsetX', 0)} step={1}
-                       onchange={(v) => set('OffsetX', v)} />
+        <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset from anchor in pixels">
+          <NumberCell label="X" value={get('OffsetX', 0)} step={1} defaultValue={0}
+                      onchange={(v) => set('OffsetX', v)} />
         </PropertyCell>
-        <PropertyCell label="Offset Y" span={1} hint="Vertical offset from anchor in pixels">
-          <NumberInput value={get('OffsetY', 0)} step={1}
-                       onchange={(v) => set('OffsetY', v)} />
+        <PropertyCell label="Offset Y" span={1} compact hint="Vertical offset from anchor in pixels">
+          <NumberCell label="Y" value={get('OffsetY', 0)} step={1} defaultValue={0}
+                      onchange={(v) => set('OffsetY', v)} />
         </PropertyCell>
       </div>
     </div>
@@ -99,14 +102,14 @@
     <PropertyCell label="Flip V" span={1} hint="Flip {label.toLowerCase()} vertically">
       <PropertyToggle value={get('FlipV', false)} onchange={() => toggle('FlipV')} />
     </PropertyCell>
-    <PropertyCell label="Angle" span={2} hint="Rotate the {label.toLowerCase()} in degrees">
-      <NumberInput value={get('Rotation', 0)} step={1} min={-360} max={360}
-                   onchange={(v) => set('Rotation', v)} />
+    <PropertyCell label="Angle" span={2} compact hint="Rotate the {label.toLowerCase()} in degrees">
+      <NumberCell label="Angle" value={get('Rotation', 0)} step={1} min={-360} max={360} defaultValue={0}
+                  onchange={(v) => set('Rotation', v)} />
     </PropertyCell>
     {#if fit === 'tile'}
-      <PropertyCell label="Scale" span={4} hint="Tile size multiplier">
-        <NumberInput value={get('TileScale', 1.0)} step={0.1} min={0.1}
-                     onchange={(v) => set('TileScale', v)} />
+      <PropertyCell label="Scale" span={4} compact hint="Tile size multiplier">
+        <NumberCell label="Scale" value={get('TileScale', 1.0)} step={0.1} min={0.1} defaultValue={1}
+                    onchange={(v) => set('TileScale', v)} />
       </PropertyCell>
     {/if}
   </PropertySection>
@@ -116,13 +119,13 @@
       <BlendModeSelect value={get('Blend', 'normal')}
                        onchange={(v) => set('Blend', v)} />
     </PropertyCell>
-    <PropertyCell label="Opacity" span={1} hint="{label} layer opacity (0–100%)">
-      <NumberInput value={get('Opacity', 100)} step={1} min={0} max={100}
-                   onchange={(v) => set('Opacity', v)} />
+    <PropertyCell label="Opacity" span={1} compact hint="{label} layer opacity (0–100%)">
+      <NumberCell label="Opac" value={get('Opacity', 100)} step={1} min={0} max={100} defaultValue={100}
+                  onchange={(v) => set('Opacity', v)} />
     </PropertyCell>
-    <PropertyCell label="Blur" span={1} hint="Blur amount in pixels">
-      <NumberInput value={get('Blur', 0)} step={1} min={0}
-                   onchange={(v) => set('Blur', v)} />
+    <PropertyCell label="Blur" span={1} compact hint="Blur amount in pixels">
+      <NumberCell label="Blur" value={get('Blur', 0)} step={1} min={0} defaultValue={0}
+                  onchange={(v) => set('Blur', v)} />
     </PropertyCell>
     <PropertyCell label="Tint" span={1} hint="Colour tint applied over the {label.toLowerCase()}">
       <PropertyColor value={String(get('Tint', 'FFFFFF'))}
@@ -152,11 +155,16 @@
   {#if showClipping}
     <PropertySection title="Clipping">
       <PropertyCell label="Mode" span={4} hint="How this layer is clipped inside the component background">
-        <select class="val" value={clipMode} onchange={(e) => set('ClipMode', e.target.value)}>
-          <option value="none">None</option>
-          <option value="shape">Shape</option>
-          <option value="border-inner">Border Inner</option>
-        </select>
+        <Segmented
+          ariaLabel="Clipping mode"
+          value={clipMode}
+          options={[
+            { value: 'none', label: 'None' },
+            { value: 'shape', label: 'Shape' },
+            { value: 'border-inner', label: 'Border Inner' },
+          ]}
+          onchange={(v) => set('ClipMode', v)}
+        />
       </PropertyCell>
     </PropertySection>
   {/if}
@@ -231,23 +239,20 @@
     user-select: none;
   }
 
-  .layer-tools-row {
-    display: flex;
-    gap: 4px;
-    padding: 2px 0 4px 0;
-  }
-
+  /* Header-slot sizing: the S/M/R/C/P tools live in the section header now. */
   .layer-tool-btn {
-    width: 24px;
-    height: 22px;
+    width: 18px;
+    height: 16px;
     background: #1A1A1A;
     border: 1px solid #333;
     border-radius: 3px;
     color: #777;
-    font-size: 10px;
+    font-size: 9px;
     font-family: inherit;
     cursor: pointer;
     flex-shrink: 0;
+    padding: 0;
+    line-height: 1;
   }
 
   .layer-tool-btn:hover {

@@ -119,11 +119,22 @@ test('beatUnit is a number, because the transport clamps any integer', () => {
 
 /* -------------------------------------- the two with no util module: pinned to the editor */
 
-/** Every `<option value="…">` of the first `<select>` bound to `field` in an editor. */
+/**
+ * The option values of the picker bound to `field` in an editor — either a
+ * `<select>` (options follow the anchoring `set('field'` in its onchange) or a
+ * flat `<Segmented>` (its options array precedes the anchoring onchange prop).
+ */
 function editorOptions(file, field) {
   const source = readFileSync(join(sections, file), 'utf8');
   const at = source.indexOf(`set('${field}'`);
   assert.notEqual(at, -1, `${file} has no picker writing ${field}`);
+  const segOpen = source.lastIndexOf('<Segmented', at);
+  const selOpen = source.lastIndexOf('<select', at);
+  if (segOpen > selOpen) {
+    const close = source.indexOf('/>', at);
+    assert.notEqual(close, -1, `${file}'s ${field} Segmented picker never closes`);
+    return [...source.slice(segOpen, close).matchAll(/value: '([^']*)'/g)].map((m) => m[1]);
+  }
   const close = source.indexOf('</select>', at);
   assert.notEqual(close, -1, `${file}'s ${field} picker is not a <select>`);
   return [...source.slice(at, close).matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]);

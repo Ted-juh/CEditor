@@ -10,8 +10,15 @@
   } from '../utils/harmoniserLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, noteName, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import Music from 'lucide-svelte/icons/music';
+  import Layers from 'lucide-svelte/icons/layers';
+  import Hash from 'lucide-svelte/icons/hash';
+  import Monitor from 'lucide-svelte/icons/monitor';
+  import Palette from 'lucide-svelte/icons/palette';
 
   let { control = null } = $props();
 
@@ -24,12 +31,6 @@
   }
   function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
   function clampInt(v, lo, hi, f) { const n = Math.round(num(v, f)); return n < lo ? lo : n > hi ? hi : n; }
-  function colRgb(v, fb) { const t = String(v ?? fb).replace(/^#/, ''); return `#${t.length >= 6 ? t.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) {
-    const t = String(cur ?? '').replace(/^#/, '');
-    const al = /^[0-9a-fA-F]{8}$/.test(t) ? t.slice(0, 2) : 'FF';
-    set(prop, `${al}${hex.replace('#', '').toUpperCase()}`);
-  }
 
   let isMemory = $derived(harmoniserMode(control) === 'memory');
   let flats = $derived(useFlats(num(p?.key, 0), String(p?.scale ?? 'major')));
@@ -88,7 +89,7 @@
 </script>
 
 {#if p}
-  <PropertySection title="Harmoniser">
+  <PropertySection title="Harmoniser" icon={Music}>
     <PropertyCell label="Mode" span={4} hint="Diatonic = the chord for the played note's degree in the key. Memory = a fixed shape transposed to whatever you play.">
       <select class="val" value={p.mode ?? 'diatonic'} onchange={(e) => set('mode', e.target.value)}>
         {#each HARMONY_MODES as m (m)}<option value={m}>{HARMONY_MODE_LABELS[m] ?? m}</option>{/each}
@@ -106,8 +107,8 @@
           {#each scaleKeys as k (k)}<option value={k}>{SCALE_LABELS[k] ?? k}</option>{/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Chord size" span={1} hint="Notes stacked in thirds up the scale. 3 is a triad, 4 a seventh, 5 a ninth.">
-        <input class="val" type="number" min="2" max="6" step="1" value={num(p.size, 3)} onchange={(e) => set('size', clampInt(e.target.value, 2, 6, 3))} />
+      <PropertyCell label="Chord size" span={1} compact hint="Notes stacked in thirds up the scale. 3 is a triad, 4 a seventh, 5 a ninth.">
+        <NumberCell label="Size" min={2} max={6} step={1} value={num(p.size, 3)} defaultValue={3} onchange={(v) => set('size', clampInt(v, 2, 6, 3))} />
       </PropertyCell>
       <PropertyCell label="Out of key" span={1} hint="What to do with a note that has no degree in the scale.">
         <select class="val" value={p.outOfKey ?? 'pass'} onchange={(e) => set('outOfKey', e.target.value)}>
@@ -132,27 +133,27 @@
         {#each VOICINGS as v (v)}<option value={v}>{VOICING_LABELS[v] ?? v}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Inversion" span={1} hint="Lifts the lowest voices up an octave, one per step.">
-      <input class="val" type="number" min="0" max="3" step="1" value={num(p.inversion, 0)} onchange={(e) => set('inversion', clampInt(e.target.value, 0, 3, 0))} />
+    <PropertyCell label="Inversion" span={1} compact hint="Lifts the lowest voices up an octave, one per step.">
+      <NumberCell label="Inv" min={0} max={3} step={1} value={num(p.inversion, 0)} defaultValue={0} onchange={(v) => set('inversion', clampInt(v, 0, 3, 0))} />
     </PropertyCell>
-    <PropertyCell label="Octave" span={1} hint="Moves the added voices by whole octaves, leaving the played note where it is.">
-      <input class="val" type="number" min="-3" max="3" step="1" value={num(p.octaveSpread, 0)} onchange={(e) => set('octaveSpread', clampInt(e.target.value, -3, 3, 0))} />
+    <PropertyCell label="Octave" span={1} compact hint="Moves the added voices by whole octaves, leaving the played note where it is.">
+      <NumberCell label="Oct" min={-3} max={3} step={1} value={num(p.octaveSpread, 0)} defaultValue={0} onchange={(v) => set('octaveSpread', clampInt(v, -3, 3, 0))} />
     </PropertyCell>
-    <PropertyCell label="Max voices" span={1} hint="A hard ceiling on how many notes one key can produce.">
-      <input class="val" type="number" min="1" max={MAX_VOICES} step="1" value={num(p.maxVoices, 6)} onchange={(e) => set('maxVoices', clampInt(e.target.value, 1, MAX_VOICES, 6))} />
+    <PropertyCell label="Max voices" span={1} compact hint="A hard ceiling on how many notes one key can produce.">
+      <NumberCell label="Max" min={1} max={MAX_VOICES} step={1} value={num(p.maxVoices, 6)} defaultValue={6} onchange={(v) => set('maxVoices', clampInt(v, 1, MAX_VOICES, 6))} />
     </PropertyCell>
 
     <PropertyCell label="Keep played note" span={2} hint="Send the played note along with the harmony. Off sends the harmony only.">
       <PropertyToggle value={p.keepPlayed !== false} onchange={() => set('keepPlayed', !(p.keepPlayed !== false))} />
     </PropertyCell>
-    <PropertyCell label="In channel" span={1} hint="0 listens on every channel.">
-      <input class="val" type="number" min="0" max="16" step="1" value={num(p.inputChannel, 0)} onchange={(e) => set('inputChannel', clampInt(e.target.value, 0, 16, 0))} />
+    <PropertyCell label="In channel" span={1} compact hint="0 listens on every channel.">
+      <NumberCell label="Ch" min={0} max={16} step={1} value={num(p.inputChannel, 0)} defaultValue={0} onchange={(v) => set('inputChannel', clampInt(v, 0, 16, 0))} />
     </PropertyCell>
-    <PropertyCell label="Out channel" span={1} hint="Where the chord is sent.">
-      <input class="val" type="number" min="1" max="16" step="1" value={num(p.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
+    <PropertyCell label="Out channel" span={1} compact hint="Where the chord is sent.">
+      <NumberCell label="Ch" min={1} max={16} step={1} value={num(p.channel, 1)} defaultValue={1} onchange={(v) => set('channel', clampInt(v, 1, 16, 1))} />
     </PropertyCell>
-    <PropertyCell label="Velocity" span={1} hint="0 follows the velocity you played. Any other value is fixed — an organ-like part that ignores how hard you hit it.">
-      <input class="val" type="number" min="0" max="127" step="1" value={num(p.velocity, 0)} onchange={(e) => set('velocity', clampInt(e.target.value, 0, 127, 0))} />
+    <PropertyCell label="Velocity" span={1} compact hint="0 follows the velocity you played. Any other value is fixed — an organ-like part that ignores how hard you hit it.">
+      <NumberCell label="Vel" min={0} max={127} step={1} value={num(p.velocity, 0)} defaultValue={0} onchange={(v) => set('velocity', clampInt(v, 0, 127, 0))} />
     </PropertyCell>
 
     <PropertyCell label="" span={4} hint={isMemory ? 'The shape applied to C.' : 'The chord built on every degree of the key.'}>
@@ -163,14 +164,14 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Voicing extras">
+  <PropertySection title="Voicing extras" icon={Layers}>
     <PropertyCell label="Voice leading" span={4} hint="Pick the inversion closest to the previous chord. Closest = least total movement; Smooth = holds the top voice.">
       <select class="val" value={voiceLeading(control)} onchange={(e) => set('voiceLeading', e.target.value)}>
         {#each VOICE_LEADING as v (v)}<option value={v}>{VOICE_LEADING_LABELS[v] ?? v}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Strum" span={1} hint="Spread the chord over this many milliseconds. Note-offs are never strummed.">
-      <input class="val" type="number" min="0" max="400" step="5" value={harmoniserStrum(control)} onchange={(e) => set('strumMs', clampInt(e.target.value, 0, 400, 0))} />
+    <PropertyCell label="Strum" span={1} compact hint="Spread the chord over this many milliseconds. Note-offs are never strummed.">
+      <NumberCell label="Strum" min={0} max={400} step={5} value={harmoniserStrum(control)} onchange={(v) => set('strumMs', clampInt(v, 0, 400, 0))} />
     </PropertyCell>
     <PropertyCell label="Direction" span={1} hint="Which end of the chord arrives first.">
       <select class="val" value={p.strumDirection ?? 'up'} onchange={(e) => set('strumDirection', e.target.value)}>
@@ -187,14 +188,14 @@
   </PropertySection>
 
   {#if !isMemory}
-    <PropertySection title="Per-degree chords">
+    <PropertySection title="Per-degree chords" icon={Hash}>
       <PropertyCell label="" span={4} hint="">
         <div class="note">
           An override replaces the stacked chord for <b>one</b> degree and leaves the others alone.
         </div>
       </PropertyCell>
-      <PropertyCell label="Degree" span={1} hint="1 is the tonic.">
-        <input class="val" type="number" min="1" max={degreeCount} step="1" value={selDegree} onchange={(e) => { selDegree = clampInt(e.target.value, 1, degreeCount, 1); }} />
+      <PropertyCell label="Degree" span={1} compact hint="1 is the tonic.">
+        <NumberCell label="Deg" min={1} max={degreeCount} step={1} value={selDegree} onchange={(v) => { selDegree = clampInt(v, 1, degreeCount, 1); }} />
       </PropertyCell>
       <PropertyCell label="Chord" span={2} hint="Semitones from the played note, comma separated. Blank uses the stacked thirds.">
         <input class="val" type="text" placeholder="stacked thirds" value={(degreeOverride ?? []).join(', ')} onchange={(e) => setDegreeText(e.target.value)} />
@@ -210,28 +211,32 @@
     </PropertySection>
   {/if}
 
-  <PropertySection title="Display">
+  <PropertySection title="Display" icon={Monitor}>
     <PropertyCell label="Click to audition" span={1} hint="Click a key in preview to hear the chord. Most of the editor's life is spent with no keyboard plugged in.">
       <PropertyToggle value={p.editable !== false} onchange={() => set('editable', !(p.editable !== false))} />
     </PropertyCell>
     <PropertyCell label="Header" span={1} hint="The chord name and mode strip.">
       <PropertyToggle value={p.showHeader !== false} onchange={() => set('showHeader', !(p.showHeader !== false))} />
     </PropertyCell>
-    <PropertyCell label="Low note" span={1} hint="The keyboard's resting low note when nothing is sounding. It stretches to fit whatever plays.">
-      <input class="val" type="number" min="0" max="108" step="1" value={num(p.displayLow, 48)} onchange={(e) => set('displayLow', clampInt(e.target.value, 0, 108, 48))} />
+    <PropertyCell label="Low note" span={1} compact hint="The keyboard's resting low note when nothing is sounding. It stretches to fit whatever plays.">
+      <NumberCell label="Note" min={0} max={108} step={1} value={num(p.displayLow, 48)} defaultValue={48} onchange={(v) => set('displayLow', clampInt(v, 0, 108, 48))} />
     </PropertyCell>
-    <PropertyCell label="Span" span={1} hint="How many semitones it shows at rest.">
-      <input class="val" type="number" min="12" max="60" step="1" value={num(p.displaySpan, 24)} onchange={(e) => set('displaySpan', clampInt(e.target.value, 12, 60, 24))} />
+    <PropertyCell label="Span" span={1} compact hint="How many semitones it shows at rest.">
+      <NumberCell label="Span" min={12} max={60} step={1} value={num(p.displaySpan, 24)} defaultValue={24} onchange={(v) => set('displaySpan', clampInt(v, 12, 60, 24))} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
-    <PropertyCell label="Face" span={1} hint=""><input class="col" type="color" value={colRgb(p.faceColour, 'FF141420')} oninput={(e) => setCol('faceColour', p.faceColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="White keys" span={1} hint=""><input class="col" type="color" value={colRgb(p.whiteColour, 'FFE8E8EE')} oninput={(e) => setCol('whiteColour', p.whiteColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Black keys" span={1} hint=""><input class="col" type="color" value={colRgb(p.blackColour, 'FF1A1A22')} oninput={(e) => setCol('blackColour', p.blackColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="You played" span={1} hint="The key you pressed, so it is distinct from what the harmoniser added."><input class="col" type="color" value={colRgb(p.playedColour, 'FFF2C94C')} oninput={(e) => setCol('playedColour', p.playedColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="It added" span={1} hint=""><input class="col" type="color" value={colRgb(p.addedColour, 'FFBB6BD9')} oninput={(e) => setCol('addedColour', p.addedColour, e.target.value)} /></PropertyCell>
-    <PropertyCell label="Labels" span={1} hint=""><input class="col" type="color" value={colRgb(p.labelColour, 'FFB9B9B9')} oninput={(e) => setCol('labelColour', p.labelColour, e.target.value)} /></PropertyCell>
+  <PropertySection title="Appearance" icon={Palette}>
+    <PropertyCell label="Colours" span={4} hint="Face, white keys, black keys, the key you played, the notes it added, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'faceColour', label: 'Face', value: p.faceColour ?? 'FF141420', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.faceColour' } },
+        { key: 'whiteColour', label: 'White', value: p.whiteColour ?? 'FFE8E8EE', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.whiteColour' } },
+        { key: 'blackColour', label: 'Black', value: p.blackColour ?? 'FF1A1A22', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.blackColour' } },
+        { key: 'playedColour', label: 'Played', value: p.playedColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.playedColour' } },
+        { key: 'addedColour', label: 'Added', value: p.addedColour ?? 'FFBB6BD9', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.addedColour' } },
+        { key: 'labelColour', label: 'Labels', value: p.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Harmoniser.labelColour' } },
+      ]} />
+    </PropertyCell>
   </PropertySection>
 {/if}
 
@@ -243,5 +248,4 @@
   .seed { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 2px 7px; border-radius: 4px; cursor: pointer; }
   .seed:hover:not(:disabled) { border-color: #4a4a58; color: #E8E8EE; }
   .seed:disabled { opacity: 0.4; cursor: default; }
-  .col { width: 26px; height: 20px; padding: 0; border: 1px solid #2a2a36; background: #141420; border-radius: 3px; }
 </style>

@@ -5,11 +5,17 @@
   import { panelPreviewSessions } from '../stores/interactionPreview.js';
   import { isRangeBehavior, getRangeMin, getRangeMax, getCurrentRangeValue } from '../utils/rangeBehavior.js';
   import { autoArrange, captureConstellationValues } from '../utils/constellationLayout.js';
+  import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
+  import Waypoints from 'lucide-svelte/icons/waypoints';
+  import Palette from 'lucide-svelte/icons/palette';
+  import Target from 'lucide-svelte/icons/target';
+  import Bookmark from 'lucide-svelte/icons/bookmark';
 
   let { control = null } = $props();
 
@@ -75,14 +81,10 @@
     if (!Object.keys(captured).length) return;
     setPresets(presets.map((p, idx) => idx === i ? { ...p, values: { ...(p.values ?? {}), ...captured } } : p));
   }
-
-  // Accent-colour swatches (preserve alpha).
-  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
-  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if cn}
-  <PropertySection title="Constellation">
+  <PropertySection title="Constellation" icon={Waypoints}>
     <PropertyCell label="Mode" span={2} hint="Snap = recall the nearest preset exactly (discrete). Blend = morph between nearby presets by distance (continuous).">
       <select class="val" value={cn.mode ?? 'blend'} onchange={(e) => set('mode', e.target.value)}>
         <option value="blend">Blend (morph)</option>
@@ -103,28 +105,28 @@
         hint="How many bars one full wander cycle takes."
       >
         {#snippet children()}
-          <PropertyCell label="Wander (bars)" span={2} hint="How many bars one full pass through the map takes.">
-            <input class="val" type="number" min={MIN_BARS} max={MAX_BARS} step="1" value={cn.wanderBars ?? 8} onchange={(e) => set('wanderBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(e.target.value, 8))))} />
+          <PropertyCell label="Wander (bars)" span={2} compact hint="How many bars one full pass through the map takes.">
+            <NumberCell label="Bars" value={cn.wanderBars ?? 8} step={1} min={MIN_BARS} max={MAX_BARS} defaultValue={8} onchange={(v) => set('wanderBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(v, 8))))} />
           </PropertyCell>
         {/snippet}
       </TransportSyncCells>
       {#if cn.syncToTransport !== true}
-        <PropertyCell label="Wander rate" span={2} hint="Wander speed (cycles per second).">
-          <input class="val" type="number" min="0.01" max="2" step="0.01" value={cn.wanderRate ?? 0.08} onchange={(e) => set('wanderRate', Math.max(0.01, num(e.target.value, 0.08)))} />
+        <PropertyCell label="Wander rate" span={2} compact hint="Wander speed (cycles per second).">
+          <NumberCell label="Rate" value={cn.wanderRate ?? 0.08} step={0.01} min={0.01} max={2} defaultValue={0.08} onchange={(v) => set('wanderRate', Math.max(0.01, num(v, 0.08)))} />
         </PropertyCell>
       {/if}
     {/if}
     {#if String(cn.mode ?? 'blend') === 'blend'}
-      <PropertyCell label="Blend" span={2} hint="Morph sharpness — higher makes the nearest preset dominate sooner.">
-        <input class="val" type="number" min="1" max="6" step="0.5" value={cn.blendPower ?? 2} onchange={(e) => set('blendPower', Math.max(1, Math.min(6, num(e.target.value, 2))))} />
+      <PropertyCell label="Blend" span={2} compact hint="Morph sharpness — higher makes the nearest preset dominate sooner.">
+        <NumberCell label="Blend" value={cn.blendPower ?? 2} step={0.5} min={1} max={6} defaultValue={2} onchange={(v) => set('blendPower', Math.max(1, Math.min(6, num(v, 2))))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Links" span={1} hint="Draw constellation lines between sonically-similar presets.">
       <PropertyToggle value={cn.showLinks !== false} onchange={() => set('showLinks', !(cn.showLinks !== false))} />
     </PropertyCell>
     {#if cn.showLinks !== false}
-      <PropertyCell label="Neighbours" span={1} hint="How many nearest neighbours each preset links to.">
-        <input class="val" type="number" min="1" max="6" step="1" value={cn.linkCount ?? 2} onchange={(e) => set('linkCount', Math.max(1, Math.min(6, Math.round(num(e.target.value, 2)))))} />
+      <PropertyCell label="Neighbours" span={1} compact hint="How many nearest neighbours each preset links to.">
+        <NumberCell label="Count" value={cn.linkCount ?? 2} step={1} min={1} max={6} defaultValue={2} onchange={(v) => set('linkCount', Math.max(1, Math.min(6, Math.round(num(v, 2)))))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Labels" span={1} hint="Show preset names.">
@@ -135,38 +137,43 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Appearance">
-    <PropertyCell label="Field" span={1} hint="Map background colour.">
-      <input class="cswatch" type="color" value={colRgb(cn.fieldColour, 'FF0C0C12')} onchange={(e) => setCol('fieldColour', cn.fieldColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Probe" span={1} hint="Probe / readout colour.">
-      <input class="cswatch" type="color" value={colRgb(cn.probeColour, 'FFF2C94C')} onchange={(e) => setCol('probeColour', cn.probeColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Links" span={1} hint="Link colour (stays faint — its transparency is kept).">
-      <input class="cswatch" type="color" value={colRgb(cn.linkColour, 'FF2A6BA8')} onchange={(e) => setCol('linkColour', cn.linkColour, e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Label colour.">
-      <input class="cswatch" type="color" value={colRgb(cn.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', cn.labelColour, e.target.value)} />
+  <PropertySection title="Appearance" icon={Palette}>
+    <PropertyCell label="Colours" span={4} hint="Map background, probe, links, labels. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'fieldColour', label: 'Field', value: cn.fieldColour ?? 'FF0C0C12', target: { type: 'control', controlId: core?.id, path: 'Constellation.fieldColour' } },
+        { key: 'probeColour', label: 'Probe', value: cn.probeColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'Constellation.probeColour' } },
+        { key: 'linkColour', label: 'Links', value: cn.linkColour ?? 'FF2A6BA8', target: { type: 'control', controlId: core?.id, path: 'Constellation.linkColour' } },
+        { key: 'labelColour', label: 'Labels', value: cn.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Constellation.labelColour' } },
+      ]} />
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Targets">
+  <PropertySection title="Targets" icon={Target}>
+    {#snippet tools()}
+      <button type="button" class="header-add-btn" title="Add target" onclick={addTarget}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each target is one parameter the presets morph. Bind its 'Target' port in Device Bindings.">
       <div class="rows">
         {#if targets.length === 0}<div class="empty">No targets yet. Add one, then bind its port.</div>{/if}
         {#each targets as t, i (t.id ?? i)}
           <div class="trow">
             <input class="val name" type="text" value={t.label ?? ''} placeholder="Target" onchange={(e) => updateTarget(i, 'label', e.target.value)} />
-            <input class="swatch" type="color" value={`#${String(t.colour ?? 'FF39D98A').slice(-6)}`} onchange={(e) => updateTarget(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+            <span class="clus">
+              <SwatchCluster swatches={[
+                { key: `target-${t.id ?? i}`, label: 'Colour', value: t.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateTarget(i, 'colour', hex) } },
+              ]} />
+            </span>
             <button type="button" class="action-btn danger" onclick={() => removeTarget(i)} title="Remove">✕</button>
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addTarget}>Add target</button>
       </div>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Presets">
+  <PropertySection title="Presets" icon={Bookmark}>
+    {#snippet tools()}
+      <button type="button" class="header-add-btn" title="Add preset" onclick={addPreset}>+ Add</button>
+    {/snippet}
     <PropertyCell label="" span={4} hint="Each preset is a star at X/Y (0–1) storing a value per target. Capture stamps the panel's current values.">
       <div class="rows">
         {#if presets.length === 0}<div class="empty">No presets yet. Add one and set its per-target values.</div>{/if}
@@ -174,26 +181,29 @@
           <div class="preset">
             <div class="prow">
               <input class="val name" type="text" value={p.label ?? ''} placeholder="Preset name" onchange={(e) => updatePreset(i, 'label', e.target.value)} />
-              <input class="swatch" type="color" value={`#${String(p.colour ?? 'FF5B9BD5').slice(-6)}`} onchange={(e) => updatePreset(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+              <span class="clus">
+                <SwatchCluster swatches={[
+                  { key: `preset-${p.id ?? i}`, label: 'Colour', value: p.colour ?? 'FF5B9BD5', target: { type: 'callback', apply: (hex) => updatePreset(i, 'colour', hex) } },
+                ]} />
+              </span>
               <button type="button" class="action-btn" onclick={() => capturePreset(i)} disabled={capturable === 0} title={capturable ? `Set from the panel's current bound controls (${capturable})` : 'Bind targets to parameters that panel controls drive, then capture'}>Capture</button>
               <button type="button" class="action-btn danger" onclick={() => removePreset(i)} title="Remove">✕</button>
             </div>
             <div class="prow2">
-              <label class="fld"><span>X</span><input class="val" type="number" min="0" max="1" step="0.05" value={num(p.x, 0.5)} onchange={(e) => updatePreset(i, 'x', clamp01(num(e.target.value, 0.5)))} /></label>
-              <label class="fld"><span>Y</span><input class="val" type="number" min="0" max="1" step="0.05" value={num(p.y, 0.5)} onchange={(e) => updatePreset(i, 'y', clamp01(num(e.target.value, 0.5)))} /></label>
+              <label class="fld"><span>X</span><span class="nc-wrap"><NumberCell value={num(p.x, 0.5)} step={0.05} min={0} max={1} onchange={(v) => updatePreset(i, 'x', clamp01(num(v, 0.5)))} /></span></label>
+              <label class="fld"><span>Y</span><span class="nc-wrap"><NumberCell value={num(p.y, 0.5)} step={0.05} min={0} max={1} onchange={(v) => updatePreset(i, 'y', clamp01(num(v, 0.5)))} /></span></label>
             </div>
             {#if targets.length}
               <div class="grid">
                 {#each targets as t (t.id)}
                   <label class="fld"><span>{t.label}</span>
-                    <input class="val" type="number" min="0" max="1" step="0.05" value={pv(p, t.id)} onchange={(e) => updatePresetValue(i, t.id, clamp01(num(e.target.value, 0)))} />
+                    <span class="nc-wrap"><NumberCell value={pv(p, t.id)} step={0.05} min={0} max={1} onchange={(v) => updatePresetValue(i, t.id, clamp01(num(v, 0)))} /></span>
                   </label>
                 {/each}
               </div>
             {/if}
           </div>
         {/each}
-        <button type="button" class="action-btn" onclick={addPreset}>Add preset</button>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -202,7 +212,6 @@
 <style>
   .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
   .val:focus { border-color: #5B9BD5; }
-  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .rows { display: flex; flex-direction: column; gap: 8px; }
   .trow { display: flex; align-items: center; gap: 8px; }
   .trow .name { flex: 1 1 auto; }
@@ -211,8 +220,9 @@
   .prow .name { flex: 1 1 auto; }
   .prow2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; border-top: 1px solid #2a2a2a; padding-top: 7px; }
-  .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
+  .clus { flex: 0 0 44px; display: flex; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
+  .nc-wrap { display: flex; }
   .fld > span { font-size: 10px; letter-spacing: .03em; color: #8a8a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .empty { border: 1px dashed #3A3A3A; border-radius: 4px; color: #8A8A8A; font-size: 11px; padding: 8px; }
   .action-btn { background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 8px; cursor: pointer; align-self: flex-start; }
@@ -220,4 +230,10 @@
   .action-btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: #3B3B3B; }
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:hover { border-color: #C96A6A; }
+  .header-add-btn {
+    height: 16px; padding: 0 8px; border-radius: 8px; border: 1px solid #333;
+    background: #252525; color: #777; font-size: 9px; font-family: inherit;
+    cursor: pointer; line-height: 1;
+  }
+  .header-add-btn:hover { color: #CCC; border-color: #4A6E8C; }
 </style>

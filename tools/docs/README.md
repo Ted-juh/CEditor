@@ -26,6 +26,7 @@ with an *as built* section per phase.
 |---|---|
 | [Device profile engine MVP plan](device-profile-engine-mvp-plan.md) | The first plan for the device profile and MIDI layer, on one architectural decision: build a device *intent compiler*, not a SysEx generator. The engine it plans exists as `CE/src/DeviceProfile/`. |
 | [MIDI 2.0 integration plan](midi2-integration-plan.md) | The deferred plan for MIDI 2.0 — MIDI-CI first so capable devices can describe themselves, UMP second. Some MIDI-CI work has since landed in `CE/src/DeviceProfile/`; read the plan for the reasoning, the code for what exists. |
+| [Screen Builder & CTRL49 control surface](screen-builder-design.md) | The CTRL49's screen/encoders/pads as a physical front panel for screenless hardware synths, on three decisions: templates + assignments (never panel rendering), one resident broker owns the hardware, device Lua is a pure renderer of host state. Byte-level protocol lives in an external reverse-engineering handoff the doc points to. |
 
 ## Panels and export
 

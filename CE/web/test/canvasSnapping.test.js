@@ -48,3 +48,19 @@ test('control-to-control alignment still works and is never tagged panel-centre'
   assert.equal(result.x, 100); // left edges aligned
   assert.equal(vGuide.center, false); // a control alignment, not the panel centre
 });
+
+test('threshold parameter widens and narrows the sticky zone (zoom compensation)', () => {
+  // 8 units off the panel-left edge: outside the default 5-unit threshold...
+  const rect = { x: 8, y: 100, w: 40, h: 20 };
+  const noSnap = findAlignmentSnap(rect, 'self', [], { horizontal: [], vertical: [] }, getSection, { width: 400, height: 300 });
+  assert.equal(noSnap.x, 8);
+
+  // ...but inside a widened threshold (5 screen px at 50% zoom = 10 panel units).
+  const zoomedOut = findAlignmentSnap(rect, 'self', [], { horizontal: [], vertical: [] }, getSection, { width: 400, height: 300 }, 10);
+  assert.equal(zoomedOut.x, 0);
+
+  // A narrowed threshold (zoomed in) refuses what the default would take.
+  const near = { x: 4, y: 100, w: 40, h: 20 };
+  const zoomedIn = findAlignmentSnap(near, 'self', [], { horizontal: [], vertical: [] }, getSection, { width: 400, height: 300 }, 1.25);
+  assert.equal(zoomedIn.x, 4);
+});

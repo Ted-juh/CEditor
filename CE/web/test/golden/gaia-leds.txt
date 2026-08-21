@@ -1,22 +1,39 @@
-8x shape path
-1x path M 0.5 4 A 3.5 3.5 0 0 1 4 0.5
-1x path M 0.5 50 L 0.5 3
-1x path M 3 0.5 L 93 0.5
-1x path M 4 52.5 A 3.5 3.5 0 0 1 0.5 49
-1x path M 92 0.5 A 3.5 3.5 0 0 1 95.5 4
-1x path M 93 52.5 L 3 52.5
-1x path M 95.5 3 L 95.5 50
-1x path M 95.5 49 A 3.5 3.5 0 0 1 92 52.5
-8x stroke #00000055 @ 1
-3x bg #120A0A
-1x bg #171C20
-2x bg #3A1E1C
-10x bg #D3DCE4
-1x bg #FF3B30
+15x shape rect
+1x box 0,0 96x53
+1x box 0.5,0.5 95x52
+1x box 21,15.3 16.676978143536676x1.4
+1x box 21,21.3 9x1.4
+1x box 21,30.3 9x1.4
+1x box 21,40.8 6.3639610306789285x1.4
+1x box 25.5,36.3 6.363961030678928x1.4
+1x box 30,21.3 9x1.4
+1x box 30,30.3 9x1.4
+1x box 30,40.8 6.3639610306789285x1.4
+1x box 34.5,45.3 6.363961030678928x1.4
+1x box 35.04,6.3 9x1.4
+1x box 7,22 9x9
+1x box 7,37 9x9
+1x box 7,7 9x9
+1x svg-transform rotate(-32.7 21.000 16.000)
+1x svg-transform rotate(-45 21.000 41.500)
+1x svg-transform rotate(-45 34.500 46.000)
+1x svg-transform rotate(-90 21.000 31.000)
+1x svg-transform rotate(45 25.500 37.000)
+1x svg-transform rotate(45 30.000 41.500)
+1x svg-transform rotate(90 30.000 22.000)
+1x svg-transform rotate(90 35.040 7.000)
+1x stroke #000000 @ 1
+3x fill #120A0A
+1x fill #171C20
+10x fill #D3DCE4
+2x bg #3A1E1CFF
+1x bg #FF3B30FF
+3x radius 999px 999px 999px 999px
+3x font-family Arial
+3x font-size 9px
+3x font-style normal
+3x font-weight 600
+3x line-height 1
+3x text-align center
+3x white-space nowrap
 3x transform none
-1x transform rotate(-32.7deg)
-2x transform rotate(-45deg)
-1x transform rotate(-90deg)
-2x transform rotate(45deg)
-2x transform rotate(90deg)
-8x origin 0% 50%

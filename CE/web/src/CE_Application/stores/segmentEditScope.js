@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { equalityWritable } from '../utils/equalityStore.js';
 
 const DEFAULT_SCOPE = {
   mode: 'all',
@@ -26,12 +26,12 @@ function sameScope(left, right) {
     && leftIds.every((id, index) => id === rightIds[index]);
 }
 
-export const segmentEditScope = writable({ ...DEFAULT_SCOPE });
+// Same shape, same reason as stateEditScope: an object-valued writable cannot be quietened from
+// the call site, so the comparison lives in the store. See utils/equalityStore.js.
+export const segmentEditScope = equalityWritable({ ...DEFAULT_SCOPE }, sameScope);
 
 export function setSegmentEditScopeAll() {
-  segmentEditScope.update((current) => (
-    sameScope(current, DEFAULT_SCOPE) ? current : { ...DEFAULT_SCOPE }
-  ));
+  segmentEditScope.set({ ...DEFAULT_SCOPE });
 }
 
 export function setSegmentEditScopeSegments(segmentIds = []) {
@@ -46,9 +46,7 @@ export function setSegmentEditScopeSegments(segmentIds = []) {
     segmentIds: nextIds,
   };
 
-  segmentEditScope.update((current) => (
-    sameScope(current, nextScope) ? current : nextScope
-  ));
+  segmentEditScope.set(nextScope);
 }
 
 export function toggleSegmentEditScopeSegment(segmentId = '') {

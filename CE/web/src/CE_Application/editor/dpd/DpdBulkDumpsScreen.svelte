@@ -7,6 +7,7 @@
   import { dumpByteMap, assembleDump, dumpRoundTrip } from '../../generated/dpd/dumps.mjs';
   import { resolveParams } from '../../generated/dpd/resolve.mjs';
   import { bytesToHex } from '../../generated/dpd/codecs.mjs';
+  import NumberCell from '../../properties/NumberCell.svelte';
 
   let { model, merged } = $props();
 
@@ -63,7 +64,6 @@
       : { type };
   }
   const codecLabel = (c) => !c ? 'u7' : c.type + (c.bytes ? `·${c.bytes}` : '') + (c.length ? `·${c.length}` : '');
-  const sel = (e) => e.target.select();
 </script>
 
 <div class="shead"><h1>Bulk dumps</h1></div>
@@ -118,7 +118,7 @@
       {#each active.layout as entry, i (i)}
         {@const fail = fieldFails.has(entry.param)}
         <div class="dlrow">
-          <input class="num" type="number" min="0" bind:value={entry.offset} onfocus={sel} />
+          <span class="nc-wrap"><NumberCell min={0} value={entry.offset} onchange={(v) => entry.offset = v} /></span>
           <select class="psel" bind:value={entry.param}>
             {#each paramOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}
             {#if !paramOptions.some((o) => o.id === entry.param)}<option value={entry.param}>{entry.param} (name)</option>{/if}
@@ -127,11 +127,11 @@
             {#each CODECS as c (c)}<option value={c}>{c}</option>{/each}
           </select>
           {#if entry.codec?.type === 'nibbles' || entry.codec?.type === 'packed8to7'}
-            <input class="num" type="number" min="1" bind:value={entry.codec.bytes} onfocus={sel} title="bytes" />
+            <span class="nc-wrap" title="bytes"><NumberCell min={1} value={entry.codec.bytes} onchange={(v) => entry.codec.bytes = v} /></span>
           {:else if entry.codec?.type === 'text-ascii' || entry.codec?.type === 'text-nibbled-ascii'}
-            <input class="num" type="number" min="1" bind:value={entry.codec.length} onfocus={sel} title="length" />
+            <span class="nc-wrap" title="length"><NumberCell min={1} value={entry.codec.length} onchange={(v) => entry.codec.length = v} /></span>
           {:else}
-            <input class="num" type="number" min="1" bind:value={entry.size} onfocus={sel} placeholder="auto" />
+            <span class="nc-wrap"><NumberCell min={1} value={entry.size} onchange={(v) => entry.size = v} /></span>
           {/if}
           <span class="ck">{#if fail}<span class="chk warn">!</span>{:else}<span class="chk ok">✓</span>{/if}</span>
           <button class="xbtn" title="remove" onclick={() => removeField(active, i)}>✕</button>
@@ -153,3 +153,11 @@
 {:else}
   <div class="placeholder">No bulk dumps defined for this device yet.</div>
 {/if}
+
+<style>
+  /* Wrapper keeping NumberCell inside its layout-table grid column. */
+  .nc-wrap {
+    display: flex;
+    min-width: 0;
+  }
+</style>
