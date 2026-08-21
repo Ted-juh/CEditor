@@ -148,11 +148,14 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
       parameter,
       label: parameter?.name || parameterId,
       detail: 'SysEx',
-      span: entry.max - entry.min,
+      // Both gated on the same question, because a text parameter now decodes to TEXT: `max - min`
+      // over two strings is NaN, which renders as "NaN" beside a perfectly correct patch name. It
+      // used to be 0 only because the decoder handed back one byte's worth of the first character.
+      span: isNumeric(parameter) ? entry.max - entry.min : null,
       count: entry.count,
       // A parameter with no numeric range is not carrying a number — the GAIA's patch name is 12
-      // ASCII bytes, and the decoder, asked for one byte, hands back the first character. Printing
-      // that as a value would be a confident wrong number next to a correct name.
+      // ASCII bytes. Printing one as a value would be a confident wrong number next to a correct
+      // name.
       last: isNumeric(parameter) ? entry.last : null,
       seen: current.seen[`param:${parameterId}`] ?? 0,
       reason: parameter ? '' : 'not in the loaded profile',

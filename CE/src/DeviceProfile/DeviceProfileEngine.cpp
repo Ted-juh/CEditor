@@ -2053,7 +2053,12 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
         auto fixedLength = encoding != nullptr ? propInt (*encoding, "length", text.length()) : text.length();
         auto padByte = encoding != nullptr ? propInt (*encoding, "pad", 32) : 32;
 
-        if (encodingType != "text-ascii")
+        // Normalised, as the DECODE path at the top of this file already does. Without it a profile
+        // spelling the codec `ascii` — an alias both readers accept — could have its patch name read
+        // back and never written, which is a one-directional editor with nothing saying so.
+        encodingType = normalisedTextCodec (encodingType);
+
+        if (encodingType != "text-ascii" && encodingType != "text-nibbled-ascii")
             return juce::Result::fail ("Unsupported text encoder: " + encodingType);
 
         if (fixedLength <= 0)
@@ -2070,7 +2075,19 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
             auto byte = i < text.length() ? (int) text[i] : padByte;
             if (byte < 32 || byte > 127)
                 return juce::Result::fail ("Text contains non-ASCII/MIDI byte for " + propString (parameter, "id"));
-            encodedBytes.add (byte);
+
+            // The exact inverse of the nibbled-ascii DECODER above. It could read a packed name and
+            // not write one, so a profile using this codec loaded a patch name into a field that
+            // could never be sent back.
+            if (encodingType == "text-nibbled-ascii")
+            {
+                encodedBytes.add ((byte >> 4) & 0x0f);
+                encodedBytes.add (byte & 0x0f);
+            }
+            else
+            {
+                encodedBytes.add (byte);
+            }
         }
 
         semanticValue = text;

@@ -149,6 +149,11 @@ export function fingerprintParameter(profile, parameterId) {
     valueStart: Math.max(0, raw.length - lead),
     valueLength: width,
     encoding: parameter.encoding ?? U7,
+    // The TYPE travels with the encoder. Without it the decoder sees `{type: undefined,
+    // encoding: {type: 'text-ascii'}}` and falls through to the numeric path, handing back the
+    // ASCII code of a patch name's first letter as the parameter's value — a plausible number from
+    // a message that matched, which is exactly the failure the value WIDTH was added to prevent.
+    valueType: String(parameter?.type ?? ''),
     source: 'compiled',
   };
 }
@@ -178,6 +183,7 @@ function declaredInboundEntries(parameter) {
       valueStart: 2,
       valueLength: 1,
       encoding: U7,          // a CC is one 7-bit byte whatever the parameter's own encoder is
+      valueType: '',
       source: 'declared',
     });
   }
@@ -206,6 +212,7 @@ export function buildInboundIndex(profile) {
         valueStart: print.valueStart,
         valueLength: print.valueLength,
         encoding: print.encoding,
+        valueType: print.valueType ?? '',
         source: print.source,
       });
     }
@@ -287,7 +294,8 @@ export function decodeInbound(index, hex) {
   const raw = bytes.slice(entry.valueStart, entry.valueStart + entry.valueLength);
   if (raw.length !== entry.valueLength) return null;
   const parameterId = entry.parameterIds[0];
-  const value = decodeParameterValue({ id: parameterId, encoding: entry.encoding }, raw);
+  const value = decodeParameterValue(
+    { id: parameterId, type: entry.valueType, encoding: entry.encoding }, raw);
   return value === null ? null : { parameterId, value };
 }
 

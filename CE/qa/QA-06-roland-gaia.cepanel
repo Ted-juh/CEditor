@@ -10539,7 +10539,7 @@
               "port": "text",
               "deviceRole": "primary",
               "parameterId": "common.patchName",
-              "parameterType": "patchName",
+              "parameterType": "text",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {

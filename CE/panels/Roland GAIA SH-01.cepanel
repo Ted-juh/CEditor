@@ -2851,7 +2851,7 @@
               "port": "text",
               "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.patchName",
-              "parameterType": "patchName",
+              "parameterType": "text",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {

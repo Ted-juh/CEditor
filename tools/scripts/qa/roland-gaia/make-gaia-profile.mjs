@@ -37,6 +37,39 @@ const EXTRA_BLOCKS = [
   { block: 'arpeggioCommon', prefix: 'arp', group: 'Arpeggio', table: PATCH_ARPEGGIO_COMMON },
 ];
 
+/**
+ * Every block the synth will answer an RQ1 for: one row, driving the REQUEST, the DUMP DEFINITION
+ * that parses the reply, and the startup sync list.
+ *
+ * One table rather than three lists, because the failure mode of three lists is a request for a
+ * dump that does not exist — which is not a warning. `buildDumpRequests` emitting a `bulkDump`
+ * response naming a dump `buildDumpDefinitions` never emitted makes DeviceProfileEngine reject the
+ * WHOLE profile at load, silently, and the 793-parameter GAIA drops out of the device list. It has
+ * happened once already this session; a shared table is what makes it unrepresentable.
+ */
+const BLOCK_DUMPS = [
+  { dump: 'common', name: 'Patch Common', block: 'common', sizeKey: 'common' },
+  { dump: 'tone1', name: 'Patch Tone 1', block: 'tone1', sizeKey: 'tone' },
+  { dump: 'tone2', name: 'Patch Tone 2', block: 'tone2', sizeKey: 'tone' },
+  { dump: 'tone3', name: 'Patch Tone 3', block: 'tone3', sizeKey: 'tone' },
+  { dump: 'distortion', name: 'Patch Distortion', block: 'distortion', sizeKey: 'distortion' },
+  { dump: 'flanger', name: 'Patch Flanger', block: 'flanger', sizeKey: 'flanger' },
+  { dump: 'delay', name: 'Patch Delay', block: 'delay', sizeKey: 'delay' },
+  { dump: 'reverb', name: 'Patch Reverb', block: 'reverb', sizeKey: 'reverb' },
+  { dump: 'arpeggioCommon', name: 'Patch Arpeggio Common', block: 'arpeggioCommon', sizeKey: 'arpeggioCommon' },
+  // The sixteen pattern lanes. They were requestable one DT1 at a time and nothing could READ them
+  // back, so a step grid could write a pattern and never show the one already in the synth.
+  ...Array.from({ length: 16 }, (unused, index) => ({
+    dump: `arpPattern${index + 1}`,
+    name: `Patch Arpeggio Pattern (Note ${index + 1})`,
+    block: `arpeggioPattern${index + 1}`,
+    sizeKey: 'arpeggioPattern',
+  })),
+];
+
+/** `requestCommon`, `requestTone1`, `requestArpPattern16` — derived from the dump id, once. */
+const requestIdFor = (dump) => `request${dump[0].toUpperCase()}${dump.slice(1)}`;
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../../..');
 // A NEW file, deliberately. `roland-gaia.ceditor-device.json` is a fifteen-parameter demo of the
@@ -202,18 +235,30 @@ function buildParameter(entry, { idPrefix, group, blockOffset, inbound }) {
   };
 }
 
-/** The 12 Patch Name bytes are one name, not twelve numbers. Collapse them. */
+/**
+ * The 12 Patch Name bytes are one name, not twelve numbers. Collapse them.
+ *
+ * `type: 'text'`, which is what BOTH engines branch on — and what this said instead was
+ * `type: 'patchName'`, a word that appears in no branch of either. Falling through to the numeric
+ * path, a write tried to parse "INIT PATCH  " as a number and a read returned the ASCII code of
+ * the first letter as the patch's name. It has never worked in either direction, in either engine,
+ * and nothing noticed because no golden vector covered it. There is one now.
+ *
+ * roland-sh-201 spells the codec `text-ascii`; both engines alias plain `ascii` to it, but writing
+ * the alias in one profile and the canonical name in the other is how a codec quietly acquires two
+ * spellings and then three.
+ */
 function patchNameParameter() {
   return {
     id: 'common.patchName',
     name: 'Patch Name',
     group: 'Patch Common',
-    type: 'patchName',
+    type: 'text',
     address: addressFor(BLOCKS.common, '00 00'),
     length: 12,
     default: 'INIT PATCH  ',
     display: { mode: 'text', shortLabel: 'Name' },
-    encoding: { type: 'ascii', length: 12, pad: 32 },
+    encoding: { type: 'text-ascii', length: 12, pad: 32 },
     access: { canRead: true, canWrite: true, realtimeSafe: false, source: 'singleParameter' },
     sendPolicy: { mode: 'onCommit', coalesce: false },
     messageRecipe: 'dt1',
@@ -254,6 +299,110 @@ function rq1Template(address, size) {
     formatBytes([rolandChecksum(body)]),
     'F7',
   ];
+}
+
+/**
+ * How far `address` sits past `base`, in bytes.
+ *
+ * Roland addresses are four 7-BIT digits, so this is base-128 arithmetic and not the subtraction
+ * of two 32-bit numbers. Distortion is the block that proves it: its size is 00 00 01 01, which is
+ * 129 and not 257, and the parameter at 10 00 05 00 is 128 bytes past 10 00 04 00 rather than 256.
+ * Getting this wrong puts every parameter in the block at the wrong payload offset — the dump
+ * parses, reports success, and fills the panel with the neighbouring value.
+ */
+const flatSize = (hex) => parseBytes(hex).reduce((total, byte) => total * 128 + byte, 0);
+
+function addressDelta(base, address) {
+  return flatSize(address) - flatSize(base);
+}
+
+/**
+ * The dumps the synth sends back, and where each parameter sits inside one.
+ *
+ * Derived from the PARAMETERS rather than re-transcribed from the manual, because the alternative
+ * is two copies of the same offsets that agree until one is edited. A parameter's address already
+ * says where it lives; a dump of a block is that block's bytes in address order, so the payload
+ * offset IS the address delta. Written out by hand, the arpeggio lanes alone would be 528 rows
+ * whose only content is `n`.
+ *
+ * The byte layout, which the offsets below are relative to:
+ *
+ *   F0 41 dd 00 00 41 12 aa bb cc dd  <size bytes>  sum F7
+ *   0  1  2  3  4  5  6  7  8  9  10  11 ...        ^   ^
+ *
+ * so payload.offset is 11, the checksum covers the address and data (offsets 7 .. 10+size) and
+ * never the header, and the whole message is 11 + size + 2 bytes.
+ */
+function buildDumpDefinitions(parameters) {
+  const byBlock = new Map(BLOCK_DUMPS.map((row) => [row.dump, []]));
+  const bases = BLOCK_DUMPS.map((row) => ({ ...row, base: addressFor(BLOCKS[row.block], '00 00') }));
+
+  for (const parameter of parameters) {
+    if (!parameter.address) continue; // master.volume is CC 7 — it is not in any dump
+    // The block a parameter belongs to is the one whose base it sits at or past, by less than that
+    // block's size. Checking the size and not just the next base is what catches a parameter that
+    // has fallen into the gap between two blocks rather than filing it under the earlier one.
+    let owner = null;
+    for (const row of bases) {
+      const delta = addressDelta(row.base, parameter.address);
+      if (delta < 0) continue;
+      if (delta >= flatSize(BLOCK_SIZES[row.sizeKey])) continue;
+      owner = { row, delta };
+      break;
+    }
+    if (!owner) throw new Error(`${parameter.id} at ${parameter.address} is inside no dumpable block`);
+    byBlock.get(owner.row.dump).push({ parameter: parameter.id, offset: owner.delta });
+  }
+
+  return bases.map((row) => {
+    const size = flatSize(BLOCK_SIZES[row.sizeKey]);
+    const mappings = byBlock.get(row.dump);
+    if (mappings.length === 0) throw new Error(`dump ${row.dump} would carry no parameters`);
+    return {
+      id: row.dump,
+      name: row.name,
+      kind: 'sysex',
+      // A DT1 addressed at this block's base. The address is part of the MATCHER rather than a
+      // field to read afterwards, so a Tone 2 reply can never be applied as Tone 1's.
+      matcher: {
+        prefix: ['F0', MODEL.manufacturer, '$deviceId', ...MODEL.modelId, MODEL.dt1,
+          ...row.base.split(' ')],
+        suffix: ['F7'],
+      },
+      payload: { offset: 11, size },
+      checksum: { type: 'roland-7bit', fromOffset: 7, toOffset: 10 + size, byteOffset: 11 + size },
+      completion: { expectedMessages: 1, expectedBytes: 11 + size + 2 },
+      requestRecipe: requestIdFor(row.dump),
+      mappings,
+    };
+  });
+}
+
+/**
+ * The preset banks, from the Bank Select table on p6 of the MIDI implementation.
+ *
+ * No patch NAMES. The MIDI implementation lists the banks and their program ranges and never
+ * prints the factory patch names, so none are invented — a catalogue of plausible-looking names
+ * would display confidently wrong titles for all 64 preset slots.
+ *
+ * The front panel numbers each bank A-1 .. H-8 (eight groups of eight). That is a display
+ * convention over the same program numbers, not a second address, so it is not modelled as one.
+ */
+function buildPresets() {
+  const bank = (id, label, role, startSlot, slotCount, bankMsb, bankLsb) => ({
+    id, label, role, writable: role === 'user', startSlot, slotCount, programBase: 0, bankMsb, bankLsb,
+  });
+  return {
+    banks: [
+      bank('user', 'User Patch', 'user', 0, 64, 87, 0),
+      bank('usb', 'USB Memory Patch', 'user', 64, 64, 87, 32),
+      bank('preset', 'Preset Patch', 'factory', 128, 64, 87, 64),
+      bank('preset-pcm', 'Preset PCM Patch', 'factory', 192, 8, 88, 64),
+    ],
+    // Bank Select MSB, LSB, then the Program Change — the GAIA has four banks, so a bare PC would
+    // recall whichever one it happened to be sitting in.
+    recall: { kind: 'bankPc' },
+  };
 }
 
 /** An RQ1 read, as the exact bytes that should appear on the wire. */
@@ -411,11 +560,16 @@ export function buildProfile() {
     },
     coverage: {
       // Honest about what is and is not built. Every block the manual prints an address map for is
-      // transcribed, including all sixteen arpeggio pattern lanes; bulk dump PARSING is not.
-      // Saying "broad" here would be the same lie the 15-parameter profile told by omission.
+      // transcribed, including all sixteen arpeggio pattern lanes, and each one's reply is parsed
+      // back into its parameters. Saying "broad" here would be the same lie the 15-parameter
+      // profile told by omission.
       singleParameterWrite: 'complete-for-every-block-in-the-address-map',
       editBufferDumpRequest: 'block-rq1-per-block',
-      editBufferDumpParse: 'notImplemented',
+      // 792 of the 793 parameters are mapped into a dump. The one that is not is Master Volume,
+      // which is CC 7 and has no address to appear at.
+      editBufferDumpParse: 'complete-for-every-block-in-the-address-map',
+      // The USER PATCH area at 20 nn 00 00 is addressable and this profile does not request it.
+      // Requesting all 64 slots is 64 x 26 round trips and a librarian's job, not an editor's.
       bankDump: 'notImplemented',
       patchNameEdit: 'complete-single-dt1-write',
       realtimeEditing: 'complete-for-transcribed-blocks',
@@ -465,37 +619,39 @@ export function buildProfile() {
       // One request per block, because that is how the synth answers: RQ1 with the block base and
       // its total size. Sizes come from BLOCK_SIZES, which is transcribed from the manual rather
       // than computed from the last offset — the two disagree for Distortion.
-      ...[
-        ['common', 'common'], ['tone1', 'tone'], ['tone2', 'tone'], ['tone3', 'tone'],
-        ['distortion', 'distortion'], ['flanger', 'flanger'], ['delay', 'delay'],
-        ['reverb', 'reverb'], ['arpeggioCommon', 'arpeggioCommon'],
-      ]
-        .map(([block, sizeKey]) => ({
-          id: `request${block[0].toUpperCase()}${block.slice(1)}`,
-          name: `Request ${block}`,
-          kind: 'sysex',
-          template: rq1Template(addressFor(BLOCKS[block], '00 00'), BLOCK_SIZES[sizeKey]),
-          address: addressFor(BLOCKS[block], '00 00'),
-          size: BLOCK_SIZES[sizeKey],
-          response: { kind: 'dt1', address: addressFor(BLOCKS[block], '00 00') },
-          timeoutMs: 1000,
-          retries: 1,
-        })),
+      //
+      // The response is `bulkDump` naming the definition that parses it, NOT `dt1` with an
+      // address. `dt1` said only "a reply will arrive at this address" and stopped there: the
+      // request went out, the synth answered with the whole block, and every byte of it was
+      // dropped. That is what made this an editor that could only write — you could not open it on
+      // a patch already in the machine. The dump ids come from the same table as the definitions.
+      ...BLOCK_DUMPS.map((row) => ({
+        id: requestIdFor(row.dump),
+        name: `Request ${row.block}`,
+        kind: 'sysex',
+        template: rq1Template(addressFor(BLOCKS[row.block], '00 00'), BLOCK_SIZES[row.sizeKey]),
+        address: addressFor(BLOCKS[row.block], '00 00'),
+        size: BLOCK_SIZES[row.sizeKey],
+        response: { kind: 'bulkDump', dump: row.dump },
+        timeoutMs: 1000,
+        retries: 1,
+      })),
     ],
     startup: {
       policy: 'pull',
       syncDirection: 'pull',
+      // Every block, including the sixteen arpeggio lanes. A partial pull is worse than an obvious
+      // one: the panel would open showing the synth's real filter next to a step grid holding
+      // whatever the profile's defaults are, with nothing on screen saying which half is live.
       sync: [
         { request: 'identityRequest' },
-        { request: 'requestCommon' },
-        { request: 'requestTone1' }, { request: 'requestTone2' }, { request: 'requestTone3' },
-        { request: 'requestDistortion' }, { request: 'requestFlanger' },
-        { request: 'requestDelay' }, { request: 'requestReverb' },
-        { request: 'requestArpeggioCommon' },
+        ...BLOCK_DUMPS.map((row) => ({ request: requestIdFor(row.dump) })),
       ],
     },
     parameters,
     tests: buildTests(deviceId, parameters),
+    dumpDefinitions: buildDumpDefinitions(parameters),
+    presets: buildPresets(),
   };
 }
 

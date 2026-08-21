@@ -96,13 +96,42 @@ test('the full GAIA is among them, with its requests intact', () => {
   // was invisible: the dropdown showed eight plausible entries and no gap where the ninth had been.
   const gaia = JSON.parse(readText(`${DIRECTORY}roland-gaia-sh01.ceditor-device.json`));
   assert.equal(gaia.parameters.length, 793);
-  assert.equal(gaia.requests.length, 10, 'an identity request and one RQ1 per block');
+  // One identity request and one RQ1 per addressable block: Common, three Tones, four effects,
+  // Arpeggio Common, and the sixteen Arpeggio Pattern notes. SH01_MI.pdf p8.
+  assert.equal(gaia.requests.length, 26, 'an identity request and one RQ1 per block');
   for (const request of gaia.requests) {
     assert.ok(Array.isArray(request.template) && request.template.length,
       `${request.id} has no template, so the whole profile would be refused`);
     assert.equal(request.template[0], 'F0');
     assert.equal(request.template.at(-1), 'F7');
   }
+});
+
+test('every GAIA block request is answered by a dump the profile actually defines', () => {
+  // A request whose response names a dump that is not there makes the engine refuse the WHOLE
+  // profile, silently — the device simply is not in the list. The requests shipped for a long time
+  // with no dumpDefinitions behind them at all, so a reply arrived and nothing decoded it.
+  const gaia = JSON.parse(readText(`${DIRECTORY}roland-gaia-sh01.ceditor-device.json`));
+  const dumps = new Set((gaia.dumpDefinitions ?? []).map((d) => d.id));
+  assert.equal(dumps.size, 25, 'one dump per addressable block');
+
+  const answered = gaia.requests.filter((r) => r.response?.kind === 'bulkDump');
+  assert.equal(answered.length, 25, 'every block request should name its dump');
+  for (const request of answered) {
+    assert.ok(dumps.has(request.response.dump),
+      `${request.id} answers with dump "${request.response.dump}", which the profile does not define`);
+  }
+});
+
+test('the GAIA dumps cover every parameter that has an address', () => {
+  // 792 of the 793: master.volume is a CC with no SysEx address, so no dump can carry it. A
+  // parameter silently missing from every layout is a control a received patch would not fill.
+  const gaia = JSON.parse(readText(`${DIRECTORY}roland-gaia-sh01.ceditor-device.json`));
+  const mapped = new Set((gaia.dumpDefinitions ?? []).flatMap((d) => d.mappings.map((m) => m.parameter)));
+  const addressed = gaia.parameters.filter((p) => typeof p.address === 'string' && p.address.trim());
+  const missing = addressed.filter((p) => !mapped.has(p.id)).map((p) => p.id);
+  assert.deepEqual(missing, [], `addressed parameters no dump carries: ${missing.slice(0, 5).join(', ')}`);
+  assert.equal(mapped.size, 792);
 });
 
 test('a profile identifies an instrument, not a firmware version', () => {

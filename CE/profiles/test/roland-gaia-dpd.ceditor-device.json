@@ -1885,5 +1885,57 @@
       "controller": 7,
       "value": "$encodedValue"
     }
-  ]
+  ],
+  "presets": {
+    "banks": [
+      {
+        "id": "user",
+        "label": "User Patch",
+        "role": "user",
+        "writable": true,
+        "startSlot": 0,
+        "slotCount": 64,
+        "programBase": 0,
+        "bankMsb": 87,
+        "bankLsb": 0,
+        "note": "MIDI Implementation p6, Bank Select table. No patch NAMES here: the manual lists the banks and their program ranges and never prints the factory names, so none are invented — a catalogue of plausible-looking ones would put confidently wrong titles on all 64 preset slots. The front panel numbers each bank A-1..H-8 (eight groups of eight), which is a display convention over the same program numbers rather than a second address, so it is not modelled as one."
+      },
+      {
+        "id": "usb",
+        "label": "USB Memory Patch",
+        "role": "user",
+        "writable": true,
+        "startSlot": 64,
+        "slotCount": 64,
+        "programBase": 0,
+        "bankMsb": 87,
+        "bankLsb": 32
+      },
+      {
+        "id": "preset",
+        "label": "Preset Patch",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 128,
+        "slotCount": 64,
+        "programBase": 0,
+        "bankMsb": 87,
+        "bankLsb": 64
+      },
+      {
+        "id": "preset-pcm",
+        "label": "Preset PCM Patch",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 192,
+        "slotCount": 8,
+        "programBase": 0,
+        "bankMsb": 88,
+        "bankLsb": 64
+      }
+    ],
+    "recall": {
+      "kind": "bankPc"
+    }
+  }
 }
