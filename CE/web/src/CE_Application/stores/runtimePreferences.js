@@ -11,7 +11,16 @@ export const DEFAULT_GENERAL_SETTINGS = {
   showGuides: true,
   showDistances: true,
   showPreviewSelectionRing: true,
-  foldSceneryInEditor: false,
+  // ON. It shipped off while the fold was new and its correctness rested on an argument rather than
+  // on tests: a scripted panel folded nothing at all, and the editor's hover-hoisting had never been
+  // driven by anything but a person. Both of those are now pinned — sceneryScripts.test.js for the
+  // script case, sceneryFold.test.js for "the folded panel paints what the unfolded one paints", and
+  // a browser check that bakes a real ground in a real Chromium.
+  //
+  // What it buys, measured on the panels in this repo: the AN1x renders 492 items instead of 783,
+  // the GAIA 237 instead of 413. Preview has always folded, so leaving this off also meant the
+  // editor and the preview were doing different work on the same panel.
+  foldSceneryInEditor: true,
   insertOffset: 20,
   duplicateOffset: 20,
   keyboardNudgeSmall: 1,

@@ -26,6 +26,8 @@ import { planSceneryFold } from '../src/CE_Application/utils/sceneryModel.js';
 import {
   clearScriptTouchedControls, scriptTouchedControlIds,
 } from '../src/CE_Application/stores/scriptTouchedControls.js';
+import { DEFAULT_GENERAL_SETTINGS } from '../src/CE_Application/stores/runtimePreferences.js';
+import { normalizeGeneralSettings } from '../src/CE_Application/stores/appSettingsSchema.js';
 
 const at = (control, x, y, width, height) => {
   Object.assign(control._children.Transform, { x, y, width, height });
@@ -126,4 +128,19 @@ test('a scripted panel folds — carrying a script is no longer a veto', () => {
   const body = renderPanel(panel);
   assert.ok(body.includes('scenery-ground'), 'a scripted panel refused to fold');
   assert.ok(body.includes('OSCILLATOR'), 'the folded scripted panel lost its labels');
+});
+
+test('folding is on by default, so the editor and the preview do the same work', () => {
+  // It shipped off while the fold's correctness was an argument rather than a set of tests. Both
+  // halves of that argument are pinned now — this file for "the folded panel paints what the
+  // unfolded one paints", sceneryScripts.test.js for the scripted case — and preview has always
+  // folded unconditionally, so leaving the editor off meant the two rendered the same panel by
+  // different routes. The one place a difference would show is the one nobody re-checks.
+  assert.equal(DEFAULT_GENERAL_SETTINGS.foldSceneryInEditor, true);
+});
+
+test('a stored preference still wins over the default, both ways', () => {
+  // Flipping a default must not take the setting away from anyone who had chosen the other one.
+  assert.equal(normalizeGeneralSettings({ foldSceneryInEditor: false }).foldSceneryInEditor, false);
+  assert.equal(normalizeGeneralSettings({ foldSceneryInEditor: true }).foldSceneryInEditor, true);
 });

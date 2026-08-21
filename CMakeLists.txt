@@ -10,6 +10,20 @@ set(CE_ROOT "${CMAKE_SOURCE_DIR}/CE")
 enable_testing()
 option(CEDITOR_DEV_MODE "Load the frontend from the Vite dev server" ON)
 
+# The GUI app, the standalone player and the VST are Windows-only in fact rather
+# than by policy: they embed the WebView2 SDK (CE/thirdparty/webview2, a Windows
+# NuGet package) and they need a native juceaide to bake BinaryData. The TESTS
+# need neither, so they are always configured and the app is not.
+#
+# Turn it on elsewhere and you will get the missing-helper error below, which is
+# then telling you something true. `cmake -B build -DCEDITOR_BUILD_APP=ON`.
+if(WIN32)
+    set(CEDITOR_BUILD_APP_DEFAULT ON)
+else()
+    set(CEDITOR_BUILD_APP_DEFAULT OFF)
+endif()
+option(CEDITOR_BUILD_APP "Build the GUI app, the standalone player and the VST (needs Windows: WebView2 + a native juceaide)" ${CEDITOR_BUILD_APP_DEFAULT})
+
 # JUCE 8.0.7 from local install
 #
 # The install is vendored in three parts: headers and module sources under
@@ -38,7 +52,16 @@ foreach(helper IN LISTS JUCE_REQUIRED_HELPERS)
     endif()
 endforeach()
 
-if(JUCE_MISSING_HELPERS)
+# The helpers are needed to BUILD THE APP, and only then: juceaide is what
+# juce_add_binary_data, the generated JuceHeader and the plugin bundles invoke.
+# A test target is a plain add_executable linking juce_core, and never calls it.
+#
+# This used to be an unconditional FATAL_ERROR, which meant the whole project —
+# tests included — refused to configure anywhere but Windows, because the
+# vendored helpers are .exe. That was a guard written for one failure standing
+# in front of a build that has nothing to do with it. The 13 test executables
+# compile and pass on Linux; they had simply never been run.
+if(JUCE_MISSING_HELPERS AND CEDITOR_BUILD_APP)
     string(REPLACE ";" "\n" JUCE_MISSING_HELPERS_TEXT "${JUCE_MISSING_HELPERS}")
     message(FATAL_ERROR
         "The vendored JUCE 8.0.7 install is missing its helper executables:\n"
@@ -54,222 +77,247 @@ endif()
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/JUCE/lib/cmake/JUCE-8.0.7")
 find_package(JUCE CONFIG REQUIRED)
 
-# --- WebView2 SDK (from NuGet package in CE/thirdparty/) ---
-set(WEBVIEW2_DIR "${CE_ROOT}/thirdparty/webview2/build/native")
-set(WEBVIEW2_INCLUDE "${WEBVIEW2_DIR}/include")
-set(WEBVIEW2_LIB_DIR "${WEBVIEW2_DIR}/x64")
+# ------------------------------------------------------------------ the app, the player, the VST
+# Everything from here to the tests needs WebView2 and a native juceaide. See CEDITOR_BUILD_APP.
+if(CEDITOR_BUILD_APP)
+    # --- WebView2 SDK (from NuGet package in CE/thirdparty/) ---
+    set(WEBVIEW2_DIR "${CE_ROOT}/thirdparty/webview2/build/native")
+    set(WEBVIEW2_INCLUDE "${WEBVIEW2_DIR}/include")
+    set(WEBVIEW2_LIB_DIR "${WEBVIEW2_DIR}/x64")
 
-# --- Binary resources (icon etc.) ---
-juce_add_binary_data(CEditorData
-    HEADER_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/BinaryData"
-    SOURCES
-        "${CE_ROOT}/include/MainApplication/logo.png"
-)
+    # --- Binary resources (icon etc.) ---
+    juce_add_binary_data(CEditorData
+        HEADER_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/BinaryData"
+        SOURCES
+            "${CE_ROOT}/include/MainApplication/logo.png"
+    )
 
-# --- Player web bundle embedded into the player/plugin (self-contained, host-path-independent) ---
-# The player and the VST3 serve player.html + assets from this BinaryData, so the WebView paints
-# regardless of where the host loads the binary from (fixes blank UI in a DAW).
-file(GLOB_RECURSE PLAYER_WEB_DIST CONFIGURE_DEPENDS "${CE_ROOT}/web/dist/*")
-juce_add_binary_data(PlayerWebData
-    NAMESPACE PlayerWebData
-    HEADER_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/PlayerWebData"
-    SOURCES ${PLAYER_WEB_DIST}
-)
+    # --- Player web bundle embedded into the player/plugin (self-contained, host-path-independent) ---
+    # The player and the VST3 serve player.html + assets from this BinaryData, so the WebView paints
+    # regardless of where the host loads the binary from (fixes blank UI in a DAW).
+    file(GLOB_RECURSE PLAYER_WEB_DIST CONFIGURE_DEPENDS "${CE_ROOT}/web/dist/*")
+    juce_add_binary_data(PlayerWebData
+        NAMESPACE PlayerWebData
+        HEADER_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/PlayerWebData"
+        SOURCES ${PLAYER_WEB_DIST}
+    )
 
-# --- Standalone GUI app ---
-juce_add_gui_app(CEditor
-    PRODUCT_NAME "CEditor"
-    COMPANY_NAME "Tedjuh-inc"
-    ICON_BIG   "${CE_ROOT}/include/MainApplication/logo.png"
-    ICON_SMALL "${CE_ROOT}/include/MainApplication/logo.png"
-)
+    # --- Standalone GUI app ---
+    juce_add_gui_app(CEditor
+        PRODUCT_NAME "CEditor"
+        COMPANY_NAME "Tedjuh-inc"
+        ICON_BIG   "${CE_ROOT}/include/MainApplication/logo.png"
+        ICON_SMALL "${CE_ROOT}/include/MainApplication/logo.png"
+    )
 
-target_sources(CEditor PRIVATE
-    "${CE_ROOT}/src/Main.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
-    "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
-    "${CE_ROOT}/src/WebViewHost.cpp"
-    "${CE_ROOT}/src/ValueTreeBridge.cpp"
-    "${CE_ROOT}/src/ValueTreeBridgeHandlers.cpp"
-    "${CE_ROOT}/src/ValueTreeBridgeState.cpp"
-)
+    target_sources(CEditor PRIVATE
+        "${CE_ROOT}/src/Main.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
+        "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
+        "${CE_ROOT}/src/WebViewHost.cpp"
+        "${CE_ROOT}/src/ValueTreeBridge.cpp"
+        "${CE_ROOT}/src/ValueTreeBridgeHandlers.cpp"
+        "${CE_ROOT}/src/ValueTreeBridgeState.cpp"
+    )
 
-target_compile_definitions(CEditor PRIVATE
-    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
-    JUCE_WEB_BROWSER=1
-    JUCE_USE_WIN_WEBVIEW2=1
-    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
-    # Dev mode: load from Vite dev server (http://localhost:5173)
-    # Set to 0 for production builds that serve files from the installed bundle
-    CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
-)
+    target_compile_definitions(CEditor PRIVATE
+        CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+        JUCE_WEB_BROWSER=1
+        JUCE_USE_WIN_WEBVIEW2=1
+        JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
+        # Dev mode: load from Vite dev server (http://localhost:5173)
+        # Set to 0 for production builds that serve files from the installed bundle
+        CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
+    )
 
-target_include_directories(CEditor PRIVATE
-    "${WEBVIEW2_INCLUDE}"
-    "${CMAKE_BINARY_DIR}/BinaryData"
-)
+    target_include_directories(CEditor PRIVATE
+        "${WEBVIEW2_INCLUDE}"
+        "${CMAKE_BINARY_DIR}/BinaryData"
+    )
 
-target_link_libraries(CEditor PRIVATE
-    juce::juce_core
-    juce::juce_audio_basics
-    juce::juce_audio_devices
-    juce::juce_midi_ci
-    juce::juce_data_structures
-    juce::juce_events
-    juce::juce_graphics
-    juce::juce_gui_basics
-    juce::juce_gui_extra
-    "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
-    dwmapi
-    CEditorData
-)
+    target_link_libraries(CEditor PRIVATE
+        juce::juce_core
+        juce::juce_audio_basics
+        juce::juce_audio_devices
+        juce::juce_midi_ci
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
+        dwmapi
+        CEditorData
+    )
 
-# --- Standalone player (Phase B4): runs an exported panel, no editor ---
-juce_add_gui_app(CEditorPlayer
-    PRODUCT_NAME "CEditor Player"
-    COMPANY_NAME "Tedjuh-inc"
-)
+    # --- Standalone player (Phase B4): runs an exported panel, no editor ---
+    juce_add_gui_app(CEditorPlayer
+        PRODUCT_NAME "CEditor Player"
+        COMPANY_NAME "Tedjuh-inc"
+    )
 
-target_sources(CEditorPlayer PRIVATE
-    "${CE_ROOT}/src/Player/PlayerMain.cpp"
-    "${CE_ROOT}/src/Player/PlayerHost.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
-    "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
-)
+    target_sources(CEditorPlayer PRIVATE
+        "${CE_ROOT}/src/Player/PlayerMain.cpp"
+        "${CE_ROOT}/src/Player/PlayerHost.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
+        "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
+    )
 
-target_compile_definitions(CEditorPlayer PRIVATE
-    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
-    JUCE_WEB_BROWSER=1
-    JUCE_USE_WIN_WEBVIEW2=1
-    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
-    CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
-)
+    target_compile_definitions(CEditorPlayer PRIVATE
+        CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+        JUCE_WEB_BROWSER=1
+        JUCE_USE_WIN_WEBVIEW2=1
+        JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
+        CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
+    )
 
-target_include_directories(CEditorPlayer PRIVATE
-    "${WEBVIEW2_INCLUDE}"
-    "${CE_ROOT}/src"
-    "${CMAKE_BINARY_DIR}/PlayerWebData"
-)
+    target_include_directories(CEditorPlayer PRIVATE
+        "${WEBVIEW2_INCLUDE}"
+        "${CE_ROOT}/src"
+        "${CMAKE_BINARY_DIR}/PlayerWebData"
+    )
 
-target_link_libraries(CEditorPlayer PRIVATE
-    juce::juce_core
-    juce::juce_audio_basics
-    juce::juce_audio_devices
-    juce::juce_midi_ci
-    juce::juce_data_structures
-    juce::juce_events
-    juce::juce_graphics
-    juce::juce_gui_basics
-    juce::juce_gui_extra
-    "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
-    dwmapi
-    PlayerWebData
-)
+    target_link_libraries(CEditorPlayer PRIVATE
+        juce::juce_core
+        juce::juce_audio_basics
+        juce::juce_audio_devices
+        juce::juce_midi_ci
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
+        dwmapi
+        PlayerWebData
+    )
 
-# --- Player as a plugin (Phase C/D): VST3 wrapping the same PlayerHost runtime ---
-# Phase D parameterizes the per-panel identity + panel via cache vars so the generator can
-# stamp out unique-per-panel binaries (the Ctrlr fix: distinct PLUGIN_CODE/name -> distinct FUID).
-set(CE_VST_PRODUCT_NAME "CEditor Player VST" CACHE STRING "Per-panel plugin product name")
-set(CE_VST_PLUGIN_CODE  "Cep1"               CACHE STRING "Per-panel 4-char plugin code")
-set(CE_VST_COMPANY_NAME "Tedjuh-inc"         CACHE STRING "Plugin vendor / company name")
-set(CE_VST_MFR_CODE     "Tdjh"               CACHE STRING "4-char plugin manufacturer code")
-set(CE_VST_VERSION      "1.0.0"              CACHE STRING "Plugin version string")
-# Empty by default: the export pipeline always passes the real panel via -DCE_VST_PANEL_PATH.
-# A plugin built without it loads no panel (blank player) — worth saying so, because a manual
-# build that produces a blank plugin is otherwise baffling.
-#
-# But the installer build ALWAYS has an empty panel path, by design: it ships the generic player
-# and the per-panel plugins are produced later by the export pipeline. Warning there fired on
-# every single packaging run about a state that was entirely correct, which is how a warning
-# stops being read. So the installer passes -DCE_VST_GENERIC_PLAYER=ON to say "this one is
-# meant to be panel-less", and gets a status line instead. A hand build still gets the warning.
-set(CE_VST_PANEL_PATH   ""                   CACHE STRING "Panel document the plugin loads")
-option(CE_VST_GENERIC_PLAYER "Building the panel-less player deliberately (suppresses the no-panel warning)" OFF)
-if (CE_VST_PANEL_PATH STREQUAL "")
-    if (CE_VST_GENERIC_PLAYER)
-        message(STATUS "CEditorPlayerVST: generic player build, no panel baked in (as intended).")
-    else()
-        message(WARNING "CE_VST_PANEL_PATH is not set — CEditorPlayerVST will build but load no panel. "
-                        "Pass -DCE_VST_PANEL_PATH=<your.cepanel> for a usable plugin (the export pipeline does this automatically).")
+    # --- Player as a plugin (Phase C/D): VST3 wrapping the same PlayerHost runtime ---
+    # Phase D parameterizes the per-panel identity + panel via cache vars so the generator can
+    # stamp out unique-per-panel binaries (the Ctrlr fix: distinct PLUGIN_CODE/name -> distinct FUID).
+    set(CE_VST_PRODUCT_NAME "CEditor Player VST" CACHE STRING "Per-panel plugin product name")
+    set(CE_VST_PLUGIN_CODE  "Cep1"               CACHE STRING "Per-panel 4-char plugin code")
+    set(CE_VST_COMPANY_NAME "Tedjuh-inc"         CACHE STRING "Plugin vendor / company name")
+    set(CE_VST_MFR_CODE     "Tdjh"               CACHE STRING "4-char plugin manufacturer code")
+    set(CE_VST_VERSION      "1.0.0"              CACHE STRING "Plugin version string")
+    # Empty by default: the export pipeline always passes the real panel via -DCE_VST_PANEL_PATH.
+    # A plugin built without it loads no panel (blank player) — worth saying so, because a manual
+    # build that produces a blank plugin is otherwise baffling.
+    #
+    # But the installer build ALWAYS has an empty panel path, by design: it ships the generic player
+    # and the per-panel plugins are produced later by the export pipeline. Warning there fired on
+    # every single packaging run about a state that was entirely correct, which is how a warning
+    # stops being read. So the installer passes -DCE_VST_GENERIC_PLAYER=ON to say "this one is
+    # meant to be panel-less", and gets a status line instead. A hand build still gets the warning.
+    set(CE_VST_PANEL_PATH   ""                   CACHE STRING "Panel document the plugin loads")
+    option(CE_VST_GENERIC_PLAYER "Building the panel-less player deliberately (suppresses the no-panel warning)" OFF)
+    if (CE_VST_PANEL_PATH STREQUAL "")
+        if (CE_VST_GENERIC_PLAYER)
+            message(STATUS "CEditorPlayerVST: generic player build, no panel baked in (as intended).")
+        else()
+            message(WARNING "CE_VST_PANEL_PATH is not set — CEditorPlayerVST will build but load no panel. "
+                            "Pass -DCE_VST_PANEL_PATH=<your.cepanel> for a usable plugin (the export pipeline does this automatically).")
+        endif()
     endif()
+
+    juce_add_plugin(CEditorPlayerVST
+        PRODUCT_NAME "${CE_VST_PRODUCT_NAME}"
+        COMPANY_NAME "${CE_VST_COMPANY_NAME}"
+        PLUGIN_MANUFACTURER_CODE "${CE_VST_MFR_CODE}"
+        PLUGIN_CODE "${CE_VST_PLUGIN_CODE}"
+        VERSION "${CE_VST_VERSION}"
+        FORMATS VST3 Standalone
+        IS_SYNTH FALSE
+        NEEDS_MIDI_INPUT TRUE
+        NEEDS_MIDI_OUTPUT TRUE
+        VST3_CATEGORIES Fx
+        COPY_PLUGIN_AFTER_BUILD FALSE
+    )
+
+    target_sources(CEditorPlayerVST PRIVATE
+        "${CE_ROOT}/src/Player/PluginProcessor.cpp"
+        "${CE_ROOT}/src/Player/PlayerHost.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
+        "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
+        "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
+    )
+
+    target_compile_definitions(CEditorPlayerVST PUBLIC
+        JUCE_WEB_BROWSER=1
+        JUCE_USE_WIN_WEBVIEW2=1
+        JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
+        JUCE_VST3_CAN_REPLACE_VST2=0
+        JUCE_VST3_EMULATE_MIDI_CC_WITH_PARAMETERS=0
+        CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+        CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
+        CEDITOR_PLAYER_PANEL_PATH="${CE_VST_PANEL_PATH}"
+    )
+
+    target_include_directories(CEditorPlayerVST PRIVATE
+        "${WEBVIEW2_INCLUDE}"
+        "${CE_ROOT}/src"
+        "${CMAKE_BINARY_DIR}/PlayerWebData"
+    )
+
+    target_link_libraries(CEditorPlayerVST PRIVATE
+        juce::juce_audio_utils
+        juce::juce_audio_devices
+        juce::juce_core
+        juce::juce_midi_ci
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
+        dwmapi
+        PlayerWebData
+    )
 endif()
 
-juce_add_plugin(CEditorPlayerVST
-    PRODUCT_NAME "${CE_VST_PRODUCT_NAME}"
-    COMPANY_NAME "${CE_VST_COMPANY_NAME}"
-    PLUGIN_MANUFACTURER_CODE "${CE_VST_MFR_CODE}"
-    PLUGIN_CODE "${CE_VST_PLUGIN_CODE}"
-    VERSION "${CE_VST_VERSION}"
-    FORMATS VST3 Standalone
-    IS_SYNTH FALSE
-    NEEDS_MIDI_INPUT TRUE
-    NEEDS_MIDI_OUTPUT TRUE
-    VST3_CATEGORIES Fx
-    COPY_PLUGIN_AFTER_BUILD FALSE
-)
+# ----------------------------------------------------------------------------------- the tests
+# Always configured, on every platform. These are plain executables over juce_core and the CE
+# sources; none of them touches WebView2, BinaryData or juceaide.
+#
+# WHAT A juce_core TEST NEEDS OFF. On Linux juce_core pulls <curl/curl.h> and the browser module
+# wants webkit2gtk; a console test wants neither, and requiring the dev packages for them would put
+# a system dependency in front of `ctest` for no reason. juce_audio_devices does genuinely need
+# ALSA headers (libasound2-dev), and only CEditorDeviceProfileTests links it.
+#
+# Applied to every test target through a helper rather than repeated per target, so a test added
+# next year does not rediscover this one platform at a time.
+function(ce_configure_test target)
+    target_compile_features(${target} PRIVATE cxx_std_23)
+    target_compile_definitions(${target} PRIVATE
+        JUCE_USE_CURL=0
+        JUCE_WEB_BROWSER=0
+        JUCE_STANDALONE_APPLICATION=1
+    )
+endfunction()
 
-target_sources(CEditorPlayerVST PRIVATE
-    "${CE_ROOT}/src/Player/PluginProcessor.cpp"
-    "${CE_ROOT}/src/Player/PlayerHost.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
-    "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
-    "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
-)
-
-target_compile_definitions(CEditorPlayerVST PUBLIC
-    JUCE_WEB_BROWSER=1
-    JUCE_USE_WIN_WEBVIEW2=1
-    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
-    JUCE_VST3_CAN_REPLACE_VST2=0
-    JUCE_VST3_EMULATE_MIDI_CC_WITH_PARAMETERS=0
-    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
-    CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
-    CEDITOR_PLAYER_PANEL_PATH="${CE_VST_PANEL_PATH}"
-)
-
-target_include_directories(CEditorPlayerVST PRIVATE
-    "${WEBVIEW2_INCLUDE}"
-    "${CE_ROOT}/src"
-    "${CMAKE_BINARY_DIR}/PlayerWebData"
-)
-
-target_link_libraries(CEditorPlayerVST PRIVATE
-    juce::juce_audio_utils
-    juce::juce_audio_devices
-    juce::juce_core
-    juce::juce_midi_ci
-    juce::juce_data_structures
-    juce::juce_events
-    juce::juce_graphics
-    juce::juce_gui_basics
-    juce::juce_gui_extra
-    "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
-    dwmapi
-    PlayerWebData
-)
 
 add_executable(CEditorDeviceProfileTests
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
@@ -300,6 +348,7 @@ target_link_libraries(CEditorDeviceProfileTests PRIVATE
 )
 
 add_test(NAME DeviceProfileEngine COMMAND CEditorDeviceProfileTests)
+ce_configure_test(CEditorDeviceProfileTests)
 
 # --- Export pipeline: compile-per-panel identity (Phase D1) ---
 add_executable(CEditorExportIdentityTests
@@ -315,6 +364,7 @@ target_link_libraries(CEditorExportIdentityTests PRIVATE
 )
 
 add_test(NAME PanelExportIdentity COMMAND CEditorExportIdentityTests)
+ce_configure_test(CEditorExportIdentityTests)
 
 # --- Window-closed script runtime (M2): C++ panel value model (full mirror) ---
 # Pure juce_core; verifies PanelValueModel.h resolves get/set paths identically to the WebView JS
@@ -334,6 +384,7 @@ target_link_libraries(CEditorPanelValueTests PRIVATE
 )
 
 add_test(NAME PanelValueModel COMMAND CEditorPanelValueTests)
+ce_configure_test(CEditorPanelValueTests)
 
 # --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
 # Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.
@@ -350,6 +401,7 @@ target_include_directories(CEditorCtrl49ProtocolTests PRIVATE
 )
 
 add_test(NAME Ctrl49Protocol COMMAND CEditorCtrl49ProtocolTests)
+ce_configure_test(CEditorCtrl49ProtocolTests)
 
 # CTRL49 reducer + session-sequence tests. The reducer cases are the PowerShell unified
 # demo's C# self-test ported one-for-one. Still hardware-free (no WinMM / KSPROPERTY).
@@ -367,6 +419,7 @@ target_include_directories(CEditorCtrl49ReducerTests PRIVATE
 )
 
 add_test(NAME Ctrl49Reducer COMMAND CEditorCtrl49ReducerTests)
+ce_configure_test(CEditorCtrl49ReducerTests)
 
 # CTRL49 preset selection primitive: Bank Select + Program Change bytes + browser index math.
 add_executable(CEditorCtrl49PresetTests
@@ -376,6 +429,7 @@ add_executable(CEditorCtrl49PresetTests
 target_compile_features(CEditorCtrl49PresetTests PRIVATE cxx_std_23)
 target_include_directories(CEditorCtrl49PresetTests PRIVATE "${CE_ROOT}/src")
 add_test(NAME Ctrl49Preset COMMAND CEditorCtrl49PresetTests)
+ce_configure_test(CEditorCtrl49PresetTests)
 
 # CTRL49 Phase-4 seam: device-profile intent compiler turns an encoder value into the
 # exact synth bytes. Loads the shipped GAIA SH-01 profile; no hardware.
@@ -390,6 +444,7 @@ target_compile_definitions(CEditorCtrl49SynthCompileTests PRIVATE
 target_include_directories(CEditorCtrl49SynthCompileTests PRIVATE "${CE_ROOT}/src")
 target_link_libraries(CEditorCtrl49SynthCompileTests PRIVATE juce::juce_core)
 add_test(NAME Ctrl49SynthCompile COMMAND CEditorCtrl49SynthCompileTests)
+ce_configure_test(CEditorCtrl49SynthCompileTests)
 
 # CTRL49 Phase-5 assignment model: loads the shipped GAIA assignment and verifies every
 # bound parameter on every page compiles through the named profile. No hardware.
@@ -405,6 +460,7 @@ target_compile_definitions(CEditorCtrl49AssignmentTests PRIVATE
 target_include_directories(CEditorCtrl49AssignmentTests PRIVATE "${CE_ROOT}/src")
 target_link_libraries(CEditorCtrl49AssignmentTests PRIVATE juce::juce_core)
 add_test(NAME Ctrl49Assignment COMMAND CEditorCtrl49AssignmentTests)
+ce_configure_test(CEditorCtrl49AssignmentTests)
 
 # CTRL49 Phase-7 multi-synth: one assignment, pages targeting different synths; each page's
 # params compile through its own profile to the right per-device bytes. No hardware.
@@ -420,6 +476,7 @@ target_compile_definitions(CEditorCtrl49MultiSynthTests PRIVATE
 target_include_directories(CEditorCtrl49MultiSynthTests PRIVATE "${CE_ROOT}/src")
 target_link_libraries(CEditorCtrl49MultiSynthTests PRIVATE juce::juce_core)
 add_test(NAME Ctrl49MultiSynth COMMAND CEditorCtrl49MultiSynthTests)
+ce_configure_test(CEditorCtrl49MultiSynthTests)
 
 # CTRL49 preset bank: loads the sample bank, verifies patch -> Bank Select + Program Change
 # bytes across banks. No hardware.
@@ -435,6 +492,7 @@ target_compile_definitions(CEditorCtrl49PresetBankTests PRIVATE
 target_include_directories(CEditorCtrl49PresetBankTests PRIVATE "${CE_ROOT}/src")
 target_link_libraries(CEditorCtrl49PresetBankTests PRIVATE juce::juce_core)
 add_test(NAME Ctrl49PresetBank COMMAND CEditorCtrl49PresetBankTests)
+ce_configure_test(CEditorCtrl49PresetBankTests)
 
 # CTRL49 bare bridge demonstrator (Phase 2 end state). Windows-only transports; the
 # executable itself compiles everywhere (guarded), but the WinMM/KSPROPERTY backends are
@@ -621,6 +679,7 @@ if (CEDITOR_SCRIPTING)
         target_link_libraries(CEditorPythonScriptTests PRIVATE ceditor_scripting juce::juce_core)
         target_include_directories(CEditorPythonScriptTests PRIVATE "${CE_ROOT}/src")
         add_test(NAME PythonScriptEngine COMMAND CEditorPythonScriptTests)
+ce_configure_test(CEditorPythonScriptTests)
         # The embedded interpreter needs a stdlib home. Exports stage a PythonRuntime folder next to
         # the plugin; for the bare test exe, point CEDITOR_PYTHONHOME at the dev Python found above
         # (its runtime-DLL dir is the install root on Windows).
@@ -645,12 +704,14 @@ if (CEDITOR_SCRIPTING)
     target_link_libraries(CEditorScriptingTests PRIVATE ceditor_scripting juce::juce_core)
     target_include_directories(CEditorScriptingTests PRIVATE "${CE_ROOT}/src")
     add_test(NAME ScriptRuntime COMMAND CEditorScriptingTests)
+ce_configure_test(CEditorScriptingTests)
 
     # Window-closed integration: panel -> gathered scripts -> runtime -> dispatch -> API callbacks.
     add_executable(CEditorPlayerScriptTests "${CE_ROOT}/tests/PlayerScriptIntegrationTests.cpp")
     target_link_libraries(CEditorPlayerScriptTests PRIVATE ceditor_scripting juce::juce_core)
     target_include_directories(CEditorPlayerScriptTests PRIVATE "${CE_ROOT}/src")
     add_test(NAME PlayerScriptIntegration COMMAND CEditorPlayerScriptTests)
+ce_configure_test(CEditorPlayerScriptTests)
 
     # Window-closed scripts in the exported plugin: link the runtime into the VST/standalone player.
     # Gated so the default (scripting OFF) player build is unchanged; PluginProcessor.h guards its
@@ -694,22 +755,25 @@ endif()
 # Turn it off with -DCEDITOR_VALUE_LAYER=OFF if you ever need the old parameter-less plugin.
 option(CEDITOR_VALUE_LAYER "Expose panel controls as host-automatable parameters + persist DAW state (M2)" ON)
 
-if (CEDITOR_VALUE_LAYER)
+if (CEDITOR_VALUE_LAYER AND TARGET CEditorPlayerVST)
     target_compile_definitions(CEditorPlayerVST PUBLIC CEDITOR_VALUE_LAYER=1)
     message(STATUS "CEditor: value/parameter layer ENABLED for CEditorPlayerVST (M2 — APVTS + state).")
 endif()
 
-install(TARGETS CEditor
-    RUNTIME DESTINATION "."
-    RESOURCE DESTINATION "."
-)
-
-if (EXISTS "${CE_ROOT}/web/dist")
-    install(DIRECTORY "${CE_ROOT}/web/dist/"
-        DESTINATION "web/dist"
+# Installing means installing the APP, which only exists when it was built.
+if (TARGET CEditor)
+    install(TARGETS CEditor
+        RUNTIME DESTINATION "."
+        RESOURCE DESTINATION "."
     )
-else()
-    message(WARNING "CE/web/dist was not found. Run `npm run build` in CE/web before `cmake --install`.")
+
+    if (EXISTS "${CE_ROOT}/web/dist")
+        install(DIRECTORY "${CE_ROOT}/web/dist/"
+            DESTINATION "web/dist"
+        )
+    else()
+        message(WARNING "CE/web/dist was not found. Run `npm run build` in CE/web before `cmake --install`.")
+    endif()
 endif()
 
 # JUCE handles the entry point via START_JUCE_APPLICATION
