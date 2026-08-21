@@ -31,7 +31,7 @@
 import { sortControlsForRender } from './controlOrder.js';
 import { layerNames, normalizeLayerName, normalizePanelLayers } from './panelLayers.js';
 import { compileScenery, sceneryLayerIsCompiled } from './sceneryCompile.js';
-import { panelAllowsFold, planSceneryFold } from './sceneryModel.js';
+import { planSceneryFold } from './sceneryModel.js';
 
 // THE ITEM WRAPPERS ARE REUSED, and this is a performance contract rather than tidiness.
 //
@@ -93,12 +93,12 @@ function groundItem(layer, controls) {
  * the order planSceneryFold's rule is stated against: it folds a control only when nothing already
  * live overlaps it, so everything left live belongs on top of everything folded.
  */
-function pushLayerControls(items, layerName, controls, folding) {
+function pushLayerControls(items, layerName, controls, folding, neverFold) {
   if (!folding) {
     for (const control of controls) items.push(controlItem(control));
     return;
   }
-  const { ground, live } = planSceneryFold(controls);
+  const { ground, live } = planSceneryFold(controls, neverFold);
   if (ground.length > 0) items.push(groundItem(layerName, ground));
   for (const control of live) items.push(controlItem(control));
 }
@@ -107,13 +107,14 @@ function pushLayerControls(items, layerName, controls, folding) {
  * @param panel the panel document
  * @param preview true in preview/export, where scenery compiles whether or not the layer is locked
  * @param fold whether to fold inert controls into a frozen ground (the editor's runtime preference;
- *        preview passes true). A panel carrying scripts never folds — see panelAllowsFold.
+ *        preview passes true)
+ * @param neverFold ids that must stay live whatever the component model says — the controls a
+ *        script has written to. See stores/scriptTouchedControls.js.
  * @returns {{ items: Array, scenery: Map }} items are
  *          `{ type: 'scenery' | 'ground' | 'control', ... }`;
  *          `scenery` maps layer name -> { folded, refusals } for the dock to report.
  */
-export function buildSceneryRenderPlan(panel, { preview = false, fold = false } = {}) {
-  const folding = fold && panelAllowsFold(panel);
+export function buildSceneryRenderPlan(panel, { preview = false, fold = false, neverFold = null } = {}) {
   const layers = normalizePanelLayers(panel?.layers, panel?.controls ?? []);
   const names = layerNames(layers);
   const ordered = sortControlsForRender(panel?.controls ?? [], names);
@@ -136,7 +137,7 @@ export function buildSceneryRenderPlan(panel, { preview = false, fold = false } 
     if (controls.length === 0) continue;
 
     if (!sceneryLayerIsCompiled(layer, { preview })) {
-      pushLayerControls(items, layer.name, controls, folding);
+      pushLayerControls(items, layer.name, controls, fold, neverFold);
       continue;
     }
 
@@ -150,7 +151,7 @@ export function buildSceneryRenderPlan(panel, { preview = false, fold = false } 
     // And it goes through the SAME fold as an ordinary layer, which is the point of doing it here:
     // the refusals are mostly captions, captions are what the ground was built for, and refusing
     // them from the image is not a reason to render 189 of them as components.
-    pushLayerControls(items, layer.name, result.live, folding);
+    pushLayerControls(items, layer.name, result.live, fold, neverFold);
   }
 
   return { items, scenery };

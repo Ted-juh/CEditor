@@ -6,9 +6,14 @@
 // into one node, and "moved them and lost a label" looks exactly like "moved them" until somebody
 // opens the panel and reads it.
 //
-// The lever used to turn folding off is a panel script, because that is a real rule rather than a
-// test hook — panelAllowsFold refuses to fold anything on a scripted panel, since a script can
-// reach any control by id and nothing in its shape says which.
+// The lever used to turn folding off is the script-touched set, because that is a real rule rather
+// than a test hook: a control a script has written to leaves the ground and stays out of it (see
+// stores/scriptTouchedControls.js). Marking every control touched is therefore the same panel with
+// the fold off, rendered through exactly the code path the fold normally takes.
+//
+// It used to be "does this panel carry a script at all", which vetoed the whole panel. That rule is
+// gone — a script write goes through the document and the ground re-bakes, so folding a scripted
+// panel was always correct; sceneryScripts.test.js pins that directly.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,6 +23,9 @@ import { render } from 'svelte/server';
 import PanelPreviewSurface from '../src/CE_Application/editor/PanelPreviewSurface.svelte';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { planSceneryFold } from '../src/CE_Application/utils/sceneryModel.js';
+import {
+  clearScriptTouchedControls, scriptTouchedControlIds,
+} from '../src/CE_Application/stores/scriptTouchedControls.js';
 
 const at = (control, x, y, width, height) => {
   Object.assign(control._children.Transform, { x, y, width, height });
@@ -28,7 +36,7 @@ const at = (control, x, y, width, height) => {
  * A panel with scenery worth folding: a plate, legends clear of everything, a knob, and one legend
  * printed over the knob so the held-back path is exercised too.
  */
-function makePanel({ scripts = [] } = {}) {
+function makePanel() {
   return {
     name: 'fold-specimen',
     width: 400,
@@ -41,8 +49,14 @@ function makePanel({ scripts = [] } = {}) {
       at(createControl('Label', { Core: { id: 'over-knob' }, Text: { content: 'RES' } }), 210, 50, 40, 12),
       at(createControl('Label', { Core: { id: 'footer' }, Text: { content: 'TONE 1' } }), 20, 160, 90, 14),
     ],
-    scripts,
+    scripts: [],
   };
+}
+
+/** Render with every control marked script-touched, which is this panel with nothing folded. */
+function renderUnfolded(panel) {
+  scriptTouchedControlIds.set(new Set(panel.controls.map((c) => c._children.Core.id)));
+  try { return renderPanel(panel); } finally { clearScriptTouchedControls(); }
 }
 
 function paint(body) {
@@ -77,7 +91,7 @@ test('the specimen actually folds, or the comparison below proves nothing', () =
 
 test('a folded panel paints what the unfolded one paints', () => {
   const folded = paint(renderPanel(makePanel()));
-  const unfolded = paint(renderPanel(makePanel({ scripts: [{ id: 's', source: '// anything' }] })));
+  const unfolded = paint(renderUnfolded(makePanel()));
 
   assert.equal(folded, unfolded,
     'folding the scenery changed what the panel paints — a control was lost, duplicated or drawn differently');
@@ -93,13 +107,23 @@ test('every scenery control is still on the page after folding', () => {
   }
 });
 
-test('a scripted panel keeps every control live', () => {
-  const { ground, live } = planSceneryFold(makePanel().controls);
-  assert.ok(ground.length > 0, 'guard: the unscripted specimen should fold');
+test('a script-touched panel keeps every control live, and still paints them', () => {
+  const { ground } = planSceneryFold(makePanel().controls);
+  assert.ok(ground.length > 0, 'guard: the untouched specimen should fold');
 
-  const panel = makePanel({ scripts: [{ id: 's', source: 'ce.ui.setText("heading", "x")' }] });
+  const panel = makePanel();
+  const body = renderUnfolded(panel);
+  assert.ok(!body.includes('scenery-ground'), 'a fully script-touched panel emitted a ground layer');
+  assert.ok(body.includes('OSCILLATOR'), 'the unfolded panel lost its labels');
+});
+
+test('a scripted panel folds — carrying a script is no longer a veto', () => {
+  // The regression this whole change is about. The GAIA panel carries two scripts and lost its
+  // entire fold — 193 Labels and 27 Backgrounds — for scripts that between them name one control.
+  const panel = makePanel();
+  panel.scripts = [{ id: 's', source: 'ce.panel.each(function (n) { log(n); })' }];
+
   const body = renderPanel(panel);
-  assert.ok(!body.includes('scenery-ground'), 'a scripted panel emitted a ground layer');
-  assert.ok(body.includes('OSCILLATOR'), 'the scripted panel lost its labels');
-  assert.equal(live.length + ground.length, panel.controls.length);
+  assert.ok(body.includes('scenery-ground'), 'a scripted panel refused to fold');
+  assert.ok(body.includes('OSCILLATOR'), 'the folded scripted panel lost its labels');
 });

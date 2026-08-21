@@ -12,7 +12,6 @@ import assert from 'node:assert/strict';
 import {
   isScenery,
   isSceneryType,
-  panelAllowsFold,
   planSceneryFold,
   sceneryFingerprint,
   sceneryHoldSet,
@@ -67,11 +66,29 @@ test('a control that grew a section its type never declared is not scenery', () 
   assert.equal(isScenery(label), false, 'a Label carrying DeviceBindings was folded');
 });
 
-test('a panel with scripts folds nothing', () => {
-  // A script reaches any control by id; which ones it touches is not visible in its shape.
-  assert.equal(panelAllowsFold({ scripts: [] }), true);
-  assert.equal(panelAllowsFold({}), true);
-  assert.equal(panelAllowsFold({ scripts: [{ id: 's', source: 'ce.ui.setText("lbl", "x")' }] }), false);
+test('a control a script has written to is kept out of the ground', () => {
+  // Not because folding it would be wrong — a script write goes through the document and the ground
+  // re-bakes, which sceneryScripts.test.js pins — but because an animation writing it sixty times a
+  // second would re-bake the ground sixty times a second. See stores/scriptTouchedControls.js.
+  const a = at(createControl('Label', { Core: { id: 'a' } }), 0, 0, 40, 10);
+  const b = at(createControl('Label', { Core: { id: 'b' } }), 0, 40, 40, 10);
+
+  assert.deepEqual(planSceneryFold([a, b]).ground.map((c) => c._children.Core.id), ['a', 'b']);
+
+  const { ground, live } = planSceneryFold([a, b], new Set(['a']));
+  assert.deepEqual(ground.map((c) => c._children.Core.id), ['b']);
+  assert.deepEqual(live.map((c) => c._children.Core.id), ['a']);
+});
+
+test('a script-touched control blocks what it covers, exactly as a live one does', () => {
+  // It IS a live control now, so the overlap rule has to see it as one: a label printed over it
+  // must stay live too, or it would drop behind it.
+  const touched = at(createControl('Label', { Core: { id: 'plate' } }), 0, 0, 100, 100);
+  const over = at(createControl('Label', { Core: { id: 'over' } }), 10, 10, 40, 10);
+
+  const { ground, live } = planSceneryFold([touched, over], new Set(['plate']));
+  assert.deepEqual(ground.map((c) => c._children.Core.id), []);
+  assert.deepEqual(live.map((c) => c._children.Core.id), ['plate', 'over']);
 });
 
 test('scenery over a live control it overlaps stays live', () => {

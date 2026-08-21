@@ -22,6 +22,7 @@
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { sceneryHoldSet } from '../utils/sceneryModel.js';
+  import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
   import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
   import { buildSceneryRenderPlan, controlItem } from '../utils/sceneryRenderPlan.js';
@@ -285,7 +286,8 @@
   // the lock has no meaning and holding the DOM elements open would buy nothing. `orderedControls`
   // is untouched, because every other thing in this file that reads it is asking about behaviour
   // rather than about paint.
-  let previewPlan = $derived(buildSceneryRenderPlan(panel, { preview: true, fold: true }));
+  let previewPlan = $derived(buildSceneryRenderPlan(panel,
+    { preview: true, fold: true, neverFold: $scriptTouchedControlIds }));
 
   /**
    * Which folded controls are drawn live over their own ground.

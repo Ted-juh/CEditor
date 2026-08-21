@@ -19,6 +19,7 @@
   import { getControlId, sortControlsForHitTest, sortControlsForRender } from '../utils/controlOrder.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
   import { sceneryHoldSet } from '../utils/sceneryModel.js';
+  import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
   import { buildSceneryRenderPlan, controlItem } from '../utils/sceneryRenderPlan.js';
   import { initialMountCount, nextMountCount, mountIncomplete, scheduleNextSlice } from '../utils/progressiveMount.js';
 
@@ -47,7 +48,8 @@
   // What to paint, in order: controls, plus one image for each locked scenery layer. The decision
   // lives in utils/sceneryRenderPlan.js so the preview surface makes it identically — a panel that
   // changes when you press Preview is worse than one that never compiles at all.
-  let plan = $derived(buildSceneryRenderPlan(panel, { preview: false, fold: $foldSceneryInEditor }));
+  let plan = $derived(buildSceneryRenderPlan(panel,
+    { preview: false, fold: $foldSceneryInEditor, neverFold: $scriptTouchedControlIds }));
   // Children still need the flat control list for snapping, distance guides and hit-testing, and
   // that list must include the folded ones: a control you cannot snap to because it was compiled
   // would be a very confusing kind of invisible.
