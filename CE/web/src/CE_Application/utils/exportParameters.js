@@ -1,4 +1,5 @@
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
+import { canSendMidiControl, isMidiControlBinding, midiControlResolution } from './midiControlBindings.js';
 // exportParameters.js — the host-automatable parameter list a panel exposes (Milestone 2).
 //
 // The exported plugin needs a FIXED, deterministic set of parameters so a DAW can automate them and
@@ -39,6 +40,10 @@ export function normalizeExportParameter(entry) {
     // automation window-closed). Empty when the control isn't bound to a device parameter.
     deviceRole: String(entry?.deviceRole ?? '').trim(),
     deviceParameterId: String(entry?.deviceParameterId ?? '').trim(),
+    // Raw MIDI wire, when the control sends a message rather than driving a profile parameter.
+    // Absent (rather than an empty object) when there is none, so the C++ side's "is there one"
+    // check is the presence of the field.
+    ...(entry?.midiControl ? { midiControl: midiControlDescriptor(entry.midiControl) } : {}),
     // Named-choice export: when 'value', the persisted/automated value is the choice's stable
     // name (choiceValues[i]) rather than its index, so it round-trips even if the visible rows
     // change (cascading lists). 'index' (default) keeps the plain numeric index.
@@ -96,15 +101,63 @@ function selectorChoices(valueSection) {
     }));
 }
 
-// The synth parameter a control is bound to (its first deviceParameter binding), for window-closed MIDI.
+// The synth parameter a control is bound to (its first deviceParameter binding), for window-closed
+// MIDI — or, failing that, the RAW MIDI message it sends.
+//
+// WHY BOTH. The exported plugin's automation loop used to skip any parameter with an empty
+// deviceParameterId, which is every control bound to a raw CC, aftertouch, NRPN, RPN or program
+// change. Those controls automated fine in the DAW — the value moved, the session saved it — and
+// sent nothing to the synth with the window closed. Silent, and indistinguishable from a MIDI cable
+// problem.
+//
+// A profile-backed binding still wins when a control has both: it carries the parameter's own
+// range, encoding and send policy, where a raw binding carries three bytes.
 function deviceWireFor(control) {
   const db = control?._children?.DeviceBindings;
   if (db?.enabled === false) return { deviceRole: '', deviceParameterId: '' };
-  const b = (Array.isArray(db?.bindings) ? db.bindings : [])
-    .find((x) => x?.kind === 'deviceParameter' && x?.parameterId);
-  return b
-    ? { deviceRole: String(b.deviceRole || DEFAULT_DEVICE_ROLE), deviceParameterId: String(b.parameterId) }
-    : { deviceRole: '', deviceParameterId: '' };
+  const bindings = Array.isArray(db?.bindings) ? db.bindings : [];
+
+  const parameter = bindings.find((x) => x?.kind === 'deviceParameter' && x?.parameterId);
+  if (parameter) {
+    return {
+      deviceRole: String(parameter.deviceRole || DEFAULT_DEVICE_ROLE),
+      deviceParameterId: String(parameter.parameterId),
+    };
+  }
+
+  // `canSendMidiControl` rather than `isMidiControlBinding`: velocity, poly pressure and pitch bend
+  // are inbound-only sources. Automating one would have nowhere to send it, and claiming otherwise
+  // would put a parameter in the plugin that silently does nothing — the bug this is fixing.
+  const raw = bindings.find((x) => isMidiControlBinding(x) && canSendMidiControl(x));
+  if (raw) {
+    return {
+      deviceRole: String(raw.deviceRole || DEFAULT_DEVICE_ROLE),
+      deviceParameterId: '',
+      midiControl: midiControlDescriptor(raw),
+    };
+  }
+
+  return { deviceRole: '', deviceParameterId: '' };
+}
+
+/**
+ * The raw binding, flattened to what the C++ send path needs.
+ *
+ * Deliberately the binding's own fields rather than a pre-built byte string: the value is not known
+ * until the DAW moves the parameter, so the bytes have to be built at send time. PanelParameters.h
+ * reads exactly these names.
+ */
+function midiControlDescriptor(binding) {
+  const kind = String(binding?.message ?? binding?.messageId ?? 'cc');
+  return {
+    kind,
+    channel: clampNum(binding?.channel, 0, 16),
+    controller: clampNum(binding?.controller, 0, 127),
+    parameterMsb: clampNum(binding?.parameterMsb, 0, 127),
+    parameterLsb: clampNum(binding?.parameterLsb, 0, 127),
+    valueResolution: midiControlResolution(binding),
+    nullAfterSend: binding?.nullAfterSend === true,
+  };
 }
 
 function paramFromChannel(controlName, channelName, channel, single) {

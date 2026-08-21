@@ -390,7 +390,10 @@ private:
         if (wasWindowOpen) { lastSentMidi.clear(); wasWindowOpen = false; } // just closed -> resend all
         for (const auto& desc : panelParams)
         {
-            if (desc.deviceParameterId.isEmpty()) continue;
+            // A raw-MIDI-bound control has no deviceParameterId and still has something to send.
+            // Skipping it here is what made every CC / NRPN / aftertouch binding automate in the DAW
+            // and reach the synth only while the window was open.
+            if (desc.deviceParameterId.isEmpty() && ! desc.hasMidiControl) continue;
             if (auto* raw = apvts.getRawParameterValue (desc.id))
             {
                 const float v = raw->load();
@@ -431,12 +434,80 @@ private:
 
     void sendParamMidi (const ce::PanelParameter& desc, float value)
     {
+        if (desc.deviceParameterId.isEmpty() && desc.hasMidiControl)
+        {
+            sendParamRawMidi (desc, value);
+            return;
+        }
+
         auto* payload = new juce::DynamicObject();
         payload->setProperty ("deviceRole", desc.deviceRole.isNotEmpty() ? desc.deviceRole : juce::String ("mainSynth"));
         payload->setProperty ("parameterId", desc.deviceParameterId);
         payload->setProperty ("value", value);
         payload->setProperty ("dryRun", false);
         deviceService.compileParameterMessage (juce::var (payload), true);
+    }
+
+    /**
+     * A raw-MIDI-bound parameter, automated with the window closed.
+     *
+     * MIRRORS utils/midiControlBindings.js midiControlMessage() byte for byte, including the two
+     * things about it that look like oversights and are not:
+     *
+     *   - the value is clamped, NOT scaled. A raw binding carries three bytes and no range, so the
+     *     control's own value is already in MIDI units; scaling here and not in the editor would
+     *     make the exported plugin send different numbers from the panel it was exported from.
+     *   - Bank Select is not folded into a program change. It is CC 0 and CC 32, which the cc kind
+     *     already sends, and a bank pair baked silently into every program change is a message the
+     *     user did not ask for going to a synth that may not want it.
+     *
+     * Out through scriptSendRawMidi, the same funnel every raw send uses, so a script's
+     * ce.midi.interceptOut sees these too.
+     */
+    void sendParamRawMidi (const ce::PanelParameter& desc, float value)
+    {
+        const auto& midi = desc.midiControl;
+        const int channel = juce::jlimit (1, 16, midi.channel > 0 ? midi.channel : 1);
+        const int status = 0xb0 + channel - 1;
+        const int number = juce::roundToInt (value);
+
+        juce::Array<int> bytes;
+
+        if (midi.kind == "aftertouch")
+        {
+            bytes.add (0xd0 + channel - 1);
+            bytes.add (juce::jlimit (0, 127, number));
+        }
+        else if (midi.kind == "programChange")
+        {
+            bytes.add (0xc0 + channel - 1);
+            bytes.add (juce::jlimit (0, 127, number));
+        }
+        else if (midi.kind == "nrpn" || midi.kind == "rpn")
+        {
+            const bool isRpn = midi.kind == "rpn";
+            const int selectMsb = isRpn ? 101 : 99;
+            const int selectLsb = isRpn ? 100 : 98;
+            const bool wide = midi.valueResolution == 14;
+            const int v = juce::jlimit (0, wide ? 16383 : 127, number);
+
+            bytes.addArray ({ status, selectMsb, juce::jlimit (0, 127, midi.parameterMsb) });
+            bytes.addArray ({ status, selectLsb, juce::jlimit (0, 127, midi.parameterLsb) });
+            bytes.addArray ({ status, 6, wide ? ((v >> 7) & 0x7f) : v });
+            if (wide) bytes.addArray ({ status, 38, v & 0x7f });
+            if (midi.nullAfterSend)
+            {
+                bytes.addArray ({ status, selectMsb, 127 });
+                bytes.addArray ({ status, selectLsb, 127 });
+            }
+        }
+        else    // cc
+        {
+            bytes.addArray ({ status, midi.controller & 0x7f, juce::jlimit (0, 127, number) });
+        }
+
+        if (! bytes.isEmpty())
+            scriptSendRawMidi ("automation_" + desc.id, bytes);
     }
 
     juce::Array<ce::PanelParameter> panelParams;  // declared before apvts (init order matters)

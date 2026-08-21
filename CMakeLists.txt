@@ -386,6 +386,28 @@ target_link_libraries(CEditorPanelValueTests PRIVATE
 add_test(NAME PanelValueModel COMMAND CEditorPanelValueTests)
 ce_configure_test(CEditorPanelValueTests)
 
+# The exported plugin's automation list. Also the only thing that COMPILES PanelParameters.h — it is
+# reachable otherwise only through PluginProcessor.h, which needs WebView2 and cannot build off
+# Windows, so a typo in it would surface nowhere but a Windows plugin build.
+add_executable(CEditorPanelParametersTests
+    "${CE_ROOT}/tests/PanelParametersTests.cpp"
+)
+
+target_include_directories(CEditorPanelParametersTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+# juce_audio_processors, because that is what PanelParameters.h includes — AudioProcessorValueTreeState
+# lives there and buildParameterLayout returns one. It drags in graphics and gui_basics; a console
+# test never opens a window, but the symbols have to resolve.
+target_link_libraries(CEditorPanelParametersTests PRIVATE
+    juce::juce_core
+    juce::juce_audio_processors
+)
+
+add_test(NAME PanelParameters COMMAND CEditorPanelParametersTests)
+ce_configure_test(CEditorPanelParametersTests)
+
 # --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
 # Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.
 # Design record: tools/docs/screen-builder-design.md.
