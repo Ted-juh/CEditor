@@ -37,7 +37,7 @@
   "coverage": {
     "singleParameterWrite": "complete-for-every-block-in-the-address-map",
     "editBufferDumpRequest": "block-rq1-per-block",
-    "editBufferDumpParse": "notImplemented",
+    "editBufferDumpParse": "complete-for-every-block-in-the-address-map",
     "bankDump": "notImplemented",
     "patchNameEdit": "complete-single-dt1-write",
     "realtimeEditing": "complete-for-transcribed-blocks",
@@ -147,8 +147,8 @@
       "address": "10 00 00 00",
       "size": "00 00 00 3D",
       "response": {
-        "kind": "dt1",
-        "address": "10 00 00 00"
+        "kind": "bulkDump",
+        "dump": "common"
       },
       "timeoutMs": 1000,
       "retries": 1
@@ -179,8 +179,8 @@
       "address": "10 00 01 00",
       "size": "00 00 00 3E",
       "response": {
-        "kind": "dt1",
-        "address": "10 00 01 00"
+        "kind": "bulkDump",
+        "dump": "tone1"
       },
       "timeoutMs": 1000,
       "retries": 1
@@ -211,8 +211,8 @@
       "address": "10 00 02 00",
       "size": "00 00 00 3E",
       "response": {
-        "kind": "dt1",
-        "address": "10 00 02 00"
+        "kind": "bulkDump",
+        "dump": "tone2"
       },
       "timeoutMs": 1000,
       "retries": 1
@@ -243,8 +243,8 @@
       "address": "10 00 03 00",
       "size": "00 00 00 3E",
       "response": {
-        "kind": "dt1",
-        "address": "10 00 03 00"
+        "kind": "bulkDump",
+        "dump": "tone3"
       },
       "timeoutMs": 1000,
       "retries": 1
@@ -275,8 +275,8 @@
       "address": "10 00 04 00",
       "size": "00 00 01 01",
       "response": {
-        "kind": "dt1",
-        "address": "10 00 04 00"
+        "kind": "bulkDump",
+        "dump": "distortion"
       },
       "timeoutMs": 1000,
       "retries": 1
@@ -307,8 +307,8 @@
       "address": "10 00 06 00",
       "size": "00 00 00 51",
       "response": {
-        "kind": "dt1",
-        "address": "10 00 06 00"
+        "kind": "bulkDump",
+        "dump": "flanger"
       },
       "timeoutMs": 1000,
       "retries": 1
@@ -339,8 +339,8 @@
       "address": "10 00 08 00",
       "size": "00 00 00 51",
       "response": {
-        "kind": "dt1",
-        "address": "10 00 08 00"
+        "kind": "bulkDump",
+        "dump": "delay"
       },
       "timeoutMs": 1000,
       "retries": 1
@@ -371,8 +371,8 @@
       "address": "10 00 0A 00",
       "size": "00 00 00 51",
       "response": {
-        "kind": "dt1",
-        "address": "10 00 0A 00"
+        "kind": "bulkDump",
+        "dump": "reverb"
       },
       "timeoutMs": 1000,
       "retries": 1
@@ -403,8 +403,520 @@
       "address": "10 00 0C 00",
       "size": "00 00 00 08",
       "response": {
-        "kind": "dt1",
-        "address": "10 00 0C 00"
+        "kind": "bulkDump",
+        "dump": "arpeggioCommon"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern1",
+      "name": "Request arpeggioPattern1",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "0D",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "21",
+        "F7"
+      ],
+      "address": "10 00 0D 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern1"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern2",
+      "name": "Request arpeggioPattern2",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "0E",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "20",
+        "F7"
+      ],
+      "address": "10 00 0E 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern2"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern3",
+      "name": "Request arpeggioPattern3",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "0F",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1F",
+        "F7"
+      ],
+      "address": "10 00 0F 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern3"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern4",
+      "name": "Request arpeggioPattern4",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "10",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1E",
+        "F7"
+      ],
+      "address": "10 00 10 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern4"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern5",
+      "name": "Request arpeggioPattern5",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "11",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1D",
+        "F7"
+      ],
+      "address": "10 00 11 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern5"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern6",
+      "name": "Request arpeggioPattern6",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "12",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1C",
+        "F7"
+      ],
+      "address": "10 00 12 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern6"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern7",
+      "name": "Request arpeggioPattern7",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "13",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1B",
+        "F7"
+      ],
+      "address": "10 00 13 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern7"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern8",
+      "name": "Request arpeggioPattern8",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "14",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1A",
+        "F7"
+      ],
+      "address": "10 00 14 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern8"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern9",
+      "name": "Request arpeggioPattern9",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "15",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "19",
+        "F7"
+      ],
+      "address": "10 00 15 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern9"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern10",
+      "name": "Request arpeggioPattern10",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "16",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "18",
+        "F7"
+      ],
+      "address": "10 00 16 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern10"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern11",
+      "name": "Request arpeggioPattern11",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "17",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "17",
+        "F7"
+      ],
+      "address": "10 00 17 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern11"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern12",
+      "name": "Request arpeggioPattern12",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "18",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "16",
+        "F7"
+      ],
+      "address": "10 00 18 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern12"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern13",
+      "name": "Request arpeggioPattern13",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "19",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "15",
+        "F7"
+      ],
+      "address": "10 00 19 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern13"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern14",
+      "name": "Request arpeggioPattern14",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "1A",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "14",
+        "F7"
+      ],
+      "address": "10 00 1A 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern14"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern15",
+      "name": "Request arpeggioPattern15",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "1B",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "13",
+        "F7"
+      ],
+      "address": "10 00 1B 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern15"
+      },
+      "timeoutMs": 1000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpPattern16",
+      "name": "Request arpeggioPattern16",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "41",
+        "11",
+        "10",
+        "00",
+        "1C",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "12",
+        "F7"
+      ],
+      "address": "10 00 1C 00",
+      "size": "00 00 00 42",
+      "response": {
+        "kind": "bulkDump",
+        "dump": "arpPattern16"
       },
       "timeoutMs": 1000,
       "retries": 1
@@ -443,6 +955,54 @@
       },
       {
         "request": "requestArpeggioCommon"
+      },
+      {
+        "request": "requestArpPattern1"
+      },
+      {
+        "request": "requestArpPattern2"
+      },
+      {
+        "request": "requestArpPattern3"
+      },
+      {
+        "request": "requestArpPattern4"
+      },
+      {
+        "request": "requestArpPattern5"
+      },
+      {
+        "request": "requestArpPattern6"
+      },
+      {
+        "request": "requestArpPattern7"
+      },
+      {
+        "request": "requestArpPattern8"
+      },
+      {
+        "request": "requestArpPattern9"
+      },
+      {
+        "request": "requestArpPattern10"
+      },
+      {
+        "request": "requestArpPattern11"
+      },
+      {
+        "request": "requestArpPattern12"
+      },
+      {
+        "request": "requestArpPattern13"
+      },
+      {
+        "request": "requestArpPattern14"
+      },
+      {
+        "request": "requestArpPattern15"
+      },
+      {
+        "request": "requestArpPattern16"
       }
     ]
   },
@@ -451,7 +1011,7 @@
       "id": "common.patchName",
       "name": "Patch Name",
       "group": "Patch Common",
-      "type": "patchName",
+      "type": "text",
       "address": "10 00 00 00",
       "length": 12,
       "default": "INIT PATCH  ",
@@ -460,7 +1020,7 @@
         "shortLabel": "Name"
       },
       "encoding": {
-        "type": "ascii",
+        "type": "text-ascii",
         "length": 12,
         "pad": 32
       },
@@ -34250,5 +34810,4226 @@
       "value": 127,
       "expectedHex": "F0 41 10 00 00 41 12 10 00 00 0C 7F 65 F7"
     }
-  ]
+  ],
+  "dumpDefinitions": [
+    {
+      "id": "common",
+      "name": "Patch Common",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "00",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 61
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 71,
+        "byteOffset": 72
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 74
+      },
+      "requestRecipe": "requestCommon",
+      "mappings": [
+        {
+          "parameter": "common.patchName",
+          "offset": 0
+        },
+        {
+          "parameter": "common.patchLevel",
+          "offset": 12
+        },
+        {
+          "parameter": "common.patchTempo",
+          "offset": 13
+        },
+        {
+          "parameter": "common.switch",
+          "offset": 16
+        },
+        {
+          "parameter": "common.portamentoSwitch",
+          "offset": 18
+        },
+        {
+          "parameter": "common.portamentoTime",
+          "offset": 19
+        },
+        {
+          "parameter": "common.monoSwitch",
+          "offset": 20
+        },
+        {
+          "parameter": "common.octaveShift",
+          "offset": 21
+        },
+        {
+          "parameter": "common.pitchBendRangeUp",
+          "offset": 22
+        },
+        {
+          "parameter": "common.pitchBendRangeDown",
+          "offset": 23
+        },
+        {
+          "parameter": "common.tone1Switch",
+          "offset": 25
+        },
+        {
+          "parameter": "common.tone1Select",
+          "offset": 26
+        },
+        {
+          "parameter": "common.tone2Switch",
+          "offset": 27
+        },
+        {
+          "parameter": "common.tone2Select",
+          "offset": 28
+        },
+        {
+          "parameter": "common.tone3Switch",
+          "offset": 29
+        },
+        {
+          "parameter": "common.tone3Select",
+          "offset": 30
+        },
+        {
+          "parameter": "common.syncRingSelect",
+          "offset": 31
+        },
+        {
+          "parameter": "common.effectsMasterSwitch",
+          "offset": 32
+        },
+        {
+          "parameter": "common.tempoSyncSwitch",
+          "offset": 34
+        },
+        {
+          "parameter": "common.lowBoostSwitch",
+          "offset": 35
+        },
+        {
+          "parameter": "common.dBeamAssign",
+          "offset": 36
+        },
+        {
+          "parameter": "common.dBeamPolarity",
+          "offset": 41
+        },
+        {
+          "parameter": "common.effectsDistortionSelect",
+          "offset": 42
+        },
+        {
+          "parameter": "common.effectsFlangerSelect",
+          "offset": 43
+        },
+        {
+          "parameter": "common.effectsDelaySelect",
+          "offset": 44
+        },
+        {
+          "parameter": "common.effectsReverbSelect",
+          "offset": 45
+        }
+      ]
+    },
+    {
+      "id": "tone1",
+      "name": "Patch Tone 1",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "01",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 62
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 72,
+        "byteOffset": 73
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 75
+      },
+      "requestRecipe": "requestTone1",
+      "mappings": [
+        {
+          "parameter": "tone1.osc.wave",
+          "offset": 0
+        },
+        {
+          "parameter": "tone1.osc.waveVariation",
+          "offset": 1
+        },
+        {
+          "parameter": "tone1.osc.pitch",
+          "offset": 3
+        },
+        {
+          "parameter": "tone1.osc.detune",
+          "offset": 4
+        },
+        {
+          "parameter": "tone1.osc.pulseWidthModDepth",
+          "offset": 5
+        },
+        {
+          "parameter": "tone1.osc.pulseWidth",
+          "offset": 6
+        },
+        {
+          "parameter": "tone1.osc.pitchEnvAttackTime",
+          "offset": 7
+        },
+        {
+          "parameter": "tone1.osc.pitchEnvDecay",
+          "offset": 8
+        },
+        {
+          "parameter": "tone1.osc.pitchEnvDepth",
+          "offset": 9
+        },
+        {
+          "parameter": "tone1.filter.mode",
+          "offset": 10
+        },
+        {
+          "parameter": "tone1.filter.slope",
+          "offset": 11
+        },
+        {
+          "parameter": "tone1.filter.cutoff",
+          "offset": 12
+        },
+        {
+          "parameter": "tone1.filter.cutoffKeyfollow",
+          "offset": 13
+        },
+        {
+          "parameter": "tone1.filter.envVelocitySens",
+          "offset": 14
+        },
+        {
+          "parameter": "tone1.filter.resonance",
+          "offset": 15
+        },
+        {
+          "parameter": "tone1.filter.envAttackTime",
+          "offset": 16
+        },
+        {
+          "parameter": "tone1.filter.envDecayTime",
+          "offset": 17
+        },
+        {
+          "parameter": "tone1.filter.envSustainLevel",
+          "offset": 18
+        },
+        {
+          "parameter": "tone1.filter.envReleaseTime",
+          "offset": 19
+        },
+        {
+          "parameter": "tone1.filter.envDepth",
+          "offset": 20
+        },
+        {
+          "parameter": "tone1.amp.level",
+          "offset": 21
+        },
+        {
+          "parameter": "tone1.amp.levelVelocitySens",
+          "offset": 22
+        },
+        {
+          "parameter": "tone1.amp.envAttackTime",
+          "offset": 23
+        },
+        {
+          "parameter": "tone1.amp.envDecayTime",
+          "offset": 24
+        },
+        {
+          "parameter": "tone1.amp.envSustainLevel",
+          "offset": 25
+        },
+        {
+          "parameter": "tone1.amp.envReleaseTime",
+          "offset": 26
+        },
+        {
+          "parameter": "tone1.amp.pan",
+          "offset": 27
+        },
+        {
+          "parameter": "tone1.lfo.shape",
+          "offset": 28
+        },
+        {
+          "parameter": "tone1.lfo.rate",
+          "offset": 29
+        },
+        {
+          "parameter": "tone1.lfo.tempoSyncSwitch",
+          "offset": 30
+        },
+        {
+          "parameter": "tone1.lfo.tempoSyncNote",
+          "offset": 31
+        },
+        {
+          "parameter": "tone1.lfo.fadeTime",
+          "offset": 32
+        },
+        {
+          "parameter": "tone1.lfo.keyTrigger",
+          "offset": 33
+        },
+        {
+          "parameter": "tone1.lfo.pitchDepth",
+          "offset": 34
+        },
+        {
+          "parameter": "tone1.lfo.filterDepth",
+          "offset": 35
+        },
+        {
+          "parameter": "tone1.lfo.ampDepth",
+          "offset": 36
+        },
+        {
+          "parameter": "tone1.lfo.panDepth",
+          "offset": 37
+        },
+        {
+          "parameter": "tone1.modLfo.shape",
+          "offset": 38
+        },
+        {
+          "parameter": "tone1.modLfo.rate",
+          "offset": 39
+        },
+        {
+          "parameter": "tone1.modLfo.tempoSyncSwitch",
+          "offset": 40
+        },
+        {
+          "parameter": "tone1.modLfo.tempoSyncNote",
+          "offset": 41
+        },
+        {
+          "parameter": "tone1.modLfo.pitchDepth",
+          "offset": 44
+        },
+        {
+          "parameter": "tone1.modLfo.filterDepth",
+          "offset": 45
+        },
+        {
+          "parameter": "tone1.modLfo.ampDepth",
+          "offset": 46
+        },
+        {
+          "parameter": "tone1.modLfo.panDepth",
+          "offset": 47
+        }
+      ]
+    },
+    {
+      "id": "tone2",
+      "name": "Patch Tone 2",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "02",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 62
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 72,
+        "byteOffset": 73
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 75
+      },
+      "requestRecipe": "requestTone2",
+      "mappings": [
+        {
+          "parameter": "tone2.osc.wave",
+          "offset": 0
+        },
+        {
+          "parameter": "tone2.osc.waveVariation",
+          "offset": 1
+        },
+        {
+          "parameter": "tone2.osc.pitch",
+          "offset": 3
+        },
+        {
+          "parameter": "tone2.osc.detune",
+          "offset": 4
+        },
+        {
+          "parameter": "tone2.osc.pulseWidthModDepth",
+          "offset": 5
+        },
+        {
+          "parameter": "tone2.osc.pulseWidth",
+          "offset": 6
+        },
+        {
+          "parameter": "tone2.osc.pitchEnvAttackTime",
+          "offset": 7
+        },
+        {
+          "parameter": "tone2.osc.pitchEnvDecay",
+          "offset": 8
+        },
+        {
+          "parameter": "tone2.osc.pitchEnvDepth",
+          "offset": 9
+        },
+        {
+          "parameter": "tone2.filter.mode",
+          "offset": 10
+        },
+        {
+          "parameter": "tone2.filter.slope",
+          "offset": 11
+        },
+        {
+          "parameter": "tone2.filter.cutoff",
+          "offset": 12
+        },
+        {
+          "parameter": "tone2.filter.cutoffKeyfollow",
+          "offset": 13
+        },
+        {
+          "parameter": "tone2.filter.envVelocitySens",
+          "offset": 14
+        },
+        {
+          "parameter": "tone2.filter.resonance",
+          "offset": 15
+        },
+        {
+          "parameter": "tone2.filter.envAttackTime",
+          "offset": 16
+        },
+        {
+          "parameter": "tone2.filter.envDecayTime",
+          "offset": 17
+        },
+        {
+          "parameter": "tone2.filter.envSustainLevel",
+          "offset": 18
+        },
+        {
+          "parameter": "tone2.filter.envReleaseTime",
+          "offset": 19
+        },
+        {
+          "parameter": "tone2.filter.envDepth",
+          "offset": 20
+        },
+        {
+          "parameter": "tone2.amp.level",
+          "offset": 21
+        },
+        {
+          "parameter": "tone2.amp.levelVelocitySens",
+          "offset": 22
+        },
+        {
+          "parameter": "tone2.amp.envAttackTime",
+          "offset": 23
+        },
+        {
+          "parameter": "tone2.amp.envDecayTime",
+          "offset": 24
+        },
+        {
+          "parameter": "tone2.amp.envSustainLevel",
+          "offset": 25
+        },
+        {
+          "parameter": "tone2.amp.envReleaseTime",
+          "offset": 26
+        },
+        {
+          "parameter": "tone2.amp.pan",
+          "offset": 27
+        },
+        {
+          "parameter": "tone2.lfo.shape",
+          "offset": 28
+        },
+        {
+          "parameter": "tone2.lfo.rate",
+          "offset": 29
+        },
+        {
+          "parameter": "tone2.lfo.tempoSyncSwitch",
+          "offset": 30
+        },
+        {
+          "parameter": "tone2.lfo.tempoSyncNote",
+          "offset": 31
+        },
+        {
+          "parameter": "tone2.lfo.fadeTime",
+          "offset": 32
+        },
+        {
+          "parameter": "tone2.lfo.keyTrigger",
+          "offset": 33
+        },
+        {
+          "parameter": "tone2.lfo.pitchDepth",
+          "offset": 34
+        },
+        {
+          "parameter": "tone2.lfo.filterDepth",
+          "offset": 35
+        },
+        {
+          "parameter": "tone2.lfo.ampDepth",
+          "offset": 36
+        },
+        {
+          "parameter": "tone2.lfo.panDepth",
+          "offset": 37
+        },
+        {
+          "parameter": "tone2.modLfo.shape",
+          "offset": 38
+        },
+        {
+          "parameter": "tone2.modLfo.rate",
+          "offset": 39
+        },
+        {
+          "parameter": "tone2.modLfo.tempoSyncSwitch",
+          "offset": 40
+        },
+        {
+          "parameter": "tone2.modLfo.tempoSyncNote",
+          "offset": 41
+        },
+        {
+          "parameter": "tone2.modLfo.pitchDepth",
+          "offset": 44
+        },
+        {
+          "parameter": "tone2.modLfo.filterDepth",
+          "offset": 45
+        },
+        {
+          "parameter": "tone2.modLfo.ampDepth",
+          "offset": 46
+        },
+        {
+          "parameter": "tone2.modLfo.panDepth",
+          "offset": 47
+        }
+      ]
+    },
+    {
+      "id": "tone3",
+      "name": "Patch Tone 3",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "03",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 62
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 72,
+        "byteOffset": 73
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 75
+      },
+      "requestRecipe": "requestTone3",
+      "mappings": [
+        {
+          "parameter": "tone3.osc.wave",
+          "offset": 0
+        },
+        {
+          "parameter": "tone3.osc.waveVariation",
+          "offset": 1
+        },
+        {
+          "parameter": "tone3.osc.pitch",
+          "offset": 3
+        },
+        {
+          "parameter": "tone3.osc.detune",
+          "offset": 4
+        },
+        {
+          "parameter": "tone3.osc.pulseWidthModDepth",
+          "offset": 5
+        },
+        {
+          "parameter": "tone3.osc.pulseWidth",
+          "offset": 6
+        },
+        {
+          "parameter": "tone3.osc.pitchEnvAttackTime",
+          "offset": 7
+        },
+        {
+          "parameter": "tone3.osc.pitchEnvDecay",
+          "offset": 8
+        },
+        {
+          "parameter": "tone3.osc.pitchEnvDepth",
+          "offset": 9
+        },
+        {
+          "parameter": "tone3.filter.mode",
+          "offset": 10
+        },
+        {
+          "parameter": "tone3.filter.slope",
+          "offset": 11
+        },
+        {
+          "parameter": "tone3.filter.cutoff",
+          "offset": 12
+        },
+        {
+          "parameter": "tone3.filter.cutoffKeyfollow",
+          "offset": 13
+        },
+        {
+          "parameter": "tone3.filter.envVelocitySens",
+          "offset": 14
+        },
+        {
+          "parameter": "tone3.filter.resonance",
+          "offset": 15
+        },
+        {
+          "parameter": "tone3.filter.envAttackTime",
+          "offset": 16
+        },
+        {
+          "parameter": "tone3.filter.envDecayTime",
+          "offset": 17
+        },
+        {
+          "parameter": "tone3.filter.envSustainLevel",
+          "offset": 18
+        },
+        {
+          "parameter": "tone3.filter.envReleaseTime",
+          "offset": 19
+        },
+        {
+          "parameter": "tone3.filter.envDepth",
+          "offset": 20
+        },
+        {
+          "parameter": "tone3.amp.level",
+          "offset": 21
+        },
+        {
+          "parameter": "tone3.amp.levelVelocitySens",
+          "offset": 22
+        },
+        {
+          "parameter": "tone3.amp.envAttackTime",
+          "offset": 23
+        },
+        {
+          "parameter": "tone3.amp.envDecayTime",
+          "offset": 24
+        },
+        {
+          "parameter": "tone3.amp.envSustainLevel",
+          "offset": 25
+        },
+        {
+          "parameter": "tone3.amp.envReleaseTime",
+          "offset": 26
+        },
+        {
+          "parameter": "tone3.amp.pan",
+          "offset": 27
+        },
+        {
+          "parameter": "tone3.lfo.shape",
+          "offset": 28
+        },
+        {
+          "parameter": "tone3.lfo.rate",
+          "offset": 29
+        },
+        {
+          "parameter": "tone3.lfo.tempoSyncSwitch",
+          "offset": 30
+        },
+        {
+          "parameter": "tone3.lfo.tempoSyncNote",
+          "offset": 31
+        },
+        {
+          "parameter": "tone3.lfo.fadeTime",
+          "offset": 32
+        },
+        {
+          "parameter": "tone3.lfo.keyTrigger",
+          "offset": 33
+        },
+        {
+          "parameter": "tone3.lfo.pitchDepth",
+          "offset": 34
+        },
+        {
+          "parameter": "tone3.lfo.filterDepth",
+          "offset": 35
+        },
+        {
+          "parameter": "tone3.lfo.ampDepth",
+          "offset": 36
+        },
+        {
+          "parameter": "tone3.lfo.panDepth",
+          "offset": 37
+        },
+        {
+          "parameter": "tone3.modLfo.shape",
+          "offset": 38
+        },
+        {
+          "parameter": "tone3.modLfo.rate",
+          "offset": 39
+        },
+        {
+          "parameter": "tone3.modLfo.tempoSyncSwitch",
+          "offset": 40
+        },
+        {
+          "parameter": "tone3.modLfo.tempoSyncNote",
+          "offset": 41
+        },
+        {
+          "parameter": "tone3.modLfo.pitchDepth",
+          "offset": 44
+        },
+        {
+          "parameter": "tone3.modLfo.filterDepth",
+          "offset": 45
+        },
+        {
+          "parameter": "tone3.modLfo.ampDepth",
+          "offset": 46
+        },
+        {
+          "parameter": "tone3.modLfo.panDepth",
+          "offset": 47
+        }
+      ]
+    },
+    {
+      "id": "distortion",
+      "name": "Patch Distortion",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "04",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 129
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 139,
+        "byteOffset": 140
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 142
+      },
+      "requestRecipe": "requestDistortion",
+      "mappings": [
+        {
+          "parameter": "distortion.type",
+          "offset": 0
+        },
+        {
+          "parameter": "distortion.parameter1",
+          "offset": 1
+        },
+        {
+          "parameter": "distortion.parameter2",
+          "offset": 5
+        },
+        {
+          "parameter": "distortion.parameter3",
+          "offset": 9
+        },
+        {
+          "parameter": "distortion.parameter4",
+          "offset": 13
+        },
+        {
+          "parameter": "distortion.parameter5",
+          "offset": 17
+        },
+        {
+          "parameter": "distortion.parameter6",
+          "offset": 21
+        },
+        {
+          "parameter": "distortion.parameter7",
+          "offset": 25
+        },
+        {
+          "parameter": "distortion.parameter8",
+          "offset": 29
+        },
+        {
+          "parameter": "distortion.parameter9",
+          "offset": 33
+        },
+        {
+          "parameter": "distortion.parameter10",
+          "offset": 37
+        },
+        {
+          "parameter": "distortion.parameter11",
+          "offset": 41
+        },
+        {
+          "parameter": "distortion.parameter12",
+          "offset": 45
+        },
+        {
+          "parameter": "distortion.parameter13",
+          "offset": 49
+        },
+        {
+          "parameter": "distortion.parameter14",
+          "offset": 53
+        },
+        {
+          "parameter": "distortion.parameter15",
+          "offset": 57
+        },
+        {
+          "parameter": "distortion.parameter16",
+          "offset": 61
+        },
+        {
+          "parameter": "distortion.parameter17",
+          "offset": 65
+        },
+        {
+          "parameter": "distortion.parameter18",
+          "offset": 69
+        },
+        {
+          "parameter": "distortion.parameter19",
+          "offset": 73
+        },
+        {
+          "parameter": "distortion.parameter20",
+          "offset": 77
+        },
+        {
+          "parameter": "distortion.parameter21",
+          "offset": 81
+        },
+        {
+          "parameter": "distortion.parameter22",
+          "offset": 85
+        },
+        {
+          "parameter": "distortion.parameter23",
+          "offset": 89
+        },
+        {
+          "parameter": "distortion.parameter24",
+          "offset": 93
+        },
+        {
+          "parameter": "distortion.parameter25",
+          "offset": 97
+        },
+        {
+          "parameter": "distortion.parameter26",
+          "offset": 101
+        },
+        {
+          "parameter": "distortion.parameter27",
+          "offset": 105
+        },
+        {
+          "parameter": "distortion.parameter28",
+          "offset": 109
+        },
+        {
+          "parameter": "distortion.parameter29",
+          "offset": 113
+        },
+        {
+          "parameter": "distortion.parameter30",
+          "offset": 117
+        },
+        {
+          "parameter": "distortion.parameter31",
+          "offset": 121
+        },
+        {
+          "parameter": "distortion.parameter32",
+          "offset": 125
+        }
+      ]
+    },
+    {
+      "id": "flanger",
+      "name": "Patch Flanger",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "06",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 81
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 91,
+        "byteOffset": 92
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 94
+      },
+      "requestRecipe": "requestFlanger",
+      "mappings": [
+        {
+          "parameter": "flanger.type",
+          "offset": 0
+        },
+        {
+          "parameter": "flanger.parameter1",
+          "offset": 1
+        },
+        {
+          "parameter": "flanger.parameter2",
+          "offset": 5
+        },
+        {
+          "parameter": "flanger.parameter3",
+          "offset": 9
+        },
+        {
+          "parameter": "flanger.parameter4",
+          "offset": 13
+        },
+        {
+          "parameter": "flanger.parameter5",
+          "offset": 17
+        },
+        {
+          "parameter": "flanger.parameter6",
+          "offset": 21
+        },
+        {
+          "parameter": "flanger.parameter7",
+          "offset": 25
+        },
+        {
+          "parameter": "flanger.parameter8",
+          "offset": 29
+        },
+        {
+          "parameter": "flanger.parameter9",
+          "offset": 33
+        },
+        {
+          "parameter": "flanger.parameter10",
+          "offset": 37
+        },
+        {
+          "parameter": "flanger.parameter11",
+          "offset": 41
+        },
+        {
+          "parameter": "flanger.parameter12",
+          "offset": 45
+        },
+        {
+          "parameter": "flanger.parameter13",
+          "offset": 49
+        },
+        {
+          "parameter": "flanger.parameter14",
+          "offset": 53
+        },
+        {
+          "parameter": "flanger.parameter15",
+          "offset": 57
+        },
+        {
+          "parameter": "flanger.parameter16",
+          "offset": 61
+        },
+        {
+          "parameter": "flanger.parameter17",
+          "offset": 65
+        },
+        {
+          "parameter": "flanger.parameter18",
+          "offset": 69
+        },
+        {
+          "parameter": "flanger.parameter19",
+          "offset": 73
+        },
+        {
+          "parameter": "flanger.parameter20",
+          "offset": 77
+        }
+      ]
+    },
+    {
+      "id": "delay",
+      "name": "Patch Delay",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "08",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 81
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 91,
+        "byteOffset": 92
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 94
+      },
+      "requestRecipe": "requestDelay",
+      "mappings": [
+        {
+          "parameter": "delay.type",
+          "offset": 0
+        },
+        {
+          "parameter": "delay.parameter1",
+          "offset": 1
+        },
+        {
+          "parameter": "delay.parameter2",
+          "offset": 5
+        },
+        {
+          "parameter": "delay.parameter3",
+          "offset": 9
+        },
+        {
+          "parameter": "delay.parameter4",
+          "offset": 13
+        },
+        {
+          "parameter": "delay.parameter5",
+          "offset": 17
+        },
+        {
+          "parameter": "delay.parameter6",
+          "offset": 21
+        },
+        {
+          "parameter": "delay.parameter7",
+          "offset": 25
+        },
+        {
+          "parameter": "delay.parameter8",
+          "offset": 29
+        },
+        {
+          "parameter": "delay.parameter9",
+          "offset": 33
+        },
+        {
+          "parameter": "delay.parameter10",
+          "offset": 37
+        },
+        {
+          "parameter": "delay.parameter11",
+          "offset": 41
+        },
+        {
+          "parameter": "delay.parameter12",
+          "offset": 45
+        },
+        {
+          "parameter": "delay.parameter13",
+          "offset": 49
+        },
+        {
+          "parameter": "delay.parameter14",
+          "offset": 53
+        },
+        {
+          "parameter": "delay.parameter15",
+          "offset": 57
+        },
+        {
+          "parameter": "delay.parameter16",
+          "offset": 61
+        },
+        {
+          "parameter": "delay.parameter17",
+          "offset": 65
+        },
+        {
+          "parameter": "delay.parameter18",
+          "offset": 69
+        },
+        {
+          "parameter": "delay.parameter19",
+          "offset": 73
+        },
+        {
+          "parameter": "delay.parameter20",
+          "offset": 77
+        }
+      ]
+    },
+    {
+      "id": "reverb",
+      "name": "Patch Reverb",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "0A",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 81
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 91,
+        "byteOffset": 92
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 94
+      },
+      "requestRecipe": "requestReverb",
+      "mappings": [
+        {
+          "parameter": "reverb.type",
+          "offset": 0
+        },
+        {
+          "parameter": "reverb.parameter1",
+          "offset": 1
+        },
+        {
+          "parameter": "reverb.parameter2",
+          "offset": 5
+        },
+        {
+          "parameter": "reverb.parameter3",
+          "offset": 9
+        },
+        {
+          "parameter": "reverb.parameter4",
+          "offset": 13
+        },
+        {
+          "parameter": "reverb.parameter5",
+          "offset": 17
+        },
+        {
+          "parameter": "reverb.parameter6",
+          "offset": 21
+        },
+        {
+          "parameter": "reverb.parameter7",
+          "offset": 25
+        },
+        {
+          "parameter": "reverb.parameter8",
+          "offset": 29
+        },
+        {
+          "parameter": "reverb.parameter9",
+          "offset": 33
+        },
+        {
+          "parameter": "reverb.parameter10",
+          "offset": 37
+        },
+        {
+          "parameter": "reverb.parameter11",
+          "offset": 41
+        },
+        {
+          "parameter": "reverb.parameter12",
+          "offset": 45
+        },
+        {
+          "parameter": "reverb.parameter13",
+          "offset": 49
+        },
+        {
+          "parameter": "reverb.parameter14",
+          "offset": 53
+        },
+        {
+          "parameter": "reverb.parameter15",
+          "offset": 57
+        },
+        {
+          "parameter": "reverb.parameter16",
+          "offset": 61
+        },
+        {
+          "parameter": "reverb.parameter17",
+          "offset": 65
+        },
+        {
+          "parameter": "reverb.parameter18",
+          "offset": 69
+        },
+        {
+          "parameter": "reverb.parameter19",
+          "offset": 73
+        },
+        {
+          "parameter": "reverb.parameter20",
+          "offset": 77
+        }
+      ]
+    },
+    {
+      "id": "arpeggioCommon",
+      "name": "Patch Arpeggio Common",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "0C",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 8
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 18,
+        "byteOffset": 19
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 21
+      },
+      "requestRecipe": "requestArpeggioCommon",
+      "mappings": [
+        {
+          "parameter": "arp.grid",
+          "offset": 0
+        },
+        {
+          "parameter": "arp.duration",
+          "offset": 1
+        },
+        {
+          "parameter": "arp.motif",
+          "offset": 2
+        },
+        {
+          "parameter": "arp.octaveRange",
+          "offset": 3
+        },
+        {
+          "parameter": "arp.accentRate",
+          "offset": 4
+        },
+        {
+          "parameter": "arp.velocity",
+          "offset": 5
+        },
+        {
+          "parameter": "arp.endStep",
+          "offset": 6
+        }
+      ]
+    },
+    {
+      "id": "arpPattern1",
+      "name": "Patch Arpeggio Pattern (Note 1)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "0D",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern1",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note1.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note1.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note1.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note1.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note1.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note1.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note1.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note1.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note1.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note1.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note1.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note1.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note1.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note1.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note1.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note1.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note1.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note1.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note1.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note1.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note1.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note1.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note1.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note1.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note1.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note1.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note1.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note1.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note1.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note1.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note1.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note1.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note1.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern2",
+      "name": "Patch Arpeggio Pattern (Note 2)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "0E",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern2",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note2.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note2.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note2.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note2.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note2.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note2.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note2.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note2.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note2.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note2.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note2.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note2.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note2.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note2.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note2.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note2.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note2.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note2.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note2.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note2.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note2.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note2.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note2.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note2.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note2.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note2.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note2.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note2.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note2.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note2.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note2.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note2.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note2.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern3",
+      "name": "Patch Arpeggio Pattern (Note 3)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "0F",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern3",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note3.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note3.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note3.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note3.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note3.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note3.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note3.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note3.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note3.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note3.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note3.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note3.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note3.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note3.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note3.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note3.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note3.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note3.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note3.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note3.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note3.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note3.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note3.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note3.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note3.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note3.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note3.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note3.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note3.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note3.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note3.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note3.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note3.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern4",
+      "name": "Patch Arpeggio Pattern (Note 4)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "10",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern4",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note4.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note4.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note4.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note4.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note4.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note4.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note4.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note4.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note4.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note4.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note4.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note4.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note4.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note4.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note4.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note4.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note4.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note4.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note4.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note4.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note4.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note4.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note4.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note4.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note4.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note4.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note4.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note4.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note4.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note4.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note4.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note4.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note4.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern5",
+      "name": "Patch Arpeggio Pattern (Note 5)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "11",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern5",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note5.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note5.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note5.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note5.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note5.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note5.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note5.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note5.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note5.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note5.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note5.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note5.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note5.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note5.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note5.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note5.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note5.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note5.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note5.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note5.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note5.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note5.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note5.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note5.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note5.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note5.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note5.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note5.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note5.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note5.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note5.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note5.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note5.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern6",
+      "name": "Patch Arpeggio Pattern (Note 6)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "12",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern6",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note6.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note6.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note6.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note6.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note6.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note6.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note6.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note6.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note6.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note6.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note6.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note6.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note6.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note6.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note6.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note6.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note6.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note6.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note6.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note6.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note6.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note6.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note6.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note6.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note6.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note6.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note6.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note6.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note6.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note6.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note6.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note6.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note6.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern7",
+      "name": "Patch Arpeggio Pattern (Note 7)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "13",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern7",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note7.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note7.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note7.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note7.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note7.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note7.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note7.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note7.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note7.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note7.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note7.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note7.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note7.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note7.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note7.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note7.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note7.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note7.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note7.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note7.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note7.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note7.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note7.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note7.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note7.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note7.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note7.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note7.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note7.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note7.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note7.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note7.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note7.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern8",
+      "name": "Patch Arpeggio Pattern (Note 8)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "14",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern8",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note8.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note8.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note8.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note8.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note8.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note8.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note8.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note8.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note8.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note8.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note8.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note8.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note8.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note8.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note8.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note8.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note8.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note8.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note8.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note8.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note8.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note8.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note8.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note8.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note8.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note8.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note8.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note8.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note8.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note8.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note8.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note8.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note8.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern9",
+      "name": "Patch Arpeggio Pattern (Note 9)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "15",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern9",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note9.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note9.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note9.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note9.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note9.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note9.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note9.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note9.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note9.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note9.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note9.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note9.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note9.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note9.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note9.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note9.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note9.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note9.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note9.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note9.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note9.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note9.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note9.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note9.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note9.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note9.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note9.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note9.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note9.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note9.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note9.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note9.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note9.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern10",
+      "name": "Patch Arpeggio Pattern (Note 10)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "16",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern10",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note10.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note10.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note10.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note10.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note10.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note10.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note10.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note10.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note10.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note10.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note10.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note10.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note10.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note10.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note10.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note10.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note10.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note10.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note10.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note10.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note10.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note10.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note10.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note10.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note10.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note10.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note10.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note10.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note10.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note10.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note10.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note10.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note10.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern11",
+      "name": "Patch Arpeggio Pattern (Note 11)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "17",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern11",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note11.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note11.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note11.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note11.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note11.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note11.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note11.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note11.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note11.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note11.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note11.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note11.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note11.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note11.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note11.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note11.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note11.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note11.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note11.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note11.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note11.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note11.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note11.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note11.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note11.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note11.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note11.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note11.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note11.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note11.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note11.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note11.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note11.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern12",
+      "name": "Patch Arpeggio Pattern (Note 12)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "18",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern12",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note12.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note12.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note12.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note12.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note12.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note12.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note12.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note12.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note12.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note12.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note12.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note12.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note12.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note12.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note12.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note12.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note12.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note12.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note12.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note12.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note12.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note12.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note12.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note12.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note12.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note12.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note12.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note12.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note12.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note12.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note12.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note12.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note12.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern13",
+      "name": "Patch Arpeggio Pattern (Note 13)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "19",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern13",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note13.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note13.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note13.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note13.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note13.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note13.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note13.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note13.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note13.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note13.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note13.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note13.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note13.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note13.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note13.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note13.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note13.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note13.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note13.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note13.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note13.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note13.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note13.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note13.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note13.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note13.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note13.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note13.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note13.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note13.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note13.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note13.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note13.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern14",
+      "name": "Patch Arpeggio Pattern (Note 14)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "1A",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern14",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note14.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note14.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note14.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note14.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note14.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note14.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note14.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note14.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note14.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note14.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note14.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note14.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note14.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note14.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note14.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note14.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note14.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note14.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note14.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note14.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note14.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note14.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note14.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note14.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note14.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note14.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note14.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note14.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note14.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note14.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note14.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note14.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note14.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern15",
+      "name": "Patch Arpeggio Pattern (Note 15)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "1B",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern15",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note15.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note15.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note15.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note15.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note15.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note15.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note15.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note15.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note15.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note15.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note15.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note15.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note15.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note15.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note15.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note15.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note15.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note15.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note15.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note15.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note15.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note15.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note15.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note15.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note15.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note15.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note15.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note15.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note15.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note15.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note15.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note15.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note15.step32Data",
+          "offset": 64
+        }
+      ]
+    },
+    {
+      "id": "arpPattern16",
+      "name": "Patch Arpeggio Pattern (Note 16)",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": [
+          "F0",
+          "41",
+          "$deviceId",
+          "00",
+          "00",
+          "41",
+          "12",
+          "10",
+          "00",
+          "1C",
+          "00"
+        ],
+        "suffix": [
+          "F7"
+        ]
+      },
+      "payload": {
+        "offset": 11,
+        "size": 66
+      },
+      "checksum": {
+        "type": "roland-7bit",
+        "fromOffset": 7,
+        "toOffset": 76,
+        "byteOffset": 77
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 79
+      },
+      "requestRecipe": "requestArpPattern16",
+      "mappings": [
+        {
+          "parameter": "arpPattern.note16.originalNote",
+          "offset": 0
+        },
+        {
+          "parameter": "arpPattern.note16.step1Data",
+          "offset": 2
+        },
+        {
+          "parameter": "arpPattern.note16.step2Data",
+          "offset": 4
+        },
+        {
+          "parameter": "arpPattern.note16.step3Data",
+          "offset": 6
+        },
+        {
+          "parameter": "arpPattern.note16.step4Data",
+          "offset": 8
+        },
+        {
+          "parameter": "arpPattern.note16.step5Data",
+          "offset": 10
+        },
+        {
+          "parameter": "arpPattern.note16.step6Data",
+          "offset": 12
+        },
+        {
+          "parameter": "arpPattern.note16.step7Data",
+          "offset": 14
+        },
+        {
+          "parameter": "arpPattern.note16.step8Data",
+          "offset": 16
+        },
+        {
+          "parameter": "arpPattern.note16.step9Data",
+          "offset": 18
+        },
+        {
+          "parameter": "arpPattern.note16.step10Data",
+          "offset": 20
+        },
+        {
+          "parameter": "arpPattern.note16.step11Data",
+          "offset": 22
+        },
+        {
+          "parameter": "arpPattern.note16.step12Data",
+          "offset": 24
+        },
+        {
+          "parameter": "arpPattern.note16.step13Data",
+          "offset": 26
+        },
+        {
+          "parameter": "arpPattern.note16.step14Data",
+          "offset": 28
+        },
+        {
+          "parameter": "arpPattern.note16.step15Data",
+          "offset": 30
+        },
+        {
+          "parameter": "arpPattern.note16.step16Data",
+          "offset": 32
+        },
+        {
+          "parameter": "arpPattern.note16.step17Data",
+          "offset": 34
+        },
+        {
+          "parameter": "arpPattern.note16.step18Data",
+          "offset": 36
+        },
+        {
+          "parameter": "arpPattern.note16.step19Data",
+          "offset": 38
+        },
+        {
+          "parameter": "arpPattern.note16.step20Data",
+          "offset": 40
+        },
+        {
+          "parameter": "arpPattern.note16.step21Data",
+          "offset": 42
+        },
+        {
+          "parameter": "arpPattern.note16.step22Data",
+          "offset": 44
+        },
+        {
+          "parameter": "arpPattern.note16.step23Data",
+          "offset": 46
+        },
+        {
+          "parameter": "arpPattern.note16.step24Data",
+          "offset": 48
+        },
+        {
+          "parameter": "arpPattern.note16.step25Data",
+          "offset": 50
+        },
+        {
+          "parameter": "arpPattern.note16.step26Data",
+          "offset": 52
+        },
+        {
+          "parameter": "arpPattern.note16.step27Data",
+          "offset": 54
+        },
+        {
+          "parameter": "arpPattern.note16.step28Data",
+          "offset": 56
+        },
+        {
+          "parameter": "arpPattern.note16.step29Data",
+          "offset": 58
+        },
+        {
+          "parameter": "arpPattern.note16.step30Data",
+          "offset": 60
+        },
+        {
+          "parameter": "arpPattern.note16.step31Data",
+          "offset": 62
+        },
+        {
+          "parameter": "arpPattern.note16.step32Data",
+          "offset": 64
+        }
+      ]
+    }
+  ],
+  "presets": {
+    "banks": [
+      {
+        "id": "user",
+        "label": "User Patch",
+        "role": "user",
+        "writable": true,
+        "startSlot": 0,
+        "slotCount": 64,
+        "programBase": 0,
+        "bankMsb": 87,
+        "bankLsb": 0
+      },
+      {
+        "id": "usb",
+        "label": "USB Memory Patch",
+        "role": "user",
+        "writable": true,
+        "startSlot": 64,
+        "slotCount": 64,
+        "programBase": 0,
+        "bankMsb": 87,
+        "bankLsb": 32
+      },
+      {
+        "id": "preset",
+        "label": "Preset Patch",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 128,
+        "slotCount": 64,
+        "programBase": 0,
+        "bankMsb": 87,
+        "bankLsb": 64
+      },
+      {
+        "id": "preset-pcm",
+        "label": "Preset PCM Patch",
+        "role": "factory",
+        "writable": false,
+        "startSlot": 192,
+        "slotCount": 8,
+        "programBase": 0,
+        "bankMsb": 88,
+        "bankLsb": 64
+      }
+    ],
+    "recall": {
+      "kind": "bankPc"
+    }
+  }
 }

@@ -168,14 +168,18 @@ test('repeated moves accumulate rather than duplicating', () => {
 });
 
 test('a parameter that is not a number does not show one', () => {
-  // The GAIA's patch name is 12 ASCII bytes. The decoder, asked for one byte's worth, hands back
-  // the first character — printing that beside a correct name would be a confident wrong number.
+  // The GAIA's patch name is 12 ASCII bytes, and it decodes to TEXT. Neither `last` nor `span` may
+  // be printed from it: `last` would be a string where the chip shows values, and `span` is
+  // `max - min` over two strings, which is NaN — and "NaN" beside a perfectly correct patch name is
+  // worse than nothing at all.
   const name = GAIA.parameters.find((p) => p.id === 'common.patchName');
   assert.ok(name && !name.range, 'guard: the patch name is the non-numeric case');
-  const chips = chipList(fold([`F0 41 10 00 00 41 12 ${name.address} 49 4E 49 54 3E F7`]), opts);
+  assert.equal(name.encoding.length, 12, 'guard: the message below must carry the whole field');
+  const chips = chipList(fold([`F0 41 10 00 00 41 12 ${name.address} 49 4E 49 54 20 50 41 54 43 48 20 20 27 F7`]), opts);
   assert.equal(chips.length, 1);
   assert.equal(chips[0].parameterId, 'common.patchName');
   assert.equal(chips[0].last, null);
+  assert.equal(chips[0].span, null);
   assert.ok(chips[0].parameter, 'still bindable — a text control takes it');
 });
 

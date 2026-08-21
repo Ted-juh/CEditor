@@ -25,6 +25,9 @@ import { fileURLToPath } from 'node:url';
 
 import { addressFor, buildProfile } from '../../../tools/scripts/qa/roland-gaia/make-gaia-profile.mjs';
 import {
+  localCompileParameter, localCompilePresetRecall, localParseDumpMessage,
+} from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
+import {
   BLOCK_SIZES, BLOCKS, PATCH_ARPEGGIO_COMMON, PATCH_COMMON, PATCH_DELAY, PATCH_DISTORTION,
   PATCH_FLANGER, PATCH_REVERB, PATCH_TONE,
 } from '../../../tools/scripts/qa/roland-gaia/address-map.mjs';
@@ -227,6 +230,166 @@ test('the arpeggio pattern is sixteen lanes of thirty-two steps, at the manual\'
     assert.equal(parameter.encoding.type, 'nibbled', `${parameter.id}: not nibble-encoded`);
     assert.equal(parameter.encoding.nibbles, 2, `${parameter.id}: wrong nibble count`);
     assert.equal(parameter.range.max, 128, `${parameter.id}: a step tops out at 128 (tie), not ${parameter.range.max}`);
+  }
+});
+
+/* ------------------------------------------------ reading a patch back, and naming one */
+
+/**
+ * A DT1 as the synth would send it: header, address, data, Roland checksum, F7.
+ *
+ * Built here rather than pasted, so the assertions below are about the profile and not about
+ * whether somebody typed a 61-byte hex string correctly.
+ */
+function dt1Message(addressBytes, data) {
+  const body = [...addressBytes, ...data];
+  const sum = body.reduce((total, byte) => total + byte, 0);
+  const bytes = [0xf0, 0x41, 0x10, 0x00, 0x00, 0x41, 0x12, ...body, (128 - (sum % 128)) % 128, 0xf7];
+  return bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+}
+
+test('a Patch Common reply is parsed rather than dropped', () => {
+  // WHAT THIS REPLACES. The block requests declared `response: {kind: 'dt1', address}` — which says
+  // only "a reply will arrive at this address" and does nothing with it — and the profile had no
+  // dumpDefinitions at all. The request went out, the synth answered with the whole block, and
+  // every byte was discarded. That is an editor that can only write: you could change the synth but
+  // never open it on the patch already loaded.
+  const data = new Array(61).fill(0);
+  const name = 'BASS MONSTER';
+  for (let i = 0; i < name.length; i += 1) data[i] = name.charCodeAt(i);
+  data[12] = 100; // common.patchLevel
+
+  const parsed = localParseDumpMessage(profile, dt1Message([0x10, 0x00, 0x00, 0x00], data));
+  assert.ok(parsed.ok, parsed.error);
+  assert.equal(parsed.dumpId, 'common');
+  assert.equal(parsed.checksumStatus, 'ok');
+  assert.equal(parsed.values['common.patchLevel'], 100, 'a mapping offset is wrong');
+  // The name — the assertion `type: "patchName"` could never have passed, because no branch of
+  // either engine knows that word. It read back as the ASCII code of the first letter.
+  assert.equal(parsed.values['common.patchName'], name);
+});
+
+test('a Tone 2 reply is not applied as Tone 1\'s', () => {
+  // The three tone blocks are the same 62-byte table at a 0x0100 stride, so the only thing telling
+  // them apart is the address — which is why it is in the MATCHER rather than a field read
+  // afterwards.
+  const parsed = localParseDumpMessage(profile, dt1Message([0x10, 0x00, 0x02, 0x00], new Array(62).fill(0)));
+  assert.ok(parsed.ok, parsed.error);
+  assert.equal(parsed.dumpId, 'tone2');
+});
+
+test('every request that names a dump names one that exists', () => {
+  // A request for a dump the profile does not define makes the engine reject the WHOLE profile,
+  // silently, taking all 793 parameters with it — the GAIA has been one regeneration away from
+  // vanishing from the device list before.
+  const declared = new Set(profile.dumpDefinitions.map((d) => d.id));
+  const wired = profile.requests.filter((r) => r.response?.kind === 'bulkDump');
+  assert.equal(wired.length, 25, 'a block request stopped parsing its reply');
+  for (const request of wired) {
+    assert.ok(declared.has(request.response.dump), `${request.id} asks for an undefined dump`);
+  }
+  // And the other direction: a dump nothing can ask for is a parser for a message that never comes.
+  const requested = new Set(wired.map((r) => r.response.dump));
+  for (const dump of profile.dumpDefinitions) {
+    assert.ok(requested.has(dump.id), `dump ${dump.id} has no request`);
+  }
+});
+
+test('every addressed parameter is in exactly one dump, at its address delta', () => {
+  // A dump is the block's bytes in address order, so a parameter's payload offset IS its distance
+  // from the block base. Checked over all 792 rather than a sample, because the failure mode of a
+  // wrong offset is a dump that parses, reports success, and fills the panel with the neighbour's
+  // value.
+  const seen = new Map();
+  for (const dump of profile.dumpDefinitions) {
+    const base = dump.matcher.prefix.slice(7).map((b) => parseInt(b, 16));
+    const flat = (bytes) => bytes.reduce((total, byte) => total * 128 + byte, 0);
+    for (const mapping of dump.mappings) {
+      assert.ok(!seen.has(mapping.parameter), `${mapping.parameter} is in two dumps`);
+      seen.set(mapping.parameter, dump.id);
+      const parameter = byId.get(mapping.parameter);
+      assert.ok(parameter, `${mapping.parameter} is not a parameter`);
+      const delta = flat(parameter.address.split(' ').map((b) => parseInt(b, 16))) - flat(base);
+      assert.equal(mapping.offset, delta, `${mapping.parameter} is mapped away from its address`);
+      assert.ok(mapping.offset < dump.payload.size, `${mapping.parameter} falls past the end of ${dump.id}`);
+    }
+  }
+
+  const addressed = profile.parameters.filter((p) => p.address).map((p) => p.id);
+  assert.equal(seen.size, addressed.length, 'a parameter with an address is in no dump');
+  // Master Volume is CC 7 and has no address, so it is correctly in none.
+  assert.equal(profile.parameters.length - addressed.length, 1);
+  assert.ok(!seen.has('master.volume'));
+});
+
+test('the patch name is written as twelve ASCII bytes, and an over-long one is refused', () => {
+  // THE BUG. `encodeParameterValue` had no text branch, so a text parameter fell through to
+  // clampInt(value, 0, 127): "BASS MONSTER" is not a number, so the result was 0, and the engine
+  // reported success and sent one byte of NUL over the first character of the patch's name. The
+  // C++ engine has always encoded text; this was a straight divergence between the two.
+  const written = localCompileParameter(profile, { parameterId: 'common.patchName', value: 'GAIA TEST' });
+  assert.ok(written.ok, written.error);
+  // The same bytes DeviceProfileEngineTests builds from the C++ side: 9 characters, padded to 12
+  // with spaces, over a Roland checksum.
+  assert.equal(written.hex, 'F0 41 10 00 00 41 12 10 00 00 00 47 41 49 41 20 54 45 53 54 20 20 20 1E F7');
+
+  // Refused, not truncated. Cutting a name down to fit would rename the patch on the instrument to
+  // something nobody typed.
+  const tooLong = localCompileParameter(profile, { parameterId: 'common.patchName', value: 'THIRTEEN CHARS' });
+  assert.equal(tooLong.ok, false);
+  assert.match(tooLong.error, /longer than 12/);
+});
+
+test('a name survives the encoder and the dump reader unchanged', () => {
+  // The round trip is the point: what is written is what must come back, or the field on screen and
+  // the field in the synth drift apart by one save.
+  const name = 'ROUND TRIP';
+  const written = localCompileParameter(profile, { parameterId: 'common.patchName', value: name });
+  const encoded = written.transaction.encodedValueHex.split(' ').map((b) => parseInt(b, 16));
+  const data = [...encoded, ...new Array(61 - encoded.length).fill(0)];
+  const parsed = localParseDumpMessage(profile, dt1Message([0x10, 0x00, 0x00, 0x00], data));
+  assert.ok(parsed.ok, parsed.error);
+  assert.equal(parsed.values['common.patchName'], name, 'the trailing pad must be trimmed, not kept');
+});
+
+/* -------------------------------------------------------------------- the preset banks */
+
+test('the four banks are the manual\'s Bank Select table, and they do not overlap', () => {
+  // p6 lists four banks: User (MSB 87 LSB 0), USB Memory (87/32) and Preset (87/64) at 64 patches
+  // each, and Preset PCM (88/64) at 8. The MSB changes for the last one, which is the detail a
+  // transcription is most likely to flatten.
+  const banks = profile.presets.banks;
+  assert.deepEqual(banks.map((b) => [b.bankMsb, b.bankLsb, b.slotCount]),
+    [[87, 0, 64], [87, 32, 64], [87, 64, 64], [88, 64, 8]]);
+
+  let next = 0;
+  for (const bank of banks) {
+    assert.equal(bank.startSlot, next, `${bank.id} does not start where the previous bank ends`);
+    next += bank.slotCount;
+  }
+  assert.equal(next, 200, 'the GAIA addresses 200 patches across its four banks');
+
+  // Only the two memory banks are writable. Marking Preset writable would offer a Save that the
+  // instrument silently ignores.
+  assert.deepEqual(banks.map((b) => b.writable), [true, true, false, false]);
+});
+
+test('a recall selects the bank before the program', () => {
+  // With four banks a bare Program Change recalls slot n of whichever bank the synth happens to be
+  // sitting in — which is the right patch number and the wrong patch.
+  assert.equal(profile.presets.recall.kind, 'bankPc');
+  const result = localCompilePresetRecall(profile, { slot: 129 });
+  assert.ok(result.ok, result.error);
+  // Slot 129 is the Preset bank's second patch: MSB 87, LSB 64, program 1.
+  assert.equal(result.messages.map((m) => m.hex).join(' | '), 'B0 00 57 | B0 20 40 | C0 01');
+});
+
+test('no patch names are invented for the factory banks', () => {
+  // The MIDI implementation lists the banks and their program ranges and never prints the factory
+  // patch names. A catalogue of plausible-looking ones would display confidently wrong titles for
+  // all 64 preset slots, and nothing on screen would say they were guesses.
+  for (const bank of profile.presets.banks) {
+    assert.ok(!('catalog' in bank), `${bank.id} carries a patch catalogue the manual does not print`);
   }
 });
 

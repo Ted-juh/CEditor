@@ -123,9 +123,68 @@ function nibbleCount(parameter) {
  */
 export function parameterValueWidth(parameter) {
   const encoding = String(parameter?.encoding?.type ?? 'u7');
+  if (String(parameter?.type ?? '') === 'text') {
+    // A name is as wide as it is long. Returning 1 here said a twelve-character patch name occupied
+    // one byte, so an RQ1 read-back asked for one and the inbound index thought the next eleven
+    // characters were eleven separate parameters' values.
+    const codec = normalizeTextCodec(encoding);
+    const length = Math.max(0, Math.round(Number(parameter?.encoding?.length ?? 0)));
+    if (codec === 'text-nibbled-ascii') {
+      return Math.max(0, Math.round(Number(parameter?.encoding?.nibbles ?? length * 2)));
+    }
+    return length;
+  }
   if (isU14(encoding)) return 2;
   if (encoding === 'nibbled') return nibbleCount(parameter).nibbles ?? 0;
   return 1;
+}
+
+/**
+ * A name to wire bytes — the exact inverse of the text branch of `localDecodeDumpParameterValue`,
+ * and a mirror of the one in DeviceProfileEngine.cpp.
+ *
+ * THIS DID NOT EXIST. `encodeParameterValue` had no text branch at all, so a `type: 'text'`
+ * parameter fell through to `clampInt(value, 0, 127)`: "GAIA TEST" is not a number, so the result
+ * was 0, and the engine reported ok and sent a message one byte long carrying NUL. Every patch-name
+ * write in the web runtime — the GAIA, the SH-201, the AN1x — wrote a NUL over the first character
+ * of the name instead of the name, and said it had succeeded. The C++ engine has always encoded
+ * text correctly, so this was also a straight divergence between the two: the DPD preview showed a
+ * message the export would never send.
+ */
+function encodeTextValue(parameter, value) {
+  const encoding = parameter?.encoding ?? {};
+  const codec = normalizeTextCodec(String(encoding?.type ?? 'u7'));
+  const text = String(value ?? '');
+  const length = Math.round(Number(encoding?.length ?? text.length));
+  const pad = Number(encoding?.pad ?? 32);
+  const id = parameter?.id ?? '';
+
+  if (codec !== 'text-ascii' && codec !== 'text-nibbled-ascii') {
+    return { error: `Unsupported text encoder: ${codec} for ${id}` };
+  }
+  if (!Number.isFinite(length) || length <= 0) {
+    return { error: `Text encoder requires a positive length for ${id}` };
+  }
+  // REFUSED, not truncated. Silently cutting "Bass Monster" to "Bass Monst" would rename the
+  // patch on the synth to something the person never typed.
+  if (text.length > length) {
+    return { error: `Text is longer than ${length} characters for ${id}` };
+  }
+  if (!Number.isFinite(pad) || pad < 0 || pad > 127) {
+    return { error: `Text pad byte outside MIDI data byte range for ${id}` };
+  }
+
+  const chars = [];
+  for (let index = 0; index < length; index += 1) {
+    const byte = index < text.length ? text.charCodeAt(index) : pad;
+    if (byte < 32 || byte > 127) return { error: `Text contains non-ASCII/MIDI byte for ${id}` };
+    chars.push(byte);
+  }
+
+  const bytes = codec === 'text-nibbled-ascii'
+    ? chars.flatMap((byte) => [(byte >> 4) & 0x0f, byte & 0x0f])
+    : chars;
+  return { bytes, number: 0, normalized: Math.min(1, text.length / length), displayed: text };
 }
 
 /**
@@ -141,6 +200,13 @@ export function decodeParameterValue(parameter, bytes) {
   const list = Array.isArray(bytes) ? bytes.map((b) => Number(b)) : [];
   if (list.some((b) => !Number.isFinite(b))) return null;
   if (list.length < parameterValueWidth(parameter)) return null;
+
+  // A name comes back as a name. Falling through to `list[0] & 0x7f` returned the ASCII code of the
+  // first letter as the parameter's value, which a caller would then write into a text field.
+  if (String(parameter?.type ?? '') === 'text') {
+    const decoded = localDecodeDumpParameterValue(parameter, list, 0, null);
+    return decoded.ok ? decoded.value : null;
+  }
 
   if (encoding === 'boolean-u7') return (list[0] & 0x7f) === 0 ? 0 : 1;
   if (encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb') {
@@ -164,6 +230,7 @@ export function decodeParameterValue(parameter, bytes) {
 
 export function encodeParameterValue(parameter, value) {
   const encoding = String(parameter?.encoding?.type ?? 'u7');
+  if (String(parameter?.type ?? '') === 'text') return encodeTextValue(parameter, value);
   if (encoding === 'boolean-u7') {
     const on = value === true || ['true', 'on', 'yes', '1'].includes(String(value).toLowerCase());
     return { bytes: [on ? 127 : 0], number: on ? 127 : 0, normalized: on ? 1 : 0, displayed: on ? 'On' : 'Off' };

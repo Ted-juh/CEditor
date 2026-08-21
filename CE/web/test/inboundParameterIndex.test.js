@@ -144,21 +144,29 @@ test('a value is decoded with the encoder its parameter declares', () => {
 
 test('every parameter decodes back to the value it was compiled from', () => {
   // The round trip that matters for a bidirectional panel: encode a value, hand the bytes back, get
-  // the same number. Run across all 793 rather than a sample, because the encodings differ per
+  // the same value. Run across all 793 rather than a sample, because the encodings differ per
   // parameter and a width bug shows up in one family at a time.
+  //
+  // A TEXT parameter is probed with text, not with a number. Probing the patch name with 1 used to
+  // "pass" for the wrong reason — the encoder had no text branch, so it wrote a single byte, and
+  // the index read a single byte back. Both were wrong and they agreed.
   const index = buildInboundIndex(GAIA);
   const failures = [];
+  let text = 0;
   for (const parameter of GAIA.parameters) {
-    const value = Math.min(Number(parameter?.range?.max ?? 1), 100);
-    if (!Number.isFinite(value)) continue;
+    const isText = String(parameter?.type ?? '') === 'text';
+    const value = isText ? 'ROUND TRIP' : Math.min(Number(parameter?.range?.max ?? 1), 100);
+    if (!isText && !Number.isFinite(value)) continue;
+    if (isText) text += 1;
     const compiled = localCompileParameter(GAIA, { parameterId: parameter.id, value });
     if (!compiled?.ok) continue;
     const back = decodeInbound(index, compiled.hex);
     if (back?.parameterId !== parameter.id || back?.value !== value) {
-      failures.push(`${parameter.id}: sent ${value}, read ${JSON.stringify(back)}`);
+      failures.push(`${parameter.id}: sent ${JSON.stringify(value)}, read ${JSON.stringify(back)}`);
     }
   }
   assert.deepEqual(failures.slice(0, 5), []);
+  assert.equal(text, 1, 'guard: the patch name is the text case and it must be covered, not skipped');
 });
 
 test('a four-nibble value is not swallowed by the address', () => {

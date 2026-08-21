@@ -195,6 +195,223 @@ int runNibbledEncoderTests (const juce::File& file)
 }
 
 /*
+ * Reading a patch back off the wire, and writing its name.
+ *
+ * WHAT WAS MISSING. The GAIA's block requests declared `response: {kind: 'dt1', address}` — which
+ * says only "a reply will arrive at this address" and does nothing with it. The request went out,
+ * the synth answered with the whole 61-byte Patch Common block, and every byte of it was dropped.
+ * The profile had no dumpDefinitions at all, so there was nothing to parse it WITH. That is an
+ * editor that can only write: you could change the synth but never open it on the patch already
+ * loaded, and nothing on screen said which half of the panel was real.
+ *
+ * The name is the second half of the same story, and a worse failure than a dropped dump. Patch
+ * Name was declared `type: "patchName"` — a word that appears in no branch of either engine — so it
+ * fell through to the numeric path. In the JS runtime that meant a write of "GAIA TEST" compiled,
+ * reported success, and sent one byte of NUL over the first character of the patch's name.
+ *
+ * These assertions are against the format's properties, not ours: a dump is the block's bytes in
+ * address order, so a parameter's payload offset is its address delta — checked here on parameters
+ * whose addresses the manual prints, and on a name that must survive a round trip through the
+ * encoder and the dump reader unchanged.
+ */
+int runPatchDumpTests (const juce::File& file)
+{
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromFile (file, error))
+    {
+        std::cerr << "[FAIL] dump: could not load " << file.getFileName() << ": " << error << "\n";
+        return 1;
+    }
+
+    auto failures = 0;
+
+    // Build a Patch Common dump the way the synth would: DT1 at 10 00 00 00, 61 bytes, Roland
+    // checksum over address and data. The name goes in at offset 0 and Patch Level at offset 12.
+    juce::Array<int> body { 0x10, 0x00, 0x00, 0x00 };
+    juce::Array<int> data;
+    for (auto i = 0; i < 61; ++i)
+        data.add (0);
+
+    const juce::String name { "BASS MONSTER" };
+    for (auto i = 0; i < name.length(); ++i)
+        data.set (i, (int) name[i]);
+    data.set (12, 100);   // common.patchLevel
+    data.set (13, 120);   // common.patchTempo is nibbled — this is its first nibble
+
+    for (auto byte : data)
+        body.add (byte);
+
+    auto sum = 0;
+    for (auto byte : body)
+        sum += byte;
+
+    juce::Array<int> message { 0xf0, 0x41, 0x10, 0x00, 0x00, 0x41, 0x12 };
+    message.addArray (body);
+    message.add ((128 - (sum % 128)) % 128);
+    message.add (0xf7);
+
+    const auto parsed = engine.parseDumpMessage (ceditor::device::DeviceProfileEngine::bytesToHex (message));
+    if (! parsed.ok)
+    {
+        std::cerr << "[FAIL] dump: Patch Common did not parse: " << parsed.error << "\n";
+        ++failures;
+    }
+    else
+    {
+        if (parsed.dumpId != "common")
+        {
+            std::cerr << "[FAIL] dump: matched \"" << parsed.dumpId << "\", not the Patch Common definition\n";
+            ++failures;
+        }
+        if (parsed.checksumStatus != "ok")
+        {
+            std::cerr << "[FAIL] dump: checksum reported \"" << parsed.checksumStatus << "\"\n";
+            ++failures;
+        }
+
+        auto* values = parsed.values.getDynamicObject();
+        const auto valueOf = [values] (const char* id)
+        {
+            return values != nullptr ? values->getProperty (id) : juce::var();
+        };
+
+        // The name, which is the assertion the old `type: "patchName"` could never have passed.
+        if (valueOf ("common.patchName").toString() != name)
+        {
+            std::cerr << "[FAIL] dump: patch name read back as \""
+                      << valueOf ("common.patchName").toString() << "\", not \"" << name << "\"\n";
+            ++failures;
+        }
+        if ((int) valueOf ("common.patchLevel") != 100)
+        {
+            std::cerr << "[FAIL] dump: Patch Level read back as " << (int) valueOf ("common.patchLevel")
+                      << " — a mapping offset is wrong\n";
+            ++failures;
+        }
+
+        if (failures == 0)
+            std::cout << "[PASS] dump :: Patch Common parses, name and level land at their addresses\n";
+    }
+
+    // A Tone 2 reply must not be applied as Tone 1's. The three tone blocks are the same table at a
+    // 0x0100 stride, so the ONLY thing telling them apart is the address — and it is in the matcher
+    // rather than a field read afterwards precisely so this cannot go wrong silently.
+    {
+        juce::Array<int> toneBody { 0x10, 0x00, 0x02, 0x00 };
+        for (auto i = 0; i < 62; ++i)
+            toneBody.add (0);
+
+        auto toneSum = 0;
+        for (auto byte : toneBody)
+            toneSum += byte;
+
+        juce::Array<int> toneMessage { 0xf0, 0x41, 0x10, 0x00, 0x00, 0x41, 0x12 };
+        toneMessage.addArray (toneBody);
+        toneMessage.add ((128 - (toneSum % 128)) % 128);
+        toneMessage.add (0xf7);
+
+        const auto tone = engine.parseDumpMessage (ceditor::device::DeviceProfileEngine::bytesToHex (toneMessage));
+        if (! tone.ok || tone.dumpId != "tone2")
+        {
+            std::cerr << "[FAIL] dump: a Tone 2 block matched \"" << tone.dumpId << "\"\n";
+            ++failures;
+        }
+        else
+        {
+            std::cout << "[PASS] dump :: the tone blocks are told apart by address, not by order\n";
+        }
+    }
+
+    // Every request that names a dump must name one that exists. A request for a dump the profile
+    // does not define makes loadFromJson reject the WHOLE profile — silently, taking all 793
+    // parameters with it — so this is a check on the profile, not on the engine.
+    {
+        const auto document = juce::JSON::parse (file.loadFileAsString());
+        auto* object = document.getDynamicObject();
+        auto* requests = object != nullptr ? object->getProperty ("requests").getArray() : nullptr;
+        auto* dumps = object != nullptr ? object->getProperty ("dumpDefinitions").getArray() : nullptr;
+
+        juce::StringArray declared;
+        if (dumps != nullptr)
+            for (const auto& dump : *dumps)
+                if (auto* d = dump.getDynamicObject())
+                    declared.add (d->getProperty ("id").toString());
+
+        auto dangling = 0, wired = 0;
+        if (requests != nullptr)
+            for (const auto& request : *requests)
+            {
+                auto* r = request.getDynamicObject();
+                auto* response = r != nullptr ? r->getProperty ("response").getDynamicObject() : nullptr;
+                if (response == nullptr || response->getProperty ("kind").toString() != "bulkDump")
+                    continue;
+                ++wired;
+                if (! declared.contains (response->getProperty ("dump").toString()))
+                {
+                    std::cerr << "[FAIL] dump: request \"" << r->getProperty ("id").toString()
+                              << "\" asks for a dump that is not defined\n";
+                    ++dangling;
+                }
+            }
+
+        if (wired < 25)
+        {
+            std::cerr << "[FAIL] dump: only " << wired << " requests parse their reply — the rest still drop it\n";
+            ++failures;
+        }
+        else if (dangling == 0)
+        {
+            std::cout << "[PASS] dump :: all " << wired << " block requests parse the reply they ask for\n";
+        }
+        failures += dangling;
+    }
+
+    // Writing the name. The round trip is the point: what the encoder produces is what the dump
+    // reader must give back, or the field on screen and the field in the synth drift by a save.
+    {
+        const auto written = engine.compileSetParameter ("mainSynth", "common.patchName", juce::var (name), true);
+        if (! written.ok)
+        {
+            std::cerr << "[FAIL] dump: the patch name could not be written: " << written.error << "\n";
+            ++failures;
+        }
+        else
+        {
+            juce::StringArray bytes;
+            bytes.addTokens (written.transaction.encodedValueHex, " ", "");
+            bytes.removeEmptyStrings();
+            if (bytes.size() != 12)
+            {
+                std::cerr << "[FAIL] dump: the patch name encoded to " << bytes.size()
+                          << " bytes, not 12\n";
+                ++failures;
+            }
+            else
+            {
+                std::cout << "[PASS] dump :: a 12-character patch name writes as 12 ASCII bytes\n";
+            }
+        }
+
+        // Refused, not truncated. Cutting "BASS MONSTER 2" down to fit would rename the patch on
+        // the instrument to something nobody typed.
+        const auto tooLong = engine.compileSetParameter ("mainSynth", "common.patchName",
+                                                         juce::var ("THIRTEEN CHARS"), true);
+        if (tooLong.ok)
+        {
+            std::cerr << "[FAIL] dump: a 14-character patch name was accepted into a 12-byte field\n";
+            ++failures;
+        }
+        else
+        {
+            std::cout << "[PASS] dump :: an over-long patch name is refused rather than cut\n";
+        }
+    }
+
+    return failures;
+}
+
+/*
  * Preset recall, in the engine.
  *
  * The engine knew nothing about presets: it passed `presetBrowser` through and stopped. So the
@@ -1709,6 +1926,7 @@ int main()
     failures += runMidiCiTests();
     failures += runChecksumTableTests();
     failures += runNibbledEncoderTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
+    failures += runPatchDumpTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runPresetRecallTests (root);
 
     if (failures == 0)
