@@ -199,10 +199,24 @@ export function expressionEvent(message) {
   const channel = (m[0] & 0x0F) + 1;
   if (status === 0xB0) {
     const cc = m[1] & 0x7F;
-    // Channel-mode messages aren't continuous controllers, but 120/123 do have
-    // to reach the reducer: they silence the channel, so any per-note pressure
-    // it was holding is stale.
+    // Channel-mode messages aren't continuous controllers, but three of them do
+    // have to reach a reducer.
+    //
+    // 120 and 123 silence the channel, so any per-note pressure it was holding
+    // is stale.
     if (cc === 120 || cc === 123) return { kind: 'pressureClearAll', channel };
+    // 121 is Reset All Controllers, and the MIDI spec has it clear the RPN/NRPN
+    // selection along with everything else — what follows a controller reset is
+    // not addressed to whatever was selected before it. It used to be dropped
+    // here with the rest of the 120-and-up block, so a stale selection stayed in
+    // force and the next Data Entry was attributed to it.
+    //
+    // Its own kind rather than a `cc` event, because it is not a controller
+    // value: every consumer gates on kind (the router's routable filter,
+    // matchesMidiControl, learnKey, the expression buckets), so this reaches the
+    // NRPN machine and is inert everywhere else, which is what widening the
+    // shared reducer was previously thought to cost.
+    if (cc === 121) return { kind: 'controllerReset', channel };
     if (cc >= 120) return null;
     return { kind: 'cc', channel, cc, value: (m[2] ?? 0) & 0x7F };
   }

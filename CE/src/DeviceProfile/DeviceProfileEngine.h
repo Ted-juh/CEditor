@@ -211,14 +211,21 @@ private:
                              const juce::String& displayedValue,
                              bool dryRun) const;
 
-    CompileResult compileNrpn (const juce::String& deviceRole,
-                               const juce::DynamicObject& parameter,
-                               const juce::DynamicObject& recipe,
-                               const juce::var& semanticValue,
-                               const juce::Array<int>& encodedBytes,
-                               double normalizedValue,
-                               const juce::String& displayedValue,
-                               bool dryRun) const;
+    // NRPN and RPN are ONE builder. They differ only in which pair of controllers selects the
+    // parameter number — 99/98 for an NRPN, 101/100 for an RPN — and in the null that closes it.
+    // Everything else (channel, 7- vs 14-bit value on CC 6/38, the delays) is identical, so a second
+    // copy would be a second place for the value handling to drift.
+    CompileResult compileParameterNumber (const juce::String& deviceRole,
+                                          const juce::DynamicObject& parameter,
+                                          const juce::DynamicObject& recipe,
+                                          const juce::var& semanticValue,
+                                          const juce::Array<int>& encodedBytes,
+                                          double normalizedValue,
+                                          const juce::String& displayedValue,
+                                          bool dryRun,
+                                          int selectMsbController,
+                                          int selectLsbController,
+                                          const juce::String& label) const;
 
     CompileResult compileSysex (const juce::String& deviceRole,
                                 const juce::DynamicObject& parameter,

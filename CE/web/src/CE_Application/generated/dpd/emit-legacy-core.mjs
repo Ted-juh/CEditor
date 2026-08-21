@@ -195,6 +195,7 @@ function legacyParam(p) {
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.
   out.messageRecipe = p.wires?.write?.msg === 'cc' ? ('cc' + p.wires.write.cc)
     : p.wires?.write?.msg === 'nrpn' ? ('nrpn' + String(p.wires.write.nrpn ?? '').replace(/\s+/g, ''))
+    : p.wires?.write?.msg === 'rpn' ? ('rpn' + String(p.wires.write.rpn ?? '').replace(/\s+/g, ''))
     : (p.wires?.write?.msg ?? 'dt1');
   // An rxLive wire is the message the instrument SENDS when its own control moves, which need not be
   // the one the editor writes: a GAIA's filter knob is written as a DT1 to an address and transmitted
@@ -240,14 +241,27 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   for (const cc of ccControllers) {
     messageRecipes.push({ id: `cc${cc}`, kind: 'cc', channel: '$channel', controller: cc, value: '$encodedValue' });
   }
-  // one NRPN recipe per distinct NRPN parameter number (the engine handles legacy nrpn recipes).
-  const nrpnSeen = new Set();
-  for (const p of params) {
-    const wr = p.wires?.write;
-    if (wr?.msg !== 'nrpn' || !wr.nrpn || nrpnSeen.has(wr.nrpn)) continue;
-    nrpnSeen.add(wr.nrpn);
-    const [msb, lsb] = wr.nrpn.trim().split(/\s+/).map((h) => parseInt(h, 16));
-    messageRecipes.push({ id: 'nrpn' + wr.nrpn.replace(/\s+/g, ''), kind: 'nrpn', channel: '$channel', parameterMsb: msb, parameterLsb: lsb, valueResolution: (wr.size ?? 1) >= 2 ? 14 : 7, value: '$encodedValue' });
+  // One recipe per distinct parameter number, for both flavours. NRPN and RPN differ only in the
+  // controller pair that selects the number — 99/98 against 101/100 — which is the engine's business
+  // rather than the emitter's, so the two loops are the same loop with a different key.
+  for (const flavour of ['nrpn', 'rpn']) {
+    const seen = new Set();
+    for (const p of params) {
+      const wr = p.wires?.write;
+      const number = wr?.[flavour];
+      if (wr?.msg !== flavour || !number || seen.has(number)) continue;
+      seen.add(number);
+      const [msb, lsb] = number.trim().split(/\s+/).map((h) => parseInt(h, 16));
+      messageRecipes.push({
+        id: flavour + number.replace(/\s+/g, ''),
+        kind: flavour,
+        channel: '$channel',
+        parameterMsb: msb,
+        parameterLsb: lsb,
+        valueResolution: (wr.size ?? 1) >= 2 ? 14 : 7,
+        value: '$encodedValue',
+      });
+    }
   }
 
   const legacy = {

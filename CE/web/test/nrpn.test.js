@@ -121,15 +121,37 @@ test('a null after a send stops the next Data Entry reaching the parameter', () 
   assert.deepEqual(after.assembled, [], 'a later Data Entry was attributed to the closed parameter');
 });
 
-test('reset all controllers does NOT clear the selection, and that is a known gap', () => {
-  // It should — what follows a controller reset is not addressed to what was selected before. But
-  // expressionEvent() drops every controller from 120 up, so CC 121 never reaches this machine, and
-  // making it arrive means widening a reducer the Router shares. Pinned as the behaviour that
-  // actually happens, so the gap is visible rather than assumed closed.
+test('reset all controllers clears the selection', () => {
+  // What follows a controller reset is not addressed to whatever was selected before it. This used
+  // to be a pinned GAP: expressionEvent() dropped every controller from 120 up, so CC 121 never
+  // reached this machine and a stale selection stayed in force, silently capturing the next Data
+  // Entry. CC 121 now arrives as its own `controllerReset` kind — not as a cc event, so it reaches
+  // here and is inert in the router, the learn buckets and matchesMidiControl, all of which gate on
+  // kind. That was the cost of "widening a reducer the Router shares", and it turned out not to be
+  // one.
   const selected = feed(`${SELECT}`);
   const after = feed('B0 79 00 B0 06 02', selected.state);
-  assert.equal(after.assembled.length, 1, 'if this starts failing, CC 121 now arrives — handle it');
-  assert.equal(after.assembled[0].parameterLsb, 32, 'the stale selection is still in force');
+  assert.deepEqual(after.assembled, [], 'a Data Entry after a reset was attributed to the old selection');
+});
+
+test('a reset clears only its own channel', () => {
+  // Two synths on two channels: resetting one must not drop the other's selection.
+  let { state } = feed('B0 63 01 B0 62 20');          // ch 1 -> NRPN 1:32
+  ({ state } = feed('B1 63 05 B1 62 06', state));     // ch 2 -> NRPN 5:6
+  ({ state } = feed('B0 79 00', state));              // reset ch 1 only
+
+  assert.deepEqual(feed('B0 06 10', state).assembled, [], 'channel 1 kept its selection');
+  const two = feed('B1 06 10', state);
+  assert.equal(two.assembled.length, 1, 'channel 2 lost a selection nobody reset');
+  assert.equal(two.assembled[0].parameterLsb, 6);
+});
+
+test('a reset with nothing selected changes nothing', () => {
+  // No churn: the reducer must hand back the same state object rather than a fresh one, or every
+  // panic button press would wake every consumer of it.
+  const { state } = feed('B0 63 01 B0 62 20');
+  const before = feed('B1 79 00', state);             // reset a channel with no selection
+  assert.equal(before.state, state, 'an empty reset minted new state');
 });
 
 test('channels are kept apart', () => {

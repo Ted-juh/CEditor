@@ -32,11 +32,12 @@
  *   what this app's own sender writes when a binding asks for nullAfterSend. Treating it as a
  *   parameter would attribute every later stray Data Entry to it.
  *
- * Reset All Controllers (CC 121) should clear the selection for the same reason and does not:
- * expressionEvent() in midiNoteInput.js drops every controller from 120 up, so it never arrives
- * here. Making it arrive means widening a reducer the Router shares, which is not worth doing for
- * this — but a device that resets controllers mid-stream will leave a stale selection, and a Data
- * Entry after it would be read against the old parameter.
+ * Reset All Controllers (CC 121) clears the selection for the same reason: a device that resets
+ * controllers mid-stream would otherwise leave a stale one, and the next Data Entry would be read
+ * against the old parameter. It used not to — expressionEvent() dropped every controller from 120
+ * up, and making one arrive was thought to mean widening a reducer the Router shares. It does not:
+ * CC 121 arrives as its own `controllerReset` kind, and every other consumer gates on kind, so it
+ * reaches this machine and is inert in all of them.
  *
  */
 
@@ -72,6 +73,16 @@ const isNull = (selection) => selection?.msb === 127 && selection?.lsb === 127;
 export function applyNrpnEvent(state, event) {
   const current = state ?? EMPTY_NRPN_STATE;
   const unchanged = { state: current, nrpn: null, consumed: false };
+  // Reset All Controllers clears the selection on its channel — see expressionEvent(). Handled
+  // before the `cc` gate because it is deliberately not a cc event.
+  if (event?.kind === 'controllerReset') {
+    const resetChannel = Number(event.channel) || 0;
+    if (!(resetChannel in current.channels)) return unchanged;
+    const channels = { ...current.channels };
+    delete channels[resetChannel];
+    return { state: { ...current, channels }, nrpn: null, consumed: false };
+  }
+
   if (event?.kind !== 'cc') return unchanged;
 
   const channel = Number(event.channel) || 0;

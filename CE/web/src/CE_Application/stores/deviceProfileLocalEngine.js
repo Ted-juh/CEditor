@@ -207,17 +207,40 @@ export function localCompileParameter(profile, request = {}) {
 
   if (kind === 'cc') {
     bytes = [status, clampInt(recipe.controller, 0, 127), encoded.bytes[0] ?? 0];
-  } else if (kind === 'nrpn') {
-    const value14 = encoded.bytes.length > 1
-      ? encoded
-      : encodeParameterValue({ encoding: { type: 'u14' } }, encoded.number);
+  } else if (kind === 'nrpn' || kind === 'rpn') {
+    // ONE builder for both, as in DeviceProfileEngine.cpp. They differ only in the controller pair
+    // that selects the parameter number: 99/98 for an NRPN, 101/100 for an RPN. Writing the RPN case
+    // out separately would be a second place for the 7- vs 14-bit value handling below to drift, and
+    // this engine exists precisely to agree with the C++ one.
+    const [selectMsb, selectLsb] = kind === 'rpn' ? [101, 100] : [99, 98];
+
+    // valueResolution DECIDES, as it does in DeviceProfileEngine.cpp. This used to re-encode every
+    // value to 14 bits and then guess from the result whether to send CC 38 — so a recipe declaring
+    // `valueResolution: 7` still emitted a second message, with the value split across CC 6 and 38.
+    // The C++ engine sends one. Every 7-bit NRPN in every profile was therefore built differently by
+    // the two engines, and the fallback was the one people saw in the DPD preview.
+    const resolution = Number(recipe.valueResolution) === 14 ? 14 : 7;
     bytes = [
-      status, 99, clampInt(recipe.parameterMsb, 0, 127),
-      status, 98, clampInt(recipe.parameterLsb, 0, 127),
-      status, 6, value14.bytes[0] ?? 0,
+      status, selectMsb, clampInt(recipe.parameterMsb, 0, 127),
+      status, selectLsb, clampInt(recipe.parameterLsb, 0, 127),
     ];
-    if ((value14.bytes[1] ?? 0) !== 0 || value14.number > 127) {
+
+    if (resolution === 14) {
+      const value14 = encoded.bytes.length > 1
+        ? encoded
+        : encodeParameterValue({ encoding: { type: 'u14' } }, encoded.number);
+      bytes.push(status, 6, value14.bytes[0] ?? 0);
       bytes.push(status, 38, value14.bytes[1] ?? 0);
+    } else {
+      bytes.push(status, 6, encoded.bytes[0] ?? 0);
+    }
+
+    // The null closes the selection, so a later CC 6 on the channel cannot land on this parameter by
+    // accident. It uses the SAME pair that opened it. Not implemented here at all until now, so a
+    // profile asking for it got it from the C++ engine and not from this one.
+    if (recipe.nullAfterSend === true) {
+      bytes.push(status, selectMsb, 127);
+      bytes.push(status, selectLsb, 127);
     }
   } else if (kind === 'sysex') {
     // This built a DIFFERENT message from DeviceProfileEngine.cpp, which is the one thing a fallback

@@ -1732,8 +1732,13 @@ CompileResult DeviceProfileEngine::compileWithParameter (const juce::String& dev
     auto kind = propString (*recipe, "kind");
     if (kind == "cc")
         return compileCc (deviceRole, parameter, *recipe, semanticValue, encodedBytes, normalizedValue, displayedValue, dryRun);
+    // 99/98 select an NRPN, 101/100 an RPN. One builder, two controller pairs — see the header.
     if (kind == "nrpn")
-        return compileNrpn (deviceRole, parameter, *recipe, semanticValue, encodedBytes, normalizedValue, displayedValue, dryRun);
+        return compileParameterNumber (deviceRole, parameter, *recipe, semanticValue, encodedBytes,
+                                       normalizedValue, displayedValue, dryRun, 99, 98, "NRPN");
+    if (kind == "rpn")
+        return compileParameterNumber (deviceRole, parameter, *recipe, semanticValue, encodedBytes,
+                                       normalizedValue, displayedValue, dryRun, 101, 100, "RPN");
     if (kind == "sysex")
         return compileSysex (deviceRole, parameter, *recipe, semanticValue, encodedBytes, normalizedValue, displayedValue, dryRun);
 
@@ -1971,23 +1976,26 @@ CompileResult DeviceProfileEngine::compileCc (const juce::String& deviceRole,
     return { true, {}, transaction };
 }
 
-CompileResult DeviceProfileEngine::compileNrpn (const juce::String& deviceRole,
-                                                const juce::DynamicObject& parameter,
-                                                const juce::DynamicObject& recipe,
-                                                const juce::var& semanticValue,
-                                                const juce::Array<int>& encodedBytes,
-                                                double normalizedValue,
-                                                const juce::String& displayedValue,
-                                                bool dryRun) const
+CompileResult DeviceProfileEngine::compileParameterNumber (const juce::String& deviceRole,
+                                                           const juce::DynamicObject& parameter,
+                                                           const juce::DynamicObject& recipe,
+                                                           const juce::var& semanticValue,
+                                                           const juce::Array<int>& encodedBytes,
+                                                           double normalizedValue,
+                                                           const juce::String& displayedValue,
+                                                           bool dryRun,
+                                                           int selectMsbController,
+                                                           int selectLsbController,
+                                                           const juce::String& label) const
 {
     auto channel = valueFromVarOrVariable (recipe, "channel", [this] (const juce::String& name) { return resolveVariable (name); }, 1);
     if (channel < 1 || channel > 16)
-        return { false, "NRPN channel must be 1-16", {} };
+        return { false, label + " channel must be 1-16", {} };
 
     auto parameterMsb = propInt (recipe, "parameterMsb");
     auto parameterLsb = propInt (recipe, "parameterLsb");
     if (! isMidiDataByte (parameterMsb) || ! isMidiDataByte (parameterLsb))
-        return { false, "NRPN parameter bytes must be 0-127", {} };
+        return { false, label + " parameter bytes must be 0-127", {} };
 
     auto status = 0xb0 + (channel - 1);
     auto messageDelayAfterMs = juce::jmax (0, propInt (recipe,
@@ -2015,14 +2023,14 @@ CompileResult DeviceProfileEngine::compileNrpn (const juce::String& deviceRole,
     transaction.checksumStatus = "none";
     applyParameterPolicies (transaction, parameter);
 
-    addCc (transaction.messages, 99, parameterMsb);
-    addCc (transaction.messages, 98, parameterLsb);
+    addCc (transaction.messages, selectMsbController, parameterMsb);
+    addCc (transaction.messages, selectLsbController, parameterLsb);
 
     auto resolution = propInt (recipe, "valueResolution", 7);
     if (resolution == 14)
     {
         if (encodedBytes.size() < 2)
-            return { false, "NRPN 14-bit recipe requires two encoded bytes", {} };
+            return { false, label + " 14-bit recipe requires two encoded bytes", {} };
 
         addCc (transaction.messages, 6, encodedBytes[0]);
         addCc (transaction.messages, 38, encodedBytes[1]);
@@ -2030,15 +2038,17 @@ CompileResult DeviceProfileEngine::compileNrpn (const juce::String& deviceRole,
     else
     {
         if (encodedBytes.isEmpty())
-            return { false, "NRPN recipe requires an encoded value", {} };
+            return { false, label + " recipe requires an encoded value", {} };
 
         addCc (transaction.messages, 6, encodedBytes[0]);
     }
 
     if (propBool (recipe, "nullAfterSend", false))
     {
-        addCc (transaction.messages, 99, 127);
-        addCc (transaction.messages, 98, 127);
+        // The null closes the selection so a later CC 6 cannot land on this parameter by accident.
+        // It uses the SAME pair that opened it: 99/98 127 for an NRPN, 101/100 127 for an RPN.
+        addCc (transaction.messages, selectMsbController, 127);
+        addCc (transaction.messages, selectLsbController, 127);
     }
 
     if (! transaction.messages.isEmpty())

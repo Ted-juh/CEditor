@@ -22,6 +22,8 @@ import { SECTION_DEFAULTS } from '../../../CE/web/src/CE_Application/models/sect
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
 import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds, stepCell } from '../gaia-panel/components.mjs';
+import { createScript } from '../../../CE/web/src/CE_Application/scripting/scriptModel.js';
+import { FEG_POINTS, FEG_TRACKS, fegBridgeScript } from './feg-bridge.mjs';
 import { midiControlBindingFrom } from '../../../CE/web/src/CE_Application/utils/midiControlBindings.js';
 import { COMMON_STRIP, EFFECT_STRIP, PANEL_WIDTH, PATTERN_STRIP, PLAY_STRIP, SCENE_STRIP, SKIN, TINT } from './layout.mjs';
 
@@ -782,6 +784,24 @@ export function buildAn1xPanel({ slim = true } = {}) {
   panel.panelGuid = 'f2b4d9c1-7a35-4e02-8b16-3dd80a95c4e7';
   panel.scriptId = 'yamaha_an1x';
   panel.filePath = null;
+
+  // The Free EG curves, written out. A script rather than a binding because 192 addresses driven by
+  // one curve is not a shape bindings have, and because the write has to DIFF: a curve edit moves
+  // the samples inside one segment, and sending all 768 every time would be many seconds of MIDI
+  // for nudging a node. See feg-bridge.mjs.
+  panel.scripts = [createScript({
+    id: 'an1x_free_eg_bridge',
+    name: 'Free EG curves → synth',
+    language: 'javascript',
+    scope: 'panel',
+    event: 'onPanelLoad',
+    target: '*',
+    description: `Writes the four drawn Free EG curves to the AN1x's ${FEG_TRACKS} tracks of ${FEG_POINTS} samples.`,
+    source: fegBridgeScript(
+      Array.from({ length: FEG_TRACKS }, (_, i) => `fegTrack${i + 1}Curve`),
+      { points: FEG_POINTS },
+    ),
+  })];
 
   return panel;
 }

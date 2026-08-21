@@ -4,10 +4,10 @@
 const KINDS = ['manufacturer', 'model', 'variant', 'component'];
 const VALUE_TYPES = ['continuous', 'signed', 'enum', 'toggle', 'trigger', 'text'];
 const WIRE_DIRS = ['write', 'read', 'rxLive'];
-const WIRE_MSGS = ['dt1', 'rq1', 'cc', 'nrpn', 'raw'];
+const WIRE_MSGS = ['dt1', 'rq1', 'cc', 'nrpn', 'rpn', 'raw'];
 const CHECKSUM_TYPES = ['roland-7bit', 'sum-7bit', 'xor', 'none'];
 const ENCODING_TYPES = ['u7', 'u8', 's7', 'u14', 'u14-lsb', 'nibbles', 'packed8to7', 'bitslice'];
-const SHAPE_KINDS = ['sysex', 'cc', 'nrpn', 'raw'];
+const SHAPE_KINDS = ['sysex', 'cc', 'nrpn', 'rpn', 'raw'];
 const SCOPE_KINDS = ['global', 'tone', 'part', 'effect', 'drumMap', 'patch'];
 const DUMP_KINDS = ['patch', 'performance', 'bank'];
 // The two text codecs are parameter encodings as well as dump codecs. A patch name is ONE value —
