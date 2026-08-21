@@ -541,3 +541,102 @@ test('an EMPTY fitted container re-compiles when its own size fields change', ()
   assert.match(first, /width="100"/);
   assert.match(second, /width="200"/);
 });
+
+/* --------------------------------------------- the two folds, composed (sceneryRenderPlan) */
+
+/*
+ * THE CASE THIS SECTION EXISTS FOR.
+ *
+ * The image compiler refuses text, because an <img> cannot see the page's fonts. On a real panel
+ * text is nearly all of it — the GAIA's 409 controls are 189 Labels and 27 Backgrounds — so a
+ * scenery layer that compiles folds the 27 and hands back the 189. The frozen ground takes exactly
+ * what the image cannot, so the two run in sequence rather than one instead of the other.
+ *
+ * An earlier version gated them against each other and this is what that cost: declaring a scenery
+ * layer traded a fold of 189 labels for an image of 27 boxes, and made the panel slower.
+ */
+
+function knob(id, layer, box = {}) {
+  return createControl('Knob', {
+    Core: { id, name: id, layer },
+    Transform: { x: 0, y: 0, width: 40, height: 40, ...box },
+  });
+}
+
+function label(id, layer, box = {}) {
+  return createControl('Label', {
+    Core: { id, name: id, layer },
+    Transform: { x: 0, y: 0, width: 40, height: 10, ...box },
+  });
+}
+
+const kindsOf = (items) => items.map((i) =>
+  i.type === 'scenery' ? `img:${i.layer}` : i.type === 'ground' ? `ground:${i.layer}` : i.control._children.Core.id);
+
+test('a compiled layer folds its text refusals into a ground instead of handing them back', () => {
+  const panel = panelWith(
+    [box('plate', { Core: { layer: 'Scenery' } }),
+     label('a', 'Scenery', { y: 100 }), label('b', 'Scenery', { y: 120 })],
+    [createLayer('Scenery', { kind: SCENERY_KIND, locked: true })],
+  );
+
+  assert.deepEqual(kindsOf(buildSceneryRenderPlan(panel, { fold: false }).items),
+    ['img:Scenery', 'a', 'b'], 'without the fold the refusals are two live controls');
+  assert.deepEqual(kindsOf(buildSceneryRenderPlan(panel, { fold: true }).items),
+    ['img:Scenery', 'ground:Scenery'], 'with it they are one ground, drawn over the image');
+});
+
+test('an ordinary layer folds too — nothing has to be declared for the ground', () => {
+  const panel = panelWith([label('a', 'Main'), label('b', 'Main', { y: 40 })], [createLayer('Main')]);
+  assert.deepEqual(kindsOf(buildSceneryRenderPlan(panel, { fold: true }).items), ['ground:Main']);
+});
+
+test('each layer gets its own ground, in the layer order', () => {
+  // Per-layer and not per-panel: a ground may only hold controls of the layer it paints at the
+  // depth of, or it would jump over the live controls of every layer in between.
+  const panel = panelWith(
+    [label('back', 'Back'), knob('knob', 'Mid'), label('front', 'Front')],
+    [createLayer('Back'), createLayer('Mid'), createLayer('Front')],
+  );
+  assert.deepEqual(kindsOf(buildSceneryRenderPlan(panel, { fold: true }).items),
+    ['ground:Back', 'knob', 'ground:Front']);
+});
+
+test('a control a live one sits under is not folded, and the ground stays behind it', () => {
+  // planSceneryFold's rule, reaching the plan: the ground paints below every live control on its
+  // layer, so a label printed OVER a knob has to stay live or the knob would swallow it.
+  const panel = panelWith(
+    [label('under', 'Main'),
+     knob('knob', 'Main', { x: 0, y: 30, width: 100, height: 50 }),
+     label('over', 'Main', { y: 40 })],
+    [createLayer('Main')],
+  );
+  assert.deepEqual(kindsOf(buildSceneryRenderPlan(panel, { fold: true }).items),
+    ['ground:Main', 'knob', 'over']);
+});
+
+test('a panel carrying scripts folds nothing, however it is asked', () => {
+  // A script can reach any control by id and set its text — see panelAllowsFold.
+  const panel = panelWith([label('a', 'Main')], [createLayer('Main')]);
+  panel.scripts = [{ id: 's', source: '' }];
+  assert.deepEqual(kindsOf(buildSceneryRenderPlan(panel, { fold: true }).items), ['a']);
+});
+
+test('fold:false is byte-for-byte the list that existed before the ground did', () => {
+  // The migration promise, and the reason every other test in this file still reads as it did.
+  const panel = panelWith(
+    [label('a', 'Main'), box('b', { Core: { id: 'b', layer: 'Main' } })], [createLayer('Main')],
+  );
+  assert.deepEqual(kindsOf(buildSceneryRenderPlan(panel, { fold: false }).items), ['a', 'b']);
+});
+
+test('a ground item is reused across a rebuild that changed nothing', () => {
+  // The same performance contract the control wrappers carry: the plan feeds a keyed {#each}, and
+  // a fresh object every rebuild is a changed value written into the signal of every item in it.
+  // planSceneryFold returns a new ARRAY each run, so this has to compare contents, not identity.
+  const panel = panelWith([label('a', 'Main'), label('b', 'Main', { y: 40 })], [createLayer('Main')]);
+  const first = buildSceneryRenderPlan(panel, { fold: true }).items[0];
+  const second = buildSceneryRenderPlan(panel, { fold: true }).items[0];
+  assert.equal(first.type, 'ground');
+  assert.equal(first, second, 'the ground item was minted twice for the same controls');
+});

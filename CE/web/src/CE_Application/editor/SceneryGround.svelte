@@ -146,9 +146,14 @@
 
 <style>
   /*
-   * Sits at the back of the surface's stacking context, above the background layers and below every
-   * live control — which is exactly the promise planSceneryFold makes when it refuses to fold
-   * anything a live control is already underneath.
+   * Stacks by DOCUMENT ORDER, in the sequence the render plan put it, which is the layer's own
+   * depth. It carried `z-index: 0` while there was only ever one ground on a surface; the plan can
+   * now emit one per layer, and a number here would put all of them in the same band and lose the
+   * ordering the plan just worked out. `.canvas-control` sets no z-index for the same reason.
+   *
+   * Where a ground lands is still the promise planSceneryFold makes: above the background layers
+   * and below every live control on its layer, because it refuses to fold anything a live control
+   * is already underneath.
    *
    * Inert to the pointer: a folded control cannot be clicked, and the editor's own hit-testing
    * reaches it by geometry instead. Without this the ground would swallow clicks meant for the
@@ -159,6 +164,5 @@
     left: 0;
     top: 0;
     pointer-events: none;
-    z-index: 0;
   }
 </style>

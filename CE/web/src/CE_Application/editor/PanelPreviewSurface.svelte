@@ -21,10 +21,10 @@
     setPreviewInspectedControlId,
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
-  import { planSceneryFold, panelAllowsFold, sceneryHoldSet } from '../utils/sceneryModel.js';
+  import { sceneryHoldSet } from '../utils/sceneryModel.js';
   import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
-  import { buildSceneryRenderPlan } from '../utils/sceneryRenderPlan.js';
+  import { buildSceneryRenderPlan, controlItem } from '../utils/sceneryRenderPlan.js';
   import SceneryGround from './SceneryGround.svelte';
   import { flatControls } from '../utils/containment.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
@@ -285,52 +285,40 @@
   // the lock has no meaning and holding the DOM elements open would buy nothing. `orderedControls`
   // is untouched, because every other thing in this file that reads it is asking about behaviour
   // rather than about paint.
-  let previewPlan = $derived(buildSceneryRenderPlan(panel, { preview: true }));
+  let previewPlan = $derived(buildSceneryRenderPlan(panel, { preview: true, fold: true }));
 
   /**
-   * Scenery folded out of the render loop, for the controls the plan did NOT compile.
+   * Which folded controls are drawn live over their own ground.
    *
-   * The two mechanisms are the same pair the editor surface reconciles: the plan folds a layer its
-   * author declared, this folds what the component model proves inert. A panel that compiled a
-   * layer is left to the plan alone — see PanelSurface.svelte for why folding twice restacks.
+   * Preview is where folding is unambiguously safe: a folded control is inert here by definition,
+   * and nothing in preview can select or drag it. The one thing preview does do to a scenery
+   * control is ring it when it is the inspected one, so that control is held live — which is
+   * exactly what sceneryHoldSet exists for, and cheaper than teaching the ground about a highlight
+   * that changes.
    *
-   * Preview is where the inferred fold is unambiguously safe: a folded control is inert here by
-   * definition, and nothing in preview can select or drag it. The one thing preview does do to a
-   * scenery control is ring it when it is the inspected one, so that control is held live — which
-   * is exactly what sceneryHoldSet exists for, and cheaper than teaching the ground about a
-   * highlight that changes.
-   *
-   * A panel carrying scripts folds nothing; see panelAllowsFold.
+   * Per ground rather than per panel: the plan emits one for every layer that folded anything, and
+   * a control may only be hoisted above the ground it actually belongs to.
    */
-  let previewPlanControls = $derived(
-    previewPlan.items.filter((item) => item.type === 'control').map((item) => item.control)
-  );
-  let foldEnabled = $derived(previewPlan.scenery.size === 0 && panelAllowsFold(panel));
-  let sceneryFold = $derived(
-    foldEnabled ? planSceneryFold(previewPlanControls) : { ground: [], live: previewPlanControls },
-  );
-  let groundControls = $derived(sceneryFold.ground);
-
-  // The inspected control is drawn live over the ground so it can carry the inspect ring, which is
-  // the one thing preview does to a scenery control that the ground cannot show.
-  let sceneryHeld = $derived(sceneryHoldSet(
-    groundControls,
-    (c) => getControlId(c) === $previewInspectedControlId,
-  ));
-
-  // The plan's own items, with the folded ones removed and the held ones moved to the front. Same
-  // shape and the same wrapper-identity contract as the editor surface's foldedItems.
-  let renderItems = $derived.by(() => {
-    if (!foldEnabled || groundControls.length === 0) return previewPlan.items;
-    const folded = new Set(groundControls);
-    const heldControls = new Set(sceneryHeld.held);
-    const held = [];
-    const rest = [];
+  let groundHolds = $derived.by(() => {
+    const holds = new Map();
     for (const item of previewPlan.items) {
-      if (item.type !== 'control' || !folded.has(item.control)) rest.push(item);
-      else if (heldControls.has(item.control)) held.push(item);
+      if (item.type !== 'ground') continue;
+      holds.set(item.layer, sceneryHoldSet(item.controls, (c) => getControlId(c) === $previewInspectedControlId));
     }
-    return [...held, ...rest];
+    return holds;
+  });
+
+  // The plan, with each ground's held controls drawn immediately after it — above the rest of that
+  // ground and below every live control on the layer, which is where the fold guarantees they fit.
+  let renderItems = $derived.by(() => {
+    if (groundHolds.size === 0) return previewPlan.items;
+    const out = [];
+    for (const item of previewPlan.items) {
+      out.push(item);
+      if (item.type !== 'ground') continue;
+      for (const control of groundHolds.get(item.layer)?.held ?? []) out.push(controlItem(control));
+    }
+    return out;
   });
   /**
    * Id -> control, over the WHOLE tree.
@@ -6959,21 +6947,19 @@
     <GuideLines {scale} panelWidth={panel.width} panelHeight={panel.height} />
   {/if}
 
-  {#if groundControls.length}
-    <SceneryGround
-      controls={groundControls}
-      allControls={orderedControls}
-      panelControls={panel.controls}
-      panelWidth={panel.width}
-      panelHeight={panel.height}
-      {scale}
-      hiddenIds={sceneryHeld.heldIds}
-    />
-  {/if}
-
-  {#each renderItems as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.control._children?.Core?.id)}
+  {#each renderItems as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.type === 'ground' ? `ground:${item.layer}` : item.control._children?.Core?.id)}
     {#if item.type === 'scenery'}
       <img class="scenery-layer" src={item.url} width={panel.width} height={panel.height} alt="" />
+    {:else if item.type === 'ground'}
+      <SceneryGround
+        controls={item.controls}
+        allControls={orderedControls}
+        panelControls={panel.controls}
+        panelWidth={panel.width}
+        panelHeight={panel.height}
+        {scale}
+        hiddenIds={groundHolds.get(item.layer)?.heldIds ?? new Set()}
+      />
     {:else}
     {@const control = item.control}
     <CanvasControl
