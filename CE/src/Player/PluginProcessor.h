@@ -514,6 +514,11 @@ private:
     juce::AudioProcessorValueTreeState apvts;
     ceditor::device::DeviceProfileService deviceService;
     std::map<juce::String, float> lastSentMidi;
+    // What preset each role is on, as far as anything has said — a recall going out or a Program
+    // Change coming in. Not a reading of the instrument: a synth does not announce its patch, so
+    // "unknown" (-1) is a real answer a script can act on rather than a confident wrong one.
+    std::map<juce::String, int> currentPresetSlot;
+    std::map<juce::String, juce::String> currentPresetSource;
     bool wasWindowOpen = false;
 #endif
 
@@ -636,6 +641,41 @@ private:
             co->setProperty ("cc", (int) bytes.getReference (1));
             co->setProperty ("value", (int) bytes.getReference (2));
             scriptRuntime->dispatchEvent ("onCcIn", "", juce::var (co));
+        }
+
+        // A Program Change is the instrument saying which preset it is on. Raised as its own event
+        // rather than left to onMidiIn, because it carries the PROFILE's reading of that slot — the
+        // name, the bank, whether it is writable — which is a different thing from "a 0xC0 arrived".
+        // Same shape and same reasoning as panelRuntime.js's inbound path.
+        if ((status & 0xF0) == 0xC0 && bytes.size() >= 2)
+        {
+            auto role = o->getProperty ("deviceRole").toString();
+            if (role.isEmpty()) role = "mainSynth";
+            const int program = ((int) bytes.getReference (1)) & 0x7f;
+            const auto previous = currentPresetSlot.find (role);
+            // Change-detected, so a device echoing its own Program Change back does not raise twice.
+            if (previous == currentPresetSlot.end() || previous->second != program
+                || currentPresetSource[role] != "device")
+            {
+                currentPresetSlot[role] = program;
+                currentPresetSource[role] = "device";
+
+                auto* po = new juce::DynamicObject();
+                po->setProperty ("role", role);
+                po->setProperty ("slot", program);
+                po->setProperty ("source", "device");
+                auto* engine = deviceService.engineForRole (role);
+                const auto info = engine != nullptr
+                    ? engine->presetSlotInfo (program)
+                    : ceditor::device::DeviceProfileEngine::PresetSlotInfo{};
+                po->setProperty ("program", info.program);
+                po->setProperty ("name", info.catalogName);
+                po->setProperty ("category", info.category);
+                po->setProperty ("bankId", info.bankId);
+                po->setProperty ("bankLabel", info.bankLabel);
+                po->setProperty ("writable", info.writable);
+                scriptRuntime->dispatchEvent ("onPresetChange", "", juce::var (po));
+            }
         }
 
         // Notes. Classified from the STATUS BYTE rather than from messageType, so this and the
@@ -1034,6 +1074,62 @@ private:
                 if (forRole == nullptr) return {};
                 const juce::Identifier key (id);
                 return forRole->hasProperty (key) ? forRole->getProperty (key) : juce::var();
+            }
+
+            // Preset recall and readback. `recallPreset` goes through the service, which compiles
+            // the profile's own action and sends it — the same door the editor's librarian uses, so
+            // a preset recalled window-closed addresses the patch a preset recalled window-open
+            // does. `preset` answers from what has been SEEN (a recall going out, a Program Change
+            // coming in) rather than by asking the instrument, which almost none can be asked.
+            if (kind == "recallPreset")
+            {
+                auto* request = new juce::DynamicObject();
+                request->setProperty ("deviceRole", role);
+                request->setProperty ("slot", p != nullptr ? p->getProperty ("slot") : juce::var (0));
+                request->setProperty ("dryRun", false);
+                auto result = deviceService.compilePresetRecallAction (juce::var (request), true);
+
+                if (auto* answered = result.getDynamicObject())
+                    if (answered->getProperty ("ok").equals (juce::var (true)))
+                    {
+                        currentPresetSlot[role] = static_cast<int> (answered->getProperty ("slot"));
+                        currentPresetSource[role] = "panel";
+                    }
+                return result;
+            }
+
+            if (kind == "preset")
+            {
+                const auto slotIt = currentPresetSlot.find (role);
+                const int slot = slotIt != currentPresetSlot.end() ? slotIt->second : -1;
+                auto* out = new juce::DynamicObject();
+                out->setProperty ("role", role);
+                out->setProperty ("slot", slot);
+                const auto sourceIt = currentPresetSource.find (role);
+                out->setProperty ("source", sourceIt != currentPresetSource.end() ? sourceIt->second : juce::String());
+                // -1 means nothing has told us yet, and the name/bank fields would be a guess.
+                if (slot < 0)
+                {
+                    out->setProperty ("program", -1);
+                    out->setProperty ("name", juce::String());
+                    out->setProperty ("category", juce::String());
+                    out->setProperty ("bankId", juce::String());
+                    out->setProperty ("bankLabel", juce::String());
+                    out->setProperty ("writable", true);
+                    return juce::var (out);
+                }
+
+                auto* engine = deviceService.engineForRole (role);
+                const auto info = engine != nullptr
+                    ? engine->presetSlotInfo (slot)
+                    : ceditor::device::DeviceProfileEngine::PresetSlotInfo{};
+                out->setProperty ("program", info.program);
+                out->setProperty ("name", info.catalogName);
+                out->setProperty ("category", info.category);
+                out->setProperty ("bankId", info.bankId);
+                out->setProperty ("bankLabel", info.bankLabel);
+                out->setProperty ("writable", info.writable);
+                return juce::var (out);
             }
 
             if (kind == "profile")

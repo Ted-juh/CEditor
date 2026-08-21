@@ -527,6 +527,10 @@ export const DEVICE_EVENTS = [
   // decoded (the DPD payoff — 90% of use)
   { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', decoded: true, summary: 'A value arrived, decoded via the DPD. info.parameter, info.value.' },
   { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', decoded: true, summary: 'A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.' },
+  // A preset changed on the instrument OR from this panel, which is one event on purpose: a script
+  // that repaints a name display does not care which end pressed the button, and giving it two
+  // events would mean every such script wiring both and getting it wrong once.
+  { id: 'presetChange', fn: 'onPresetChange', payload: 'preset', decoded: true, summary: 'The current preset changed. preset.slot, preset.program, preset.name, preset.category, preset.bankId, preset.source ("device" when the instrument sent a Program Change, "panel" when recallPreset did it).' },
   // raw (escape hatch)
   { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.' },
   { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value. cc.channel is 0-based here, unlike sendCC and onNoteIn.' },
@@ -806,6 +810,26 @@ export const COMMANDS = [
       lua: 'requestDump("${1:patch}", function(values, info)\n  if info.ok then $0 end\nend)',
       javascript: 'requestDump("${1:patch}", (values, info) => {\n  if (info.ok) { $0 }\n});',
     },
+  },
+  {
+    id: 'recallPreset', category: 'Device / MIDI', signature: 'recallPreset(slot [, opts])',
+    summary: 'Recall a preset by slot, using the action the profile declares — a Program Change, a Bank Select pair plus a Program Change, or a SysEx template. Returns { ok, error, slot, name, category, messages }. The slot is the device-global number the profile\'s banks partition, not a program number: on a machine whose second bank starts at 64, slot 64 is that bank\'s first preset whatever program number it maps to.',
+    params: [
+      { name: 'slot', type: 'number', required: true },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'role', type: 'string', default: '"mainSynth"',
+          summary: 'Which device to recall on, when the panel names more than one.' },
+      ]) },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'recallPreset(${1:0})$0', javascript: 'recallPreset(${1:0})$0' },
+  },
+  {
+    id: 'preset', category: 'Device / MIDI', signature: 'preset([role])',
+    summary: 'What is loaded now: { slot, program, name, category, bankId, bankLabel, writable, source }. Slot is -1 until something says otherwise — a synth does not announce its patch on connect and almost none can be asked, so this reports what has been observed (a Program Change arriving, or a recallPreset going out) rather than a reading of the instrument.',
+    params: [{ name: 'role', type: 'string', required: false }],
+    scopes: 'any',
+    snippet: { lua: 'local p = preset()$0', javascript: 'const p = preset();$0' },
   },
   {
     id: 'applyDump', category: 'Device / MIDI', signature: 'applyDump(bytes)',
@@ -3770,6 +3794,9 @@ const MODULE_MEMBERS = {
     // is the only thing distinguishing it from a panel property.
     profile: 'deviceProfile', parameters: 'deviceParameters',
     parameter: 'deviceParameter', connected: 'deviceConnected',
+    // Preset recall keeps its full name flat AND namespaced: `recallPreset` is unambiguous either
+    // way, where a bare global `preset` would not be — so the read is aliased and the action is not.
+    recallPreset: 'recallPreset', preset: 'preset',
     // The profile DOCUMENT, rather than the catalogue row profile() answers from. `variables` and
     // `timing` are §1 collisions as bare globals — both are words a panel author reaches for — so
     // flat they keep the device prefix, the same rule every other read here follows.

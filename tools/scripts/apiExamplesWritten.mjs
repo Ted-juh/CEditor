@@ -126,6 +126,18 @@ export const WRITTEN = {
     js: `// from the device, or from an already-decoded map with no device at all\nce.device.applyDump(bytes);\nce.device.applyDump({ "osc1.wave": 2, "filter.cutoff": 96 });`,
   },
   sendDump: { code: 'ce.device.sendDump("patch")' },
+  // The slot is the device-global number the profile's banks partition, not a program number: on a
+  // machine whose second bank starts at 64, slot 64 is that bank's first preset whatever program
+  // number it maps to. `preset()` reports what has been observed rather than asking the instrument,
+  // so its slot is -1 until a recall goes out or a Program Change arrives.
+  recallPreset: {
+    lua: `local r = ce.device.recallPreset(47)\nif r.ok then log("recalled " .. r.slot .. " " .. r.name) else log(r.error) end`,
+    js: `const r = ce.device.recallPreset(47);\nif (r.ok) log(\`recalled \${r.slot} \${r.name}\`); else log(r.error);`,
+  },
+  preset: {
+    lua: `local p = ce.device.preset()\nif p.slot >= 0 then set("nameDisplay.text.content", p.name) end`,
+    js: `const p = ce.device.preset();\nif (p.slot >= 0) set("nameDisplay.text.content", p.name);`,
+  },
   buildDump: {
     lua: `local bytes = ce.device.buildDump("patch")\nif bytes then ce.storage.saveSetting("lastPatch", bytes) end`,
     js: `const bytes = ce.device.buildDump("patch");\nif (bytes) ce.storage.saveSetting("lastPatch", bytes);`,

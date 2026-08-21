@@ -52,6 +52,17 @@ public:
     juce::var getBulkDumpSends() const;
     juce::var compileParameterMessage (const juce::var& payload, bool updateState);
     juce::var compileRawMidiAction (const juce::var& payload, bool appendToMonitor);
+    /**
+     * Recall a preset by slot, through the profile's own recall action.
+     *
+     * The engine compiles it (DeviceProfileEngine::compilePresetRecall); this sends it and reports
+     * it, exactly as compileRawMidiAction does for a hand-written message. Payload:
+     * { requestId, deviceRole, slot, dryRun }.
+     */
+    juce::var compilePresetRecallAction (const juce::var& payload, bool appendToMonitor);
+
+    /** The engine backing a role, for a caller that needs to read the profile rather than send. */
+    DeviceProfileEngine* engineForRole (const juce::String& deviceRole) { return resolveEngine ({}, deviceRole); }
     juce::var ingestIncomingMidiMessage (const juce::var& payload);
     juce::var startMidiCiDiscovery (const juce::var& payload);
     juce::var setMidiCiProfile (const juce::var& payload);

@@ -20,6 +20,8 @@
 import { get } from 'svelte/store';
 import { panels, scriptRuntimePanelId, updatePanel } from '../stores/panels.js';
 import { updateControlProperty, removeControlNode } from '../stores/controls.js';
+import { presetSlotInfo } from '../stores/deviceProfileLocalEngine.js';
+import { recallPreset as recallPresetAction } from '../stores/presetLibrarian.js';
 import { noteScriptTouchedControl } from '../stores/scriptTouchedControls.js';
 import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
@@ -5946,6 +5948,92 @@ function resolveDumpWaiters(kind, role, values, error = '') {
   }
 }
 
+/**
+ * ce.device.preset() / recallPreset() / onPresetChange — the current patch, per device role.
+ *
+ * WHAT "CURRENT" MEANS, and why it starts empty. A synth does not announce its patch when you plug
+ * in, and almost none can be asked. So this is what has been SEEN — a Program Change arriving, or a
+ * recallPreset going out — rather than a reading of the instrument. Slot -1 says "nothing has told
+ * us yet", which a script can act on; inventing slot 0 would have every panel confidently displaying
+ * the wrong preset name until somebody turned the dial.
+ *
+ * ONE EVENT FOR BOTH DIRECTIONS. A script repainting a name display does not care which end pressed
+ * the button, and two events would mean wiring both and getting it wrong once. `source` says which
+ * it was for the scripts that do care.
+ */
+const currentPreset = new Map();     // role -> { slot, program, name, category, bankId, source }
+
+function presetStateFor(role) {
+  return currentPreset.get(role) ?? {
+    slot: -1, program: -1, name: '', category: '', bankId: '', bankLabel: '',
+    writable: true, source: '',
+  };
+}
+
+function notePresetChange(role, slot, source) {
+  const profile = deviceProfileSource(role);
+  const info = profile ? presetSlotInfo(profile, slot) : null;
+  const next = {
+    slot,
+    program: info?.program ?? slot,
+    name: info?.catalogName ?? '',
+    category: info?.category ?? '',
+    bankId: info?.bankId ?? '',
+    bankLabel: info?.bankLabel ?? '',
+    writable: info?.writable !== false,
+    source,
+  };
+  const previous = currentPreset.get(role);
+  // Change-detected, so a device echoing its own Program Change back does not raise twice.
+  if (previous && previous.slot === next.slot && previous.source === next.source) return next;
+  currentPreset.set(role, next);
+  deliverEmit('onPresetChange', null, { ...next, role });
+  return next;
+}
+
+/** Called by the inbound path when a Program Change arrives. */
+export function notePresetChangeFromDevice(role, program) {
+  const number = Math.round(Number(program));
+  if (!Number.isFinite(number) || number < 0 || number > 127) return;
+  notePresetChange(String(role || DEFAULT_ROLE), number, 'device');
+}
+
+function presetReadImpl(role = DEFAULT_ROLE) {
+  return { ...presetStateFor(String(role || DEFAULT_ROLE)), role: String(role || DEFAULT_ROLE) };
+}
+
+function recallPresetImpl(slot, opts = {}) {
+  const role = String(opts?.role || DEFAULT_ROLE);
+  const number = Math.round(Number(slot));
+  if (!Number.isFinite(number) || number < 0) {
+    addScriptTrace('error', '', 'recallPreset(slot): slot must be an integer >= 0.');
+    return { ok: false, error: 'Preset recall needs an integer slot >= 0.', slot: number };
+  }
+
+  const profile = deviceProfileSource(role);
+  if (!profile) {
+    return { ok: false, error: `No device profile for role "${role}".`, slot: number };
+  }
+
+  // Straight through the librarian, which is the same door the Presets screen uses. A second
+  // implementation here would be a second opinion about what a slot means.
+  const result = recallPresetAction(profile, { slot: number, deviceRole: role });
+  if (!result.ok) {
+    addScriptTrace('error', '', `recallPreset(${number}): ${result.error}`);
+    return { ok: false, error: result.error, slot: number };
+  }
+
+  const state = notePresetChange(role, number, 'panel');
+  return {
+    ok: true,
+    error: '',
+    slot: number,
+    name: state.name,
+    category: state.category,
+    messages: (result.messages ?? []).map((m) => m.hex ?? ''),
+  };
+}
+
 function requestDumpImpl(kind, fn, opts, scriptId = '') {
   const key = String(kind ?? '');
   const role = DEFAULT_ROLE;
@@ -6608,6 +6696,10 @@ function buildApi(ownerName, scriptId = '') {
     // The callback belongs to the calling script, so this is bound here rather than in midiApi —
     // a throw inside it is reported against the script that scheduled it.
     requestDump: (kind, fn, opts) => requestDumpImpl(kind, fn, opts, scriptId),
+    // ce.device preset recall. The slot is the device-global number the profile's banks partition,
+    // not a program number — see panelApi.
+    recallPreset: (slot, opts) => recallPresetImpl(slot, opts),
+    preset: (role) => presetReadImpl(role),
     // ce.math — the seeded generator. Bound here rather than in the shared helpers object because
     // it is the only place that knows WHICH SCRIPT is drawing, and the generator is per script.
     random: (lo, hi) => randomImpl(scriptId, lo, hi),
@@ -7763,6 +7855,14 @@ function onMidiInputMessage(payload) {
   const note = noteEventFor(bytes);
   if (note) events.push({ event: note.event, controlName: null, payload: note.payload });
   dispatchEvents(events, { inbound: true });
+
+  // A Program Change is the instrument saying which preset it is on. Raised AFTER the events above
+  // rather than folded into them, because onPresetChange carries the profile's reading of the slot
+  // — its name, its bank, whether it is writable — and that is a different thing from "a 0xC0
+  // arrived", which onMidiIn already said.
+  if ((status & 0xf0) === 0xc0 && bytes.length >= 2) {
+    notePresetChangeFromDevice(String(payload.deviceRole ?? '') || DEFAULT_ROLE, bytes[1]);
+  }
 }
 
 function onSysexInputMessage(payload) {

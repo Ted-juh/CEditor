@@ -693,6 +693,185 @@ juce::var DeviceProfileEngine::listParameterDescriptors() const
     return descriptors;
 }
 
+DeviceProfileEngine::PresetSlotInfo DeviceProfileEngine::presetSlotInfo (int slot) const
+{
+    PresetSlotInfo info;
+    // Outside any bank, a slot is its own program number. That is what the JS does, and it keeps a
+    // profile with no bank list usable rather than refusing every recall.
+    info.program = juce::jlimit (0, 127, slot);
+
+    auto* root = profile.getDynamicObject();
+    auto* presets = root != nullptr ? asObject (root->getProperty ("presets")) : nullptr;
+    auto* banks = presets != nullptr ? asArray (presets->getProperty ("banks")) : nullptr;
+    if (banks == nullptr) return info;
+
+    for (const auto& entry : *banks)
+    {
+        auto* bank = asObject (entry);
+        if (bank == nullptr) continue;
+        const auto start = propInt (*bank, "startSlot", 0);
+        const auto count = propInt (*bank, "slotCount", 0);
+        if (count <= 0 || slot < start || slot >= start + count) continue;
+
+        const auto index = slot - start;
+        info.inBank = true;
+        info.bankId = propString (*bank, "id");
+        info.bankLabel = propString (*bank, "label");
+        if (info.bankLabel.isEmpty()) info.bankLabel = info.bankId;
+        info.role = propString (*bank, "role");
+        if (info.role.isEmpty()) info.role = "user";
+        info.writable = bank->hasProperty ("writable") ? propBool (*bank, "writable", true)
+                                                       : info.role == "user";
+        info.program = juce::jlimit (0, 127, propInt (*bank, "programBase", 0) + index);
+        if (bank->hasProperty ("bankMsb")) info.bankMsb = propInt (*bank, "bankMsb", 0);
+        if (bank->hasProperty ("bankLsb")) info.bankLsb = propInt (*bank, "bankLsb", 0);
+
+        // Per-slot first, then the bank's own — the same precedence presetSlotInfo has in JS.
+        if (auto* categories = asArray (bank->getProperty ("categories")))
+            if (index < categories->size())
+                info.category = (*categories)[index].toString();
+        if (info.category.isEmpty()) info.category = propString (*bank, "category");
+
+        if (auto* names = asArray (bank->getProperty ("names")))
+            if (index < names->size())
+                info.catalogName = (*names)[index].toString();
+
+        break;
+    }
+
+    return info;
+}
+
+CompileResult DeviceProfileEngine::compilePresetRecall (const juce::String& deviceRole, int slot) const
+{
+    auto* root = profile.getDynamicObject();
+    auto* presets = root != nullptr ? asObject (root->getProperty ("presets")) : nullptr;
+    if (presets == nullptr)
+        return { false, "Profile has no preset model (presets block).", {} };
+
+    auto* recall = asObject (presets->getProperty ("recall"));
+    if (recall == nullptr)
+        return { false, "Preset model has no recall action.", {} };
+
+    if (slot < 0)
+        return { false, "Preset recall needs an integer slot >= 0.", {} };
+
+    const auto info = presetSlotInfo (slot);
+    if (auto* banks = asArray (presets->getProperty ("banks")))
+        if (! banks->isEmpty() && ! info.inBank)
+            return { false, "Slot " + juce::String (slot) + " is not inside any preset bank.", {} };
+
+    const auto channel = juce::jlimit (1, 16, recall->hasProperty ("channel")
+        ? propInt (*recall, "channel", 1)
+        : (int) resolveVariable ("channel"));
+
+    MidiTransaction transaction;
+    transaction.transactionId = "preset_recall";
+    transaction.deviceRole = deviceRole;
+    transaction.parameterId = "preset.slot";
+    transaction.semanticValue = juce::var (slot);
+    transaction.displayedValue = info.catalogName.isNotEmpty()
+        ? (juce::String (slot) + " " + info.catalogName)
+        : juce::String (slot);
+    transaction.checksumStatus = "none";
+    transaction.sendPolicyMode = "onCommit";
+    transaction.coalesce = false;
+
+    const auto kind = propString (*recall, "kind");
+
+    const auto addMessage = [&transaction] (const juce::String& messageKind, const juce::Array<int>& bytes)
+    {
+        MidiMessageSpec message;
+        message.kind = messageKind;
+        message.bytes = bytes;
+        transaction.messages.add (message);
+    };
+
+    if (kind == "pc" || kind == "bankPc")
+    {
+        // Bank Select is sent ONLY for bankPc, and only for the halves the bank actually declares.
+        // A machine with one bank has no CC 0 to send, and sending 0 anyway would select bank 0 on a
+        // machine that numbers its banks from 1.
+        if (kind == "bankPc")
+        {
+            const auto cc = 0xb0 + channel - 1;
+            if (info.bankMsb >= 0) addMessage ("cc", { cc, 0, juce::jlimit (0, 127, info.bankMsb) });
+            if (info.bankLsb >= 0) addMessage ("cc", { cc, 32, juce::jlimit (0, 127, info.bankLsb) });
+        }
+        addMessage ("raw", { 0xc0 + channel - 1, info.program });
+        return { true, {}, transaction };
+    }
+
+    if (kind == "sysex")
+    {
+        auto* templateItems = asArray (recall->getProperty ("template"));
+        if (templateItems == nullptr || templateItems->isEmpty())
+            return { false, "SysEx preset recall has no template.", {} };
+
+        juce::Array<int> bytes;
+        juce::Array<int> checksumBytes;
+        auto* checksum = asObject (recall->getProperty ("checksum"));
+        const auto checksumType = checksum != nullptr ? propString (*checksum, "type") : "none";
+        // Everything after the header up to $checksum, which is the span a Roland checksum covers.
+        // Started at the first token so a template without $deviceId still accumulates.
+        bool collecting = false;
+
+        for (const auto& item : *templateItems)
+        {
+            const auto token = item.toString().trim();
+
+            if (token == "$checksum")
+            {
+                if (checksumType == "none") { bytes.add (0); continue; }
+                const auto value = ce::checksums::toBytes (checksumType, checksumBytes,
+                                                           checksum != nullptr ? propInt (*checksum, "offset", 0xa5) : 0xa5);
+                if (value.isEmpty())
+                    return { false, "Unsupported checksum type: " + checksumType, {} };
+                for (auto byte : value) bytes.add (byte);
+                transaction.checksumStatus = "computed";
+                continue;
+            }
+
+            int value = -1;
+            if (token.startsWithChar ('$'))
+            {
+                const auto name = token.substring (1);
+                // The recall's own variables first — the slot it was asked for and what that slot
+                // maps to — then the profile's. A profile-level `slot` would otherwise shadow the
+                // argument and recall the same preset every time.
+                if (name == "slot") value = slot;
+                else if (name == "program") value = info.program;
+                else if (name == "bankMsb") value = juce::jlimit (0, 127, info.bankMsb < 0 ? 0 : info.bankMsb);
+                else if (name == "bankLsb") value = juce::jlimit (0, 127, info.bankLsb < 0 ? 0 : info.bankLsb);
+                else value = (int) resolveVariable (name);
+
+                if (! isMidiDataByte (value))
+                    return { false, "Variable " + token + " is not a MIDI data byte", {} };
+            }
+            else
+            {
+                value = parseHexByte (token);
+                if (value < 0 || value > 255)
+                    return { false, "Invalid hex byte in preset recall template: " + token, {} };
+            }
+
+            bytes.add (value);
+            if (collecting) checksumBytes.add (value);
+            // F0 and the manufacturer id are header, not payload: a checksum that covered them would
+            // disagree with every manual that defines one.
+            if (! collecting && bytes.size() >= 2 && bytes[0] == 0xf0) collecting = true;
+        }
+
+        if (bytes.isEmpty() || bytes[0] != 0xf0 || bytes[bytes.size() - 1] != 0xf7)
+            return { false, "A SysEx preset recall must start with F0 and end with F7.", {} };
+
+        addMessage ("sysex", bytes);
+        return { true, {}, transaction };
+    }
+
+    return { false, "Unsupported preset recall kind: " + kind, {} };
+}
+
 juce::var DeviceProfileEngine::getPresetBrowser() const
 {
     auto* root = profileObject();

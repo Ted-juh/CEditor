@@ -194,6 +194,171 @@ int runNibbledEncoderTests (const juce::File& file)
     return failures;
 }
 
+/*
+ * Preset recall, in the engine.
+ *
+ * The engine knew nothing about presets: it passed `presetBrowser` through and stopped. So the
+ * exported plugin could not recall one with the window closed, and a script had no way to ask —
+ * both of which the editor could do, through localCompilePresetRecall in the JS fallback engine.
+ * A capability that exists in the preview and not in the export is the shape of bug this whole
+ * two-engine arrangement exists to prevent, so the two now build the same bytes and this says so
+ * against the real profiles.
+ */
+int runPresetRecallTests (const juce::File& root)
+{
+    auto failures = 0;
+    const auto hexOf = [] (const ceditor::device::CompileResult& result)
+    {
+        juce::StringArray parts;
+        for (const auto& message : result.transaction.messages)
+            parts.add (ceditor::device::DeviceProfileEngine::bytesToHex (message.bytes));
+        return parts.joinIntoString (" | ");
+    };
+
+    // The AN1x: one factory bank of 128, recall kind "pc", programBase 0. Slot 47 is Program
+    // Change 47 on channel 1 — C0 2F.
+    {
+        ceditor::device::DeviceProfileEngine engine;
+        juce::String error;
+        if (! engine.loadFromFile (root.getChildFile ("yamaha-an1x-dpd.ceditor-device.json"), error))
+        {
+            std::cerr << "[FAIL] preset recall: AN1x load: " << error << "\n";
+            return 1;
+        }
+
+        const auto result = engine.compilePresetRecall ("mainSynth", 47);
+        if (! result.ok || hexOf (result) != "C0 2F")
+        {
+            std::cerr << "[FAIL] preset recall AN1x slot 47: expected C0 2F, got "
+                      << (result.ok ? hexOf (result) : result.error) << "\n";
+            ++failures;
+        }
+        else
+        {
+            std::cout << "[PASS] preset recall :: AN1x slot 47 -> C0 2F (kind pc)\n";
+        }
+
+        // The slot's own name comes back with it, so a caller can log what it recalled rather than
+        // a number.
+        const auto info = engine.presetSlotInfo (0);
+        if (! info.inBank || info.catalogName != "Relaxx" || info.category != "Co" || info.program != 0)
+        {
+            std::cerr << "[FAIL] preset recall AN1x slot 0 info: "
+                      << info.catalogName << " / " << info.category << " / " << info.program << "\n";
+            ++failures;
+        }
+        else
+        {
+            std::cout << "[PASS] preset recall :: slot info carries the bank's name and category\n";
+        }
+
+        // Past the last slot is refused rather than silently clamped to 127.
+        if (engine.compilePresetRecall ("mainSynth", 512).ok)
+        {
+            std::cerr << "[FAIL] preset recall: slot 512 was accepted on a 128-slot machine\n";
+            ++failures;
+        }
+        else
+        {
+            std::cout << "[PASS] preset recall :: a slot outside every bank is refused\n";
+        }
+    }
+
+    // bankPc and sysex, against profiles written for them: CC 0 / CC 32 / PC, and a template with
+    // the recall's own variables. Built here rather than shipped, because no library profile uses
+    // either kind yet and a test that cannot run is not a test.
+    {
+        const char* bankPcJson = R"JSON({
+          "schemaVersion": 1, "id": "probe-bankpc", "name": "Probe", "manufacturer": "Probe",
+          "variables": { "channel": 1, "deviceId": 16 },
+          "parameters": [{
+            "id": "probe.value", "name": "Probe", "messageRecipe": "cc1", "type": "integer",
+            "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" },
+            "access": { "canWrite": true }
+          }],
+          "messageRecipes": [{ "id": "cc1", "kind": "cc", "channel": "$channel", "controller": 1, "value": "$encodedValue" }],
+          "tests": [{ "name": "Probe 64", "parameter": "probe.value", "value": 64, "expectedHex": "B0 01 40" }],
+          "presets": {
+            "recall": { "kind": "bankPc", "channel": 1 },
+            "banks": [
+              { "id": "a", "role": "factory", "startSlot": 0, "slotCount": 4, "programBase": 0, "bankMsb": 0, "bankLsb": 0 },
+              { "id": "b", "role": "factory", "startSlot": 4, "slotCount": 4, "programBase": 0, "bankMsb": 0, "bankLsb": 1 }
+            ]
+          }
+        })JSON";
+
+        ceditor::device::DeviceProfileEngine engine;
+        juce::String error;
+        if (! engine.loadFromJson (bankPcJson, error))
+        {
+            std::cerr << "[FAIL] preset recall: bankPc profile load: " << error << "\n";
+            for (const auto& m : engine.getValidationMessages())
+                std::cerr << "    " << m.path << ": " << m.message << "\n";
+            return failures + 1;
+        }
+
+        // Slot 5 is the second bank's second slot: bank LSB 1, program 1.
+        const auto result = engine.compilePresetRecall ("mainSynth", 5);
+        if (! result.ok || hexOf (result) != "B0 00 00 | B0 20 01 | C0 01")
+        {
+            std::cerr << "[FAIL] preset recall bankPc slot 5: got "
+                      << (result.ok ? hexOf (result) : result.error) << "\n";
+            ++failures;
+        }
+        else
+        {
+            std::cout << "[PASS] preset recall :: bankPc sends CC 0, CC 32, then the program\n";
+        }
+    }
+
+    {
+        // A SysEx recall whose template uses $slot and a Roland checksum.
+        const char* sysexJson = R"JSON({
+          "schemaVersion": 1, "id": "probe-sysex", "name": "Probe", "manufacturer": "Probe",
+          "variables": { "channel": 1, "deviceId": 16 },
+          "parameters": [{
+            "id": "probe.value", "name": "Probe", "messageRecipe": "cc1", "type": "integer",
+            "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" },
+            "access": { "canWrite": true }
+          }],
+          "messageRecipes": [{ "id": "cc1", "kind": "cc", "channel": "$channel", "controller": 1, "value": "$encodedValue" }],
+          "tests": [{ "name": "Probe 64", "parameter": "probe.value", "value": 64, "expectedHex": "B0 01 40" }],
+          "presets": {
+            "recall": {
+              "kind": "sysex",
+              "template": ["F0", "41", "$deviceId", "42", "12", "$slot", "$checksum", "F7"],
+              "checksum": { "type": "roland-7bit" }
+            },
+            "banks": [{ "id": "a", "role": "factory", "startSlot": 0, "slotCount": 8, "programBase": 0 }]
+          }
+        })JSON";
+
+        ceditor::device::DeviceProfileEngine engine;
+        juce::String error;
+        if (! engine.loadFromJson (sysexJson, error))
+        {
+            std::cerr << "[FAIL] preset recall: sysex profile load: " << error << "\n";
+            return failures + 1;
+        }
+
+        const auto result = engine.compilePresetRecall ("mainSynth", 3);
+        // Covered span is everything after F0 41 (header) up to $checksum: 10 42 12 03 = 0x67,
+        // so the Roland checksum is (128 - 0x67 % 128) & 0x7f = 0x19.
+        if (! result.ok || hexOf (result) != "F0 41 10 42 12 03 19 F7")
+        {
+            std::cerr << "[FAIL] preset recall sysex slot 3: got "
+                      << (result.ok ? hexOf (result) : result.error) << "\n";
+            ++failures;
+        }
+        else
+        {
+            std::cout << "[PASS] preset recall :: a SysEx template resolves $slot and its checksum\n";
+        }
+    }
+
+    return failures;
+}
+
 int runProfileTests (const juce::File& file)
 {
     ceditor::device::DeviceProfileEngine engine;
@@ -1544,6 +1709,7 @@ int main()
     failures += runMidiCiTests();
     failures += runChecksumTableTests();
     failures += runNibbledEncoderTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
+    failures += runPresetRecallTests (root);
 
     if (failures == 0)
     {

@@ -80,6 +80,64 @@ juce::var DeviceProfileService::compileParameterMessage (const juce::var& payloa
     return juce::var (response);
 }
 
+juce::var DeviceProfileService::compilePresetRecallAction (const juce::var& payload, bool appendToMonitor)
+{
+    auto* obj = payload.getDynamicObject();
+    if (obj == nullptr)
+        return errorResponse ({}, "compilePresetRecallAction payload must be an object");
+
+    auto requestId = obj->getProperty ("requestId").toString();
+    auto deviceRole = varToStringOr (obj->getProperty ("deviceRole"), "mainSynth");
+    const auto slot = static_cast<int> (obj->getProperty ("slot"));
+    auto dryRun = ! obj->getProperties().contains ("dryRun") || static_cast<bool> (obj->getProperty ("dryRun"));
+
+    // profileId is optional here — resolveEngine falls back to the role's mapping, which is what a
+    // script asking "recall slot 47" has, since it never saw a profile id.
+    auto* engine = resolveEngine (obj->getProperty ("profileId").toString(), deviceRole);
+    if (engine == nullptr)
+        return errorResponse (requestId, "No device profile is mapped to role \"" + deviceRole + "\".");
+
+    const auto compiled = engine->compilePresetRecall (deviceRole, slot);
+    if (! compiled.ok)
+        return errorResponse (requestId, compiled.error);
+
+    auto transaction = compiled.transaction;
+
+    auto status = juce::String ("Dry run");
+    auto direction = juce::String ("preview");
+
+    if (appendToMonitor && ! dryRun)
+    {
+        status = sendOrQueueTransaction (deviceRole, transaction);
+        direction = status.startsWith ("Sent") ? "out" : (status.startsWith ("Queued") ? "queued" : "error");
+    }
+
+    if (appendToMonitor)
+        appendMonitorEvent (direction,
+                            deviceRole,
+                            "preset",
+                            "Recall preset " + transaction.displayedValue,
+                            DeviceProfileEngine::transactionToHex (transaction),
+                            status);
+
+    const auto info = engine->presetSlotInfo (slot);
+    auto* response = new juce::DynamicObject();
+    response->setProperty ("ok", true);
+    response->setProperty ("requestId", requestId);
+    response->setProperty ("deviceRole", deviceRole);
+    response->setProperty ("slot", slot);
+    response->setProperty ("program", info.program);
+    response->setProperty ("name", info.catalogName);
+    response->setProperty ("category", info.category);
+    response->setProperty ("bankId", info.bankId);
+    response->setProperty ("bankLabel", info.bankLabel);
+    response->setProperty ("writable", info.writable);
+    response->setProperty ("transaction", transactionToVar (transaction));
+    response->setProperty ("runtimeState", getRuntimeState());
+    response->setProperty ("status", status);
+    return juce::var (response);
+}
+
 juce::var DeviceProfileService::compileRawMidiAction (const juce::var& payload, bool appendToMonitor)
 {
     auto* obj = payload.getDynamicObject();

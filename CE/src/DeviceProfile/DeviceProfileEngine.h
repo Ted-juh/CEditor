@@ -153,6 +153,31 @@ public:
                                               const juce::var& variables = {}) const;
 
     DeviceRequestResult compileIdentityRequest (const juce::String& deviceRole) const;
+
+    /**
+     * The profile's preset-recall action for a slot.
+     *
+     * Mirrors localCompilePresetRecall in deviceProfileLocalEngine.js — the two have to agree, or a
+     * preset recalled from the editor and the same preset recalled from the exported plugin address
+     * different patches. Handles the three kinds the schema defines: `pc` (a bare Program Change),
+     * `bankPc` (CC 0 / CC 32 / PC), and `sysex` (a template with $slot / $program / $bankMsb /
+     * $bankLsb and an optional $checksum).
+     *
+     * The engine knew nothing about presets before this: the exported plugin could not recall one
+     * window-closed, and a script had no way to ask for it.
+     */
+    CompileResult compilePresetRecall (const juce::String& deviceRole, int slot) const;
+
+    /** Which bank a slot falls in, and the Program Change number it maps to. */
+    struct PresetSlotInfo
+    {
+        bool inBank = false;
+        juce::String bankId, bankLabel, role, category, catalogName;
+        bool writable = true;
+        int program = 0;
+        int bankMsb = -1, bankLsb = -1;   // -1 = the bank declares none
+    };
+    [[nodiscard]] PresetSlotInfo presetSlotInfo (int slot) const;
     IdentityMatchResult matchIdentityReply (const juce::String& hex) const;
     DumpParseResult parseDumpMessage (const juce::String& hex) const;
     DumpCollectionResult collectDumpMessages (const juce::StringArray& hexMessages) const;
