@@ -409,6 +409,17 @@ export function getMidiMonitorEvents() {
   window.__JUCE__.backend.emitEvent('getMidiMonitorEvents', {});
 }
 
+/**
+ * Forget the monitor log, on the side that owns it.
+ *
+ * The engine keeps the last 500 events and pushes the whole list to the UI on every message, so
+ * emptying only the local store cleared the view until the next slider move brought it all back.
+ */
+export function clearMidiMonitorEvents() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('clearMidiMonitorEvents', {});
+}
+
 export function getDeviceDiagnostics() {
   if (!isJuceAvailable()) return;
   window.__JUCE__.backend.emitEvent('getDeviceDiagnostics', {});

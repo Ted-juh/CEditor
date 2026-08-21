@@ -121,7 +121,7 @@
   },
   "requiredProfiles": [
     {
-      "role": "primary",
+      "role": "Roland GAIA SH-01",
       "profileId": "roland-gaia-sh01",
       "version": "*"
     }
@@ -138,7 +138,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.patchLevel"
     },
     {
@@ -151,7 +151,7 @@
       "defaultValue": 5,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.patchTempo"
     },
     {
@@ -164,7 +164,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.octaveShift"
     },
     {
@@ -177,7 +177,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.monoSwitch"
     },
     {
@@ -190,7 +190,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.portamentoSwitch"
     },
     {
@@ -203,7 +203,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.portamentoTime"
     },
     {
@@ -216,7 +216,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.pitchBendRangeUp"
     },
     {
@@ -229,7 +229,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.pitchBendRangeDown"
     },
     {
@@ -242,7 +242,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone1Switch"
     },
     {
@@ -255,7 +255,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone1Select"
     },
     {
@@ -268,7 +268,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone2Switch"
     },
     {
@@ -281,7 +281,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone2Select"
     },
     {
@@ -294,7 +294,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone3Switch"
     },
     {
@@ -307,7 +307,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone3Select"
     },
     {
@@ -320,7 +320,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.syncRingSelect"
     },
     {
@@ -333,7 +333,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.dBeamAssign"
     },
     {
@@ -346,7 +346,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.dBeamPolarity"
     },
     {
@@ -359,7 +359,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.effectsMasterSwitch"
     },
     {
@@ -372,7 +372,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.effectsDistortionSelect"
     },
     {
@@ -385,7 +385,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.effectsFlangerSelect"
     },
     {
@@ -398,7 +398,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.effectsDelaySelect"
     },
     {
@@ -411,7 +411,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.effectsReverbSelect"
     },
     {
@@ -424,7 +424,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.lowBoostSwitch"
     },
     {
@@ -437,7 +437,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tempoSyncSwitch"
     },
     {
@@ -450,7 +450,7 @@
       "defaultValue": 100,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "master.volume"
     },
     {
@@ -463,7 +463,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.shape"
     },
     {
@@ -476,7 +476,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.rate"
     },
     {
@@ -489,7 +489,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.tempoSyncSwitch"
     },
     {
@@ -502,7 +502,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.tempoSyncNote"
     },
     {
@@ -515,7 +515,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.keyTrigger"
     },
     {
@@ -528,7 +528,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.fadeTime"
     },
     {
@@ -541,7 +541,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.pitchDepth"
     },
     {
@@ -554,7 +554,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.filterDepth"
     },
     {
@@ -567,7 +567,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.ampDepth"
     },
     {
@@ -593,7 +593,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.wave"
     },
     {
@@ -606,7 +606,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.waveVariation"
     },
     {
@@ -619,7 +619,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pitch"
     },
     {
@@ -632,7 +632,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.detune"
     },
     {
@@ -645,7 +645,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pulseWidthModDepth"
     },
     {
@@ -658,7 +658,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pulseWidth"
     },
     {
@@ -671,7 +671,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pitchEnvAttackTime"
     },
     {
@@ -684,7 +684,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pitchEnvDecay"
     },
     {
@@ -697,7 +697,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pitchEnvDepth"
     },
     {
@@ -723,7 +723,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.mode"
     },
     {
@@ -736,7 +736,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.slope"
     },
     {
@@ -749,7 +749,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.cutoff"
     },
     {
@@ -762,7 +762,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.resonance"
     },
     {
@@ -775,7 +775,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envAttackTime"
     },
     {
@@ -788,7 +788,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envDecayTime"
     },
     {
@@ -801,7 +801,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envSustainLevel"
     },
     {
@@ -814,7 +814,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envReleaseTime"
     },
     {
@@ -827,7 +827,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envDepth"
     },
     {
@@ -840,7 +840,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envVelocitySens"
     },
     {
@@ -853,7 +853,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.cutoffKeyfollow"
     },
     {
@@ -879,7 +879,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.level"
     },
     {
@@ -892,7 +892,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.pan"
     },
     {
@@ -905,7 +905,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.levelVelocitySens"
     },
     {
@@ -918,7 +918,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.envAttackTime"
     },
     {
@@ -931,7 +931,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.envDecayTime"
     },
     {
@@ -944,7 +944,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.envSustainLevel"
     },
     {
@@ -957,7 +957,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.envReleaseTime"
     },
     {
@@ -970,7 +970,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.shape"
     },
     {
@@ -983,7 +983,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.rate"
     },
     {
@@ -996,7 +996,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.tempoSyncSwitch"
     },
     {
@@ -1009,7 +1009,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.pitchDepth"
     },
     {
@@ -1022,7 +1022,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.filterDepth"
     },
     {
@@ -1035,7 +1035,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.ampDepth"
     },
     {
@@ -1048,7 +1048,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.panDepth"
     },
     {
@@ -1061,7 +1061,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.shape"
     },
     {
@@ -1074,7 +1074,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.rate"
     },
     {
@@ -1087,7 +1087,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.tempoSyncSwitch"
     },
     {
@@ -1100,7 +1100,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.tempoSyncNote"
     },
     {
@@ -1113,7 +1113,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.keyTrigger"
     },
     {
@@ -1126,7 +1126,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.fadeTime"
     },
     {
@@ -1139,7 +1139,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.pitchDepth"
     },
     {
@@ -1152,7 +1152,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.filterDepth"
     },
     {
@@ -1165,7 +1165,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.ampDepth"
     },
     {
@@ -1191,7 +1191,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.wave"
     },
     {
@@ -1204,7 +1204,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.waveVariation"
     },
     {
@@ -1217,7 +1217,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pitch"
     },
     {
@@ -1230,7 +1230,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.detune"
     },
     {
@@ -1243,7 +1243,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pulseWidthModDepth"
     },
     {
@@ -1256,7 +1256,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pulseWidth"
     },
     {
@@ -1269,7 +1269,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pitchEnvAttackTime"
     },
     {
@@ -1282,7 +1282,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pitchEnvDecay"
     },
     {
@@ -1295,7 +1295,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pitchEnvDepth"
     },
     {
@@ -1321,7 +1321,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.mode"
     },
     {
@@ -1334,7 +1334,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.slope"
     },
     {
@@ -1347,7 +1347,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.cutoff"
     },
     {
@@ -1360,7 +1360,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.resonance"
     },
     {
@@ -1373,7 +1373,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envAttackTime"
     },
     {
@@ -1386,7 +1386,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envDecayTime"
     },
     {
@@ -1399,7 +1399,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envSustainLevel"
     },
     {
@@ -1412,7 +1412,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envReleaseTime"
     },
     {
@@ -1425,7 +1425,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envDepth"
     },
     {
@@ -1438,7 +1438,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envVelocitySens"
     },
     {
@@ -1451,7 +1451,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.cutoffKeyfollow"
     },
     {
@@ -1477,7 +1477,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.level"
     },
     {
@@ -1490,7 +1490,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.pan"
     },
     {
@@ -1503,7 +1503,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.levelVelocitySens"
     },
     {
@@ -1516,7 +1516,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.envAttackTime"
     },
     {
@@ -1529,7 +1529,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.envDecayTime"
     },
     {
@@ -1542,7 +1542,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.envSustainLevel"
     },
     {
@@ -1555,7 +1555,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.envReleaseTime"
     },
     {
@@ -1568,7 +1568,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.shape"
     },
     {
@@ -1581,7 +1581,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.rate"
     },
     {
@@ -1594,7 +1594,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.tempoSyncSwitch"
     },
     {
@@ -1607,7 +1607,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.pitchDepth"
     },
     {
@@ -1620,7 +1620,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.filterDepth"
     },
     {
@@ -1633,7 +1633,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.ampDepth"
     },
     {
@@ -1646,7 +1646,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.panDepth"
     },
     {
@@ -1659,7 +1659,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.shape"
     },
     {
@@ -1672,7 +1672,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.rate"
     },
     {
@@ -1685,7 +1685,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.tempoSyncSwitch"
     },
     {
@@ -1698,7 +1698,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.tempoSyncNote"
     },
     {
@@ -1711,7 +1711,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.keyTrigger"
     },
     {
@@ -1724,7 +1724,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.fadeTime"
     },
     {
@@ -1737,7 +1737,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.pitchDepth"
     },
     {
@@ -1750,7 +1750,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.filterDepth"
     },
     {
@@ -1763,7 +1763,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.ampDepth"
     },
     {
@@ -1789,7 +1789,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.wave"
     },
     {
@@ -1802,7 +1802,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.waveVariation"
     },
     {
@@ -1815,7 +1815,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pitch"
     },
     {
@@ -1828,7 +1828,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.detune"
     },
     {
@@ -1841,7 +1841,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pulseWidthModDepth"
     },
     {
@@ -1854,7 +1854,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pulseWidth"
     },
     {
@@ -1867,7 +1867,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pitchEnvAttackTime"
     },
     {
@@ -1880,7 +1880,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pitchEnvDecay"
     },
     {
@@ -1893,7 +1893,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pitchEnvDepth"
     },
     {
@@ -1919,7 +1919,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.mode"
     },
     {
@@ -1932,7 +1932,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.slope"
     },
     {
@@ -1945,7 +1945,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.cutoff"
     },
     {
@@ -1958,7 +1958,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.resonance"
     },
     {
@@ -1971,7 +1971,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envAttackTime"
     },
     {
@@ -1984,7 +1984,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envDecayTime"
     },
     {
@@ -1997,7 +1997,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envSustainLevel"
     },
     {
@@ -2010,7 +2010,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envReleaseTime"
     },
     {
@@ -2023,7 +2023,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envDepth"
     },
     {
@@ -2036,7 +2036,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envVelocitySens"
     },
     {
@@ -2049,7 +2049,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.cutoffKeyfollow"
     },
     {
@@ -2075,7 +2075,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.level"
     },
     {
@@ -2088,7 +2088,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.pan"
     },
     {
@@ -2101,7 +2101,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.levelVelocitySens"
     },
     {
@@ -2114,7 +2114,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.envAttackTime"
     },
     {
@@ -2127,7 +2127,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.envDecayTime"
     },
     {
@@ -2140,7 +2140,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.envSustainLevel"
     },
     {
@@ -2153,7 +2153,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.envReleaseTime"
     },
     {
@@ -2166,7 +2166,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.shape"
     },
     {
@@ -2179,7 +2179,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.rate"
     },
     {
@@ -2192,7 +2192,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.tempoSyncSwitch"
     },
     {
@@ -2205,7 +2205,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.pitchDepth"
     },
     {
@@ -2218,7 +2218,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.filterDepth"
     },
     {
@@ -2231,7 +2231,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.ampDepth"
     },
     {
@@ -2244,7 +2244,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.panDepth"
     },
     {
@@ -2257,7 +2257,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.switch"
     },
     {
@@ -2270,7 +2270,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.grid"
     },
     {
@@ -2283,7 +2283,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.duration"
     },
     {
@@ -2296,7 +2296,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.motif"
     },
     {
@@ -2309,7 +2309,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.octaveRange"
     },
     {
@@ -2322,7 +2322,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.accentRate"
     },
     {
@@ -2335,7 +2335,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.velocity"
     },
     {
@@ -2348,7 +2348,7 @@
       "defaultValue": 1,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.endStep"
     },
     {
@@ -2361,7 +2361,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "distortion.type"
     },
     {
@@ -2374,7 +2374,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "distortion.parameter1"
     },
     {
@@ -2387,7 +2387,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "distortion.parameter2"
     },
     {
@@ -2400,7 +2400,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "distortion.parameter3"
     },
     {
@@ -2413,7 +2413,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "distortion.parameter4"
     },
     {
@@ -2426,7 +2426,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "flanger.type"
     },
     {
@@ -2439,7 +2439,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "flanger.parameter1"
     },
     {
@@ -2452,7 +2452,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "flanger.parameter2"
     },
     {
@@ -2465,7 +2465,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "flanger.parameter3"
     },
     {
@@ -2478,7 +2478,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "flanger.parameter4"
     },
     {
@@ -2491,7 +2491,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "delay.type"
     },
     {
@@ -2504,7 +2504,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "delay.parameter1"
     },
     {
@@ -2517,7 +2517,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "delay.parameter2"
     },
     {
@@ -2530,7 +2530,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "delay.parameter3"
     },
     {
@@ -2543,7 +2543,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "delay.parameter4"
     },
     {
@@ -2556,7 +2556,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "reverb.type"
     },
     {
@@ -2569,7 +2569,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "reverb.parameter1"
     },
     {
@@ -2582,7 +2582,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "reverb.parameter2"
     },
     {
@@ -2595,7 +2595,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "reverb.parameter3"
     },
     {
@@ -2608,7 +2608,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
-      "deviceRole": "primary",
+      "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "reverb.parameter4"
     },
     {
@@ -2849,7 +2849,7 @@
             {
               "kind": "deviceParameter",
               "port": "text",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.patchName",
               "parameterType": "patchName",
               "adoptMetadata": true,
@@ -3673,7 +3673,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.patchLevel",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -4404,7 +4404,7 @@
               "max": 300,
               "step": 1,
               "defaultValue": 5,
-              "currentValue": 0,
+              "currentValue": 5,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -4528,7 +4528,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.patchTempo",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -5259,7 +5259,7 @@
               "max": 67,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -5385,7 +5385,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.octaveShift",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -5558,7 +5558,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.monoSwitch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -5648,7 +5648,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.portamentoSwitch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -6420,7 +6420,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.portamentoTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -7275,7 +7275,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.pitchBendRangeUp",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -8130,7 +8130,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.pitchBendRangeDown",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -8381,7 +8381,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.tone1Switch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -8471,7 +8471,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.tone1Select",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -8561,7 +8561,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.tone2Switch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -8651,7 +8651,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.tone2Select",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -8741,7 +8741,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.tone3Switch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -8831,7 +8831,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.tone3Select",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -9598,7 +9598,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.syncRingSelect",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -10052,7 +10052,7 @@
             {
               "kind": "deviceParameter",
               "port": "selectedChoice",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.dBeamAssign",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -10610,7 +10610,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.dBeamPolarity",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -10861,7 +10861,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.effectsMasterSwitch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -10951,7 +10951,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.effectsDistortionSelect",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -11041,7 +11041,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.effectsFlangerSelect",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -11131,7 +11131,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.effectsDelaySelect",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -11221,7 +11221,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.effectsReverbSelect",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -11311,7 +11311,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.lowBoostSwitch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -11401,7 +11401,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.tempoSyncSwitch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -12049,7 +12049,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 100,
-              "currentValue": 0,
+              "currentValue": 100,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -12173,7 +12173,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "master.volume",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -14329,7 +14329,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.lfo.shape",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -15184,7 +15184,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.lfo.rate",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -15357,7 +15357,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.lfo.tempoSyncSwitch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -15602,7 +15602,7 @@
             {
               "kind": "deviceParameter",
               "port": "selectedChoice",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.lfo.tempoSyncNote",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -15744,7 +15744,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.lfo.keyTrigger",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -16807,7 +16807,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.lfo.fadeTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -17772,7 +17772,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -17955,7 +17955,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.lfo.pitchDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -18920,7 +18920,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -19103,7 +19103,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.lfo.filterDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -20068,7 +20068,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -20251,7 +20251,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.lfo.ampDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -22904,7 +22904,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.osc.wave",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -23676,7 +23676,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.osc.waveVariation",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -24407,7 +24407,7 @@
               "max": 88,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -24533,7 +24533,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.osc.pitch",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -25264,7 +25264,7 @@
               "max": 114,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -25390,7 +25390,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.osc.detune",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -26536,7 +26536,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.osc.pulseWidthModDepth",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -27682,7 +27682,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.osc.pulseWidth",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -28828,7 +28828,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.osc.pitchEnvAttackTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -29974,7 +29974,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.osc.pitchEnvDecay",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -30939,7 +30939,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -31122,7 +31122,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.osc.pitchEnvDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -32728,7 +32728,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.filter.mode",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -33317,7 +33317,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.filter.slope",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -34172,7 +34172,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.filter.cutoff",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -35027,7 +35027,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.filter.resonance",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -36173,7 +36173,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.filter.envAttackTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -37319,7 +37319,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.filter.envDecayTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -38465,7 +38465,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.filter.envSustainLevel",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -39611,7 +39611,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.filter.envReleaseTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -40576,7 +40576,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -40759,7 +40759,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.filter.envDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -41724,7 +41724,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -41907,7 +41907,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.filter.envVelocitySens",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -42638,7 +42638,7 @@
               "max": 74,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -42764,7 +42764,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.filter.cutoffKeyfollow",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -44077,7 +44077,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.amp.level",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -44808,7 +44808,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -44934,7 +44934,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.amp.pan",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -45665,7 +45665,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -45791,7 +45791,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.amp.levelVelocitySens",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -46937,7 +46937,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.amp.envAttackTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -48083,7 +48083,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.amp.envDecayTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -49229,7 +49229,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.amp.envSustainLevel",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -50375,7 +50375,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.amp.envReleaseTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -52477,7 +52477,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.modLfo.shape",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -53332,7 +53332,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.modLfo.rate",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -53505,7 +53505,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.modLfo.tempoSyncSwitch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -54387,7 +54387,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -54570,7 +54570,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.modLfo.pitchDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -55535,7 +55535,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -55718,7 +55718,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.modLfo.filterDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -56683,7 +56683,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -56866,7 +56866,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.modLfo.ampDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -57831,7 +57831,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -58014,7 +58014,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone1.modLfo.panDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -60170,7 +60170,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.lfo.shape",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -61025,7 +61025,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.lfo.rate",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -61198,7 +61198,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.lfo.tempoSyncSwitch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -61443,7 +61443,7 @@
             {
               "kind": "deviceParameter",
               "port": "selectedChoice",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.lfo.tempoSyncNote",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -61585,7 +61585,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.lfo.keyTrigger",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -62648,7 +62648,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.lfo.fadeTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -63613,7 +63613,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -63796,7 +63796,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.lfo.pitchDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -64761,7 +64761,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -64944,7 +64944,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.lfo.filterDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -65909,7 +65909,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -66092,7 +66092,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.lfo.ampDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -68745,7 +68745,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.osc.wave",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -69517,7 +69517,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.osc.waveVariation",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -70248,7 +70248,7 @@
               "max": 88,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -70374,7 +70374,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.osc.pitch",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -71105,7 +71105,7 @@
               "max": 114,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -71231,7 +71231,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.osc.detune",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -72377,7 +72377,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.osc.pulseWidthModDepth",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -73523,7 +73523,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.osc.pulseWidth",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -74669,7 +74669,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.osc.pitchEnvAttackTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -75815,7 +75815,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.osc.pitchEnvDecay",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -76780,7 +76780,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -76963,7 +76963,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.osc.pitchEnvDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -78569,7 +78569,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.filter.mode",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -79158,7 +79158,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.filter.slope",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -80013,7 +80013,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.filter.cutoff",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -80868,7 +80868,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.filter.resonance",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -82014,7 +82014,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.filter.envAttackTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -83160,7 +83160,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.filter.envDecayTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -84306,7 +84306,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.filter.envSustainLevel",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -85452,7 +85452,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.filter.envReleaseTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -86417,7 +86417,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -86600,7 +86600,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.filter.envDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -87565,7 +87565,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -87748,7 +87748,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.filter.envVelocitySens",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -88479,7 +88479,7 @@
               "max": 74,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -88605,7 +88605,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.filter.cutoffKeyfollow",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -89918,7 +89918,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.amp.level",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -90649,7 +90649,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -90775,7 +90775,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.amp.pan",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -91506,7 +91506,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -91632,7 +91632,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.amp.levelVelocitySens",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -92778,7 +92778,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.amp.envAttackTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -93924,7 +93924,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.amp.envDecayTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -95070,7 +95070,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.amp.envSustainLevel",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -96216,7 +96216,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.amp.envReleaseTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -98318,7 +98318,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.modLfo.shape",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -99173,7 +99173,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.modLfo.rate",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -99346,7 +99346,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.modLfo.tempoSyncSwitch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -100228,7 +100228,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -100411,7 +100411,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.modLfo.pitchDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -101376,7 +101376,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -101559,7 +101559,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.modLfo.filterDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -102524,7 +102524,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -102707,7 +102707,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.modLfo.ampDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -103672,7 +103672,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -103855,7 +103855,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone2.modLfo.panDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -106011,7 +106011,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.lfo.shape",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -106866,7 +106866,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.lfo.rate",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -107039,7 +107039,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.lfo.tempoSyncSwitch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -107284,7 +107284,7 @@
             {
               "kind": "deviceParameter",
               "port": "selectedChoice",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.lfo.tempoSyncNote",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -107426,7 +107426,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.lfo.keyTrigger",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -108489,7 +108489,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.lfo.fadeTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -109454,7 +109454,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -109637,7 +109637,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.lfo.pitchDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -110602,7 +110602,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -110785,7 +110785,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.lfo.filterDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -111750,7 +111750,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -111933,7 +111933,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.lfo.ampDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -114586,7 +114586,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.osc.wave",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -115358,7 +115358,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.osc.waveVariation",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -116089,7 +116089,7 @@
               "max": 88,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -116215,7 +116215,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.osc.pitch",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -116946,7 +116946,7 @@
               "max": 114,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -117072,7 +117072,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.osc.detune",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -118218,7 +118218,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.osc.pulseWidthModDepth",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -119364,7 +119364,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.osc.pulseWidth",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -120510,7 +120510,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.osc.pitchEnvAttackTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -121656,7 +121656,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.osc.pitchEnvDecay",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -122621,7 +122621,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -122804,7 +122804,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.osc.pitchEnvDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -124410,7 +124410,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.filter.mode",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -124999,7 +124999,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.filter.slope",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -125854,7 +125854,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.filter.cutoff",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -126709,7 +126709,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.filter.resonance",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -127855,7 +127855,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.filter.envAttackTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -129001,7 +129001,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.filter.envDecayTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -130147,7 +130147,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.filter.envSustainLevel",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -131293,7 +131293,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.filter.envReleaseTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -132258,7 +132258,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -132441,7 +132441,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.filter.envDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -133406,7 +133406,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -133589,7 +133589,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.filter.envVelocitySens",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -134320,7 +134320,7 @@
               "max": 74,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -134446,7 +134446,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.filter.cutoffKeyfollow",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -135759,7 +135759,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.amp.level",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -136490,7 +136490,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -136616,7 +136616,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.amp.pan",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -137347,7 +137347,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -137473,7 +137473,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.amp.levelVelocitySens",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -138619,7 +138619,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.amp.envAttackTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -139765,7 +139765,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.amp.envDecayTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -140911,7 +140911,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.amp.envSustainLevel",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -142057,7 +142057,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.amp.envReleaseTime",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -144159,7 +144159,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.modLfo.shape",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -145014,7 +145014,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.modLfo.rate",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -145187,7 +145187,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.modLfo.tempoSyncSwitch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -146069,7 +146069,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -146252,7 +146252,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.modLfo.pitchDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -147217,7 +147217,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -147400,7 +147400,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.modLfo.filterDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -148365,7 +148365,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -148548,7 +148548,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.modLfo.ampDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -149513,7 +149513,7 @@
               "max": 127,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -149696,7 +149696,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "tone3.modLfo.panDepth",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -149947,7 +149947,7 @@
             {
               "kind": "deviceParameter",
               "port": "state",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "common.switch",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -150082,7 +150082,7 @@
             {
               "kind": "deviceParameter",
               "port": "selectedChoice",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "arp.grid",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -150279,7 +150279,7 @@
             {
               "kind": "deviceParameter",
               "port": "selectedChoice",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "arp.duration",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -150496,7 +150496,7 @@
             {
               "kind": "deviceParameter",
               "port": "selectedChoice",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "arp.motif",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -151196,7 +151196,7 @@
               "max": 67,
               "step": 1,
               "defaultValue": 64,
-              "currentValue": 0,
+              "currentValue": 64,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -151322,7 +151322,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "arp.octaveRange",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -152177,7 +152177,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "arp.accentRate",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -153032,7 +153032,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "arp.velocity",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -153763,7 +153763,7 @@
               "max": 32,
               "step": 1,
               "defaultValue": 1,
-              "currentValue": 0,
+              "currentValue": 1,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -153887,7 +153887,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "arp.endStep",
               "parameterType": "integer",
               "adoptMetadata": true,
@@ -154975,7 +154975,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "distortion.type",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -155706,7 +155706,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -155832,7 +155832,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "distortion.parameter1",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -156563,7 +156563,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -156689,7 +156689,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "distortion.parameter2",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -157420,7 +157420,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -157546,7 +157546,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "distortion.parameter3",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -158277,7 +158277,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -158403,7 +158403,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "distortion.parameter4",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -159491,7 +159491,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "flanger.type",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -160222,7 +160222,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -160348,7 +160348,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "flanger.parameter1",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -161079,7 +161079,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -161205,7 +161205,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "flanger.parameter2",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -161936,7 +161936,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -162062,7 +162062,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "flanger.parameter3",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -162793,7 +162793,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -162919,7 +162919,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "flanger.parameter4",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -163821,7 +163821,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "delay.type",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -164552,7 +164552,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -164678,7 +164678,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "delay.parameter1",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -165409,7 +165409,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -165535,7 +165535,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "delay.parameter2",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -166266,7 +166266,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -166392,7 +166392,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "delay.parameter3",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -167123,7 +167123,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -167249,7 +167249,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "delay.parameter4",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -167968,7 +167968,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "reverb.type",
               "parameterType": "choice",
               "adoptMetadata": true,
@@ -168699,7 +168699,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -168825,7 +168825,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "reverb.parameter1",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -169556,7 +169556,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -169682,7 +169682,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "reverb.parameter2",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -170413,7 +170413,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -170539,7 +170539,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "reverb.parameter3",
               "parameterType": "bipolar",
               "adoptMetadata": true,
@@ -171270,7 +171270,7 @@
               "max": 52768,
               "step": 1,
               "defaultValue": 32768,
-              "currentValue": 0,
+              "currentValue": 32768,
               "publicInput": true,
               "publicOutput": true,
               "deviceBindable": true,
@@ -171396,7 +171396,7 @@
             {
               "kind": "deviceParameter",
               "port": "value",
-              "deviceRole": "primary",
+              "deviceRole": "Roland GAIA SH-01",
               "parameterId": "reverb.parameter4",
               "parameterType": "bipolar",
               "adoptMetadata": true,

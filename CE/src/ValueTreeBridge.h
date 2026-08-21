@@ -122,5 +122,9 @@ private:
     // Active scripting-toolchain provision/remove job (Settings → Scripting Toolchains), held as its
     // Timer base for the same reason as buildJob (the concrete ToolchainJob lives in the handlers .cpp).
     std::unique_ptr<juce::Timer> toolchainJob;
+    // Reports how long anything holds the message thread, while perf logging is on. Held as its
+    // Timer base for the same reason as the two above (MessageThreadStallWatch lives in the
+    // handlers .cpp); null whenever perf logging is off, which is the normal case.
+    std::unique_ptr<juce::Timer> stallWatch;
     ceditor::device::DeviceProfileService deviceProfileService;
 };

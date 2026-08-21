@@ -57,12 +57,15 @@ import {
   getBulkDumpSends,
   requestFileData,
 } from '../bridge/bridge.js';
+import { fileDataText, profileSourceText } from '../utils/fileDataPayload.js';
+import { decodeInbound } from '../utils/inboundParameterIndex.js';
+import { inboundIndexFor } from './inboundIndexCache.js';
 import { midiCiPropertiesToProfile } from '../generated/dpd/import-midici.mjs';
 import {
   queueDeviceParameterPanelPreviewSync,
   syncDeviceRuntimeStateToPanelPreview,
 } from '../utils/deviceBindingSync.js';
-import { appSettings, replaceDeviceSessionSettings, updateDeviceSessionSettings } from './appSettings.js';
+import { appSettings, removeDeviceSessionRole, replaceDeviceSessionSettings, updateDeviceSessionSettings } from './appSettings.js';
 import {
   createProjectDeviceSessionSnapshot,
   mergeProjectDeviceRoleMapping,
@@ -118,6 +121,11 @@ import {
   sourceControlIdFromRequestId,
 } from './deviceMidiRuntime.js';
 import { DEFAULT_DEVICE_ROLE, DEFAULT_ECHO_WINDOW_MS } from './deviceConstants.js';
+// The inbound choke point below calls this, and never imported it — so every incoming CC threw a
+// ReferenceError inside the handler and latestMidiInputMessage was never set. midiFilters.js names
+// this file as the inbound seam in its own header; the outbound half in bridge.js imports its
+// counterpart correctly. Dependency-free by design, so there is no cycle to avoid here.
+import { filterInboundMidi } from '../scripting/midiFilters.js';
 
 // Echo window per role: role mapping timingOverrides.echoWindowMs wins, then the profile
 // source's timing.echoWindowMs, then the conservative default. The parsed value is cached per
@@ -149,6 +157,47 @@ function echoWindowMsForRole(deviceRole) {
   return ms;
 }
 
+/**
+ * Make the editor's panel follow the instrument.
+ *
+ * The reverse index was built, tested and then wired into the Player only — so the exported plugin
+ * followed the synth and the editor, where every panel is actually built and tried, did not. Turning
+ * a knob showed the CC arriving in the monitor and moved nothing, which reads exactly like a broken
+ * binding and is not one.
+ *
+ * Everything else that moves a control in the editor comes from C++: a parsed dump, a runtime state
+ * push, the echo of our own send. None of those fire for a live CC or a single-parameter SysEx,
+ * because the engine has no notion of a profile's `inbound` declaration — that mapping exists only
+ * here. So this is the one path from "the instrument sent something" to "the panel shows it".
+ *
+ * Per role, because two synths can be mapped at once and a message arriving on one must not move
+ * the other's controls. Echo-suppressed, or our own send comes back a few milliseconds later and
+ * fights the hand that is still turning the knob.
+ */
+export function followInboundMessage(payload) {
+  const hex = String(payload?.hex ?? '');
+  if (!hex) return;
+
+  const role = String(payload?.deviceRole ?? DEFAULT_DEVICE_ROLE);
+  const profileId = String(get(deviceRoleMappings)?.[role]?.profileId ?? '');
+  if (!profileId) return;
+
+  const indexed = inboundIndexFor(profileId, get(profileSources)?.[profileId]?.source ?? '');
+  if (!indexed?.index) return;   // the source has not arrived yet; ordinary, not an error
+
+  const hit = decodeInbound(indexed.index, hex);
+  if (!hit) return;
+
+  if (shouldSuppressEcho(role, hit.parameterId, hit.value)) return;
+  markRuntimeOrigin(role, hit.parameterId, 'deviceInbound');
+  recordRuntimeConflict(role, hit.parameterId, hit.value, { source: 'inbound' });
+  deviceRuntimeState.update((state) => ({
+    ...state,
+    [role]: { ...(state?.[role] ?? {}), [hit.parameterId]: hit.value },
+  }));
+  queueDeviceParameterPanelPreviewSync(role, hit.parameterId, hit.value);
+}
+
 let initialized = false;
 let sessionPersistenceInitialized = false;
 let applyingPersistedDeviceSession = false;
@@ -160,28 +209,6 @@ function fallbackPreviewDestination() {
 
 function fallbackMidiInput() {
   return { type: 'none', id: 'none', name: 'No MIDI Input' };
-}
-
-function decodeDataUrlText(dataUrl = '') {
-  const commaIndex = String(dataUrl).indexOf(',');
-  if (commaIndex < 0) return '';
-
-  const meta = dataUrl.slice(0, commaIndex).toLowerCase();
-  const payload = dataUrl.slice(commaIndex + 1);
-  if (!meta.includes(';base64')) {
-    try {
-      return decodeURIComponent(payload);
-    } catch {
-      return payload;
-    }
-  }
-
-  const binary = atob(payload);
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  if (typeof TextDecoder !== 'undefined') {
-    return new TextDecoder('utf-8').decode(bytes);
-  }
-  return Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
 }
 
 function destinationId(destination) {
@@ -305,10 +332,13 @@ function initDeviceSessionPersistence() {
       applyingPersistedDeviceSession = false;
     }
 
-    if (initialized) {
-      for (const mapping of Object.values(roleMappings)) {
-        setDeviceRoleMapping(mapping);
-      }
+    // Unconditional. This was guarded by `if (initialized)`, which is false during the very first
+    // restore — this subscription is installed from the top of initDeviceProfileBridge, before that
+    // flag is set — so the one restore that matters, the one at launch, was the one that never
+    // reached the engine. setDeviceRoleMapping is an outbound emit and no-ops without a bridge, so
+    // there is nothing for the guard to protect.
+    for (const mapping of Object.values(roleMappings)) {
+      setDeviceRoleMapping(mapping);
     }
   });
 }
@@ -359,13 +389,15 @@ export function initDeviceProfileBridge() {
 
   onDeviceProfileSource((payload) => {
     if (payload?.ok !== true || !payload?.profileId) return;
+    // The engine answered, so the armed fallback has nothing left to fall back to.
+    clearProfileSourceRequest(payload.profileId);
     profileSourceFallbackRequests.delete(`profile_source_file_${payload.profileId}`);
     profileSources.update((sources) => ({
       ...sources,
       [payload.profileId]: {
         profileId: payload.profileId,
         filePath: payload.filePath,
-        source: String(payload.source ?? ''),
+        source: profileSourceText(payload),
         lastModified: payload.lastModified ?? '',
         native: true,
         fallback: false,
@@ -387,7 +419,7 @@ export function initDeviceProfileBridge() {
         [request.profileId]: {
         profileId: request.profileId,
         filePath: request.filePath,
-        source: decodeDataUrlText(payload?.data ?? ''),
+        source: fileDataText(payload),
         lastModified: '',
         fallback: true,
       },
@@ -409,7 +441,7 @@ export function initDeviceProfileBridge() {
         [payload.profileId]: {
           profileId: payload.profileId,
           filePath: payload.filePath,
-          source: String(payload.source ?? ''),
+          source: profileSourceText(payload),
           lastModified: payload.lastModified ?? '',
           native: true,
           fallback: false,
@@ -447,10 +479,12 @@ export function initDeviceProfileBridge() {
     const filtered = filterInboundMidi(payload ?? null);
     if (filtered === null || filtered === undefined) return;   // a filter swallowed it
     latestMidiInputMessage.set(filtered);
+    followInboundMessage(filtered);
   });
 
   onSysexInputMessage((payload) => {
     latestSysexInputMessage.set(payload ?? null);
+    followInboundMessage(payload);
   });
 
   onDeviceSyncStarted((payload) => {
@@ -722,10 +756,31 @@ export function initDeviceProfileBridge() {
     latestProfileTestResult.set(payload);
   });
 
-  const currentMainSynth = get(deviceRoleMappings)?.mainSynth;
-  if (currentMainSynth) {
-    setDeviceRoleMapping(currentMainSynth);
+  // EVERY device, not just mainSynth — and this line is why a card could show "CTRL49 MIDI" while
+  // the engine refused the send with "Not sent: MIDI destination is preview-only".
+  //
+  // The restore above pushes its mappings to C++ only `if (initialized)`, and
+  // initDeviceSessionPersistence() is called at the TOP of this function, before initialized is set.
+  // A Svelte store subscription fires synchronously with the value it already holds, so on any
+  // launch where the saved settings are present the restore runs with initialized still false, the
+  // push is skipped, and the mappings land in the JS store and nowhere else.
+  //
+  // This line was the compensation for that, and it named one device: `mainSynth`, from before there
+  // could be more than one. Every other device — every role a panel names, which is all of them now
+  // — was restored into the UI and never mentioned to the engine, which then default-constructed a
+  // mapping for the unknown role with a preview-only destination. The settings page and the thing
+  // doing the sending disagreed, and only the settings page was on screen.
+  for (const mapping of Object.values(get(deviceRoleMappings) ?? {})) {
+    if (mapping) setDeviceRoleMapping(mapping);
   }
+
+  // And ask for the profile catalog, which nothing did outside the settings page. The listener for
+  // the reply is registered above — this file's own header records the identical bug for the port
+  // list, "registers the LISTENER for the port-list reply; it never asks for the list", and the
+  // profile catalog had it too. Every send checks that catalog before compiling, so opening a panel
+  // without visiting Settings first meant every control on it was refused with "Not sent:
+  // unresolved profile for <role>".
+  listDeviceProfiles();
 }
 
 export function refreshProfileParameters(profileId, deviceRole = DEFAULT_DEVICE_ROLE, options = {}) {
@@ -797,20 +852,73 @@ export function restoreProjectDeviceSession(session, options = {}) {
 
 registerProjectDeviceSessionRestoreHandler(restoreProjectDeviceSession);
 
+/**
+ * Ask for a profile's source text, once.
+ *
+ * Two things here used to make one screen cost minutes of frozen window, and both were invisible
+ * because each looked harmless on its own.
+ *
+ * The file read was called a fallback and behaved like a duplicate: it fired alongside every native
+ * request, and the handler for it then threw the result away whenever the native source had already
+ * arrived — which is nearly always. For the 790 KB GAIA profile that discarded copy cost 55 seconds
+ * of blocked message thread, on top of the 55 the native one cost.
+ *
+ * And nothing tracked that a request was outstanding. presetProfileForRole asks for a source it does
+ * not have and returns null, on every sync — so a source slow to arrive was requested again, and
+ * again, each repeat stalling the app for as long as the last. The log reads as one stall per fetch,
+ * forever.
+ */
+const PROFILE_SOURCE_FALLBACK_MS = 2000;
+const profileSourceRequestsInFlight = new Map();   // profileId -> fallback timer
+
+function clearProfileSourceRequest(profileId) {
+  const id = String(profileId ?? '');
+  const timer = profileSourceRequestsInFlight.get(id);
+  if (timer !== undefined) clearTimeout(timer);
+  profileSourceRequestsInFlight.delete(id);
+}
+
 export function requestProfileSource(profileId) {
+  const id = String(profileId ?? '');
+  if (!id) return;
+
   initDeviceProfileBridge();
-  getDeviceProfileSource({
-    requestId: `profile_source_${profileId}`,
-    profileId,
+  if (profileSourceRequestsInFlight.has(id)) return;   // already asking; asking louder does not help
+
+  getDeviceProfileSource({ requestId: `profile_source_${id}`, profileId: id });
+
+  // Armed, not fired. If the engine answers — the normal case — the timer is cleared before this
+  // runs and the file is never read at all.
+  const filePath = get(deviceProfiles).find((item) => String(item?.id ?? '') === id)?.filePath;
+  profileSourceRequestsInFlight.set(id, setTimeout(() => {
+    profileSourceRequestsInFlight.delete(id);
+    if (!filePath || get(profileSources)?.[id]?.source) return;
+
+    const requestId = `profile_source_file_${id}`;
+    profileSourceFallbackRequests.set(requestId, { profileId: id, filePath });
+    requestFileData(requestId, filePath);
+  }, PROFILE_SOURCE_FALLBACK_MS));
+}
+
+/**
+ * Forget a device: remove its mapping from the store and from the saved session.
+ *
+ * The counterpart to mapDeviceRole, needed once devices are named by the user rather than picked
+ * from a fixed set — a name you can create is a name you have to be able to get rid of, and a
+ * rename is a create followed by one of these.
+ */
+export function forgetDeviceRole(role) {
+  const name = String(role ?? '');
+  if (!name) return;
+
+  deviceRoleMappings.update((mappings) => {
+    if (!(name in (mappings ?? {}))) return mappings;
+    const { [name]: _gone, ...rest } = mappings;
+    return rest;
   });
 
-  const profile = get(deviceProfiles).find((item) => String(item?.id ?? '') === String(profileId));
-  const filePath = profile?.filePath;
-  if (filePath) {
-    const requestId = `profile_source_file_${profileId}`;
-    profileSourceFallbackRequests.set(requestId, { profileId, filePath });
-    requestFileData(requestId, filePath);
-  }
+  removeDeviceSessionRole(name);
+  getDeviceDiagnostics();
 }
 
 export function mapDeviceRole(role, profileId, options = {}) {

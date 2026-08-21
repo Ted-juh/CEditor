@@ -264,8 +264,13 @@ export function normalizeDeviceSession(session) {
     roleMappings[role] = normalizeDeviceRoleMapping(mapping, role);
   }
 
-  if (!roleMappings.mainSynth) {
-    roleMappings.mainSynth = normalizeDeviceRoleMapping(session?.mainSynth, DEFAULT_DEVICE_ROLE);
+  // A session with no devices at all gets the default one, because an unlabelled send and the
+  // transport's clock/start/stop have to go somewhere. A session that HAS devices does not: this
+  // used to re-add `mainSynth` unconditionally, so a user who named their instruments and removed
+  // the placeholder got it back on the next save, and the settings list grew a device nobody asked
+  // for. Devices are named by the user; the app should stop inventing one over the top.
+  if (Object.keys(roleMappings).length === 0) {
+    roleMappings[DEFAULT_DEVICE_ROLE] = normalizeDeviceRoleMapping(session?.mainSynth, DEFAULT_DEVICE_ROLE);
   }
 
   const selectedProfileId = String(
@@ -320,6 +325,7 @@ export function normalizeGeneralSettings(general) {
     showGuides: general?.showGuides !== false,
     showDistances: general?.showDistances !== false,
     showPreviewSelectionRing: general?.showPreviewSelectionRing !== false,
+    foldSceneryInEditor: general?.foldSceneryInEditor === true,
     insertOffset: clampInteger(general?.insertOffset, DEFAULT_GENERAL_SETTINGS.insertOffset, 0, 400),
     duplicateOffset: clampInteger(general?.duplicateOffset, DEFAULT_GENERAL_SETTINGS.duplicateOffset, 0, 400),
     keyboardNudgeSmall: clampInteger(

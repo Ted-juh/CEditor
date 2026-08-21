@@ -171,6 +171,13 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
         {
             e ("midiMonitorEvents", s.getMonitorEvents());
         }))
+        .withEventListener ("clearMidiMonitorEvents", on ([] (S& s, E e, const juce::var&)
+        {
+            // Emitted back so the UI's list is replaced by the engine's, rather than merely agreeing
+            // with it until the next message arrives and contradicts it.
+            s.clearMonitorEvents();
+            e ("midiMonitorEvents", s.getMonitorEvents());
+        }))
         .withEventListener ("getDeviceDiagnostics", on ([] (S& s, E e, const juce::var&)
         {
             e ("deviceDiagnostics", s.getDiagnostics());

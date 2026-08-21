@@ -10,12 +10,16 @@
    */
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
+  import SceneryGround from './SceneryGround.svelte';
   import SelectionBoundsOverlay from './SelectionBoundsOverlay.svelte';
   import { showGuides } from '../stores/editorView.js';
+  import { foldSceneryInEditor } from '../stores/runtimePreferences.js';
   import { deviceParameterDrag } from '../stores/deviceParameterDrag.js';
-  import { sortControlsForRender } from '../utils/controlOrder.js';
+  import { selectedComponentIds } from '../stores/panels.js';
+  import { getControlId, sortControlsForHitTest, sortControlsForRender } from '../utils/controlOrder.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
-  import { buildSceneryRenderPlan } from '../utils/sceneryRenderPlan.js';
+  import { sceneryHoldSet } from '../utils/sceneryModel.js';
+  import { buildSceneryRenderPlan, controlItem } from '../utils/sceneryRenderPlan.js';
   import { initialMountCount, nextMountCount, mountIncomplete, scheduleNextSlice } from '../utils/progressiveMount.js';
 
   let {
@@ -43,7 +47,7 @@
   // What to paint, in order: controls, plus one image for each locked scenery layer. The decision
   // lives in utils/sceneryRenderPlan.js so the preview surface makes it identically — a panel that
   // changes when you press Preview is worse than one that never compiles at all.
-  let plan = $derived(buildSceneryRenderPlan(panel, { preview: false }));
+  let plan = $derived(buildSceneryRenderPlan(panel, { preview: false, fold: $foldSceneryInEditor }));
   // Children still need the flat control list for snapping, distance guides and hit-testing, and
   // that list must include the folded ones: a control you cannot snap to because it was compiled
   // would be a very confusing kind of invisible.
@@ -56,24 +60,116 @@
   );
   let scopedEditingControlId = $derived(scopedEditingControl?._children?.Core?.id ?? null);
 
+  /**
+   * The control the pointer is over, when that control is only in a ground.
+   *
+   * Folding in the EDIT surface has a problem preview does not: selection is DOM-driven. Every
+   * CanvasControl carries its own mousedown, so a control that was never mounted cannot be clicked,
+   * and a control that only becomes real once clicked would need a second press before it could be
+   * dragged.
+   *
+   * Hover is the way out. Pointer moves over the surface are hit-tested against the grounds by
+   * geometry, and whatever is under the pointer gets a live copy drawn over it. By the time a press
+   * arrives the control is a real one, with its handles and its drag, and nothing downstream needs
+   * to know it was ever folded.
+   */
+  let hoveredSceneryId = $state(null);
+
+  /**
+   * Which folded controls are drawn live over their own ground: whatever is selected (it needs
+   * handles and a drag), whatever is being scope-edited, and whatever the pointer is on.
+   *
+   * Note these do NOT leave the ground. A ground is cached against its own contents, so removing
+   * one to hoist it would re-bake the rest — a few hundred milliseconds every time the pointer
+   * crossed a label. They are hidden inside it and redrawn instead, and sceneryHoldSet brings along
+   * anything they would otherwise cover.
+   *
+   * Per ground rather than per panel, because the plan can emit one for every layer and a control
+   * may only be hoisted above the ground it actually belongs to.
+   */
+  let groundHolds = $derived.by(() => {
+    const seeds = (control) => {
+      const id = getControlId(control);
+      if (id == null) return false;
+      return id === hoveredSceneryId || id === scopedEditingControlId || $selectedComponentIds.has(id);
+    };
+    const holds = new Map();
+    for (const item of plan.items) {
+      if (item.type === 'ground') holds.set(item.layer, sceneryHoldSet(item.controls, seeds));
+    }
+    return holds;
+  });
+
+  /**
+   * The plan, with each ground's held controls drawn immediately after it.
+   *
+   * Immediately after is where they belong on both sides: above the rest of that ground, and below
+   * every live control on the layer, which the fold already guarantees nothing of theirs is under.
+   */
+  let heldItems = $derived.by(() => {
+    if (groundHolds.size === 0) return plan.items;
+    const out = [];
+    for (const item of plan.items) {
+      out.push(item);
+      if (item.type !== 'ground') continue;
+      for (const control of groundHolds.get(item.layer)?.held ?? []) out.push(controlItem(control));
+    }
+    return out;
+  });
+
+  // Hit-test the grounds the way the editor hit-tests anything: topmost first, by box. Later
+  // grounds paint over earlier ones, so they are searched in reverse.
+  function sceneryAt(x, y) {
+    const grounds = plan.items.filter((item) => item.type === 'ground');
+    for (let i = grounds.length - 1; i >= 0; i--) {
+      for (const control of sortControlsForHitTest(grounds[i].controls)) {
+        const t = control?._children?.Transform ?? {};
+        const cx = Number(t.x) || 0, cy = Number(t.y) || 0;
+        const w = Number(t.width) || 0, h = Number(t.height) || 0;
+        if (x >= cx && x <= cx + w && y >= cy && y <= cy + h) return getControlId(control);
+      }
+    }
+    return null;
+  }
+
+  function handleSurfacePointerMove(event) {
+    if (groundHolds.size === 0) {
+      if (hoveredSceneryId !== null) hoveredSceneryId = null;
+      return;
+    }
+    // The surface is scaled, so client pixels are not panel pixels.
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / (scale || 1);
+    const y = (event.clientY - rect.top) / (scale || 1);
+    const hit = sceneryAt(x, y);
+    if (hit !== hoveredSceneryId) hoveredSceneryId = hit;
+  }
+
+  function handleSurfacePointerLeave() {
+    // Not cleared while something is selected — the selection already holds it live, and dropping
+    // the hover mid-drag would fold the control out from under the pointer.
+    if (hoveredSceneryId !== null) hoveredSceneryId = null;
+  }
+
   // A large panel is mounted in slices so the editor appears before the last control is built —
   // see utils/progressiveMount.js. Below its threshold `mountedCount` is simply the whole list and
-  // none of this runs.
+  // none of this runs. It slices what is LEFT after the fold, which is the list that costs anything
+  // to mount — a ground is one item however many controls went into it.
   let mountedCount = $state(0);
   // Reset on a new panel, not on every edit: the identity that matters is which panel is open, and
   // rebuilding from the first slice on each keystroke would be a flicker, not a speed-up.
   let panelIdentity = $derived(panel?.id ?? null);
   $effect(() => {
     panelIdentity;
-    mountedCount = initialMountCount(plan.items.length);
+    mountedCount = initialMountCount(heldItems.length);
   });
   $effect(() => {
-    const total = plan.items.length;
+    const total = heldItems.length;
     if (!mountIncomplete(mountedCount, total)) return;
     return scheduleNextSlice(() => { mountedCount = nextMountCount(mountedCount, total); });
   });
   let renderItems = $derived(
-    mountedCount >= plan.items.length ? plan.items : plan.items.slice(0, mountedCount)
+    mountedCount >= heldItems.length ? heldItems : heldItems.slice(0, mountedCount)
   );
 
   function bindSurface(node) {
@@ -97,6 +193,8 @@
   onclick={onclick}
   onmousedown={onmousedown}
   oncontextmenu={oncontextmenu}
+  onpointermove={handleSurfacePointerMove}
+  onpointerleave={handleSurfacePointerLeave}
   ondragover={ondragover}
   ondrop={ondrop}
 >
@@ -114,11 +212,23 @@
     <GuideLines {scale} panelWidth={panel.width} panelHeight={panel.height} />
   {/if}
 
-  {#each renderItems as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.control._children?.Core?.id)}
+  {#each renderItems as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.type === 'ground' ? `ground:${item.layer}` : item.control._children?.Core?.id)}
     {#if item.type === 'scenery'}
       <!-- A whole locked scenery layer, as one element. Not interactive by construction: unlock
            the layer to get the controls back. -->
       <img class="scenery-layer" src={item.url} width={panel.width} height={panel.height} alt="" />
+    {:else if item.type === 'ground'}
+      <!-- A layer's inert controls as one node of frozen markup, with the ones being hovered,
+           selected or scope-edited hidden inside it and redrawn live immediately below. -->
+      <SceneryGround
+        controls={item.controls}
+        allControls={orderedControls}
+        panelControls={panel.controls}
+        panelWidth={panel.width}
+        panelHeight={panel.height}
+        {scale}
+        hiddenIds={groundHolds.get(item.layer)?.heldIds ?? new Set()}
+      />
     {:else}
       <CanvasControl
         control={scopedEditingControlId != null && scopedEditingControlId === item.control._children?.Core?.id

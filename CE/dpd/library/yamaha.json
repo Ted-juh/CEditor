@@ -13,7 +13,7 @@
   "provenance": {
     "source": "official",
     "verifiedRoundTrip": true,
-    "verifiedFullDump": null,
+    "verifiedFullDump": false,
     "verifiedOnHardware": null,
     "confirmations": 0,
     "contributors": [],

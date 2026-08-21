@@ -21,8 +21,11 @@
     setPreviewInspectedControlId,
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
+  import { sceneryHoldSet } from '../utils/sceneryModel.js';
+  import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
-  import { buildSceneryRenderPlan } from '../utils/sceneryRenderPlan.js';
+  import { buildSceneryRenderPlan, controlItem } from '../utils/sceneryRenderPlan.js';
+  import SceneryGround from './SceneryGround.svelte';
   import { flatControls } from '../utils/containment.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
   import {
@@ -171,7 +174,7 @@
   } from '../utils/transportLayout.js';
   import {
     transport, startTransport, stopTransport, toggleTransport,
-    setTransportBpm, setTransportSource, setTransportClockOut, transportSwingNow, setTransportSwing,
+    setTransportBpm, setTransportSource, setTransportClockOut, setTransportClockDevice, transportSwingNow, setTransportSwing,
     transportBeatsNow, isTransportRunning, transportBpmNow,
     setTransportSignature, transportBeatsPerBar, transportJumpSeq,
     setTransportLoop, startTransportWithCountIn, isCountingIn, countInBeatsLeft,
@@ -179,6 +182,15 @@
   import { noteLevels } from '../utils/midiNoteInput.js';
   import { heldNotes as inputHeldNotes, heldNoteEntries as inputHeldEntries } from '../utils/midiNoteInput.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
+  import {
+    activeMidiControlBindings,
+    matchesMidiControl,
+    midiControlMessage,
+    midiControlValue,
+  } from '../utils/midiControlBindings.js';
+  import { EMPTY_NRPN_STATE, applyNrpnEvents } from '../utils/nrpn.js';
+  import { expressionEventsFromHex } from '../utils/midiNoteInput.js';
+  import { latestMidiInputMessage } from '../stores/deviceProfileStores.js';
   import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
@@ -273,7 +285,41 @@
   // the lock has no meaning and holding the DOM elements open would buy nothing. `orderedControls`
   // is untouched, because every other thing in this file that reads it is asking about behaviour
   // rather than about paint.
-  let previewPlan = $derived(buildSceneryRenderPlan(panel, { preview: true }));
+  let previewPlan = $derived(buildSceneryRenderPlan(panel, { preview: true, fold: true }));
+
+  /**
+   * Which folded controls are drawn live over their own ground.
+   *
+   * Preview is where folding is unambiguously safe: a folded control is inert here by definition,
+   * and nothing in preview can select or drag it. The one thing preview does do to a scenery
+   * control is ring it when it is the inspected one, so that control is held live — which is
+   * exactly what sceneryHoldSet exists for, and cheaper than teaching the ground about a highlight
+   * that changes.
+   *
+   * Per ground rather than per panel: the plan emits one for every layer that folded anything, and
+   * a control may only be hoisted above the ground it actually belongs to.
+   */
+  let groundHolds = $derived.by(() => {
+    const holds = new Map();
+    for (const item of previewPlan.items) {
+      if (item.type !== 'ground') continue;
+      holds.set(item.layer, sceneryHoldSet(item.controls, (c) => getControlId(c) === $previewInspectedControlId));
+    }
+    return holds;
+  });
+
+  // The plan, with each ground's held controls drawn immediately after it — above the rest of that
+  // ground and below every live control on the layer, which is where the fold guarantees they fit.
+  let renderItems = $derived.by(() => {
+    if (groundHolds.size === 0) return previewPlan.items;
+    const out = [];
+    for (const item of previewPlan.items) {
+      out.push(item);
+      if (item.type !== 'ground') continue;
+      for (const control of groundHolds.get(item.layer)?.held ?? []) out.push(controlItem(control));
+    }
+    return out;
+  });
   /**
    * Id -> control, over the WHOLE tree.
    *
@@ -2412,9 +2458,28 @@
   // checks it, so closing a panel that never played stays silent instead of
   // firing 64 messages at the rig for no reason.
   let sentAnyNote = false;
+  /**
+   * Which device the panel's notes are played to.
+   *
+   * Resolved from the panel itself, exactly as the transport's clock already was — see
+   * resolveClockDevice, whose own comment records that this used to be the literal string
+   * 'mainSynth' in six places and that a panel naming any other device had its messages dropped
+   * with no way to find out. sendNoteBytes was the seventh, and it was still there: every
+   * note-playing control — the ribbon, the chord pad, the drum pads, the arp — played to a device
+   * called `mainSynth` whatever the panel was for. On the AN1x panel, whose device is "Yamaha
+   * AN1x", that is a device nobody configured, so the note resolved no mapping and went nowhere.
+   *
+   * A panel that names exactly one device is unambiguous; one that names several needs to be asked,
+   * and until there is somewhere to ask, sending to the first of them would be a guess with a synth
+   * on the end of it. Empty means nothing is sent, which is the honest outcome.
+   */
+  let noteDeviceRole = $derived(resolveClockDevice('', countRolesInPanels([panel]).keys()));
+
   function sendNoteBytes(bytes, actionId, sourceType = '', sourceId = '') {
     if ((bytes?.[0] & 0xF0) === 0x90) sentAnyNote = true;
-    triggerRawMidiAction({ deviceRole: 'mainSynth', actionId, message: bytesToHex(bytes), dryRun: false });
+    if (noteDeviceRole) {
+      triggerRawMidiAction({ deviceRole: noteDeviceRole, actionId, message: bytesToHex(bytes), dryRun: false });
+    }
     // Every note the panel plays passes through here, which is what makes
     // "record what I just played" one tap instead of six integrations.
     const tapped = noteOutputFromBytes(bytes, sourceType, sourceId);
@@ -4096,13 +4161,17 @@
     const base = resolved?.control ?? control;
     const cfg = base?._children?.Transport;
     if (!cfg) return resolved;
+    // Which device the clock goes to is part of the signature: renaming a device or opening a panel
+    // that names a different one has to re-address the transport, not keep clocking the old one.
+    const clockTarget = resolveClockDevice(cfg.clockDevice, countRolesInPanels([panel]).keys());
     const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}|${cfg.beatsPerBar}`
-      + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}|${cfg.swing}`;
+      + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}|${cfg.swing}|${clockTarget}`;
     if (transportConfigured !== signature) {
       transportConfigured = signature;
       setTransportSource(tpSource(base));
       if (!transportIsFollowing(tpSource(base))) setTransportBpm(numberOr(cfg.bpm, 120));
       setTransportClockOut(cfg.clockOut === true);
+      setTransportClockDevice(clockTarget);
       // Swing lives on the clock so every synced follower shuffles together.
       setTransportSwing(numberOr(cfg.swing, 0));
       // The meter has to reach the store, not just the readout: the components
@@ -5086,6 +5155,77 @@
         dryRun: binding.dryRun !== false,
       });
     }
+    // Raw CC bindings go out as bytes rather than through the profile engine, because there is no
+    // parameter for it to compile. Same door as everything else outbound, so a script's
+    // ce.midi.interceptOut still sees them.
+    for (const binding of activeMidiControlBindings(control)) {
+      const value = bindingValueForPatch(binding, patch, control);
+      if (value === undefined) continue;
+      const message = midiControlMessage(binding, value);
+      if (!message) continue;
+      triggerRawMidiAction({
+        deviceRole: binding.deviceRole || DEFAULT_DEVICE_ROLE,
+        actionId: `panel_preview_cc_${controlId || 'control'}_${binding.controller}`,
+        message,
+        dryRun: binding.dryRun !== false,
+      });
+    }
+  }
+
+  // Hardware -> control. The counterpart of the block above, and the reason the binding kind exists:
+  // a controller the profile does not describe can now drive something on screen.
+  //
+  // Read off latestMidiInputMessage rather than midiRouteEvents, for two reasons. That stream
+  // deliberately excludes note velocity — "a run of notes never wakes a controller consumer" — and
+  // velocity is one of the things bindable here. And a store subscription fires per message where an
+  // $effect flushes once per microtask, so two controllers moved in the same tick would collapse
+  // into one and the other would never reach its control.
+  let lastInboundPayload = null;
+  let nrpnState = EMPTY_NRPN_STATE;
+  $effect(() => {
+    const stop = latestMidiInputMessage.subscribe((payload) => {
+      if (!payload?.hex || payload === lastInboundPayload) return;
+      lastInboundPayload = payload;
+      // The assembler runs even with nothing bound, so its channel selections stay in step with the
+      // stream; an NRPN begun before a binding existed still resolves once one does.
+      const assembly = applyNrpnEvents(nrpnState, expressionEventsFromHex(payload.hex));
+      nrpnState = assembly.state;
+      const bound = midiControlBoundControls;
+      if (!bound.length) return;
+      for (const event of [...assembly.passthrough, ...assembly.assembled]) {
+        for (const [controlId, bindings] of bound) {
+          for (const binding of bindings) {
+            if (binding?.feedback?.receiveUpdates === false) continue;
+            if (matchesMidiControl(binding, event)) {
+              applyMidiControlValue(controlId, binding, midiControlValue(binding, event));
+            }
+          }
+        }
+      }
+    });
+    return stop;
+  });
+
+  // Only the controls that actually have one, recomputed when the panel changes rather than per
+  // message: a CC stream is hundreds a second and this panel can hold hundreds of controls.
+  let midiControlBoundControls = $derived.by(() => {
+    const out = [];
+    for (const [controlId, control] of controlsById) {
+      const bindings = activeMidiControlBindings(control);
+      if (bindings.length && controlId) out.push([controlId, bindings]);
+    }
+    return out;
+  });
+
+  function applyMidiControlValue(controlId, binding, value) {
+    const port = String(binding?.port ?? 'value');
+    // Written straight into the preview session, like an inbound device parameter — not through the
+    // interaction path, so the panel following the hardware cannot echo back out and fight it.
+    if (port === 'state') updatePanelPreviewSession(controlId, { checked: value >= 64, mixed: false, valueOverrideEnabled: false });
+    else if (port === 'brightness') updatePanelPreviewSession(controlId, { brightnessOverride: Math.round((value / 127) * 100) });
+    else if (port === 'backlight') updatePanelPreviewSession(controlId, { backlightOverride: value >= 64 });
+    else if (port === 'text') updatePanelPreviewSession(controlId, { textOverride: String(value) });
+    else updatePanelPreviewSession(controlId, { valueOverrideEnabled: true, valueOverride: value });
   }
 
   function commitSelectActionAndEmit(control, options = {}) {
@@ -5240,8 +5380,16 @@
         [channelName]: nextValue,
       },
       customNormalizedValue: normalizeCustomChannelValue(channel, nextValue),
-      valueOverrideEnabled: channelName === 'mainValue',
-      valueOverride: channelName === 'mainValue' ? nextValue : sessionFor(control)?.valueOverride,
+      // Whatever the main channel is CALLED. customMainChannelName, three lines up, resolves it —
+      // `mainValue` when the component has one, otherwise its first channel — and this used to
+      // throw that answer away to compare against the literal string instead. A component whose
+      // channel is named `value`, which is what createValueChannel('value') and every generated
+      // GAIA/AN1x knob, fader and LED column produce, then published no value into the patch at
+      // all, so emitDeviceBindingsForPatch found undefined and sent nothing. Both panels' native
+      // controls sent and every drawn one was silent, which reads as "the panel isn't wired" and
+      // was one magic string.
+      valueOverrideEnabled: !!channelName,
+      valueOverride: channelName ? nextValue : sessionFor(control)?.valueOverride,
       focused: true,
       hover: true,
     });
@@ -5258,8 +5406,8 @@
         [channelName]: nextValue,
       },
       customNormalizedValue: normalizeCustomChannelValue(channel, nextValue),
-      valueOverrideEnabled: channelName === 'mainValue',
-      valueOverride: channelName === 'mainValue' ? nextValue : sessionFor(control)?.valueOverride,
+      valueOverrideEnabled: !!channelName,
+      valueOverride: channelName ? nextValue : sessionFor(control)?.valueOverride,
       focused: true,
       hover: true,
     });
@@ -5717,6 +5865,9 @@
   }
 
   function removeWindowListeners() {
+    // Server-rendered, onDestroy still runs when the render closes and there is no window to detach
+    // from — which made this component impossible to render in a test at all.
+    if (typeof window === 'undefined') return;
     window.removeEventListener('pointermove', handleWindowPointerMove);
     window.removeEventListener('pointerup', handleWindowPointerUp);
     rangeScrub?.end();
@@ -6796,9 +6947,19 @@
     <GuideLines {scale} panelWidth={panel.width} panelHeight={panel.height} />
   {/if}
 
-  {#each previewPlan.items as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.control._children?.Core?.id)}
+  {#each renderItems as item (item.type === 'scenery' ? `scenery:${item.layer}` : item.type === 'ground' ? `ground:${item.layer}` : item.control._children?.Core?.id)}
     {#if item.type === 'scenery'}
       <img class="scenery-layer" src={item.url} width={panel.width} height={panel.height} alt="" />
+    {:else if item.type === 'ground'}
+      <SceneryGround
+        controls={item.controls}
+        allControls={orderedControls}
+        panelControls={panel.controls}
+        panelWidth={panel.width}
+        panelHeight={panel.height}
+        {scale}
+        hiddenIds={groundHolds.get(item.layer)?.heldIds ?? new Set()}
+      />
     {:else}
     {@const control = item.control}
     <CanvasControl

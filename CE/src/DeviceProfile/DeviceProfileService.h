@@ -59,6 +59,8 @@ public:
     juce::var runProfileTests (const juce::var& payload);
     juce::var getRuntimeState() const;
     juce::var getMonitorEvents() const;
+    /** Forget the monitor log. The engine owns it, so clearing only the UI's copy does nothing. */
+    void clearMonitorEvents();
     juce::var getDiagnostics() const;
     void setEventCallback (EventCallback callback);
 
@@ -227,6 +229,8 @@ private:
     std::map<juce::String, std::map<juce::String, juce::var>> runtimeState;
     juce::Array<juce::var> monitorEvents;
     double lastInboundHeavyEmitMs = 0.0;  // throttles per-incoming heavy bridge emits (CC streams)
+    double lastProfileScanMs = 0.0;       // throttles the profile directory rescan (see loadInternalTestProfiles)
+    std::map<juce::String, juce::Time> refusedProfiles;  // path -> mtime of the copy we already refused
     EventCallback eventCallback;
     mutable juce::CriticalSection midiInputLock;
 
@@ -238,7 +242,10 @@ private:
     bool midiCiActive = false;
     std::set<uint32_t> midiCiReported; // muids already emitted as midiCiDiscovered
 
-    void loadInternalTestProfiles();
+    // `force` skips the rescan throttle, for the cold paths that must see a profile written a moment
+    // ago (the profile list behind the settings dropdown, and validating a newly chosen profile id).
+    void loadInternalTestProfiles (bool force = false);
+    bool isLoadedProfileCurrent (const juce::File& file) const;
     bool loadProfileFile (const juce::File& file, juce::String& error);
     DeviceProfileEngine* resolveEngine (const juce::String& profileId, const juce::String& deviceRole);
     juce::String resolveProfileId (const juce::String& profileId, const juce::String& deviceRole) const;

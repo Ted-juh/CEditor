@@ -112,10 +112,15 @@ function getCornerStrokes(border, corners, pos) {
 }
 
 // Distance from the corner anchor where the side path must START.
-// - rounded outward / chamfer / notch / straight: side inset by R. The
-//   outward arc has horizontal tangent where it meets the top side, so the
-//   stroke flows continuously from arc into side; aligning at the centerline
-//   endpoint (R + tt/2 with the 1-px overlap → R) is enough.
+// - rounded outward: the arc's centreline ends at R along the box edge (its
+//   outer edge is the R-radius round the fill also paints), and the tangent
+//   there is horizontal, so the stroke flows continuously from arc into side.
+//   Solving `sideStart = tlG + t - tlOv = R` gives tlG = R - tt/2 + 1; using
+//   R - tt/2 keeps the 1-px overlap convention the other shapes use. This used
+//   to return R, which paired with the old arc that ended at R + tt/2 — both
+//   were half a thickness out, so the join looked right while the corner was
+//   rounder than the box it belonged to.
+// - chamfer / notch / straight: side inset by R.
 // - rounded inward: the arc has a *vertical* tangent at its top endpoint,
 //   so the arc's butt cap is a horizontal segment at y = tt/2 spanning
 //   x ∈ [R, R + tt]. The arc band itself only exists at y ≥ tt/2 — there is
@@ -150,6 +155,13 @@ function sideInset(on, _cn, r, tt) {
   if (cornerStyle === 'notch') {
     return r;
   }
+  // Rounded OUTWARD only. An inward corner's arc still meets the side at
+  // R + tt/2 (it is anchored at the box corner, not inset from it), so pulling
+  // its sides back would open a gap the width of the border between the side's
+  // end and the arc's leg.
+  if (cornerStyle === 'rounded' && (_cn?.direction || 'outward') !== 'inward') {
+    return Math.max(0, r - tt / 2);
+  }
   return r;
 }
 
@@ -181,16 +193,16 @@ function computeCornerGradientGeom(pos, cnStyle, cnDir, R, t, W, H) {
   const e = R + t;
 
   if (cnStyle === 'rounded') {
-    let tangentialAxis;
-    switch (pos) {
-      case 'tl': tangentialAxis = { x1: t,     y1: e,     x2: e,     y2: t };     break;
-      case 'tr': tangentialAxis = { x1: W - e, y1: t,     x2: W - t, y2: e };     break;
-      case 'br': tangentialAxis = { x1: W - t, y1: H - e, x2: W - e, y2: H - t }; break;
-      case 'bl': tangentialAxis = { x1: e,     y1: H - t, x2: t,     y2: H - e }; break;
-    }
-
     if (cnDir === 'inward') {
-      // Inward: radial centered at the inset point near the anchor.
+      // Inward: arc anchored at the box corner — centred at the inset point,
+      // running between the (R + t) marks on the two edges.
+      let tangentialAxis;
+      switch (pos) {
+        case 'tl': tangentialAxis = { x1: t,     y1: e,     x2: e,     y2: t };     break;
+        case 'tr': tangentialAxis = { x1: W - e, y1: t,     x2: W - t, y2: e };     break;
+        case 'br': tangentialAxis = { x1: W - t, y1: H - e, x2: W - e, y2: H - t }; break;
+        case 'bl': tangentialAxis = { x1: e,     y1: H - t, x2: t,     y2: H - e }; break;
+      }
       let arcCx, arcCy;
       switch (pos) {
         case 'tl': arcCx = t;     arcCy = t;     break;
@@ -201,23 +213,35 @@ function computeCornerGradientGeom(pos, cnStyle, cnDir, R, t, W, H) {
       return {
         cornerShape: 'rounded',
         isInward: true,
-        arcCx, arcCy,
+        arcCx, arcCy, arcR: R,
         radialAxis: null,
         tangentialAxis,
       };
     }
-    // Outward: radial centered at the arc circle center.
+
+    // Outward: the arc's centreline circle is radius R - t about (R, R), so its
+    // endpoints sit at R along each edge and its outer edge lands on R — the
+    // radius the fill underneath is rounded to. Both the tangential axis (which
+    // runs endpoint to endpoint) and the radial centre follow from that; they
+    // used to be written in terms of R + t, matching the old oversized arc.
+    let tangentialAxis;
+    switch (pos) {
+      case 'tl': tangentialAxis = { x1: t,     y1: R,     x2: R,     y2: t };     break;
+      case 'tr': tangentialAxis = { x1: W - R, y1: t,     x2: W - t, y2: R };     break;
+      case 'br': tangentialAxis = { x1: W - t, y1: H - R, x2: W - R, y2: H - t }; break;
+      case 'bl': tangentialAxis = { x1: R,     y1: H - t, x2: t,     y2: H - R }; break;
+    }
     let arcCx, arcCy;
     switch (pos) {
-      case 'tl': arcCx = R + t;     arcCy = R + t;     break;
-      case 'tr': arcCx = W - R - t; arcCy = R + t;     break;
-      case 'br': arcCx = W - R - t; arcCy = H - R - t; break;
-      case 'bl': arcCx = R + t;     arcCy = H - R - t; break;
+      case 'tl': arcCx = R;     arcCy = R;     break;
+      case 'tr': arcCx = W - R; arcCy = R;     break;
+      case 'br': arcCx = W - R; arcCy = H - R; break;
+      case 'bl': arcCx = R;     arcCy = H - R; break;
     }
     return {
       cornerShape: 'rounded',
       isInward: false,
-      arcCx, arcCy,
+      arcCx, arcCy, arcR: Math.max(0, R - t),
       radialAxis: null,
       tangentialAxis,
     };
@@ -331,6 +355,42 @@ function cornerLineJoin(style) {
   return style === 'rounded' ? 'round' : 'miter';
 }
 
+/**
+ * Will SVG put ink on the page for this path, given the cap it is stroked with?
+ *
+ * Two ways for a segment to be born blank, and the geometry produces both:
+ *
+ *   - A lone moveto. A corner with no radius has no shape to draw and buildCornerPath says so by
+ *     returning the moveto to its anchor. "A subpath consisting of a single moveto shall not be
+ *     stroked" (SVG 1.1 §11.4) — unconditionally, whatever the cap.
+ *   - A zero-length subpath, `M 3 3 L 3 3`. A straight corner at radius 0 makes two per corner, and
+ *     a chamfer whose radius has been clamped to half the box makes four *sides*, because the
+ *     chamfers meet at the midpoint of each edge and leave no straight run between them. These are
+ *     stroked under a round or square cap, which is how a dotted border paints its dots, so the cap
+ *     decides and it is passed in rather than assumed.
+ *
+ * Emitting one costs a <path> element, a Svelte keyed block and a gradient lookup to paint nothing.
+ * Four per square-cornered control with a border — a Label at defaults is exactly that.
+ *
+ * Worth being accurate about the size of this: the GAIA panel saves nothing, because all 163 of its
+ * bordered controls are rounded. It is a tax on square and fully-chamfered borders, not a panel-wide
+ * win, and it is not where the 413-control open time goes.
+ *
+ * Dropping the corner blanks is safe only because the sides close a square corner themselves — see
+ * overlapAt, which runs each side to the box edge when there is no corner shape to meet.
+ */
+function paintsInk(d, linecap) {
+  const s = String(d ?? '');
+  if (!/[LlHhVvCcSsQqTtAaZz]/.test(s)) return false;
+  if (linecap === 'round' || linecap === 'square') return true;
+  // Only straight runs can be measured this cheaply; an arc's parameters do not parse as points,
+  // and none of the arcs built here are degenerate (the collapsed cases return an elbow or a
+  // moveto, both caught above).
+  if (/[AaCcSsQqTt]/.test(s)) return true;
+  const points = [...s.matchAll(/[ML] (-?[\d.]+) (-?[\d.]+)/g)].map(([, x, y]) => `${x},${y}`);
+  return points.length < 2 || new Set(points).size > 1;
+}
+
 function acrossAxisForSide(side, x, y, t) {
   switch (side) {
     case 'top':    return { x1: x,     y1: y + t, x2: x,     y2: y - t };
@@ -405,12 +465,21 @@ export function buildBorderSegments(W, H, border, corners) {
   const brOn = isCornerOn(corners, 'br');
   const blOn = isCornerOn(corners, 'bl');
 
-  // 1px overlap where the side meets an enabled corner — eliminates
-  // anti-aliasing gaps at the junction point.
-  const tlOv = tlOn ? 1 : 0;
-  const trOv = trOn ? 1 : 0;
-  const brOv = brOn ? 1 : 0;
-  const blOv = blOn ? 1 : 0;
+  // How far past its nominal start each side runs, which depends on whether there is a corner there
+  // to run into:
+  //
+  //   - a corner with a shape: 1px, to eliminate anti-aliasing gaps at the junction point.
+  //   - a corner with no radius: the side's own half-thickness, which puts its end on the box edge.
+  //     There is no corner segment at a square corner (nothing to draw, see isDrawn), so the two
+  //     sides have to close it between them. At 1px they meet at their centerlines and cover only
+  //     the inner part of the corner square, leaving the outer (thickness/2 - 1)px bare — 0px at the
+  //     1-2px borders nearly everything uses, 2px at 6, showing as a chip of fill colour bitten out
+  //     of each corner of a thick square border. Run both to the edge and their bands overlap across
+  //     the whole corner square.
+  //   - no corner at all: 0, and sideInset holds the sides out of the space it would have filled.
+  //
+  // The half-thickness is per side, so this is resolved inside each side's own block below.
+  const overlapAt = (on, R, t) => (on ? (R > 0 ? 1 : t) : 0);
 
   // --- Sides ---
   if (isSideOn(border, 'top')) {
@@ -418,14 +487,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const t = tt / 2;
     const tlG = sideInset(tlOn, tl, tlR, tt);
     const trG = sideInset(trOn, tr, trR, tt);
+    const tlOv = overlapAt(tlOn, tlR, t);
+    const trOv = overlapAt(trOn, trR, t);
     for (const l of ll) {
       const y = t + l.offset;
       const x1 = tlG + t - tlOv;
       const x2 = W - trG - t + trOv;
+      const d = `M ${x1} ${y} L ${x2} ${y}`;
+      if (!paintsInk(d, l.linecap)) continue;
       result.push({
         kind: 'side',
         key: 'top',
-        d: `M ${x1} ${y} L ${x2} ${y}`,
+        d,
         thick: l.thick,
         colour: l.colour,
         dasharray: l.dasharray,
@@ -439,14 +512,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const t = tt / 2;
     const trG = sideInset(trOn, tr, trR, tt);
     const brG = sideInset(brOn, br, brR, tt);
+    const trOv = overlapAt(trOn, trR, t);
+    const brOv = overlapAt(brOn, brR, t);
     for (const l of ll) {
       const x = W - t - l.offset;
       const y1 = trG + t - trOv;
       const y2 = H - brG - t + brOv;
+      const d = `M ${x} ${y1} L ${x} ${y2}`;
+      if (!paintsInk(d, l.linecap)) continue;
       result.push({
         kind: 'side',
         key: 'right',
-        d: `M ${x} ${y1} L ${x} ${y2}`,
+        d,
         thick: l.thick,
         colour: l.colour,
         dasharray: l.dasharray,
@@ -460,14 +537,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const t = tt / 2;
     const brG = sideInset(brOn, br, brR, tt);
     const blG = sideInset(blOn, bl, blR, tt);
+    const brOv = overlapAt(brOn, brR, t);
+    const blOv = overlapAt(blOn, blR, t);
     for (const l of ll) {
       const y = H - t - l.offset;
       const x1 = W - brG - t + brOv;
       const x2 = blG + t - blOv;
+      const d = `M ${x1} ${y} L ${x2} ${y}`;
+      if (!paintsInk(d, l.linecap)) continue;
       result.push({
         kind: 'side',
         key: 'bottom',
-        d: `M ${x1} ${y} L ${x2} ${y}`,
+        d,
         thick: l.thick,
         colour: l.colour,
         dasharray: l.dasharray,
@@ -481,14 +562,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const t = tt / 2;
     const blG = sideInset(blOn, bl, blR, tt);
     const tlG = sideInset(tlOn, tl, tlR, tt);
+    const blOv = overlapAt(blOn, blR, t);
+    const tlOv = overlapAt(tlOn, tlR, t);
     for (const l of ll) {
       const x = t + l.offset;
       const y1 = H - blG - t + blOv;
       const y2 = tlG + t - tlOv;
+      const d = `M ${x} ${y1} L ${x} ${y2}`;
+      if (!paintsInk(d, l.linecap)) continue;
       result.push({
         kind: 'side',
         key: 'left',
-        d: `M ${x} ${y1} L ${x} ${y2}`,
+        d,
         thick: l.thick,
         colour: l.colour,
         dasharray: l.dasharray,
@@ -524,6 +609,7 @@ export function buildBorderSegments(W, H, border, corners) {
       const pieces = buildLinearCornerPieces(cnStyle, pos, inset, e, t, W, H);
       if (pieces?.length) {
         pieces.forEach((piece, partIdx) => {
+          if (!paintsInk(piece.d, l.linecap)) return;
           const radialAxis = cnDir === 'inward' ? reverseAxis(piece.radialAxis) : piece.radialAxis;
           result.push({
             kind: 'corner', key, pos, d: piece.d,
@@ -536,10 +622,11 @@ export function buildBorderSegments(W, H, border, corners) {
             tangentialAxis: piece.tangentialAxis,
             cornerPart: partIdx,
             cornerPartSide: piece.sideKey,
-            geom: { ...cornerGeom[pos], R, thickness: tt, arcCx: grad.arcCx, arcCy: grad.arcCy },
+            geom: { ...cornerGeom[pos], R, thickness: tt, arcCx: grad.arcCx, arcCy: grad.arcCy, arcR: grad.arcR },
           });
         });
       } else {
+        if (!paintsInk(d, l.linecap)) continue;
         result.push({
           kind: 'corner', key, pos, d,
           thick: l.thick, colour: l.colour, dasharray: l.dasharray, linecap: l.linecap,
@@ -549,7 +636,7 @@ export function buildBorderSegments(W, H, border, corners) {
           radialIsInward: grad.isInward,
           radialAxis: grad.radialAxis,
           tangentialAxis: grad.tangentialAxis,
-          geom: { ...cornerGeom[pos], R, thickness: tt, arcCx: grad.arcCx, arcCy: grad.arcCy },
+          geom: { ...cornerGeom[pos], R, thickness: tt, arcCx: grad.arcCx, arcCy: grad.arcCy, arcR: grad.arcR },
         });
       }
     }

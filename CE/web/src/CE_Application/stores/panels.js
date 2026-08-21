@@ -23,6 +23,7 @@ import {
   restoreUnsavedWork,
 } from './runtimePreferences.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
+import { fileDataByteSize, fileDataText } from '../utils/fileDataPayload.js';
 import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
 import { runWhenIdle } from '../utils/runWhenIdle.js';
 import { equalityWritable } from '../utils/equalityStore.js';
@@ -112,39 +113,6 @@ function panelPerfLabel(name, filePath) {
   return String(name ?? filePath ?? 'panel').trim() || 'panel';
 }
 
-function estimateDataUrlBytes(dataUrl) {
-  const value = String(dataUrl ?? '');
-  const commaIndex = value.indexOf(',');
-  if (commaIndex < 0) return value.length;
-
-  const base64 = value.slice(commaIndex + 1);
-  const padding = base64.endsWith('==') ? 2 : (base64.endsWith('=') ? 1 : 0);
-  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
-}
-
-function dataUrlToText(dataUrl) {
-  const value = String(dataUrl ?? '');
-  const commaIndex = value.indexOf(',');
-  if (commaIndex < 0) {
-    throw new Error('Invalid panel data URL');
-  }
-
-  const header = value.slice(0, commaIndex);
-  const body = value.slice(commaIndex + 1);
-
-  if (!/;base64/i.test(header)) {
-    return decodeURIComponent(body);
-  }
-
-  const binary = atob(body);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return new TextDecoder().decode(bytes);
-}
-
 function finishPendingPanelTimers(filePath, label, payloadSizeBytes, extra = '') {
   const detail = `label="${label}" bytes=${formatBytes(payloadSizeBytes)}${extra ? ` ${extra}` : ''}`;
   pendingManualOpenTimer?.(detail);
@@ -166,8 +134,8 @@ function ensurePanelDataListener() {
     pendingPanelDataRequests.delete(payload.requestId);
 
     try {
-      const decodedText = dataUrlToText(payload?.data);
-      const byteSize = Number(payload?.byteSize) || estimateDataUrlBytes(payload?.data);
+      const decodedText = fileDataText(payload);
+      const byteSize = fileDataByteSize(payload);
       pending.stopTimer?.(
         `bytes=${formatBytes(byteSize)} read=${Number(payload?.readMs || 0).toFixed(1)}ms encode=${Number(payload?.encodeMs || 0).toFixed(1)}ms`
       );

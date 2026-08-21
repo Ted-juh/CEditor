@@ -173,12 +173,45 @@ section('legacy emit — device-agnostic');
   eq(gaia.manufacturer, 'Roland', 'GAIA manufacturer derived from inherits');
   eq(gaia.family, 'SH', 'GAIA family from model');
   ok(gaia.identity === undefined, 'GAIA identity omitted (no captured codes)');
+  // The AN1x's family code was captured under the SCHEMA's key names (identity.family), and the
+  // emitter used to look only for the legacy engine's (familyCode) — so the one profile that could
+  // answer a Test button never got an identity block. The engine compares only declared fields, so
+  // manufacturer + family without a member is a legal, matchable identity.
+  {
+    const an1x = buildLegacyProfile(resolveProfile('yamaha.an1x'), { legacyId: 'yamaha-an1x-dpd' });
+    ok(an1x.identity !== undefined, 'AN1x identity emitted from schema keys');
+    eq(JSON.stringify(an1x.identity.manufacturerId), JSON.stringify(['43']), 'AN1x manufacturer 43');
+    // From the instrument, not from the library: a real AN1x answered
+    //     F0 7E 7F 06 02 43 00 41 1A 02 00 00 00 7E F7
+    // which is manufacturer 43, family 00 41, member 1A 02, version 00 00 00 7E. The library had
+    // said family "02 1A" — the MEMBER code, in the wrong field and with its two bytes swapped —
+    // so Test reported "Wrong instrument" at a correctly wired AN1x. Authored codes are a guess
+    // until something answers; these are the answer.
+    eq(JSON.stringify(an1x.identity.familyCode), JSON.stringify(['00', '41']), 'AN1x family as the instrument reports it');
+    eq(JSON.stringify(an1x.identity.modelNumber), JSON.stringify(['1A', '02']), 'AN1x member as the instrument reports it');
+    ok(an1x.identity.revision === undefined, 'firmware selects a variant; identity never pins it');
+    // The inquiry must be broadcast. $deviceId is the manufacturer's own addressing byte — for
+    // Yamaha the composite `1n` of a Parameter Change, 0x10 meaning "device 1" — and putting it in
+    // F0 7E <id> asks for device 17 instead, which nothing answers.
+    ok(an1x.identity.requestDeviceId === undefined,
+      'no requestDeviceId: the engine broadcasts to 7F, which every device answers');
+  }
   eq(JSON.stringify(gaia.messageRecipes.find((r) => r.id === 'dt1').template),
     JSON.stringify(['F0', '41', '$deviceId', '00', '00', '41', '12', '$address', '$encodedValue', '$checksum', 'F7']),
     'GAIA dt1 recipe byte-identical (modelId expanded)');
   ok(gaia.messageRecipes.some((r) => r.id === 'cc7' && r.controller === 7), 'GAIA cc7 recipe (per-controller)');
   eq(gaia.parameters.find((p) => p.id === 'master.volume').messageRecipe, 'cc7', 'master.volume -> cc7 recipe');
   eq(gaia.parameters.find((p) => p.id === 'filter.cutoff').address, '10 00 01 0C', 'GAIA cutoff address unchanged');
+  // rxLive — the message the instrument SENDS when its own knob moves. The GAIA writes cutoff as a
+  // DT1 and transmits it as CC 102, so nothing derived from the write path can recognise the knob.
+  // This emitter resolved the wire and then dropped it, which is why the Player carried a
+  // hand-written CC map beside the profile it already had.
+  eq(JSON.stringify(gaia.parameters.find((p) => p.id === 'filter.cutoff').inbound),
+    JSON.stringify([{ kind: 'cc', controller: 102 }]), 'GAIA cutoff declares the CC its knob sends');
+  ok(!gaia.parameters.find((p) => p.id === 'master.volume').inbound,
+    'a parameter whose rxLive IS its write wire declares nothing extra');
+  ok(!gaia.parameters.find((p) => p.id === 'filter.resonance').inbound,
+    'a parameter with no CC rxLive declares nothing');
 
   // A synthetic non-Roland device must derive EVERYTHING from its own profile — nothing GAIA-specific.
   const lib = {
@@ -326,7 +359,7 @@ section('Universal bulk dumps (assemble / parse / round-trip)');
   const mp = Object.fromEntries(ld.mappings.map((m) => [m.parameter, m]));
   ok(!mp.cutoff.codec, 'emit: u7 mapping carries no codec (engine default)');
   eq(mp.pitch.codec?.type, 'u14-msb-lsb', 'emit: u14 -> engine u14-msb-lsb');
-  ok(mp.level.codec?.type === 'nibbled' && mp.level.codec.bytes === 2, 'emit: nibbles -> engine nibbled(bytes:2)');
+  ok(mp.level.codec?.type === 'nibbled' && mp.level.codec.nibbles === 2, 'emit: nibbles -> engine nibbled, count under the key the engine reads');
   ok(mp.patchName.codec?.type === 'text-ascii' && mp.patchName.codec.length === 1 && mp.patchName.codec.pad === 32, 'emit: text-ascii name mapping');
   ok(mp.tune.codec?.type === 's7' && mp.tune.codec.signedOffset === 64, 'emit: s7 ships a signed dump codec (engine decodes the sign)');
   ok(!emit.notes.some((n) => /s7/.test(n)), 'emit: no s7 degrade note (engine supports it)');
@@ -334,6 +367,15 @@ section('Universal bulk dumps (assemble / parse / round-trip)');
   // emitted into a full legacy profile; the Korg payload-pack is now SHIPPED (the C++ engine unpacks it)
   const legacy = buildLegacyProfile({ ...dev, label: 'Syn', dumps: [dump] }, {});
   ok(Array.isArray(legacy.dumpDefinitions) && legacy.dumpDefinitions.length === 1, 'buildLegacyProfile carries dumpDefinitions');
+  // The single-parameter SEND encoder, which is a different code path from the dump codec above and
+  // had no coverage. The engine matches this name as an exact string and fails the send on anything
+  // it does not know, so a parameter emitted with the DPD word is a control that silently does
+  // nothing. Assert the word AND the count key: a right-named encoder reading a missing count just
+  // defaults to two nibbles, which is the same wrong value with no error.
+  const lp = Object.fromEntries((legacy.parameters ?? []).map((p) => [p.id, p]));
+  const levelEnc = lp.level?.encoding;
+  ok(levelEnc?.type === 'nibbled' && levelEnc.nibbles === 2, 'emit: parameter encoder is the engine word, with its count');
+  ok(!Object.values(lp).some((p) => p.encoding?.type === 'nibbles'), 'emit: no DPD-only encoder name reaches a runtime profile');
   const kEmit = buildDumpDefinitions({ ...korg, dumps: [korgDump] });
   ok(kEmit.dumpDefinitions[0].payload?.pack?.type === 'packed8to7' && kEmit.dumpDefinitions[0].engineSupported !== false, 'emit: Korg payload-pack shipped (engine unpacks it, no longer flagged)');
   ok(!kEmit.notes.some((n) => /block-packing/.test(n)), 'emit: no block-packing gap note (engine supports it)');

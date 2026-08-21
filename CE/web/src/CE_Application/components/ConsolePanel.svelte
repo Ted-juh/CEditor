@@ -5,7 +5,7 @@
   import Copy from 'lucide-svelte/icons/copy';
   import Check from 'lucide-svelte/icons/check';
   import { consoleEntries, clearConsole } from '../stores/console.js';
-  import { isPerfDebugEnabled, setPerfDebugEnabled } from '../utils/perfDebug.js';
+  import { isPerfDebugEnabled, setPerfDebugEnabled, startPerfDebugStallWatch } from '../utils/perfDebug.js';
 
   let copied = $state(false);
   let perfLoggingEnabled = $state(isPerfDebugEnabled());
@@ -81,6 +81,7 @@
 
     if (nextEnabled) {
       filterText = 'perf';
+      startPerfDebugStallWatch();   // armed here too, so it does not need a restart to start watching
       console.info('[perf] Logging enabled from Console panel. Load or reload a panel to capture timings.');
     } else {
       console.info('[perf] Logging disabled from Console panel.');

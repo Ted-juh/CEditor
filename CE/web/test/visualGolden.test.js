@@ -14,16 +14,27 @@
 // so at minimum it aimed up-and-left where the instrument aims down-and-left. That one survived
 // even the first version of THIS file, because the summary captured colour and forgot geometry.
 //
+// And a fifth: every rounded border was drawn half a thickness too round, so the fill's own corner
+// poked out past the border enclosing it. That one survived the SECOND version of this file, which
+// had learned to capture transforms but still described a `<path>` only as "shape path". A border's
+// whole shape lives in its `d`, and with `d` uncaptured you could take this file's own rounded
+// specimen, set its radius to 0, and get a byte-identical summary from a square control. So `d` is
+// captured now, rounded to the thousandth — the numbers are arithmetic on radii and thicknesses,
+// and 7.500000000000001 on one machine is the same corner as 7.5 on another.
+//
 // So this pins the paint. Each specimen is server-rendered and reduced to the things that decide
-// what you see — stroke colours and widths, fills, shape primitives, and the transforms and pivots
-// that place them — and compared against a committed baseline. A change in any of them fails with
-// a readable diff instead of a pixel percentage.
+// what you see — stroke colours and widths, fills, shape primitives and their path data, and the
+// transforms and pivots that place them — and compared against a committed baseline. A change in
+// any of them fails with a readable diff instead of a pixel percentage.
 //
 // WHY NOT A PIXEL DIFF. A real screenshot needs a browser and a running dev server, and it drifts
 // on font hinting between machines, which makes it flaky exactly where it needs to be trusted.
 // Every bug above was in the emitted markup, which is deterministic. The tradeoff is that a purely
 // visual regression — one that changes no attribute — would slip through; nothing here claims
-// otherwise, and that is what the QA sheets and a human eye are still for.
+// otherwise, and that is what the QA sheets and a human eye are still for. Note what that does and
+// does not cover now: `d` is pinned, but the CSS `border-radius` the fill is clipped to is not, so
+// a fill and its border can still drift apart in the other direction. borderSegments.test.js checks
+// the two against each other directly.
 //
 // UPDATING A BASELINE, when a change is intended:
 //
@@ -54,7 +65,8 @@ const UPDATING = process.env.UPDATE_GOLDEN === '1';
  * Not the raw HTML: Svelte's scoped class hashes and the defs-id namespacing change for reasons
  * that have nothing to do with how a control looks, and a baseline that churns on those is a
  * baseline people regenerate without reading. What is kept is every stroke, every fill, the shape
- * primitives, and the transforms — which between them are what all four bugs moved.
+ * primitives and the path data that gives them their shape, and the transforms — which between
+ * them are what all five bugs moved.
  */
 /**
  * Unfold any baked static parts back into markup before summarising.
@@ -103,6 +115,13 @@ function paintSummary(rawBody) {
     .map(([, prop, value]) => `${prop} ${value.trim()}`);
   const shapes = [...body.matchAll(/<(rect|circle|ellipse|path|polygon|line)\b/g)].map(([, kind]) => `shape ${kind}`);
 
+  // Path data, because "shape path" says a path was drawn and nothing about what it is. Every
+  // border outline, corner arc and glyph stroke is a `d`, and the corner-radius bug moved nothing
+  // else. Decimals are rounded to the thousandth so the baseline pins the geometry and not the
+  // float noise of arithmetic on radii and half-thicknesses.
+  const round = (d) => d.replace(/-?\d+\.\d+/g, (n) => String(Math.round(parseFloat(n) * 1000) / 1000));
+  const paths = [...body.matchAll(/\sd="([^"]+)"/g)].map(([, d]) => `path ${round(d)}`);
+
   // Transforms, because geometry is appearance too. The knob pointer pointed the wrong way for
   // three revisions: it rotated about its own midpoint instead of the knob's centre, so at minimum
   // it aimed up-and-left where the hardware aims down-and-left. Nothing above would have noticed —
@@ -124,6 +143,7 @@ function paintSummary(rawBody) {
 
   return [
     ...tally(shapes),
+    ...tally(paths),
     ...tally(boxes),
     ...tally(svgTransforms),
     ...tally(strokes),
@@ -225,6 +245,20 @@ test('a specimen that loses its border fails the gate', () => {
   const after = paintSummary(renderControl(control));
 
   assert.notEqual(after, before, 'switching a border off changed nothing in the paint summary');
+});
+
+test('a specimen whose corners change shape fails the gate', () => {
+  // The corner-radius bug's own class: same strokes, same widths, same fills, same count of the
+  // same primitives — a different shape. Before `d` was captured this specimen could go from a
+  // 6px round to a square and produce a byte-identical summary, which is how a border that was
+  // half a thickness too round shipped past a green gate.
+  const control = SPECIMENS['coloured-rounded-border']();
+  const before = paintSummary(renderControl(control));
+
+  control._children.Background._children.Corners.radius = 0;
+  const after = paintSummary(renderControl(control));
+
+  assert.notEqual(after, before, 'squaring off every corner changed nothing in the paint summary');
 });
 
 test('a rotated part that loses its pivot fails the gate', () => {

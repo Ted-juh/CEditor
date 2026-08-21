@@ -122,7 +122,24 @@ function preferredComponent(entry) {
   return /Env |Level$|Time$/.test(entry.name) ? 'Slider' : 'Knob';
 }
 
-function buildParameter(entry, { idPrefix, group, blockOffset }) {
+/**
+ * The messages the GAIA SENDS that the editor never sends to it.
+ *
+ * A synth's own panel does not have to echo the editor's write path. Everything here is written as
+ * a DT1 to an address, but turning the physical CUTOFF knob transmits a CC — 102, 103 and 104 for
+ * tones 1, 2 and 3 — and nothing derived from the write path can recognise those. So the profile
+ * has to say it, and this is the only place that knows.
+ *
+ * Not a new idea: the DPD authoring schema has always had an `rxLive` wire direction, and
+ * `CE/dpd/library/roland.gaia.json` declares exactly this as {msg:'cc', cc:102, ccStride:1}. This
+ * profile is generated from the address map rather than from DPD, so it needs its own statement of
+ * the same fact. Keyed by section.leaf, applied per tone.
+ */
+const TONE_INBOUND = {
+  'filter.cutoff': (tone) => [{ kind: 'cc', controller: 101 + tone }],
+};
+
+function buildParameter(entry, { idPrefix, group, blockOffset, inbound }) {
   const { section, leaf } = splitName(entry.name);
   const id = [idPrefix, section, leaf].filter(Boolean).join('.');
   const address = addressFor(blockOffset, entry.offset);
@@ -134,6 +151,7 @@ function buildParameter(entry, { idPrefix, group, blockOffset }) {
     address,
     access: { canRead: true, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
     messageRecipe: 'dt1',
+    ...(inbound?.length ? { inbound } : {}),
     ui: { preferredComponent: preferredComponent(entry) },
   };
 
@@ -169,7 +187,15 @@ function buildParameter(entry, { idPrefix, group, blockOffset }) {
       ...(bipolar ? { min: entry.displayMin, max: entry.displayMax } : {}),
     },
     normalization: { mode: 'linear' },
-    encoding: entry.nibbles ? { type: 'nibbles', count: entry.nibbles } : { type: 'u7' },
+    // `nibbled` with a `nibbles` count, which is what BOTH engines read — DeviceProfileEngine.cpp
+    // matches the string "nibbled" and calls propInt(encoding, "nibbles"), and the JS engine now
+    // mirrors it. This emitted the DPD schema's authoring vocabulary instead, {type: 'nibbles',
+    // count: N}, which matches no branch in either: C++ fell through to "Unsupported numeric
+    // encoder" and refused to send, and JS fell through to a single u7 byte. 622 of this
+    // profile's parameters — the whole envelope, LFO and filter section — could not be sent at
+    // all on the desktop build. roland-sh-201 already used the runtime vocabulary; this profile
+    // was the outlier.
+    encoding: entry.nibbles ? { type: 'nibbled', nibbles: entry.nibbles } : { type: 'u7' },
     sendPolicy: continuous
       ? { mode: 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true }
       : { mode: 'onCommit', coalesce: true },
@@ -203,6 +229,31 @@ function patchNameParameter() {
 function rolandChecksum(bytes) {
   const sum = bytes.reduce((total, byte) => total + byte, 0);
   return (128 - (sum % 128)) % 128;
+}
+
+/**
+ * An RQ1 read as a device-request TEMPLATE.
+ *
+ * A device request is not a message recipe, and that is the whole point of this function. The
+ * engine's compileDeviceRequest walks a flat token list where every token is either a literal hex
+ * byte or a `$variable` worth exactly one byte — there is no $address, no $size, no $checksum, and
+ * no messageRecipe. These nine requests referenced `messageRecipe: 'rq1'` and carried address/size
+ * fields instead, which the engine cannot use: its validator rejects a request with no template as
+ * an ERROR, loadFromJson refuses the whole profile, and loadInternalTestProfiles discards the
+ * message — so the entire 793-parameter profile vanished from the device list with nothing said.
+ * It was the only profile of the nine that failed, and therefore the only one nobody could pick.
+ *
+ * Address and size are constants per request, so the checksum is a constant too and is baked in
+ * here by the same arithmetic the runtime uses.
+ */
+function rq1Template(address, size) {
+  const body = [...parseBytes(address), ...parseBytes(size)];
+  return [
+    'F0', MODEL.manufacturer, '$deviceId', ...MODEL.modelId, MODEL.rq1,
+    ...formatBytes(body).split(' '),
+    formatBytes([rolandChecksum(body)]),
+    'F7',
+  ];
 }
 
 /** An RQ1 read, as the exact bytes that should appear on the wire. */
@@ -265,7 +316,7 @@ export function buildProfile() {
 
   for (const tone of [1, 2, 3]) {
     for (const entry of PATCH_TONE) {
-      const { section } = splitName(entry.name);
+      const { section, leaf } = splitName(entry.name);
       const SECTION_LABEL = { osc: 'OSC', filter: 'Filter', amp: 'Amp', lfo: 'LFO', modLfo: 'Mod LFO' };
       parameters.push(buildParameter(entry, {
         idPrefix: `tone${tone}`,
@@ -273,6 +324,7 @@ export function buildProfile() {
         // without inspecting parameter ids.
         group: `Tone ${tone} · ${SECTION_LABEL[section] ?? 'Misc'}`,
         blockOffset: BLOCKS[`tone${tone}`],
+        inbound: TONE_INBOUND[`${section}.${leaf}`]?.(tone),
       }));
     }
   }
@@ -338,11 +390,22 @@ export function buildProfile() {
     }],
     variables: { deviceId, channel: 1 },
     identity: {
-      requestDeviceId: '$deviceId',
+      // No requestDeviceId: the engine then addresses the inquiry to 0x7F, the Universal Device
+      // Inquiry's ALL CALL, which every instrument answers whatever its own device number is.
+      // This said '$deviceId' (0x10) and worked only because the GAIA it was tested against
+      // happened to be set to device 17 — its reply carried 0x10 in the same byte. Any GAIA on a
+      // different device number would have gone silent, and Test would have blamed the cable.
       manufacturerId: [MODEL.manufacturer],
       familyCode: ['41', '02'],
       modelNumber: ['00', '00'],
-      revision: ['00', '03', '00', '00'],
+      // NO revision, deliberately. DeviceProfileEngine compares revision byte-for-byte when the
+      // profile declares one, and reports it either way — so declaring it turns a firmware version
+      // into part of the instrument's identity. A real SH-01 answered
+      //   F0 7E 10 06 02 41 41 02 00 00 00 03 00 01 F7
+      // whose manufacturer, family and model match this profile exactly and whose revision is
+      // 00 03 00 01. Pinning 00 03 00 00 made that unit "the wrong instrument". Manufacturer,
+      // family and model say WHICH synth; revision says which firmware, and an editor that refuses
+      // to talk to a synth for having been updated is wrong about what identity means.
       timeoutMs: 1000,
       retries: 0,
     },
@@ -411,7 +474,7 @@ export function buildProfile() {
           id: `request${block[0].toUpperCase()}${block.slice(1)}`,
           name: `Request ${block}`,
           kind: 'sysex',
-          messageRecipe: 'rq1',
+          template: rq1Template(addressFor(BLOCKS[block], '00 00'), BLOCK_SIZES[sizeKey]),
           address: addressFor(BLOCKS[block], '00 00'),
           size: BLOCK_SIZES[sizeKey],
           response: { kind: 'dt1', address: addressFor(BLOCKS[block], '00 00') },

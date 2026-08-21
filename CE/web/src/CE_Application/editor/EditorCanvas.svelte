@@ -24,6 +24,7 @@
   import DeviceProfileDesignerV2 from './DeviceProfileDesignerV2.svelte';
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
+  import { isTextEntryTarget } from '../utils/textEntry.js';
   import BehaviorDesigner from './BehaviorDesigner.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
   import ScreenBuilderEditor from '../sections/ScreenBuilderEditor.svelte';
@@ -31,7 +32,6 @@
   import { activePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
   import { fitToWindowSignal, zoomStepSignal, zoomToSelectionSignal } from '../stores/editorCommands.js';
-  import { isEditableTarget } from '../utils/globalShortcuts.js';
   import { showRulers, viewportPanelCenter } from '../stores/editorView.js';
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
@@ -384,9 +384,11 @@
 
   function handleEditorKeyDown(e) {
     if (componentSurfaceWorkspaceActive) return;
-    // Text fields inside the canvas chrome (tab pickers, future inline
-    // editors) keep their keys — Delete in an input must never delete controls.
-    if (isEditableTarget(e.target)) return;
+    // Text fields inside the canvas chrome keep their keys — Delete in an input must never delete
+    // controls. The Settings view also renders INSIDE this wrapper, so every keystroke in a settings
+    // text box arrives here too. Without this, Backspace in a field never reached the field — and if
+    // a control happened to be selected, deleted it. Ctrl+A/C/X/V/D were swallowed the same way.
+    if (isTextEntryTarget(e.target)) return;
 
     if ($previewModeEnabled) {
       handlePreviewShortcut(e);

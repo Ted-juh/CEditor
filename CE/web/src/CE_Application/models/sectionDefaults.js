@@ -1544,6 +1544,11 @@ export const SECTION_DEFAULTS = {
     loopLengthBars: 4,
     countInBars: 0,              // bars of silence before the first step (0 = off)             // start the clock as soon as the panel opens
     clockOut: false,              // send MIDI clock — 24 messages per quarter note
+    // Which device the clock, start, stop and song-position go to. Empty means "work it out":
+    // if the panel names exactly one device, that is the one. Clock used to be sent to a
+    // hardcoded `mainSynth`, so a panel whose controls named anything else — the GAIA names
+    // itself — had its transport messages dropped with nothing said.
+    clockDevice: '',
     editable: true,               // press play / tap tempo in preview
     showPosition: true,           // the bar.beat.tick readout
     showTap: true,                // the tap-tempo button

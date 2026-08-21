@@ -69,6 +69,7 @@ export {
   restoreProjectDeviceSession,
   requestProfileSource,
   mapDeviceRole,
+  forgetDeviceRole,
 } from './deviceProfileSession.js';
 
 export {

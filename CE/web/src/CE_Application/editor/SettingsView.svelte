@@ -3,15 +3,18 @@
   import Image from 'lucide-svelte/icons/image';
   import Type from 'lucide-svelte/icons/type';
   import Code2 from 'lucide-svelte/icons/code-2';
+  import Piano from 'lucide-svelte/icons/piano';
   import GeneralSettings from '../settings/GeneralSettings.svelte';
   import FontsSettings from '../settings/FontsSettings.svelte';
   import IconsSettings from '../settings/IconsSettings.svelte';
   import ToolchainsSettings from '../settings/ToolchainsSettings.svelte';
+  import MidiSettings from '../settings/MidiSettings.svelte';
 
   const sections = [
     { id: 'general', label: 'General', icon: Cog, available: true },
     { id: 'fonts', label: 'Fonts', icon: Type, available: true },
     { id: 'icons', label: 'Icons', icon: Image, available: true },
+    { id: 'midi', label: 'MIDI', icon: Piano, available: true },
     { id: 'toolchains', label: 'Scripting Toolchains', icon: Code2, available: true },
   ];
 
@@ -44,6 +47,8 @@
       <FontsSettings />
     {:else if activeSection === 'icons'}
       <IconsSettings />
+    {:else if activeSection === 'midi'}
+      <MidiSettings />
     {:else if activeSection === 'toolchains'}
       <ToolchainsSettings />
     {:else}

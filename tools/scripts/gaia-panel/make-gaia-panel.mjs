@@ -31,6 +31,20 @@ const REPO = path.resolve(HERE, '../../..');
 const PROFILE = path.join(REPO, 'CE/profiles/test/roland-gaia-sh01.ceditor-device.json');
 const DEFAULT_OUT = path.join(REPO, 'CE/panels/Roland GAIA SH-01.cepanel');
 
+/**
+ * What this panel calls the instrument it drives.
+ *
+ * A device is identified by its name — bindings name one, sends name one, and the MIDI settings map
+ * that name to a port. So the name has to be one a person would recognise in a list of their gear.
+ *
+ * This said `primary` by accident, which was worse than ugly: nothing in the app could configure a
+ * device by that name, so all 183 bindings resolved no mapping and failed with "Not sent: unresolved
+ * profile for primary" whichever port was chosen. Naming it after the instrument means the device
+ * shows up in Settings already called the right thing, and anyone who calls their GAIA something
+ * else can rename it there — which rewrites these bindings to match.
+ */
+const DEVICE_NAME = 'Roland GAIA SH-01';
+
 /** Which port a bound control exposes. */
 /**
  * Every box reserves this much for its header tab before its first control.
@@ -183,7 +197,7 @@ function bound(parameter, type, box, overrides = {}, make = null) {
       bindings: [{
         kind: 'deviceParameter',
         port: PORT_FOR[type] ?? 'value',
-        deviceRole: 'primary',
+        deviceRole: DEVICE_NAME,
         parameterId: parameter.id,
         parameterType: parameter.type,
         adoptMetadata: true,
@@ -219,7 +233,7 @@ function boundCustom(parameter, build, box) {
     bindings: [{
       kind: 'deviceParameter',
       port: 'value',
-      deviceRole: 'primary',
+      deviceRole: DEVICE_NAME,
       parameterId: parameter.id,
       parameterType: parameter.type,
       adoptMetadata: true,
@@ -246,7 +260,15 @@ function boundCustom(parameter, build, box) {
       // read "64.00" the moment anything formatted it.
       channel.format = { ...channel.format, precision: channel.type === 'float' ? 2 : 0 };
     }
-    if (typeof parameter.default === 'number') channel.defaultValue = parameter.default;
+    // BOTH, and this is the whole point: customChannelDefaultValue reads `currentValue ?? defaultValue`,
+    // and createValueChannel stamped currentValue from the factory default before this ran. Setting
+    // only defaultValue left currentValue at 0, so every knob and fader on the panel opened at the
+    // bottom of its range instead of at the value the instrument ships with — a filter shut, a
+    // master tune at -100 cent — and looked, convincingly, like a panel with no values in it.
+    if (typeof parameter.default === 'number') {
+      channel.defaultValue = parameter.default;
+      channel.currentValue = parameter.default;
+    }
 
     // The range the INSTRUMENT prints, when it is not the range on the wire. Octave Shift is
     // stored 61..67 and reads -3..+3; every MFX parameter is stored 12768..52768 and reads
@@ -577,7 +599,7 @@ export function buildGaiaPanel() {
   panel.gridEnabled = false;
   panel.snapToGrid = false;
   panel.description = 'Roland GAIA SH-01 — all three tones, laid out like the instrument';
-  panel.requiredProfiles = [{ role: 'primary', profileId: profile.id, version: '*' }];
+  panel.requiredProfiles = [{ role: DEVICE_NAME, profileId: profile.id, version: '*' }];
   panel.notepad = { activeNoteIndex: 0, notes: [{ name: 'About this panel', content: NOTES }] };
   // The grid actually reaches the synth now — see arp-bridge.mjs. A panel-scope script rather than
   // a binding because 528 addresses driven by one array channel is not a shape bindings have, and

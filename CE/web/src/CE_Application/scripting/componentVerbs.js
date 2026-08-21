@@ -511,6 +511,9 @@ export const COMPONENT_FAMILIES = [
       v('loopBars', 'loopLengthBars', INT, { min: 1, max: 9999 }),
       v('countIn', 'countInBars', INT, { min: 0, max: 16 }),
       v('clockOut', 'clockOut', BOOL, { toggle: true }),
+      v('clockDevice', 'clockDevice', STR, {
+        doc: 'Which device receives clock, start, stop and song position. Empty uses the panel\'s own device when it names exactly one.',
+      }),
       v('runOnLoad', 'runOnLoad', BOOL, { toggle: true, doc: 'Start the transport as soon as the panel loads.' }),
     ],
   },

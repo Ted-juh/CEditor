@@ -43,10 +43,14 @@
   import dpdRuntime from '../generated/roland.gaia.runtime.json';
   import dpdProfileMap from '../generated/dpdProfileMap.json';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
+  import { listMidiDestinations, listMidiInputs } from '../bridge/bridge.js';
+  import { monitorCounts } from '../utils/midiMonitor.js';
+
+  /** Set by DisplayPanel, which owns the tab state. Used to hand off to the MIDI monitor. */
+  let { onopentab = null } = $props();
 
   let query = $state('');
   let showAllIssues = $state(false);
-  let showAllMonitorEvents = $state(false);
   let showProfileInspector = $state(false);
   let monitorCopyStatus = $state('');
   let selectedProfileId = $derived($selectedDeviceProfileId);
@@ -142,9 +146,7 @@
       ? monitorEventTitle(latestMonitorEvent)
       : 'No MIDI events'
   );
-  let visibleMonitorEvents = $derived(
-    ($midiMonitorEvents ?? []).slice(showAllMonitorEvents ? -20 : -4).reverse()
-  );
+  let monitorSummary = $derived(monitorCounts($midiMonitorEvents ?? []));
   let panelDeviceIssues = $derived(buildPanelDeviceIssues($activePanel));
   let combinedDeviceIssues = $derived([
     ...($deviceDiagnostics?.issues ?? []),
@@ -156,6 +158,12 @@
   onMount(() => {
     refreshDeviceProfiles();
     refreshProfileParameters(selectedProfileId);
+    // Ask C++ what ports exist. initDeviceProfileBridge registers the listener for the reply but
+    // never sends the request, and only Player.svelte ever did — so in the editor these two
+    // dropdowns sat on their defaults ("Preview Only", "No MIDI Input") even on a desktop build
+    // with hardware attached. Nothing was broken down in the C++; nobody had asked it anything.
+    listMidiDestinations();
+    listMidiInputs();
   });
 
   $effect(() => {
@@ -632,10 +640,6 @@
     }, 1200);
   }
 
-  function clearMonitorView() {
-    midiMonitorEvents.set([]);
-  }
-
   function usePanelRequiredProfile() {
     if (!panelRequiredProfileId || !panelRequiredProfileLoaded) return;
     refreshProfileParameters(panelRequiredProfileId);
@@ -958,17 +962,22 @@
 
 <div class="parameter-browser">
   <div class="toolbar">
-    <select value={selectedProfileId} onchange={(e) => handleProfileChange(e.target.value)}>
+    <!--
+      Three anonymous dropdowns read as decoration. They are the profile and the two MIDI ports, and
+      being unable to tell which is which is most of why people conclude the app has no MIDI at all.
+      The direction toggle beside them was already labelled; these now are too.
+    -->
+    <select aria-label="Device profile" title="Device profile" value={selectedProfileId} onchange={(e) => handleProfileChange(e.target.value)}>
       {#each $deviceProfiles as profile (profile.id)}
         <option value={profile.id}>{profile.name || profile.id}</option>
       {/each}
     </select>
-    <select value={selectedDestinationId} onchange={(e) => handleDestinationChange(e.target.value)}>
+    <select aria-label="MIDI output" title="MIDI output — where control values are sent" value={selectedDestinationId} onchange={(e) => handleDestinationChange(e.target.value)}>
       {#each $midiDestinations as destination (destination.id)}
         <option value={destination.id}>{destination.name || destination.id}</option>
       {/each}
     </select>
-    <select value={selectedInputId} onchange={(e) => handleInputChange(e.target.value)}>
+    <select aria-label="MIDI input" title="MIDI input — where values are read back from" value={selectedInputId} onchange={(e) => handleInputChange(e.target.value)}>
       {#each $midiInputs as input (input.id)}
         <option value={input.id}>{input.name || input.id}</option>
       {/each}
@@ -1205,28 +1214,28 @@
         <div class="hex">No live conflicts</div>
       {/each}
     </div>
+    <!--
+      The monitor lives in the MIDI tab, not here. This showed four of the buffer's 500 events with
+      three of each event's seven fields dropped, which was enough to look like the whole feature
+      and not enough to diagnose anything. What is worth keeping in a diagnostics strip is the
+      count and whether any of it failed — the reading is done next door.
+    -->
     <div class="diagnostic-panel monitor">
       <div class="diagnostic-header">
-        <div class="diagnostic-title">Monitor</div>
+        <div class="diagnostic-title">MIDI Traffic</div>
         <div class="diagnostic-actions">
-          {#if ($midiMonitorEvents ?? []).length > 4}
-            <button class="diagnostic-action" onclick={() => showAllMonitorEvents = !showAllMonitorEvents}>
-              {showAllMonitorEvents ? 'Less' : '20'}
-            </button>
-          {/if}
-          <button class="diagnostic-action" onclick={clearMonitorView}>Clear</button>
+          <button class="diagnostic-action" onclick={() => onopentab?.('midi')}>Open monitor</button>
         </div>
       </div>
-      {#each visibleMonitorEvents as event}
-        <div class="monitor-row" title={monitorEventTitle(event)}>
-          <span>{event.direction}</span>
-          <span>{event.semantic}</span>
-          <span class="monitor-hex">{event.hex || ''}</span>
-          <span>{event.status}</span>
-        </div>
-      {:else}
+      {#if monitorSummary.total === 0}
         <div class="hex">No MIDI events</div>
-      {/each}
+      {:else}
+        <div class="monitor-summary">
+          <span>{monitorSummary.sent} sent</span>
+          <span>{monitorSummary.received} received</span>
+          {#if monitorSummary.failed}<span class="failed">{monitorSummary.failed} failed</span>{/if}
+        </div>
+      {/if}
     </div>
     <div class="diagnostic-panel issues">
       <div class="diagnostic-header">
@@ -1724,6 +1733,22 @@
     color: #888;
     margin-top: 3px;
   }
+
+  /*
+   * Its own line rather than the shared four-column grid: that grid is sized for an event's
+   * direction/semantic/hex/status, and a summary squeezed into those columns loses the failure
+   * count off the right edge — which is the one number worth putting here.
+   */
+  .monitor-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 2px;
+    color: #AAA;
+    font-family: Consolas, monospace;
+  }
+
+  .monitor-summary .failed { color: #E8A0A0; }
 
   .monitor-row,
   .issue-row,

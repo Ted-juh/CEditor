@@ -1,0 +1,401 @@
+{
+  "profileId": "generic.cc",
+  "version": "1.0.0",
+  "sysexIn": {},
+  "ccIn": {
+    "1": "global.modulation",
+    "7": "global.volume",
+    "10": "global.pan",
+    "11": "global.expression",
+    "71": "global.resonance",
+    "72": "global.release",
+    "73": "global.attack",
+    "74": "global.cutoff",
+    "91": "global.reverb",
+    "93": "global.chorus"
+  },
+  "params": {
+    "global.modulation": {
+      "valueType": "continuous",
+      "outAddress": null,
+      "outCc": 1,
+      "size": 1,
+      "enum": null
+    },
+    "global.volume": {
+      "valueType": "continuous",
+      "outAddress": null,
+      "outCc": 7,
+      "size": 1,
+      "enum": null
+    },
+    "global.pan": {
+      "valueType": "continuous",
+      "outAddress": null,
+      "outCc": 10,
+      "size": 1,
+      "enum": null
+    },
+    "global.expression": {
+      "valueType": "continuous",
+      "outAddress": null,
+      "outCc": 11,
+      "size": 1,
+      "enum": null
+    },
+    "global.resonance": {
+      "valueType": "continuous",
+      "outAddress": null,
+      "outCc": 71,
+      "size": 1,
+      "enum": null
+    },
+    "global.release": {
+      "valueType": "continuous",
+      "outAddress": null,
+      "outCc": 72,
+      "size": 1,
+      "enum": null
+    },
+    "global.attack": {
+      "valueType": "continuous",
+      "outAddress": null,
+      "outCc": 73,
+      "size": 1,
+      "enum": null
+    },
+    "global.cutoff": {
+      "valueType": "continuous",
+      "outAddress": null,
+      "outCc": 74,
+      "size": 1,
+      "enum": null
+    },
+    "global.reverb": {
+      "valueType": "continuous",
+      "outAddress": null,
+      "outCc": 91,
+      "size": 1,
+      "enum": null
+    },
+    "global.chorus": {
+      "valueType": "continuous",
+      "outAddress": null,
+      "outCc": 93,
+      "size": 1,
+      "enum": null
+    }
+  },
+  "mergeParams": {
+    "global.modulation": {
+      "resolvedId": "global.modulation",
+      "paramId": "modulation",
+      "name": "Modulation",
+      "group": "MIDI CC",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": null,
+      "wires": {
+        "write": {
+          "msg": "cc",
+          "cc": 1
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 1
+        }
+      }
+    },
+    "global.volume": {
+      "resolvedId": "global.volume",
+      "paramId": "volume",
+      "name": "Volume",
+      "group": "MIDI CC",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": null,
+      "wires": {
+        "write": {
+          "msg": "cc",
+          "cc": 7
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 7
+        }
+      }
+    },
+    "global.pan": {
+      "resolvedId": "global.pan",
+      "paramId": "pan",
+      "name": "Pan",
+      "group": "MIDI CC",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": null,
+      "wires": {
+        "write": {
+          "msg": "cc",
+          "cc": 10
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 10
+        }
+      }
+    },
+    "global.expression": {
+      "resolvedId": "global.expression",
+      "paramId": "expression",
+      "name": "Expression",
+      "group": "MIDI CC",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": null,
+      "wires": {
+        "write": {
+          "msg": "cc",
+          "cc": 11
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 11
+        }
+      }
+    },
+    "global.resonance": {
+      "resolvedId": "global.resonance",
+      "paramId": "resonance",
+      "name": "Resonance",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": null,
+      "wires": {
+        "write": {
+          "msg": "cc",
+          "cc": 71
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 71
+        }
+      }
+    },
+    "global.release": {
+      "resolvedId": "global.release",
+      "paramId": "release",
+      "name": "Release Time",
+      "group": "Envelope",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": null,
+      "wires": {
+        "write": {
+          "msg": "cc",
+          "cc": 72
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 72
+        }
+      }
+    },
+    "global.attack": {
+      "resolvedId": "global.attack",
+      "paramId": "attack",
+      "name": "Attack Time",
+      "group": "Envelope",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": null,
+      "wires": {
+        "write": {
+          "msg": "cc",
+          "cc": 73
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 73
+        }
+      }
+    },
+    "global.cutoff": {
+      "resolvedId": "global.cutoff",
+      "paramId": "cutoff",
+      "name": "Cutoff (Brightness)",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": null,
+      "wires": {
+        "write": {
+          "msg": "cc",
+          "cc": 74
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 74
+        }
+      }
+    },
+    "global.reverb": {
+      "resolvedId": "global.reverb",
+      "paramId": "reverb",
+      "name": "Reverb Send",
+      "group": "Effects",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": null,
+      "wires": {
+        "write": {
+          "msg": "cc",
+          "cc": 91
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 91
+        }
+      }
+    },
+    "global.chorus": {
+      "resolvedId": "global.chorus",
+      "paramId": "chorus",
+      "name": "Chorus Send",
+      "group": "Effects",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": null,
+      "wires": {
+        "write": {
+          "msg": "cc",
+          "cc": 93
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 93
+        }
+      }
+    }
+  }
+}

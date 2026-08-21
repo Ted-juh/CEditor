@@ -115,25 +115,24 @@ test('a zero-sized box gets no CSS, so nothing paints on a collapsed control', (
 
 /* ------------------------------------------------- the geometry claim, in numbers */
 
-test('the SVG corner arc is a radius too fat, and this is the pin for it', () => {
-  // A KNOWN, MEASURED DISAGREEMENT, recorded here rather than left to be rediscovered.
+test('the SVG corner arc and the CSS radius agree, and this is the pin for it', () => {
+  // A DISAGREEMENT THAT WAS HERE AND IS NOW CLOSED, kept as a pin so it cannot come back.
   //
-  // cornerPaths.buildCornerPath draws a rounded outward corner as an arc of radius `R + tBase - i`
-  // — which with the solid-stroke inset `i = tBase = thickness / 2` comes to R, centred at
-  // (R + t, R + t). Its painted band therefore runs out to radius R + thickness/2, so the OUTER
-  // curve is half a border thickness rounder than the radius anybody authored.
+  // cornerPaths.buildCornerPath used to draw a rounded outward corner as an arc of radius
+  // `R + tBase - i` — which with the solid-stroke inset `i = tBase = thickness / 2` came to R,
+  // centred at (R + t, R + t). Its painted band ran out to radius R + thickness/2, so the OUTER
+  // curve was half a border thickness rounder than the radius anybody authored.
   //
-  // Three things say that is the bug and not the baseline:
+  // Three things said that was the bug and not the baseline:
   //   - the fill underneath is clipped at `border-radius: R` (BackgroundRenderer.fillCornerCSS),
-  //     so the stroke overhangs its own fill at every rounded corner;
-  //   - partsToSvg.boxElement already draws the same box with `strokeRadius = radius - inset`,
-  //     the correct reading, so a baked control and a live one differ today;
+  //     so the stroke overhung its own fill at every rounded corner;
+  //   - partsToSvg.boxElement already drew the same box with `strokeRadius = radius - inset`,
+  //     the correct reading, so a baked control and a live one differed;
   //   - CSS, which is what this file emits, narrows a radius under a border the same way.
   //
-  // Fixing borderSegments means reworking sideInset and the 1px anti-aliasing overlap along with
-  // it, so it is deliberately NOT bundled into a performance change. Until it is fixed, a solid
-  // border and a dashed one on the same panel round their corners differently by thickness/2 —
-  // 0.5px on the GAIA panel's hairlines. When someone does fix it, this test fails and says where.
+  // The arc now sweeps at the authored radius less the stroke inset, so its painted band runs out
+  // to exactly R and a solid border, a dashed one and the CSS band all round the same. What this
+  // test pins is the AGREEMENT: if the arc grows a half-thickness again, this fails and says so.
   const border = solid({ thickness: 8 });
   const corners = round(20);
   const arc = buildBorderSegments(80, 60, border, corners).find((s) => s.kind === 'corner' && s.pos === 'tl');
@@ -143,8 +142,8 @@ test('the SVG corner arc is a radius too fat, and this is the pin for it', () =>
   const cssOuterRadius = parseFloat(decl(css(border, corners, 80, 60), 'border-radius'));
 
   assert.equal(cssOuterRadius, 20, 'CSS rounds at the authored radius');
-  assert.equal(svgOuterRadius, 24, 'the SVG rounds at radius + thickness/2');
-  assert.equal(svgOuterRadius - cssOuterRadius, border.thickness / 2);
+  assert.equal(svgOuterRadius, 20, 'the SVG rounds at the authored radius too');
+  assert.equal(svgOuterRadius - cssOuterRadius, 0, 'and the two agree exactly');
 });
 
 test('the CSS band covers exactly the pixels the SVG stroke covers', () => {

@@ -11,6 +11,7 @@ export const DEFAULT_GENERAL_SETTINGS = {
   showGuides: true,
   showDistances: true,
   showPreviewSelectionRing: true,
+  foldSceneryInEditor: false,
   insertOffset: 20,
   duplicateOffset: 20,
   keyboardNudgeSmall: 1,
@@ -27,6 +28,11 @@ export const showRulers = writable(DEFAULT_GENERAL_SETTINGS.showRulers);
 export const showGuides = writable(DEFAULT_GENERAL_SETTINGS.showGuides);
 export const showDistances = writable(DEFAULT_GENERAL_SETTINGS.showDistances);
 export const showPreviewSelectionRing = writable(DEFAULT_GENERAL_SETTINGS.showPreviewSelectionRing);
+// Off by default. Folding scenery in the EDIT surface means a control you can see is not a control
+// that exists, and selection, hover and drag all have to reach it by geometry instead. Preview
+// folds unconditionally because nothing there can select anything; this is the half that has to
+// earn its place on real panels first.
+export const foldSceneryInEditor = writable(DEFAULT_GENERAL_SETTINGS.foldSceneryInEditor);
 export const insertOffset = writable(DEFAULT_GENERAL_SETTINGS.insertOffset);
 export const duplicateOffset = writable(DEFAULT_GENERAL_SETTINGS.duplicateOffset);
 export const keyboardNudgeSmall = writable(DEFAULT_GENERAL_SETTINGS.keyboardNudgeSmall);
@@ -43,6 +49,7 @@ export function applyGeneralSettingsToRuntime(settings) {
   showGuides.set(settings.showGuides);
   showDistances.set(settings.showDistances);
   showPreviewSelectionRing.set(settings.showPreviewSelectionRing);
+  foldSceneryInEditor.set(settings.foldSceneryInEditor);
   insertOffset.set(settings.insertOffset);
   duplicateOffset.set(settings.duplicateOffset);
   keyboardNudgeSmall.set(settings.keyboardNudgeSmall);

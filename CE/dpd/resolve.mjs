@@ -50,8 +50,8 @@ export function resolveParams(resolved) {
         const offset = hexToBytes(p.address ?? '');
         const absAddr = offset.length ? bytesToHex(resolveAddress(base, stride, idx, offset)) : null;
         out.push({
-          resolvedId: `${instanceLabel}.${p.id}`, scope: scopeKey, instance: idx, paramId: p.id,
-          name: p.name, group: p.group, valueType: p.valueType, range: p.range,
+          resolvedId: `${instanceLabel}.${p.id}`, scope: scopeKey, scopeLabel: scope.label, instance: idx, paramId: p.id,
+          name: p.name, group: p.group, valueType: p.valueType, range: p.range, default: p.default,
           encoding: p.encoding ?? { type: 'u7' }, access: p.access ?? { read: true, write: true },
           enum: p.enum, ui: p.ui, size: p.size ?? 1, absAddress: absAddr,
           wires: resolveWires(p, absAddr, idx, (rel) => bytesToHex(resolveAddress(base, stride, idx, hexToBytes(rel)))),

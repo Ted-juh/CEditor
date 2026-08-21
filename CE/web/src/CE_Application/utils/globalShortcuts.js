@@ -12,12 +12,12 @@
  * command name.
  */
 
-export function isEditableTarget(target) {
-  if (!target || typeof target !== 'object') return false;
-  const tag = target.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
-  return target.isContentEditable === true;
-}
+/**
+ * Alias in this module's vocabulary for the one shared "is the user typing?" test.
+ * The implementation lives in textEntry.js so that every global key handler — this
+ * resolver, the editor canvas, the panic-layout bindings — agrees on the answer.
+ */
+export { isTextEntryTarget as isEditableTarget } from './textEntry.js';
 
 export function resolveGlobalShortcut(e, { editableTarget = false } = {}) {
   const mod = e.ctrlKey || e.metaKey;

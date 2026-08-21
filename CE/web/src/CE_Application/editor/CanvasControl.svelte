@@ -75,6 +75,7 @@
   import { segmentEditScope } from '../stores/segmentEditScope.js';
   import { normalizeSegmentTargetIds } from '../utils/segmentTargets.js';
   import { getBindingCompatibility } from '../models/componentPorts.js';
+  import { midiControlBindingFrom } from '../utils/midiControlBindings.js';
   import { deviceParameterDrag } from '../stores/deviceParameterDrag.js';
   import { numberOr } from '../utils/primitives.js';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
@@ -745,7 +746,11 @@
 
     try {
       const payload = JSON.parse(raw);
-      if (payload?.kind !== 'ceditor.deviceParameter' || !payload?.parameter?.id) return null;
+      // Two kinds over one MIME type: a named profile parameter, or a raw CC described as the
+      // 0-127 integer it is. Both carry `parameter`, so everything downstream that only asks about
+      // compatibility — the accept check, the drag highlight — needs no branch.
+      const known = payload?.kind === 'ceditor.deviceParameter' || payload?.kind === 'ceditor.midiControl';
+      if (!known || !payload?.parameter?.id) return null;
       return payload;
     } catch {
       return null;
@@ -790,20 +795,39 @@
     const existing = deviceBindings?.bindings;
     const nextBindings = Array.isArray(existing) ? [...existing] : [];
     const bindingIndex = nextBindings.findIndex((binding) => binding.port === compatibility.port.id);
-    const nextBinding = {
-      kind: 'deviceParameter',
-      port: compatibility.port.id,
-      deviceRole: payload.deviceRole || DEFAULT_DEVICE_ROLE,
-      parameterId: parameter.id,
-      parameterType: parameter.type,
-      adoptMetadata: true,
-      dryRun: true,
-      feedback: {
-        receiveUpdates: true,
-        ignoreOwnEchoes: true,
-        echoWindowMs: 250,
-      },
-    };
+    // A raw CC binds to the MESSAGE; there is no profile parameter to name, no metadata to adopt
+    // and no required profile to record, because the whole point is that the profile does not
+    // describe this controller.
+    const rawControl = payload.kind === 'ceditor.midiControl';
+    const nextBinding = rawControl
+      ? midiControlBindingFrom({
+        message: payload.message,
+        controller: payload.controller,
+        parameterMsb: payload.parameterMsb,
+        parameterLsb: payload.parameterLsb,
+        valueResolution: payload.valueResolution,
+        port: compatibility.port.id,
+        deviceRole: payload.deviceRole || DEFAULT_DEVICE_ROLE,
+      })
+      : {
+        kind: 'deviceParameter',
+        port: compatibility.port.id,
+        deviceRole: payload.deviceRole || DEFAULT_DEVICE_ROLE,
+        parameterId: parameter.id,
+        parameterType: parameter.type,
+        adoptMetadata: true,
+        // Not a dry run. This was true, and dropping a parameter onto a fader then produced a
+        // binding that compiled its message, showed it in the monitor and never sent it — so the
+        // gesture looked like it worked and the fader did nothing. Dry run is a real mode with a
+        // toggle in the properties panel; it is not what someone means by dragging.
+        dryRun: false,
+        feedback: {
+          receiveUpdates: true,
+          ignoreOwnEchoes: true,
+          echoWindowMs: 250,
+        },
+      };
+    if (!nextBinding) return;
 
     if (bindingIndex >= 0) nextBindings[bindingIndex] = nextBinding;
     else nextBindings.push(nextBinding);
@@ -819,6 +843,7 @@
       });
     }
 
+    if (rawControl) return;
     adoptParameterMetadata(core.id, core.controlType, parameter);
     persistDroppedPanelDeviceReference(payload);
   }
@@ -2190,7 +2215,16 @@
     return { left, top, width: glyphWidth, height: glyphHeight };
   });
   let textUnrotatedOrigin = $derived.by(() => {
-    const width = Math.max(0, domTextGlyphSize.width);
+    // The DOM measurement, but never zero. This origin subtracts half the block's width from the
+    // centre, so a width of 0 puts the block's LEFT edge at the centre — and until the measuring
+    // effect has committed (or wherever it never does), that is exactly what happened: every
+    // centred label started at its box's midpoint and ran off the right edge, so "CATEGORY"
+    // rendered as "CATEG" and "LEVEL" as "LEV", cut mid-glyph. The layout engine has already
+    // measured the same lines itself — its lineBoxWidth is the width the span is styled to — so an
+    // unanswered DOM measurement falls back to that instead of to nothing.
+    const width = Math.max(0, domTextGlyphSize.width)
+      || Math.max(0, blockTextLayout.lineBoxWidth || 0)
+      || Math.max(0, textLayoutBounds.width || 0);
     const height = Math.max(0, domTextGlyphSize.height || numberOr(textFont?.size, 12));
     return {
       left: textAxisCenter.x - (width / 2),
@@ -2199,6 +2233,29 @@
       height,
     };
   });
+  /**
+   * Where the text block sits. Emitted onto `.text-span` alongside textSpanStyle.
+   *
+   * These were two elements: an absolutely positioned `.text-anchor` div wrapping a
+   * `position:relative; display:inline-block` `.text-span`. That is one DOM node per text-bearing
+   * control — 225 on the GAIA panel — and it also placed the text wrong. An inline-block sits on a
+   * line box and is aligned by BASELINE, so when the span was shorter than the strut of the div
+   * around it, it was pushed down inside its own anchor. Short single-line text rendered ~2px low;
+   * text of two lines or more grew past the strut, dominated the line box, and came out right. That
+   * is the "Top/Center/Bottom drifts and flips" this used to warn about: not the anchor arithmetic,
+   * which was correct, but an inline-block quietly moving underneath it, by an amount that depended
+   * on the font and the line-height.
+   *
+   * One absolutely positioned element has no line box to be aligned within, so it lands where it is
+   * put. browser-checks/textPlacement.mjs measures all nine justifications across eleven variants
+   * against the rule this code claims to implement — top edge at the top padding, centred in the
+   * padded box, bottom edge at the bottom padding. The old structure fails twelve of those; this one
+   * passes all of them.
+   *
+   * Underline/overline/strike still live in their own layers and must never be folded back into this
+   * placement — they are decoration around the glyphs, and including them would put the block where
+   * the decoration is rather than where the text is.
+   */
   let textAnchorStyle = $derived.by(() => {
     if (!hasText || !textPlacement || usesCustomTextFlow) return '';
     const anchorMaxWidth = Math.max(0, Math.max(textMeasureMaxWidth, blockTextLayout.lineBoxWidth || 0));
@@ -2209,10 +2266,7 @@
       `max-width:${anchorMaxWidth}px`,
     ].join('; ');
   });
-  // Stay off this anchor math unless the text-position system is being redesigned.
-  // Label->Text->Position must stay locked to glyph bounds only.
-  // Underline/overline/strike live in their own layers and must never be folded
-  // back into this placement, or Top/Center/Bottom drifts and flips again.
+  // Label->Text->Position stays locked to glyph bounds only.
   let textAxisCenter = $derived.by(() => {
     const baseLeft = textPlacement?.left ?? effectiveTextPaddingLeft;
     const baseTop = textPlacement?.top ?? effectiveTextPaddingTop;
@@ -2472,7 +2526,7 @@
   // the same thing on the span that carries the face. Two or more do need their own, because each
   // can hold its own alignment and its own justification spacing.
   let foldsSoleLine = $derived(!usesCustomTextFlow && svgTextLines.length === 1);
-  let soleLineStyle = $derived(foldsSoleLine ? `${blockLinePaintStyles(0).join('; ')};` : '');
+  let soleLineStyle = $derived(foldsSoleLine ? blockLinePaintStyles(0).join('; ') : '');
 
   function blockLineDomText(line) {
     return line === '' ? '\u200B' : line;
@@ -2546,6 +2600,17 @@
     if (textShadowValue) styles.push(`text-shadow:${textShadowValue}`);
     return styles.join('; ');
   });
+  /**
+   * The glyph box's declarations and, when there is only one line, that line's as well.
+   *
+   * Joined with `'; '` and with the empty fragments dropped, which is the whole point of it being
+   * a derived rather than three interpolations in the markup. Writing `"{a} {b}"` in the attribute
+   * concatenates two lists that do not end in a semicolon, so the last declaration of one fuses
+   * with the first of the next — `width:104px  white-space:pre` — and the CSS parser discards the
+   * pair. Both of those are invisible in the server-rendered string a golden baseline reads; only
+   * the browser's parse shows the loss.
+   */
+  let textGlyphAndLineStyle = $derived([textGlyphStyle, soleLineStyle].filter(Boolean).join('; '));
   let hasLineDecorations = $derived(
     textFont?.underline === true || textFont?.strikethrough === true || textFont?.overline === true
   );
@@ -2967,6 +3032,7 @@
 <div
   bind:this={rootElement}
   class="canvas-control"
+  data-control-id={core?.id}
   class:selected={editorInteractionEnabled && isSelected && !panelLocked}
   class:key-object={editorInteractionEnabled && isKeyObject && !panelLocked}
   class:hidden-component={!isVisible}
@@ -3517,24 +3583,24 @@
 
     {#if hasText && !usesCustomTextFlow && (!shouldUseNativeTextPreview || !nativePreviewData || showBlockTextVisual)}
       <div class="text-content" style={textStyle}>
-        <div class="text-anchor" style={textAnchorStyle}>
-          <!--
-            The font carrier and the glyph box are ONE element. They were two: an inline-block
-            holding the face, and a block inside it holding the mirror, the small-caps and the
-            text-shadow. Nothing sat between them, they shared a box exactly — no padding, no
-            border, the inner one filling the outer's content width — so the two transforms
-            composed about the same point and can be written in the same order on one element.
-            225 labels on the GAIA panel is 225 elements for a nesting nobody could see.
+        <!--
+          Two elements, not three and not one. The placement and the face share `.text-span`,
+          because an anchor around them bought nothing and cost the placement: an inline-block is
+          baseline-aligned inside its parent's line box, which pushed short text down (see
+          textAnchorStyle). The mirror, the small-caps and the text-shadow stay on their own
+          `.text-glyphs` inside it, because `transform` cannot be written twice on one element —
+          the mirror would replace the rotation and the fit-scale rather than compose with them.
 
-            A LINE IS FOLDED IN TOO when there is only one of it, which is most captions. The
-            per-line styles are alignment and spacing, and on a single line they are the same
-            declarations one level up.
-          -->
+          A LINE IS FOLDED IN when there is only one of it, which is most captions. The per-line
+          styles are alignment and spacing, and on a single line they say the same thing one level
+          up — 225 labels on the GAIA panel is 225 elements saved.
+        -->
+        <span class="text-span" style="{textAnchorStyle}; {textSpanStyle}">
           <span
             bind:this={textGlyphElement}
-            class="text-span"
+            class="text-glyphs"
             class:hidden-glyphs={(shouldUseNativeTextPreview && nativePreviewData) || showBlockTextVisual}
-            style="{textSpanStyle} {textGlyphStyle} {soleLineStyle}"
+            style={textGlyphAndLineStyle}
           >
             {#if foldsSoleLine}
               {blockLineDomText(svgTextLines[0])}
@@ -3544,7 +3610,7 @@
               {/each}
             {/if}
           </span>
-        </div>
+        </span>
       </div>
     {/if}
 
@@ -4030,12 +4096,6 @@
     line-height: 1;
   }
 
-  .text-anchor {
-    position: absolute;
-    max-width: 100%;
-    min-width: 0;
-  }
-
   .radio-group-content {
     position: absolute;
     inset: 0;
@@ -4158,12 +4218,32 @@
     display: block;
   }
 
+  /*
+   * Was two elements: `.text-anchor` positioned the block, `.text-span` was the inline-block the
+   * glyphs and their transforms lived in. `display:inline-block` is kept because `transform` and
+   * `transform-origin: center center` in textSpanStyle are relative to this box — but note that
+   * `position:absolute` blockifies it, which is the point: an inline-block is baseline-aligned
+   * inside its parent's line box, and that is what used to push short text down. Absolute
+   * positioning removes the line box, so the element lands exactly where left/top put it.
+   *
+   * `max-width` is no longer set here; it comes in through textAnchorStyle as a pixel value, which
+   * would beat any percentage written at this level anyway.
+   */
   .text-span {
-    position: relative;
+    position: absolute;
     display: inline-block;
-    max-width: 100%;
+    min-width: 0;
     white-space: pre-wrap;
     word-break: break-word;
+  }
+
+  /*
+   * The glyph box, and — when there is only one line — that line as well. `display:block` either
+   * way: the folded line needs it, and blockLinePaintStyles deliberately leaves it out so that a
+   * line folded onto an inline-block would not blockify it.
+   */
+  .text-glyphs {
+    display: block;
   }
 
   .text-line {
@@ -4171,7 +4251,7 @@
     min-width: 0;
   }
 
-  .text-span.hidden-glyphs {
+  .text-glyphs.hidden-glyphs {
     color: transparent !important;
     -webkit-text-fill-color: transparent;
     -webkit-text-stroke-width: 0 !important;

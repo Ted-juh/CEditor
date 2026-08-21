@@ -136,6 +136,18 @@
       </div>
       <input type="checkbox" checked={general.showPreviewSelectionRing} onchange={(event) => setBool('showPreviewSelectionRing', event)} />
     </label>
+
+    <label class="setting-row">
+      <div class="setting-copy">
+        <strong>Fold Scenery While Editing</strong>
+        <span>
+          Draw labels, plates and images as one layer instead of as individual components, so a large
+          panel builds faster. They stay selectable and become editable again as soon as you point at
+          one. Preview always does this; turning it on here applies it to the edit canvas too.
+        </span>
+      </div>
+      <input type="checkbox" checked={general.foldSceneryInEditor} onchange={(event) => setBool('foldSceneryInEditor', event)} />
+    </label>
   </section>
 
   <section class="settings-card">

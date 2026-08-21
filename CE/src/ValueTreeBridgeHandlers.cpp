@@ -97,6 +97,49 @@ void ValueTreeBridge::emitScriptModules() const
 
 
 /**
+ * Is the message thread still answering?
+ *
+ * Every other timer in this file measures work we already suspected — a file read, a base64 encode,
+ * a panel decode. That only ever finds the freeze if the freeze is somewhere we thought to look, and
+ * twice now it has not been: a startup with no panels to load, seventy-seven milliseconds of logged
+ * work, and then a window that stops responding when the user clicks a menu.
+ *
+ * So this measures the thread rather than the work. A timer that should fire four times a second
+ * cannot fire while something else holds the message thread, and the gap it comes back to is exactly
+ * how long that something held it. Nothing needs to be instrumented, or even suspected, to show up
+ * here — and if the gaps never appear while the window is visibly frozen, that is the answer too:
+ * the message thread was fine and the WebView renderer was not.
+ *
+ * Only alive while perf logging is on, so it costs nothing in normal use.
+ */
+class MessageThreadStallWatch final : public juce::Timer
+{
+public:
+    explicit MessageThreadStallWatch (std::function<void (double)> reportStall)
+        : report (std::move (reportStall))
+    {
+        lastTickMs = juce::Time::getMillisecondCounterHiRes();
+        startTimerHz (4);
+    }
+
+private:
+    void timerCallback() override
+    {
+        auto now = juce::Time::getMillisecondCounterHiRes();
+        auto gap = now - lastTickMs;
+        lastTickMs = now;
+
+        // Well above the 250ms period and any ordinary scheduling jitter, so a report means a stall
+        // a person would notice rather than a busy moment.
+        if (gap > 1000.0 && report != nullptr)
+            report (gap);
+    }
+
+    std::function<void (double)> report;
+    double lastTickMs = 0.0;
+};
+
+/**
  * Runs the VST3 exporter (tools/scripts/export-panel-vst3.mjs) as a child process, polled on the
  * message thread so the UI stays responsive. Each stdout/stderr line is emitted to JS as
  * "buildProgress" { line }; a terminal "buildComplete" { ok, code, message, path } closes it out.
@@ -714,28 +757,48 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 file.loadFileAsData (mb);
                 auto readDurationMs = juce::Time::getMillisecondCounterHiRes() - readStartMs;
 
-                auto encodeStartMs = juce::Time::getMillisecondCounterHiRes();
-                auto base64 = juce::Base64::toBase64 (mb.getData(), mb.getSize());
-                auto encodeDurationMs = juce::Time::getMillisecondCounterHiRes() - encodeStartMs;
-
                 auto ext = file.getFileExtension().toLowerCase();
                 juce::String mimeType = "image/png";
                 if (ext == ".jpg" || ext == ".jpeg") mimeType = "image/jpeg";
                 else if (ext == ".gif") mimeType = "image/gif";
                 else if (ext == ".bmp") mimeType = "image/bmp";
-                else if (ext == ".svg") mimeType = "image/svg+xml";
                 else if (ext == ".webp") mimeType = "image/webp";
-                else if (ext == ".json" || ext == ".cepanel") mimeType = "application/json";
                 else if (ext == ".ttf") mimeType = "font/ttf";
                 else if (ext == ".otf") mimeType = "font/otf";
                 else if (ext == ".woff") mimeType = "font/woff";
                 else if (ext == ".woff2") mimeType = "font/woff2";
+                else if (ext == ".svg") mimeType = "image/svg+xml";
+                else if (ext == ".json" || ext == ".cepanel") mimeType = "application/json";
 
                 auto* obj = new juce::DynamicObject();
                 obj->setProperty ("requestId", requestId);
-                obj->setProperty ("data", "data:" + mimeType + ";base64," + base64);
                 obj->setProperty ("mimeType", mimeType);
                 obj->setProperty ("byteSize", (juce::int64) mb.getSize());
+
+                // Base64 for everything, text included — and NOT because base64 is cheap.
+                //
+                // Sending text as text is the obvious improvement: no encode, no decode, a third
+                // fewer bytes. It was measured on the 790 KB GAIA profile and cost 55,298 ms in the
+                // emit below, with the window unresponsive for two minutes at a stretch.
+                //
+                // WebBrowserComponent::emitEvent embeds the payload in a JavaScript source string,
+                // so it escapes the JSON with
+                //     objectAsString.replace ("\\", "\\\\").replace ("'", "\\'")
+                // and juce::String::replace is O(occurrences x length): it re-walks from the start
+                // of the string and reallocates the whole thing for every hit. JSON::toString turns
+                // each of that profile's 77,554 quotes into \", so the first replace runs 77,554
+                // times over 790 KB — 61.3 billion character operations, which is the 55 seconds.
+                //
+                // Base64 contains no backslash and no apostrophe. Both replaces find nothing and
+                // return after a single scan, so the encode buys back far more than it costs. The
+                // real fix is upstream in that escape; until then this transport has a constraint —
+                // a payload must not carry characters that need escaping — and base64 is what
+                // satisfies it. Do not "optimise" this away again without re-measuring the emit.
+                auto encodeStartMs = juce::Time::getMillisecondCounterHiRes();
+                obj->setProperty ("data", "data:" + mimeType + ";base64,"
+                                          + juce::Base64::toBase64 (mb.getData(), mb.getSize()));
+                auto encodeDurationMs = juce::Time::getMillisecondCounterHiRes() - encodeStartMs;
+
                 obj->setProperty ("readMs", readDurationMs);
                 obj->setProperty ("encodeMs", encodeDurationMs);
 
@@ -947,6 +1010,17 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
             {
                 perfDebugEnabled = (bool) payload;
                 emitPerfDebug (juce::String ("native perf logging ") + (perfDebugEnabled ? "enabled" : "disabled"));
+
+                // The freeze this exists to find is invisible to every timer above: they all measure
+                // work we already suspected. This measures the thread instead. Whatever is blocking
+                // it does not have to be instrumented, or even known, to show up here.
+                if (perfDebugEnabled)
+                    stallWatch = std::make_unique<MessageThreadStallWatch> ([this] (double gapMs)
+                    {
+                        emitPerfDebug ("message thread stalled " + juce::String (gapMs, 0) + "ms");
+                    });
+                else
+                    stallWatch.reset();
             });
         })
         /* --- third-party scripting modules (ce.ext.*) -------------------------------------
