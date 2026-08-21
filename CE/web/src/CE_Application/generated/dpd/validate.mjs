@@ -4,10 +4,10 @@
 const KINDS = ['manufacturer', 'model', 'variant', 'component'];
 const VALUE_TYPES = ['continuous', 'signed', 'enum', 'toggle', 'trigger', 'text'];
 const WIRE_DIRS = ['write', 'read', 'rxLive'];
-const WIRE_MSGS = ['dt1', 'rq1', 'cc', 'nrpn', 'raw'];
+const WIRE_MSGS = ['dt1', 'rq1', 'cc', 'nrpn', 'rpn', 'raw'];
 const CHECKSUM_TYPES = ['roland-7bit', 'sum-7bit', 'xor', 'none'];
 const ENCODING_TYPES = ['u7', 'u8', 's7', 'u14', 'u14-lsb', 'nibbles', 'packed8to7', 'bitslice'];
-const SHAPE_KINDS = ['sysex', 'cc', 'nrpn', 'raw'];
+const SHAPE_KINDS = ['sysex', 'cc', 'nrpn', 'rpn', 'raw'];
 const SCOPE_KINDS = ['global', 'tone', 'part', 'effect', 'drumMap', 'patch'];
 const DUMP_KINDS = ['patch', 'performance', 'bank'];
 // The two text codecs are parameter encodings as well as dump codecs. A patch name is ONE value —
@@ -124,6 +124,10 @@ export function validatePresets(presets, E) {
     if (Number.isInteger(b.startSlot) && Number.isInteger(b.slotCount)) ranges.push({ id, from: b.startSlot, to: b.startSlot + b.slotCount - 1 });
     if (Array.isArray(b.names) && Number.isInteger(b.slotCount) && b.names.length > b.slotCount)
       E(`presets bank ${id}: names catalog (${b.names.length}) exceeds slotCount (${b.slotCount})`);
+    // Same rule for the per-slot categories, and for the same reason: both are indexed by
+    // slot - startSlot, so an over-long array is entries nothing can ever address.
+    if (Array.isArray(b.categories) && Number.isInteger(b.slotCount) && b.categories.length > b.slotCount)
+      E(`presets bank ${id}: categories (${b.categories.length}) exceeds slotCount (${b.slotCount})`);
     for (const f of ['programBase', 'bankMsb', 'bankLsb'])
       if (b[f] != null && !(Number.isInteger(b[f]) && b[f] >= 0 && b[f] <= 127)) E(`presets bank ${id}: ${f} must be 0-127`);
   });

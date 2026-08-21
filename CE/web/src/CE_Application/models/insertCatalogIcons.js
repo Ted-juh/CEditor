@@ -94,6 +94,7 @@ export const TYPE_ICONS = {
   Range: RangeSliderIcon,
   Number: Hash,
   Crossfader: ArrowLeftRight,
+  Numpad: Hash,
   Ribbon: RibbonStripIcon,
   Macro: CircleDashed,
   VectorJoystick: Joystick,

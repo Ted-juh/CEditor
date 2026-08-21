@@ -140,7 +140,7 @@
       "required": ["id", "kind", "template"],
       "properties": {
         "id": { "type": "string", "description": "e.g. 'dt1', 'rq1'." },
-        "kind": { "enum": ["sysex", "cc", "nrpn", "raw"] },
+        "kind": { "enum": ["sysex", "cc", "nrpn", "rpn", "raw"] },
         "template": {
           "type": "array",
           "items": { "type": "string" },
@@ -251,13 +251,14 @@
       "description": "One directional wire binding for a parameter. dir=write (panel->synth), read (request value), rxLive (synth->panel on edit). msg picks the transport.",
       "properties": {
         "dir": { "enum": ["write", "read", "rxLive"] },
-        "msg": { "enum": ["dt1", "rq1", "cc", "nrpn", "raw"] },
+        "msg": { "enum": ["dt1", "rq1", "cc", "nrpn", "rpn", "raw"] },
         "address": { "$ref": "#/$defs/hexBytes", "description": "Relative address for sysex msgs (dt1/rq1)." },
         "size": { "type": "integer", "minimum": 1 },
         "cc": { "type": "integer", "minimum": 0, "maximum": 127, "description": "Controller number for msg=cc." },
         "ccStride": { "type": "integer", "description": "Per-instance increment added to cc (GAIA: tone1 CC102, tone2 103, tone3 104 -> ccStride 1)." },
         "nrpn": { "type": "string", "description": "NRPN MSB/LSB, space-hex, for msg=nrpn." },
-        "channelRelative": { "type": "boolean", "description": "If true, the CC/NRPN channel follows the part/instance channel rather than a fixed one." }
+        "rpn": { "type": "string", "description": "RPN MSB/LSB, space-hex, for msg=rpn. Selected with CC 101/100 rather than 99/98; the registered numbers the MIDI spec names (00 00 pitch bend range, 00 01 fine tune, 00 02 coarse tune) live here." },
+        "channelRelative": { "type": "boolean", "description": "If true, the CC/NRPN/RPN channel follows the part/instance channel rather than a fixed one." }
       }
     },
 
@@ -360,12 +361,18 @@
         "programBase": { "type": "integer", "minimum": 0, "maximum": 127, "description": "Program Change number of the bank's FIRST slot (PC = programBase + slot - startSlot). Default 0." },
         "bankMsb": { "type": "integer", "minimum": 0, "maximum": 127, "description": "CC0 Bank Select MSB selecting this bank (recall kind 'bankPc')." },
         "bankLsb": { "type": "integer", "minimum": 0, "maximum": 127, "description": "CC32 Bank Select LSB selecting this bank (recall kind 'bankPc')." },
-        "category": { "type": "string", "description": "Optional genre/category tag for the whole bank." },
+        "category": { "type": "string", "description": "Optional genre/category tag for the whole bank. A per-slot entry in `categories` beats it." },
+        "categories": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional per-slot category tag; index = slot - startSlot, exactly like `names`. Length must not exceed slotCount. A blank entry falls back to the bank's own `category`. Verbatim from the device's own documentation — the AN1x prints two-letter codes (Ba, Pd, Sq) in its Voice List and gives no legend for them, so the codes are what is stored rather than an invented expansion."
+        },
         "names": {
           "type": "array",
           "items": { "type": "string" },
           "description": "Optional shipped factory-name catalog; index = slot - startSlot. Length must not exceed slotCount."
-        }
+        },
+        "note": { "type": "string", "description": "Free-text provenance for this bank — which page of which document the names or categories were transcribed from, and anything the document leaves undefined." }
       }
     },
 

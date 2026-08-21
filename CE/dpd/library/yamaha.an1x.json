@@ -491,7 +491,7 @@
           "ui": {
             "preferredComponent": "Slider"
           },
-          "note": "p12: v = 0:-64 — 64:0 — 127:+63; Reset All Controllers restores 64 (no effect)",
+          "note": "p12: v = 0:-64 \u2014 64:0 \u2014 127:+63; Reset All Controllers restores 64 (no effect)",
           "default": 64
         },
         {
@@ -3851,7 +3851,7 @@
             "min": 0,
             "max": 84
           },
-          "note": "p14 common 0Ah: 00...54 with the member list printed as a dash, then \"Pf...Wv\", then a dash — the Data List does not enumerate the 85 category codes anywhere. The Factory-set Voice List (p2-p4) uses 13 of them: Ba, Pd, Fx, Sq, Ld, Co, Br, St, Se, Sc, Pf, Or, Cp."
+          "note": "p14 common 0Ah: 00...54 with the member list printed as a dash, then \"Pf...Wv\", then a dash \u2014 the Data List does not enumerate the 85 category codes anywhere. The Factory-set Voice List (p2-p4) uses 13 of them: Ba, Pd, Fx, Sq, Ld, Co, Br, St, Se, Sc, Pf, Or, Cp."
         },
         {
           "id": "vcSceneSelect",
@@ -4577,7 +4577,7 @@
             "min": 0,
             "max": 159
           },
-          "note": "Data List p6, Variation Effect — what this byte means depends on the selected variation type: Chorus 1/2, Flanger, Symphonic, Phaser: Mod Freq 0-159 | Auto PAN, Rotary Sp.: Speed 0-159 | Pitch Change: Pitch 0-48 | Aural Exc: HPF 28-58 | Comp: Attack 0-19 | Wah: Sensitivity 0-100 | Distortion, Over Drive, Amp Sim.: Drive 0-100. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p6, Variation Effect \u2014 what this byte means depends on the selected variation type: Chorus 1/2, Flanger, Symphonic, Phaser: Mod Freq 0-159 | Auto PAN, Rotary Sp.: Speed 0-159 | Pitch Change: Pitch 0-48 | Aural Exc: HPF 28-58 | Comp: Attack 0-19 | Wah: Sensitivity 0-100 | Distortion, Over Drive, Amp Sim.: Drive 0-100. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcVariParam2",
@@ -4610,7 +4610,7 @@
             "min": 0,
             "max": 100
           },
-          "note": "Data List p6, Variation Effect — what this byte means depends on the selected variation type: Chorus 1/2: PM Depth 0-100 | Flanger, Symphonic, Phaser: Mod Depth 0-100 | Auto PAN: L/R Depth 0-100 | Rotary Sp.: Depth 0-100 | Pitch Change: Fine 1 0-100 | Aural Exc: Drive 0-100 | Comp: Release 0-15 | Wah: Cutoff Freq Offset 0-39 | Distortion, Over Drive: Mid Freq 14-54 | Amp Sim.: AMP Type 0-3. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p6, Variation Effect \u2014 what this byte means depends on the selected variation type: Chorus 1/2: PM Depth 0-100 | Flanger, Symphonic, Phaser: Mod Depth 0-100 | Auto PAN: L/R Depth 0-100 | Rotary Sp.: Depth 0-100 | Pitch Change: Fine 1 0-100 | Aural Exc: Drive 0-100 | Comp: Release 0-15 | Wah: Cutoff Freq Offset 0-39 | Distortion, Over Drive: Mid Freq 14-54 | Amp Sim.: AMP Type 0-3. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcVariParam3",
@@ -4643,7 +4643,7 @@
             "min": 0,
             "max": 450
           },
-          "note": "Data List p6, Variation Effect — what this byte means depends on the selected variation type: Chorus 1/2: AM Type 0-15 | Flanger: Dly Offset 0-155 | Symphonic: Dly Offset 0-450 | Phaser: Phase Shift Offset 0-100 | Auto PAN: F/R Depth 0-100 | Rotary Sp.: HPF 0-52 | Pitch Change: Pan 1 1-127 | Aural Exc: Mix Level 0-100 | Comp: Threshold 0-42 | Wah: Resonance 0-90 | Distortion, Over Drive: Mid Gain 52-76 | Amp Sim.: LPF 34-60. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p6, Variation Effect \u2014 what this byte means depends on the selected variation type: Chorus 1/2: AM Type 0-15 | Flanger: Dly Offset 0-155 | Symphonic: Dly Offset 0-450 | Phaser: Phase Shift Offset 0-100 | Auto PAN: F/R Depth 0-100 | Rotary Sp.: HPF 0-52 | Pitch Change: Pan 1 1-127 | Aural Exc: Mix Level 0-100 | Comp: Threshold 0-42 | Wah: Resonance 0-90 | Distortion, Over Drive: Mid Gain 52-76 | Amp Sim.: LPF 34-60. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcVariParam4",
@@ -4676,7 +4676,7 @@
             "min": 0,
             "max": 500
           },
-          "note": "Data List p6, Variation Effect — what this byte means depends on the selected variation type: Chorus 1/2: Dly Offset 0-500 | Flanger, Phaser: FB Level 0-198 | Auto PAN: PAN Direction 0-4 | Rotary Sp.: LPF 34-60 | Pitch Change: Fine 2 0-100 | Comp: Ratio 0-7 | Distortion, Over Drive: High Freq 28-58 | Amp Sim.: Out Level 0-100. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p6, Variation Effect \u2014 what this byte means depends on the selected variation type: Chorus 1/2: Dly Offset 0-500 | Flanger, Phaser: FB Level 0-198 | Auto PAN: PAN Direction 0-4 | Rotary Sp.: LPF 34-60 | Pitch Change: Fine 2 0-100 | Comp: Ratio 0-7 | Distortion, Over Drive: High Freq 28-58 | Amp Sim.: Out Level 0-100. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcVariParam5",
@@ -4709,7 +4709,7 @@
             "min": 0,
             "max": 127
           },
-          "note": "Data List p6, Variation Effect — what this byte means depends on the selected variation type: Phaser: Stage 0-2 (4, 6, 8) | Pitch Change: Pan 2 1-127 | Comp: Out Level 0-100 | Distortion, Over Drive: High Gain 52-76. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p6, Variation Effect \u2014 what this byte means depends on the selected variation type: Phaser: Stage 0-2 (4, 6, 8) | Pitch Change: Pan 2 1-127 | Comp: Out Level 0-100 | Distortion, Over Drive: High Gain 52-76. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcVariParam6",
@@ -4742,7 +4742,7 @@
             "min": 0,
             "max": 100
           },
-          "note": "Data List p6, Variation Effect — what this byte means depends on the selected variation type: Phaser: Diffusion 0-1 (stereo, mono) | Distortion, Over Drive: Out Level 0-100. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p6, Variation Effect \u2014 what this byte means depends on the selected variation type: Phaser: Diffusion 0-1 (stereo, mono) | Distortion, Over Drive: Out Level 0-100. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "eqLowFreq",
@@ -5064,7 +5064,7 @@
               "wire": 4
             }
           ],
-          "note": "p6 Effect Type List: 5 delay effects. The parameter table's 00...0D is wrong — bytes 05..0D are undefined.",
+          "note": "p6 Effect Type List: 5 delay effects. The parameter table's 00...0D is wrong \u2014 bytes 05..0D are undefined.",
           "default": "delay-l-c-r"
         },
         {
@@ -5099,7 +5099,7 @@
             "max": 127
           },
           "default": 0,
-          "note": "The parameter table prints the data range as 00...00 and the description as 0...127; the Effect Parameter List (p7) settles it — \"Return 0~127\", routed to the Common control matrix. 0..127 is right and the table's data column is a misprint."
+          "note": "The parameter table prints the data range as 00...00 and the description as 0...127; the Effect Parameter List (p7) settles it \u2014 \"Return 0~127\", routed to the Common control matrix. 0..127 is right and the table's data column is a misprint."
         },
         {
           "id": "vcDlyParam1",
@@ -5132,7 +5132,7 @@
             "min": 0,
             "max": 6599
           },
-          "note": "Data List p7, Delay Effect — what this byte means depends on the selected delay type: Delay L,C,R: Lch Dly 0-6599 | Delay L,R: Lch Dly 0-6599 | Echo: Lch Dly 0-3299 | Cross Delay: L->R Dly 0-3299 | Tempo Delay: Reference Dly (a note value, not a time). The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p7, Delay Effect \u2014 what this byte means depends on the selected delay type: Delay L,C,R: Lch Dly 0-6599 | Delay L,R: Lch Dly 0-6599 | Echo: Lch Dly 0-3299 | Cross Delay: L->R Dly 0-3299 | Tempo Delay: Reference Dly (a note value, not a time). The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcDlyParam2",
@@ -5165,7 +5165,7 @@
             "min": 0,
             "max": 6599
           },
-          "note": "Data List p7, Delay Effect — what this byte means depends on the selected delay type: Delay L,C,R: Rch Dly 0-6599 | Delay L,R: Rch Dly 0-6599 | Echo: Lch FB Level 0-198 | Cross Delay: L->R FB Level 0-198 | Tempo Delay: Lch Diffusion 44-84. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p7, Delay Effect \u2014 what this byte means depends on the selected delay type: Delay L,C,R: Rch Dly 0-6599 | Delay L,R: Rch Dly 0-6599 | Echo: Lch FB Level 0-198 | Cross Delay: L->R FB Level 0-198 | Tempo Delay: Lch Diffusion 44-84. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcDlyParam3",
@@ -5198,7 +5198,7 @@
             "min": 0,
             "max": 6599
           },
-          "note": "Data List p7, Delay Effect — what this byte means depends on the selected delay type: Delay L,C,R: Cch Dly 0-6599 | Delay L,R: FB Dly 1 0-6599 | Echo: Rch Dly 0-3299 | Cross Delay: R->L Dly 0-3299 | Tempo Delay: Rch Diffusion 44-84. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p7, Delay Effect \u2014 what this byte means depends on the selected delay type: Delay L,C,R: Cch Dly 0-6599 | Delay L,R: FB Dly 1 0-6599 | Echo: Rch Dly 0-3299 | Cross Delay: R->L Dly 0-3299 | Tempo Delay: Rch Diffusion 44-84. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcDlyParam4",
@@ -5231,7 +5231,7 @@
             "min": 0,
             "max": 6599
           },
-          "note": "Data List p7, Delay Effect — what this byte means depends on the selected delay type: Delay L,C,R: Cch Level 0-100 | Delay L,R: FB Dly 2 0-6599 | Echo: Rch FB Level 0-198 | Cross Delay: R->L FB Level 0-198 | Tempo Delay: FB Level 0-198. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p7, Delay Effect \u2014 what this byte means depends on the selected delay type: Delay L,C,R: Cch Level 0-100 | Delay L,R: FB Dly 2 0-6599 | Echo: Rch FB Level 0-198 | Cross Delay: R->L FB Level 0-198 | Tempo Delay: FB Level 0-198. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcDlyParam5",
@@ -5264,7 +5264,7 @@
             "min": 0,
             "max": 198
           },
-          "note": "Data List p7, Delay Effect — what this byte means depends on the selected delay type: Delay L,C,R: FB Level 0-198 | Delay L,R: FB Level 0-198 | Echo: HPF 0-52 | Cross Delay: Input Select 0-2 (L, R, L&R) | Tempo Delay: HPF 0-52. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p7, Delay Effect \u2014 what this byte means depends on the selected delay type: Delay L,C,R: FB Level 0-198 | Delay L,R: FB Level 0-198 | Echo: HPF 0-52 | Cross Delay: Input Select 0-2 (L, R, L&R) | Tempo Delay: HPF 0-52. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcDlyParam6",
@@ -5297,7 +5297,7 @@
             "min": 0,
             "max": 60
           },
-          "note": "Data List p7, Delay Effect — what this byte means depends on the selected delay type: Delay L,C,R: HPF 0-52 | Delay L,R: HPF 0-52 | Echo: LPF 34-60 | Cross Delay: HPF 0-52 | Tempo Delay: LPF 34-60. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p7, Delay Effect \u2014 what this byte means depends on the selected delay type: Delay L,C,R: HPF 0-52 | Delay L,R: HPF 0-52 | Echo: LPF 34-60 | Cross Delay: HPF 0-52 | Tempo Delay: LPF 34-60. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcDlyParam7",
@@ -5330,7 +5330,7 @@
             "min": 34,
             "max": 60
           },
-          "note": "Data List p7, Delay Effect — what this byte means depends on the selected delay type: Delay L,C,R: LPF 34-60 | Delay L,R: LPF 34-60 | Cross Delay: LPF 34-60 | Echo and Tempo Delay have only six parameters and do not use this byte. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
+          "note": "Data List p7, Delay Effect \u2014 what this byte means depends on the selected delay type: Delay L,C,R: LPF 34-60 | Delay L,R: LPF 34-60 | Cross Delay: LPF 34-60 | Echo and Tempo Delay have only six parameters and do not use this byte. The range here is the widest any type uses; the DPD cannot make one parameter's range depend on another. The Value column is the raw byte; tables #1-#8 on Data List p8 map it to the displayed value (LFO frequency, EQ frequency, reverb time, chorus AM type, compressor attack, release and ratio, wah cutoff). The DPD has no display-table concept, so a panel shows the raw number."
         },
         {
           "id": "vcRevType",
@@ -5398,7 +5398,7 @@
               "wire": 7
             }
           ],
-          "note": "p6 Effect Type List: 8 reverbs. p7's parameter table heads the third column ROOM3 where p6 says Hall3; both lists have 8 entries so only the label is in doubt. The parameter table's 00...0D is wrong — bytes 08..0D are undefined.",
+          "note": "p6 Effect Type List: 8 reverbs. p7's parameter table heads the third column ROOM3 where p6 says Hall3; both lists have 8 entries so only the label is in doubt. The parameter table's 00...0D is wrong \u2014 bytes 08..0D are undefined.",
           "default": "hall-1"
         },
         {
@@ -5433,7 +5433,7 @@
             "max": 127
           },
           "default": 0,
-          "note": "The parameter table prints the data range as 00...00 and the description as 0...127; the Effect Parameter List (p7) settles it — \"Return 0~127\", routed to the Common control matrix. 0..127 is right and the table's data column is a misprint."
+          "note": "The parameter table prints the data range as 00...00 and the description as 0...127; the Effect Parameter List (p7) settles it \u2014 \"Return 0~127\", routed to the Common control matrix. 0..127 is right and the table's data column is a misprint."
         },
         {
           "id": "vcRevParam1",
@@ -5918,7 +5918,7 @@
               "wire": 29
             }
           ],
-          "note": "p5 Arpeggiator Type List (30 types, wires 0..29). The parameter table calls type 0 \"UpDwn1\" where the type list calls it UpOct1. When Step Seq is selected and Kbd Mode is a pattern-select mode, this same byte is a User Pattern number 0..127 instead (p14 footnote *3) — a second range this model cannot express.",
+          "note": "p5 Arpeggiator Type List (30 types, wires 0..29). The parameter table calls type 0 \"UpDwn1\" where the type list calls it UpOct1. When Step Seq is selected and Kbd Mode is a pattern-select mode, this same byte is a User Pattern number 0..127 instead (p14 footnote *3) \u2014 a second range this model cannot express.",
           "default": "upoct1"
         },
         {
@@ -6039,7 +6039,7 @@
               "wire": 3
             }
           ],
-          "note": "p14 common 55h. The Data List contradicts itself: the data column reads 00...02 while the member list reads Scene1(1),Scene2(2),both(3) and the default column reads 03(both). Modelled on the members — a 0..2 range cannot send the documented default.",
+          "note": "p14 common 55h. The Data List contradicts itself: the data column reads 00...02 while the member list reads Scene1(1),Scene2(2),both(3) and the default column reads 03(both). Modelled on the members \u2014 a 0..2 range cannot send the documented default.",
           "default": "both"
         },
         {
@@ -10092,7 +10092,7 @@
             "max": 127
           },
           "default": 1,
-          "note": "Data List p6, the Wet:Dry column of the Effect Type List. For most types this is a blend, D63>W ... D=W ... D<W63 over 1-127. For Aural Exc and Comp it is a two-way switch — 1-63 reads as dry(1) and 64-127 as wet(127). For Distortion, Over Drive and Amp Sim. it is three-way — dry(1), both(64), wet(127). The Data List footnote *3 also notes the Control Matrix has no effect on VarEF D:W for those five types."
+          "note": "Data List p6, the Wet:Dry column of the Effect Type List. For most types this is a blend, D63>W ... D=W ... D<W63 over 1-127. For Aural Exc and Comp it is a two-way switch \u2014 1-63 reads as dry(1) and 64-127 as wet(127). For Distortion, Over Drive and Amp Sim. it is three-way \u2014 dry(1), both(64), wet(127). The Data List footnote *3 also notes the Control Matrix has no effect on VarEF D:W for those five types."
         },
         {
           "id": "scReserved43",
@@ -10413,7 +10413,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -10738,7 +10738,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -11063,7 +11063,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -11388,7 +11388,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -11713,7 +11713,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -12038,7 +12038,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -12363,7 +12363,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -12688,7 +12688,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -13013,7 +13013,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -13338,7 +13338,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -13663,7 +13663,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -13988,7 +13988,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -14313,7 +14313,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -14638,7 +14638,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -14963,7 +14963,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -15288,7 +15288,7 @@
               "wire": 45
             }
           ],
-          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) — the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
+          "note": "p10 Control Matrix List, data value 0..45. The parameter table says \"00...24 off(0)...Vari-Ef Dry:Wet(24)\", but 24h is FEG Depth in the list and VarEF D:W is 45 (2Dh) \u2014 the table's \"24\" is a misprint for \"2D\". The Free EG column of the same page uses the identical convention and there the two agree (00...38 = 56).",
           "default": "off"
         },
         {
@@ -16118,7 +16118,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity2",
@@ -16152,7 +16152,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity3",
@@ -16186,7 +16186,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity4",
@@ -16220,7 +16220,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity5",
@@ -16254,7 +16254,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity6",
@@ -16288,7 +16288,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity7",
@@ -16322,7 +16322,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity8",
@@ -16356,7 +16356,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity9",
@@ -16390,7 +16390,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity10",
@@ -16424,7 +16424,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity11",
@@ -16458,7 +16458,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity12",
@@ -16492,7 +16492,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity13",
@@ -16526,7 +16526,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity14",
@@ -16560,7 +16560,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity15",
@@ -16594,7 +16594,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssVelocity16",
@@ -16628,7 +16628,7 @@
             "max": 127
           },
           "default": 100,
-          "note": "p15: rest(0), 1...127 — velocity 0 is a REST, not a silent note."
+          "note": "p15: rest(0), 1...127 \u2014 velocity 0 is a REST, not a silent note."
         },
         {
           "id": "ssGateTime1",
@@ -30914,7 +30914,7 @@
           "offset": 1638
         }
       ],
-      "note": "Data List p14, MIDI Data Table <1-3>: TOTAL SIZE 668h = 1640 bytes — 104 bytes of named parameters followed by the four Free EG curve tracks."
+      "note": "Data List p14, MIDI Data Table <1-3>: TOTAL SIZE 668h = 1640 bytes \u2014 104 bytes of named parameters followed by the four Free EG curve tracks."
     },
     {
       "id": "sceneCtrl",
@@ -33030,7 +33030,7 @@
           "offset": 1941
         }
       ],
-      "note": "Bulk dump only (Data List p15, MIDI Data Table <1-6>): 796h = 1942 bytes, laid out as Voice Common, Scene 1, Scene 2, Step Seq. mm = 00...7F selects User Voice 1...128, so the address byte is the $slot variable. The Free EG curve region (offsets 104...1639) is deliberately unmapped — a captured voice is replayed byte for byte."
+      "note": "Bulk dump only (Data List p15, MIDI Data Table <1-6>): 796h = 1942 bytes, laid out as Voice Common, Scene 1, Scene 2, Step Seq. mm = 00...7F selects User Voice 1...128, so the address byte is the $slot variable. The Free EG curve region (offsets 104...1639) is deliberately unmapped \u2014 a captured voice is replayed byte for byte."
     },
     {
       "id": "userPattern",
@@ -33494,7 +33494,138 @@
           "Saturn",
           "Poptart",
           "VirtlScene"
-        ]
+        ],
+        "categories": [
+          "Co",
+          "Sq",
+          "Ba",
+          "Br",
+          "Pd",
+          "Ba",
+          "Ba",
+          "Ld",
+          "Ld",
+          "St",
+          "Sq",
+          "Ba",
+          "Se",
+          "Pd",
+          "Sc",
+          "Pf",
+          "Sq",
+          "Sq",
+          "Sq",
+          "Fx",
+          "Co",
+          "Co",
+          "Co",
+          "Co",
+          "Co",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Ba",
+          "Br",
+          "Br",
+          "Br",
+          "Br",
+          "Br",
+          "Br",
+          "Br",
+          "Br",
+          "St",
+          "St",
+          "St",
+          "St",
+          "St",
+          "Sc",
+          "Sc",
+          "Sc",
+          "Sc",
+          "Sc",
+          "Sc",
+          "Sc",
+          "Ld",
+          "Ld",
+          "Ld",
+          "Ld",
+          "Ld",
+          "Ld",
+          "Ld",
+          "Ld",
+          "Ld",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Pd",
+          "Co",
+          "Pf",
+          "Pf",
+          "Pf",
+          "Or",
+          "Or",
+          "Or",
+          "Or",
+          "Or",
+          "Pc",
+          "Pc",
+          "Pc",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Fx",
+          "Se",
+          "Se",
+          "Se",
+          "Se",
+          "Se",
+          "Sq",
+          "Sq",
+          "Sq",
+          "Sq",
+          "Sq",
+          "Sq",
+          "Sq",
+          "Sq",
+          "Sq"
+        ],
+        "note": "p2-4 Factory-set Voice List, the `Cat.` column. Two-letter codes exactly as printed: the Data List gives no legend for them, so nothing here expands them into words that would be a guess. Distinct: Ba, Br, Co, Fx, Ld, Or, Pc, Pd, Pf, Sc, Se, Sq, St."
       }
     ],
     "recall": {
@@ -33509,7 +33640,7 @@
     "confirmations": 0,
     "contributors": [],
     "importedFrom": null,
-    "note": "Transcribed from the official Yamaha AN1x Data List (MIDI Data Format). CC: full MODE2 per-parameter Control Change map (set the AN1x MIDI Control Mode to 2). SysEx parameter change F0 43 1n 5C addr3 data F7 (model 5C, no checksum): System block (00 00 00, complete), Voice Common (10 00 00: name in dump, effects/EQ/arp/free-EG config), Voice Scene 1/2 (10 10 00 / 10 11 00, full synth voice + 16-slot control matrix). Bulk dump F0 43 0n 5C bcMSB bcLSB addr3 data cs F7 with a negated 7-bit checksum (roland-7bit in this codebase; p13: the sum of byte count, address, data and the checksum itself is 0 mod 128); request F0 43 2n 5C addr3 F7. Full dump receive layouts verified for System and Scene buffers; Voice Common / Scene Ctrl / Step SEQ / User banks are request-only (their bulk-dump-only arrays, e.g. per-step Free EG data, are not transcribed). Presets: the Data List's MIDI Implementation Chart marks Bank Select (CC 0 / CC 32) as neither transmitted nor recognized, so voices are selected by Program Change alone (0...127, transmitted and recognized). The 128 factory voice names are the Data List's Factory-set Voice List. The 128 User voices are addressable only by bulk dump (11 00 00...11 7F 00) and have no Program Change of their own, so they are not modelled as a bank: PRESET/USER is a front-panel choice the AN1x does not expose over MIDI. Device number: the AN1x puts it in the LOW nibble of byte 3 and the high nibble is the substatus — 1n parameter change, 0n bulk dump, 2n dump request. The profile writes 10 / 00 / 20, i.e. n=0 (device number 1), which is what the instrument answers at its factory setting (System 0Ah defaults to \"all\"). A non-default device number needs those three bytes changed together; the engine has no way to compute them from one variable."
+    "note": "Transcribed from the official Yamaha AN1x Data List (MIDI Data Format). CC: full MODE2 per-parameter Control Change map (set the AN1x MIDI Control Mode to 2). SysEx parameter change F0 43 1n 5C addr3 data F7 (model 5C, no checksum): System block (00 00 00, complete), Voice Common (10 00 00: name in dump, effects/EQ/arp/free-EG config), Voice Scene 1/2 (10 10 00 / 10 11 00, full synth voice + 16-slot control matrix). Bulk dump F0 43 0n 5C bcMSB bcLSB addr3 data cs F7 with a negated 7-bit checksum (roland-7bit in this codebase; p13: the sum of byte count, address, data and the checksum itself is 0 mod 128); request F0 43 2n 5C addr3 F7. Full dump receive layouts verified for System and Scene buffers; Voice Common / Scene Ctrl / Step SEQ / User banks are request-only (their bulk-dump-only arrays, e.g. per-step Free EG data, are not transcribed). Presets: the Data List's MIDI Implementation Chart marks Bank Select (CC 0 / CC 32) as neither transmitted nor recognized, so voices are selected by Program Change alone (0...127, transmitted and recognized). The 128 factory voice names are the Data List's Factory-set Voice List. The 128 User voices are addressable only by bulk dump (11 00 00...11 7F 00) and have no Program Change of their own, so they are not modelled as a bank: PRESET/USER is a front-panel choice the AN1x does not expose over MIDI. Device number: the AN1x puts it in the LOW nibble of byte 3 and the high nibble is the substatus \u2014 1n parameter change, 0n bulk dump, 2n dump request. The profile writes 10 / 00 / 20, i.e. n=0 (device number 1), which is what the instrument answers at its factory setting (System 0Ah defaults to \"all\"). A non-default device number needs those three bytes changed together; the engine has no way to compute them from one variable."
   },
   "completeness": "partial"
 }

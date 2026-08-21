@@ -402,6 +402,7 @@ Your handler is passed the data directly. When there is one thing to pass, you g
 |---|---|---|---|
 | `"parameterReceived"` | `onParameterReceived(info)` | `info` | A value arrived, decoded via the DPD. info.parameter, info.value. |
 | `"dumpReceived"` | `onDumpReceived(dump)` | `dump` | A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel. |
+| `"presetChange"` | `onPresetChange(preset)` | `preset` | The current preset changed. preset.slot, preset.program, preset.name, preset.category, preset.bankId, preset.source ("device" when the instrument sent a Program Change, "panel" when recallPreset did it). |
 | `"midiIn"` | `onMidiIn(midi)` | `midi` | Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status. |
 | `"ccIn"` | `onCcIn(cc)` | `cc` | A CC arrived. cc.channel, cc.cc, cc.value. cc.channel is 0-based here, unlike sendCC and onNoteIn. |
 | `"noteIn"` | `onNoteIn(note)` | `note` | A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 counts as a note-off and arrives as onNoteOffIn instead. |
@@ -627,6 +628,27 @@ end)
 requestDump("patch", (values, info) => {
   if (info.ok) {  }
 });
+```
+
+#### `recallPreset(slot [, opts])`
+
+Recall a preset by slot, using the action the profile declares — a Program Change, a Bank Select pair plus a Program Change, or a SysEx template. Returns { ok, error, slot, name, category, messages }. The slot is the device-global number the profile's banks partition, not a program number: on a machine whose second bank starts at 64, slot 64 is that bank's first preset whatever program number it maps to.
+
+```lua
+recallPreset(0)
+```
+
+#### `preset([role])`
+
+What is loaded now: { slot, program, name, category, bankId, bankLabel, writable, source }. Slot is -1 until something says otherwise — a synth does not announce its patch on connect and almost none can be asked, so this reports what has been observed (a Program Change arriving, or a recallPreset going out) rather than a reading of the instrument.
+
+```lua
+-- Lua
+local p = preset()
+```
+```js
+// JavaScript
+const p = preset();
 ```
 
 #### `applyDump(bytes)`

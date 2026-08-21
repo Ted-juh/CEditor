@@ -24,11 +24,22 @@
       "name": "Filter Cutoff",
       "group": "Filter",
       "type": "integer",
-      "range": { "min": 0, "max": 127 },
+      "range": {
+        "min": 0,
+        "max": 127
+      },
       "default": 64,
-      "display": { "mode": "number", "unit": "", "shortLabel": "Cutoff" },
-      "normalization": { "mode": "linear" },
-      "encoding": { "type": "u7" },
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "Cutoff"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
       "access": {
         "canRead": true,
         "canWrite": true,
@@ -42,18 +53,31 @@
         "sendFinalOnRelease": true
       },
       "messageRecipe": "cutoffNrpn7",
-      "ui": { "preferredComponent": "Slider" }
+      "ui": {
+        "preferredComponent": "Slider"
+      }
     },
     {
       "id": "osc.pitch",
       "name": "Oscillator Pitch",
       "group": "Oscillator",
       "type": "integer",
-      "range": { "min": 0, "max": 16383 },
+      "range": {
+        "min": 0,
+        "max": 16383
+      },
       "default": 8192,
-      "display": { "mode": "number", "unit": "", "shortLabel": "Pitch" },
-      "normalization": { "mode": "linear" },
-      "encoding": { "type": "u14-msb-lsb" },
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "Pitch"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u14-msb-lsb"
+      },
       "access": {
         "canRead": true,
         "canWrite": true,
@@ -67,7 +91,66 @@
         "sendFinalOnRelease": true
       },
       "messageRecipe": "pitchNrpn14",
-      "ui": { "preferredComponent": "Slider" }
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "global.bendRange",
+      "name": "Pitch Bend Range",
+      "group": "Global",
+      "messageRecipe": "bendRangeRpn7",
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 24
+      },
+      "default": 2,
+      "display": {
+        "mode": "number",
+        "unit": "semitones",
+        "shortLabel": "bendRange"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      }
+    },
+    {
+      "id": "global.fineTune",
+      "name": "Channel Fine Tuning",
+      "group": "Global",
+      "messageRecipe": "fineTuneRpn14",
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "type": "integer",
+      "range": {
+        "min": 0,
+        "max": 16383
+      },
+      "default": 8192,
+      "display": {
+        "mode": "number",
+        "shortLabel": "fineTune"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u14-msb-lsb"
+      }
     }
   ],
   "messageRecipes": [
@@ -91,6 +174,26 @@
       "valueResolution": 14,
       "value": "$encodedValue",
       "nullAfterSend": false
+    },
+    {
+      "id": "bendRangeRpn7",
+      "kind": "rpn",
+      "channel": "$channel",
+      "parameterMsb": 0,
+      "parameterLsb": 0,
+      "valueResolution": 7,
+      "value": "$encodedValue",
+      "nullAfterSend": true
+    },
+    {
+      "id": "fineTuneRpn14",
+      "kind": "rpn",
+      "channel": "$channel",
+      "parameterMsb": 0,
+      "parameterLsb": 1,
+      "valueResolution": 14,
+      "value": "$encodedValue",
+      "nullAfterSend": false
     }
   ],
   "tests": [
@@ -105,6 +208,18 @@
       "parameter": "osc.pitch",
       "value": 8192,
       "expectedHex": "B0 63 02\nB0 62 10\nB0 06 40\nB0 26 00"
+    },
+    {
+      "name": "Pitch Bend Range 2 RPN7 (101/100, then the null)",
+      "parameter": "global.bendRange",
+      "value": 2,
+      "expectedHex": "B0 65 00\nB0 64 00\nB0 06 02\nB0 65 7F\nB0 64 7F"
+    },
+    {
+      "name": "Channel Fine Tuning centre RPN14",
+      "parameter": "global.fineTune",
+      "value": 8192,
+      "expectedHex": "B0 65 00\nB0 64 01\nB0 06 40\nB0 26 00"
     }
   ],
   "sources": [

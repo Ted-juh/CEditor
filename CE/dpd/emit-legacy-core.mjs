@@ -100,10 +100,17 @@ export function buildDumpDefinitions(resolved) {
 // the top-level `requests` array with `response: { kind: "bulkDump", dump: <id> }`, and until now
 // only the preset name-scan produced one. A block the profile can parse but cannot ask for is a
 // block the user can only capture by pressing buttons on the instrument.
-export function buildDumpRequests(resolved, modelBytes) {
+export function buildDumpRequests(resolved, modelBytes, emittedDumpIds = null) {
   const shapes = resolved.messageShapes ?? [];
   const out = [];
   for (const d of resolved.dumps ?? []) {
+    // ONLY for a dump that actually became a dumpDefinition. A dump declared with just spans and a
+    // requestShape is a placeholder whose byte layout is still in somebody's manual, and
+    // buildDumpDefinitions rightly emits nothing for it — but this used to emit a request pointing
+    // at it anyway. The engine then refused the whole profile for an unknown dump reference and
+    // said nothing, so the device simply was not in the list. The GAIA, whose `patch` dump is
+    // exactly that placeholder, was one regeneration away from disappearing.
+    if (emittedDumpIds && !emittedDumpIds.has(d.id)) continue;
     const shape = shapes.find((s) => s.id === d.requestShape);
     if (!shape || out.some((r) => r.id === shape.id)) continue;
     out.push({
@@ -195,6 +202,7 @@ function legacyParam(p) {
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.
   out.messageRecipe = p.wires?.write?.msg === 'cc' ? ('cc' + p.wires.write.cc)
     : p.wires?.write?.msg === 'nrpn' ? ('nrpn' + String(p.wires.write.nrpn ?? '').replace(/\s+/g, ''))
+    : p.wires?.write?.msg === 'rpn' ? ('rpn' + String(p.wires.write.rpn ?? '').replace(/\s+/g, ''))
     : (p.wires?.write?.msg ?? 'dt1');
   // An rxLive wire is the message the instrument SENDS when its own control moves, which need not be
   // the one the editor writes: a GAIA's filter knob is written as a DT1 to an address and transmitted
@@ -240,14 +248,27 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   for (const cc of ccControllers) {
     messageRecipes.push({ id: `cc${cc}`, kind: 'cc', channel: '$channel', controller: cc, value: '$encodedValue' });
   }
-  // one NRPN recipe per distinct NRPN parameter number (the engine handles legacy nrpn recipes).
-  const nrpnSeen = new Set();
-  for (const p of params) {
-    const wr = p.wires?.write;
-    if (wr?.msg !== 'nrpn' || !wr.nrpn || nrpnSeen.has(wr.nrpn)) continue;
-    nrpnSeen.add(wr.nrpn);
-    const [msb, lsb] = wr.nrpn.trim().split(/\s+/).map((h) => parseInt(h, 16));
-    messageRecipes.push({ id: 'nrpn' + wr.nrpn.replace(/\s+/g, ''), kind: 'nrpn', channel: '$channel', parameterMsb: msb, parameterLsb: lsb, valueResolution: (wr.size ?? 1) >= 2 ? 14 : 7, value: '$encodedValue' });
+  // One recipe per distinct parameter number, for both flavours. NRPN and RPN differ only in the
+  // controller pair that selects the number — 99/98 against 101/100 — which is the engine's business
+  // rather than the emitter's, so the two loops are the same loop with a different key.
+  for (const flavour of ['nrpn', 'rpn']) {
+    const seen = new Set();
+    for (const p of params) {
+      const wr = p.wires?.write;
+      const number = wr?.[flavour];
+      if (wr?.msg !== flavour || !number || seen.has(number)) continue;
+      seen.add(number);
+      const [msb, lsb] = number.trim().split(/\s+/).map((h) => parseInt(h, 16));
+      messageRecipes.push({
+        id: flavour + number.replace(/\s+/g, ''),
+        kind: flavour,
+        channel: '$channel',
+        parameterMsb: msb,
+        parameterLsb: lsb,
+        valueResolution: (wr.size ?? 1) >= 2 ? 14 : 7,
+        value: '$encodedValue',
+      });
+    }
   }
 
   const legacy = {
@@ -318,7 +339,10 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   if (dumpDefinitions) legacy.dumpDefinitions = dumpDefinitions;
   if (notes.length && log) for (const n of notes) log('[dump] ' + n);
 
-  const dumpRequests = buildDumpRequests(resolved, toBytes(resolved.modelId));
+  // Gated on what dumpDefinitions actually emitted — a request whose response names a dump the
+  // profile does not carry makes the engine refuse the profile outright.
+  const emittedDumpIds = new Set((dumpDefinitions ?? []).map((d) => d.id));
+  const dumpRequests = buildDumpRequests(resolved, toBytes(resolved.modelId), emittedDumpIds);
   if (dumpRequests.length) (legacy.requests ??= []).push(...dumpRequests);
 
   // Preset model: carried through verbatim (the librarian/selector reads it), plus the legacy

@@ -45,6 +45,7 @@ export const INSERT_CATEGORIES = [
       { type: 'Range',           label: 'Range' },
       { type: 'Number',          label: 'Number' },
       { type: 'Crossfader',      label: 'Crossfader' },
+      { type: 'Numpad',          label: 'Numpad' },
       { type: 'Ribbon',          label: 'Ribbon / Wheel' },
       { type: 'Macro',           label: 'Macro' },
       { type: 'VectorJoystick',  label: 'Vector Joystick' },

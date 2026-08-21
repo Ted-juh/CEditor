@@ -655,7 +655,7 @@
       "address": "10 00 02 00",
       "display": {
         "mode": "choice",
-        "shortLabel": "OSC Wave"
+        "shortLabel": "OSC Wave (Tone 2)"
       },
       "normalization": {
         "mode": "choiceIndex"
@@ -716,7 +716,7 @@
       "address": "10 00 02 0A",
       "display": {
         "mode": "choice",
-        "shortLabel": "Filter Mode"
+        "shortLabel": "Filter Mode (Tone 2)"
       },
       "normalization": {
         "mode": "choiceIndex"
@@ -762,7 +762,7 @@
       "address": "10 00 02 0B",
       "display": {
         "mode": "choice",
-        "shortLabel": "Filter Slope"
+        "shortLabel": "Filter Slope (Tone 2)"
       },
       "normalization": {
         "mode": "choiceIndex"
@@ -800,7 +800,7 @@
       "address": "10 00 02 0C",
       "display": {
         "mode": "number",
-        "shortLabel": "Cutoff"
+        "shortLabel": "Cutoff (Tone 2)"
       },
       "normalization": {
         "mode": "linear"
@@ -844,7 +844,7 @@
       "address": "10 00 02 0D",
       "display": {
         "mode": "number",
-        "shortLabel": "Cutoff Keyfollow"
+        "shortLabel": "Cutoff Keyfollow (Tone 2)"
       },
       "normalization": {
         "mode": "linear"
@@ -882,7 +882,7 @@
       "address": "10 00 02 0E",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Velocity Sens"
+        "shortLabel": "Env Velocity Sens (Tone 2)"
       },
       "normalization": {
         "mode": "linear"
@@ -920,7 +920,7 @@
       "address": "10 00 02 0F",
       "display": {
         "mode": "number",
-        "shortLabel": "Resonance"
+        "shortLabel": "Resonance (Tone 2)"
       },
       "normalization": {
         "mode": "linear"
@@ -958,7 +958,7 @@
       "address": "10 00 02 10",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Attack"
+        "shortLabel": "Env Attack (Tone 2)"
       },
       "normalization": {
         "mode": "linear"
@@ -996,7 +996,7 @@
       "address": "10 00 02 11",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Decay"
+        "shortLabel": "Env Decay (Tone 2)"
       },
       "normalization": {
         "mode": "linear"
@@ -1034,7 +1034,7 @@
       "address": "10 00 02 12",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Sustain"
+        "shortLabel": "Env Sustain (Tone 2)"
       },
       "normalization": {
         "mode": "linear"
@@ -1072,7 +1072,7 @@
       "address": "10 00 02 13",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Release"
+        "shortLabel": "Env Release (Tone 2)"
       },
       "normalization": {
         "mode": "linear"
@@ -1110,7 +1110,7 @@
       "address": "10 00 02 14",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Depth"
+        "shortLabel": "Env Depth (Tone 2)"
       },
       "normalization": {
         "mode": "linear"
@@ -1176,7 +1176,7 @@
       "address": "10 00 02 1C",
       "display": {
         "mode": "choice",
-        "shortLabel": "LFO Shape"
+        "shortLabel": "LFO Shape (Tone 2)"
       },
       "normalization": {
         "mode": "choiceIndex"
@@ -1247,7 +1247,7 @@
       "address": "10 00 03 00",
       "display": {
         "mode": "choice",
-        "shortLabel": "OSC Wave"
+        "shortLabel": "OSC Wave (Tone 3)"
       },
       "normalization": {
         "mode": "choiceIndex"
@@ -1308,7 +1308,7 @@
       "address": "10 00 03 0A",
       "display": {
         "mode": "choice",
-        "shortLabel": "Filter Mode"
+        "shortLabel": "Filter Mode (Tone 3)"
       },
       "normalization": {
         "mode": "choiceIndex"
@@ -1354,7 +1354,7 @@
       "address": "10 00 03 0B",
       "display": {
         "mode": "choice",
-        "shortLabel": "Filter Slope"
+        "shortLabel": "Filter Slope (Tone 3)"
       },
       "normalization": {
         "mode": "choiceIndex"
@@ -1392,7 +1392,7 @@
       "address": "10 00 03 0C",
       "display": {
         "mode": "number",
-        "shortLabel": "Cutoff"
+        "shortLabel": "Cutoff (Tone 3)"
       },
       "normalization": {
         "mode": "linear"
@@ -1436,7 +1436,7 @@
       "address": "10 00 03 0D",
       "display": {
         "mode": "number",
-        "shortLabel": "Cutoff Keyfollow"
+        "shortLabel": "Cutoff Keyfollow (Tone 3)"
       },
       "normalization": {
         "mode": "linear"
@@ -1474,7 +1474,7 @@
       "address": "10 00 03 0E",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Velocity Sens"
+        "shortLabel": "Env Velocity Sens (Tone 3)"
       },
       "normalization": {
         "mode": "linear"
@@ -1512,7 +1512,7 @@
       "address": "10 00 03 0F",
       "display": {
         "mode": "number",
-        "shortLabel": "Resonance"
+        "shortLabel": "Resonance (Tone 3)"
       },
       "normalization": {
         "mode": "linear"
@@ -1550,7 +1550,7 @@
       "address": "10 00 03 10",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Attack"
+        "shortLabel": "Env Attack (Tone 3)"
       },
       "normalization": {
         "mode": "linear"
@@ -1588,7 +1588,7 @@
       "address": "10 00 03 11",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Decay"
+        "shortLabel": "Env Decay (Tone 3)"
       },
       "normalization": {
         "mode": "linear"
@@ -1626,7 +1626,7 @@
       "address": "10 00 03 12",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Sustain"
+        "shortLabel": "Env Sustain (Tone 3)"
       },
       "normalization": {
         "mode": "linear"
@@ -1664,7 +1664,7 @@
       "address": "10 00 03 13",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Release"
+        "shortLabel": "Env Release (Tone 3)"
       },
       "normalization": {
         "mode": "linear"
@@ -1702,7 +1702,7 @@
       "address": "10 00 03 14",
       "display": {
         "mode": "number",
-        "shortLabel": "Env Depth"
+        "shortLabel": "Env Depth (Tone 3)"
       },
       "normalization": {
         "mode": "linear"
@@ -1768,7 +1768,7 @@
       "address": "10 00 03 1C",
       "display": {
         "mode": "choice",
-        "shortLabel": "LFO Shape"
+        "shortLabel": "LFO Shape (Tone 3)"
       },
       "normalization": {
         "mode": "choiceIndex"

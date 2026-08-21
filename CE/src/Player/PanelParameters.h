@@ -24,6 +24,25 @@ struct PanelParameter
     // The synth parameter this drives (the control's device binding) — lets the processor send MIDI
     // for automation with the plugin window closed. Empty when the control isn't device-bound.
     juce::String deviceRole, deviceParameterId;
+
+    // OR the raw MIDI message it sends, for a control bound to a CC / aftertouch / NRPN / RPN /
+    // program change rather than to a profile parameter. Those automated fine in the DAW and sent
+    // NOTHING with the window closed, because the send loop skipped anything with an empty
+    // deviceParameterId — silent, and indistinguishable from a cable problem.
+    //
+    // Not a pre-built byte string: the value is not known until the host moves the parameter, so the
+    // bytes are built at send time from these fields (see PluginProcessor::sendParamRawMidi).
+    struct MidiControl
+    {
+        juce::String kind;          // cc | aftertouch | nrpn | rpn | programChange
+        int channel = 0;            // 0 = the device's own channel; 1-16 pins it
+        int controller = 0;         // cc only
+        int parameterMsb = 0, parameterLsb = 0;   // nrpn / rpn only
+        int valueResolution = 7;    // 7 or 14, nrpn / rpn only
+        bool nullAfterSend = false; // nrpn / rpn only
+    };
+    bool hasMidiControl = false;
+    MidiControl midiControl;
 };
 
 /** Read `exportParameters` from a .cepanel file. Returns an empty list if absent/malformed. */
@@ -59,6 +78,21 @@ inline juce::Array<PanelParameter> parseExportParameters (const juce::File& pane
 
             p.deviceRole = entry.getProperty ("deviceRole", "").toString();
             p.deviceParameterId = entry.getProperty ("deviceParameterId", "").toString();
+
+            // The presence of the object is the flag — exportParameters.js omits it entirely rather
+            // than writing an empty one, so a panel exported before this existed reads as "none".
+            if (auto* midi = entry.getProperty ("midiControl", juce::var()).getDynamicObject())
+            {
+                p.hasMidiControl = true;
+                p.midiControl.kind = midi->getProperty ("kind").toString();
+                p.midiControl.channel = static_cast<int> (midi->getProperty ("channel"));
+                p.midiControl.controller = static_cast<int> (midi->getProperty ("controller"));
+                p.midiControl.parameterMsb = static_cast<int> (midi->getProperty ("parameterMsb"));
+                p.midiControl.parameterLsb = static_cast<int> (midi->getProperty ("parameterLsb"));
+                const auto resolution = static_cast<int> (midi->getProperty ("valueResolution"));
+                p.midiControl.valueResolution = resolution == 14 ? 14 : 7;
+                p.midiControl.nullAfterSend = midi->getProperty ("nullAfterSend").equals (juce::var (true));
+            }
 
             params.add (p);
         }

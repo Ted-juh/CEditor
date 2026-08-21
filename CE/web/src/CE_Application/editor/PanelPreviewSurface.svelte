@@ -54,6 +54,7 @@
     crossfaderConfig, crossfaderMix, crossfaderGeometry, crossfaderMixFromPx,
     crossfaderDetent, crossfaderGlide,
   } from '../utils/crossfaderLayout.js';
+  import { numpadConfig, numpadDisplayText, numpadKeyAt, numpadPress } from '../utils/numpadLayout.js';
   import {
     ribbonConfig, ribbonValue, ribbonVertical, ribbonGeometry, ribbonValueFromPx,
     ribbonSnap, ribbonReturnTarget, ribbonGlide,
@@ -457,7 +458,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))));
+    return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1389,6 +1390,65 @@
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
+    return true;
+  }
+
+  // --- Numpad: type a number, commit it -----------------------------------
+  //
+  // A press builds a PENDING entry in the session and only Enter writes Value.value. Typing 1, 2, 7
+  // on a pad bound to a preset must not recall 1, then 12, then 127 on the way past — see
+  // numpadLayout.js. The rules live there; this is the pointer half.
+  function isNumpadControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Numpad';
+  }
+  function numpadControlWith(control, patch) {
+    return { ...control, _children: { ...control._children, Numpad: { ...control._children?.Numpad, ...patch } } };
+  }
+  function applyNumpadValueSource(control, resolved) {
+    if (!isNumpadControl(control)) return resolved;
+    const sess = sessionFor(control);
+    if (!sess || (sess.numpadPending === undefined && sess.numpadDown === undefined
+      && sess.numpadRejected === undefined)) return resolved;
+    const base = resolved?.control ?? control;
+    const numpad = base?._children?.Numpad;
+    if (!numpad) return resolved;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Numpad: {
+      ...numpad,
+      __pending: sess.numpadPending ?? '',
+      __down: sess.numpadDown ?? '',
+      __rejected: sess.numpadRejected ?? '',
+    } } } };
+  }
+  function handleNumpadPointerDown(control, localPoint) {
+    if (!isNumpadControl(control)) return false;
+    const cfg = numpadConfig(control);
+    if (cfg.editable === false) return false;
+    const t = control?._children?.Transform ?? {};
+    const key = numpadKeyAt(localPoint.x, localPoint.y, numberOr(t.width, 0), numberOr(t.height, 0), cfg);
+    if (!key) return false;
+
+    const id = getControlId(control);
+    const pending = String(sessionFor(control)?.numpadPending ?? '');
+    const result = numpadPress(key, pending, cfg);
+
+    patchControlSession(id, {
+      numpadPending: result.pending,
+      numpadDown: key.id,
+      numpadRejected: result.rejected,
+    });
+
+    if (result.commit !== null) {
+      // The one place a value leaves this component. Committed to the document so a binding sends
+      // it, and announced so a script can act on the entry rather than on every keypress.
+      updateControlProperty(id, 'Value.value', result.commit);
+      emitControlPortFanout(numpadControlWith(control, { __pending: '' }), 'commit');
+      raiseComponent(control, 'onEntered', { value: result.commit });
+    }
+    return true;
+  }
+  function endNumpadPress(control) {
+    if (!isNumpadControl(control)) return false;
+    patchControlSession(getControlId(control), { numpadDown: '' });
     return true;
   }
 
@@ -6155,6 +6215,8 @@
     handleJoystickPointerDown(control, pointerDownLocal);
     // Crossfader: jump the handle to the click point + start dragging.
     handleCrossfaderPointerDown(control, pointerDownLocal);
+    // Numpad: press a key. Digits build a pending entry; only Enter commits a value.
+    handleNumpadPointerDown(control, pointerDownLocal);
     // Ribbon: absolute touch — jump the value to the finger + start tracking.
     handleRibbonPointerDown(control, pointerDownLocal);
     // Macro: grab the knob for a vertical drag.
@@ -6433,6 +6495,10 @@
         patchControlSession(activeId, { xfadeMix: undefined });
       }
     }
+
+    // Release a numpad key: only the pressed-key highlight, since the value (if any) was already
+    // committed on the press. A keypad answers on the way down.
+    if (activeControl) endNumpadPress(activeControl);
 
     // Release a ribbon: touch-off gate + latch / snap / glide to rest.
     if (ribbonDrag && activeControl) {

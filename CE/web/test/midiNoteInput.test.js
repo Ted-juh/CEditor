@@ -147,7 +147,12 @@ test('expression events: CC, channel aftertouch, note velocity', () => {
   // reducer so stale per-note pressure gets dropped
   assert.deepEqual(expressionEvent([0xB0, 123, 0]), { kind: 'pressureClearAll', channel: 1 });
   assert.deepEqual(expressionEvent([0xB0, 120, 0]), { kind: 'pressureClearAll', channel: 1 });
-  assert.equal(expressionEvent([0xB0, 121, 0]), null);        // other channel-mode: ignored
+  // 121 is Reset All Controllers. It gets its OWN kind rather than being dropped, so it can reach
+  // the NRPN machine and clear the selection (nrpn.js) — and rather than a `cc` event, so it stays
+  // inert in the router, the learn buckets and matchesMidiControl, which all gate on kind.
+  assert.deepEqual(expressionEvent([0xB0, 121, 0]), { kind: 'controllerReset', channel: 1 });
+  assert.equal(expressionEvent([0xB0, 122, 0]), null);        // other channel-mode: still ignored
+  assert.equal(expressionEvent([0xB0, 124, 0]), null);
   // Pitch bend USED to return null here — it wasn't a router source. The Zone
   // Splitter needs to forward it, so it's parsed now, with the 14-bit value
   // kept intact alongside a 0-127 scaling. It still reaches no expression

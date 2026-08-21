@@ -36,7 +36,7 @@ export const GROUPS = [
   },
   {
     title: 'Selection',
-    types: ['Combobox', 'Listbox'],
+    types: ['Combobox', 'Listbox', 'Numpad'],
   },
   {
     title: 'Continuous controls',
