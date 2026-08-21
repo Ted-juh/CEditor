@@ -962,6 +962,24 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Numpad: {
+    // Value + DeviceBindings, so a typed number binds like any other value — to a device parameter,
+    // or through a script to a preset recall. Nothing about Program Change lives in the component.
+    sections: ['Background', 'Numpad', 'Value', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Numpad'),
+    defaultOverrides: {
+      // Three columns of keys plus a readout: taller than it is wide, like the thing it imitates.
+      Transform: { width: 168, height: 232 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   Crossfader: {
     sections: ['Background', 'Crossfader', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Crossfader'),

@@ -361,12 +361,18 @@
         "programBase": { "type": "integer", "minimum": 0, "maximum": 127, "description": "Program Change number of the bank's FIRST slot (PC = programBase + slot - startSlot). Default 0." },
         "bankMsb": { "type": "integer", "minimum": 0, "maximum": 127, "description": "CC0 Bank Select MSB selecting this bank (recall kind 'bankPc')." },
         "bankLsb": { "type": "integer", "minimum": 0, "maximum": 127, "description": "CC32 Bank Select LSB selecting this bank (recall kind 'bankPc')." },
-        "category": { "type": "string", "description": "Optional genre/category tag for the whole bank." },
+        "category": { "type": "string", "description": "Optional genre/category tag for the whole bank. A per-slot entry in `categories` beats it." },
+        "categories": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional per-slot category tag; index = slot - startSlot, exactly like `names`. Length must not exceed slotCount. A blank entry falls back to the bank's own `category`. Verbatim from the device's own documentation — the AN1x prints two-letter codes (Ba, Pd, Sq) in its Voice List and gives no legend for them, so the codes are what is stored rather than an invented expansion."
+        },
         "names": {
           "type": "array",
           "items": { "type": "string" },
           "description": "Optional shipped factory-name catalog; index = slot - startSlot. Length must not exceed slotCount."
-        }
+        },
+        "note": { "type": "string", "description": "Free-text provenance for this bank — which page of which document the names or categories were transcribed from, and anything the document leaves undefined." }
       }
     },
 

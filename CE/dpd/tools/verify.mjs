@@ -177,6 +177,23 @@ section('legacy emit — device-agnostic');
   // emitter used to look only for the legacy engine's (familyCode) — so the one profile that could
   // answer a Test button never got an identity block. The engine compares only declared fields, so
   // manufacturer + family without a member is a legal, matchable identity.
+  // A request whose response names a dump the profile does not carry makes the engine refuse the
+  // WHOLE profile, and say nothing — the device simply is not in the list. The GAIA's `patch` dump is
+  // a placeholder with no byte layout, so buildDumpDefinitions rightly emits nothing for it; the
+  // request builder used to emit a request pointing at it anyway.
+  {
+    for (const id of ['roland.gaia', 'yamaha.an1x', 'roland', 'yamaha', 'generic.cc']) {
+      const legacy = buildLegacyProfile(resolveProfile(id), { legacyId: id.replace(/\./g, '-') + '-dpd' });
+      const dumps = new Set((legacy.dumpDefinitions ?? []).map((d) => d.id));
+      for (const request of legacy.requests ?? []) {
+        const wanted = request.response?.dump;
+        if (!wanted) continue;
+        ok(dumps.has(wanted),
+          `${id}: request "${request.id}" answers with dump "${wanted}", which the profile does not define`);
+      }
+    }
+  }
+
   {
     const an1x = buildLegacyProfile(resolveProfile('yamaha.an1x'), { legacyId: 'yamaha-an1x-dpd' });
     ok(an1x.identity !== undefined, 'AN1x identity emitted from schema keys');

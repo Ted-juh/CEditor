@@ -287,12 +287,16 @@
       {#if statusLine}<span class="lm">{statusLine}</span>{/if}
     </div>
     {#if browserSlots.length}
-      <div class="dlhead browsegrid"><span>slot</span><span>bank</span><span>name</span><span>source</span><span></span></div>
+      <div class="dlhead browsegrid"><span>slot</span><span>bank</span><span>cat</span><span>name</span><span>source</span><span></span></div>
       <div class="browselist">
         {#each browserSlots as row (row.slot)}
           <div class="dlrow browsegrid">
             <span class="lm">{row.slot}</span>
             <span class="lm">{row.info.bankLabel || row.info.bankId}{row.info.writable ? '' : ' 🔒'}</span>
+            <!-- The device's own category tag for THIS slot, falling back to the bank's. Shown as
+                 the device prints it: the AN1x's Voice List gives two-letter codes and no legend,
+                 so expanding them here would be inventing words the instrument never uses. -->
+            <span class="lm cat">{row.info.category || ''}</span>
             <span>{row.name || '—'}</span>
             <span class="lm">{row.source === 'none' ? '' : row.source}</span>
             <button class="asbtn" onclick={() => recall(row.slot)} title="Send the recall action for this slot">Recall</button>
@@ -350,7 +354,10 @@
   .bs-name { font-weight: 600; font-size: 12px; }
   .bs-range { font-size: 11px; opacity: 0.65; }
   .presetgrid { display: grid; grid-template-columns: 1fr 1.2fr 90px 26px 64px 64px 64px 56px 56px 28px; gap: 6px; align-items: center; }
-  .browsegrid { display: grid; grid-template-columns: 56px 140px 1fr 80px 70px; gap: 6px; align-items: center; }
+  .browsegrid { display: grid; grid-template-columns: 56px 140px 44px 1fr 80px 70px; gap: 6px; align-items: center; }
+  /* The category code sits between the bank and the name, narrow because it IS narrow: the
+     devices that ship one print two or three letters. */
+  .cat { opacity: 0.75; }
   .browselist { max-height: 300px; overflow-y: auto; }
   .librow { display: grid; grid-template-columns: 56px 1fr 110px 70px 70px 28px; gap: 6px; align-items: center; }
   .recallrow { display: flex; gap: 10px; align-items: center; padding: 8px 10px; flex-wrap: wrap; }

@@ -37,6 +37,7 @@ export const EXEMPT = {
   Phrase: 'ditto', Setlist: 'ditto', Harmoniser: 'ditto', Recorder: 'ditto', SplitZone: 'ditto',
   Panic: 'ditto', Transport: 'ditto', Constraint: 'ditto', Kinetic: 'ditto', Orbit: 'ditto',
   Ribbon: 'ditto', Crossfader: 'ditto', Joystick: 'ditto', Matrix: 'ditto', Envelope: 'ditto',
+  Numpad: 'ditto',
 
   // Custom-component authoring sections. These describe a component being *designed*, not one
   // being used, and they only mean anything inside a package. QA-07 instantiates real packages

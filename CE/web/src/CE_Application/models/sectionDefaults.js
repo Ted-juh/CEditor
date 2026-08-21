@@ -1660,6 +1660,54 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /**
+   * Numpad — type a number, commit it.
+   *
+   * WHAT IT IS FOR. Selecting a preset, a program, a bank slot: a value you KNOW rather than one you
+   * hunt for. A knob on a 0..127 range is 128 indistinguishable positions and a combobox of 128 rows
+   * is a scroll; on hardware this is a keypad, and the reason is that "call up 47" is one gesture.
+   *
+   * DEVICE-AGNOSTIC ON PURPOSE. It emits a NUMBER through Value, so what it means is whatever it is
+   * bound to — a device parameter, a preset slot, a script. Nothing here knows about Program Change
+   * or Bank Select; a profile's own preset model already says how a slot is recalled, and teaching
+   * this component a second opinion about that is how the two start disagreeing.
+   *
+   * COMMIT IS EXPLICIT, which is the whole design. Typing 1, then 2, then 7 must not recall preset
+   * 1, then 12, then 127 on the way past — three patch changes for one intended change, two of them
+   * wrong, and on a real synth audible. So digits build a PENDING string and `Value.value` only
+   * moves on Enter. `commitOnLength` exists for the fixed-width case (a 3-digit machine where 047 is
+   * unambiguous) and is off by default.
+   */
+  Numpad: {
+    _type: 'Numpad',
+    min: 0,
+    max: 127,
+    digits: 3,                    // widest entry accepted; also the readout's width
+    // Commit as soon as `digits` have been typed, rather than waiting for Enter. Off by default:
+    // a machine numbered 1..128 cannot be entered blind at a fixed width.
+    commitOnLength: false,
+    // What the pad shows before anything is typed, and what Clear returns to. 'value' echoes the
+    // committed value, which is what a hardware display does.
+    placeholder: 'value',         // value | blank
+    showDisplay: true,
+    showClear: true,
+    showEnter: true,
+    // Offset between what is TYPED and what is emitted. A machine whose front panel calls its first
+    // preset 1 while the wire calls it 0 is the common case, and getting this wrong is an off-by-one
+    // on every recall.
+    displayOffset: 0,
+    editable: true,
+    gap: 4,
+    // Colours.
+    keyColour: 'FF1B1B1B',
+    keyDownColour: 'FF2E2E2E',
+    keyLabelColour: 'FFE8E8E8',
+    actionColour: 'FF243040',
+    displayColour: 'FF0B0B0B',
+    displayTextColour: 'FF7FD8B4',
+    borderColour: 'FF000000',
+  },
+
   /** Crossfader — a 1-D A/B blend with a curve law + centre detent. */
   Crossfader: {
     _type: 'Crossfader',

@@ -976,7 +976,12 @@ export function presetSlotInfo(profile, slot) {
     writable: bank.writable != null ? bank.writable === true : role === 'user',
     program: clampInt(Number(bank.programBase ?? 0) + index, 0, 127),
     catalogName: Array.isArray(bank.names) ? String(bank.names[index] ?? '') : '',
-    category: String(bank.category ?? ''),
+    // Per slot, falling back to the bank's own tag. `categories` is indexed the same way `names`
+    // is — slot - startSlot — so a bank can carry one tag for all of it, a tag per slot, or a
+    // per-slot list with gaps the bank tag fills.
+    category: String(
+      (Array.isArray(bank.categories) ? bank.categories[index] : '') || bank.category || '',
+    ),
     inBank: true,
   };
 }

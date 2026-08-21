@@ -205,6 +205,13 @@ export const DEFAULT_COMPONENT_PORTS = {
     { id: 'value', label: 'Value', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
     { id: 'touch', label: 'Touch gate', accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
   ],
+  Numpad: [
+    // The committed number, and a pulse when it commits. `value` is an INTEGER port: a preset slot
+    // is not a fraction, and offering it as normalized would invite a 0..1 binding that quietly
+    // rounds every entry to the same handful of slots.
+    { id: 'value', label: 'Value', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT], defaultBindingMode: 'continuous' },
+    { id: 'entered', label: 'Entered', accepts: [PARAMETER_TYPES.BOOLEAN], defaultBindingMode: 'trigger' },
+  ],
   Crossfader: [
     { id: 'a', label: 'Gain A', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
     { id: 'b', label: 'Gain B', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },

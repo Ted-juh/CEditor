@@ -23,6 +23,7 @@
   import Grid2x2 from 'lucide-svelte/icons/grid-2x2';
   import Crosshair from 'lucide-svelte/icons/crosshair';
   import ArrowLeftRight from 'lucide-svelte/icons/arrow-left-right';
+  import Hash from 'lucide-svelte/icons/hash';
   import SlidersVertical from 'lucide-svelte/icons/sliders-vertical';
   import CircleDashed from 'lucide-svelte/icons/circle-dashed';
   import Orbit from 'lucide-svelte/icons/orbit';
@@ -191,6 +192,7 @@
     { id: 'matrix',     icon: Grid2x2,       label: 'Matrix',     section: 'Matrix' },
     { id: 'joystick',   icon: Crosshair,     label: 'Joystick',   section: 'Joystick' },
     { id: 'crossfader', icon: ArrowLeftRight, label: 'Crossfader', section: 'Crossfader' },
+    { id: 'numpad', icon: Hash, label: 'Numpad', section: 'Numpad' },
     { id: 'ribbon',     icon: SlidersVertical, label: 'Ribbon',    section: 'Ribbon' },
     { id: 'macro',      icon: CircleDashed,  label: 'Macro',      section: 'Macro' },
     { id: 'orbit',      icon: Orbit,         label: 'Orbit',      section: 'Orbit' },

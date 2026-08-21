@@ -100,10 +100,17 @@ export function buildDumpDefinitions(resolved) {
 // the top-level `requests` array with `response: { kind: "bulkDump", dump: <id> }`, and until now
 // only the preset name-scan produced one. A block the profile can parse but cannot ask for is a
 // block the user can only capture by pressing buttons on the instrument.
-export function buildDumpRequests(resolved, modelBytes) {
+export function buildDumpRequests(resolved, modelBytes, emittedDumpIds = null) {
   const shapes = resolved.messageShapes ?? [];
   const out = [];
   for (const d of resolved.dumps ?? []) {
+    // ONLY for a dump that actually became a dumpDefinition. A dump declared with just spans and a
+    // requestShape is a placeholder whose byte layout is still in somebody's manual, and
+    // buildDumpDefinitions rightly emits nothing for it — but this used to emit a request pointing
+    // at it anyway. The engine then refused the whole profile for an unknown dump reference and
+    // said nothing, so the device simply was not in the list. The GAIA, whose `patch` dump is
+    // exactly that placeholder, was one regeneration away from disappearing.
+    if (emittedDumpIds && !emittedDumpIds.has(d.id)) continue;
     const shape = shapes.find((s) => s.id === d.requestShape);
     if (!shape || out.some((r) => r.id === shape.id)) continue;
     out.push({
@@ -332,7 +339,10 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
   if (dumpDefinitions) legacy.dumpDefinitions = dumpDefinitions;
   if (notes.length && log) for (const n of notes) log('[dump] ' + n);
 
-  const dumpRequests = buildDumpRequests(resolved, toBytes(resolved.modelId));
+  // Gated on what dumpDefinitions actually emitted — a request whose response names a dump the
+  // profile does not carry makes the engine refuse the profile outright.
+  const emittedDumpIds = new Set((dumpDefinitions ?? []).map((d) => d.id));
+  const dumpRequests = buildDumpRequests(resolved, toBytes(resolved.modelId), emittedDumpIds);
   if (dumpRequests.length) (legacy.requests ??= []).push(...dumpRequests);
 
   // Preset model: carried through verbatim (the librarian/selector reads it), plus the legacy
