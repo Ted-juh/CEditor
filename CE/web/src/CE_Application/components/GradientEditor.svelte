@@ -17,7 +17,7 @@
    * Double-clicking a stop opens its colour editor IN PLACE (B5), so the
    * gradient stays on screen while one of its stops is edited.
    */
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { gradientToCSS, gradientFilterCSS, gradientBlendCSS, interpolateColor, squareRampToDataURL } from '../utils/gradientCSS.js';
   import {
     computeAxisGeometry, stopThumbPoint,
@@ -55,11 +55,24 @@
   // from empty: the sync effect below does not run during SSR (or before the
   // first paint), and an editor whose first frame has no stops draws a flat
   // #333 rectangle with no handles on it.
-  let internalStops = $state((props.gradient?.stops ?? []).map((s) => ({ ...s })));
-  let internalCenterX = $state(props.gradient?.centerX ?? 50);
-  let internalCenterY = $state(props.gradient?.centerY ?? 50);
-  let internalRadiusX = $state(props.gradient?.radiusX ?? 50);
-  let internalRadiusY = $state(props.gradient?.radiusY ?? 50);
+  //
+  // One `untrack` around the whole group, because Svelte warns that reading
+  // `props` here captures it once — which is the intent. These five are the
+  // live copy a drag mutates; the prop→state direction belongs to the sync
+  // effect below, which knows to leave them alone mid-gesture. Making the
+  // seed reactive would overwrite the drag it is meant to precede.
+  const seeded = untrack(() => ({
+    stops: (props.gradient?.stops ?? []).map((s) => ({ ...s })),
+    centerX: props.gradient?.centerX ?? 50,
+    centerY: props.gradient?.centerY ?? 50,
+    radiusX: props.gradient?.radiusX ?? 50,
+    radiusY: props.gradient?.radiusY ?? 50,
+  }));
+  let internalStops = $state(seeded.stops);
+  let internalCenterX = $state(seeded.centerX);
+  let internalCenterY = $state(seeded.centerY);
+  let internalRadiusX = $state(seeded.radiusX);
+  let internalRadiusY = $state(seeded.radiusY);
   let dragging = $state(false);
   // Declared up here with the other gesture state because the prop-sync effect
   // below reads it — an in-place stop edit is a gesture like a drag is.

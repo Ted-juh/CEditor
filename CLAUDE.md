@@ -107,6 +107,30 @@ failure, but do not read a run full of skips as coverage.
 `npm run test:browser` additionally drives Playwright over the built bundle. It is not in CI; run it
 locally when you touch rendering, the player inbound path or the learn chips.
 
+### C++ *on* Windows: use a Developer shell, or you will get MinGW
+
+The `native` preset asks for Ninja, and Ninja asks CMake for a compiler, and CMake takes the first
+one on `PATH`. `cl.exe` is only on `PATH` inside a Visual Studio Developer shell. So in a plain
+PowerShell the configure quietly picks up whatever MinGW happens to be installed, succeeds, and the
+mistake surfaces hundreds of lines into the build as `#error "MinGW is not supported."` from
+`juce_TargetPlatform.h` — under a pile of consequences (a `(4 == 8)` static assert, an undersized
+`CRITICAL_SECTION`, undeclared `memset`/`strlen`/`__cpuid`, a sol2 template error) that all look
+like repo bugs and are not.
+
+`CMakeLists.txt` now stops at configure time with that explanation, but the fix is the same either
+way. Delete the cache first — it has the compiler pinned:
+
+```powershell
+Remove-Item -Recurse -Force build/native
+```
+
+then either open **x64 Native Tools Command Prompt for VS 2022** (or run `Launch-VsDevShell.ps1
+-Arch amd64`) and configure there, or stay put and name the generator:
+
+```powershell
+cmake -S . -B build/native -G "Visual Studio 17 2022" -A x64 -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF
+```
+
 ### C++ tests, off Windows
 
 ```bash

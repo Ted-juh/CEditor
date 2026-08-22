@@ -491,10 +491,6 @@
     color: #F0F0F0;
   }
 
-  .setting-copy strong.live {
-    color: #6FCF97;
-  }
-
   .setting-copy span {
     font-size: 11px;
     color: #8A8A8A;

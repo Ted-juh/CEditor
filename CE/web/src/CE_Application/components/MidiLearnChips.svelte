@@ -15,7 +15,14 @@
    * produce now has somewhere to go, so no chip is inert; one still says when the profile could not
    * name it, because binding by number and binding by name are different promises.
    */
-  import { Eraser, Radio } from 'lucide-svelte';
+  // Per-icon imports, not the `lucide-svelte` barrel. Tree-shaking is off (see the comment on
+  // `treeshake: false` in vite.config.js), so a barrel import is not trimmed back to the two
+  // icons it names — it drags lucide's whole ~1800-icon index in behind it. This one did, and
+  // because every icon module carries a full licence banner that the minifier must preserve,
+  // the MidiMonitorTab chunk that renders these chips came out at 5.8 MB, 99.7% of it the same
+  // notice repeated 1702 times. That is the exact failure vite.config.js warns about.
+  import Eraser from 'lucide-svelte/icons/eraser';
+  import Radio from 'lucide-svelte/icons/radio';
   import {
     deviceRoleMappings,
     latestMidiInputMessage,

@@ -18,7 +18,7 @@
    *   onchange(AARRGGBB) — every interaction that changes the colour
    */
 
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import Pipette from 'lucide-svelte/icons/pipette';
   import { rgbToHex, alphaToHex } from '../utils/colorMath.js';
   import { hsvToRgb, hsvToHslaString, hexToHsvPreserving } from '../utils/hsvMath.js';
@@ -35,11 +35,17 @@
   // Seeded from the props rather than from zero: effects do not run during
   // SSR, so a chooser that waited for its sync effect rendered the wrong
   // colour on first paint (and in the server-rendered tests).
-  const seed = hexToHsvPreserving(color);
+  //
+  // `untrack` because reading a prop out here captures its value once, and
+  // Svelte warns about that on the assumption you wanted a live read. Once is
+  // exactly what a seed is: from the first paint onwards the $effect below
+  // owns the prop→state direction, and it has to, because these three are
+  // also written by every drag. A reactive seed would fight it.
+  const seed = untrack(() => hexToHsvPreserving(color));
   let hue = $state(seed.h);
   let saturation = $state(seed.s);
   let brightness = $state(seed.v);
-  let alpha = $state(propAlpha);
+  let alpha = $state(untrack(() => propAlpha));
   let hexInput = $state('');
   let editingHex = $state(false);
   let notice = $state('');           // why an entry was refused, or an eyedropper failure

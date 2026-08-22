@@ -5,6 +5,35 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CE_ROOT "${CMAKE_SOURCE_DIR}/CE")
 
+# Refuse MinGW here, where the reason still fits on a screen.
+#
+# JUCE does not support it and says so, but it says so from inside a header — juce_core's
+# juce_TargetPlatform.h has a bare `#error "MinGW is not supported."` — which means you find out
+# several hundred lines into a build, underneath the wreckage that follows from it: a
+# `static_assert (sizeof (pointer_sized_int) == sizeof (void*))` reduced to `(4 == 8)` because the
+# platform block that defines those types was never entered, a CRITICAL_SECTION sized `40 <= 24`,
+# memset/strlen/strcmp/stricmp and __cpuid all undeclared, and a sol2 template error on top. None
+# of that is a defect in this repo and none of it is worth reading.
+#
+# It is easy to hit by accident and the accident leaves no trace: on Windows the `native` preset
+# asks for Ninja, Ninja asks CMake for a C++ compiler, and CMake takes the first one on PATH. In a
+# plain PowerShell that is whatever MinGW you have installed for something else; `cl.exe` is only
+# on PATH inside a Developer shell. The configure then succeeds, so the mistake surfaces as a
+# compile failure in JUCE rather than as a wrong compiler.
+if(MINGW)
+    message(FATAL_ERROR
+        "MinGW cannot build this project — JUCE rejects it outright (juce_TargetPlatform.h).\n"
+        "CMake picked ${CMAKE_CXX_COMPILER}, which is the first compiler on PATH.\n"
+        "\n"
+        "Build with MSVC instead. Delete the cache first, because it has the compiler pinned:\n"
+        "    Remove-Item -Recurse -Force build/native\n"
+        "then EITHER open 'x64 Native Tools Command Prompt for VS 2022' (or run\n"
+        "Launch-VsDevShell.ps1 -Arch amd64) and re-run the configure there, so cl.exe is found:\n"
+        "    cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF\n"
+        "OR stay in a plain shell and let CMake find MSVC itself:\n"
+        "    cmake -S . -B build/native -G \"Visual Studio 17 2022\" -A x64 -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF")
+endif()
+
 # Register the test executables below with CTest so `ctest --test-dir <build> -C <config>` (and CI)
 # discovers and runs them all; each exe returns non-zero on failure.
 enable_testing()

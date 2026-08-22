@@ -22,12 +22,16 @@
    *   oncommit(hex6) — keep it
    *   oncancel()     — put the original back
    */
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import ColorChooser from './ColorChooser.svelte';
 
   let { color = 'FFFFFF', label = 'Stop', stepSize = 0, oninput, oncommit, oncancel } = $props();
 
-  const original = String(color ?? 'FFFFFF').replace(/^#/, '').toUpperCase();
+  // `untrack`: the colour the stop had when the popover opened, captured once
+  // on purpose — it is what Cancel and Escape restore. Following the prop would
+  // defeat that, because `oninput` above drives the prop, so a live read would
+  // make "the original" chase the edit and Cancel become a no-op.
+  const original = untrack(() => String(color ?? 'FFFFFF').replace(/^#/, '').toUpperCase());
   let live = $state(original);
   let rootEl = $state(null);
 
