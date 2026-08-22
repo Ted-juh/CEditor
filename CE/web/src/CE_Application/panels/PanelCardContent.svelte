@@ -156,6 +156,17 @@
     embedPythonMode === 'on' || (embedPythonMode === 'auto' && panelHasPython)
   );
 
+  // Default ON, so `!== false` rather than `?? true` on a possibly-absent key — a panel saved
+  // before these settings existed exports every format, which is what "every reachable format
+  // ships" means for the panels people already have.
+  let exportClap = $derived(exportSettings.exportClap !== false);
+  let exportLv2 = $derived(exportSettings.exportLv2 !== false);
+  // What the build will actually leave in export-out/, so the note under the button cannot drift
+  // from the toggles above it.
+  let exportFormatSuffix = $derived(
+    ['.vst3', ...(exportClap ? ['.clap'] : []), ...(exportLv2 ? ['.lv2'] : [])].join(' + ')
+  );
+
   function setExportSetting(key, value) {
     if (!panel) return;
     updatePanel(panel.id, { exportSettings: { ...(panel.exportSettings ?? {}), [key]: value } });
@@ -810,11 +821,31 @@
       </PropertyCell>
     </PropertySection>
 
+    <PropertySection title="Formats" icon={Package}>
+      <PropertyCell label="VST3" span={2} hint="Always built — the primary format." disabled>
+        <PropertyToggle value={true} />
+      </PropertyCell>
+      <PropertyCell label="CLAP" span={2}
+                    hint="Also build a .clap next to the .vst3 (Bitwig, Reaper, FL Studio). Same player, same panel — just a second door.">
+        <PropertyToggle value={exportClap}
+                        onchange={() => setExportSetting('exportClap', !exportClap)} />
+      </PropertyCell>
+      <PropertyCell label="LV2" span={2}
+                    hint="Also build an .lv2 bundle. Rare on Windows hosts; mainly future-proofing for Linux DAWs.">
+        <PropertyToggle value={exportLv2}
+                        onchange={() => setExportSetting('exportLv2', !exportLv2)} />
+      </PropertyCell>
+      <PropertyCell label="AU / AAX" span={2}
+                    hint="AU needs a macOS build — its identity is already derived per panel, so it activates the day a Mac port exists. AAX needs Avid's SDK and PACE signing. VST2 licensing closed in 2018 — permanently out.">
+        <span class="export-build-note">gated</span>
+      </PropertyCell>
+    </PropertySection>
+
     <PropertySection title="Build" icon={Hammer}>
-      <PropertyCell label="Output" span={4} hint="Builds the VST3 from this panel into export-out/. Progress streams into the Console panel.">
+      <PropertyCell label="Output" span={4} hint="Builds every enabled format (see Formats above) from this panel into export-out/. Progress streams into the Console panel.">
         <div class="export-row">
-          <button class="export-action" onclick={() => buildActivePanelVst3()}>Build VST3</button>
-          <span class="export-build-note">→ export-out/{effectivePluginName}.vst3{pythonWillEmbed ? ` (+~${PYTHON_RUNTIME_MB} MB Python)` : ''}</span>
+          <button class="export-action" onclick={() => buildActivePanelVst3()}>Export Plugin</button>
+          <span class="export-build-note">→ export-out/{effectivePluginName}{exportFormatSuffix}{pythonWillEmbed ? ` (+~${PYTHON_RUNTIME_MB} MB Python)` : ''}</span>
         </div>
       </PropertyCell>
     </PropertySection>

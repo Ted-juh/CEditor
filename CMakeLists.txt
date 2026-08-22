@@ -236,13 +236,30 @@ if(CEDITOR_BUILD_APP)
         endif()
     endif()
 
+    # Every JUCE format reachable without a third-party gate. The gated ones stay off on purpose:
+    # AAX needs Avid's SDK + PACE signing, VST2 licensing closed in 2018, AUv3 is an App Store
+    # product. AU costs nothing to declare but only produces a target on a macOS build — it lights
+    # up the day a Mac port exists (auSubtype is already derived per panel, waiting).
+    #
+    # The LV2 URI is per-panel like the CLAP id: a freeform string, kept unique by the guid hash.
+    option(CEDITOR_LV2 "Also build the player plugin as LV2" ON)
+    set(CE_LV2_URI "urn:ceditor:default" CACHE STRING "Per-panel LV2 URI (the export pipeline passes the real one)")
+    set(CE_PLUGIN_FORMATS VST3 Standalone)
+    if (CEDITOR_LV2)
+        list(APPEND CE_PLUGIN_FORMATS LV2)
+    endif()
+    if (APPLE)
+        list(APPEND CE_PLUGIN_FORMATS AU)
+    endif()
+
     juce_add_plugin(CEditorPlayerVST
         PRODUCT_NAME "${CE_VST_PRODUCT_NAME}"
         COMPANY_NAME "${CE_VST_COMPANY_NAME}"
         PLUGIN_MANUFACTURER_CODE "${CE_VST_MFR_CODE}"
         PLUGIN_CODE "${CE_VST_PLUGIN_CODE}"
         VERSION "${CE_VST_VERSION}"
-        FORMATS VST3 Standalone
+        FORMATS ${CE_PLUGIN_FORMATS}
+        LV2URI "${CE_LV2_URI}"
         IS_SYNTH FALSE
         NEEDS_MIDI_INPUT TRUE
         NEEDS_MIDI_OUTPUT TRUE
@@ -296,6 +313,29 @@ if(CEDITOR_BUILD_APP)
         dwmapi
         PlayerWebData
     )
+
+    # --- CLAP format (via vendored clap-juce-extensions, ThirdParty/clap-juce-extensions) --------
+    # JUCE has no native CLAP support, so the .clap comes from the free-audio wrapper: it creates a
+    # CEditorPlayerVST_CLAP target reusing the same PlayerHost/plugin code. The CLAP id is a
+    # freeform reverse-DNS string, so per-panel uniqueness needs no 4-char-code hashing — the
+    # export pipeline passes "com.<vendor>.<panel>.<guid-hash>" straight through CE_CLAP_ID.
+    #
+    # INSIDE the CEDITOR_BUILD_APP guard, deliberately. clap_juce_extensions_plugin() attaches
+    # itself to the CEditorPlayerVST target, which only exists in this block — off Windows there is
+    # no plugin to attach to, and add_subdirectory() would pull the wrapper's own CMake into a
+    # configure that has no use for it. This is the same trap the guard was added for.
+    option(CEDITOR_CLAP "Build the player plugin as a CLAP alongside VST3/Standalone" ON)
+    set(CE_CLAP_ID "com.tedjuh.ceditor.default" CACHE STRING "Per-panel CLAP id (the export pipeline passes the real one)")
+
+    if (CEDITOR_CLAP)
+        add_subdirectory(ThirdParty/clap-juce-extensions clap-juce-extensions EXCLUDE_FROM_ALL)
+        clap_juce_extensions_plugin(TARGET CEditorPlayerVST
+            CLAP_ID "${CE_CLAP_ID}"
+            # A MIDI controller surface, not an audio processor: "utility" is the honest category
+            # and "external" marks it as controlling outboard gear (both from the CLAP taxonomy).
+            CLAP_FEATURES utility external)
+        message(STATUS "CEditor: CLAP format ENABLED (target CEditorPlayerVST_CLAP, id ${CE_CLAP_ID}).")
+    endif()
 endif()
 
 # ----------------------------------------------------------------------------------- the tests
@@ -749,7 +789,11 @@ ce_configure_test(CEditorPlayerScriptTests)
         # UNVERIFIED until a native mac/Linux build; on mac also rewrite libpython's install-name to
         # @loader_path/<lib> (install_name_tool) where the bundler places it.
         if (CEDITOR_PYTHON)
-            foreach(_fmt VST3 Standalone)
+            # Every format that can exist, not just the two that used to. `if (TARGET …)` below
+            # already skips the ones this configure did not produce, so naming CLAP/LV2/AU here
+            # costs nothing and stops a new format from silently missing its runpath — which would
+            # only show up as a plugin that refuses to load on an end user's machine.
+            foreach(_fmt VST3 Standalone CLAP LV2 AU)
                 set(_t CEditorPlayerVST_${_fmt})
                 if (TARGET ${_t})
                     if (APPLE)
