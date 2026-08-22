@@ -461,7 +461,7 @@ private:
      *     already sends, and a bank pair baked silently into every program change is a message the
      *     user did not ask for going to a synth that may not want it.
      *
-     * Out through scriptSendRawMidi, the same funnel every raw send uses, so a script's
+     * Out through sendRawMidiBytes, the same funnel every raw send uses, so a script's
      * ce.midi.interceptOut sees these too.
      */
     void sendParamRawMidi (const ce::PanelParameter& desc, float value)
@@ -507,7 +507,7 @@ private:
         }
 
         if (! bytes.isEmpty())
-            scriptSendRawMidi ("automation_" + desc.id, bytes);
+            sendRawMidiBytes ("automation_" + desc.id, bytes);
     }
 
     juce::Array<ce::PanelParameter> panelParams;  // declared before apvts (init order matters)
@@ -519,42 +519,33 @@ private:
     // "unknown" (-1) is a real answer a script can act on rather than a confident wrong one.
     std::map<juce::String, int> currentPresetSlot;
     std::map<juce::String, juce::String> currentPresetSource;
-    bool wasWindowOpen = false;
-#endif
-
-#if CEDITOR_SCRIPTING
-    // Window-closed script runtime (Model 2). The full-mirror value model (scriptValues) backs
-    // get/set so a script behaves identically whether the GUI is open (WebView/JS) or closed (here).
-    // Stage 3 wires instantiation + lifecycle + DAW state; Stage 4 (script MIDI sends) now transmits
-    // via the plugin's MIDI output bus (scriptMidiCollector -> processBlock). JS<->C++ value sync for
-    // UNBOUND controls (Stage 5) is still TODO. Declared after deviceService and in this order so the
-    // runtime (holds host&) tears down before the host, and scriptValues outlives both.
-
-    // Script log()/errors append here, so window-closed activity is observable without a debugger
-    // or MIDI monitor: tail %TEMP%\ceditor-player-scripts.log.
-    static void scriptLogLine (const juce::String& line)
-    {
-        auto f = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("ceditor-player-scripts.log");
-        f.appendText (juce::Time::getCurrentTime().toString (true, true, true, true) + "  " + line + juce::newLine);
-    }
-
-   #if CEDITOR_VALUE_LAYER
-    // Send raw MIDI from a script by queueing it onto the plugin's MIDI OUTPUT BUS (drained in
-    // processBlock). The DAW routes that track to the synth's hardware port — the plugin never opens a
-    // port itself (that's the standalone's job; a plugin opening hardware ports fights the host and is
-    // not portable). `bytes` may be a multi-message stream (e.g. NRPN = 4 CCs); we split it.
-    // The role a routeMidi(role, fn) block is in force for, empty outside one.
-    juce::String scriptRouteRole;
-
-    void scriptSendRawMidi (const juce::String& actionId, const juce::Array<int>& bytesIn)
+    /**
+     * THE ONE FUNNEL every raw MIDI send leaves through, script or not.
+     *
+     * Queues the bytes onto the plugin's MIDI OUTPUT BUS (drained in processBlock). The DAW routes
+     * that track to the synth's hardware port — the plugin never opens a port itself; that is the
+     * standalone's job, and a plugin opening hardware ports fights the host and is not portable.
+     * `bytes` may be a multi-message stream (an NRPN is four CCs), so it is split into messages.
+     *
+     * IT LIVES HERE, NOT IN THE SCRIPTING BLOCK, and that is the whole point of this shape. It used
+     * to be `scriptSendRawMidi`, defined under `#if CEDITOR_SCRIPTING`. The automation path calls it
+     * too — a raw-MIDI-bound control moved by the host — and that call sits under CEDITOR_VALUE_LAYER
+     * alone. The two flags are independent, so a build with the value layer ON and scripting OFF had
+     * the call and not the callee: `error C3861: 'scriptSendRawMidi': identifier not found`. It
+     * compiled everywhere scripting happened to be on, which is every configuration anyone had run.
+     */
+    void sendRawMidiBytes (const juce::String& actionId, const juce::Array<int>& bytesIn)
     {
         if (bytesIn.isEmpty()) return;
 
-        // interceptMidiOut runs HERE, at the one funnel every script send goes through, so a filter
-        // sees the assembled bytes rather than each verb's arguments. A filter that swallows the
-        // message stops it dead — nothing reaches the collector and nothing is reported as sent.
         juce::Array<int> bytes = bytesIn;
+
        #if CEDITOR_SCRIPTING
+        // interceptMidiOut runs HERE, at the funnel, so a filter sees the assembled bytes rather
+        // than each verb's arguments — and so it sees AUTOMATION sends as well as script ones, which
+        // is the reason the automation path was routed through here in the first place. A filter
+        // that swallows the message stops it dead: nothing reaches the collector, nothing is
+        // reported as sent.
         if (scriptRuntime != nullptr)
         {
             juce::Array<juce::var> asVar;
@@ -585,9 +576,10 @@ private:
             pos += used;
         }
 
+       #if CEDITOR_SCRIPTING
         juce::StringArray hex;
         for (const int b : bytes) hex.add (juce::String::toHexString (b & 0xff).paddedLeft ('0', 2).toUpperCase());
-        // The routed role is logged, not applied: in the plugin every script send leaves through the
+        // The routed role is logged, not applied: in the plugin every send leaves through the
         // plugin's own MIDI output bus, and which synth that reaches is the DAW's routing decision,
         // not ours. Saying so in the log is honest; silently accepting a role we cannot honour is the
         // failure mode this whole audit keeps finding. routeMidi() is fully applied in the panel
@@ -595,7 +587,33 @@ private:
         scriptLogLine ("midi out  [" + actionId + "]"
                        + (scriptRouteRole.isNotEmpty() ? "  {route " + scriptRouteRole + ", DAW-routed here}" : juce::String())
                        + "  " + hex.joinIntoString (" "));
+       #else
+        juce::ignoreUnused (actionId);
+       #endif
     }
+
+    bool wasWindowOpen = false;
+#endif
+
+#if CEDITOR_SCRIPTING
+    // Window-closed script runtime (Model 2). The full-mirror value model (scriptValues) backs
+    // get/set so a script behaves identically whether the GUI is open (WebView/JS) or closed (here).
+    // Stage 3 wires instantiation + lifecycle + DAW state; Stage 4 (script MIDI sends) now transmits
+    // via the plugin's MIDI output bus (scriptMidiCollector -> processBlock). JS<->C++ value sync for
+    // UNBOUND controls (Stage 5) is still TODO. Declared after deviceService and in this order so the
+    // runtime (holds host&) tears down before the host, and scriptValues outlives both.
+
+    // Script log()/errors append here, so window-closed activity is observable without a debugger
+    // or MIDI monitor: tail %TEMP%\ceditor-player-scripts.log.
+    static void scriptLogLine (const juce::String& line)
+    {
+        auto f = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("ceditor-player-scripts.log");
+        f.appendText (juce::Time::getCurrentTime().toString (true, true, true, true) + "  " + line + juce::newLine);
+    }
+
+   #if CEDITOR_VALUE_LAYER
+    // The role a routeMidi(role, fn) block is in force for, empty outside one.
+    juce::String scriptRouteRole;
 
     // Receive device events window-CLOSED and route them to the C++ runtime. PlayerHost owns the
     // single service callback while the window is open (routing to JS); it nulls it on close, so we
@@ -823,13 +841,13 @@ private:
         cb.sendCC = [this] (int ch, int cc, const juce::var& v)
         {
             const int c = juce::jlimit (1, 16, ch) - 1, n = juce::jlimit (0, 127, cc);
-            scriptSendRawMidi ("cc_" + juce::String (n), { 0xB0 | c, n, juce::jlimit (0, 127, (int) v) });
+            sendRawMidiBytes ("cc_" + juce::String (n), { 0xB0 | c, n, juce::jlimit (0, 127, (int) v) });
         };
         cb.sendNRPN = [this] (int ch, int msb, int lsb, const juce::var& v)
         {
             const int s = 0xB0 | (juce::jlimit (1, 16, ch) - 1);
             const int m = juce::jlimit (0, 127, msb), l = juce::jlimit (0, 127, lsb), val = juce::jlimit (0, 16383, (int) v);
-            scriptSendRawMidi ("nrpn_" + juce::String (m) + "_" + juce::String (l),
+            sendRawMidiBytes ("nrpn_" + juce::String (m) + "_" + juce::String (l),
                                { s, 0x63, m, s, 0x62, l, s, 0x06, (val >> 7) & 0x7f, s, 0x26, val & 0x7f });
         };
         cb.sendSysex = [this] (const juce::var& bytes)
@@ -843,7 +861,7 @@ private:
             if (b.isEmpty()) return;
             if (b.getFirst() != 0xF0) b.insert (0, 0xF0);
             if (b.getLast()  != 0xF7) b.add (0xF7);
-            scriptSendRawMidi ("sysex", b);
+            sendRawMidiBytes ("sysex", b);
         };
         // Raw bytes straight out — notes, program change, bend, aftertouch, clock all arrive here
         // already assembled by the prelude, so the host does no interpretation.
@@ -853,7 +871,7 @@ private:
             if (auto* arr = bytes.getArray())
                 for (const auto& x : *arr) b.add (juce::jlimit (0, 255, (int) x));
             if (b.isEmpty()) return;
-            scriptSendRawMidi ("raw", b);
+            sendRawMidiBytes ("raw", b);
         };
         // routeMidi(role, fn): the role in force for the block's sends. Stored rather than pushed
         // through every sender, and restored by endRoute — a throw inside the block unwinds through
