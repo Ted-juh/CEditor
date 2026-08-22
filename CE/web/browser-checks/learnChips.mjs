@@ -42,10 +42,14 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}/learnChips.html`);
   await page.waitForFunction(() => !!window.__chips, null, { timeout: 20000 });
 
-  // A DT1 edit for distortion.parameter1 (four nibbles at 10 00 04 01) carrying 4095, then a CC the
-  // profile has no parameter for. The first is the case the learn reducer cannot see at all.
+  // A DT1 edit for distortion.parameter1 (four nibbles at 10 00 04 01) carrying 32895, then a CC
+  // the profile has no parameter for. The first is the case the learn reducer cannot see at all.
+  //
+  // 32895, not the 4095 this used to send: the effect slots carry the owner's manual's ranges over
+  // Roland's offset container now, so DIST Drive's 0..127 is stored 32768..32895 and 4095 is below
+  // the field's own minimum — a message the index would refuse to match at all.
   await page.evaluate(() => {
-    window.__chips.sysex('F0 41 10 00 00 41 12 10 00 04 01 00 0F 0F 0F 3E F7');
+    window.__chips.sysex('F0 41 10 00 00 41 12 10 00 04 01 08 00 07 0F 4D F7');
     window.__chips.cc('B0 4A 60');    // CC 74 — not in this profile, binds as a raw CC
     window.__chips.cc('D0 70');       // channel pressure — binds by message, with no CC number
     // One NRPN knob, as four separate arrivals. It must become ONE chip, not four.
@@ -63,7 +67,7 @@ try {
   const nrpnChip = rendered.find((chip) => /NRPN/.test(chip.label));
 
   assert.ok(named?.draggable, 'a sysex edit should resolve to a named, draggable parameter');
-  assert.equal(named.value, '4095', `the four-nibble value did not reach the chip (${named.value})`);
+  assert.equal(named.value, '32895', `the four-nibble value did not reach the chip (${named.value})`);
   assert.equal(named.detail, 'SysEx');
   assert.ok(rawCc, 'an unresolvable CC should still be shown');
   assert.equal(rawCc.draggable, true, 'a raw CC is bindable as a message — that is the whole point');

@@ -8663,18 +8663,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32832,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter1",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -8705,18 +8705,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32832,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter2",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -8747,18 +8747,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32832,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter3",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -8789,18 +8789,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32832,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter4",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -10063,16 +10063,16 @@
       },
       "type": "bipolar",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32756,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32826,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter1",
-        "min": -20000,
-        "max": 20000
+        "min": -12,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -10103,18 +10103,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32832,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter2",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -10147,16 +10147,16 @@
       },
       "type": "bipolar",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32756,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32826,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter3",
-        "min": -20000,
-        "max": 20000
+        "min": -12,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -10187,18 +10187,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32832,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter4",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -10950,18 +10950,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32832,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter1",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -10992,18 +10992,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32832,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter2",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -11036,16 +11036,16 @@
       },
       "type": "bipolar",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32732,
+        "max": 32768
       },
-      "default": 32768,
+      "default": 32750,
       "display": {
         "mode": "number",
-        "unit": "",
+        "unit": "dB",
         "shortLabel": "parameter3",
-        "min": -20000,
-        "max": 20000
+        "min": -36,
+        "max": 0
       },
       "normalization": {
         "mode": "linear"
@@ -11076,18 +11076,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32832,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter4",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -11834,18 +11834,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32832,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter1",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
@@ -11876,18 +11876,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32770
       },
-      "default": 32768,
+      "default": 32769,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter2",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 2
       },
       "normalization": {
         "mode": "linear"
@@ -11897,10 +11897,8 @@
         "nibbles": 4
       },
       "sendPolicy": {
-        "mode": "continuous",
-        "coalesce": true,
-        "minIntervalMs": 20,
-        "sendFinalOnRelease": true
+        "mode": "onCommit",
+        "coalesce": true
       }
     },
     {
@@ -11918,18 +11916,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32769,
+        "max": 32868
       },
-      "default": 32768,
+      "default": 32819,
       "display": {
         "mode": "number",
-        "unit": "",
+        "unit": "%",
         "shortLabel": "parameter3",
-        "min": -20000,
-        "max": 20000
+        "min": 1,
+        "max": 100
       },
       "normalization": {
         "mode": "linear"
@@ -11960,18 +11958,18 @@
       "ui": {
         "preferredComponent": "Knob"
       },
-      "type": "bipolar",
+      "type": "integer",
       "range": {
-        "min": 12768,
-        "max": 52768
+        "min": 32768,
+        "max": 32895
       },
-      "default": 32768,
+      "default": 32832,
       "display": {
         "mode": "number",
         "unit": "",
         "shortLabel": "parameter4",
-        "min": -20000,
-        "max": 20000
+        "min": 0,
+        "max": 127
       },
       "normalization": {
         "mode": "linear"
