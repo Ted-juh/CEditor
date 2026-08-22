@@ -139,10 +139,37 @@ test('every added Edit row greys out through the shared availability table', () 
   assert.match(edit, /const id = editAvailability\(\)\.ungroupTargetId;/);
 });
 
-test('the Arrange rows advertise no shortcut, because none is bound', () => {
+test('the Arrange rows advertise exactly the chords that are really bound', () => {
+  // This test used to assert the opposite — that no Arrange row printed a shortcut, because at
+  // the time none was bound. D9 then bound the z-order pair, and the rule ("advertise a chord
+  // only when a handler answers it") flipped the expected answer without changing. So the row
+  // labels are now checked against editorShortcuts.js itself rather than against a hardcoded
+  // list, and the menu cannot drift away from the bindings in either direction.
   const edit = source.match(/type: 'header', label: 'Arrange'[\s\S]*?\n      \{ type: 'separator' \},/)?.[0] ?? '';
   assert.ok(edit.includes("label: 'Bring to Front'"));
-  assert.ok(!/shortcut:/.test(edit), 'no invented Ctrl+[ / Ctrl+] — that is D9\'s bug, not a fix');
+
+  const bindings = readFileSync(
+    new URL('../src/CE_Application/utils/editorShortcuts.js', import.meta.url), 'utf8',
+  );
+  const chordFor = (description) =>
+    bindings.match(new RegExp(`keys: '([^']+)', description: '${description}'`))?.[1] ?? null;
+
+  for (const label of ['Bring to Front', 'Bring Forward', 'Send Backward', 'Send to Back']) {
+    const chord = chordFor(label);
+    assert.ok(chord, `${label} must actually be bound for the menu to print it`);
+    const row = edit.match(new RegExp(`\\{ label: '${label}'[^\\n]*`))?.[0] ?? '';
+    assert.ok(
+      row.includes(`shortcut: '${chord}'`),
+      `${label} prints ${chord}, the chord editorShortcuts really listens for — got: ${row}`,
+    );
+  }
+
+  // Tidy Grid and Arrange in Circle have no handler, so they must still print nothing.
+  for (const label of ['Tidy Grid', 'Arrange in Circle']) {
+    assert.equal(chordFor(label), null, `${label} is unbound; update this test if that changes`);
+    const row = edit.match(new RegExp(`\\{ label: '${label}'[^\\n]*`))?.[0] ?? '';
+    assert.ok(!row.includes('shortcut:'), `${label} must not advertise a chord nothing answers`);
+  }
 });
 
 // --- D6 / E6: Open Recent ---------------------------------------------------------------------

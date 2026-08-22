@@ -110,6 +110,9 @@
         case 'open-panel': openPanelFromFile(); break;
         case 'close-tab': closeActiveEditorTab(); break;
         case 'open-settings': openSettingsTab(); break;
+        case 'toggle-display-panel': togglePanelVisibility('display'); break;
+        case 'toggle-tree-panel': togglePanelVisibility('tree'); break;
+        case 'toggle-properties-panel': togglePanelVisibility('properties'); break;
         case 'zoom-to-selection': requestZoomToSelection(); break;
         case 'undo': undo(); break;
         case 'redo': redo(); break;

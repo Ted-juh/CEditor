@@ -132,6 +132,27 @@ export const GLOBAL_SHORTCUTS = [
     keys: 'Ctrl+,', description: 'Settings',
     match: (e) => modOf(e) && e.key === ',',
   },
+  // --- Panels. The three toggles the Window menu offers, which had no accelerator at all: the
+  // display dock in particular was hidden by default and reachable only by finding one button on
+  // the rail, which is the whole of review finding B9. DOCUMENT scope, not application — nobody
+  // toggles a panel mid-word, and document scope is what keeps Ctrl+J off a script editor that
+  // may want it. Chords follow VS Code, which is where this muscle memory comes from: Ctrl+J for
+  // the bottom panel, Ctrl+Shift+E for the tree.
+  {
+    id: 'toggle-display-panel', scope: 'document', section: 'Panels',
+    keys: 'Ctrl+J', description: 'Show / hide the display dock',
+    match: (e) => modOf(e) && !e.shiftKey && !e.altKey && lowerOf(e) === 'j',
+  },
+  {
+    id: 'toggle-tree-panel', scope: 'document', section: 'Panels',
+    keys: 'Ctrl+Shift+E', description: 'Show / hide the component tree',
+    match: (e) => modOf(e) && e.shiftKey && !e.altKey && lowerOf(e) === 'e',
+  },
+  {
+    id: 'toggle-properties-panel', scope: 'document', section: 'Panels',
+    keys: 'Ctrl+Shift+D', description: 'Show / hide the properties panel',
+    match: (e) => modOf(e) && e.shiftKey && !e.altKey && lowerOf(e) === 'd',
+  },
   // --- Tabs. Application chords: Ctrl+Tab in a script editor must move to the
   // next document, not indent a line, and Ctrl+digit types nothing anywhere,
   // so neither can collide with the user's hands being in a text field. They

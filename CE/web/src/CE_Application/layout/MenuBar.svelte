@@ -30,6 +30,7 @@
     PANEL_VISIBILITY_ITEMS, showDisplayPanel, showPropertiesPanel,
     showTreePanel, togglePanelVisibility,
   } from '../stores/panelVisibility.js';
+  import { GLOBAL_SHORTCUTS } from '../utils/globalShortcuts.js';
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
 
@@ -178,14 +179,16 @@
         if (id != null) ungroupContainer(id);
       } },
       { type: 'separator' },
-      // Arrange: z-order plus the two layout commands that need a crowd. No shortcuts are printed
-      // because none are bound — advertising Ctrl+] here while nothing listens for it is the F1
-      // overlay's bug (D9), and this menu is not the place to repeat it.
+      // Arrange: z-order plus the two layout commands that need a crowd. The four z-order rows
+      // print their chords because editorShortcuts.js really does bind them (the ARRANGE block:
+      // Ctrl+[ / Ctrl+], Shift for the extremes). Tidy Grid and Arrange in Circle print nothing,
+      // because nothing listens for them — a menu that advertises a chord no handler answers is
+      // the F1 overlay's old bug (D9), and this menu is not the place to repeat it.
       { type: 'header', label: 'Arrange' },
-      { label: 'Bring to Front', enabled: () => editAvailability().canReorder, action: () => bringToFront() },
-      { label: 'Bring Forward', enabled: () => editAvailability().canReorder, action: () => bringForward() },
-      { label: 'Send Backward', enabled: () => editAvailability().canReorder, action: () => sendBackward() },
-      { label: 'Send to Back', enabled: () => editAvailability().canReorder, action: () => sendToBack() },
+      { label: 'Bring to Front', shortcut: 'Ctrl+Shift+]', enabled: () => editAvailability().canReorder, action: () => bringToFront() },
+      { label: 'Bring Forward', shortcut: 'Ctrl+]', enabled: () => editAvailability().canReorder, action: () => bringForward() },
+      { label: 'Send Backward', shortcut: 'Ctrl+[', enabled: () => editAvailability().canReorder, action: () => sendBackward() },
+      { label: 'Send to Back', shortcut: 'Ctrl+Shift+[', enabled: () => editAvailability().canReorder, action: () => sendToBack() },
       { label: 'Tidy Grid', enabled: () => editAvailability().canArrangeMany, action: () => tidyGrid() },
       { label: 'Arrange in Circle', enabled: () => editAvailability().canArrangeMany, action: () => arrangeCircular() },
       { type: 'separator' },
@@ -225,15 +228,13 @@
     ],
     // The three dock toggles had exactly one home — the icon rail — because they were `$state`
     // locals inside App.svelte and nothing else could see them. They live in a store now
-    // (stores/panelVisibility.js) so this menu can both show and set them.
-    //
-    // WIRING STILL OUTSTANDING: App.svelte must read those three from the store instead of
-    // keeping its own `$state` copies (App.svelte:160,186-187, its three persistence `$effect`s
-    // at 175-177/208-213, and the IconPanel props at 328-342). Until it does there are two copies
-    // of the truth and this menu's checkmark leads the layout by one restart.
+    // (stores/panelVisibility.js), App.svelte reads that store rather than keeping its own copy,
+    // and the accelerators come from the same GLOBAL_SHORTCUTS table the dispatcher matches on —
+    // so the label, the tick and the chord cannot drift from each other or from the layout.
     Window: [
       ...PANEL_VISIBILITY_ITEMS.map((item) => ({
         label: item.label,
+        shortcut: panelToggleChord(item.id),
         checked: () => visibilityFlags[item.id] === true,
         action: () => togglePanelVisibility(item.id),
       })),
@@ -247,6 +248,16 @@
       { label: 'About CEditor', action: () => window.alert?.(`CEditor\n\nBuild ${buildInfo.sha}\nBranch ${buildInfo.branch}\nBuilt ${buildInfo.time}`) },
     ],
   };
+
+  /**
+   * The chord for a panel toggle, read out of the table the dispatcher actually matches on.
+   * Hardcoding 'Ctrl+J' here is how a menu ends up advertising a shortcut nobody listens for —
+   * the bug D9 was about. If the binding is removed, this returns undefined and the row simply
+   * stops claiming one.
+   */
+  function panelToggleChord(id) {
+    return GLOBAL_SHORTCUTS.find((b) => b.id === `toggle-${id}-panel`)?.keys;
+  }
 
   const menuNames = Object.keys(menus);
 

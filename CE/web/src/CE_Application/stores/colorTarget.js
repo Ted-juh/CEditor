@@ -14,6 +14,25 @@ import { updateControlProperty } from './controls.js';
  *   { type: 'panel', prop: 'gridColour' }
  *   { type: 'control', controlId: 'ctrl_1', path: 'Background.Fill.colour' }
  *   null  (no active target — default panel bgColour behavior)
+ *
+ * WHY A GLOBAL DOCK AND NOT AN ANCHORED POPOVER — a decision, recorded here because the review
+ * that argued the other way has been deleted and this is the file the argument was about.
+ *
+ * The 2026-08-13 GUI review's S3 called this out as a structural problem: Canva, Figma and
+ * Illustrator all anchor colour editing next to the thing being edited, while CEditor routes it
+ * through a dock at the far end of the window that can push the edited object out of view. That
+ * reading was accepted; the conclusion was not. The owner elected to KEEP colour and gradient
+ * editing in the display panel, and the complaints that were really about the dock being unusable
+ * — no label saying what is being edited, no Done, no Cancel, a target that outlived its selection
+ * and silently repainted the wrong object, and 44% of the viewport for a colour picker — were
+ * fixed in place instead. One editing surface for colour, everywhere, is the rule.
+ *
+ * The single exception is the gradient STOP, which gets components/StopColourPopover.svelte,
+ * because editing a stop through the dock meant leaving the gradient editor and coming back —
+ * the gradient itself was the thing being pushed off screen.
+ *
+ * So: if you are here to add an anchored colour popover for controls, this is not an oversight.
+ * Reopen the decision deliberately.
  */
 export const colorTarget = writable(null);
 

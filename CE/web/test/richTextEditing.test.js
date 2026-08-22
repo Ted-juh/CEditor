@@ -22,8 +22,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  activeDecorationLines,
+  applyBlockAlignment,
+  applyFontFamily,
+  applyFontSize,
   applyInlineStyle,
+  applyList,
   applyTextColour,
+  blocksInRange,
+  clearFormatting,
+  decorationValue,
+  topLevelBlock,
   caretOffsetWithin,
   collectTextNodes,
   insertPlainText,
@@ -65,6 +74,13 @@ class FakeNode {
     if (index >= 0) this.childNodes.splice(index, 1);
     node.parentNode = null;
     return node;
+  }
+
+  // The list operations rebuild a run of blocks IN PLACE, so the fake has to model position and
+  // not just membership — appending everything to the end would hide an ordering bug entirely.
+  insertBefore(node, ref) {
+    const index = ref ? this.childNodes.indexOf(ref) : this.childNodes.length;
+    return this.insertAt(index < 0 ? this.childNodes.length : index, node);
   }
 
   get textContent() {
@@ -457,4 +473,177 @@ test('a note switch still wins over a composition, because the old note is gone'
   const decision = resolveNotepadSync({ index: 1, lastIndex: 0, composing: true });
   assert.equal(decision.sync, true);
   assert.equal(decision.reason, 'note-switch');
+});
+
+
+// --- B10, the rest of the sidebar --------------------------------------------
+//
+// The keyboard half of the notepad moved off execCommand first and the SIDEBAR did not, so for a
+// while clicking B and pressing Ctrl+B wrote different markup into the same note. These cover the
+// operations that migration needed: everything the toolbar can do, through the same functions the
+// keyboard uses.
+
+/** An editor of `n` top-level div blocks, with the caret in block `at`. */
+function editorWithBlocks(texts, at = 0, upto = null) {
+  const root = new FakeElement('DIV');
+  const blocks = texts.map((t) => {
+    const div = new FakeElement('DIV');
+    div.appendChild(new FakeText(t));
+    root.appendChild(div);
+    return div;
+  });
+  const selection = new FakeSelection();
+  const range = fakeDocument.createRange();
+  range.setStart(blocks[at].childNodes[0], 0);
+  const end = blocks[upto ?? at];
+  range.setEnd(end.childNodes[0], end.childNodes[0].nodeValue.length);
+  selection.addRange(range);
+  return { root, blocks, selection };
+}
+
+test('underline and strikethrough compose instead of clobbering each other', () => {
+  const { root, selection } = editorWith('hello', 0, 5);
+  applyInlineStyle(root, selection, 'underline', fakeDocument);
+
+  // Re-select the text now living inside the underline span, and strike it too. Naive on/off
+  // toggles both write `textDecoration`, so the second one used to erase the first.
+  // extractContents leaves the emptied original text node in place, so the span is not
+  // necessarily the first child — find it by what it is, not by where it landed.
+  const span = root.childNodes.find((n) => n.nodeType === 1 && n.style?.textDecoration);
+  assert.ok(span, 'the underline span must exist');
+  const text = span.childNodes[0];
+  const sel2 = new FakeSelection();
+  const r2 = fakeDocument.createRange();
+  r2.setStart(text, 0);
+  r2.setEnd(text, text.nodeValue.length);
+  sel2.addRange(r2);
+  applyInlineStyle(root, sel2, 'strikethrough', fakeDocument);
+
+  const out = innerHtml(root);
+  assert.ok(out.includes('underline'), `underline must survive the strike: ${out}`);
+  assert.ok(out.includes('line-through'), `strike must be applied: ${out}`);
+});
+
+test('decorationValue collapses an empty set to none, and orders the pair', () => {
+  assert.equal(decorationValue(new Set()), 'none');
+  assert.equal(decorationValue(new Set(['line-through'])), 'line-through');
+  assert.equal(decorationValue(new Set(['line-through', 'underline'])), 'underline line-through');
+});
+
+test('turning underline off leaves strikethrough alone', () => {
+  const span = new FakeElement('SPAN');
+  span.style.textDecoration = 'underline line-through';
+  const text = new FakeText('x');
+  span.appendChild(text);
+  const root = new FakeElement('DIV');
+  root.appendChild(span);
+
+  const lines = activeDecorationLines(text, root);
+  lines.delete('underline');
+  assert.equal(decorationValue(lines), 'line-through');
+});
+
+test('font size emits real pixels, not the legacy 1-7 scale', () => {
+  const { root, selection } = editorWith('hello', 0, 5);
+  applyFontSize(root, selection, 18, fakeDocument);
+  const out = innerHtml(root);
+  assert.ok(out.includes('fontSize:18px'), out);
+  assert.ok(!out.includes('<FONT'), 'no <font size> element may be produced');
+});
+
+test('font size refuses nonsense rather than writing NaNpx', () => {
+  const { root, selection } = editorWith('hello', 0, 5);
+  assert.equal(applyFontSize(root, selection, 'big', fakeDocument), null);
+  assert.equal(applyFontSize(root, selection, 0, fakeDocument), null);
+  assert.equal(innerHtml(root), 'hello');
+});
+
+test('font family wraps the selection', () => {
+  const { root, selection } = editorWith('hello', 0, 5);
+  applyFontFamily(root, selection, 'Inter', fakeDocument);
+  assert.ok(innerHtml(root).includes('fontFamily:Inter'));
+  assert.equal(applyFontFamily(root, selection, '   ', fakeDocument), null);
+});
+
+test('clear formatting keeps the words and drops the wrapper', () => {
+  const { root, selection } = editorWith('hello world', 0, 11);
+  applyInlineStyle(root, selection, 'bold', fakeDocument);
+  assert.ok(innerHtml(root).includes('fontWeight'));
+
+  const span = root.childNodes[0];
+  const sel2 = new FakeSelection();
+  const r2 = fakeDocument.createRange();
+  r2.setStart(span, 0);
+  r2.setEnd(span, span.childNodes.length);
+  sel2.addRange(r2);
+  clearFormatting(root, sel2, fakeDocument);
+
+  assert.equal(root.textContent, 'hello world', 'the text must survive');
+  assert.ok(!innerHtml(span).includes('fontWeight'), 'the styling must not');
+});
+
+test('topLevelBlock finds the line a deep node sits on', () => {
+  const { root, blocks } = editorWithBlocks(['one', 'two']);
+  const deep = new FakeElement('SPAN');
+  const text = new FakeText('x');
+  deep.appendChild(text);
+  blocks[1].appendChild(deep);
+  assert.equal(topLevelBlock(text, root), blocks[1]);
+  assert.equal(topLevelBlock(root, root), null, 'the root is not its own block');
+});
+
+test('alignment sets text-align on every block the range touches', () => {
+  const { root, blocks, selection } = editorWithBlocks(['one', 'two', 'three'], 0, 2);
+  const touched = blocksInRange(root, selection.getRangeAt(0));
+  assert.equal(touched.length, 3);
+
+  applyBlockAlignment(root, selection, 'center', fakeDocument);
+  assert.deepEqual(blocks.map((b) => b.style.textAlign), ['center', 'center', 'center']);
+});
+
+test('alignment refuses a value that is not one', () => {
+  const { root, selection, blocks } = editorWithBlocks(['one']);
+  assert.equal(applyBlockAlignment(root, selection, 'sideways', fakeDocument), null);
+  assert.equal(blocks[0].style.textAlign, undefined);
+});
+
+test('alignment on a note that has no blocks yet makes one', () => {
+  // A fresh note is bare text in the root — execCommand made a block implicitly and the
+  // replacement has to as well, or the first click on a new note does nothing.
+  const { root, selection } = editorWith('loose text', 0, 5);
+  applyBlockAlignment(root, selection, 'right', fakeDocument);
+  assert.equal(root.childNodes.length, 1);
+  assert.equal(String(root.childNodes[0].tagName).toUpperCase(), 'DIV');
+  assert.equal(root.childNodes[0].style.textAlign, 'right');
+  assert.equal(root.textContent, 'loose text');
+});
+
+test('a bullet list wraps the selected blocks, in place and in order', () => {
+  const { root, selection } = editorWithBlocks(['one', 'two', 'three'], 0, 1);
+  applyList(root, selection, false, fakeDocument);
+
+  assert.equal(root.childNodes.length, 2, 'two blocks became one list, the third stayed');
+  const list = root.childNodes[0];
+  assert.equal(list.tagName, 'ul');
+  assert.deepEqual(list.childNodes.map((li) => li.textContent), ['one', 'two']);
+  assert.equal(root.childNodes[1].textContent, 'three', 'and it stayed AFTER the list');
+});
+
+test('an ordered list is ol, and re-applying it unwraps back to blocks', () => {
+  const { root, selection } = editorWithBlocks(['a', 'b'], 0, 1);
+  applyList(root, selection, true, fakeDocument);
+  assert.equal(root.childNodes[0].tagName, 'ol');
+
+  // Select the list itself and toggle the same kind again.
+  const list = root.childNodes[0];
+  const sel2 = new FakeSelection();
+  const r2 = fakeDocument.createRange();
+  r2.setStart(list, 0);
+  r2.setEnd(list, list.childNodes.length);
+  sel2.addRange(r2);
+  applyList(root, sel2, true, fakeDocument);
+
+  assert.equal(root.textContent, 'ab');
+  assert.ok(root.childNodes.every((n) => String(n.tagName).toUpperCase() === 'DIV'), 'every item is a plain block again');
+  assert.equal(root.childNodes.length, 2);
 });

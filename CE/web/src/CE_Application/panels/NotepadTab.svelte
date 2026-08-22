@@ -103,6 +103,17 @@
     return editorRef?.getEditorElement?.();
   }
 
+  /**
+   * The sidebar's formatting entry point. It focuses the editor first because every one of these
+   * operations works on the live selection, and a click on a toolbar button has already taken
+   * focus away from the contenteditable — without this the first click after clicking anywhere
+   * else formats nothing and looks like a dead button.
+   */
+  function formatSelection(command, value = null) {
+    editorRef?.getEditorElement?.()?.focus();
+    return editorRef?.formatSelection?.(command, value) ?? false;
+  }
+
   export function applyTextColor(hex, range) {
     textColor = hex;
     // A frame later: the parent switches tab and applies the colour in the same
@@ -124,7 +135,7 @@
     <div class="notepad-sidebar">
       <div class="sidebar-settings">
         <NotepadSettings
-          getEditorElement={getEditorElement}
+          format={formatSelection}
           onPickColor={() => onpickcolor?.()}
         />
       </div>

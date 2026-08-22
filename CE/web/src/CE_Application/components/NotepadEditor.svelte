@@ -3,7 +3,12 @@
   import X from 'lucide-svelte/icons/x';
 
   import {
+    applyBlockAlignment,
+    applyFontFamily,
+    applyFontSize,
     applyInlineStyle,
+    applyList,
+    clearFormatting,
     insertPlainText,
     readCaretOffset,
     resolveNotepadSync,
@@ -162,14 +167,37 @@
   }
 
   /**
-   * Apply one of the inline styles from outside (the notepad sidebar, the
-   * cross-tab colour pick). Exposed rather than letting callers reach for
-   * execCommand on the element they got from `getEditorElement()` — the save
-   * afterwards is not optional, and only this component can do it.
+   * Every formatting operation the sidebar and the keyboard can ask for, in ONE place.
+   *
+   * The sidebar used to take `getEditorElement()` and run execCommand on it directly, so clicking
+   * **B** and pressing Ctrl+B wrote different markup into the same note — different enough to
+   * disagree about what "already bold" means, which is how a toggle stops toggling. Both callers
+   * come through here now, so they cannot drift again. The save afterwards is not optional and
+   * only this component can do it: a programmatic DOM edit raises no `input` event, so a
+   * formatting change that skipped the save was lost on the next reload.
    */
-  export function formatSelection(command) {
+  const FORMAT_OPS = {
+    bold: (sel) => applyInlineStyle(editorEl, sel, 'bold', document),
+    italic: (sel) => applyInlineStyle(editorEl, sel, 'italic', document),
+    underline: (sel) => applyInlineStyle(editorEl, sel, 'underline', document),
+    strikethrough: (sel) => applyInlineStyle(editorEl, sel, 'strikethrough', document),
+    clearFormatting: (sel) => clearFormatting(editorEl, sel, document),
+    alignLeft: (sel) => applyBlockAlignment(editorEl, sel, 'left', document),
+    alignCenter: (sel) => applyBlockAlignment(editorEl, sel, 'center', document),
+    alignRight: (sel) => applyBlockAlignment(editorEl, sel, 'right', document),
+    bulletList: (sel) => applyList(editorEl, sel, false, document),
+    numberedList: (sel) => applyList(editorEl, sel, true, document),
+  };
+
+  export function formatSelection(command, value = null) {
     if (!editorEl) return false;
-    const applied = applyInlineStyle(editorEl, currentSelection(), command, document);
+    const sel = currentSelection();
+    let applied = null;
+
+    if (command === 'fontFamily') applied = applyFontFamily(editorEl, sel, value, document);
+    else if (command === 'fontSize') applied = applyFontSize(editorEl, sel, value, document);
+    else applied = FORMAT_OPS[command]?.(sel) ?? null;
+
     if (applied) saveCurrentContent();
     return !!applied;
   }
