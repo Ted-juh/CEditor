@@ -133,22 +133,33 @@ at the first failure, so you get *zero* executables and a `ctest` run where all 
 `Not Run`. That reads like catastrophe and is nothing of the kind. `-k 0` tells ninja to keep going,
 and the other nine targets build and pass.
 
-If you cannot install the packages, exclude the two by name and know what you gave up:
+**Install them and you get eleven of eleven** — there is no permanent gap here, both targets build
+and pass on Linux:
+
+```bash
+apt-get install -y libasound2-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev
+```
+
+`CEditorPanelParametersTests` needs that whole X11 set, not just `libxrandr-dev` as the table says.
+
+**Install the packages BEFORE you configure.** This is the trap, and it will cost you an hour.
+JUCE resolves `juce_audio_devices`' ALSA dependency through pkg-config *at configure time*
+(`linuxPackages: alsa` in the module header, consumed by `JUCEModuleSupport.cmake:640-646`).
+Install `libasound2-dev` into a build tree that was already configured without it and CMake will
+not notice — it does not re-run because a system package appeared — so the pkgconfig target is
+never created, and the target then compiles and fails to *link* with a page of
+`undefined reference to 'snd_pcm_open'`. That reads exactly like a missing `target_link_libraries`
+in this file, and is not: it is a stale configure. `rm -rf` the build directory and configure again.
+
+If you genuinely cannot install them, exclude the two by name and know what you gave up:
 
 ```bash
 ctest --test-dir build/native -C Release --output-on-failure -E "DeviceProfileEngine|PanelParameters"
 ```
 
-That leaves the device-profile engine and the panel-parameter model unverified locally. If your
-change touches `CE/src/DeviceProfile/` or panel parameters, that is a real gap — say so rather than
+That leaves the device-profile engine and the panel-parameter model unverified. If your change
+touches `CE/src/DeviceProfile/` or panel parameters, that is a real gap — say so rather than
 reporting a green run.
-
-**Install the packages and you get ten of eleven, not nine.** `CEditorPanelParametersTests` needs
-the wider X11 set than the table implies — `libxrandr-dev libxinerama-dev libxcursor-dev
-libxcomposite-dev` — and with those it builds and passes. `CEditorDeviceProfileTests` is the one
-that still cannot run here, and for a different reason than the table gives: with `libasound2-dev`
-present it compiles fine and then fails at **link**, because nothing adds `-lasound` on Linux. That
-is a gap in this file's Linux support, not in your change; don't go chasing it when it appears.
 
 ### The app target off Windows
 
