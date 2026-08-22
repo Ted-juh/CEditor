@@ -55,6 +55,19 @@ Read in this order; each one is a response to the one before it.
 | 3 | [Properties panel restructure stages](cc-properties-panel-restructure-stages.md) | The implementation plan for 2: four independently shippable stages. Records all four as shipped on 2026-07-12. |
 | 4 | [Designer workspace review](cc-designer-workspace-review.md) | The other half of the editor — canvas, palette, bars, docks — audited against the code, and the regressions that audit found. |
 
+## Post-beta bets
+
+Plans, not commitments. Each says what the thing is, why it would matter, and what it would cost —
+written to be argued with before anybody builds one. The overview is
+[beta differentiation](../../docs/beta-differentiation.md).
+
+| Document | What it is |
+|---|---|
+| [Tier 3 moonshots](tier-3-moonshots.md) | The post-beta bets, ranked, and the Tier 1 story in plain English. |
+| [Capture Session](capture-session-plan.md) | Learning a synth from the synth: turn its knobs, watch what it sends, write the profile. |
+| [Total Recall](total-recall-plan.md) | Hardware that behaves like a plugin — the session restores the rig's state. |
+| [Ctrlr import](ctrlr-import-plan.md) | Reading the existing Ctrlr panel library, so a user's collection is not stranded. |
+
 ## Snapshots
 
 - [Legacy controls snapshot](legacy-controls/README.md) — the pre-rewrite interactive control
