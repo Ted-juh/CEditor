@@ -139,7 +139,12 @@
       })),
     ]),
     Build: [
-      { label: 'Build VST3', enabled: hasPanel, action: () => buildActivePanelVst3() },
+      // "Export Plugin", not "Build VST3": one build now produces every format the panel's Export
+      // settings enable — the .vst3 plus a .clap and .lv2 by default. The label deliberately does
+      // not list them, because it cannot see the panel's settings from here and a menu item naming
+      // a format the user switched off would be a lie in the one place it is hardest to check.
+      // The Export tab's build note spells out exactly what this run will produce.
+      { label: 'Export Plugin', enabled: hasPanel, action: () => buildActivePanelVst3() },
     ],
     Help: [
       { label: 'Keyboard Shortcuts', shortcut: 'F1', action: () => {

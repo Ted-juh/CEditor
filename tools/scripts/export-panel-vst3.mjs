@@ -349,10 +349,37 @@ function findVcvars() {
   return null; // not found — caller falls back to the bundled LLVM-MinGW toolchain
 }
 
+// --- CLAP format (Export settings → Formats → CLAP) ---
+// Default ON: the .clap ships beside the .vst3 for Bitwig/Reaper/FL users; opt out with
+// exportSettings.exportClap === false. The id is the derived reverse-DNS string — per-panel unique
+// via the guid hash, no 4-char-code dance needed (see exportIdentity.js).
+const exportClap = es.exportClap !== false;
+console.log(`CLAP format: ${exportClap ? `BUILD (id ${id.clapId})` : 'skip (Export settings)'}`);
+
+// LV2 is the other zero-gate JUCE format (AAX needs Avid's SDK + signing, VST2 licensing is closed,
+// AU/AUv3 need a macOS build). Windows LV2 hosts are rare, so the toggle exists — but the default
+// follows "every reachable format ships".
+const exportLv2 = es.exportLv2 !== false;
+const lv2Uri = `urn:ceditor:${id.clapId}`;
+console.log(`LV2 format: ${exportLv2 ? `BUILD (uri ${lv2Uri})` : 'skip (Export settings)'}`);
+
+if (exportClap && embedPython) {
+  console.warn('  ⚠ Python embed + CLAP: the stdlib bundler only lays out the VST3 today — Python in the .clap '
+    + 'runs window-open only until the CLAP layout lands. Lua/JS are unaffected.');
+}
+
+// The build targets, from the same two flags that set the cache vars — written once so a format
+// can never be configured ON and then not built, which produces a silent "artifact not found".
+const formatTargets = ['CEditorPlayerVST_VST3',
+  ...(exportClap ? ['CEditorPlayerVST_CLAP'] : []),
+  ...(exportLv2 ? ['CEditorPlayerVST_LV2'] : [])].join(' ');
+
 // Common CMake cache vars (identity + feature flags), generator-agnostic.
 const cacheVars = `-DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON`
   + ` -DCEDITOR_PYTHON=${embedPython ? 'ON' : 'OFF'}`
   + ` -DCEDITOR_NATIVE_HANDLERS=${compileNative ? 'ON' : 'OFF'}`
+  + ` -DCEDITOR_CLAP=${exportClap ? 'ON' : 'OFF'} "-DCE_CLAP_ID=${id.clapId}"`
+  + ` -DCEDITOR_LV2=${exportLv2 ? 'ON' : 'OFF'} "-DCE_LV2_URI=${lv2Uri}"`
   + ` -DCE_VST_PLUGIN_CODE=${id.pluginCode} "-DCE_VST_PRODUCT_NAME=${productName}"`
   + ` "-DCE_VST_COMPANY_NAME=${vendor}" -DCE_VST_MFR_CODE=${mfrCode} "-DCE_VST_VERSION=${version}"`
   + ` "-DCE_VST_PANEL_PATH=${panelAbs}"`;
@@ -367,7 +394,7 @@ let runBuild, runRestore;
 if (vcvars) {
   console.log('Build backend: Visual Studio —', vcvars);
   const cfg = `cmake -S "${repo}" -B "${build}" ${cacheVars}`;
-  const bld = `cmake --build "${build}" --target CEditorPlayerVST_VST3 --config Release`;
+  const bld = `cmake --build "${build}" --target ${formatTargets} --config Release`;
   runBuild = () => execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && ${cfg} >nul && ${bld}"`, { stdio: 'inherit' });
   runRestore = () => execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && cmake -S \"${repo}\" -B \"${build}\" -DCEDITOR_DEV_MODE=ON >nul"`, { stdio: 'inherit' });
 } else if (mingw) {
@@ -377,7 +404,7 @@ if (vcvars) {
   const tcFile = path.join(repo, 'tools/toolchains/llvm-mingw-win.cmake');
   const cfg = `cmake -S "${repo}" -B "${build}" -G Ninja -DCMAKE_MAKE_PROGRAM="${ninja}"`
     + ` -DCMAKE_TOOLCHAIN_FILE="${tcFile}" -DCE_LLVM_MINGW_DIR="${mingw}" -DCMAKE_BUILD_TYPE=Release ${cacheVars}`;
-  const bld = `cmake --build "${build}" --target CEditorPlayerVST_VST3`;
+  const bld = `cmake --build "${build}" --target ${formatTargets}`;
   runBuild = () => { execSync(cfg, { stdio: 'inherit' }); execSync(bld, { stdio: 'inherit' }); };
   runRestore = () => execSync(`cmake -S "${repo}" -B "${build}" -DCEDITOR_DEV_MODE=ON`, { stdio: 'inherit' });
 } else {
@@ -408,6 +435,47 @@ try {
     }
   }
   else console.error('Build artifact not found:', built);
+
+  if (exportClap) {
+    // The wrapper derives its output directory from the shared target's LIBRARY_OUTPUT_DIRECTORY,
+    // so the .clap normally lands beside the VST3 under <artefacts>/<config>/CLAP/ — but SEARCH the
+    // build tree rather than hardcode it, in case the wrapper's layout shifts between versions.
+    const findClap = (dir) => {
+      if (!existsSync(dir)) return null;
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, entry.name);
+        if (entry.isFile() && entry.name === `${productName}.clap`) return p;
+        if (entry.isDirectory() && !entry.name.startsWith('.')) {
+          const hit = findClap(p);
+          if (hit) return hit;
+        }
+      }
+      return null;
+    };
+    const builtClap = findClap(path.join(build, 'CEditorPlayerVST_artefacts'));
+    if (builtClap) {
+      const destClap = path.join(outDir, `${productName}.clap`);
+      rmSync(destClap, { force: true });
+      cpSync(builtClap, destClap);
+      console.log(`EXPORTED: ${destClap} (${mb(statSync(destClap).size)} MB)`);
+    } else {
+      console.error('CLAP artifact not found under', path.join(build, 'CEditorPlayerVST_artefacts'));
+    }
+  }
+
+  if (exportLv2) {
+    // An .lv2 is a DIRECTORY bundle — the binary plus its Turtle manifests — so it is copied
+    // recursively and measured with dirSize, like the VST3 above and unlike the single-file .clap.
+    const builtLv2 = path.join(build, 'CEditorPlayerVST_artefacts', 'Release', 'LV2', `${productName}.lv2`);
+    if (existsSync(builtLv2)) {
+      const destLv2 = path.join(outDir, `${productName}.lv2`);
+      rmSync(destLv2, { recursive: true, force: true });
+      cpSync(builtLv2, destLv2, { recursive: true });
+      console.log(`EXPORTED: ${destLv2} (${mb(dirSize(destLv2))} MB)`);
+    } else {
+      console.error('LV2 artifact not found:', builtLv2);
+    }
+  }
 } finally {
   // Always restore dev mode so the editor's normal build keeps loading the Vite dev server.
   runRestore();

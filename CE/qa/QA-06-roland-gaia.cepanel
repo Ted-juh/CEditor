@@ -6,7 +6,9 @@
     "manufacturerCode": "Tdjh",
     "version": "1.0.0",
     "embedPython": "auto",
-    "compileNativeHandlers": "auto"
+    "compileNativeHandlers": "auto",
+    "exportClap": true,
+    "exportLv2": true
   },
   "name": "QA-06 Roland GAIA SH-01",
   "scriptId": "qa_06_roland_gaia",

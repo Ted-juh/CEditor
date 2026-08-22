@@ -46,6 +46,13 @@ export function createPanel(name = null) {
       // present on the export machine (clang for C++, .NET SDK for C#, GraalVM native-image for Java),
       // warning for any that's missing; 'on' = force; 'off' = keep those handlers editor-preview-only.
       compileNativeHandlers: 'auto',
+      // Every JUCE format reachable without a third-party gate ships by default. Both readers
+      // (the Export tab and export-panel-vst3.mjs) test `!== false`, so a panel saved before these
+      // keys existed exports all three too — the default is the behaviour, not just the value.
+      // AAX needs Avid's SDK + PACE signing, VST2 licensing closed in 2018, and AU/AUv3 need a
+      // macOS build, so none of those are settings here.
+      exportClap: true,
+      exportLv2: true,
     },
     name: name ?? `Untitled ${id}`,
     scriptId: `panel_${id}`,
