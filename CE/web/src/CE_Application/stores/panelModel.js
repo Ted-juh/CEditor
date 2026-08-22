@@ -164,6 +164,12 @@ export function createPanel(name = null) {
       runInPreview: true,
       runOnExport: true,
     },
+    // Card presets the document carries. They also live in the user's localStorage library
+    // (stores/cardPresets.js) — that is what makes them reusable across panels — but a preset
+    // that ONLY lives there is a preset a shared .cepanel arrives without, and the design the
+    // file describes then cannot be reproduced by the person who received it. So the file
+    // carries its own copy and the store merges the two on open, document winning.
+    cardPresets: [],
     modified: false,
     controls: [],
     // Paint order, back to front. One layer to begin with, because a panel with none is a panel
@@ -213,6 +219,25 @@ function toDocumentForm(control) {
   return shrinkControl(control);
 }
 
+/**
+ * Card presets as read off a document: an array of entries with an id, deduplicated. Anything
+ * else in the field is dropped rather than repaired — a preset with no id cannot be merged,
+ * applied or deleted, so keeping it would only mean carrying it forward for ever.
+ */
+export function normalizeCardPresets(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const preset of value) {
+    if (!preset || typeof preset !== 'object' || Array.isArray(preset)) continue;
+    const id = preset.id;
+    if (typeof id !== 'string' || !id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(preset);
+  }
+  return out;
+}
+
 /** `Untitled 7` and friends — a stand-in the app invented, not a name anyone chose. */
 const PLACEHOLDER_PANEL_NAME = /^Untitled \d+$/;
 
@@ -260,6 +285,14 @@ export function serializePanel(panel, options = {}) {
   if (deviceSession) data.deviceSession = normalizeProjectDeviceSession(deviceSession);
   else delete data.deviceSession;
 
+  // Card presets, on the same "right or absent" rule as `name` and `deviceSession` above: a panel
+  // that defines none writes no key, so a document saved before presets travelled round-trips
+  // byte-identical and the committed .cepanel fixtures do not all grow an empty array. The key
+  // appears the moment there is a preset worth carrying.
+  const cardPresets = normalizeCardPresets(data.cardPresets);
+  if (cardPresets.length) data.cardPresets = cardPresets;
+  else delete data.cardPresets;
+
   // Bake the host-automatable parameter list (M2) so the exported plugin's APVTS can read it.
   // Author-defined `exportParameters` are kept as-is; an empty list is derived from the controls.
   if (!Array.isArray(data.exportParameters) || data.exportParameters.length === 0) {
@@ -297,6 +330,11 @@ export function deserializePanel(json, filePath, name) {
     ...createPanel(),
     ...data,
     controls,
+    // A document written before presets travelled has no `cardPresets` key, and one written by
+    // hand can have anything at all in it. Normalising here means every reader downstream can
+    // assume an array of {id,…} and the merge in stores/cardPresets.js never has to defend
+    // itself against a string or a null.
+    cardPresets: normalizeCardPresets(data.cardPresets),
     // Migration lives here rather than in a version bump: a document with no `layers` gets one
     // built from first-appearance order, which is exactly what rendering used to infer, so it
     // looks identical on the first load and stops restacking on every load after it.

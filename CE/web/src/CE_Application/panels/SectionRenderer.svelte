@@ -10,6 +10,7 @@
    *   fallbackLabel — human label for the placeholder
   */
   import { isStateScopableTabId } from '../utils/stateTargets.js';
+  import { sectionEditorInstanceKey } from './sectionEditorKey.js';
   import {
     ensureSectionEditorComponent,
     getSectionEditorComponent,
@@ -31,9 +32,6 @@
     if (!isStateScopableTabId(tabId)) return control;
     return scopedControl ?? control;
   });
-  let textEditorRenderKey = $derived(
-    `${control?._children?.Core?.id ?? 'none'}:${stateTargetKey}:${editorControl?._children?.Text?.content ?? ''}:${editorControl?._children?.Text?._children?.Font?.family ?? 'Arial'}`
-  );
   let editorProps = $derived.by(() => {
     if (contextMode === 'panel') {
       return { tabId };
@@ -49,10 +47,16 @@
     if (tabId === 'segments') return { control, stateTargetKey };
     return { control: editorControl };
   });
+  // Identity only — see sectionEditorKey.js for what used to be in here and why it is not any
+  // more. In short: the Text tab keyed on the text content, so every undo remounted a 2,455-line
+  // editor to change one caption.
   let editorInstanceKey = $derived(
-    tabId === 'text'
-      ? textEditorRenderKey
-      : `${contextMode}:${tabId}:${control?._children?.Core?.id ?? 'none'}:${tabId === 'segments' ? stateTargetKey : ''}`
+    sectionEditorInstanceKey({
+      contextMode,
+      tabId,
+      controlId: control?._children?.Core?.id ?? null,
+      stateTargetKey,
+    })
   );
   let hasDedicatedEditor = $derived(hasSectionEditor(contextMode, tabId));
   let EditorComponent = $state(null);

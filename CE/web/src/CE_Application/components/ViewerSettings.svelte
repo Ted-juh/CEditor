@@ -6,44 +6,59 @@
   import ImagePlus from 'lucide-svelte/icons/image-plus';
   import Pipette from 'lucide-svelte/icons/pipette';
   import NumberCell from '../properties/NumberCell.svelte';
+  import { createViewerSync } from '../utils/viewerSync.js';
 
   let { getViewerRef, statusMessage = '', hoverColor = null } = $props();
 
   let zoomDisplay = $state(100);
+  let eyedropperOn = $state(false);
 
-  // Poll zoom from viewer ref (lightweight — updates on user interaction)
-  $effect(() => {
-    const interval = setInterval(() => {
-      const ref = getViewerRef?.();
-      if (ref) zoomDisplay = ref.getZoom?.() ?? 100;
-    }, 100);
-    return () => clearInterval(interval);
+  /**
+   * This readout used to run off a 100ms `setInterval` that never stopped, and
+   * the eyedropper indicator was a `$derived` that read `void zoomDisplay` to
+   * borrow that heartbeat (B10). `ViewerEditor` keeps its zoom as component
+   * state behind `getZoom()`, so there is nothing to subscribe to — but zoom
+   * only ever moves because of an input event, so we read after those instead
+   * of ten times a second forever. See utils/viewerSync.js.
+   */
+  const viewerSync = createViewerSync({
+    getRef: () => getViewerRef?.() ?? null,
+    apply: ({ zoom, eyedropper }) => {
+      if (zoom !== null) zoomDisplay = zoom;
+      eyedropperOn = eyedropper;
+    },
   });
 
-  function zoomIn() { getViewerRef?.()?.zoomIn?.(); }
-  function zoomOut() { getViewerRef?.()?.zoomOut?.(); }
-  function zoom100() { getViewerRef?.()?.zoom100?.(); }
-  function fitToSection() { getViewerRef?.()?.fitToSection?.(); }
+  $effect(() => {
+    // The viewer mounts alongside us, so the first read is deferred a frame;
+    // referencing the prop keeps this honest if the tab is handed a new one.
+    void getViewerRef;
+    viewerSync.requestRefresh();
+    if (typeof window === 'undefined') return;
+    return viewerSync.attach(window);
+  });
+
+  /** Act, then read back at once — our own buttons need no event to notice. */
+  function act(run) {
+    const ref = getViewerRef?.();
+    if (!ref) return;
+    run(ref);
+    viewerSync.refresh();
+  }
+
+  function zoomIn() { act((ref) => ref.zoomIn?.()); }
+  function zoomOut() { act((ref) => ref.zoomOut?.()); }
+  function zoom100() { act((ref) => ref.zoom100?.()); }
+  function fitToSection() { act((ref) => ref.fitToSection?.()); }
   function loadImage() { getViewerRef?.()?.addImage?.() ?? document.querySelector('.image-tab-add')?.click(); }
 
   function toggleEyedropper() {
-    const ref = getViewerRef?.();
-    if (!ref) return;
-    const current = ref.isEyedropper?.() ?? false;
-    ref.setEyedropper?.(!current);
+    act((ref) => ref.setEyedropper?.(!(ref.isEyedropper?.() ?? false)));
   }
-
-  let eyedropperOn = $derived((() => {
-    // Re-check periodically via zoomDisplay dependency (polled)
-    void zoomDisplay;
-    return getViewerRef?.()?.isEyedropper?.() ?? false;
-  })());
 
   function handleZoomChange(v) {
     const val = parseInt(v, 10);
-    if (!isNaN(val)) {
-      getViewerRef?.()?.setZoom?.(val);
-    }
+    if (!isNaN(val)) act((ref) => ref.setZoom?.(val));
   }
 </script>
 

@@ -232,6 +232,15 @@
         hiddenIds={groundHolds.get(item.layer)?.heldIds ?? new Set()}
       />
     {:else}
+      <!-- THE TOP-LEVEL COORDINATE FRAME. `orderedControls` is the panel's top-level list and
+           nothing else, which is exactly right for a control whose x/y is measured from the panel
+           origin — these controls are each other's siblings and the panel is the box they live in.
+           It was also, for a long time, what every NESTED control was handed, and a nested
+           control's x/y is measured from its container's content origin instead; comparing the two
+           is what made snapping and distance labels inside a container meaningless. A container
+           now re-frames for its own children (CanvasControl hands them `frameControls` /
+           `frameSize`), so no frameControls is passed here — the absence IS the statement that this
+           is the top of the tree. -->
       <CanvasControl
         control={scopedEditingControlId != null && scopedEditingControlId === item.control._children?.Core?.id
           ? scopedEditingControl

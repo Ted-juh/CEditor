@@ -1,6 +1,6 @@
 <script>
   import { panels, activePanel, updatePanel, buildActivePanelVst3 } from '../stores/panels.js';
-  import { makeGuid } from '../stores/panelModel.js';
+  import { createPanel, makeGuid } from '../stores/panelModel.js';
   import { shortcutFromEvent, panicShortcutWarnings } from '../utils/panicLayout.js';
   import { deriveIdentity } from '../utils/exportIdentity.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
@@ -45,6 +45,14 @@
   } from '../stores/scriptModules.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
+  import {
+    backgroundLayerClipboard,
+    canPastePanelBackgroundLayer,
+    copyPanelBackgroundLayer,
+    getBackgroundLayerClipboard,
+    panelBackgroundLayerPatch,
+    panelBackgroundLayerPayload,
+  } from '../stores/backgroundLayerClipboard.js';
 
   let { tabId = '' } = $props();
 
@@ -248,6 +256,53 @@
     if (layerId === 'image') return panel.bgImageEnabled === true;
     if (layerId === 'texture') return panel.bgTextureEnabled === true;
     return false;
+  }
+
+  // --- Background layer copy / paste / reset ---
+  // The panel background had none of these. The control background editor has had a layer
+  // clipboard for a while, but it was its own private store, so a gradient could travel from one
+  // control to another and never to the panel behind them — the two editors are separate
+  // implementations over separate field names and there was no route between them.
+  //
+  // They share the clipboard now. stores/backgroundLayerClipboard.js owns the translation
+  // (the panel's "texture" is the control's "overlay"; `bgImageTint` is `imageTint`), so copying
+  // a control's Image layer and pasting it onto the panel — or the reverse — is one click each
+  // way, and the R/C/P buttons the Image and Texture sections have always drawn finally do
+  // something.
+  function copyBgLayer(layerId) {
+    if (panel) copyPanelBackgroundLayer(panel, layerId);
+  }
+
+  function canPasteBgLayer(layerId) {
+    return canPastePanelBackgroundLayer($backgroundLayerClipboard, layerId);
+  }
+
+  function pasteBgLayer(layerId) {
+    if (!panel) return;
+    const patch = panelBackgroundLayerPatch(getBackgroundLayerClipboard(), layerId);
+    if (patch) updatePanel(panel.id, patch);
+  }
+
+  // A pristine panel, made once and only if someone actually presses Reset. It burns one
+  // in-memory panel id, which is why it is not built at module load — those ids are session-local
+  // (see panelModel.makeGuid's note) but there is no reason to spend one on nobody's behalf.
+  let pristinePanel = null;
+  function panelDefaults() {
+    if (!pristinePanel) pristinePanel = createPanel();
+    return pristinePanel;
+  }
+
+  function resetBgLayer(layerId) {
+    if (!panel) return;
+    const defaults = panelDefaults();
+    const patch = panelBackgroundLayerPatch(panelBackgroundLayerPayload(defaults, layerId), layerId);
+    if (!patch) return;
+    // Reset restores the defaults but must not switch a layer the author had turned off back on.
+    delete patch.bgSolid;
+    delete patch.bgGradientEnabled;
+    delete patch.bgImageEnabled;
+    delete patch.bgTextureEnabled;
+    updatePanel(panel.id, patch);
   }
 
   // --- Panic shortcut capture ---------------------------------------------------
@@ -512,6 +567,11 @@
     {#each [...layerOrder()].reverse() as layerId (layerId)}
       {#if layerId === 'solid' && panel.bgSolid !== false}
         <PropertySection title="Solid" icon={PaintBucket}>
+          {#snippet tools()}
+            <button class="layer-tool-btn" title="Reset layer" onclick={() => resetBgLayer('solid')}>R</button>
+            <button class="layer-tool-btn" title="Copy layer settings" onclick={() => copyBgLayer('solid')}>C</button>
+            <button class="layer-tool-btn" disabled={!canPasteBgLayer('solid')} title="Paste layer settings" onclick={() => pasteBgLayer('solid')}>P</button>
+          {/snippet}
           <PropertyCell label="" span={2} hint="Background fill colour — click swatch to open colour picker">
             <button class="bg-swatch"
                     style="background:#{String(panel.bgColour ?? '333333').slice(-6)}"
@@ -531,6 +591,11 @@
       {/if}
       {#if layerId === 'gradient' && panel.bgGradientEnabled === true}
         <PropertySection title="Gradient" icon={Blend}>
+          {#snippet tools()}
+            <button class="layer-tool-btn" title="Reset layer" onclick={() => resetBgLayer('gradient')}>R</button>
+            <button class="layer-tool-btn" title="Copy layer settings" onclick={() => copyBgLayer('gradient')}>C</button>
+            <button class="layer-tool-btn" disabled={!canPasteBgLayer('gradient')} title="Paste layer settings" onclick={() => pasteBgLayer('gradient')}>P</button>
+          {/snippet}
           <PropertyCell label="" span={2} hint="Gradient preview — click to edit">
             <button class="bg-swatch"
                     style="background:{gradientToCSS(panel.bgGradient)}"
@@ -560,10 +625,14 @@
           defaultFit="fill"
           placeholder="No image selected"
           collapsed={imageCollapsed}
+          canPaste={canPasteBgLayer('image')}
           onupdate={(patch) => updatePanel(panel.id, patch)}
           onbrowse={handleBrowseImage}
           oncollapsetoggle={(v) => setCollapsed('bg-image', v)}
           onswatchclick={handleSwatchClick}
+          onreset={() => resetBgLayer('image')}
+          oncopy={() => copyBgLayer('image')}
+          onpaste={() => pasteBgLayer('image')}
         />
       {/if}
       {#if layerId === 'texture' && panel.bgTextureEnabled === true}
@@ -574,10 +643,14 @@
           defaultFit="tile"
           placeholder="No texture selected"
           collapsed={textureCollapsed}
+          canPaste={canPasteBgLayer('texture')}
           onupdate={(patch) => updatePanel(panel.id, patch)}
           onbrowse={handleBrowseTexture}
           oncollapsetoggle={(v) => setCollapsed('bg-texture', v)}
           onswatchclick={handleSwatchClick}
+          onreset={() => resetBgLayer('texture')}
+          oncopy={() => copyBgLayer('texture')}
+          onpaste={() => pasteBgLayer('texture')}
         />
       {/if}
     {/each}
@@ -1137,5 +1210,32 @@
     padding: 20px;
     color: #444;
     font-size: 11px;
+  }
+
+  /* Same R/C/P chips LayerEffectsSection draws for the Image and Texture layers, so the Solid and
+     Gradient sections' tools do not look like a different control. */
+  .layer-tool-btn {
+    width: 18px;
+    height: 16px;
+    background: #1A1A1A;
+    border: 1px solid #333;
+    border-radius: 3px;
+    color: #777;
+    font-size: 9px;
+    font-family: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .layer-tool-btn:hover {
+    border-color: #5B9BD5;
+    color: #DDD;
+  }
+
+  .layer-tool-btn:disabled {
+    opacity: 0.3;
+    pointer-events: none;
   }
 </style>

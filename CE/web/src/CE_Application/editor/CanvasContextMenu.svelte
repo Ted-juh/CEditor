@@ -11,14 +11,48 @@
   import { styleClipboard, copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { guides, clearGuides } from '../stores/guides.js';
+  import { placeMenu, placeSubmenu } from '../utils/menuPlacement.js';
 
   // `target` is null when hidden, { screenX, screenY, panelX, panelY } when shown.
   // Parent binds to this so the menu can close itself.
   let { target = $bindable(null), panel = null } = $props();
 
-  let sub = $state(null); // open submenu: 'order' | null
+  let sub = $state(null); // open submenu: 'edit' | 'order' | null
 
   function close() { target = null; sub = null; }
+
+  // --- Placement (see utils/menuPlacement.js for why) ---
+  // The menu used to be pinned straight to the pointer with no measurement at
+  // all, so near a window edge it simply hung outside it. Measure first, place
+  // second: the size is known only once the items are in the DOM, and it
+  // depends on the selection (Ungroup, Edit, Device Bindings all come and go),
+  // so this cannot be a constant.
+  let menuEl = $state(null);
+  let subEl = $state(null);
+  let placed = $state(null);
+  let subPlaced = $state(null);
+
+  const viewportSize = () => ({
+    width: typeof window === 'undefined' ? 0 : window.innerWidth,
+    height: typeof window === 'undefined' ? 0 : window.innerHeight,
+  });
+
+  $effect(() => {
+    // Re-measure whenever the menu opens somewhere new. Reading the rect is
+    // untracked, so writing `placed` here cannot loop.
+    const at = target;
+    if (!at || !menuEl) { placed = null; return; }
+    const rect = menuEl.getBoundingClientRect();
+    placed = placeMenu(at.screenX, at.screenY, { width: rect.width, height: rect.height }, viewportSize());
+  });
+
+  $effect(() => {
+    const which = sub;
+    if (!which || !subEl) { subPlaced = null; return; }
+    const itemRect = subEl.parentElement?.getBoundingClientRect();
+    const rect = subEl.getBoundingClientRect();
+    subPlaced = placeSubmenu(itemRect, { width: rect.width, height: rect.height }, viewportSize());
+  });
 
   function cut()    { cutSelection(); close(); }
   function copy()   { copySelection(); close(); }
@@ -98,7 +132,14 @@
     onmousedown={close}
     oncontextmenu={(e) => { e.preventDefault(); close(); }}
   ></div>
-  <div class="ctx-menu" style="left:{target.screenX}px; top:{target.screenY}px;">
+  <!-- Hidden for the one frame between "rendered so it can be measured" and
+       "measured, so we know where it goes" — a menu that visibly jumps into
+       place reads as a glitch. -->
+  <div
+    class="ctx-menu"
+    bind:this={menuEl}
+    style="left:{placed ? placed.left : target.screenX}px; top:{placed ? placed.top : target.screenY}px; {placed?.clipped ? `max-height:${placed.maxHeight}px; overflow-y:auto;` : ''} visibility:{placed ? 'visible' : 'hidden'};"
+  >
     <button class="ctx-item" disabled={$selectedComponentIds.size === 0} onclick={cut}>Cut<span class="ctx-shortcut">Ctrl+X</span></button>
     <button class="ctx-item" disabled={$selectedComponentIds.size === 0} onclick={copy}>Copy<span class="ctx-shortcut">Ctrl+C</span></button>
     <button class="ctx-item" disabled={!hasClipboardContent()} onclick={paste}>Paste Here<span class="ctx-shortcut">Ctrl+V</span></button>
@@ -112,7 +153,12 @@
         <div class="ctx-sub-wrapper" onmouseenter={() => sub = 'edit'} onmouseleave={() => sub = null}>
           <button class="ctx-item">Edit<span class="ctx-arrow">&#9656;</span></button>
           {#if sub === 'edit'}
-            <div class="ctx-submenu">
+            <div
+              class="ctx-submenu"
+              class:flip-left={subPlaced?.side === 'left'}
+              bind:this={subEl}
+              style="top:{subPlaced ? subPlaced.top : -4}px;"
+            >
               {#each editFacets as facet}
                 <button class="ctx-item" onclick={() => editFacet(facet.id)}>{facet.label}</button>
               {/each}
@@ -141,7 +187,12 @@
       <div class="ctx-sub-wrapper" onmouseenter={() => sub = 'order'} onmouseleave={() => sub = null}>
         <button class="ctx-item">Order<span class="ctx-arrow">&#9656;</span></button>
         {#if sub === 'order'}
-          <div class="ctx-submenu">
+          <div
+            class="ctx-submenu"
+            class:flip-left={subPlaced?.side === 'left'}
+            bind:this={subEl}
+            style="top:{subPlaced ? subPlaced.top : -4}px;"
+          >
             <button class="ctx-item" onclick={() => order(bringToFront)}>Bring to Front</button>
             <button class="ctx-item" onclick={() => order(bringForward)}>Bring Forward</button>
             <button class="ctx-item" onclick={() => order(sendBackward)}>Send Backward</button>
@@ -179,6 +230,11 @@
     border-radius: 4px;
     padding: 4px 0;
     box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    /* No overflow rule here on purpose — a menu taller than the window gets
+       max-height + overflow-y written inline, because scrolling also clips the
+       submenus that hang outside the box (overflow-x follows overflow-y to
+       `auto`), and that trade is only worth making when the alternative is
+       items nobody can reach. */
   }
 
   .ctx-item {
@@ -243,7 +299,6 @@
   .ctx-submenu {
     position: absolute;
     left: 100%;
-    top: -4px;
     min-width: 150px;
     background: #2D2D2D;
     border: 1px solid #444;
@@ -251,5 +306,13 @@
     padding: 4px 0;
     box-shadow: 0 4px 16px rgba(0,0,0,0.5);
     z-index: 1001;
+  }
+
+  /* Rightward was hardcoded, so a menu opened near the right edge grew a
+     submenu that started off-screen — worse than the parent menu's version of
+     the same bug, because the parent at least had its first column visible. */
+  .ctx-submenu.flip-left {
+    left: auto;
+    right: 100%;
   }
 </style>

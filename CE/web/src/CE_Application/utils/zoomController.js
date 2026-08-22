@@ -25,6 +25,7 @@ import {
   computeFitZoom,
   computeZoomToSelection,
   computeWheelZoom,
+  tidyZoomStep,
 } from './canvasInteractions.js';
 
 export function createZoomController({ getViewport, getPanel, getSelection, editorZoom, getZoom, getZoomIncrement = null }) {
@@ -87,17 +88,21 @@ export function createZoomController({ getViewport, getPanel, getSelection, edit
   }
 
   /** Step zoom (buttons, Ctrl+= / Ctrl+-), anchored at the viewport centre so
-   *  the view stays put instead of drifting toward the top-left corner. Uses
-   *  the user-configurable increment. */
+   *  the view stays put instead of drifting toward the top-left corner.
+   *
+   *  The step itself is multiplicative and lands on tidy numbers — see
+   *  tidyZoomStep, which also explains why the configurable increment is now
+   *  read as a percentage of the current zoom. Buttons and wheel are the same
+   *  gesture with different hardware, so they had no business disagreeing
+   *  about what one notch means. */
   function zoomStep(direction) {
     const el = getViewport();
     const panel = getPanel();
     if (!el || !panel) return;
-    const inc = Math.max(1, getZoomIncrement?.() ?? 10);
     const base = pendingDeferredResult?.zoom ?? getZoom();
     apply(
       computeAnchoredZoom(
-        el, getZoom(), panel, base + direction * inc,
+        el, getZoom(), panel, tidyZoomStep(base, direction, getZoomIncrement?.() ?? 10),
         el.clientWidth / 2, el.clientHeight / 2, pendingDeferredResult,
       ),
       /* scrollDeferred */ true,

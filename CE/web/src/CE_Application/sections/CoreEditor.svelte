@@ -1,5 +1,5 @@
 <script>
-  import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
+  import { getSection, renameControl, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import NumberCell from '../properties/NumberCell.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
@@ -26,6 +26,28 @@
     set(prop, value);
   }
 
+  // `Core.name` never goes through `set`. Two reasons, and both are about it being the
+  // script-addressable handle rather than an ordinary property:
+  //
+  //   - it has to be unique, and it has to survive being cleared, which is renameControl's job
+  //     (stores/controls.js) — this field wrote it blind, exactly as the tree's rename used to;
+  //   - it is never a multi-edit. `set` would call updateSelectedProperty for a multi-selection
+  //     and give twelve controls one name in one keystroke, which is the bug in its purest form.
+  //     A multi-selection shows the key object here, so the key object is what gets renamed.
+  let nameNotice = $state('');
+
+  function handleNameChange(e) {
+    if (!core?.id) return;
+    const typed = String(e.target.value ?? '').trim();
+    const result = renameControl(core.id, e.target.value);
+    const applied = result?.applied ?? typed;
+    nameNotice = applied === typed
+      ? ''
+      : (typed ? `"${typed}" is taken — used "${applied}"` : `A component needs a name — used "${applied}"`);
+    // The input is uncontrolled between renders, so put back whatever was actually applied.
+    e.target.value = applied;
+  }
+
   function handleToggle(prop) {
     set(prop, !core?.[prop]);
   }
@@ -40,8 +62,11 @@
     <div class="prop-row">
       <span class="lbl">Name</span>
       <input class="val" type="text" value={core.name}
-             onfocus={selectAll} onchange={(e) => handleInput('name', e)} />
+             onfocus={selectAll} onchange={handleNameChange} />
     </div>
+    {#if nameNotice}
+      <div class="name-notice" role="status">{nameNotice}</div>
+    {/if}
     <div class="prop-row">
       <span class="lbl">Type</span>
       <span class="val readonly">{core.controlType}</span>
@@ -56,11 +81,25 @@
       <input class="val" type="text" value={core.screenReaderText ?? ''}
              onfocus={selectAll} onchange={(e) => handleInput('screenReaderText', e)} />
     </div>
-    <div class="prop-row">
-      <span class="lbl">Preset</span>
-      <input class="val" type="text" value={core.stylePreset ?? ''}
-             onfocus={selectAll} onchange={(e) => handleInput('stylePreset', e)} />
-    </div>
+    <!--
+      `Core.stylePreset` was an editable text field on the most-visited card in the app, wired to
+      a document field that NOTHING has ever read — no renderer, no exporter, no script API, no
+      C++ side. Typing in it did nothing except dirty the panel. The input is gone rather than
+      given a meaning it never had; card presets (properties/PresetFooter.svelte) are the real
+      feature it looked like it was.
+
+      The row survives for one case: a document saved while the field existed still carries the
+      value, and deleting the author's text behind their back would be its own kind of dishonest.
+      So a non-empty value is shown, marked for what it is, with a way to clear it — and once
+      cleared the row is gone for good.
+    -->
+    {#if String(core.stylePreset ?? '').trim()}
+      <div class="prop-row">
+        <span class="lbl">Preset</span>
+        <span class="val readonly legacy" title="Left over from a field that was never read by anything. Safe to clear.">{core.stylePreset}</span>
+        <button class="clear-btn" title="Clear this unused value" onclick={() => set('stylePreset', '')}>Clear</button>
+      </div>
+    {/if}
     <div class="prop-row">
       <span class="lbl">State</span>
       <FlagStrip
@@ -92,4 +131,8 @@
   .val { color: #DDD; font-size: 11px; background: #1A1A1A; padding: 4px 6px; border-radius: 3px; border: 1px solid #333; flex: 1; min-width: 0; font-family: inherit; outline: none; }
   .val:focus { border-color: #5B9BD5; }
   .val.readonly { background: transparent; border-color: transparent; color: #666; }
+  .val.legacy { font-style: italic; }
+  .clear-btn { background: #2A2A2A; border: 1px solid #3A3A3A; border-radius: 3px; color: #999; font-size: 10px; font-family: inherit; padding: 3px 6px; cursor: pointer; flex-shrink: 0; }
+  .clear-btn:hover { border-color: #5B9BD5; color: #DDD; }
+  .name-notice { color: #E5A029; font-size: 10px; padding: 0 6px 2px 68px; }
 </style>

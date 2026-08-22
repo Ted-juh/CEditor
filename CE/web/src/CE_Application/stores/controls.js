@@ -452,6 +452,76 @@ export function duplicateControlsInPlace(ids) {
 }
 
 /**
+ * The name a control can actually be given: not blank, and not one another control already has.
+ *
+ * `Core.name` is the SCRIPT-ADDRESSABLE handle — `set("cutoff.value", 0.7)` finds a control by
+ * this string — so two controls sharing one is not a cosmetic clash, it is an ambiguous script
+ * target. Add, duplicate and paste have gone through a uniquifier since the paste/duplicate
+ * unification (`uniqueCopyName`, utils/containment.js); rename was the hole, writing whatever was
+ * typed straight into the document.
+ *
+ * The suffix rule here is deliberately NOT `uniqueCopyName`'s `_copy`: someone renaming `knob3` to
+ * `cutoff` when `cutoff` exists means "another cutoff", so they get `cutoff_2`, not `cutoff_copy`.
+ *
+ * @param {Set<string>} existingNames - names already in use (the control's own name excluded)
+ * @param {string} desired
+ * @param {string} fallback - used when `desired` is blank; the control's type, normally
+ */
+export function uniqueControlName(existingNames, desired, fallback = 'control') {
+  const base = String(desired ?? '').trim() || String(fallback ?? '').trim() || 'control';
+  if (!existingNames.has(base)) return base;
+  let n = 2;
+  while (existingNames.has(`${base}_${n}`)) n++;
+  return `${base}_${n}`;
+}
+
+/**
+ * Rename a control, honestly.
+ *
+ * The tree's inline rename used to do `if (renameValue.trim()) updateControlProperty(...)`, which
+ * meant clearing the field discarded the edit without a word, and typing a name another control
+ * already had applied it anyway. Both are decided here instead of at each call site, because
+ * there are three call sites (tree row, tree context menu, the Core card's Name field) and they
+ * were not going to agree on their own:
+ *
+ *   - a blank falls back to the control's type name, so the row always says *something*
+ *   - a name in use gets `_2`, `_3`… (see uniqueControlName)
+ *
+ * The applied name comes back so the caller can say what happened when it is not what was typed —
+ * a silent correction is only marginally better than a silent discard.
+ *
+ * @param {string} controlId
+ * @param {string} requestedName
+ * @returns {{ applied: string, requested: string, changed: boolean } | null}
+ */
+export function renameControl(controlId, requestedName) {
+  if (controlId == null) return null;
+  const requested = String(requestedName ?? '').trim();
+
+  const panelId = get(resolvedActivePanelId);
+  const panel = panelId == null ? null : get(panels).find((p) => p.id === panelId);
+  const control = panel ? findControlById(panel.controls, controlId) : null;
+
+  // No panel means the component-workspace document, whose control list this store cannot see.
+  // Applying the trimmed name unchecked is what happened before and is still the honest thing to
+  // do there — better a name than a silently dropped edit.
+  if (!panel || !control) {
+    if (!requested) return null;
+    updateControlProperty(controlId, 'Core.name', requested);
+    return { applied: requested, requested, changed: true };
+  }
+
+  const core = control._children?.Core ?? {};
+  const currentName = String(core.name ?? '');
+  const existingNames = collectControlNames(panel.controls);
+  existingNames.delete(currentName);
+
+  const applied = uniqueControlName(existingNames, requested, core.controlType ?? 'control');
+  if (applied !== currentName) updateControlProperty(controlId, 'Core.name', applied);
+  return { applied, requested, changed: applied !== currentName };
+}
+
+/**
  * Update a property on a control using a dot-notation path.
  * Path is relative to the control's _children, e.g.:
  *   "Transform.x" → control._children.Transform.x

@@ -579,6 +579,30 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                                + " emitCall=" + juce::String (juce::Time::getMillisecondCounterHiRes() - emitStartMs, 1) + "ms");
             });
         })
+        .withEventListener ("revealFile", [] (const juce::var& payload)
+        {
+            // "Show me where this actually is" — the tab strip's context menu (review finding D8).
+            // No browser round-trip and no reply: the OS file manager is the whole answer, so
+            // there is nothing for the web side to wait on. It still hops to the message thread,
+            // because revealToUser() opens a shell window and the bridge callback is not the
+            // place to do that.
+            juce::MessageManager::callAsync ([payload]()
+            {
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                juce::File file (payloadObj->getProperty ("filePath").toString());
+
+                // A path that no longer exists reveals nothing; fall back to the containing
+                // folder so a moved-or-deleted file still gets the user somewhere useful rather
+                // than opening a window on nothing.
+                if (file.exists())
+                    file.revealToUser();
+                else if (file.getParentDirectory().isDirectory())
+                    file.getParentDirectory().revealToUser();
+            });
+        })
         .withEventListener ("saveScriptWorkspaceAs", [this] (const juce::var& payload)
         {
             juce::MessageManager::callAsync ([this, payload]()

@@ -1,6 +1,12 @@
 import { sortControlsForHitTest } from './controlOrder.js';
 import { normalizeLayerName } from './panelLayers.js';
-import { contentOrigin, getChildControls } from './containment.js';
+import {
+  buildControlIndex,
+  contentOrigin,
+  findControlById,
+  getChildControls,
+  panelToLocalPoint,
+} from './containment.js';
 
 /** Rotate a panel-space point into a control's local (unrotated) frame,
  *  about the control's centre. Rotation-aware hit testing: the DOM rotates
@@ -68,21 +74,83 @@ function marqueeIntersects(t, rotation, rect) {
 }
 
 /**
+ * The container a marquee should select INSIDE, derived from the current
+ * selection, or null for the top level.
+ *
+ * There is no separate "you are now inside this group" flag anywhere in the
+ * editor, and adding one would give us two sources of truth to keep in step.
+ * The drill-down state is already fully expressed by the selection: a
+ * double-click on a container selects the child under the pointer
+ * (CanvasControl.handleDoubleClick), Escape hands the selection back to the
+ * parent (editorShortcuts.js), and the CSS that makes a drilled-into child
+ * directly draggable keys off `.selected` for exactly the same reason. So the
+ * scope is "the container every selected control shares" — one child selected
+ * after a drill, or the several children a previous scoped marquee left
+ * selected. A mixed selection, a top-level selection or an empty one is not a
+ * drill-down and scopes to null.
+ */
+export function marqueeScopeId(controls, selectedIds) {
+  const ids = selectedIds instanceof Set ? selectedIds : new Set(selectedIds ?? []);
+  if (ids.size === 0) return null;
+  const index = buildControlIndex(controls ?? []);
+  let scope;
+  for (const id of ids) {
+    const parentId = index.get(id)?.parent?._children?.Core?.id ?? null;
+    if (parentId == null) return null;              // something top-level is selected
+    if (scope === undefined) scope = parentId;
+    else if (scope !== parentId) return null;       // selection straddles containers
+  }
+  return scope ?? null;
+}
+
+/**
  * Return a Set of control IDs whose rendered rect (rotation included)
  * intersects the given rect (partial overlap counts). `rect` is
  * { x, y, w, h } in panel coordinates.
  *
- * Marquee scope: a marquee started on the panel surface selects TOP-LEVEL
- * controls only — nested children are selected by clicking into their
- * container, matching every design tool.
+ * MARQUEE SCOPE. With no `scopeId` a marquee selects TOP-LEVEL controls only,
+ * which is right when nothing is drilled into: rubber-banding across a
+ * container is asking for the container, not its parts.
+ *
+ * `scopeId` names the container the user has drilled into (see
+ * marqueeScopeId), and inside one the answer inverts — the parts are what you
+ * are working on and the container is the box around them, so the marquee
+ * selects THAT CONTAINER'S CHILDREN and nothing else. Without this there was
+ * no rubber-band selection of nested controls anywhere in the app, at any
+ * time, however deep you had drilled.
+ *
+ * One level, deliberately: the marquee reaches exactly as far as the
+ * double-click that got you here did. Drill again for the level below.
+ *
+ * The rect arrives in panel space and the children's x/y are measured from
+ * their container's content origin, so it is translated into their frame
+ * first — the same conversion `panelToLocalPoint` does for the drill-down hit
+ * test. A ROTATED container is not handled: its children's frame is rotated
+ * too, and nothing else in the editor (controlPanelOffset, the drop
+ * candidates, the distance labels) accounts for that either. Scoping is
+ * skipped for one rather than being quietly wrong about where its children
+ * are.
  */
-export function findControlsInRect(controls, rect, getSection) {
+export function findControlsInRect(controls, rect, getSection, scopeId = null) {
   const ids = new Set();
-  for (const ctrl of controls) {
+  let list = controls;
+  let scopedRect = rect;
+
+  if (scopeId != null) {
+    const container = findControlById(controls ?? [], scopeId);
+    const kids = getChildControls(container);
+    if (!kids.length) return ids;
+    if (Number(container?._children?.Transform?.rotation ?? 0) % 360) return ids;
+    const local = panelToLocalPoint(controls, scopeId, rect.x, rect.y);
+    list = kids;
+    scopedRect = { x: local.x, y: local.y, w: rect.w, h: rect.h };
+  }
+
+  for (const ctrl of list) {
     const t = getSection(ctrl, 'Transform');
     const c = getSection(ctrl, 'Core');
     if (!t || !c) continue;
-    if (marqueeIntersects(t, t.rotation, rect)) {
+    if (marqueeIntersects(t, t.rotation, scopedRect)) {
       ids.add(c.id);
     }
   }

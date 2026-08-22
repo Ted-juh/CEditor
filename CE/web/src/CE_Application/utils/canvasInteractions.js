@@ -17,19 +17,27 @@ import { flatControlsWithPanelRects } from './containment.js';
  *
  *   state        — { isPanning: false, spaceHeld: false }
  *   getViewport  — () => HTMLElement | null
- *   onRightClick — (screenX, screenY) => void  (called on no-drag right-click)
+ *
+ * THE RIGHT BUTTON DOES NOT PAN. It used to, and it cost the menu: the pan
+ * ended by deciding whether the press had been a click or a drag, and more
+ * than two pixels of travel meant "drag", meaning no context menu. The native
+ * menu is suppressed on the canvas, so a right-click with a shaky hand — the
+ * ordinary case on a trackpad, or on any mouse held while talking — produced
+ * no menu at all, from either source. There is no threshold that fixes that,
+ * because the two gestures share a button and the wrong guess is silent.
+ *
+ * So the button was given back its one conventional job. Panning already has
+ * two bindings that nothing else wants (middle-drag and Space+drag), the menu
+ * now opens from the browser's own `contextmenu` event, which fires whether
+ * or not the pointer moved, and right-drag does nothing.
  */
-export function createPanController(state, { getViewport, onRightClick }) {
+export function createPanController(state, { getViewport }) {
   let panStart = { x: 0, y: 0, scrollX: 0, scrollY: 0 };
-  let panDidMove = false;
-  let panButton = -1;
 
   function startPan(e) {
     const el = getViewport();
     if (!el) return;
     state.isPanning = true;
-    panDidMove = false;
-    panButton = e.button;
     panStart = { x: e.clientX, y: e.clientY, scrollX: el.scrollLeft, scrollY: el.scrollTop };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onEnd);
@@ -38,27 +46,18 @@ export function createPanController(state, { getViewport, onRightClick }) {
   function onMove(e) {
     const el = getViewport();
     if (!state.isPanning || !el) return;
-    const dx = e.clientX - panStart.x;
-    const dy = e.clientY - panStart.y;
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) panDidMove = true;
-    el.scrollLeft = panStart.scrollX - dx;
-    el.scrollTop = panStart.scrollY - dy;
+    el.scrollLeft = panStart.scrollX - (e.clientX - panStart.x);
+    el.scrollTop = panStart.scrollY - (e.clientY - panStart.y);
   }
 
-  function onEnd(e) {
-    const wasRight = panButton === 2;
-    const didMove = panDidMove;
+  function onEnd() {
     state.isPanning = false;
-    panButton = -1;
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onEnd);
-    // Right-click with no drag → show context menu
-    if (wasRight && !didMove && e) onRightClick?.(e.clientX, e.clientY);
   }
 
   function handleMouseDown(e) {
     if (e.button === 1) { e.preventDefault(); startPan(e); return true; }
-    if (e.button === 2) { startPan(e); return true; }
     if (e.button === 0 && state.spaceHeld) {
       e.preventDefault();
       e.stopPropagation();
@@ -94,12 +93,51 @@ export function createPanController(state, { getViewport, onRightClick }) {
  *   getSurface  — () => HTMLElement | null  (panel surface for coordinate math)
  *   getScale    — () => number              (zoom scale to divide by)
  *   isBlocked   — () => boolean             (e.g. "is space held? don't start")
- *   onSelect    — (rect) => void            (called on mouseup if rect is meaningful)
+ *   onSelect    — (rect, mouseUpEvent, info) => void  (called on mouseup)
+ *   alsoStartsOn — (target) => boolean, an extra "yes, start here" the
+ *                  consumer supplies for cases only it can judge. The editor
+ *                  uses it for the body of a container the user has drilled
+ *                  into: inside a group, dragging over its empty space is a
+ *                  rubber band over its children, not a drag of the group.
  *
- * Returns { handleMouseDown, getRect } — `getRect` always returns the current
+ * `info` carries { onLocked } — see startsMarquee. Returns
+ * { handleMouseDown, getRect }; `getRect` always returns the current
  * normalized rect in panel coordinates.
  */
-export function createMarqueeController(state, { getSurface, getScale, isBlocked, onSelect }) {
+
+/**
+ * Is this mousedown target something a rubber band may start on?
+ *
+ * The surface itself and its two full-bleed decorations obviously are. A
+ * LOCKED CONTROL is the interesting case: it used to be an absolute wall,
+ * because it is a real element that takes the press and its own mousedown
+ * calls stopPropagation, so the surface below never heard about it. Locking a
+ * background plate — the single most common thing anyone locks — therefore
+ * removed the ability to rubber-band across most of the panel, which is the
+ * opposite of what locking is for. Locked means "not a target", so the press
+ * belongs to the marquee.
+ *
+ * A control locked on its own is now click-through in CSS
+ * (CanvasControl's .lock-click-through), which makes `e.target` the surface
+ * and never reaches this branch at all. It still matters for the case that
+ * rule deliberately leaves alone: a locked PANEL, where every control keeps
+ * its pointer events so the canvas does not go inert. Marquee-selecting on a
+ * locked panel is legitimate — selection is not mutation.
+ */
+export function startsMarquee(target, surface) {
+  if (!target) return false;
+  if (target === surface) return true;
+  if (target.classList?.contains?.('grid-overlay') || target.classList?.contains?.('bg-layer')) return true;
+  return !!target.closest?.('.canvas-control.locked');
+}
+
+export function createMarqueeController(state, { getSurface, getScale, isBlocked, onSelect, alsoStartsOn = null }) {
+  // Whether the gesture began on top of a locked control rather than on bare
+  // surface. The consumer needs to know: a click-sized marquee normally means
+  // "deselect", but a press on a control has already selected something by the
+  // time we get here, and clearing that would make locked controls unclickable.
+  let onLocked = false;
+
   function getRect() {
     const x1 = Math.min(state.start.x, state.end.x);
     const y1 = Math.min(state.start.y, state.end.y);
@@ -110,10 +148,14 @@ export function createMarqueeController(state, { getSurface, getScale, isBlocked
 
   function handleMouseDown(e) {
     if (e.button !== 0 || isBlocked?.()) return;
+    // The locked-control route registers this handler in the CAPTURE phase as
+    // well (the control's own mousedown would otherwise stop it reaching the
+    // surface), so the same press can arrive twice. First one wins.
+    if (state.isActive) return;
     const el = getSurface();
     if (!el) return;
-    // Only start marquee on the surface itself, not on controls
-    if (e.target !== el && !e.target.classList.contains('grid-overlay') && !e.target.classList.contains('bg-layer')) return;
+    if (!startsMarquee(e.target, el) && !alsoStartsOn?.(e.target)) return;
+    onLocked = e.target !== el && !!e.target.closest?.('.canvas-control.locked');
 
     e.preventDefault();
     const rect = el.getBoundingClientRect();
@@ -145,7 +187,8 @@ export function createMarqueeController(state, { getSurface, getScale, isBlocked
     state.isActive = false;
     // The mouseup event rides along so the consumer can read modifiers
     // (Shift+marquee extends the selection instead of replacing it).
-    onSelect?.(getRect(), e);
+    onSelect?.(getRect(), e, { onLocked });
+    onLocked = false;
 
     // Swallow the click that follows mouseup so canvas-click handlers don't
     // immediately clear the selection we just made.
@@ -266,6 +309,44 @@ export function computeAnchoredZoom(viewportEl, currentZoom, panel, targetZoom, 
     scrollLeft: panelX * newScale + newOff.left - anchorVpX,
     scrollTop: panelY * newScale + newOff.top - anchorVpY,
   };
+}
+
+/**
+ * The next zoom a button/keyboard step should land on.
+ *
+ * MULTIPLICATIVE, like the wheel. The old step was `zoom + increment`, and an
+ * additive step over a range that spans 40× is two different gestures wearing
+ * one name: +10 at the bottom doubled the view (10%→20%), +10 at the top moved
+ * it by a fortieth (390%→400%). Zoom is perceived in ratios, so the step is
+ * one — every press changes the view by the same proportion wherever you are.
+ *
+ * WHAT THE INCREMENT SETTING NOW MEANS. It is read as a PERCENTAGE OF THE
+ * CURRENT ZOOM rather than a number of percentage points: the default 10 is
+ * ×1.1 per press, exactly the wheel's factor, and at 100% it still lands on
+ * 110% so the setting reads the same as it always did at the zoom people
+ * mostly sit at. That coincidence is the reason for choosing this reading over
+ * a stop-ladder — nobody's configured value silently becomes something else.
+ *
+ * TIDY LANDINGS. A raw ratio produces 121%, 133%, 146%. Zoom levels are read
+ * aloud and typed into the zoom box, so the result is rounded to a granularity
+ * that grows with the number: 1 below 20%, 5 below 100%, 10 below 200%, 25
+ * above. Rounding can collide with where we started (22.7 → 25 → the button
+ * does nothing) or even overshoot backwards, so the last step forces a move of
+ * at least one granularity unit in the requested direction. A zoom button that
+ * sometimes does nothing is worse than one that is slightly uneven.
+ */
+export function tidyZoomStep(base, direction, incrementPercent = 10) {
+  const from = Number(base) || 0;
+  const pct = Math.max(1, Number(incrementPercent) || 10);
+  const factor = 1 + pct / 100;
+  const raw = direction > 0 ? from * factor : from / factor;
+
+  const grain = (z) => (z < 20 ? 1 : z < 100 ? 5 : z < 200 ? 10 : 25);
+  const g = grain(raw);
+  let next = Math.round(raw / g) * g;
+  if (direction > 0 && next <= from) next = from + grain(from);
+  if (direction < 0 && next >= from) next = from - grain(from);
+  return clampZoom(next);
 }
 
 /**

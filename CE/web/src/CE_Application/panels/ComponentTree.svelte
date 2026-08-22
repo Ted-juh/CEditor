@@ -19,11 +19,20 @@
   // stroke attributes), minus the class names, which nothing styles. Icons elsewhere in the editor
   // are fine as components — this is about a list with hundreds of rows, not about lucide.
   import { activePanel, selectedComponentIds, selectComponent, keyObjectId } from '../stores/panels.js';
-  import { applyControlPatchesById, updateControlProperty, reparentControls, removeControl, duplicateControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
+  import { applyControlPatchesById, renameControl, updateControlProperty, reparentControls, removeControl, duplicateControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
   import { bringToFront, bringForward, sendBackward, sendToBack } from '../stores/alignment.js';
   import { getSection } from '../models/componentTypes.js';
   import { getControlId, getControlLayer, sortControlsForRender } from '../utils/controlOrder.js';
   import { isEditableTarget } from '../utils/globalShortcuts.js';
+  import {
+    TREE_ROW_HEIGHT,
+    controlTreeSignature,
+    dragAutoScrollStep,
+    scrollTopForRow,
+    treeArrowTarget,
+    treeWindow,
+    typeBadgeAddsInformation,
+  } from '../utils/componentTreeView.js';
   import {
     controlPanelRect,
     findControlById,
@@ -77,26 +86,54 @@
   // container-ness and the inherited hidden/locked flags are part of the row, so a cached row is
   // only reused while all of them still hold. (A control's OWN hidden/locked state needs no check:
   // editing it replaces the control object, which misses the WeakMap on its own.)
+  //
+  // `posinset`/`setsize` are here because the list is windowed: only ~25 of the rows are in the
+  // DOM at once, so a screen reader counting `role="treeitem"` children would announce "3 of 25"
+  // in a panel of 413. They have to be told the real position, and only the walk knows it.
   const rowCache = new WeakMap();
-  const rowFor = (ctrl, id, depth, container, inheritedHidden, inheritedLocked) => {
+  const rowFor = (ctrl, id, depth, container, inheritedHidden, inheritedLocked, posinset, setsize) => {
     const cached = rowCache.get(ctrl);
     if (
       cached !== undefined &&
       cached.depth === depth &&
       cached.container === container &&
       cached.inheritedHidden === inheritedHidden &&
-      cached.inheritedLocked === inheritedLocked
+      cached.inheritedLocked === inheritedLocked &&
+      cached.posinset === posinset &&
+      cached.setsize === setsize
     ) return cached;
-    const row = { ctrl, id, depth, container, inheritedHidden, inheritedLocked };
+    const row = { ctrl, id, depth, container, inheritedHidden, inheritedLocked, posinset, setsize };
     rowCache.set(ctrl, row);
     return row;
   };
 
+  // The last row array handed out, and the inputs it was built from. `controlTreeSignature` covers
+  // everything a row draws or is ordered by; the filter text and the collapsed set are the other
+  // two inputs. When none of the three moved, the SAME array instance goes back out, so the
+  // `$derived` value is unchanged, the keyed `{#each}` is never entered, and a canvas drag — which
+  // writes Transform.x/y and nothing this tree shows — costs one signature pass per frame instead
+  // of a sort per sibling list and 413 fresh row objects.
+  let cachedRows = [];
+  let cachedPanelId = null;
+  let cachedSignature = null;
+  let cachedQuery = null;
+  let cachedCollapsed = null;
+
   let rows = $derived.by(() => {
     if (!$activePanel) return [];
     const controls = $activePanel.controls;
+    const panelId = $activePanel.id;
 
     const query = filterText.trim().toLowerCase();
+    const signature = controlTreeSignature(controls);
+    if (
+      panelId === cachedPanelId
+      && signature === cachedSignature
+      && query === cachedQuery
+      && collapsedIds === cachedCollapsed
+    ) {
+      return cachedRows;
+    }
     let visibleSet = null;
     if (query) {
       visibleSet = new Set();
@@ -113,27 +150,66 @@
 
     const out = [];
     const visit = (list, depth, inheritedHidden, inheritedLocked) => {
-      for (const ctrl of [...sortControlsForRender(list)].reverse()) {
+      const siblings = [...sortControlsForRender(list)].reverse()
+        .filter((ctrl) => !visibleSet || visibleSet.has(getControlId(ctrl)));
+      const setsize = siblings.length;
+      siblings.forEach((ctrl, index) => {
         const id = getControlId(ctrl);
-        if (visibleSet && !visibleSet.has(id)) continue;
         const container = isContainerControl(ctrl);
         const core = ctrl._children?.Core;
         const hidden = core?.visible === false;
         const locked = core?.locked === true;
-        out.push(rowFor(ctrl, id, depth, container, inheritedHidden, inheritedLocked));
+        out.push(rowFor(ctrl, id, depth, container, inheritedHidden, inheritedLocked, index + 1, setsize));
         if (container && (query || !collapsedIds.has(id))) {
           visit(getChildControls(ctrl), depth + 1, inheritedHidden || hidden, inheritedLocked || locked);
         }
-      }
+      });
     };
     visit(controls, 0, false, false);
+
+    cachedRows = out;
+    cachedPanelId = panelId;
+    cachedSignature = signature;
+    cachedQuery = query;
+    cachedCollapsed = collapsedIds;
     return out;
   });
 
   let totalCount = $derived($activePanel ? flatControls($activePanel.controls).length : 0);
 
-  // --- Reveal: canvas selection must be findable in the tree ---
+  // --- Windowing ---
+  // Only the rows in (and just outside) the viewport are mounted; the rest are two spacer divs.
+  // Everything that used to reach for a row ELEMENT — the reveal below, the keyboard focus, the
+  // drag targets — now works from the row INDEX, because the element it wants usually does not
+  // exist. That is the whole cost of virtualizing this list, and it is paid in the four places
+  // marked "windowed:".
   let treeListEl = $state(null);
+  let scrollTop = $state(0);
+  let viewportHeight = $state(0);
+
+  let windowRange = $derived(treeWindow({ scrollTop, viewportHeight, rowCount: rows.length }));
+  let visibleRows = $derived(rows.slice(windowRange.start, windowRange.end));
+
+  function handleListScroll(e) {
+    scrollTop = e.currentTarget.scrollTop;
+  }
+
+  // windowed: scroll by index, then let the render catch up.
+  function scrollRowIntoView(index) {
+    if (!treeListEl || index < 0) return;
+    const next = scrollTopForRow({
+      index,
+      scrollTop: treeListEl.scrollTop,
+      viewportHeight: treeListEl.clientHeight,
+      rowCount: rows.length,
+    });
+    if (next !== treeListEl.scrollTop) {
+      treeListEl.scrollTop = next;
+      scrollTop = next;
+    }
+  }
+
+  // --- Reveal: canvas selection must be findable in the tree ---
   let lastRevealedId = null;
   $effect(() => {
     const ids = $selectedComponentIds;
@@ -151,11 +227,12 @@
       setCollapsed(next);
     }
 
-    requestAnimationFrame(() => {
-      treeListEl
-        ?.querySelector(`[data-tree-id="${CSS.escape(String(first))}"]`)
-        ?.scrollIntoView({ block: 'nearest' });
-    });
+    // windowed: `rows` is re-derived on read, so the index below already accounts for the
+    // ancestors just expanded. The rAF is still needed for the element's own height to settle
+    // after a panel switch, not for the row to exist — the index does not need it to.
+    const index = rows.findIndex((row) => row.id === first);
+    focusedId = first;
+    requestAnimationFrame(() => scrollRowIntoView(index));
   });
 
   // --- Rename ---
@@ -167,9 +244,35 @@
     renameValue = name;
   }
 
+  // A rename that cannot be typed is a rename that lies. The old code took `renameValue.trim()`
+  // and, if it was empty, threw the edit away without a word — the row snapped back to its old
+  // name and nothing said why. And it wrote `Core.name` straight through, so two controls could
+  // end up sharing the name a script addresses them by.
+  //
+  // Both are `renameControl`'s job now (stores/controls.js): a blank falls back to the type name,
+  // a taken name gets a numeric suffix. What it can never do is happen silently, so whenever the
+  // applied name is not the typed one, the tree says so.
+  let renameNotice = $state('');
+  let renameNoticeTimer = null;
+
+  function showRenameNotice(message) {
+    renameNotice = message;
+    clearTimeout(renameNoticeTimer);
+    renameNoticeTimer = setTimeout(() => { renameNotice = ''; }, 4000);
+  }
+
   function commitRename() {
-    if (renamingId && renameValue.trim()) {
-      updateControlProperty(renamingId, 'Core.name', renameValue.trim());
+    if (!renamingId) return;
+    const typed = renameValue.trim();
+    const result = renameControl(renamingId, renameValue);
+    if (result?.applied && result.applied !== typed) {
+      showRenameNotice(
+        typed
+          ? `"${typed}" is taken — renamed to "${result.applied}"`
+          : `A component needs a name — used "${result.applied}"`
+      );
+    } else {
+      renameNotice = '';
     }
     renamingId = null;
   }
@@ -182,6 +285,9 @@
   // F2 renames the selected component — the same convention the code editor
   // and behavior designer already use.
   function handleWindowKeyDown(e) {
+    // The tree's own keydown already handles F2 for the focused row; this is the path for when
+    // focus is somewhere else entirely (the canvas, a bar button) and the selection is the target.
+    if (e.defaultPrevented) return;
     if (e.key !== 'F2' || isEditableTarget(e.target)) return;
     const ids = $selectedComponentIds;
     if (ids.size !== 1) return;
@@ -192,25 +298,82 @@
     startRename(id, core.name ?? '');
   }
 
-  // --- Selection ---
-  function handleItemClick(id, e) {
-    if (e.shiftKey && $keyObjectId != null) {
-      // Range-select between the anchor (key object) and the clicked row,
-      // in display order. Ctrl+Shift adds the range to the selection.
-      const ids = rows.map((row) => row.id);
-      const a = ids.indexOf($keyObjectId);
-      const b = ids.indexOf(id);
-      if (a !== -1 && b !== -1) {
-        const [lo, hi] = a < b ? [a, b] : [b, a];
-        const range = ids.slice(lo, hi + 1);
-        if (e.ctrlKey || e.metaKey) {
-          selectedComponentIds.update((s) => new Set([...s, ...range]));
-        } else {
-          selectedComponentIds.set(new Set(range));
-        }
-        return;
-      }
+  // --- Keyboard traversal (WAI-ARIA tree pattern) ---
+  // The rows used to be non-focusable divs with the a11y warnings switched off above them, which
+  // meant the tree was mouse-only: no way in from the keyboard, nothing for a screen reader to
+  // read, and no Delete because there was nothing to press it on. The list is now a roving-
+  // tabindex `role="tree"` — one row in the tab order at a time, arrows to move between them.
+  let focusedId = $state(null);
+  let focusedIndex = $derived(rows.findIndex((row) => row.id === focusedId));
+
+  // windowed: the row to focus is often not mounted yet, so move the scroll first and let the
+  // window catch up, then take focus on the next frame.
+  function moveFocus(index, e) {
+    const row = rows[index];
+    if (!row) return;
+    focusedId = row.id;
+    scrollRowIntoView(index);
+    if (e?.shiftKey && $keyObjectId != null) selectRange(row.id, e.ctrlKey || e.metaKey);
+    else if (!e?.ctrlKey && !e?.metaKey) selectComponent(row.id, false);
+    requestAnimationFrame(() => focusRowElement(row.id));
+  }
+
+  function focusRowElement(id) {
+    treeListEl?.querySelector(`[data-tree-id="${CSS.escape(String(id))}"]`)?.focus?.({ preventScroll: true });
+  }
+
+  function handleTreeKeyDown(e) {
+    if (renamingId != null || isEditableTarget(e.target)) return;
+
+    const arrow = treeArrowTarget({
+      rows,
+      index: focusedIndex,
+      key: e.key,
+      expanded: (id) => filtering || !collapsedIds.has(id),
+    });
+    if (arrow) {
+      e.preventDefault();
+      if (arrow.type === 'move') moveFocus(arrow.index, e);
+      else toggleCollapsed(arrow.id);
+      return;
     }
+
+    const row = rows[focusedIndex];
+    if (!row) return;
+
+    if (e.key === 'Enter' || e.key === 'F2') {
+      e.preventDefault();
+      startRename(row.id, getSection(row.ctrl, 'Core')?.name ?? '');
+    } else if (e.key === ' ') {
+      e.preventDefault();
+      selectComponent(row.id, true);
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      const ids = $selectedComponentIds.has(row.id) ? [...$selectedComponentIds] : [row.id];
+      for (const id of ids) removeControl(id);
+    } else if (e.key === 'Escape') {
+      closeCtx();
+    }
+  }
+
+  // --- Selection ---
+  function selectRange(id, additive) {
+    const ids = rows.map((row) => row.id);
+    const a = ids.indexOf($keyObjectId);
+    const b = ids.indexOf(id);
+    if (a === -1 || b === -1) return false;
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+    const range = ids.slice(lo, hi + 1);
+    if (additive) selectedComponentIds.update((s) => new Set([...s, ...range]));
+    else selectedComponentIds.set(new Set(range));
+    return true;
+  }
+
+  function handleItemClick(id, e) {
+    focusedId = id;
+    // Range-select between the anchor (key object) and the clicked row, in display order.
+    // Ctrl+Shift adds the range to the selection.
+    if (e.shiftKey && $keyObjectId != null && selectRange(id, e.ctrlKey || e.metaKey)) return;
     if (e.ctrlKey || e.metaKey) {
       selectComponent(id, true);
     } else {
@@ -303,6 +466,40 @@
     dragOverId = null;
     dragOverPos = null;
     dragSourceIds = [];
+    stopDragAutoScroll();
+  }
+
+  // --- Drag auto-scroll ---
+  // A drag holds the pointer, so the wheel never reaches the list and the drop target has to be
+  // on screen already: without this, moving a row from the bottom of a 413-row panel to the top
+  // is not a slow operation, it is an impossible one. Hovering near an edge scrolls the list, at
+  // a speed that ramps with how close to the edge the pointer is.
+  let dragScrollFrame = 0;
+  let dragScrollSpeed = 0;
+
+  function stopDragAutoScroll() {
+    if (dragScrollFrame) cancelAnimationFrame(dragScrollFrame);
+    dragScrollFrame = 0;
+    dragScrollSpeed = 0;
+  }
+
+  function stepDragAutoScroll() {
+    dragScrollFrame = 0;
+    if (!treeListEl || dragScrollSpeed === 0 || dragSourceIds.length === 0) return;
+    treeListEl.scrollTop += dragScrollSpeed;
+    scrollTop = treeListEl.scrollTop;
+    dragScrollFrame = requestAnimationFrame(stepDragAutoScroll);
+  }
+
+  function updateDragAutoScroll(clientY) {
+    if (!treeListEl) return;
+    const rect = treeListEl.getBoundingClientRect();
+    dragScrollSpeed = dragAutoScrollStep({ pointerY: clientY, top: rect.top, bottom: rect.bottom });
+    if (dragScrollSpeed !== 0 && !dragScrollFrame) {
+      dragScrollFrame = requestAnimationFrame(stepDragAutoScroll);
+    } else if (dragScrollSpeed === 0) {
+      stopDragAutoScroll();
+    }
   }
 
   function handleDragStart(id, e) {
@@ -317,6 +514,7 @@
   function handleDragOver(id, container, e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    updateDragAutoScroll(e.clientY);
     if (dragSourceIds.length === 0 || dragSourceIds.includes(id)) { dragOverId = null; return; }
     // Never allow dropping a container into its own subtree
     if ($activePanel && dragSourceIds.some((sourceId) => isDescendantOfControl($activePanel.controls, sourceId, id))) {
@@ -447,132 +645,186 @@
     {/if}
   </div>
 
-  <div class="tree-list" bind:this={treeListEl}>
+  {#if renameNotice}
+    <div class="rename-notice" role="status">{renameNotice}</div>
+  {/if}
+
+  <!--
+    windowed: `.tree-list` scrolls, `.tree-window` is a full-height spacer so the scrollbar
+    matches the real row count, and only `visibleRows` are mounted. `padTop` positions them.
+    The ARIA tree lives on these two elements: the scroller is the `tree`, the rows inside are
+    `treeitem`s carrying their real position via aria-posinset/aria-setsize, because most of
+    their siblings are not in the DOM to be counted.
+  -->
+  <div
+    class="tree-list"
+    bind:this={treeListEl}
+    bind:clientHeight={viewportHeight}
+    onscroll={handleListScroll}
+    ondragover={(e) => { e.preventDefault(); updateDragAutoScroll(e.clientY); }}
+    ondragleave={(e) => { if (!treeListEl?.contains(e.relatedTarget)) stopDragAutoScroll(); }}
+    role="tree"
+    aria-label="Components"
+    aria-multiselectable="true"
+    tabindex="-1"
+  >
     {#if rows.length === 0}
       <div class="tree-empty">{filtering ? 'No matches' : 'No components'}</div>
     {:else}
-      {#each rows as row (row.id)}
-        {@const core = getSection(row.ctrl, 'Core')}
-        {@const id = row.id}
-        {@const isSelected = $selectedComponentIds.has(id)}
-        {@const isKey = $keyObjectId === id && $selectedComponentIds.size > 1}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div
-          class="tree-item"
-          class:selected={isSelected}
-          class:key-object={isKey}
-          class:hidden-item={core?.visible === false || row.inheritedHidden}
-          class:drag-above={dragOverId === id && dragOverPos === 'above'}
-          class:drag-below={dragOverId === id && dragOverPos === 'below'}
-          class:drag-inside={dragOverId === id && dragOverPos === 'inside'}
-          style="padding-left: {10 + row.depth * 14}px"
-          data-tree-id={id}
-          onclick={(e) => handleItemClick(id, e)}
-          ondblclick={() => startRename(id, core?.name ?? '')}
-          oncontextmenu={(e) => openContextMenu(id, e)}
-          draggable="true"
-          ondragstart={(e) => handleDragStart(id, e)}
-          ondragover={(e) => handleDragOver(id, row.container, e)}
-          ondragleave={handleDragLeave}
-          ondrop={handleDrop}
-          ondragend={handleDragEnd}
-        >
-          {#if row.container}
-            <button
-              class="collapse-toggle"
-              title={collapsedIds.has(id) ? 'Expand' : 'Collapse'}
-              onclick={(e) => { e.stopPropagation(); toggleCollapsed(id); }}
+      <div class="tree-window" role="presentation" style="height: {rows.length * TREE_ROW_HEIGHT}px">
+        <div class="tree-rows" role="presentation" style="transform: translateY({windowRange.padTop}px)">
+          {#each visibleRows as row (row.id)}
+            {@const core = getSection(row.ctrl, 'Core')}
+            {@const id = row.id}
+            {@const isSelected = $selectedComponentIds.has(id)}
+            {@const isKey = $keyObjectId === id && $selectedComponentIds.size > 1}
+            <div
+              class="tree-item"
+              class:selected={isSelected}
+              class:key-object={isKey}
+              class:hidden-item={core?.visible === false || row.inheritedHidden}
+              class:drag-above={dragOverId === id && dragOverPos === 'above'}
+              class:drag-below={dragOverId === id && dragOverPos === 'below'}
+              class:drag-inside={dragOverId === id && dragOverPos === 'inside'}
+              style="padding-left: {10 + row.depth * 14}px"
+              data-tree-id={id}
+              role="treeitem"
+              aria-selected={isSelected}
+              aria-level={row.depth + 1}
+              aria-posinset={row.posinset}
+              aria-setsize={row.setsize}
+              aria-expanded={row.container ? (filtering || !collapsedIds.has(id)) : undefined}
+              tabindex={focusedId === id || (focusedId == null && row === visibleRows[0]) ? 0 : -1}
+              onfocus={() => { focusedId = id; }}
+              onkeydown={handleTreeKeyDown}
+              onclick={(e) => handleItemClick(id, e)}
+              ondblclick={() => startRename(id, core?.name ?? '')}
+              oncontextmenu={(e) => openContextMenu(id, e)}
+              draggable="true"
+              ondragstart={(e) => handleDragStart(id, e)}
+              ondragover={(e) => handleDragOver(id, row.container, e)}
+              ondragleave={handleDragLeave}
+              ondrop={handleDrop}
+              ondragend={handleDragEnd}
             >
-              {#if collapsedIds.has(id) && !filtering}
-                {@render chevronRight()}
+              {#if row.container}
+                <button
+                  class="collapse-toggle"
+                  tabindex="-1"
+                  aria-label={collapsedIds.has(id) ? `Expand ${core?.name ?? 'container'}` : `Collapse ${core?.name ?? 'container'}`}
+                  title={collapsedIds.has(id) ? 'Expand' : 'Collapse'}
+                  onclick={(e) => { e.stopPropagation(); toggleCollapsed(id); }}
+                >
+                  {#if collapsedIds.has(id) && !filtering}
+                    {@render chevronRight()}
+                  {:else}
+                    {@render chevronDown()}
+                  {/if}
+                </button>
               {:else}
-                {@render chevronDown()}
+                <span class="collapse-spacer"></span>
               {/if}
-            </button>
-          {:else}
-            <span class="collapse-spacer"></span>
-          {/if}
 
-          <span class="item-type" title={core?.controlType}>{core?.controlType ?? '?'}</span>
+              <!--
+                The type badge only earns its 72px when the name has stopped saying the type. It used
+                to print `MomentaryButton` next to `MomentaryButton_12` in a 200px panel — half the
+                width spent repeating the other half. See typeBadgeAddsInformation.
+              -->
+              {#if typeBadgeAddsInformation(core?.name, core?.controlType)}
+                <span class="item-type" title={core?.controlType}>{core?.controlType ?? '?'}</span>
+              {/if}
 
-          {#if renamingId === id}
-            <!-- svelte-ignore a11y_autofocus -->
-            <input
-              class="rename-input"
-              type="text"
-              bind:value={renameValue}
-              onblur={commitRename}
-              onkeydown={handleRenameKeyDown}
-              onfocus={(e) => e.target.select()}
-              autofocus
-              onclick={(e) => e.stopPropagation()}
-            />
-          {:else}
-            <span class="item-name" title={core?.name}>{core?.name ?? ''}</span>
-          {/if}
-
-          <div class="item-actions">
-            {#if row.inheritedLocked}
-              <span class="inherited-icon" title="Locked by a parent container">{@render lockSmall()}</span>
-            {/if}
-            <button
-              class="action-icon"
-              class:off={core?.visible === false}
-              title={core?.visible !== false ? 'Hide' : 'Show'}
-              onclick={(e) => { e.stopPropagation(); toggleVisible(id, core?.visible !== false); }}
-            >
-              {#if core?.visible !== false}
-                {@render eye()}
+              {#if renamingId === id}
+                <!-- svelte-ignore a11y_autofocus -->
+                <input
+                  class="rename-input"
+                  type="text"
+                  bind:value={renameValue}
+                  onblur={commitRename}
+                  onkeydown={handleRenameKeyDown}
+                  onfocus={(e) => e.target.select()}
+                  autofocus
+                  onclick={(e) => e.stopPropagation()}
+                />
               {:else}
-                {@render eyeOff()}
+                <span class="item-name" title={core?.name}>{core?.name ?? ''}</span>
               {/if}
-            </button>
-            <button
-              class="action-icon"
-              class:on={core?.locked}
-              title={core?.locked ? 'Unlock' : 'Lock'}
-              onclick={(e) => { e.stopPropagation(); toggleLocked(id, core?.locked ?? false); }}
-            >
-              {#if core?.locked}
-                {@render lock()}
-              {:else}
-                {@render lockOpen()}
-              {/if}
-            </button>
-          </div>
+
+              <div class="item-actions">
+                {#if row.inheritedLocked}
+                  <span class="inherited-icon" title="Locked by a parent container">{@render lockSmall()}</span>
+                {/if}
+                <button
+                  class="action-icon"
+                  class:off={core?.visible === false}
+                  tabindex="-1"
+                  aria-label={core?.visible !== false ? `Hide ${core?.name ?? 'component'}` : `Show ${core?.name ?? 'component'}`}
+                  title={core?.visible !== false ? 'Hide' : 'Show'}
+                  onclick={(e) => { e.stopPropagation(); toggleVisible(id, core?.visible !== false); }}
+                >
+                  {#if core?.visible !== false}
+                    {@render eye()}
+                  {:else}
+                    {@render eyeOff()}
+                  {/if}
+                </button>
+                <button
+                  class="action-icon"
+                  class:on={core?.locked}
+                  tabindex="-1"
+                  aria-label={core?.locked ? `Unlock ${core?.name ?? 'component'}` : `Lock ${core?.name ?? 'component'}`}
+                  title={core?.locked ? 'Unlock' : 'Lock'}
+                  onclick={(e) => { e.stopPropagation(); toggleLocked(id, core?.locked ?? false); }}
+                >
+                  {#if core?.locked}
+                    {@render lock()}
+                  {:else}
+                    {@render lockOpen()}
+                  {/if}
+                </button>
+              </div>
+            </div>
+          {/each}
         </div>
-      {/each}
+      </div>
     {/if}
   </div>
 </div>
 
 {#if ctxMenu}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
+  <!-- A real button rather than a bare div, so dismissing the menu is reachable from the
+       keyboard too (Escape is handled on the menu itself). -->
+  <button
     class="ctx-backdrop"
+    aria-label="Close menu"
     onmousedown={closeCtx}
     oncontextmenu={(e) => { e.preventDefault(); closeCtx(); }}
-  ></div>
-  <div class="ctx-menu" style="left:{ctxMenu.x}px; top:{ctxMenu.y}px;">
+  ></button>
+  <div
+    class="ctx-menu"
+    role="menu"
+    tabindex="-1"
+    onkeydown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); closeCtx(); } }}
+    style="left:{ctxMenu.x}px; top:{ctxMenu.y}px;"
+  >
     {#if ctxSingle}
-      <button class="ctx-item" onclick={ctxRename}>Rename<span class="ctx-shortcut">F2</span></button>
+      <button class="ctx-item" role="menuitem" onclick={ctxRename}>Rename<span class="ctx-shortcut">F2</span></button>
     {/if}
-    <button class="ctx-item" onclick={ctxDuplicate}>Duplicate<span class="ctx-shortcut">Ctrl+D</span></button>
-    <button class="ctx-item ctx-danger" onclick={ctxDelete}>Delete<span class="ctx-shortcut">Del</span></button>
+    <button class="ctx-item" role="menuitem" onclick={ctxDuplicate}>Duplicate<span class="ctx-shortcut">Ctrl+D</span></button>
+    <button class="ctx-item ctx-danger" role="menuitem" onclick={ctxDelete}>Delete<span class="ctx-shortcut">Del</span></button>
     <div class="ctx-separator"></div>
-    <button class="ctx-item" onclick={ctxGroup}>Group into Container<span class="ctx-shortcut">Ctrl+G</span></button>
+    <button class="ctx-item" role="menuitem" onclick={ctxGroup}>Group into Container<span class="ctx-shortcut">Ctrl+G</span></button>
     {#if ctxSingle && ctxIsContainer}
-      <button class="ctx-item" onclick={ctxUngroup}>Ungroup<span class="ctx-shortcut">Ctrl+Shift+G</span></button>
+      <button class="ctx-item" role="menuitem" onclick={ctxUngroup}>Ungroup<span class="ctx-shortcut">Ctrl+Shift+G</span></button>
     {/if}
     <div class="ctx-separator"></div>
-    <button class="ctx-item" onclick={() => ctxOrder(bringToFront)}>Bring to Front</button>
-    <button class="ctx-item" onclick={() => ctxOrder(bringForward)}>Bring Forward</button>
-    <button class="ctx-item" onclick={() => ctxOrder(sendBackward)}>Send Backward</button>
-    <button class="ctx-item" onclick={() => ctxOrder(sendToBack)}>Send to Back</button>
+    <button class="ctx-item" role="menuitem" onclick={() => ctxOrder(bringToFront)}>Bring to Front</button>
+    <button class="ctx-item" role="menuitem" onclick={() => ctxOrder(bringForward)}>Bring Forward</button>
+    <button class="ctx-item" role="menuitem" onclick={() => ctxOrder(sendBackward)}>Send Backward</button>
+    <button class="ctx-item" role="menuitem" onclick={() => ctxOrder(sendToBack)}>Send to Back</button>
     <div class="ctx-separator"></div>
-    <button class="ctx-item" onclick={ctxToggleVisible}>{ctxCore?.visible !== false ? 'Hide' : 'Show'}</button>
-    <button class="ctx-item" onclick={ctxToggleLocked}>{ctxCore?.locked ? 'Unlock' : 'Lock'}</button>
+    <button class="ctx-item" role="menuitem" onclick={ctxToggleVisible}>{ctxCore?.visible !== false ? 'Hide' : 'Show'}</button>
+    <button class="ctx-item" role="menuitem" onclick={ctxToggleLocked}>{ctxCore?.locked ? 'Unlock' : 'Lock'}</button>
   </div>
 {/if}
 
@@ -713,10 +965,12 @@
 
   .filter-clear:hover { color: #CCC; }
 
+  /* No vertical padding: the window maths maps scrollTop straight onto row indexes, and a 4px
+     lead-in would put every row 4px away from where the arithmetic says it is. */
   .tree-list {
     flex: 1;
     overflow-y: auto;
-    padding: 4px 0;
+    padding: 0;
   }
 
   .tree-list::-webkit-scrollbar { width: 6px; }
@@ -730,15 +984,46 @@
     font-size: 11px;
   }
 
+  /* windowed: the spacer owns the full scroll height, the row strip is offset into place. */
+  .tree-window {
+    position: relative;
+  }
+
+  .tree-rows {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+  }
+
+  /* The window maths cannot measure, so the row height is a constant in two places: here and
+     TREE_ROW_HEIGHT in utils/componentTreeView.js. Change one and change the other, or the
+     scrollbar and the rows disagree. */
   .tree-item {
     display: flex;
     align-items: center;
     gap: 6px;
+    height: 32px;
+    box-sizing: border-box;
     padding: 4px 10px;
     cursor: pointer;
     border-top: 2px solid transparent;
     border-bottom: 2px solid transparent;
     user-select: none;
+  }
+
+  .tree-item:focus-visible {
+    outline: 1px solid #5B9BD5;
+    outline-offset: -1px;
+  }
+
+  .rename-notice {
+    padding: 4px 10px;
+    font-size: 10px;
+    color: #E5A029;
+    background: #2A2415;
+    border-bottom: 1px solid #3A3216;
+    flex-shrink: 0;
   }
 
   .tree-item:hover {
@@ -873,6 +1158,10 @@
     position: fixed;
     inset: 0;
     z-index: 999;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: default;
   }
 
   .ctx-menu {

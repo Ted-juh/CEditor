@@ -26,6 +26,7 @@ import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 import { fileDataByteSize, fileDataText } from '../utils/fileDataPayload.js';
 import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
 import { runWhenIdle } from '../utils/runWhenIdle.js';
+import { rememberRecentFile } from './recentFiles.js';
 import { equalityWritable } from '../utils/equalityStore.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { createPanel, deserializePanel, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
@@ -1127,6 +1128,14 @@ export function initPanelBridge() {
       list.map(p => p.id === panelId ? { ...p, ...updates } : p)
     );
 
+    // No markContextSaved() call here on purpose: history.js imports this module, so importing it
+    // back would close a cycle for something it does not need. Its noteCleanState() adopts this
+    // state as the saved marker the moment the cleared `modified` flag reaches its subscription,
+    // which is this same tick — so undo back to here clears the dirty dot either way.
+    if (updates.filePath) {
+      rememberRecentFile({ kind: 'panel', path: updates.filePath, name: updates.name });
+    }
+
     // Persist open panel paths now that this panel has a file
     schedulePanelOpenHousekeeping(label);
   });
@@ -1198,6 +1207,7 @@ export function initPanelBridge() {
 
     const activateTimer = createPerfDebugTimer(`panel activate ${label}`);
     addPanel(panel);
+    if (filePath) rememberRecentFile({ kind: 'panel', path: filePath, name: panel?.name });
     activateTimer(`controls=${controlCount}`);
 
     requestAnimationFrame(() => {

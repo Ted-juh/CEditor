@@ -1,5 +1,6 @@
 <script>
   import { guides, removeGuide, updateGuide, draggingGuide, selectedGuide } from '../stores/guides.js';
+  import { rulerCreateDrag, pendingGuideOf, pendingGuideFor } from '../utils/guideGeometry.js';
 
   const RULER_SIZE = 20;
   const NICE_INTERVALS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
@@ -26,6 +27,12 @@
     isHorizontal ? $guides.vertical : $guides.horizontal
   );
   let guideOrientation = $derived(isHorizontal ? 'vertical' : 'horizontal');
+
+  // A guide being pulled out of the OPPOSITE ruler is marked on this one: drag down out of the
+  // horizontal ruler and the guide you get is horizontal, and horizontal guides live on the
+  // vertical ruler's axis. Read from the shared store rather than from local drag state so the
+  // marker, the canvas line and the label can never disagree about where the new guide is.
+  let pendingMarker = $derived(pendingGuideFor($draggingGuide, guideOrientation));
 
   // Convert panel coord → ruler screen pixel
   function panelToRuler(pc) {
@@ -175,32 +182,56 @@
   });
 
   // --- Drag from empty ruler area to create guide ---
+  //
+  // The move handler used to be `() => {}`: the guide existed only from mouseup onwards, so the
+  // whole gesture was performed blind and you learned where the guide had landed by looking at
+  // it afterwards. It now publishes the pending guide to `draggingGuide` on every move, which is
+  // what makes the preview show up on this ruler's opposite number AND as a full line on the
+  // canvas without any of them talking to each other.
   function handleRulerMouseDown(e) {
     if (e.button !== 0) return;
     // Don't start create-drag if clicking on a marker
     if (e.target.closest('.guide-marker')) return;
+    // No creator wired — the custom design surface reuses this ruler for its ticks and markers
+    // only. Starting a drag there would preview a guide that mouseup could never commit.
+    if (!onGuideCreate) return;
     e.preventDefault();
 
-    const createDragMove = () => {};
+    const newOrientation = isHorizontal ? 'horizontal' : 'vertical';
+
+    // Both rects are re-read per event instead of captured at mousedown: the canvas scrolls and
+    // zooms under a drag in this editor, and a stale surface rect would silently place the guide
+    // at the position it *would* have had before the view moved.
+    const measure = (ev) => {
+      if (!canvasEl) return null;
+      const surface = canvasEl.closest('.canvas-area')?.querySelector('.panel-surface');
+      if (!surface) return null;
+      return rulerCreateDrag(
+        newOrientation,
+        ev,
+        canvasEl.getBoundingClientRect(),
+        surface.getBoundingClientRect(),
+        scale,
+      );
+    };
+
+    const createDragMove = (ev) => {
+      // Dragging back over the ruler clears the preview rather than freezing the last one, so
+      // the canvas always shows what releasing right here would leave behind.
+      draggingGuide.set(pendingGuideOf(measure(ev)));
+    };
+
     const createDragEnd = (ev) => {
       window.removeEventListener('mousemove', createDragMove);
       window.removeEventListener('mouseup', createDragEnd);
 
-      const rect = canvasEl.getBoundingClientRect();
-
-      const surface = canvasEl.closest('.canvas-area')?.querySelector('.panel-surface');
-      if (!surface) return;
-      const sRect = surface.getBoundingClientRect();
-
-      if (isHorizontal) {
-        if (ev.clientY <= rect.bottom) return;
-        const panelY = (ev.clientY - sRect.top) / scale;
-        onGuideCreate?.('horizontal', panelY);
-      } else {
-        if (ev.clientX <= rect.right) return;
-        const panelX = (ev.clientX - sRect.left) / scale;
-        onGuideCreate?.('vertical', panelX);
-      }
+      const drag = measure(ev);
+      // Cleared first and unconditionally, ahead of the cancel check: releasing back over the
+      // ruler must leave no guide AND no preview, and an early return that skipped this line
+      // would strand a guide-shaped ghost on the canvas with nothing behind it.
+      draggingGuide.set(null);
+      if (!drag?.outside) return;
+      onGuideCreate(drag.orientation, drag.pos);
     };
 
     window.addEventListener('mousemove', createDragMove);
@@ -284,6 +315,19 @@
       <div class="marker-tab"></div>
     </div>
   {/each}
+
+  {#if pendingMarker}
+    <!-- The guide currently being pulled out of the other ruler. Inert: it has no index in the
+         document yet, so there is nothing here to grab, move or right-click away. -->
+    <div
+      class="guide-marker pending"
+      class:is-horizontal={isHorizontal}
+      class:is-vertical={!isHorizontal}
+      style="{isHorizontal ? `left:${panelToRuler(pendingMarker.pos)}px;` : `top:${panelToRuler(pendingMarker.pos)}px;`}"
+    >
+      <div class="marker-tab"></div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -377,6 +421,17 @@
 
   .guide-marker.selected .marker-tab {
     background: #FFD700;
+  }
+
+  /* The in-flight create-drag: same colour as a real guide so what you drag is what you get,
+     but it must never eat the pointer — the mousemove/mouseup pair driving the drag is on the
+     window, and a hit zone appearing under the cursor mid-gesture would fight it. */
+  .guide-marker.pending {
+    pointer-events: none;
+  }
+
+  .guide-marker.pending .marker-tab {
+    background: #FFF;
   }
 
   .guide-marker:hover .marker-tab {

@@ -1,8 +1,20 @@
 <script>
+  import { get } from 'svelte/store';
   import { generalSettings, updateGeneralSettings } from '../stores/appSettings.js';
+  import { activeEditorTab } from '../stores/panels.js';
+  import { registerGeneralSettingsHistory } from './generalSettingsHistory.js';
   import NumberCell from '../properties/NumberCell.svelte';
 
   let general = $derived($generalSettings);
+
+  // Ctrl+Z did nothing whatsoever in the settings workspace, and every row here
+  // is a one-click change that is applied and persisted the instant it is made.
+  // The page is an undo context for as long as it is the section on screen —
+  // why only this section, and why preferences get undo at all, is argued in
+  // generalSettingsHistory.js.
+  $effect(() => registerGeneralSettingsHistory({
+    isActive: () => get(activeEditorTab)?.type === 'settings',
+  }));
 
   function setBool(key, event) {
     updateGeneralSettings({ [key]: event.target.checked });

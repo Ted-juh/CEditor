@@ -8,7 +8,6 @@
   import Image from 'lucide-svelte/icons/image';
   import Palette from 'lucide-svelte/icons/palette';
   import Play from 'lucide-svelte/icons/play';
-  import Sparkles from 'lucide-svelte/icons/sparkles';
   import StickyNote from 'lucide-svelte/icons/sticky-note';
   import SwatchBook from 'lucide-svelte/icons/swatch-book';
   import Terminal from 'lucide-svelte/icons/terminal';
@@ -17,6 +16,8 @@
   import ColorChooser from '../components/ColorChooser.svelte';
   import ColorSettings from '../components/ColorSettings.svelte';
   import GradientMiniPreview from '../components/GradientMiniPreview.svelte';
+  import { deriveProxyGeometry, proxyShapeKind } from '../utils/gradientProxyGeometry.js';
+  import { gradientShapeOverride } from '../stores/gradientProxyShape.js';
   import SwatchGrid from '../components/SwatchGrid.svelte';
   import GradientTab from './GradientTab.svelte';
   import { activePanel, updatePanel } from '../stores/panels.js';
@@ -27,6 +28,7 @@
   import { readStoredJson, readStoredNumber, writeStoredJson } from '../utils/localStorageState.js';
   import { syncExternalTarget } from '../utils/targetSync.js';
   import { splitColourAlpha, alphaToHex } from '../utils/colorMath.js';
+  import { impliedDockTab } from '../utils/displayDock.js';
   import { flatControls } from '../utils/containment.js';
   import { collectDocumentColours } from '../utils/documentColours.js';
   import { recentColours, recordRecentColour } from '../stores/recentColours.js';
@@ -37,7 +39,15 @@
 
   const DISPLAY_TAB_STORAGE_KEY = 'ce.displayPanel.activeTab';
   const DEFAULT_DISPLAY_TAB = 'colors';
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'notepad', 'viewer', 'align', 'device', 'midi', 'preview', 'console']);
+  // 'effects' is gone, not renamed: it was a placeholder tab reading "full
+  // editing coming soon" in a prime slot next to Colors and Gradient (B10).
+  // Effects have real editing in the properties panel; a tab that only points
+  // elsewhere costs a slot and a click and teaches the user that the tabs here
+  // may be empty. Left out of this set too, so an install that had it stored as
+  // its last tab sanitises to Colors rather than to nothing at all.
+  // ('layers' was missing here while shipping as a tab — same sanitiser, same
+  // consequence, so it is listed now.)
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
     notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
     viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
@@ -151,10 +161,21 @@
   $effect(() => {
     const req = $displayTabRequest;
     if (req) {
-      handleTabClick(req.tab);
+      handleTabClick(impliedDockTab({ tabRequest: req, lastTab: activeTab }));
       displayTabRequest.set(null);
     }
   });
+
+  /**
+   * The dock was opened (or re-pointed) BY an action, so it shows the tab that
+   * action implies rather than whatever was last active (B9). The parent is
+   * told as well: it is the one that decides the dock's height, and a switch it
+   * never heard about is a switch it cannot size for.
+   */
+  function openTabForAction(tabId) {
+    activeTab = tabId;
+    onTabChange?.(tabId);
+  }
 
   // --- Central color state ---
   // Panel colours are stored AARRGGBB — splitColourAlpha keeps the alpha out
@@ -168,9 +189,9 @@
   const colorTargetGuard = { current: null };
   $effect(() => {
     syncExternalTarget($colorTarget, colorTargetGuard, (t) => !!t._initialColor, (t) => {
-      activeTab = 'colors';
       userPickedColor = t._initialColor;
       userPickedAlpha = t._initialAlpha ?? 1;
+      openTabForAction(impliedDockTab({ colorTarget: t, lastTab: activeTab }));
     });
   });
   // Drag quantisation for the colour bands. 0 = smooth (no design tool ships
@@ -211,7 +232,13 @@
   // Lives here rather than inside GradientTab because the Colors-tab stop
   // editing flow (liveGradient mini-preview) also reads it.
   let currentGradient = $state(deepClone(defaultGradient));
-  let gradientShape = $state('rectangle');
+  // The gradient editor draws its proxy from the targeted control's real geometry, with the
+  // manual picker as an override (B7). The mini preview shown while a stop's colour is being
+  // edited has to answer from the same place, or the two previews of one gradient disagree —
+  // which is the WYSIWYG complaint again, just one panel further down.
+  let gradientShape = $derived(
+    $gradientShapeOverride ?? proxyShapeKind(deriveProxyGeometry($gradientTarget, $activePanel))
+  );
 
   // Bumped whenever the active panel changes — child tabs watch this as
   // their reset signal so they can re-sync from the new active panel.
@@ -244,8 +271,7 @@
   $effect(() => {
     syncExternalTarget($gradientTarget, gradTargetGuard, (t) => !!t._initialGradient, (t) => {
       currentGradient = deepClone(t._initialGradient);
-      activeTab = 'gradient';
-      onTabChange?.('gradient');
+      openTabForAction(impliedDockTab({ gradientTarget: t, lastTab: activeTab }));
     });
   });
 
@@ -383,21 +409,33 @@
     if (onTabChange) onTabChange('colors');
   }
 
-  // --- Back from color picking to notepad ---
-  function handleBackToNotepad() {
+  /**
+   * Apply the colour the user picked to the notepad selection they left behind, and leave the
+   * picking mode. Tab-agnostic on purpose: it is called both by the explicit "Back to Notepad"
+   * button and by the two abandonment paths (tab-away, dock close).
+   *
+   * Abandonment used to be split down the middle — a half-finished GRADIENT STOP edit committed
+   * on the way out while a half-finished NOTEPAD pick was thrown away, which is the same gesture
+   * with two opposite answers depending on which mode you happened to be in. Both commit now.
+   * Discarding is what Cancel and Escape are for.
+   */
+  function commitNotepadPick() {
+    if (!pickingNotepadColor) return;
     const pickedColor = userPickedColor;
     const range = savedNotepadSelection;
     savedNotepadSelection = null;
-
-    // Restore color chooser to panel bgColour
-    resetUserColor();
     pickingNotepadColor = false;
+    resetUserColor();
+    notepadTabRef?.applyTextColor(pickedColor, range);
+  }
+
+  // --- Back from color picking to notepad ---
+  function handleBackToNotepad() {
     activeTab = 'notepad';
     onTabChange?.('notepad');
-
-    // Apply foreColor after the tab is visible — NotepadTab handles the
-    // focus, selection restore, and execCommand internally.
-    notepadTabRef?.applyTextColor(pickedColor, range);
+    // After the tab is visible — NotepadTab handles the focus, selection restore and the
+    // styling call internally, and needs to be on screen to do it.
+    commitNotepadPick();
   }
 
   // --- Tab change: commit/discard any in-flight editing mode ---
@@ -450,8 +488,7 @@
         commitStopColor();
         editingGradientStop = null;
       }
-      savedNotepadSelection = null;
-      pickingNotepadColor = false;
+      commitNotepadPick();
       if ($colorTarget) clearColorTarget();
       if ($gradientTarget) clearGradientTarget();
       resetUserColor();
@@ -507,11 +544,64 @@
     }
   }
 
+  /**
+   * Cancel — the exit that was missing (S3).
+   *
+   * "Done" was the only way out of a colour edit, and it does not undo
+   * anything: a targeted colour is written live on every band drag, so by the
+   * time you decide you preferred the old one it has been on the control for
+   * thirty repaints. Clearing the target, which is all Done does, leaves every
+   * one of those writes standing.
+   *
+   * The value to restore is the one captured when the target was ARMED —
+   * `_initialColor` / `_initialAlpha`, put there by activateColorTarget — not
+   * whatever the property held a moment ago, which is the colour this session
+   * put there. The deferred modes (a gradient stop, a notepad pick) commit only
+   * on their way back, so cancelling them is simply refusing to commit.
+   */
+  function handleColorCancel() {
+    if (editingGradientStop !== null) {
+      editingGradientStop = null;
+      resetUserColor();
+      activeTab = 'gradient';
+      onTabChange?.('gradient');
+      return;
+    }
+    if (pickingNotepadColor) {
+      savedNotepadSelection = null;
+      pickingNotepadColor = false;
+      resetUserColor();
+      activeTab = 'notepad';
+      onTabChange?.('notepad');
+      return;
+    }
+    const target = $colorTarget;
+    if (target) {
+      if (target._initialColor) {
+        applyColorToTarget(alphaToHex(target._initialAlpha ?? 1) + target._initialColor);
+      }
+      clearColorTarget();
+      resetUserColor();
+    }
+  }
+
   function handleGradientDone() {
     if ($gradientTarget) {
       clearGradientTarget();
       resetGradientFromPanel();
     }
+  }
+
+  /** Same bargain as handleColorCancel, for the gradient half. */
+  function handleGradientCancel() {
+    const target = $gradientTarget;
+    if (!target) return;
+    if (target._initialGradient) {
+      currentGradient = deepClone(target._initialGradient);
+      applyGradientToTarget(currentGradient);
+    }
+    clearGradientTarget();
+    resetGradientFromPanel();
   }
 
   function handleTabClick(tabId) {
@@ -521,12 +611,8 @@
         editingGradientStop = null;
         resetUserColor();
       }
-      if (pickingNotepadColor) {
-        // Leaving colors without going back — discard the pick
-        savedNotepadSelection = null;
-        pickingNotepadColor = false;
-        resetUserColor();
-      }
+      // Leaving colors without going back still commits, exactly as an in-flight stop edit does.
+      commitNotepadPick();
       if ($colorTarget) {
         clearColorTarget();
         resetUserColor();
@@ -561,7 +647,6 @@
   const tabs = [
     { id: 'colors',   label: 'Colors',   icon: Palette },
     { id: 'gradient', label: 'Gradient', icon: SwatchBook },
-    { id: 'effects',  label: 'Effects',  icon: Sparkles },
     { id: 'notepad',  label: 'Notepad',  icon: StickyNote },
     { id: 'viewer',   label: 'Viewer',   icon: Image },
     { id: 'layers',   label: 'Layers',   icon: LayersIcon },
@@ -595,6 +680,7 @@
         <div class="context-bar" class:active={colorContextActive}>
           <span class="context-label">Editing: <strong>{colorContextLabel}</strong></span>
           {#if colorContextActive}
+            <button class="context-cancel" title="Discard this edit and put the original colour back" onclick={handleColorCancel}>Cancel</button>
             <button class="context-done" onclick={handleColorDone}>Done</button>
           {/if}
         </div>
@@ -668,6 +754,7 @@
         <div class="context-bar" class:active={gradientContextActive}>
           <span class="context-label">Editing: <strong>{gradientContextLabel}</strong></span>
           {#if gradientContextActive}
+            <button class="context-cancel" title="Discard this edit and put the original gradient back" onclick={handleGradientCancel}>Cancel</button>
             <button class="context-done" onclick={handleGradientDone}>Done</button>
           {/if}
         </div>
@@ -679,7 +766,6 @@
             {gradientPresets}
             onchange={handleGradientChange}
             oneditstopcolor={handleEditStopColor}
-            onshapechange={(shape) => gradientShape = shape}
             onswatchdblclick={handleSwatchDblClick}
             onswatchrightclick={handleSwatchRightClick}
           />
@@ -702,10 +788,6 @@
       {@const ViewerTab = activeTabComponent.default}
       <div class="tab-pane">
         <ViewerTab resetKey={panelResetKey} oncolorpicked={handleViewerColorPicked} />
-      </div>
-    {:else if activeTab === 'effects'}
-      <div class="tab-pane">
-      <div class="placeholder">Effects editor — full editing coming soon. Use Properties Panel for quick toggles.</div>
       </div>
     {:else if activeTab === 'layers' && activeTabComponent?.default}
       {@const LayersPanel = activeTabComponent.default}
@@ -880,6 +962,27 @@
   .context-done:hover {
     background: #5B9BD5;
     color: #FFF;
+  }
+
+  /* Quieter than Done on purpose: reverting is the rarer choice, and the two
+     sit a few pixels apart at the end of a colour drag. */
+  .context-cancel {
+    background: #2A2A2A;
+    border: 1px solid #444;
+    color: #BBB;
+    font-size: 10px;
+    line-height: 1;
+    padding: 2px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: inherit;
+    margin-right: 4px;
+  }
+
+  .context-cancel:hover {
+    background: #3A3A3A;
+    border-color: #666;
+    color: #EEE;
   }
 
   .context-content {

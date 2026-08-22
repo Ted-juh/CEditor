@@ -33,7 +33,7 @@
   import NewPanelDialog from './CE_Application/layout/NewPanelDialog.svelte';
   import { openNewPanelDialog } from './CE_Application/stores/newPanelDialog.js';
   import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
-  import { initHistory, undo, redo } from './CE_Application/stores/history.js';
+  import { initHistory, undo, redo, flushHistory } from './CE_Application/stores/history.js';
   import { initPresetChoiceSync } from './CE_Application/stores/presetChoiceSync.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
   import { requestFitToWindow, requestZoomStep, requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
@@ -42,6 +42,9 @@
   import { gradientTarget } from './CE_Application/stores/gradientTarget.js';
   import { displayTabRequest } from './CE_Application/stores/displayTab.js';
   import { readStoredBool, readStoredNumber, writeStoredJson } from './CE_Application/utils/localStorageState.js';
+  import { showDisplayPanel, showPropertiesPanel, showTreePanel, togglePanelVisibility } from './CE_Application/stores/panelVisibility.js';
+  import { clampDockHeight, maxDisplayDockHeight, resolveDockHeight } from './CE_Application/utils/displayDock.js';
+  import { advanceWorkspaceSwap, workspaceSwapPhase } from './CE_Application/utils/chromeMotion.js';
   import { startPerfDebugStallWatch, syncPerfDebugToNative } from './CE_Application/utils/perfDebug.js';
   import { createCustomComponentStressPanel, createCustomComponentStressTest } from './CE_Application/utils/customComponentStressTest.js';
   import { resolveWorkspaceChrome } from './CE_Application/utils/workspaceChrome.js';
@@ -143,56 +146,71 @@
     });
   }
 
+  // The arrow keys nudge through the window-level fallback above whenever focus has wandered out
+  // of the canvas wrapper, and EditorCanvas's own keyup never fires in that case — so the tail of
+  // a held nudge would sit in the debounce until something unrelated pushed it out. Same flush,
+  // same reason, second entry point. flushHistory is a no-op when nothing is pending, so this
+  // costs nothing on every other key.
+  function handleGlobalKeyUp(e) {
+    if (isEditableTarget(e.target)) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      flushHistory();
+    }
+  }
+
   const MIN_PROPERTIES_PANEL_WIDTH = 600;
+  // The three panel-visibility flags used to live here as `$state` locals, which
+  // is why nothing outside App.svelte could read them and the View/Window menu
+  // could neither tick a box nor flip one (D6). They are a store now — see
+  // stores/panelVisibility.js, which owns their persistence and their keys.
   const UI_STORAGE_KEYS = {
     propertiesPanelWidth: 'ce.ui.propertiesPanelWidth',
     treePanelWidth: 'ce.ui.treePanelWidth',
-    showTreePanel: 'ce.ui.showTreePanel',
     displayPanelHeight: 'ce.ui.displayPanelHeight',
-    showDisplayPanel: 'ce.ui.showDisplayPanel',
-    showPropertiesPanel: 'ce.ui.showPropertiesPanel',
+    displayPanelHeightUserSized: 'ce.ui.displayPanelHeightUserSized',
   };
 
   let propertiesPanelWidth = $state(readStoredNumber(UI_STORAGE_KEYS.propertiesPanelWidth, MIN_PROPERTIES_PANEL_WIDTH));
   let isResizingProps = $state(false);
   let treePanelWidth = $state(readStoredNumber(UI_STORAGE_KEYS.treePanelWidth, 200));
   let isResizingTree = $state(false);
-  let showTreePanel = $state(readStoredBool(UI_STORAGE_KEYS.showTreePanel, true));
   let showShortcuts = $state(false);
   let isSettingsTab = $derived($activeEditorTab?.type === 'settings');
   let viewportHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 900);
 
   function maxDisplayPanelHeight() {
-    return Math.max(140, Math.floor(viewportHeight * 0.44));
+    return maxDisplayDockHeight(viewportHeight);
   }
 
   function handleWindowResize() {
     viewportHeight = window.innerHeight;
     viewportWidth = window.innerWidth;
-    displayPanelHeight = Math.min(displayPanelHeight, maxDisplayPanelHeight());
+    // Deliberately NOT clamping the stored height here. A window briefly
+    // dragged narrow used to permanently shrink a dock the user had sized, and
+    // there was no way to get it back except by dragging again. The render
+    // basis below clamps, so the dock always fits; the preference survives.
   }
 
-  $effect(() => {
-    writeStoredJson(UI_STORAGE_KEYS.showTreePanel, showTreePanel);
-  });
   $effect(() => {
     writeStoredJson(UI_STORAGE_KEYS.propertiesPanelWidth, propertiesPanelWidth);
   });
   $effect(() => {
     writeStoredJson(UI_STORAGE_KEYS.treePanelWidth, treePanelWidth);
   });
-  let displayPanelHeight = $state(readStoredNumber(UI_STORAGE_KEYS.displayPanelHeight, 480));
+  let displayPanelHeight = $state(readStoredNumber(UI_STORAGE_KEYS.displayPanelHeight, 320));
+  // Has the user ever dragged the dock splitter? Once they have, tab clicks
+  // stop having opinions about height (B8) — and this must be persisted, or the
+  // dock forgets on restart and ambushes them all over again.
+  let displayHeightUserSized = $state(readStoredBool(UI_STORAGE_KEYS.displayPanelHeightUserSized, false));
   let isResizingDisplay = $state(false);
-  let showDisplayPanel = $state(readStoredBool(UI_STORAGE_KEYS.showDisplayPanel, false));
-  let showPropertiesPanel = $state(readStoredBool(UI_STORAGE_KEYS.showPropertiesPanel, true));
   let viewportWidth = $state(typeof window === 'undefined' ? 1280 : window.innerWidth);
   let workspaceChrome = $derived(resolveWorkspaceChrome({
     activeTab: $activeEditorTab,
     componentWorkspaceMode: $componentWorkspaceMode,
     viewportWidth,
-    showTreePanel,
-    showDisplayPanel,
-    showPropertiesPanel,
+    showTreePanel: $showTreePanel,
+    showDisplayPanel: $showDisplayPanel,
+    showPropertiesPanel: $showPropertiesPanel,
   }));
   let componentDesignerWorkspaceActive = $derived(workspaceChrome.workspaceKind === 'component');
   let scriptWorkspaceActive = $derived(workspaceChrome.workspaceKind === 'script');
@@ -200,27 +218,44 @@
   let effectiveShowPropertiesPanel = $derived(workspaceChrome.showPropertiesPanel);
   let effectiveShowTreePanel = $derived(workspaceChrome.showTreePanel);
   let effectiveShowDisplayPanel = $derived(workspaceChrome.showDisplayPanel);
-  let displayPanelBasis = $derived(`${Math.min(displayPanelHeight, maxDisplayPanelHeight())}px`);
+  let displayPanelBasis = $derived(`${clampDockHeight(displayPanelHeight, viewportHeight)}px`);
+
+  // A workspace change is announced to CSS as an alternating phase class, which
+  // is what lets the arriving frame animate instead of appearing between two
+  // frames with nothing to say it moved (E4). See utils/chromeMotion.js.
+  let workspaceSwapCount = $state(0);
+  let lastWorkspaceKind = null;
+  $effect(() => {
+    const kind = workspaceChrome.workspaceKind;
+    const next = advanceWorkspaceSwap({ kind, previousKind: lastWorkspaceKind, swapCount: workspaceSwapCount });
+    lastWorkspaceKind = kind;
+    if (next.changed) workspaceSwapCount = next.swapCount;
+  });
+  let workspaceSwapClass = $derived(workspaceSwapPhase(workspaceSwapCount));
 
   $effect(() => {
     writeStoredJson(UI_STORAGE_KEYS.displayPanelHeight, displayPanelHeight);
   });
   $effect(() => {
-    writeStoredJson(UI_STORAGE_KEYS.showDisplayPanel, showDisplayPanel);
-  });
-  $effect(() => {
-    writeStoredJson(UI_STORAGE_KEYS.showPropertiesPanel, showPropertiesPanel);
+    writeStoredJson(UI_STORAGE_KEYS.displayPanelHeightUserSized, displayHeightUserSized);
   });
   $effect(() => {
     if ($colorTarget || $gradientTarget || $displayTabRequest) {
-      showDisplayPanel = true;
+      showDisplayPanel.set(true);
     }
   });
-  const tabDefaultHeights = { colors: 480, gradient: 580 };
 
+  // Tab clicks may SUGGEST a height, never impose one. The old table
+  // (colors 480, gradient 580) was applied unconditionally and then persisted
+  // over whatever the user had dragged — so the dock relayouted the canvas
+  // under the pointer mid-task and the user's own height was gone for good.
   function handleDisplayTabChange(tabId) {
-    const target = tabDefaultHeights[tabId];
-    if (target) displayPanelHeight = Math.min(target, maxDisplayPanelHeight());
+    displayPanelHeight = resolveDockHeight({
+      tabId,
+      currentHeight: displayPanelHeight,
+      userSized: displayHeightUserSized,
+      viewportHeight,
+    });
   }
 
   // Pane splitters: relative dragScrub, one CSS pixel per pixel of travel.
@@ -266,7 +301,10 @@
     value: displayPanelHeight,
     manageCursor: false,
     onChange: (v) => { displayPanelHeight = Math.round(v); },
-    onDragStart: () => { isResizingDisplay = true; },
+    // The drag itself is what marks the height as the user's. Set on start,
+    // not on end, so a drag abandoned halfway still counts — they touched it,
+    // which is all the dock needs to know to stop overriding them.
+    onDragStart: () => { isResizingDisplay = true; displayHeightUserSized = true; },
     onDragEnd: () => { isResizingDisplay = false; },
   });
 
@@ -305,7 +343,7 @@
 
 </script>
 
-<svelte:window onkeydown={handleGlobalKeyDown} onresize={handleWindowResize} onbeforeunload={handleBeforeUnload} oncontextmenu={(e) => e.preventDefault()} />
+<svelte:window onkeydown={handleGlobalKeyDown} onkeyup={handleGlobalKeyUp} onresize={handleWindowResize} onbeforeunload={handleBeforeUnload} oncontextmenu={(e) => e.preventDefault()} />
 
 {#if isBehaviorDebug}
   <BehaviorDesigner controls={behaviorSampleControls} initialScripts={behaviorSampleScripts} />
@@ -317,6 +355,8 @@
     class:component-workspace-active={componentDesignerWorkspaceActive}
     class:script-workspace-active={scriptWorkspaceActive}
     class:compact-panel-workspace={workspaceChrome.compactPanel}
+    class:workspace-swap-a={workspaceSwapClass === 'a'}
+    class:workspace-swap-b={workspaceSwapClass === 'b'}
     style="--icon-width: {workspaceChrome.iconWidth + 'px'}; --props-width: {effectiveShowPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {effectiveShowPropertiesPanel ? '8px' : '0px'}"
   >
     <div class="menubar-area">
@@ -325,20 +365,15 @@
 
     <div class="icon-panel-area">
       <IconPanel
-        {showDisplayPanel}
-        {showPropertiesPanel}
-        {showTreePanel}
+        showDisplayPanel={$showDisplayPanel}
+        showPropertiesPanel={$showPropertiesPanel}
+        showTreePanel={$showTreePanel}
         togglesEnabled={workspaceChrome.railTogglesEnabled}
         insertEnabled={workspaceChrome.railInsertEnabled}
-        onToggleDisplay={() => {
-          showDisplayPanel = !showDisplayPanel;
-        }}
-        onToggleProperties={() => {
-          showPropertiesPanel = !showPropertiesPanel;
-        }}
-        onToggleTree={() => {
-          showTreePanel = !showTreePanel;
-        }}
+        previewEnabled={workspaceChrome.workspaceKind === 'panel'}
+        onToggleDisplay={() => togglePanelVisibility('display')}
+        onToggleProperties={() => togglePanelVisibility('properties')}
+        onToggleTree={() => togglePanelVisibility('tree')}
       />
     </div>
 
@@ -493,5 +528,45 @@
   .display-panel-area {
     border-top: 1px solid #333;
     overflow: hidden;
+  }
+
+  /* Workspace swap (E4). Switching to a script / device / screen / component
+     tab used to replace the context bar, tree, dock and properties panel
+     between two frames, which reads as a glitch rather than as navigation.
+     The arriving frame now lifts and fades in over 160ms.
+
+     Two identical animations under two class names, alternated by
+     chromeMotion.js: a CSS animation restarts on a change of animation NAME,
+     so with a single name a second tab switch inside the same 160ms would
+     simply not play. Nothing here gates input — no pointer-events change, no
+     handler waits on the animation, and the regions are interactive from the
+     first frame. */
+  .workspace-swap-a .center-area,
+  .workspace-swap-a .properties-area {
+    animation: workspace-swap-a 160ms ease-out;
+  }
+  .workspace-swap-b .center-area,
+  .workspace-swap-b .properties-area {
+    animation: workspace-swap-b 160ms ease-out;
+  }
+
+  @keyframes workspace-swap-a {
+    from { opacity: 0.35; transform: translateY(4px); }
+    to   { opacity: 1;    transform: none; }
+  }
+  @keyframes workspace-swap-b {
+    from { opacity: 0.35; transform: translateY(4px); }
+    to   { opacity: 1;    transform: none; }
+  }
+
+  /* Honoured in CSS rather than by a matchMedia read at mount, so flipping the
+     OS setting takes effect without a reload. */
+  @media (prefers-reduced-motion: reduce) {
+    .workspace-swap-a .center-area,
+    .workspace-swap-a .properties-area,
+    .workspace-swap-b .center-area,
+    .workspace-swap-b .properties-area {
+      animation: none;
+    }
   }
 </style>

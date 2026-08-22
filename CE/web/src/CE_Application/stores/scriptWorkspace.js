@@ -19,6 +19,7 @@ import {
   serializeScriptWorkspaceDocument,
 } from '../scripting/scriptDocumentModel.js';
 import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
+import { rememberRecentFile } from './recentFiles.js';
 
 const SCRIPT_WORKSPACE_STORAGE_KEY = 'ce.scriptWorkspaces.v1';
 let bridgeInitialized = false;
@@ -163,6 +164,11 @@ export function markScriptWorkspaceSaved(documentId, { filePath = '', name = '' 
       };
     })
   );
+  // The per-document `recentFiles` list above is this workspace's own history of where IT has
+  // been saved; the app-wide Open Recent is a different list with a different job, and a script
+  // workspace has to appear in it beside panels and components or File > Open Recent lies by
+  // omission about half the documents the app can open.
+  if (filePath) rememberRecentFile({ kind: 'script', path: filePath, name });
   persistOpenScriptWorkspacePaths();
 }
 
@@ -313,6 +319,7 @@ export function initScriptWorkspaceBridge() {
         filePath,
         String(payload?.name ?? '')
       ));
+      if (filePath) rememberRecentFile({ kind: 'script', path: filePath, name: String(payload?.name ?? '') });
       persistOpenScriptWorkspacePaths();
     } catch (error) {
       console.error('[scriptWorkspace] Failed to open script workspace:', error);

@@ -5,6 +5,17 @@
    * Radial types: axis from center → center+radius. Stop 0% = center, 100% = radius edge.
    *   Draggable center handle, radius handle(s), and stop handles on the axis.
    * Linear types: axis through shape center from edge to edge. Stop 0% = start, 100% = end.
+   *
+   * THE PROXY IS THE TARGET NOW. The preview's shape used to be whatever the
+   * sidebar's five-button toggle row said, defaulting to 'rectangle' forever —
+   * so the box you designed the gradient on had nothing to do with the control
+   * it was going onto, and a radial drawn on a square proxy landed on a 240×40
+   * fader as something else entirely. Unless the user has explicitly overridden
+   * it (`stores/gradientProxyShape.js`), the preview box is the target's real
+   * width, height and corner geometry — see `utils/gradientProxyGeometry.js`.
+   *
+   * Double-clicking a stop opens its colour editor IN PLACE (B5), so the
+   * gradient stays on screen while one of its stops is edited.
    */
   import { onMount } from 'svelte';
   import { gradientToCSS, gradientFilterCSS, gradientBlendCSS, interpolateColor, squareRampToDataURL } from '../utils/gradientCSS.js';
@@ -12,21 +23,49 @@
     computeAxisGeometry, stopThumbPoint,
     projectOntoAxis as projectPointOntoAxis,
   } from '../utils/gradientAxisGeometry.js';
+  import { deriveProxyGeometry, fitProxyBox, proxyShapeCSS, proxyShapeKind } from '../utils/gradientProxyGeometry.js';
+  import { placeMenu } from '../utils/menuPlacement.js';
+  import { beginStopEdit, previewStopColour, commitStopEdit, cancelStopEdit } from '../utils/stopColourEdit.js';
+  import { gradientShapeOverride } from '../stores/gradientProxyShape.js';
+  import { gradientTarget } from '../stores/gradientTarget.js';
+  import { activePanel } from '../stores/panels.js';
+  import StopColourPopover from './StopColourPopover.svelte';
 
   let props = $props();
   let gradient = $derived(props.gradient);
   let selectedStop = $derived(props.selectedStop ?? 0);
-  let shape = $derived(props.shape ?? 'rectangle');
   let onchange = $derived(props.onchange);
   let onSelectStop = $derived(props.onSelectStop);
 
-  // Internal state for smooth dragging
-  let internalStops = $state([]);
-  let internalCenterX = $state(50);
-  let internalCenterY = $state(50);
-  let internalRadiusX = $state(50);
-  let internalRadiusY = $state(50);
+  // `props.shape` is deliberately no longer read. It could not express the
+  // default we need — its default value is the string 'rectangle', a real
+  // answer, so there was nowhere for "nobody has chosen" to live. The choice
+  // now comes from the override store (null = derive it), and GradientSettings
+  // still calls `onShapeChange` so the parent's copy stays in step for the
+  // other previews that read it.
+  //
+  // The manual override, when there is one; otherwise the closest legacy shape
+  // name for the target's real geometry, which is what `gradientToCSS` and
+  // `computeAxisGeometry` still speak.
+  let geometry = $derived(deriveProxyGeometry($gradientTarget, $activePanel));
+  let autoProxy = $derived($gradientShapeOverride == null);
+  let shape = $derived($gradientShapeOverride ?? proxyShapeKind(geometry));
+
+  // Internal state for smooth dragging. Seeded from the gradient rather than
+  // from empty: the sync effect below does not run during SSR (or before the
+  // first paint), and an editor whose first frame has no stops draws a flat
+  // #333 rectangle with no handles on it.
+  let internalStops = $state((props.gradient?.stops ?? []).map((s) => ({ ...s })));
+  let internalCenterX = $state(props.gradient?.centerX ?? 50);
+  let internalCenterY = $state(props.gradient?.centerY ?? 50);
+  let internalRadiusX = $state(props.gradient?.radiusX ?? 50);
+  let internalRadiusY = $state(props.gradient?.radiusY ?? 50);
   let dragging = $state(false);
+  // Declared up here with the other gesture state because the prop-sync effect
+  // below reads it — an in-place stop edit is a gesture like a drag is.
+  // `stopEdit` is the record from utils/stopColourEdit.js: { index, original }.
+  let stopEdit = $state(null);
+  let editingStopIndex = $derived(stopEdit ? stopEdit.index : null);
   let editorEl = $state(null);
   let shapeSize = $state(0);
   let editorWidth = $state(100);
@@ -47,14 +86,23 @@
     shapeSize = Math.floor(Math.min(editorWidth, editorHeight) * 0.85);
   });
 
-  let shapeW = $derived(shape === 'ellipse' ? Math.floor(editorWidth * 0.85) : shapeSize);
-  let shapeH = $derived(shape === 'ellipse' ? Math.floor(editorHeight * 0.85) : shapeSize);
+  // Auto: the target's own box, fitted to the editor with its aspect ratio and
+  // its corner radii intact. Manual: the old hand-picked squares and ellipses.
+  let proxyBox = $derived(autoProxy ? fitProxyBox(geometry, editorWidth, editorHeight) : null);
+  let shapeW = $derived(autoProxy ? proxyBox.width : (shape === 'ellipse' ? Math.floor(editorWidth * 0.85) : shapeSize));
+  let shapeH = $derived(autoProxy ? proxyBox.height : (shape === 'ellipse' ? Math.floor(editorHeight * 0.85) : shapeSize));
+  // A declaration, not a value: `border-radius: …;` or `clip-path: …;`, built
+  // by the same fillShapeCSS the canvas paints the control's own fill with.
+  let proxyCSS = $derived(autoProxy ? proxyShapeCSS(geometry, shapeW, shapeH) : '');
 
   // Sync from prop when NOT dragging
   let ignoreNextSync = false;
   $effect(() => {
     const g = gradient;
-    if (!dragging && !ignoreNextSync && g) {
+    // `editingStopIndex !== null` joins `dragging` here for the same reason:
+    // an in-flight edit lives in internalStops, and re-syncing from the prop
+    // mid-gesture would snap the stop back to its pre-edit colour.
+    if (!dragging && editingStopIndex === null && !ignoreNextSync && g) {
       if (g.stops) internalStops = g.stops.map(s => ({ ...s }));
       internalCenterX = g.centerX ?? 50;
       internalCenterY = g.centerY ?? 50;
@@ -88,7 +136,11 @@
     : shape === 'triangle' ? 'shape-triangle'
     : ''
   );
-  let needsShapeContainer = $derived(shape !== 'rectangle');
+  // In auto mode the proxy is always a box of the target's size sitting on the
+  // checkerboard — full-bleed would mean "the shape is the panel", which is
+  // only true when the panel IS the target.
+  let needsShapeContainer = $derived(autoProxy || shape !== 'rectangle');
+  let shapeClassApplied = $derived(autoProxy ? '' : shapeClass);
 
   // --- Axis geometry ---
   // All the axis math lives in gradientAxisGeometry.js. This one derivation
@@ -254,6 +306,58 @@
     if (onSelectStop) onSelectStop(newStops.length - 1);
   }
 
+  // --- In-place stop colour editing (B5) ---------------------------------
+  // Live edits stay in `internalStops` and are NOT emitted until the popover
+  // commits, exactly like a handle drag: the picture updates under the pointer,
+  // the document gets one write at the end of the gesture rather than one per
+  // frame.
+  let popoverLeft = $state(0);
+  let popoverTop = $state(0);
+
+  const POPOVER_SIZE = { width: 230, height: 250 };
+
+  function stopEditorLabel(index) {
+    return `Stop ${index + 1}`;
+  }
+
+  function openStopEditor(index, e) {
+    e?.preventDefault();
+    e?.stopPropagation();
+    const edit = beginStopEdit(internalStops, index);
+    if (!edit) return;
+    if (onSelectStop) onSelectStop(index);
+
+    // Anchor on the thumb, in editor coordinates, then let the shared menu
+    // placement flip it away from whichever edge it would have hung over.
+    const point = stopThumbPoint(axisStart, axisEnd, internalStops[index].position);
+    const boxLeft = needsShapeContainer ? (editorWidth - shapeW) / 2 : 0;
+    const boxTop = needsShapeContainer ? (editorHeight - shapeH) / 2 : 0;
+    const anchorX = boxLeft + (point.x / 100) * (needsShapeContainer ? shapeW : editorWidth);
+    const anchorY = boxTop + (point.y / 100) * (needsShapeContainer ? shapeH : editorHeight);
+    const placed = placeMenu(anchorX + 10, anchorY + 10, POPOVER_SIZE, { width: editorWidth, height: editorHeight }, 4);
+    popoverLeft = placed.left;
+    popoverTop = placed.top;
+    stopEdit = edit;
+  }
+
+  function handleStopColourInput(colour) {
+    internalStops = previewStopColour(internalStops, stopEdit, colour);
+  }
+
+  function handleStopColourCommit(colour) {
+    const result = commitStopEdit(internalStops, stopEdit, colour);
+    internalStops = result.stops;
+    stopEdit = result.edit;
+    ignoreNextSync = true;
+    emitChange();
+  }
+
+  function handleStopColourCancel() {
+    const result = cancelStopEdit(internalStops, stopEdit);
+    internalStops = result.stops;
+    stopEdit = result.edit;
+  }
+
   function handleStopRightClick(index, e) {
     e.preventDefault();
     e.stopPropagation();
@@ -274,12 +378,12 @@
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
-        class="gradient-surface {shapeClass} axis-host"
+        class="gradient-surface {shapeClassApplied} axis-host"
         style="width: {shapeW}px; height: {shapeH}px;"
         bind:this={axisContainerEl}
         onclick={handleAxisClick}
       >
-        <div class="gradient-bg" style="background: {cssGradient}; background-size: 100% 100%;{cssFilter ? ` filter: ${cssFilter};` : ''}{cssBlend ? ` background-blend-mode: ${cssBlend};` : ''}"></div>
+        <div class="gradient-bg" style="background: {cssGradient}; background-size: 100% 100%;{cssFilter ? ` filter: ${cssFilter};` : ''}{cssBlend ? ` background-blend-mode: ${cssBlend};` : ''}{proxyCSS ? ` ${proxyCSS}` : ''}"></div>
         <svg class="axis-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
           <line x1={lineStyle.x1} y1={lineStyle.y1} x2={lineStyle.x2} y2={lineStyle.y2}
             stroke="rgba(255,255,255,0.3)" stroke-width="0.4" stroke-dasharray="1.5,1" />
@@ -312,9 +416,12 @@
         {#each internalStops as stop, i}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="stop-thumb" class:selected={i === selectedStop}
+            class:editing={i === editingStopIndex}
             style={getThumbStyle(stop)}
             onmousedown={(e) => handleStopMouseDown(i, e)}
+            ondblclick={(e) => openStopEditor(i, e)}
             oncontextmenu={(e) => handleStopRightClick(i, e)}
+            title="Drag to move · double-click to edit its colour · right-click to delete"
           ></div>
         {/each}
       </div>
@@ -354,11 +461,32 @@
       {#each internalStops as stop, i}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="stop-thumb" class:selected={i === selectedStop}
+          class:editing={i === editingStopIndex}
           style={getThumbStyle(stop)}
           onmousedown={(e) => handleStopMouseDown(i, e)}
+          ondblclick={(e) => openStopEditor(i, e)}
           oncontextmenu={(e) => handleStopRightClick(i, e)}
+          title="Drag to move · double-click to edit its colour · right-click to delete"
         ></div>
       {/each}
+    </div>
+  {/if}
+
+  {#if autoProxy}
+    <div class="proxy-caption" title="The preview is the target's real geometry — override it in the sidebar's Shape section">
+      {geometry.label}
+    </div>
+  {/if}
+
+  {#if editingStopIndex !== null && internalStops[editingStopIndex]}
+    <div class="stop-popover-layer" style="left: {popoverLeft}px; top: {popoverTop}px">
+      <StopColourPopover
+        color={internalStops[editingStopIndex].color}
+        label={stopEditorLabel(editingStopIndex)}
+        oninput={handleStopColourInput}
+        oncommit={handleStopColourCommit}
+        oncancel={handleStopColourCancel}
+      />
     </div>
   {/if}
 </div>
@@ -522,5 +650,33 @@
 
   .stop-thumb:active {
     cursor: grabbing;
+  }
+
+  .stop-thumb.editing {
+    border-color: #F2B04A;
+    box-shadow: 0 0 8px rgba(242, 176, 74, 0.7), 0 0 3px rgba(0, 0, 0, 0.6);
+    z-index: 6;
+  }
+
+  .stop-popover-layer {
+    position: absolute;
+    z-index: 10;
+  }
+
+  /* Says what the proxy IS, so "why is my preview that shape" never has to be
+     asked — it is the shape of the thing being painted. */
+  .proxy-caption {
+    position: absolute;
+    left: 8px;
+    bottom: 6px;
+    z-index: 6;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.55);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+    max-width: calc(100% - 16px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

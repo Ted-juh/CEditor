@@ -5,13 +5,21 @@
    * cross-tab "pick a text color from the Colors tab" flow — when the
    * user clicks the mini "Back to Notepad" button, the parent calls
    * `applyTextColor(hex, range)` (exposed via bind:this) which focuses
-   * the editor, restores the selection range, and runs execCommand.
+   * the editor, restores the selection range, and recolours it.
+   *
+   * The recolouring was `document.execCommand('foreColor')` (B10): deprecated,
+   * unspecified, and emitting `<font color>` in some engines — legacy markup
+   * being written into a file format we still have to read back. It is a
+   * Range-based span now (utils/richTextEditing.js), and the result is
+   * committed through the editor rather than left in the DOM for the next
+   * keystroke to notice.
    *
    * The swatch array itself lives in the parent (it's shared across three
    * tabs), so the parent owns the dbl-click clear and right-click replace
    * handlers — we just bubble those through as callbacks.
    */
   import NotepadEditor from '../components/NotepadEditor.svelte';
+  import { applyTextColour } from '../utils/richTextEditing.js';
   import NotepadSettings from '../components/NotepadSettings.svelte';
   import SwatchGrid from '../components/SwatchGrid.svelte';
   import { activePanel, updatePanel } from '../stores/panels.js';
@@ -62,15 +70,31 @@
   function handleSwatchClick(index) {
     if (swatches[index]) {
       textColor = swatches[index];
-      const el = editorRef?.getEditorElement?.();
-      if (el) {
-        el.focus();
-        // eslint-disable-next-line deprecation/deprecation
-        document.execCommand('foreColor', false, '#' + swatches[index]);
-      }
+      recolourSelection(swatches[index]);
     } else {
       onswatchstore?.(index, textColor);
     }
+  }
+
+  /**
+   * Focus the editor, optionally put a saved range back, colour what is
+   * selected, and tell the editor to save. The save is the part that used to
+   * be missing entirely: execCommand raises no `input` event, so a colour
+   * applied this way lived only in the DOM until the user happened to type
+   * again.
+   */
+  function recolourSelection(hex, range = null) {
+    const el = editorRef?.getEditorElement?.();
+    if (!el) return false;
+    el.focus();
+    const selection = typeof window === 'undefined' ? null : window.getSelection?.() ?? null;
+    if (range && selection) {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    const applied = applyTextColour(el, selection, hex, document);
+    if (applied) editorRef?.commitDomEdit?.();
+    return !!applied;
   }
 
   // Expose the editor element accessor + a one-shot "apply color" method
@@ -81,18 +105,9 @@
 
   export function applyTextColor(hex, range) {
     textColor = hex;
-    requestAnimationFrame(() => {
-      const el = getEditorElement();
-      if (!el) return;
-      el.focus();
-      if (range) {
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
-      // eslint-disable-next-line deprecation/deprecation
-      document.execCommand('foreColor', false, '#' + hex);
-    });
+    // A frame later: the parent switches tab and applies the colour in the same
+    // turn, and the editor is not back on screen (or focusable) until it paints.
+    requestAnimationFrame(() => recolourSelection(hex, range));
   }
 </script>
 
