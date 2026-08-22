@@ -1,17 +1,18 @@
-// gaiaEffectLabels.test.js — the four effect knobs, and the names nobody has yet.
+// gaiaEffectLabels.test.js — the four effect knobs, and the names they now have.
 //
-// THE SITUATION. The GAIA's EFFECTS section is SELECT CONTROL, CONTROL 1/2/3 and LEVEL: five knobs
-// whose meaning changes with the selected effect type. The MIDI implementation names the addresses
-// "Distortion Parameter 1..32" and never says which of those CONTROL 1 turns for DIST as opposed to
-// for BIT CRASH. That mapping is in the owner's manual, which this repo does not have.
+// THE SITUATION, AND HOW IT CHANGED. The GAIA's EFFECTS section is SELECT CONTROL, CONTROL 1/2/3
+// and LEVEL: knobs whose meaning changes with the selected effect type. The MIDI implementation
+// names the addresses "MFX Parameter 1..32" and never says which of those CONTROL 1 turns for DIST
+// as opposed to for BIT CRASH — it documents a box, not a set of controls.
 //
-// So effect-parameters.mjs ships with the TYPE keys filled in — those come from the profile's own
-// choice lists and are not guesses — and the leaves empty. A wrong label is worse than a generic
-// one: PARAM 3 makes you check the manual, "DEPTH" makes you not check it.
+// The SH-01 OWNER'S MANUAL carries them, and effect-parameters.mjs is now filled in from it. This
+// file used to pin the shape of the hole; it now pins the answer, and — just as importantly — that
+// the FALLBACK still works, because a half-filled table has to stay useful. The fallback tests
+// therefore drive synthetic tables with deliberate gaps rather than the real one, which has none.
 //
-// This file's job is to make sure the machinery around that hole is CORRECT WHILE DORMANT. A
-// generated script that only appears once the table is filled is a script nobody runs and nobody
-// tests, so every test below fills the table itself and drives the result.
+// The order of the four is the load-bearing claim and it is checked below: the owner's manual gives
+// a panel gesture per parameter, and the instrument's silkscreen names those knobs CONTROL 1,
+// (CONTROL 2) and (CONTROL 3) with LEVEL last — so the manual's row order is the slot order.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,8 +21,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  EFFECT_PARAMETER_NAMES, anyEffectHasNames, effectHasNames, effectLabelScript,
-  effectParameterLabel, genericParameterLabel,
+  EFFECT_PARAMETER_NAMES, EFFECT_PARAMETER_RANGES, anyEffectHasNames, effectHasNames,
+  effectLabelScript, effectParameterLabel, genericParameterLabel,
 } from '../../../tools/scripts/gaia-panel/effect-parameters.mjs';
 import { buildGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
 import { KNOB_GESTURES, effectProbeScript } from '../../../tools/scripts/gaia-panel/effect-probe.mjs';
@@ -47,15 +48,72 @@ const blocks = {
 
 /* ------------------------------------------------------------------ the table as it ships */
 
-test('the table has every effect type the machine has, and no names', () => {
-  // The keys are the assertion. They are the profile's own choice labels, so a type added or
-  // renamed in the address map without being reflected here is a hole nobody would notice.
+test('the table has every effect type the machine has, and every one is named', () => {
+  // The keys are the profile's own choice labels, so a type added or renamed in the address map
+  // without being reflected here is a hole nobody would notice.
   assert.deepEqual(Object.keys(EFFECT_PARAMETER_NAMES), ['distortion', 'flanger', 'delay', 'reverb']);
   assert.deepEqual(Object.keys(EFFECT_PARAMETER_NAMES.distortion), ['DIST', 'FUZZ', 'BIT CRASH']);
   assert.deepEqual(Object.keys(EFFECT_PARAMETER_NAMES.flanger), ['FLANGER', 'PHASER', 'PITCH SHIFTER']);
   assert.deepEqual(Object.keys(EFFECT_PARAMETER_NAMES.delay), ['DELAY', 'PANNING DELAY']);
   assert.deepEqual(Object.keys(EFFECT_PARAMETER_NAMES.reverb), ['REVERB']);
-  assert.equal(anyEffectHasNames(), false, 'a name here would have to have come from somewhere');
+  assert.equal(anyEffectHasNames(), true);
+
+  // No empty leaves anywhere. A gap is legal — the fallback exists for exactly that — but the
+  // owner's manual gives all four for all nine types, so a blank here means a transcription slip
+  // rather than a documented unknown, and it would show up on the panel as a lone PARAM 3.
+  for (const [effect, types] of Object.entries(EFFECT_PARAMETER_NAMES)) {
+    for (const [type, names] of Object.entries(types)) {
+      assert.equal(names.length, 4, `${effect}/${type}: the panel shows four knobs`);
+      for (const [i, name] of names.entries()) {
+        assert.ok(String(name).trim(), `${effect}/${type} parameter ${i + 1} has no name`);
+      }
+    }
+  }
+});
+
+test('the names are the owner\'s manual\'s, spot-checked where a slip would be silent', () => {
+  // Every row is plausible, which is the problem — a wrong-but-reasonable label is the failure this
+  // whole file exists to prevent. These are the ones where getting it wrong would read as fine:
+  // BIT CRASH shares no vocabulary with the distortions it sits beside, and PHASER differs from
+  // FLANGER in exactly one slot.
+  const at = (fx, type) => EFFECT_PARAMETER_NAMES[fx][type];
+  assert.deepEqual(at('distortion', 'BIT CRASH'), ['SAMPLE RATE', 'BIT DOWN', 'FILTER', 'LEVEL']);
+  assert.deepEqual(at('flanger', 'FLANGER'), ['FEEDBACK', 'DEPTH', 'RATE', 'LEVEL']);
+  assert.deepEqual(at('flanger', 'PHASER'), ['RESONANCE', 'DEPTH', 'RATE', 'LEVEL']);
+  assert.deepEqual(at('reverb', 'REVERB'), ['TIME', 'TYPE', 'HIGH DAMP', 'LEVEL']);
+
+  // LEVEL is parameter 4 for every single type, because the manual reaches it with the plain
+  // EFFECTS LEVEL knob every time. If the row order were ever misread, this is what would break.
+  for (const types of Object.values(EFFECT_PARAMETER_NAMES)) {
+    for (const names of Object.values(types)) assert.equal(names[3], 'LEVEL');
+  }
+});
+
+test('PITCH SHIFTER\'s two Pitch rows are told apart', () => {
+  // The manual prints "Pitch" twice for this type: the CONTROL 1 knob over -12..+12 semitones, and
+  // a CONTROL 3 SELECTOR over a fixed list. Two knobs captioned PITCH would be unreadable, so the
+  // selector is PITCH SEL — the one label here that is not the manual's own word.
+  assert.deepEqual(EFFECT_PARAMETER_NAMES.flanger['PITCH SHIFTER'],
+    ['PITCH', 'DETUNE', 'PITCH SEL', 'LEVEL']);
+  const ranges = EFFECT_PARAMETER_RANGES.flanger['PITCH SHIFTER'];
+  assert.deepEqual(ranges[0], { min: -12, max: 12, unit: 'semitones' });
+  assert.ok(Array.isArray(ranges[2].values), 'the third is a selector, not a range');
+});
+
+test('every named parameter has the manual\'s range recorded beside it', () => {
+  // The ranges are not applied to the profile yet — where the manual's 0-127 sits inside the
+  // container is the open question — but they must not drift from the names while they wait.
+  for (const [effect, types] of Object.entries(EFFECT_PARAMETER_NAMES)) {
+    for (const [type, names] of Object.entries(types)) {
+      const ranges = EFFECT_PARAMETER_RANGES[effect]?.[type];
+      assert.ok(ranges, `${effect}/${type} has names but no ranges`);
+      assert.equal(ranges.length, names.length, `${effect}/${type}: ranges and names disagree`);
+      for (const r of ranges) {
+        assert.ok(Array.isArray(r.values) || (Number.isFinite(r.min) && Number.isFinite(r.max)),
+          `${effect}/${type}: a range must be a span or a list of values`);
+      }
+    }
+  }
 });
 
 test('OFF is not a type anything can be named for', () => {
@@ -94,8 +152,13 @@ test('the table matches the profile about which types exist', () => {
 /* ------------------------------------------------------------------ the fallback */
 
 test('an unnamed parameter reads PARAM n', () => {
-  assert.equal(effectParameterLabel('distortion', 'DIST', 2), genericParameterLabel(2));
-  assert.equal(effectParameterLabel('distortion', 'DIST', 2), 'PARAM 3');
+  // Against a table with a deliberate gap, because the real one no longer has any. The fallback is
+  // not dead code: it is what keeps a PARTIALLY transcribed manual useful, and what a future
+  // instrument with an undocumented slot would land on.
+  assert.equal(effectParameterLabel('distortion', 'DIST', 2, filled), genericParameterLabel(2));
+  assert.equal(effectParameterLabel('distortion', 'DIST', 2, filled), 'PARAM 3');
+  // A type the table has never heard of falls back whole rather than throwing.
+  assert.equal(effectParameterLabel('distortion', 'NO SUCH TYPE', 0, filled), 'PARAM 1');
 });
 
 test('the fallback is per parameter, not per type', () => {
@@ -113,12 +176,18 @@ test('a type nobody has touched is entirely generic', () => {
 
 /* ------------------------------------------------------------------ the generated script */
 
-test('an empty table emits no script at all', () => {
-  // The panel must not carry a dead script waiting for a manual. Asserted against the real table,
-  // so this starts failing the moment anyone fills it in — at which point the panel gains a script
-  // and the tests below are the ones that matter.
-  assert.equal(effectLabelScript(blocks), null);
-  assert.equal((buildGaiaPanel().scripts ?? []).some((s) => s.id === 'gaia_effect_parameter_labels'), false);
+test('an empty table emits no script, and the real one does', () => {
+  // Both directions. The generator must not bake a dead script into a panel that has nothing to
+  // say — and now that the manual has been transcribed, the panel must actually carry the script,
+  // or the names would sit in a module nothing reads.
+  const empty = { distortion: { DIST: ['', '', '', ''] } };
+  assert.equal(effectLabelScript(blocks, empty), null);
+  assert.ok(effectLabelScript(blocks), 'the real table should emit a script');
+
+  const script = (buildGaiaPanel().scripts ?? []).find((s) => s.id === 'gaia_effect_parameter_labels');
+  assert.ok(script, 'the panel should carry the relabel script');
+  assert.notEqual(script.enabled, false, 'and it must be enabled — unlike the probe');
+  assert.equal(script.event, 'onPanelLoad');
 });
 
 /** Run the generated script with fake host verbs and report what it set. */
@@ -182,10 +251,11 @@ test('the generated script is valid JavaScript', () => {
 
 /* ------------------------------------------------------------------ the panel while it waits */
 
-test('the effect boxes print the caveat, and the captions are addressable', () => {
-  // Two halves of "correct while dormant": the panel says why the knobs are called PARAM n, where
-  // someone looking at the knobs will read it — and the captions carry names, so filling the table
-  // in is genuinely the only step.
+test('the printed caveat is gone, and the captions are still addressable', () => {
+  // The caveat existed to explain why the knobs read PARAM n. They do not any more, so it must go:
+  // a panel that still says "meaning depends on TYPE" beside a knob labelled DRIVE is telling the
+  // reader not to trust a label that is now correct. It drops away by itself — the generator asks
+  // anyEffectHasNames() — and this is what proves the wiring works in that direction too.
   const panel = buildGaiaPanel();
   const names = new Set(panel.controls.map((c) => c._children?.Core?.name));
   for (const effect of ['distortion', 'flanger', 'delay', 'reverb']) {
@@ -198,7 +268,7 @@ test('the effect boxes print the caveat, and the captions are addressable', () =
 
   const caveats = panel.controls.filter((c) =>
     String(c._children?.Text?.content ?? '').includes('meaning depends on TYPE'));
-  assert.equal(caveats.length, 4, 'each effect box should carry the caveat');
+  assert.equal(caveats.length, 0, 'the knobs have their real names now — the caveat contradicts them');
 });
 
 /* ------------------------------------------------------------------ against the REAL runtime */

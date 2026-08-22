@@ -1,50 +1,115 @@
 // effect-parameters.mjs — what the GAIA's effect knobs are actually called.
 //
-// THE GAP, stated plainly. The hardware's EFFECTS section is SELECT CONTROL, CONTROL 1/2/3 and
-// LEVEL: five knobs whose meaning changes with the selected effect type. The MIDI implementation
-// names the addresses "Distortion Parameter 1..32" and never says which of those CONTROL 1 turns
-// for DIST as opposed to for BIT CRASH. That mapping is in the owner's manual, which this repo does
-// not have — so the panel has been showing PARAM 1..4, which is nobody's name for anything.
+// THE GAP THIS CLOSES. The MIDI implementation names every effect address "MFX Parameter 1..32",
+// all 92 of them with the same container range, and never says which one CONTROL 1 turns for DIST
+// as opposed to for BIT CRASH. It documents a box, not a set of controls. The panel therefore
+// showed PARAM 1..4, which is nobody's name for anything.
 //
-// WHY THE TABLE SHIPS EMPTY. Guessing would produce labels that look right and are wrong, and a
-// wrong label on a synth editor is worse than a generic one: PARAM 3 makes you check the manual,
-// "DEPTH" makes you not check it. The type lists below are NOT guesses — they are the labels the
-// MIDI implementation prints for each Type parameter, transcribed in address-map.mjs — so the shape
-// of the answer is complete and only the leaves are missing.
+// The names below are transcribed from the SH-01 OWNER'S MANUAL, "Effect Parameters" — a different
+// document from the MIDI implementation, and the only one that carries them.
 //
-// TO FILL IT IN. Put the manual's own name for each of MFX Parameter 1..4 into the array beside the
-// type, in order, and regenerate the panel. Nothing else changes: `effectLabelScript` starts
-// emitting a panel script that renames the captions when the type selector moves, and a type with
-// no name for a given knob keeps PARAM n. Partial is fine — name the two you are sure of.
+// WHY THE ORDER IS THE SLOT ORDER. The owner's manual gives no addresses. It gives a PANEL
+// OPERATION per parameter, and the instrument's own silkscreen names those knobs:
 //
-//   distortion: { DIST: ['DRIVE', '', '', 'LEVEL'] }
+//     MFX Parameter 1   CONTROL 1     turn the CONTROL 1 knob
+//     MFX Parameter 2   CONTROL 2     SHIFT (cancel) + turn the CONTROL 1 knob
+//     MFX Parameter 3   CONTROL 3     SHIFT (cancel) + turn the EFFECTS LEVEL knob
+//     MFX Parameter 4   LEVEL         turn the EFFECTS LEVEL knob
+//
+// The CONTROL 1 knob is engraved "(CONTROL 2)" underneath and the LEVEL knob "(CONTROL 3)", and the
+// owner's manual lists every effect's four rows in exactly that order with Level last. So the
+// manual's row order IS the CONTROL 1/2/3 + LEVEL order.
+//
+// THE ONE STEP THAT IS STILL AN INFERENCE, and it is worth saying out loud: nothing printed
+// anywhere says CONTROL 1 writes MFX Parameter 1. Two documents agree on an ordering and the
+// addresses are consecutive, which is strong — but it is not the instrument saying so.
+// effect-probe.mjs answers it directly by dumping a block, moving one knob and dumping again;
+// running it once would turn this from a well-founded reading into a fact.
 //
 // OFF is deliberately absent from every list: when an effect is off there is nothing for its knobs
 // to be named, and inventing labels for a block that is not running is the same defect one level
 // down.
 
 /**
- * effect -> type label -> the manual's names for MFX Parameter 1..4.
+ * effect -> type label -> the owner's manual's names for MFX Parameter 1..4.
  *
- * The keys are exhaustive and real; the values are the part that needs the manual.
+ * Verbatim from the manual's Parameter column, upper-cased for the panel's caption style. The two
+ * PITCH SHIFTER entries are the manual's only collision: it prints "Pitch" twice, once as the
+ * CONTROL 1 knob over -12..+12 semitones ("adjusts the amount of pitch shift in semitone steps")
+ * and once as a CONTROL 3 selector over a fixed list ("selects the amount of pitch shift"). Two
+ * knobs both captioned PITCH would be unreadable, so the selector is PITCH SEL — the only label
+ * here that is not the manual's own word, and it is a disambiguation rather than a guess.
  */
 export const EFFECT_PARAMETER_NAMES = {
   distortion: {
-    DIST: ['', '', '', ''],
-    FUZZ: ['', '', '', ''],
-    'BIT CRASH': ['', '', '', ''],
+    DIST: ['DRIVE', 'TYPE', 'PRESENCE', 'LEVEL'],
+    FUZZ: ['DRIVE', 'TYPE', 'PRESENCE', 'LEVEL'],
+    'BIT CRASH': ['SAMPLE RATE', 'BIT DOWN', 'FILTER', 'LEVEL'],
   },
   flanger: {
-    FLANGER: ['', '', '', ''],
-    PHASER: ['', '', '', ''],
-    'PITCH SHIFTER': ['', '', '', ''],
+    FLANGER: ['FEEDBACK', 'DEPTH', 'RATE', 'LEVEL'],
+    PHASER: ['RESONANCE', 'DEPTH', 'RATE', 'LEVEL'],
+    'PITCH SHIFTER': ['PITCH', 'DETUNE', 'PITCH SEL', 'LEVEL'],
   },
   delay: {
-    DELAY: ['', '', '', ''],
-    'PANNING DELAY': ['', '', '', ''],
+    DELAY: ['TIME', 'FEEDBACK', 'HIGH DAMP', 'LEVEL'],
+    'PANNING DELAY': ['TIME', 'FEEDBACK', 'HIGH DAMP', 'LEVEL'],
   },
   reverb: {
-    REVERB: ['', '', '', ''],
+    REVERB: ['TIME', 'TYPE', 'HIGH DAMP', 'LEVEL'],
+  },
+};
+
+/**
+ * The manual's RANGE for each of those parameters — recorded, and deliberately NOT yet applied to
+ * the profile.
+ *
+ * Why it matters: the profile declares every MFX slot over the container's full extent, wire
+ * 12768..52768 shown as -20000..+20000, because that is all the MIDI implementation gives. A knob
+ * bound to DIST Drive therefore sweeps forty thousand steps for a parameter with a hundred and
+ * twenty-eight, and the useful part of its travel is a third of one percent. That is the difference
+ * between a panel you can play and a panel you can only look at.
+ *
+ * Why it is not applied: the container's centre is certainly 32768 — the MIDI implementation's own
+ * 12768/52768 is exactly 32768 ± 20000 — but that does not settle where the manual's "0-127" sits
+ * inside it. Drive 0 could be stored 32768 (the parameter is signed-offset like the container) or
+ * stored 0 (the container's range is only a maximum extent and the parameter uses raw values).
+ * Both are real Roland conventions, no document distinguishes them, and picking wrong sends the
+ * synth a number from the other end of its range.
+ *
+ * ONE READING SETTLES IT, and the machinery now exists: select DIST, set Drive to a known position,
+ * request the distortion block, and look at what MFX Parameter 1 came back as. 32768 means offset,
+ * 0 means raw. Then these ranges can be wired in and the knobs become usable.
+ */
+export const EFFECT_PARAMETER_RANGES = {
+  distortion: {
+    DIST: [{ min: 0, max: 127 }, { min: 1, max: 6 }, { min: 0, max: 127 }, { min: 0, max: 127 }],
+    FUZZ: [{ min: 0, max: 127 }, { min: 1, max: 6 }, { min: 0, max: 127 }, { min: 0, max: 127 }],
+    'BIT CRASH': [{ min: 0, max: 127 }, { min: 0, max: 127 }, { min: 0, max: 127 }, { min: 0, max: 127 }],
+  },
+  flanger: {
+    FLANGER: [{ min: 0, max: 127 }, { min: 0, max: 127 }, { min: 0, max: 127 }, { min: 0, max: 127 }],
+    PHASER: [{ min: 0, max: 127 }, { min: 0, max: 127 }, { min: 0, max: 127 }, { min: 0, max: 127 }],
+    // Detune is in cents; the third is a SELECTOR over a fixed list, not a continuous range, which
+    // is why its values are spelled out rather than given as min/max.
+    'PITCH SHIFTER': [
+      { min: -12, max: 12, unit: 'semitones' },
+      { min: 0, max: 50, unit: 'cent' },
+      { values: [-12, -7, -5, -2, -1, 0, 1, 2, 5, 7, 12] },
+      { min: 0, max: 127 },
+    ],
+  },
+  delay: {
+    DELAY: [{ min: 0, max: 127 }, { min: 0, max: 127 }, { min: -36, max: 0, unit: 'dB' }, { min: 0, max: 127 }],
+    'PANNING DELAY': [{ min: 0, max: 127 }, { min: 0, max: 127 }, { min: -36, max: 0, unit: 'dB' }, { min: 0, max: 127 }],
+  },
+  reverb: {
+    REVERB: [
+      { min: 0, max: 127 },
+      { values: ['ROOM', 'PLATE', 'HALL'] },
+      { min: 1, max: 100, unit: '%' },
+      { min: 0, max: 127 },
+    ],
   },
 };
 
