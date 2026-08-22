@@ -10,19 +10,33 @@ set(CE_ROOT "${CMAKE_SOURCE_DIR}/CE")
 enable_testing()
 option(CEDITOR_DEV_MODE "Load the frontend from the Vite dev server" ON)
 
-# The GUI app, the standalone player and the VST are Windows-only in fact rather
-# than by policy: they embed the WebView2 SDK (CE/thirdparty/webview2, a Windows
-# NuGet package) and they need a native juceaide to bake BinaryData. The TESTS
-# need neither, so they are always configured and the app is not.
+# The GUI app, the standalone player and the VST default to Windows-only, but the reason is
+# narrower than it looks and it is worth knowing exactly where the wall is, because "it needs
+# Windows" was used for a long time to avoid checking anything at all off it.
 #
-# Turn it on elsewhere and you will get the missing-helper error below, which is
-# then telling you something true. `cmake -B build -DCEDITOR_BUILD_APP=ON`.
+# What is actually Windows-only is the LINK, and one library of it: `dwmapi`. Everything else
+# builds here. All thirty translation units of the CEditor target compile on Linux — Main.cpp
+# included — with the real app defines (JUCE_WEB_BROWSER=1, JUCE_USE_WIN_WEBVIEW2=1), and even
+# WebView2LoaderStatic.lib goes through the linker without complaint. juceaide is not a wall
+# either: the vendored .exe runs under Wine and bakes BinaryData correctly, which is what
+# CEDITOR_JUCE_HELPER_DIR below is for. See CLAUDE.md, "Local verification", for the recipe.
+#
+# So the honest split is:
+#   compiles anywhere   — every CE/src file, every JUCE module, the generated binary data
+#   needs Windows       — the final link (dwmapi), and MSVC's opinion of the source
+#
+# That second one is not a formality: the commit before this comment was written fixed a
+# C3861 that GCC and Clang both accept, caused by a function sitting behind the wrong #if. A
+# clean Linux compile is a strong check and not a substitute for the CI run.
+#
+# The TESTS need none of it, so they are always configured and the app is not.
+# `cmake -B build -DCEDITOR_BUILD_APP=ON` turns the app on wherever you are.
 if(WIN32)
     set(CEDITOR_BUILD_APP_DEFAULT ON)
 else()
     set(CEDITOR_BUILD_APP_DEFAULT OFF)
 endif()
-option(CEDITOR_BUILD_APP "Build the GUI app, the standalone player and the VST (needs Windows: WebView2 + a native juceaide)" ${CEDITOR_BUILD_APP_DEFAULT})
+option(CEDITOR_BUILD_APP "Build the GUI app, the standalone player and the VST (links against Windows dwmapi; compiles anywhere)" ${CEDITOR_BUILD_APP_DEFAULT})
 
 # JUCE 8.0.7 from local install
 #
@@ -39,16 +53,26 @@ option(CEDITOR_BUILD_APP "Build the GUI app, the standalone player and the VST (
 # source), so the fix is always to copy them in from a JUCE 8.0.7 install.
 set(JUCE_VENDORED_BIN "${CMAKE_SOURCE_DIR}/JUCE/bin/JUCE-8.0.7")
 set(JUCE_REQUIRED_HELPERS juceaide juce_lv2_helper juce_vst3_helper)
-if(WIN32)
-    set(JUCE_HELPER_SUFFIX ".exe")
-else()
-    set(JUCE_HELPER_SUFFIX "")
-endif()
+
+# Where to find the helpers, overridable so the vendored .exe files are not the only answer:
+#   -DCEDITOR_JUCE_HELPER_DIR=/path/to/dir
+# holding `juceaide.exe`, `juce_lv2_helper.exe`, `juce_vst3_helper.exe`. Those names keep the
+# .exe suffix whatever the platform, because JUCEConfig.cmake hardcodes it (JUCE/lib/cmake/
+# JUCE-8.0.7/JUCEConfig.cmake:71) — but nothing requires them to BE Windows binaries. A shell
+# script that execs `wine juceaide.exe` works, and is how the app target is built off Windows.
+#
+# This used to compute a platform suffix and check for `juceaide` with no extension on Linux
+# while the import below went on pointing at `juceaide.exe`. The two never agreed: dropping
+# genuine native helpers in would satisfy the check and then fail at build time on a path that
+# does not exist, and the vendored .exe files failed the check while being perfectly usable.
+# One name, checked and imported in the same place, is the fix.
+set(CEDITOR_JUCE_HELPER_DIR "${JUCE_VENDORED_BIN}" CACHE PATH
+    "Directory holding juceaide.exe and the plugin format helpers (may be Wine wrappers)")
 
 set(JUCE_MISSING_HELPERS "")
 foreach(helper IN LISTS JUCE_REQUIRED_HELPERS)
-    if(NOT EXISTS "${JUCE_VENDORED_BIN}/${helper}${JUCE_HELPER_SUFFIX}")
-        list(APPEND JUCE_MISSING_HELPERS "  JUCE/bin/JUCE-8.0.7/${helper}${JUCE_HELPER_SUFFIX}")
+    if(NOT EXISTS "${CEDITOR_JUCE_HELPER_DIR}/${helper}.exe")
+        list(APPEND JUCE_MISSING_HELPERS "  ${CEDITOR_JUCE_HELPER_DIR}/${helper}.exe")
     endif()
 endforeach()
 
@@ -71,11 +95,28 @@ if(JUCE_MISSING_HELPERS AND CEDITOR_BUILD_APP)
         "format helpers.\n\n"
         "Copy them from a JUCE 8.0.7 install (they sit in bin/JUCE-8.0.7 "
         "there too) and commit them. .gitignore has an exception for this "
-        "directory; without it the blanket *.exe rule drops them again.")
+        "directory; without it the blanket *.exe rule drops them again.\n\n"
+        "Off Windows you do not need native ones: point "
+        "-DCEDITOR_JUCE_HELPER_DIR at a directory of wrappers that exec them "
+        "under Wine. See CLAUDE.md, \"Local verification\".")
 endif()
 
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/JUCE/lib/cmake/JUCE-8.0.7")
 find_package(JUCE CONFIG REQUIRED)
+
+# JUCEConfig.cmake hardcodes each helper's IMPORTED_LOCATION to the vendored path, so honouring
+# CEDITOR_JUCE_HELPER_DIR means re-pointing the imported targets after the fact. Only when it has
+# been moved: the default path is what find_package already set, and rewriting it to the same
+# value would be noise.
+if(NOT CEDITOR_JUCE_HELPER_DIR STREQUAL JUCE_VENDORED_BIN)
+    foreach(helper IN LISTS JUCE_REQUIRED_HELPERS)
+        if(TARGET juce::${helper})
+            set_target_properties(juce::${helper} PROPERTIES
+                IMPORTED_LOCATION "${CEDITOR_JUCE_HELPER_DIR}/${helper}.exe")
+        endif()
+    endforeach()
+    message(STATUS "CEditor: JUCE helpers from ${CEDITOR_JUCE_HELPER_DIR}")
+endif()
 
 # ------------------------------------------------------------------ the app, the player, the VST
 # Everything from here to the tests needs WebView2 and a native juceaide. See CEDITOR_BUILD_APP.

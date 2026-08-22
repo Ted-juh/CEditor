@@ -59,9 +59,27 @@ that and are not negotiable without asking first.
 
 ### What actually needs CI
 
-Only what cannot be built here: WebView2, `juceaide` and the generated binary data, the app,
-standalone player and VST3 plugin targets, and MSVC-specific compile errors that Clang/GCC accept.
-That is a real reason to spend a run — **once**, on the finished change.
+Less than this file used to claim, and the difference matters — "it needs Windows" was doing a lot
+of work here as an excuse not to check anything at all off it.
+
+**Only two things genuinely need the runner:**
+
+1. **The final link of the app, player and plugin targets.** One library: `dwmapi`. That is the
+   whole of it.
+2. **MSVC's opinion of the source.** Not a formality — commit `ba41774` fixed a `C3861` that both
+   GCC and Clang accept, caused by a function sitting behind the wrong `#if`. A clean local
+   compile is a strong check and is not a substitute for this.
+
+**Everything else builds here**, and did all along:
+
+- All thirty translation units of the `CEditor` target, `Main.cpp` included, with the real app
+  defines (`JUCE_WEB_BROWSER=1`, `JUCE_USE_WIN_WEBVIEW2=1`). WebView2LoaderStatic.lib even goes
+  through the linker without complaint.
+- `juceaide` and the generated binary data. The vendored `.exe` runs under Wine and bakes
+  `BinaryData.h` correctly. See [the app target off Windows](#the-app-target-off-windows).
+
+So a change to `CE/src/**` that never gets compiled locally is a choice, not a limitation. Compile
+it, then spend the run — **once**, on the finished change.
 
 Remaining allowance is visible under the account's Settings → Billing → Plans and usage. If you are
 about to do something that will cost several runs, say what it will cost before you do it.
@@ -124,6 +142,60 @@ ctest --test-dir build/native -C Release --output-on-failure -E "DeviceProfileEn
 That leaves the device-profile engine and the panel-parameter model unverified locally. If your
 change touches `CE/src/DeviceProfile/` or panel parameters, that is a real gap — say so rather than
 reporting a green run.
+
+**Install the packages and you get ten of eleven, not nine.** `CEditorPanelParametersTests` needs
+the wider X11 set than the table implies — `libxrandr-dev libxinerama-dev libxcursor-dev
+libxcomposite-dev` — and with those it builds and passes. `CEditorDeviceProfileTests` is the one
+that still cannot run here, and for a different reason than the table gives: with `libasound2-dev`
+present it compiles fine and then fails at **link**, because nothing adds `-lasound` on Linux. That
+is a gap in this file's Linux support, not in your change; don't go chasing it when it appears.
+
+### The app target off Windows
+
+The app, player and plugin targets compile here. Only the link fails, on `dwmapi`. Do this before
+spending a CI run on anything under `CE/src/**`:
+
+```bash
+apt-get install -y wine libgtk-3-dev libwebkit2gtk-4.1-dev libcurl4-openssl-dev \
+                   libasound2-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev
+
+# juceaide is vendored as a Windows .exe and there is no source to build a native one from.
+# It runs under Wine, so wrap it. The wrappers keep the .exe names: JUCEConfig.cmake hardcodes
+# that suffix, and nothing requires the file behind it to be a Windows binary.
+mkdir -p /tmp/juce-wine && export WINEPREFIX=/tmp/juce-wine/prefix WINEDEBUG=-all
+for h in juceaide juce_lv2_helper juce_vst3_helper; do
+  printf '#!/bin/sh\nexport WINEDEBUG=-all WINEPREFIX=/tmp/juce-wine/prefix\nexec wine %s "$@"\n' \
+    "$PWD/JUCE/bin/JUCE-8.0.7/$h.exe" > /tmp/juce-wine/$h.exe
+  chmod +x /tmp/juce-wine/$h.exe
+done
+
+cmake -B build/app -G Ninja -DCMAKE_BUILD_TYPE=Release -DCEDITOR_BUILD_APP=ON \
+      -DCEDITOR_JUCE_HELPER_DIR=/tmp/juce-wine \
+      -DCMAKE_CXX_FLAGS="$(pkg-config --cflags gtk+-3.0 webkit2gtk-4.1)"
+cmake --build build/app --target CEditor -- -k 0
+```
+
+Expected result: **every translation unit compiles**, then `/usr/bin/ld: cannot find -ldwmapi` and
+nothing else. That line is success — it means the whole app is semantically clean under the real
+app defines. Anything above it is a genuine error you have just saved a Windows run on.
+
+For a single file, `-fsyntax-only` is faster than standing the whole thing up, and catches the same
+class of mistake:
+
+```bash
+g++ -fsyntax-only -std=gnu++23 -I CE/src -I JUCE/include/JUCE-8.0.7/modules \
+    -I /usr/include/freetype2 -I /usr/include/libpng16 \
+    -DJUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1 -DJUCE_WEB_BROWSER=1 -DJUCE_USE_CURL=0 \
+    -DJUCE_STANDALONE_APPLICATION=1 -DLINUX=1 -DNDEBUG=1 \
+    $(for m in core audio_basics audio_devices midi_ci data_structures events graphics \
+               gui_basics gui_extra; do printf -- '-DJUCE_MODULE_AVAILABLE_juce_%s=1 ' $m; done) \
+    CE/src/ValueTreeBridgeHandlers.cpp
+```
+
+Two things this does **not** cover, and you should say so rather than claim a clean build:
+`#if JUCE_WINDOWS` branches are not compiled, and GCC is not MSVC.
+
+### Matching CI's configure
 
 CI configures with `-DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF`. Match that when your change
 touches `CE/src/Scripting/` or the player's script integration — otherwise the scripting,
