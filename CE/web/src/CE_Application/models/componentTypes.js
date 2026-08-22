@@ -1,4 +1,5 @@
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
+import { deepClone } from '../utils/deepClone.js';
 import { createDefaultInteractiveSections } from './interactionDefaults.js';
 import { getComponentPorts } from './componentPorts.js';
 import {
@@ -1072,11 +1073,6 @@ export const COMPONENT_TYPES = {
 // --- Internal helpers ---
 
 let nextControlId = Date.now();
-
-/** Deep-clone a plain object. */
-function deepClone(obj) {
-  return JSON.parse(JSON.stringify(obj));
-}
 
 /** Deep-merge overrides into a section clone, including _children. */
 function applyOverrides(section, overrides) {

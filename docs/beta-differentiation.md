@@ -315,12 +315,16 @@ whether they compound or merely impress. Summary:
 
 ## What to do for this beta
 
-[`BETA_SMOKE_TEST_2026-08-06.md`](../BETA_SMOKE_TEST_2026-08-06.md) says do not ship — **but that
-verdict is stale, and this document repeated it for several rounds before anyone checked.** The pass
-ran against a build from 2026-08-04; all three High-severity findings were fixed on 2026-08-06, most
-within hours of the report, and the report was committed afterwards without a status. Verified on
-2026-08-11: the regression test asserts the original crash still reproduces without the fix, and the
-full suite is 2197/2197. See the status block at the top of that file.
+The 2026-08-06 first-beta smoke pass said do not ship — **but that verdict was stale before it was
+written down, and this document repeated it for several rounds before anyone checked.** The pass ran
+against a build from 2026-08-04; all three High-severity findings were fixed on 2026-08-06, most
+within hours of the report, and the report was committed afterwards without a status.
+
+That report has since been retired: all twelve of its findings were verified closed in the code, and
+the ones worth pinning are pinned by tests that name them — `deepCloneProxySafety.test.js` for the
+three High findings (one `structuredClone` root cause behind all of them, plus a sweep that fails on
+a new unguarded call anywhere in `src`), `comboboxDefaults.test.js`, `sliderDefaultCurrent.test.js`,
+`packageReadinessDetail.test.js` and `panelIdentityAndVersion.test.js` for the rest.
 
 The lesson is worth more than the fix: **a QA report is a snapshot, and an undated verdict outlives
 the build it describes.** Every finding table in this repository should carry a status column from

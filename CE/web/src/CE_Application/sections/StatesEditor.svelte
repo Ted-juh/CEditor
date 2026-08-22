@@ -6,6 +6,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import ConditionBuilder from './ConditionBuilder.svelte';
   import { BASE_STATE_TARGET, buildStateTargetOptions, resolveSelectedStateName, summarizeStateOverrides } from '../utils/stateTargets.js';
 
   let { control = null } = $props();
@@ -23,6 +24,10 @@
   let core = $derived(getSection(control, 'Core'));
   let designer = $derived(getSection(control, 'Designer'));
   let states = $derived(getSection(control, 'States'));
+  // Channel names for the rule builder's operand list. A plain panel control has no
+  // ValueChannels section and the builder degrades to its free-text form, which is right:
+  // flags like `hover` are still legal operands there.
+  let channelNames = $derived(Object.keys(getSection(control, 'ValueChannels')?._children ?? {}));
   let multiEdit = $derived($selectedComponentIds.size > 1);
   let stateTargetOptions = $derived(buildStateTargetOptions(states));
   let selectedStateName = $state('');
@@ -249,6 +254,23 @@
     </PropertySection>
 
     <PropertySection title="When">
+      <!--
+        The rule half of `evaluateState()` (utils/interactionRuntime.js): an optional compound
+        condition over channels and flags, ANDed with the toggles below. The runtime has honoured
+        it for as long as it has existed and the starter templates write one — the Tabbed Pages
+        container drives its page states with `tab == 'a'`, the Status LED with `active >= 1` —
+        but there was no field here, so a rule could be seen on the filmstrip badge and never
+        edited, and no user could write a new one. Same builder Links and Hit Zones use, on the
+        same condition language, so a rule learned in one place reads in all three.
+      -->
+      <PropertyCell label="Rule" span={4} hint="Compound condition over channels and flags. ANDed with the toggles below; leave empty to depend on the toggles alone.">
+        <ConditionBuilder
+          value={selectedState.rule ?? ''}
+          channels={channelNames}
+          onChange={(next) => setStateProp('rule', next)}
+          placeholder="no rule — flags only"
+        />
+      </PropertyCell>
       {#each COMMON_FLAGS as flag}
         <PropertyCell label={flag.label} span={1} hint={`Require ${flag.label.toLowerCase()} to activate this state.`}>
           <PropertyToggle
