@@ -44,20 +44,36 @@ const opts = { index, parameterById };
 
 const fold = (hexes, state = EMPTY_CHIP_STATE) => hexes.reduce((s, hex) => applyChipHex(s, hex, index), state);
 
-/** A DT1 for distortion.parameter1 (four nibbles at 10 00 04 01) carrying `value`. */
+/**
+ * A DT1 for distortion.parameter1 (four nibbles at 10 00 04 01) carrying `value`.
+ *
+ * The checksum is COMPUTED rather than pinned. It used to be the literal 3E, which was correct for
+ * the single value the helper was written with and wrong for every other — invisible while nothing
+ * verified it, and a trap the moment the parameter's range moved and the values had to change.
+ */
 const distortion = (value) => {
-  const nibbles = [12, 8, 4, 0].map((shift) => ((value >> shift) & 0x0f).toString(16).toUpperCase().padStart(2, '0'));
-  return `F0 41 10 00 00 41 12 10 00 04 01 ${nibbles.join(' ')} 3E F7`;
+  const address = [0x10, 0x00, 0x04, 0x01];
+  const data = [12, 8, 4, 0].map((shift) => (value >> shift) & 0x0f);
+  const sum = [...address, ...data].reduce((total, byte) => total + byte, 0);
+  const hex = (b) => b.toString(16).toUpperCase().padStart(2, '0');
+  return `F0 41 10 00 00 41 12 ${[...address, ...data, (128 - (sum % 128)) % 128].map(hex).join(' ')} F7`;
 };
+
+// Values INSIDE the parameter's declared range. Roland's MFX container is offset by 32768 — the
+// address map's 12768..52768 is exactly 32768 ± 20000 — so DIST Drive's 0..127 is stored
+// 32768..32895. A probe of 4095 sits below the field's own minimum and compiles to nothing at all.
+const DRIVE_MIN = 32768;   // Drive 0
+const DRIVE_MID = 32831;   // Drive 63
+const DRIVE_MAX = 32895;   // Drive 127
 
 test('a sysex edit becomes a chip that knows its parameter', () => {
   // The case the learn reducer cannot reach at all. No span threshold either: one DT1 is enough,
   // because the address is not a guess.
-  const chips = chipList(fold([distortion(4095)]), opts);
+  const chips = chipList(fold([distortion(DRIVE_MAX)]), opts);
   assert.equal(chips.length, 1);
   assert.equal(chips[0].parameterId, 'distortion.parameter1');
   assert.equal(chips[0].parameter?.id, 'distortion.parameter1');
-  assert.equal(chips[0].last, 4095, 'the value is decoded with the parameter\'s own encoder');
+  assert.equal(chips[0].last, DRIVE_MAX, 'the value is decoded with the parameter\'s own encoder');
   assert.equal(chips[0].origin, 'sysex');
 });
 
@@ -145,7 +161,7 @@ test('a Data Entry with no NRPN selected is still an ordinary controller', () =>
 test('the newest chip comes first', () => {
   // The whole interaction: wiggle the one you want, take the chip that just appeared. Ranking by
   // span — what the one-shot session does — would bury it under whatever moved furthest earlier.
-  const state = fold([distortion(4095), distortion(0), 'B0 4A 7F', 'B0 4A 00', 'B0 66 05']);
+  const state = fold([distortion(DRIVE_MAX), distortion(DRIVE_MIN), 'B0 4A 7F', 'B0 4A 00', 'B0 66 05']);
   const chips = chipList(state, opts);
   assert.equal(chips[0].parameterId, 'tone1.filter.cutoff', 'the last thing touched is first');
   assert.equal(chips.length, 3);
@@ -155,16 +171,20 @@ test('the newest chip comes first', () => {
 test('one message does not reorder the chips it did not touch', () => {
   // The stamp is per candidate, not per state. Restamping everything on every message would make
   // the strip shuffle on any incoming traffic, which is exactly when someone is trying to grab one.
-  const before = chipList(fold([distortion(10), 'B0 4A 40', 'B0 66 20']), opts).map((c) => c.key);
-  const after = chipList(fold(['B0 66 21'], fold([distortion(10), 'B0 4A 40', 'B0 66 20'])), opts).map((c) => c.key);
+  const before = chipList(fold([distortion(DRIVE_MID), 'B0 4A 40', 'B0 66 20']), opts).map((c) => c.key);
+  const after = chipList(fold(['B0 66 21'], fold([distortion(DRIVE_MID), 'B0 4A 40', 'B0 66 20'])), opts).map((c) => c.key);
   assert.deepEqual(after, before, 'moving the front chip further reordered the rest');
 });
 
 test('repeated moves accumulate rather than duplicating', () => {
-  const chips = chipList(fold([distortion(100), distortion(4095), distortion(50)]), opts);
+  const chips = chipList(fold([distortion(DRIVE_MIN), distortion(DRIVE_MAX), distortion(DRIVE_MID)]), opts);
   assert.equal(chips.length, 1);
   assert.equal(chips[0].count, 3);
-  assert.equal(chips[0].span, 4045, 'span is the range seen, not the last step');
+  // 127, because the parameter's declared range IS 0..127 now — the span of DIST Drive from
+  // bottom to top. It read 4045 while every effect slot was declared over the MFX container's
+  // full 40000, which is the number this narrowing exists to get rid of.
+  assert.equal(chips[0].span, DRIVE_MAX - DRIVE_MIN, 'span is the range seen, not the last step');
+  assert.equal(chips[0].span, 127, 'and that range is the manual\'s, not the container\'s');
 });
 
 test('a parameter that is not a number does not show one', () => {
@@ -197,7 +217,7 @@ test('without a profile the CC side still works, it just cannot name anything', 
   assert.equal(chips.length, 1);
   assert.equal(chips[0].parameterId, null);
   assert.equal(chips[0].last, 90);
-  assert.deepEqual(chipList(applyChipHex(EMPTY_CHIP_STATE, distortion(4095), null), {}), [],
+  assert.deepEqual(chipList(applyChipHex(EMPTY_CHIP_STATE, distortion(DRIVE_MAX), null), {}), [],
     'and a sysex edit cannot be read at all without one');
 });
 
@@ -239,10 +259,13 @@ test('the drag payload is the shape the drop handler already parses', () => {
   // Not a shape chosen here: parseDeviceParameterDrag checks `kind` and `parameter.id`, and
   // getBindingCompatibility reads the parameter's own type. This is the first thing in the app to
   // produce it — the drop path has never had a source.
-  const chip = chipList(fold([distortion(4095)]), opts)[0];
+  const chip = chipList(fold([distortion(DRIVE_MAX)]), opts)[0];
   const payload = chipDragPayload(chip, 'Roland GAIA SH-01');
   assert.equal(payload.kind, 'ceditor.deviceParameter');
   assert.equal(payload.parameter.id, 'distortion.parameter1');
-  assert.equal(payload.parameter.type, 'bipolar', 'the whole parameter travels, not just its id');
+  // 'integer', not 'bipolar'. Drive is 0..127 with a display offset, and only a parameter whose
+  // displayed range goes NEGATIVE is bipolar. Every effect slot read bipolar while they were all
+  // declared over the container's -20000..+20000.
+  assert.equal(payload.parameter.type, 'integer', 'the whole parameter travels, not just its id');
   assert.equal(payload.deviceRole, 'Roland GAIA SH-01');
 });

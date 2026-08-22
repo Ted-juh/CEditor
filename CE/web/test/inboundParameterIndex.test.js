@@ -85,7 +85,15 @@ test('every parameter of both profiles round-trips to itself', () => {
     assert.deepEqual(index.collisions, [], `${name} puts two parameters on one message`);
 
     for (const parameter of source.parameters) {
-      const compiled = localCompileParameter(source, { parameterId: parameter.id, value: 64 });
+      // A value inside the parameter's OWN range. A flat 64 assumed every parameter starts at
+      // zero. It stopped being true when the effect slots took the owner's manual's ranges over
+      // Roland's offset container — DIST Drive is 32768..32895 — and the failure was not a skip:
+      // the encoder does not enforce the declared range, so 64 compiled to a message whose leading
+      // value bytes were 00 00 where the fingerprint expects 08 00, and it resolved to NOTHING.
+      const min = Number(parameter?.range?.min ?? 0);
+      const max = Number(parameter?.range?.max ?? 127);
+      const value = Number.isFinite(min) && Number.isFinite(max) ? Math.min(max, min + 64) : 64;
+      const compiled = localCompileParameter(source, { parameterId: parameter.id, value });
       if (!compiled?.ok) continue;
       assert.deepEqual(matchInbound(index, compiled.hex), {
         parameterId: parameter.id,
@@ -131,14 +139,18 @@ test('the value bytes stop where the value stops', () => {
 
 test('a value is decoded with the encoder its parameter declares', () => {
   // The reason the width matters. A nibbled parameter read as one byte gives its top nibble — a
-  // plausible number, and the wrong one, from a message that matched. 4095 is 0x0FFF: four nibbles
-  // 0, 15, 15, 15. Reading one byte would say 0.
+  // plausible number, and the wrong one, from a message that matched. 32895 is 0x807F: four
+  // nibbles 8, 0, 7, 15. Reading one byte would say 8.
+  //
+  // 32895 rather than the 4095 this used to probe with, because DIST Drive's range is now the
+  // owner's manual's 0..127 over Roland's offset container — stored 32768..32895 — and 4095 sits
+  // below the field's own declared minimum.
   const index = buildInboundIndex(GAIA);
-  assert.deepEqual(decodeInbound(index, 'F0 41 10 00 00 41 12 10 00 04 01 00 0F 0F 0F 3E F7'),
-    { parameterId: 'distortion.parameter1', value: 4095 });
+  assert.deepEqual(decodeInbound(index, 'F0 41 10 00 00 41 12 10 00 04 01 08 00 07 0F 4D F7'),
+    { parameterId: 'distortion.parameter1', value: 32895 });
   assert.deepEqual(decodeInbound(index, 'F0 41 10 00 00 41 12 10 00 01 0C 05 34 F7'),
     { parameterId: 'tone1.filter.cutoff', value: 5 });
-  assert.equal(decodeInbound(index, 'F0 41 10 00 00 41 12 10 00 04 01 00 0F'), null,
+  assert.equal(decodeInbound(index, 'F0 41 10 00 00 41 12 10 00 04 01 08 00'), null,
     'a message too short to hold its own value decodes to nothing');
 });
 
@@ -155,7 +167,13 @@ test('every parameter decodes back to the value it was compiled from', () => {
   let text = 0;
   for (const parameter of GAIA.parameters) {
     const isText = String(parameter?.type ?? '') === 'text';
-    const value = isText ? 'ROUND TRIP' : Math.min(Number(parameter?.range?.max ?? 1), 100);
+    // A probe INSIDE the parameter's own range. `Math.min(max, 100)` assumed every parameter
+    // starts at zero, which stopped being true when the effect slots took the owner's manual's
+    // ranges over Roland's offset container: DIST Drive is 32768..32895, and 100 is below its
+    // minimum. A probe the encoder refuses makes a round-trip test pass by never running.
+    const min = Number(parameter?.range?.min ?? 0);
+    const max = Number(parameter?.range?.max ?? 1);
+    const value = isText ? 'ROUND TRIP' : Math.min(max, min + 100);
     if (!isText && !Number.isFinite(value)) continue;
     if (isText) text += 1;
     const compiled = localCompileParameter(GAIA, { parameterId: parameter.id, value });
@@ -170,13 +188,33 @@ test('every parameter decodes back to the value it was compiled from', () => {
 });
 
 test('a four-nibble value is not swallowed by the address', () => {
-  // A bug this file caught while being written. Probing values 0..127 on a four-nibble parameter
-  // leaves its top two bytes at zero every time, so they looked as fixed as the address, the prefix
-  // absorbed them, and the value was then read two bytes late. Probes now span the declared range.
+  // A bug this file caught while being written: probing 0..127 on a four-nibble parameter left its
+  // top two bytes at zero every time, so they looked as fixed as the address, the prefix absorbed
+  // them, and the value was read two bytes late.
+  //
+  // The narrowed effect ranges make that condition PERMANENT rather than an artefact of a bad
+  // probe. DIST Drive is stored 32768..32895 — 08 00 0X 0Y — so its top two bytes are constant
+  // across the parameter's entire legal range, and no choice of probe can move them. The prefix
+  // therefore grows to 13 and `valueStart` pulls those two bytes back into the value, which is the
+  // arrangement the module's own comment describes: constant bytes belong in the prefix for
+  // matching AND in the value for decoding.
+  //
+  // What must hold is the INVARIANT, not either number on its own: the value is as wide as its
+  // encoder says, and it starts exactly that far from the end of the prefix.
   const print = fingerprintParameter(GAIA, 'distortion.parameter1');
-  assert.equal(print.valueLength, 4);
-  assert.equal(print.prefix.length, 11, 'the prefix is the header and the four address bytes, nothing more');
-  assert.equal(print.valueStart, 11);
+  assert.equal(print.valueLength, 4, 'four nibbles, whatever the range');
+  assert.equal(print.valueStart, print.prefix.length - 2,
+    'the two constant leading value bytes are counted back out of the prefix');
+  assert.equal(print.valueStart, 11, 'and 11 is where the address ends');
+  assert.equal(print.prefix.length, 13);
+
+  // The reason it matters, asserted end to end rather than by inspecting offsets: a value whose
+  // leading bytes never move must still round-trip.
+  const index = buildInboundIndex(GAIA);
+  for (const value of [32768, 32831, 32895]) {
+    const compiled = localCompileParameter(GAIA, { parameterId: 'distortion.parameter1', value });
+    assert.deepEqual(decodeInbound(index, compiled.hex), { parameterId: 'distortion.parameter1', value });
+  }
 });
 
 test('the read-back asks for the right number of bytes', () => {

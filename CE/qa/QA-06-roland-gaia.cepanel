@@ -9196,9 +9196,9 @@
       "label": "gaia_Effects_Delay_delay_parameter1",
       "controlName": "gaia_Effects_Delay_delay_parameter1",
       "path": "gaia_Effects_Delay_delay_parameter1.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32895,
+      "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -9209,9 +9209,9 @@
       "label": "gaia_Effects_Delay_delay_parameter2",
       "controlName": "gaia_Effects_Delay_delay_parameter2",
       "path": "gaia_Effects_Delay_delay_parameter2.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32895,
+      "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -9222,10 +9222,10 @@
       "label": "gaia_Effects_Delay_delay_parameter3",
       "controlName": "gaia_Effects_Delay_delay_parameter3",
       "path": "gaia_Effects_Delay_delay_parameter3.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
-      "unit": "",
+      "min": 32732,
+      "max": 32768,
+      "defaultValue": 32750,
+      "unit": "dB",
       "midiCC": null,
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter3"
@@ -9235,9 +9235,9 @@
       "label": "gaia_Effects_Delay_delay_parameter4",
       "controlName": "gaia_Effects_Delay_delay_parameter4",
       "path": "gaia_Effects_Delay_delay_parameter4.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32895,
+      "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -9469,9 +9469,9 @@
       "label": "gaia_Effects_Distortion_distortion_parameter1",
       "controlName": "gaia_Effects_Distortion_distortion_parameter1",
       "path": "gaia_Effects_Distortion_distortion_parameter1.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32895,
+      "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -9482,9 +9482,9 @@
       "label": "gaia_Effects_Distortion_distortion_parameter2",
       "controlName": "gaia_Effects_Distortion_distortion_parameter2",
       "path": "gaia_Effects_Distortion_distortion_parameter2.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32895,
+      "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -9495,9 +9495,9 @@
       "label": "gaia_Effects_Distortion_distortion_parameter3",
       "controlName": "gaia_Effects_Distortion_distortion_parameter3",
       "path": "gaia_Effects_Distortion_distortion_parameter3.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32895,
+      "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -9508,9 +9508,9 @@
       "label": "gaia_Effects_Distortion_distortion_parameter4",
       "controlName": "gaia_Effects_Distortion_distortion_parameter4",
       "path": "gaia_Effects_Distortion_distortion_parameter4.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32895,
+      "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -9898,9 +9898,9 @@
       "label": "gaia_Effects_Flanger_flanger_parameter1",
       "controlName": "gaia_Effects_Flanger_flanger_parameter1",
       "path": "gaia_Effects_Flanger_flanger_parameter1.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32756,
+      "max": 32895,
+      "defaultValue": 32826,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -9911,9 +9911,9 @@
       "label": "gaia_Effects_Flanger_flanger_parameter2",
       "controlName": "gaia_Effects_Flanger_flanger_parameter2",
       "path": "gaia_Effects_Flanger_flanger_parameter2.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32895,
+      "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -9924,9 +9924,9 @@
       "label": "gaia_Effects_Flanger_flanger_parameter3",
       "controlName": "gaia_Effects_Flanger_flanger_parameter3",
       "path": "gaia_Effects_Flanger_flanger_parameter3.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32756,
+      "max": 32895,
+      "defaultValue": 32826,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -9937,9 +9937,9 @@
       "label": "gaia_Effects_Flanger_flanger_parameter4",
       "controlName": "gaia_Effects_Flanger_flanger_parameter4",
       "path": "gaia_Effects_Flanger_flanger_parameter4.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32895,
+      "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -10171,9 +10171,9 @@
       "label": "gaia_Effects_Reverb_reverb_parameter1",
       "controlName": "gaia_Effects_Reverb_reverb_parameter1",
       "path": "gaia_Effects_Reverb_reverb_parameter1.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32895,
+      "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -10184,9 +10184,9 @@
       "label": "gaia_Effects_Reverb_reverb_parameter2",
       "controlName": "gaia_Effects_Reverb_reverb_parameter2",
       "path": "gaia_Effects_Reverb_reverb_parameter2.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32770,
+      "defaultValue": 32769,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -10197,10 +10197,10 @@
       "label": "gaia_Effects_Reverb_reverb_parameter3",
       "controlName": "gaia_Effects_Reverb_reverb_parameter3",
       "path": "gaia_Effects_Reverb_reverb_parameter3.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
-      "unit": "",
+      "min": 32769,
+      "max": 32868,
+      "defaultValue": 32819,
+      "unit": "%",
       "midiCC": null,
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter3"
@@ -10210,9 +10210,9 @@
       "label": "gaia_Effects_Reverb_reverb_parameter4",
       "controlName": "gaia_Effects_Reverb_reverb_parameter4",
       "path": "gaia_Effects_Reverb_reverb_parameter4.value",
-      "min": 12768,
-      "max": 52768,
-      "defaultValue": 32768,
+      "min": 32768,
+      "max": 32895,
+      "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
       "deviceRole": "primary",
@@ -74298,12 +74298,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32895,
+          "defaultCurrentValue": 32832,
+          "displayMin": 0,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -74312,7 +74311,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "delay.parameter1",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -74384,12 +74383,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32895,
+          "defaultCurrentValue": 32832,
+          "displayMin": 0,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -74398,7 +74396,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "delay.parameter2",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -74470,12 +74468,13 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
+          "min": 32732,
+          "max": 32768,
+          "defaultCurrentValue": 32750,
+          "unit": "dB",
           "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "displayMin": -36,
+          "displayMax": 0
         },
         "DeviceBindings": {
           "bindings": [
@@ -74556,12 +74555,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32895,
+          "defaultCurrentValue": 32832,
+          "displayMin": 0,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -74570,7 +74568,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "delay.parameter4",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -76189,12 +76187,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32895,
+          "defaultCurrentValue": 32832,
+          "displayMin": 0,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -76203,7 +76200,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "distortion.parameter1",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -76275,12 +76272,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32895,
+          "defaultCurrentValue": 32832,
+          "displayMin": 0,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -76289,7 +76285,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "distortion.parameter2",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -76361,12 +76357,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32895,
+          "defaultCurrentValue": 32832,
+          "displayMin": 0,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -76375,7 +76370,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "distortion.parameter3",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -76447,12 +76442,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32895,
+          "defaultCurrentValue": 32832,
+          "displayMin": 0,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -76461,7 +76455,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "distortion.parameter4",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -79112,12 +79106,12 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
+          "min": 32756,
+          "max": 32895,
+          "defaultCurrentValue": 32826,
           "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "displayMin": -12,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -79198,12 +79192,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32895,
+          "defaultCurrentValue": 32832,
+          "displayMin": 0,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -79212,7 +79205,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "flanger.parameter2",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -79284,12 +79277,12 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
+          "min": 32756,
+          "max": 32895,
+          "defaultCurrentValue": 32826,
           "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "displayMin": -12,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -79370,12 +79363,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32895,
+          "defaultCurrentValue": 32832,
+          "displayMin": 0,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -79384,7 +79376,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "flanger.parameter4",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -80984,12 +80976,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32895,
+          "defaultCurrentValue": 32832,
+          "displayMin": 0,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -80998,7 +80989,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "reverb.parameter1",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -81070,12 +81061,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32770,
+          "defaultCurrentValue": 32769,
+          "displayMin": 0,
+          "displayMax": 2
         },
         "DeviceBindings": {
           "bindings": [
@@ -81084,7 +81074,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "reverb.parameter2",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -81156,12 +81146,12 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32769,
+          "max": 32868,
+          "defaultCurrentValue": 32819,
+          "unit": "%",
+          "displayMin": 1,
+          "displayMax": 100
         },
         "DeviceBindings": {
           "bindings": [
@@ -81170,7 +81160,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "reverb.parameter3",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {
@@ -81242,12 +81232,11 @@
         },
         "Behavior": {
           "valueType": "int",
-          "min": 12768,
-          "max": 52768,
-          "defaultCurrentValue": 32768,
-          "showSign": true,
-          "displayMin": -20000,
-          "displayMax": 20000
+          "min": 32768,
+          "max": 32895,
+          "defaultCurrentValue": 32832,
+          "displayMin": 0,
+          "displayMax": 127
         },
         "DeviceBindings": {
           "bindings": [
@@ -81256,7 +81245,7 @@
               "port": "value",
               "deviceRole": "primary",
               "parameterId": "reverb.parameter4",
-              "parameterType": "bipolar",
+              "parameterType": "integer",
               "adoptMetadata": true,
               "dryRun": false,
               "feedback": {

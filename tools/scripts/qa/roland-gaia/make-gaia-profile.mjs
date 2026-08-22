@@ -18,6 +18,10 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readCommitted } from '../../readCommitted.mjs';
+// The OWNER'S MANUAL's effect parameter table, which the MIDI implementation does not contain.
+// Imported rather than re-transcribed: it is one table, and two copies of it would agree until one
+// was edited. The panel reads it for the knob CAPTIONS; this file reads it for the RANGES.
+import { EFFECT_PARAMETER_RANGES } from '../../gaia-panel/effect-parameters.mjs';
 
 import {
   BLOCK_SIZES, BLOCKS, MODEL, PATCH_ARPEGGIO_COMMON, PATCH_ARPEGGIO_PATTERN, PATCH_COMMON,
@@ -36,6 +40,68 @@ const EXTRA_BLOCKS = [
   { block: 'reverb', prefix: 'reverb', group: 'Effects · Reverb', table: PATCH_REVERB },
   { block: 'arpeggioCommon', prefix: 'arp', group: 'Arpeggio', table: PATCH_ARPEGGIO_COMMON },
 ];
+
+/**
+ * The MFX container, and why every effect parameter needed its range narrowed.
+ *
+ * The MIDI implementation declares each effect slot as four nibbles over 12768..52768, displayed
+ * -20000..+20000. That is Roland's generic MFX container, not the parameter's own range: the span
+ * is 40000 and the centre is 32768, so `displayed = stored - 32768`.
+ *
+ * A four-nibble field declared 12768..52768 CANNOT be carrying a raw 0-127 byte — 0 would sit below
+ * its own declared minimum. The offset encoding is the only self-consistent reading of the address
+ * map, and it is why the ranges below can be applied from the owner's manual without a hardware
+ * reading first.
+ *
+ * What it fixes: DIST Drive is 0-127, so a knob bound to the container swept forty thousand steps
+ * for a hundred and twenty-eight values — a third of one percent of its travel did anything at all.
+ * That is the difference between a panel you can play and one you can only look at.
+ */
+const MFX_CENTRE = 32768;
+
+/**
+ * The manual's range for each effect slot, folded across the types that share it.
+ *
+ * One address serves every type of its block — `distortion.parameter2` is the distortion TYPE
+ * (1-6) under DIST and Bit Down (0-127) under BIT CRASH — and a profile parameter carries one
+ * range. So slots whose meaning changes take the UNION, which is the widest range that can never
+ * refuse a legal value. Twelve of the sixteen need no union at all: every type agrees.
+ *
+ * Slots 5 and up keep the container range. The owner's manual documents four parameters per type
+ * because the instrument reaches four, and narrowing an address on no evidence would be inventing
+ * a limit rather than recording one.
+ */
+function mfxRangeFor(block, slot) {
+  const perType = EFFECT_PARAMETER_RANGES[block];
+  if (!perType || slot < 1 || slot > 4) return null;
+
+  let min = Infinity;
+  let max = -Infinity;
+  const units = new Set();
+  for (const ranges of Object.values(perType)) {
+    const range = ranges[slot - 1];
+    if (!range) return null;
+    // A selector's `values` are the displayed numbers themselves; a choice list (REVERB Type) is
+    // indexed from zero, because that is what the wire carries for a named option.
+    const numeric = Array.isArray(range.values)
+      ? (range.values.every((v) => typeof v === 'number') ? range.values : range.values.map((unused, i) => i))
+      : [range.min, range.max];
+    min = Math.min(min, ...numeric);
+    max = Math.max(max, ...numeric);
+    units.add(range.unit ?? '');
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  // Only when every type agrees. A slot that is dB under one type and cents under another has no
+  // single unit, and printing one would label two thirds of the cases wrong.
+  const unit = units.size === 1 ? [...units][0] : '';
+  return { min: MFX_CENTRE + min, max: MFX_CENTRE + max, displayMin: min, displayMax: max, unit };
+}
+
+/** `MFX Parameter 7` / `Delay Parameter 3` -> 7 / 3, or 0 for a row that is not one. */
+function mfxSlotOf(name) {
+  const match = /Parameter (\d+)$/.exec(String(name ?? ''));
+  return match ? Number(match[1]) : 0;
+}
 
 /**
  * Every block the synth will answer an RQ1 for: one row, driving the REQUEST, the DUMP DEFINITION
@@ -480,7 +546,13 @@ export function buildProfile() {
 
   for (const { block, prefix, group, table } of EXTRA_BLOCKS) {
     for (const entry of table) {
-      parameters.push(buildParameter(entry, { idPrefix: prefix, group, blockOffset: BLOCKS[block] }));
+      // The owner's manual's range, where it has one. The address map carries the CONTAINER, which
+      // is all the MIDI implementation prints; narrowing it here keeps each document's contribution
+      // separate — address-map.mjs stays a transcription of the one manual, and the overlay is
+      // visibly from the other.
+      const narrowed = mfxRangeFor(block, mfxSlotOf(entry.name));
+      parameters.push(buildParameter(narrowed ? { ...entry, ...narrowed } : entry,
+        { idPrefix: prefix, group, blockOffset: BLOCKS[block] }));
     }
   }
 

@@ -88,9 +88,11 @@ test('every transcribed block reaches the profile, whole', () => {
   assert.equal(count('arp'), PATCH_ARPEGGIO_COMMON.length);
 });
 
-test('the effect parameter banks are 4-nibble and bipolar', () => {
-  // 16 bits split across four bytes of four bits each, wire 12768..52768 shown as -20000..+20000.
-  // Getting either half wrong sends a plausible number to the wrong place.
+test('the effect parameter banks are 4-nibble, over Roland\'s offset container', () => {
+  // 16 bits split across four bytes of four bits each. The MIDI implementation declares every slot
+  // as 12768..52768 shown -20000..+20000, which is exactly 32768 ± 20000 — so the container's
+  // centre is 32768 and `displayed = stored - 32768`. Getting either half wrong sends a plausible
+  // number to the wrong place.
   for (const parameter of profile.parameters) {
     if (!/^(distortion|flanger|delay|reverb)\.parameter\d+$/.test(parameter.id)) continue;
     // `nibbled` with a `nibbles` count is the vocabulary BOTH engines read. This said
@@ -98,10 +100,52 @@ test('the effect parameter banks are 4-nibble and bipolar', () => {
     // either: C++ refused with "Unsupported numeric encoder" and JS emitted one u7 byte.
     assert.equal(parameter.encoding.type, 'nibbled', `${parameter.id}: effect parameters are nibble-encoded`);
     assert.equal(parameter.encoding.nibbles, 4, `${parameter.id}: four nibbles, not ${parameter.encoding.nibbles}`);
-    assert.equal(parameter.type, 'bipolar');
-    assert.equal(parameter.display.min, -20000);
+    // The offset, on every slot whether narrowed or not: what is displayed is what is stored, less
+    // the container's centre.
+    assert.equal(parameter.range.min - parameter.display.min, 32768, `${parameter.id}: wrong offset`);
+    assert.equal(parameter.range.max - parameter.display.max, 32768, `${parameter.id}: wrong offset`);
+  }
+});
+
+test('the four slots the panel shows carry the owner\'s manual\'s range, not the container\'s', () => {
+  // THE fix this pins. Every effect slot used to be declared over the container's full 40000, so a
+  // knob bound to DIST Drive — a 0..127 parameter — swept forty thousand steps and a third of one
+  // percent of its travel did anything. The MIDI implementation could not have said otherwise: it
+  // prints the container. The OWNER'S MANUAL prints the parameter.
+  const shown = (id) => profile.parameters.find((p) => p.id === id);
+
+  for (const [id, min, max, unit] of [
+    ['distortion.parameter1', 0, 127, ''],      // DIST Drive / BIT CRASH Sample Rate
+    ['distortion.parameter4', 0, 127, ''],      // Level, on every type
+    ['delay.parameter3', -36, 0, 'dB'],         // High Damp, in dB on both delay types
+    ['reverb.parameter2', 0, 2, ''],            // Type: ROOM, PLATE, HALL
+    ['reverb.parameter3', 1, 100, '%'],         // High Damp, as a percentage
+  ]) {
+    const parameter = shown(id);
+    assert.equal(parameter.display.min, min, `${id}: displayed minimum`);
+    assert.equal(parameter.display.max, max, `${id}: displayed maximum`);
+    assert.equal(parameter.display.unit, unit, `${id}: unit`);
+    assert.equal(parameter.range.min, 32768 + min, `${id}: wire minimum`);
+    assert.equal(parameter.range.max, 32768 + max, `${id}: wire maximum`);
+  }
+
+  // A slot whose meaning CHANGES with the type takes the union, because one address carries one
+  // range and the union is the widest that can never refuse a legal value. distortion.parameter2 is
+  // the distortion Type (1-6) under DIST and Bit Down (0-127) under BIT CRASH.
+  assert.equal(shown('distortion.parameter2').display.min, 0);
+  assert.equal(shown('distortion.parameter2').display.max, 127);
+  // And where the units disagree, none is printed rather than one that is wrong two thirds of the
+  // time: flanger.parameter1 is Feedback, Resonance, or a pitch shift in semitones.
+  assert.equal(shown('flanger.parameter1').display.unit, '');
+  assert.equal(shown('flanger.parameter1').display.min, -12, 'the union reaches below zero');
+
+  // Slots 5 and up keep the container. The manual documents four per type because the instrument
+  // reaches four; narrowing an address on no evidence would invent a limit rather than record one.
+  for (const fx of ['distortion', 'flanger', 'delay', 'reverb']) {
+    const parameter = shown(`${fx}.parameter5`);
+    assert.equal(parameter.display.min, -20000, `${fx}.parameter5 should still be the container`);
     assert.equal(parameter.display.max, 20000);
-    assert.equal(parameter.default, 32768, `${parameter.id}: the centre of 12768..52768 is 32768, which displays as 0`);
+    assert.equal(parameter.default, 32768, 'the centre of 12768..52768, which displays as 0');
   }
 });
 

@@ -10,7 +10,11 @@
  *
  *   - distortion.parameter1 is four nibbles at 10 00 04 01, an address the 39-entry hand map does
  *     not contain. Before, nothing moved. Reading it one byte wide — the other old bug — would say
- *     0 instead of 4095.
+ *     8 instead of 32895.
+ *
+ *     The values here are Roland MFX container values, not small integers: the address map's
+ *     12768..52768 is exactly 32768 ± 20000, so DIST Drive's 0..127 is stored 32768..32895. They
+ *     used to be 4095 and 256, which sit below the field's own declared minimum.
  *   - the same message with a different device id byte, which the profile's compiled prefix bakes
  *     in and the mask has to forgive.
  *   - CC 102, which the hand map DID know and the profile could not be asked until the inbound
@@ -61,19 +65,19 @@ try {
 
   // A four-nibble parameter the old map did not know, at an address it did not carry.
   const nibbled = await page.evaluate(async (id) => {
-    window.__player.sysex('F0 41 10 00 00 41 12 10 00 04 01 00 0F 0F 0F 3E F7');
+    window.__player.sysex('F0 41 10 00 00 41 12 10 00 04 01 08 00 07 0F 4D F7');
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     return window.__player.value(id);
   }, DISTORTION);
-  assert.equal(nibbled, 4095, `a four-nibble value did not reach its control (got ${nibbled})`);
+  assert.equal(nibbled, 32895, `a four-nibble value did not reach its control (got ${nibbled})`);
 
   // Same parameter, different device id. The compiled prefix bakes in 0x10; the mask forgives it.
   const otherDevice = await page.evaluate(async (id) => {
-    window.__player.sysex('F0 41 11 00 00 41 12 10 00 04 01 00 00 01 00 3E F7');
+    window.__player.sysex('F0 41 11 00 00 41 12 10 00 04 01 08 00 01 00 62 F7');
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     return window.__player.value(id);
   }, DISTORTION);
-  assert.equal(otherDevice, 16, `device id 0x11 was not recognised (got ${otherDevice})`);
+  assert.equal(otherDevice, 32784, `device id 0x11 was not recognised (got ${otherDevice})`);
 
   // Three nibbles, to catch a width fixed at the wrong number rather than at one.
   const tempo = await page.evaluate(async (id) => {
