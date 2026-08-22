@@ -22,10 +22,18 @@ and the [manual review of 2026-08-02](scripting-manual-review-2026-08-02.md) tha
 
 - [Panel text style](property-hints.md) — the rules for user-facing strings: property hints,
   tooltips, and the notes in the panel body.
+- [CLAP export](clap-export.md) — the format map: CLAP, LV2, AU and VST3, and which are gated.
 - [Program completeness review 2026-08-03](program-completeness-review-2026-08-03.md)
+- [Beta readiness review 2026-08-10](beta-readiness-review-2026-08-10.md)
+- [Beta differentiation](beta-differentiation.md) — what actually sets CEditor apart, and the
+  three bets that would define the product.
 - [Project review 2026-07-02](project-review-2026-07-02.md)
 - [License decision](license-decision.md)
 - [Verify end-to-end](verify-end-to-end.md)
+- [Editor manual — snapshot of 2026-08-10](editor-manual-2026-08-10.md) — ⚠️ **not generated, not
+  tested.** The user-facing manual for everything *before* scripting: components, bindings, export.
+  Its generator needed two files the editor has since replaced, so it is kept as a dated record and
+  as the specification for whoever ports it. The scripting manual above is the current one.
 
 Component and panel-part design docs live in `CE/web/src/CE_Application/docs/`; editor and tooling
 design records have their own index at [tools/docs](../tools/docs/README.md).
