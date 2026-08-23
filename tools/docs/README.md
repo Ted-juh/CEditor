@@ -46,19 +46,25 @@ with an *as built* section per phase.
 
 ## The Custom Component creator
 
-Read in this order; each one is a response to the one before it.
+| Document | What it is |
+|---|---|
+| [Creator redesign plan](custom-component-creator-redesign-plan.md) | What was wrong with the creator, the principles constraining the fix, and the phased plan: remove bookkeeping, never remove capability. **§1–§11 are all shipped.** It stays for §12, which is a live roadmap rather than a record — the array primitive and indexed repeats landed there, the arpeggiator write-side, responsive anchors, theme tokens and the sharing gallery have not. |
 
-| # | Document | What it is |
-|---|---|---|
-| 1 | [Creator redesign plan](custom-component-creator-redesign-plan.md) | What was wrong with the creator, the principles constraining the fix, and the phased plan: remove bookkeeping, never remove capability. |
-| 2 | [Properties panel review](cc-properties-panel-review.md) | The diagnosis its predecessor did not touch — the *taxonomy* of the properties panel. Its own phasing sketch (§6) was superseded by the staged plan, which is now retired too. |
+This used to be a four-document chain, read in order. The other three are retired, and what
+outlived them is here rather than in a document that reads as open:
 
-The chain's other two documents are gone. The **restructure stages** plan recorded all four of its
-stages as shipped on 2026-07-12, and its one remaining half — the W0 decomposition — was done on
-2026-08-23. The **designer workspace review** was closed out the same day: its regressions were
-restored, its five bugs fixed or verified, its Tier 0 and Tier 1 lists complete, and the decisions
-it raised and nobody acted on are in [known-issues.md](../../docs/known-issues.md) rather than in a
-document that reads as open. The work is pinned by `CE/web/test/surfaceDecomposition.test.js`.
+- **Properties panel review** — the taxonomy diagnosis. It produced the four-stage restructure,
+  all four of which shipped on 2026-07-12 and are verifiable in the code: the tabs are gated on
+  `componentWorkspaceMode`, `CustomDesignerEditor.svelte` is gone, `CustomInteractEditor` is the
+  cluster view, `CustomReactEditor` is the React group with its sub-nav. Its closing "what not to
+  do" was guidance, not work, and is now §2 of the redesign plan.
+- **Properties panel restructure stages** — the plan those four stages came from. Its one
+  remaining half, the W0 decomposition, was done on 2026-08-23.
+- **Designer workspace review** — closed out the same day: regressions restored, five bugs fixed
+  or verified, Tier 0 and Tier 1 complete, the feasible Tier 2 items done, the theming pass
+  applied, and the §5 decomposition finished at eight components. The decisions it raised that
+  nobody acted on are in [known-issues.md](../../docs/known-issues.md). Pinned by
+  `CE/web/test/surfaceDecomposition.test.js`.
 
 ## Post-beta bets
 
