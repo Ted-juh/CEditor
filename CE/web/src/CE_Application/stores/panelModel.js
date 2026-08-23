@@ -173,6 +173,13 @@ export function createPanel(name = null) {
     // the controls. Distinct from `parameterSnapshots` below, which despite the name is a cache of
     // profile parameter METADATA rather than any captured value. See utils/snapshotModel.js.
     snapshots: [],
+    // Routes: one source to many targets, each with its own window, depth, offset and curve. On the
+    // DOCUMENT rather than on a component, and that is the answer to the design note's open
+    // question — three editors are planned (properties-panel link, Link Mapper, node-graph) and if
+    // each kept its own routes a cable drawn on the canvas would be invisible in the Mapper. The
+    // Macro's slots and the Router's destinations are READ as routes rather than copied into here;
+    // see utils/routeAdapters.js.
+    routes: [],
     parameterSnapshots: {},
     // Host-automatable parameters this panel exposes (Milestone 2 / DAW automation). Empty = derive
     // automatically from the value-bearing controls at export time (see utils/exportParameters.js).
@@ -321,6 +328,11 @@ export function serializePanel(panel, options = {}) {
 
   // Snapshots, same rule. An empty array on every panel would be noise in every committed fixture.
   if (!Array.isArray(data.snapshots) || data.snapshots.length === 0) delete data.snapshots;
+
+  // Routes, same rule. Only the panel's OWN routes are stored — the ones derived from Macro slots
+  // and Router destinations are a view, and writing them here would give the panel a stale second
+  // copy of something the component already owns.
+  if (!Array.isArray(data.routes) || data.routes.length === 0) delete data.routes;
 
   // Bake the host-automatable parameter list (M2) so the exported plugin's APVTS can read it.
   // Author-defined `exportParameters` are kept as-is; an empty list is derived from the controls.

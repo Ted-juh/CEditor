@@ -5,6 +5,7 @@
    */
   import AlignCenter from 'lucide-svelte/icons/align-center';
   import Cable from 'lucide-svelte/icons/cable';
+  import Share2 from 'lucide-svelte/icons/share-2';
   import Image from 'lucide-svelte/icons/image';
   import Palette from 'lucide-svelte/icons/palette';
   import Play from 'lucide-svelte/icons/play';
@@ -51,7 +52,7 @@
   // its last tab sanitises to Colors rather than to nothing at all.
   // ('layers' was missing here while shipping as a tab — same sanitiser, same
   // consequence, so it is listed now.)
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'snapshots', 'preview', 'console']);
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
     notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
     viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
@@ -60,6 +61,7 @@
     device: () => import('../components/ParameterBrowserTab.svelte').then((module) => ({ default: module.default })),
     midi: () => import('../components/MidiMonitorTab.svelte').then((module) => ({ default: module.default })),
     ports: () => import('../components/DeviceWorkbenchTab.svelte').then((module) => ({ default: module.default })),
+    routes: () => import('../components/RoutesTab.svelte').then((module) => ({ default: module.default })),
     snapshots: () => import('../components/SnapshotsTab.svelte').then((module) => ({ default: module.default })),
     preview: () => import('../components/InteractionPreviewTab.svelte').then((module) => ({ default: module.default })),
     console: async () => {
@@ -660,6 +662,7 @@
     { id: 'device',   label: 'Device',   icon: Cable },
     { id: 'midi',     label: 'MIDI',     icon: Activity },
     { id: 'ports',    label: 'Ports',    icon: PlugZap },
+    { id: 'routes',   label: 'Routes',   icon: Share2 },
     { id: 'snapshots', label: 'Snapshots', icon: Camera },
     { id: 'preview',  label: 'Preview',  icon: Play },
     { id: 'console',  label: 'Console',  icon: Terminal },

@@ -97,3 +97,43 @@ route list (add/remove) · per-route source/target · input/output range · dept
   reads? (Ideally one model, three editors.)
 - Conditions/logic depth (simple gate vs expressions — scripting overlaps).
 - Relationship to the node-graph (same route model, visual editor).
+
+---
+
+## Built, 2026-08-23
+
+`utils/routeModel.js`, `utils/routeAdapters.js`, `stores/routes.js` and the Routes tab, pinned by
+`test/routeModel.test.js`.
+
+**The open question answered itself: one model, and the components are read rather than copied.**
+The note asked whether routes live on the Mapper or in a shared store. Neither, quite — they live on
+the DOCUMENT, and the two things that already fan a value out to several destinations with a depth
+and a curve, the Macro's `slots` and the Router's `destinations`, are *read as routes* by
+`routeAdapters.js`. A third store would have left a Macro's assignments invisible to the node-graph,
+which is exactly the failure the question was about. The canvas draws a Macro's four assignments as
+four cables and nothing had to be migrated to make that true. A derived route carries where its real
+record lives, so an editor offers to edit it in place instead of writing a stale copy.
+
+**Fan-in needed a decision the note glossed.** "Sum when multiple sources hit one target" is right,
+but summing *absolute* values is not what summing means here: two routes each mapping to half a
+target's range would together reach the top of it, so adding a second modulator would slam a
+parameter both sources are only nudging. So `mode` is part of a route. `add` contributes a signed
+offset around the target's own value — a mod matrix row. `set` replaces it — a macro, where the knob
+*is* the value. Where both reach one target the `set` is the base and the `add` routes sum on top,
+because a macro that sets a parameter and a wheel that nudges it is the normal case and the nudge
+belongs above.
+
+**Cycle detection is not in the note and is what would have taken the feature down.** Fan-out plus a
+canvas makes a loop trivially easy to draw — A modulates B, B modulates A, or a longer ring nobody
+can see at once — and the runtime would chase it forever. `routeCycles` finds them, `wouldCycle`
+answers before the cable is drawn, and a cycle is reported from where the ring *closes* rather than
+from where the walk began, so the author is sent to a wire that is actually part of it. A fan-out
+that reconverges is not a cycle, which is the obvious false positive and is pinned.
+
+**The Router's transfer curve is declared, not flattened.** Its curve is a breakpoint list with
+per-segment shapes; a route's single `curve` name cannot express that, so the derived route says
+`linear` and carries `shapedBySource: true`. Calling it "exp" would be a lie the canvas then draws
+confidently.
+
+**An inverted input window is a feature.** `inputMin: 127, inputMax: 0` reverses the source, which
+people set up deliberately, so nothing validates it away.
