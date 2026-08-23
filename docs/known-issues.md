@@ -95,41 +95,47 @@ suite to catch a slip.
 
 ---
 
-## Eight component types are undecided for host automation
+## ~~Eight component types are undecided for host automation~~ — CLOSED
 
-*(Was "twenty-seven cannot be automated". All fifty are now ruled; this is what is left.)*
+*(Was "twenty-seven cannot be automated", then "eight are deferred". All fifty are now ruled and
+nothing is deferred.)*
 
 `deriveExportParameters` reads a control's `Behavior`, its `ValueChannels`, or its type's own
-`exportValues` declaration. As of 2026-08-23 every one of the fifty types says something:
-**17 export parameters, 25 decline with a stated reason, 8 are deferred.** Nothing is silent any
-more, and `qaPanels.test.js` fails if a new type reintroduces silence.
+`exportValues` declaration. As of 2026-08-23: **24 types export parameters and 26 decline with a
+stated reason.** `qaPanels.test.js` fails if a new type reintroduces silence, and `DEFERRED_TYPES`
+in `tools/scripts/qa/sheets/export.mjs` is now empty — kept rather than deleted, because a type
+added tomorrow with `exportValues: []` and no ruling lands in "declined" and reads as considered,
+so a future deferral has to be written down there to show up as one.
 
-**The eight deferred, and why each is a question rather than an oversight.** Each has real
-candidates and no obvious single answer, and an exported parameter is permanent once a saved session
-references it — which is the whole reason these were not just decided in passing.
+**How the eight were decided.** Each had real candidates and no obvious single answer, and an
+exported parameter is permanent once a saved session references it.
 
-| Type | The candidates, and the snag |
+| Type | Ruling |
 |---|---|
-| `Arp` | `rate`, `gate`, `swing`, `octaves` — four genuine ones |
-| `Turing` | `rate`, `randomness`, `gateThreshold`, `length` are all knobs; `phase` is generated output and must **not** become one |
-| `Orbit` | `rate` is obvious, but `nodes` carries per-node values, so "one parameter" may be the wrong shape |
-| `Kinetic` | `gravity`, `restitution`, `friction` — picking one would be arbitrary |
-| `Looper` | `loopSeconds`/`loopBars` are settings, `phase` is output; there may be no automatable value here at all |
-| `Phrase` | `transpose`, `swing`, `gate`; `steps` is a pattern, with the Matrix's variable-cardinality problem |
-| `Transport` | `bpm` and `swing` in principle — but a Transport that FOLLOWS the host already takes tempo from it, so a host parameter would fight its own source |
-| `Setlist` | `index` is the obvious one and the trap: its range is the number of songs, which is per-panel, and the exported list must be FIXED |
+| `Arp` | `rate`, `gate`, `swing`, `octaves` — all four, because all four are performed rather than configured. Picking a subset would have been the arbitrary choice. `phase` never, it is generated output. |
+| `Turing` | `rate`, `randomness`, `gateThreshold`, `length`. Shortening the loop live is the instrument's defining gesture, not a setting. `quantizeLevels` declines — it changes what the values MEAN. |
+| `Orbit` | `rate` only. `nodes` is a list whose length the author chooses, which is the Matrix problem: an exported list has to be fixed, so per-node values stay on ports and scripting. |
+| `Kinetic` | `gravity`, `restitution`, `friction` — all three, the non-arbitrary answer to "picking one would be arbitrary". |
+| `Looper` | **Nothing**, and the deferral was right to suspect it. `phase` is output; loop length is a structural edit, because every recorded gesture is stored against the loop it was drawn in. |
+| `Phrase` | `transpose`, `swing`, `gate`, `rate` — the Arp's four over a different pattern source. `steps` declines (variable cardinality); `velocity` declines because it moves only the cells that carry none. |
+| `Transport` | `swing` exports, `bpm` does not. A Transport following the host takes tempo FROM the DAW, so a host parameter writing tempo INTO it is the DAW arguing with itself, and which side wins depends on a setting the automation lane cannot see. `swing` is CEditor's own and behaves identically on either source. |
+| `Setlist` | `index`, with a **fixed 0..127** range rather than the scene count. A range tracking the scene list would change meaning the moment somebody added a song; 0..127 is the answer MIDI program change already gives, and the component clamps. |
 
-The live version of this table is **QA-08**'s "Not decided yet" group, computed from the model.
-Deciding one means giving the type an `exportValues` entry and removing it from `DEFERRED_TYPES` in
-`tools/scripts/qa/sheets/export.mjs`; the test fails until both happen, in either direction.
+**What the ruling uncovered.** The `exportValues` door led nowhere. `valueOverride` is where a
+Behavior value lands and `customValues` is where a CustomComponent channel lands; a field on a
+component's own section was neither, so those parameters reached the host, automated, saved with
+the session — and moved nothing. Only four types used that door and three of their parameters had
+never been driven by anyone, which is why it survived. `utils/sectionValueOverrides.js` closes it
+with one session key overlaid before anything renders, so `VectorJoystick`, `Timbre` and
+`Constellation` gained working automation alongside the seven new ones.
 
-**What was decided, for the record.** Structural types (`Background`, `Container`, `Group`, `Image`,
-`Label`, `TestBox`) hold no value. Displays (`LcdDisplay`, `PixelDisplay`, `Meter`) are outputs — a
-host parameter would let a DAW write what the component is meant to be reporting. Note emitters
-(`ChordPad`, `NoteRibbon`, `DrumPads`, `Harmoniser`) send notes and hold no scalar to sweep.
-`Router`, `SplitZone`, `Constraint` and `Recorder` are configuration or state machines. `Matrix` and
-`Envelope` have variable cardinality against a fixed export list. `Timbre` and `Constellation` got
-two parameters each — an XY space, the same ruling `VectorJoystick` got.
+**What was decided earlier, for the record.** Structural types (`Background`, `Container`, `Group`,
+`Image`, `Label`, `TestBox`) hold no value. Displays (`LcdDisplay`, `PixelDisplay`, `Meter`) are
+outputs — a host parameter would let a DAW write what the component is meant to be reporting. Note
+emitters (`ChordPad`, `NoteRibbon`, `DrumPads`, `Harmoniser`) send notes and hold no scalar to
+sweep. `Router`, `SplitZone`, `Constraint` and `Recorder` are configuration or state machines.
+`Matrix` and `Envelope` have variable cardinality against a fixed export list. `Timbre` and
+`Constellation` got two parameters each — an XY space, the same ruling `VectorJoystick` got.
 
 Why none of them got a `Behavior` section, which was the obvious route: `PropertiesPanel.svelte:223`
 mounts a Behavior tab off the section's mere presence, so a crossfader would have grown a tab full

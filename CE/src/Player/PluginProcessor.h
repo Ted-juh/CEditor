@@ -46,6 +46,7 @@ static inline juce::File ceditorPlayerPanelFile()
 
 #if CEDITOR_VALUE_LAYER
  #include "PanelParameters.h"
+ #include "ProgramBank.h"
  #include "RestorePolicy.h"
 #endif
 
@@ -80,10 +81,18 @@ public:
     {
         scriptMidiCollector.reset (44100.0);  // valid before prepareToPlay; the host resets with the real rate
 #if CEDITOR_VALUE_LAYER
-        // The panel author's restore policy, read once. Absent means Ask, which is the conservative
-        // reading: a panel exported before this setting existed pushed nothing at all.
-        restorePolicy = ce::readPanelRestorePolicy (
-            juce::JSON::parse (ceditorPlayerPanelFile().loadFileAsString()));
+        // The panel document, parsed once for the two things the processor reads out of it directly:
+        // the restore policy and the baked program bank. Both are constant for the life of the
+        // plugin — the host caches getNumPrograms() the moment it loads us, so the bank had better
+        // not change afterwards.
+        //
+        // Absent policy means Ask, which is the conservative reading: a panel exported before that
+        // setting existed pushed nothing at all.
+        {
+            const auto document = juce::JSON::parse (ceditorPlayerPanelFile().loadFileAsString());
+            restorePolicy = ce::readPanelRestorePolicy (document);
+            programBank = ce::parseProgramBank (document);
+        }
         // Window-CLOSED automation -> MIDI: a message-thread timer that sends bound parameters to the
         // synth when there is no editor (when open, the WebView/JS does the sending). The MIDI service
         // lives here on the processor, so it persists across the editor window being closed.
@@ -241,11 +250,53 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
 
+    // --- Total Recall S4: host-visible programs ---------------------------------------------------
+    //
+    // These four reported one nameless program, so a DAW's program menu was empty and there was no
+    // host-automatable way to change patch — while the preset librarian had persisted banks,
+    // captured patch data and recall sitting in the editor's web layer where the plugin never saw
+    // them. The editor bakes a chosen bank into the panel document at export; ProgramBank.h reads
+    // it, and these are a thin adapter over that.
+    //
+    // The honest limit, which the Export tab states too: this is a PANEL-AUTHORED bank — a list
+    // somebody curated — not a live view of what is in the synth right now. The alternative is a
+    // memory scan on every project load, which is not a thing a plugin should do.
+#if CEDITOR_VALUE_LAYER
+    int getNumPrograms() override { return ce::hostProgramCount (programBank); }
+
+    int getCurrentProgram() override { return currentProgram; }
+
+    /**
+     * The host asked for a different patch.
+     *
+     * NOTHING IS SENT HERE. A host may call this from the audio thread — VST3 maps a program change
+     * onto a parameter, and JUCE delivers it wherever the message arrived — and the send path runs
+     * a script's interceptMidiOut filter, which is message-thread work. So this records the request
+     * and the timer performs it, the same discipline the restore push follows and for the same
+     * reason.
+     */
+    void setCurrentProgram (int index) override
+    {
+        if (! juce::isPositiveAndBelow (index, ce::hostProgramCount (programBank))) return;
+        if (index == currentProgram) return;
+        currentProgram = index;
+        programChangePending.store (true);
+    }
+
+    const juce::String getProgramName (int index) override { return ce::hostProgramName (programBank, index); }
+
+    // Renaming is refused rather than accepted-and-dropped. The bank is baked into the exported
+    // panel, so a name changed here would live until the plugin is unloaded and then be gone —
+    // which reads as the DAW losing the edit. The place to rename a preset is the librarian.
+    void changeProgramName (int, const juce::String&) override {}
+#else
+    // No value layer, no bank: the pre-S4 behaviour, unchanged.
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
     void setCurrentProgram (int) override {}
     const juce::String getProgramName (int) override { return {}; }
     void changeProgramName (int, const juce::String&) override {}
+#endif
 
     // DAW session save/restore: the APVTS state (every parameter value) AND the device role→port
     // mapping, so a reopened project restores control positions AND reconnects to the synth (the
@@ -263,6 +314,11 @@ public:
         // this session's synth, and a different project is a different question.
         if (restoreAnswer.isNotEmpty())
             root.createNewChildElement ("RestoreAnswer")->addTextElement (restoreAnswer);
+        // Which program the host had selected. Hosts do restore this themselves through
+        // setCurrentProgram, but not all of them and not always before setStateInformation, so it
+        // rides along and the two agree either way.
+        if (currentProgram != 0)
+            root.createNewChildElement ("CurrentProgram")->addTextElement (juce::String (currentProgram));
 
         // S3: the whole patch, as bytes, beside the automation list.
         //
@@ -315,6 +371,15 @@ public:
             restoredDumps = juce::var();
             if (auto* dumps = xml->getChildByName ("DeviceDumps"))
                 restoredDumps = juce::JSON::parse (dumps->getAllSubText());
+            if (auto* program = xml->getChildByName ("CurrentProgram"))
+            {
+                const int index = program->getAllSubText().trim().getIntValue();
+                // Set WITHOUT sending. The restore push is about to run and will put the whole
+                // patch back; a program change on top of it would recall a slot over the top of
+                // the patch that was just restored, which is the wrong sound and the wrong order.
+                if (juce::isPositiveAndBelow (index, ce::hostProgramCount (programBank)))
+                    currentProgram = index;
+            }
 
             // ARM THE RESTORE PUSH — do not send here. This call can arrive before the ports are
             // open, before prepareToPlay, and on a thread with no business emitting SysEx. The
@@ -458,6 +523,7 @@ private:
         // be asked at all.
         serviceRestorePush (windowOpen);
         serviceDumpCapture();
+        serviceProgramChange();
 
         if (windowOpen) { wasWindowOpen = true; return; }
         if (wasWindowOpen) { lastSentMidi.clear(); wasWindowOpen = false; } // just closed -> resend all
@@ -584,6 +650,58 @@ private:
 
         dumpsLastCapturedMs = now;
         refreshCapturedDumps();
+    }
+
+    /**
+     * Perform a program change the host asked for. Message thread.
+     *
+     * TWO WAYS to recall, and the choice is the librarian's own: an entry that captured the patch
+     * sends THAT (the exact bytes, so the synth ends up on the sound somebody saved), and a
+     * name-only entry sends the profile's recall action for the slot (a Program Change, a bank
+     * select pair plus one, or a SysEx template — whatever the instrument wants). The second is
+     * weaker and honest: it tells the synth which of its own patches to load, and what is in that
+     * slot today is the synth's business.
+     */
+    void serviceProgramChange()
+    {
+        if (! programChangePending.exchange (false)) return;
+
+        const auto* program = ce::programForIndex (programBank, currentProgram);
+        if (program == nullptr) return;
+
+        if (program->hasData())
+        {
+            const auto bytes = ce::bytesFromHex (program->hex);
+            if (bytes.isEmpty())
+            {
+                scriptLogLine ("[program] \"" + program->name + "\" carries unreadable patch data");
+                return;
+            }
+            sendRawMidiBytes ("program_" + juce::String (program->slot), bytes);
+            scriptLogLine ("[program] sent captured patch \"" + program->name + "\" ("
+                           + juce::String (bytes.size()) + " bytes)");
+            return;
+        }
+
+        auto* engine = deviceService.engineForRole ({});
+        if (engine == nullptr)
+        {
+            scriptLogLine ("[program] no profile loaded, cannot recall slot " + juce::String (program->slot));
+            return;
+        }
+
+        const auto recall = engine->compilePresetRecall ({}, program->slot);
+        if (! recall.ok)
+        {
+            scriptLogLine ("[program] slot " + juce::String (program->slot) + " would not compile: " + recall.error);
+            return;
+        }
+        // A recall can be more than one message — `bankPc` is CC 0, CC 32 and a Program Change —
+        // and each goes out on its own so the funnel splits them the way a real sequence arrives.
+        for (const auto& message : recall.transaction.messages)
+            sendRawMidiBytes ("program_recall_" + juce::String (program->slot), message.bytes);
+        scriptLogLine ("[program] recalled slot " + juce::String (program->slot) + " (\"" + program->name
+                       + "\", " + juce::String (recall.transaction.messages.size()) + " message(s))");
     }
 
     void serviceRestorePush (bool windowOpen)
@@ -936,6 +1054,13 @@ private:
     juce::var restoredDumps;
     double dumpsLastCapturedMs = 0.0;
     std::map<juce::String, float> lastCapturedValue;
+
+    // S4. The bank is baked at export and never changes — the host caches getNumPrograms() the
+    // moment it loads us. `programChangePending` is atomic because setCurrentProgram can arrive on
+    // the audio thread; the send itself happens on the timer.
+    ce::ProgramBank programBank;
+    int currentProgram = 0;
+    std::atomic<bool> programChangePending { false };
     // What preset each role is on, as far as anything has said — a recall going out or a Program
     // Change coming in. Not a reading of the instrument: a synth does not announce its patch, so
     // "unknown" (-1) is a real answer a script can act on rather than a confident wrong one.

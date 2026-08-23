@@ -163,8 +163,8 @@ smallest change here and the one that delivers the headline.
 
 | Location | Current | Needed |
 |---|---|---|
-| `CE/src/Player/PluginProcessor.h:213` | `getNumPrograms() { return 1; }` | Host-visible programs backed by the preset librarian — **still open (S4)** |
-| `CE/src/Player/PluginProcessor.h:215` | `setCurrentProgram (int) {}` | Recall the bank slot, send it to the device — **still open (S4)** |
+| ~~`CE/src/Player/PluginProcessor.h:213`~~ | ~~`getNumPrograms() { return 1; }`~~ | *(done, S4 — the bank size, off a librarian bank baked into the panel)* |
+| ~~`CE/src/Player/PluginProcessor.h:215`~~ | ~~`setCurrentProgram (int) {}`~~ | *(done, S4 — queues the recall; the timer sends it, because a host may call this from the audio thread)* |
 | ~~`CE/src/Player/PluginProcessor.h:809`~~ | ~~`cb.buildDump = [] (const juce::String&) { return juce::var(); }`~~ | *(done, S3 — the codec, plus `<DeviceDumps>` in the saved state and a dump-before-values restore)* |
 | ~~`CE/src/Player/PanelParameters.h:71-84`~~ | ~~every parameter → `AudioParameterFloat`~~ | *(done, S1 — `AudioParameterChoice` / `AudioParameterBool` / `AudioParameterFloat` off an explicit `valueKind`)* |
 
@@ -172,8 +172,7 @@ The last one is cosmetic but it is the one a reviewer screenshots: a combobox th
 `0.4700` in the automation lane instead of `Saw` makes the whole export look like a debug build.
 
 **The claim it earns:** *save the session, close the lid, come back next year — the synth comes
-back too.* S1, S2 and S3 earn it for the whole patch; S4 (host programs) makes it complete.
-Nothing here has yet been run against real hardware. Pair it with Panic and the Setlist and the story is complete: your hardware is a
+back too.* All four stages are done. Nothing here has yet been run against real hardware. Pair it with Panic and the Setlist and the story is complete: your hardware is a
 session-recallable, automatable, stage-ready instrument.
 
 Staged, with the ordering rules and the failure modes to test:
@@ -317,7 +316,7 @@ whether they compound or merely impress. Summary:
 |---|---|---|---|---|
 | 0 | Reposition around the instrument layer | Already earned | ~zero | **Beta** |
 | 1 | Capture-and-infer profiling | **Highest — structurally uncopyable** | Medium | Beta headline |
-| 2 | Total Recall (S1–S3 **done**; S4 open) | High — the #1 user pain | Low–medium | **Beta** |
+| 2 | Total Recall (**all four stages done**) | High — the #1 user pain | Low–medium | **Beta** |
 | 3 | ~~Auto-Panel~~ **built** | High — adoption + onboarding | Medium | **Beta** |
 | 4 | Ctrlr harvest → profiles | High — network effect, migration | Low (staged) | Beta+1 |
 | 5 | Verified-profile badge | Medium — trust | **Very low** | Beta |

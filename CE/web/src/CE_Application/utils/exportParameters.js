@@ -67,6 +67,12 @@ export function normalizeExportParameter(entry) {
     // name (choiceValues[i]) rather than its index, so it round-trips even if the visible rows
     // change (cascading lists). 'index' (default) keeps the plain numeric index.
     ...choiceExportFields(entry),
+    // Where the value lives, for the parameters that drive a field on a component's own section
+    // (an Arp's rate, a joystick's x). Absent for the other two doors — a Behavior value and a
+    // CustomComponent channel both already have a place the player writes.
+    ...(entry?.section && entry?.field
+      ? { section: String(entry.section), field: String(entry.field) }
+      : {}),
   };
 }
 
@@ -329,11 +335,21 @@ function paramFromTypeSpec(name, spec, sections) {
   const section = sections?.[spec.section];
   if (!section) return null;
 
-  // The stored domain, not the displayed one. These components keep a normalized 0..1 position and
+  // Three ways a range is known, in order of who knows best.
+  //
+  //   minField/maxField  the COMPONENT names its own bounds (Numpad.min / .max) and the author may
+  //                      have changed them, so they win.
+  //   min/max            the TYPE states a fixed range, for a field that is not 0..1 and has no
+  //                      per-instance bounds to read — an Arp's steps-per-second, a Setlist index.
+  //                      Fixed on purpose: an exported parameter's range is permanent once a
+  //                      session references it, so it must not vary with what the author drew.
+  //   neither            0..1, which is what the normalized components store.
+  //
+  // The stored domain, not the displayed one. Several of these keep a normalized 0..1 position and
   // a `bipolar` flag that only changes the readout (RibbonRenderer does `value * 2 - 1` for it), so
   // exporting -1..1 would hand the host a range the control does not actually hold.
-  const min = spec.minField ? num(section[spec.minField], 0) : 0;
-  const max = spec.maxField ? num(section[spec.maxField], 1) : 1;
+  const min = spec.minField ? num(section[spec.minField], 0) : num(spec.min, 0);
+  const max = spec.maxField ? num(section[spec.maxField], 1) : num(spec.max, 1);
   const suffix = spec.suffix ?? 'value';
 
   return {
@@ -347,6 +363,12 @@ function paramFromTypeSpec(name, spec, sections) {
     unit: String(spec.unit ?? '').trim(),
     midiCC: null,
     valueKind: spec.kind === 'bool' || spec.kind === 'choice' ? spec.kind : 'float',
+    // WHERE the value lives, carried through to the player. Without these the parameter reaches the
+    // host and moves nothing: `valueOverride` is for a Behavior value and `customValues` is for a
+    // CustomComponent channel, and a field on a component's own section is neither. See
+    // utils/sectionValueOverrides.js.
+    section: spec.section,
+    field: spec.field,
   };
 }
 

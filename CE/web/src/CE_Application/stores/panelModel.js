@@ -162,6 +162,12 @@ export function createPanel(name = null) {
       activeImageIndex: 0,
     },
     requiredProfiles: [],
+    // Total Recall S4: the program list the exported plugin shows a DAW, baked from a preset
+    // librarian bank at author time. Absent means the plugin reports the one nameless program it
+    // always did. The librarian lives in browser storage, which neither the Node exporter nor the
+    // plugin can reach — and a plugin should not scan an instrument's memory on every project
+    // load, so baking is the right answer rather than a workaround. See utils/programBank.js.
+    programBank: null,
     parameterSnapshots: {},
     // Host-automatable parameters this panel exposes (Milestone 2 / DAW automation). Empty = derive
     // automatically from the value-bearing controls at export time (see utils/exportParameters.js).
@@ -300,6 +306,13 @@ export function serializePanel(panel, options = {}) {
   const cardPresets = normalizeCardPresets(data.cardPresets);
   if (cardPresets.length) data.cardPresets = cardPresets;
   else delete data.cardPresets;
+
+  // The program bank, on the same "right or absent" rule as `name` and `cardPresets`: a panel with
+  // no bank writes no key, so every committed .cepanel does not grow a `"programBank": null` and
+  // the plugin's reader never has to tell "no bank" from "an empty one".
+  if (!data.programBank || !Array.isArray(data.programBank.programs) || data.programBank.programs.length === 0) {
+    delete data.programBank;
+  }
 
   // Bake the host-automatable parameter list (M2) so the exported plugin's APVTS can read it.
   // Author-defined `exportParameters` are kept as-is; an empty list is derived from the controls.

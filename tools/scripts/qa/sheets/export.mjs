@@ -58,9 +58,13 @@ export function parametersFor(control, panelExtras = {}) {
  * should not live in prose the linter is free to reflow. When one of these is decided, it moves out
  * of this set and the ratchet in `qaPanels.test.js` notices.
  */
-export const DEFERRED_TYPES = new Set([
-  'Turing', 'Orbit', 'Kinetic', 'Looper', 'Arp', 'Phrase', 'Transport', 'Setlist',
-]);
+// Empty since 2026-08-23: every one of the fifty types now either exports parameters or declines
+// with a stated reason. Kept rather than deleted because the gate below is the thing that made the
+// eight get decided — a type added tomorrow with `exportValues: []` and no ruling lands in
+// "declined" and reads as considered, so a future deferral has to be written down HERE to show up
+// as one. `Looper` was the only one of the eight that ended up declining, and it is in the declined
+// group with its reason rather than in this set.
+export const DEFERRED_TYPES = new Set([]);
 
 export function classifyType(type) {
   const control = createControl(type, { Core: { id: `qa08_${type}`, name: `qa08_${type}` } });

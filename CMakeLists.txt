@@ -591,6 +591,25 @@ target_link_libraries(CEditorRestorePolicyTests PRIVATE
 add_test(NAME RestorePolicy COMMAND CEditorRestorePolicyTests)
 ce_configure_test(CEditorRestorePolicyTests)
 
+# --- Total Recall S4: the exported plugin's program list ---
+# Same reasoning as RestorePolicy above — the rules are a pure function of the baked document so
+# they can be driven off Windows, and the failures they guard (a host caching getNumPrograms, asking
+# for names it was never promised, refusing a plugin that claims zero programs) show up in no build.
+add_executable(CEditorProgramBankTests
+    "${CE_ROOT}/tests/ProgramBankTests.cpp"
+)
+
+target_include_directories(CEditorProgramBankTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorProgramBankTests PRIVATE
+    juce::juce_core
+)
+
+add_test(NAME ProgramBank COMMAND CEditorProgramBankTests)
+ce_configure_test(CEditorProgramBankTests)
+
 # --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
 # Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.
 # Design record: tools/docs/screen-builder-design.md.

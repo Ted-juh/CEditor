@@ -718,11 +718,19 @@ export const COMPONENT_TYPES = {
 
   Turing: {
     sections: ['Background', 'Turing', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
-    // HOST AUTOMATION.
-    // DEFERRED, not declined -- `rate`, `randomness`, `gateThreshold` and `length` are all knobs a
-    // musician would reach for; `phase` is generated output and must not be one. Each choice is permanent
-    // once a session references it, so this wants a decision rather than a default.
-    exportValues: [],
+    // HOST AUTOMATION. Decided 2026-08-23: the four knobs the front panel of a real Turing machine
+    // has. `length` is included deliberately — shortening the loop live is the instrument's defining
+    // gesture, not a configuration step.
+    //
+    // `phase` stays out permanently: generated output, and a host parameter would let a DAW write
+    // what the component reports. `quantizeLevels` stays out too — it changes what the values MEAN
+    // rather than what they are, so sweeping it is a patch edit, not a performance.
+    exportValues: [
+      { field: 'rate', section: 'Turing', kind: 'float', suffix: 'rate', min: 0.1, max: 32, label: 'Rate', unit: 'st/s' },
+      { field: 'randomness', section: 'Turing', kind: 'float', suffix: 'randomness', label: 'Randomness' },
+      { field: 'gateThreshold', section: 'Turing', kind: 'float', suffix: 'gateThreshold', label: 'Gate threshold' },
+      { field: 'length', section: 'Turing', kind: 'float', suffix: 'length', min: 1, max: 64, label: 'Length' },
+    ],
     ports: getComponentPorts('Turing'),
     defaultOverrides: {
       // A wide step-sequence field on a dark panel by default.
@@ -739,10 +747,13 @@ export const COMPONENT_TYPES = {
 
   Looper: {
     sections: ['Background', 'Looper', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
-    // HOST AUTOMATION.
-    // DEFERRED, not declined -- `loopSeconds`/`loopBars` are settings and `phase` is output -- there may
-    // be no automatable value here at all. Each choice is permanent once a session references it, so this
-    // wants a decision rather than a default.
+    // HOST AUTOMATION. Decided 2026-08-23: NOTHING, and the deferral was right to suspect it.
+    //
+    // `phase` is the playhead — generated output, so a host writing it would be a DAW driving the
+    // component's own report. `loopSeconds` and `loopBars` are the loop's LENGTH, and changing that
+    // while lanes are playing is a structural edit rather than a sweep: every recorded gesture is
+    // stored against the loop it was drawn in, so a host automating the length would be scrubbing
+    // the material rather than performing it. There is no scalar here worth a permanent parameter.
     exportValues: [],
     ports: getComponentPorts('Looper'),
     defaultOverrides: {
@@ -784,10 +795,20 @@ export const COMPONENT_TYPES = {
     // Like the ChordPad it plays notes rather than driving a parameter, so it
     // carries no DeviceBindings section either.
     sections: ['Background', 'Arp', 'Text', 'Effects', 'Scripts'],
-    // HOST AUTOMATION.
-    // DEFERRED, not declined -- `rate`, `gate`, `swing` and `octaves` are four genuine candidates. Each
-    // choice is permanent once a session references it, so this wants a decision rather than a default.
-    exportValues: [],
+    // HOST AUTOMATION. Decided 2026-08-23: all four candidates export, because all four are
+    // things a player sweeps mid-performance rather than settings they configure once. Picking a
+    // subset would have been the arbitrary choice.
+    //
+    // `phase` is deliberately absent and always will be: it is the arpeggiator's own position,
+    // GENERATED output, and a host parameter would let a DAW write what the component is reporting.
+    // `octaves` is stepped and rides as a float — arpLayout's `clampInt(octaves, 1, 4)` rounds it,
+    // so a host sweeping between values lands on whole octaves.
+    exportValues: [
+      { field: 'rate', section: 'Arp', kind: 'float', suffix: 'rate', min: 0.1, max: 32, label: 'Rate', unit: 'st/s' },
+      { field: 'gate', section: 'Arp', kind: 'float', suffix: 'gate', label: 'Gate' },
+      { field: 'swing', section: 'Arp', kind: 'float', suffix: 'swing', label: 'Swing' },
+      { field: 'octaves', section: 'Arp', kind: 'float', suffix: 'octaves', min: 1, max: 4, label: 'Octaves' },
+    ],
     ports: getComponentPorts('Arp'),
     defaultOverrides: {
       // A wide, short step lane.
@@ -848,11 +869,19 @@ export const COMPONENT_TYPES = {
     // Sequences PITCH — the gap between the Turing (values) and the Arp (notes
     // you're already holding). Emits MIDI, so no DeviceBindings.
     sections: ['Background', 'Phrase', 'Text', 'Effects', 'Scripts'],
-    // HOST AUTOMATION.
-    // DEFERRED, not declined -- `transpose`, `swing` and `gate` are candidates; `steps` is a pattern,
-    // which has the Matrix's variable-cardinality problem. Each choice is permanent once a session
-    // references it, so this wants a decision rather than a default.
-    exportValues: [],
+    // HOST AUTOMATION. Decided 2026-08-23: the four continuous performance controls, matching the
+    // Arp's ruling because they are the same four gestures over a different pattern source.
+    //
+    // `steps` stays out permanently — it is a pattern with the Matrix's variable-cardinality
+    // problem, and an exported list has to be fixed. `velocity` stays out too, but for a softer
+    // reason: it is the default a cell uses when it carries none, so automating it moves only the
+    // cells that declined to say, which is a surprising thing for a host parameter to do.
+    exportValues: [
+      { field: 'transpose', section: 'Phrase', kind: 'float', suffix: 'transpose', min: -24, max: 24, label: 'Transpose', unit: 'st' },
+      { field: 'swing', section: 'Phrase', kind: 'float', suffix: 'swing', label: 'Swing' },
+      { field: 'gate', section: 'Phrase', kind: 'float', suffix: 'gate', label: 'Gate' },
+      { field: 'rate', section: 'Phrase', kind: 'float', suffix: 'rate', min: 0.1, max: 32, label: 'Rate', unit: 'st/s' },
+    ],
     ports: getComponentPorts('Phrase'),
     defaultOverrides: {
       Transform: { width: 460, height: 170 },
@@ -870,12 +899,20 @@ export const COMPONENT_TYPES = {
     // An ordered list of panel states you advance with a footswitch. Sends
     // program change and writes panel values, so no DeviceBindings of its own.
     sections: ['Background', 'Setlist', 'Text', 'Effects', 'Scripts'],
-    // HOST AUTOMATION.
-    // DEFERRED, not declined -- `index` is the obvious one and the trap: its range is the number of
-    // songs, which is per-panel, and the exported parameter list has to be FIXED (the same reason Matrix
-    // exports nothing). Each choice is permanent once a session references it, so this wants a decision
-    // rather than a default.
-    exportValues: [],
+    // HOST AUTOMATION. Decided 2026-08-23: `index` exports, with a FIXED 0..127 range rather than
+    // the scene count.
+    //
+    // The trap was real — the number of scenes is per-panel and an exported parameter's range is
+    // permanent once a session references it, so a range that tracked the scene list would silently
+    // change meaning the moment somebody added a song. Pinning it at 0..127 is the same answer MIDI
+    // itself gives for program change: the host sees a fixed set of slots and the component clamps
+    // to the scenes that exist. Adding a song then widens what is reachable instead of rewriting
+    // what every saved automation lane means.
+    //
+    // `crossfadeMs` stays out: it is how a scene change behaves, not a thing to perform.
+    exportValues: [
+      { field: 'index', section: 'Setlist', kind: 'float', suffix: 'index', min: 0, max: 127, label: 'Scene' },
+    ],
     ports: getComponentPorts('Setlist'),
     defaultOverrides: {
       Transform: { width: 260, height: 150 },
@@ -975,11 +1012,20 @@ export const COMPONENT_TYPES = {
   Transport: {
     // Emits MIDI clock directly rather than driving a parameter.
     sections: ['Background', 'Transport', 'Text', 'Effects', 'Scripts'],
-    // HOST AUTOMATION.
-    // DEFERRED, not declined -- `bpm` and `swing` are automatable in principle, but a Transport that
-    // FOLLOWS the host already takes tempo from it, so a host parameter would fight its own source. Each
-    // choice is permanent once a session references it, so this wants a decision rather than a default.
-    exportValues: [],
+    // HOST AUTOMATION. Decided 2026-08-23: `swing` exports, `bpm` does not — and the split is the
+    // resolution of the snag rather than a compromise around it.
+    //
+    // `bpm` genuinely fights its own source. A Transport set to follow the host takes tempo FROM the
+    // DAW, so a host parameter writing tempo INTO it would be the DAW arguing with itself, and which
+    // side wins depends on a setting the automation lane cannot see. A parameter that is ignored
+    // half the time is worse than no parameter, because the lane looks like it is doing something.
+    //
+    // `swing` has no such conflict. It is CEditor's own, applied to every synced step follower, and
+    // no host has an opinion about it — so it behaves identically whichever source the Transport is
+    // on, which is exactly the property `bpm` lacks.
+    exportValues: [
+      { field: 'swing', section: 'Transport', kind: 'float', suffix: 'swing', label: 'Swing' },
+    ],
     ports: getComponentPorts('Transport'),
     defaultOverrides: {
       Transform: { width: 230, height: 58 },
@@ -1014,11 +1060,17 @@ export const COMPONENT_TYPES = {
 
   Kinetic: {
     sections: ['Background', 'Kinetic', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
-    // HOST AUTOMATION.
-    // DEFERRED, not declined -- `gravity`, `restitution` and `friction` are all performance controls;
-    // picking one would be arbitrary. Each choice is permanent once a session references it, so this
-    // wants a decision rather than a default.
-    exportValues: [],
+    // HOST AUTOMATION. Decided 2026-08-23: all three, which is the non-arbitrary answer to "picking
+    // one would be arbitrary" — the same reasoning that gave VectorJoystick two rather than one.
+    //
+    // They are the physics a player performs with: gravity swings the field, restitution decides how
+    // long it rings, friction decides how fast it dies. Each is a plain scalar with a stable range
+    // and none of them is generated output.
+    exportValues: [
+      { field: 'gravity', section: 'Kinetic', kind: 'float', suffix: 'gravity', min: -1, max: 1, label: 'Gravity' },
+      { field: 'restitution', section: 'Kinetic', kind: 'float', suffix: 'restitution', label: 'Restitution' },
+      { field: 'friction', section: 'Kinetic', kind: 'float', suffix: 'friction', label: 'Friction' },
+    ],
     ports: getComponentPorts('Kinetic'),
     defaultOverrides: {
       // A square physics box on a dark panel by default.
@@ -1035,11 +1087,20 @@ export const COMPONENT_TYPES = {
 
   Orbit: {
     sections: ['Background', 'Orbit', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
-    // HOST AUTOMATION.
-    // DEFERRED, not declined -- `rate` is the obvious candidate, but `nodes` carries per-node values too,
-    // so 'one parameter' may be the wrong shape. Each choice is permanent once a session references it,
-    // so this wants a decision rather than a default.
-    exportValues: [],
+    // HOST AUTOMATION. Decided 2026-08-23: `rate` exports and `nodes` does not, which turns out not
+    // to be a compromise — they are different kinds of thing.
+    //
+    // `rate` is the global speed of the whole field: one scalar, stable range, exactly what a host
+    // parameter is for. `nodes` is a LIST whose length the author chooses, which is the Matrix and
+    // Envelope problem — an exported parameter list has to be fixed, and a panel that gains a node
+    // must not silently change what every saved automation lane addresses. The per-node values stay
+    // reachable through the component's own ports and through scripting, where cardinality can
+    // change without breaking anything already written down.
+    //
+    // `cycleBars` stays out: it is which division to sync to, a setting rather than a sweep.
+    exportValues: [
+      { field: 'rate', section: 'Orbit', kind: 'float', suffix: 'rate', min: 0.01, max: 8, label: 'Rate', unit: 'Hz' },
+    ],
     ports: getComponentPorts('Orbit'),
     defaultOverrides: {
       // A square circular modulation field on a dark panel by default.

@@ -174,6 +174,51 @@ test('one unbuildable dump does not cost the others', () => {
     'a failed dump must be skipped, not fatal');
 });
 
+// --- S4: host-visible programs ----------------------------------------------------------------
+
+test('setCurrentProgram sends nothing — the timer does', () => {
+  // A host may call it from the audio thread (VST3 maps a program change onto a parameter), and the
+  // send path runs a script's interceptMidiOut filter, which is message-thread work.
+  const setter = PROCESSOR.slice(PROCESSOR.indexOf('void setCurrentProgram (int index)'),
+    PROCESSOR.indexOf('const juce::String getProgramName'));
+  assert.ok(!setter.includes('sendRawMidiBytes'), 'setCurrentProgram must not send from the caller\'s thread');
+  assert.match(setter, /programChangePending\.store \(true\)/);
+  assert.match(PROCESSOR, /std::atomic<bool> programChangePending/,
+    'the flag is written from the audio thread and must be atomic');
+});
+
+test('a restored program index does not fire a program change', () => {
+  // The restore push is about to put the whole patch back. A program change on top of it recalls a
+  // slot over the patch that was just restored — the wrong sound and the wrong order.
+  const load = PROCESSOR.slice(PROCESSOR.indexOf('getChildByName ("CurrentProgram")'),
+    PROCESSOR.indexOf('getChildByName ("CurrentProgram")') + 700);
+  assert.ok(!load.includes('programChangePending'), 'restoring the index must not queue a send');
+  assert.match(load, /currentProgram = index;/);
+});
+
+test('a captured patch is sent as itself; a name-only slot is recalled', () => {
+  // The two are genuinely different and the second is weaker: it tells the synth which of its own
+  // patches to load, and what is in that slot today is the synth's business.
+  const service = PROCESSOR.slice(PROCESSOR.indexOf('void serviceProgramChange'),
+    PROCESSOR.indexOf('void serviceRestorePush'));
+  assert.match(service, /program->hasData\(\)/);
+  assert.match(service, /compilePresetRecall/);
+  assert.match(service, /for \(const auto& message : recall\.transaction\.messages\)/,
+    'a bankPc recall is three messages and each must go out on its own');
+});
+
+test('the plugin never reports zero programs', () => {
+  // Some hosts refuse to instantiate such a plugin, and JUCE assumes at least one exists.
+  assert.match(PROCESSOR, /int getNumPrograms\(\) override \{ return ce::hostProgramCount \(programBank\); \}/);
+});
+
+test('the bank is read once, at construction', () => {
+  // The host caches getNumPrograms() the moment it loads us, so the count had better not change.
+  const ctor = PROCESSOR.slice(PROCESSOR.indexOf('PlayerAudioProcessor()'),
+    PROCESSOR.indexOf('~PlayerAudioProcessor() override'));
+  assert.match(ctor, /programBank = ce::parseProgramBank \(document\);/);
+});
+
 test('the Player asks in a bar, and "not now" answers nothing', () => {
   // A modal over a plugin window in a DAW is a good way to lose a take. And a deferred restore is
   // still pending — sending "not now" to the processor would turn it into a third permanent answer.

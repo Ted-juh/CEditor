@@ -3,6 +3,7 @@
   // Reuses the editor's PanelPreviewSurface so interaction -> device-binding MIDI works
   // identically. Boots from a panel document injected by the host (C++) or a test caller.
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import PanelPreviewSurface from './CE_Application/editor/PanelPreviewSurface.svelte';
   import { deserializePanel } from './CE_Application/stores/panelModel.js';
   import { syncPanelPreviewSessions, updatePanelPreviewSession, panelPreviewSessions, setPreviewModeEnabled } from './CE_Application/stores/interactionPreview.js';
@@ -11,6 +12,7 @@
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
   import { choiceIndexOf, choiceValueAt } from './CE_Application/utils/exportParameters.js';
+  import { sectionValueOf, sectionValuePatch } from './CE_Application/utils/sectionValueOverrides.js';
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
   import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState, requestProfileSource } from './CE_Application/stores/deviceProfiles.js';
   import { profileSources, latestPresetListScan } from './CE_Application/stores/deviceProfileStores.js';
@@ -150,18 +152,28 @@
       const controlId = idByName[param.controlName] ?? idByName[String(param.id).split('.')[0]];
       if (!controlId) continue;
       const leaf = String(param.path ?? '').split('.').slice(1).join('.') || 'value';
+      // A parameter that drives a field on the component's OWN section (an Arp's rate, a joystick's
+      // x) says so, and goes through sectionValues rather than customValues. Without this it
+      // reached the host, automated, saved with the session — and moved nothing.
+      const sectionField = param.section && param.field
+        ? { section: String(param.section), field: String(param.field) }
+        : null;
       const bindings = (controlsById[controlId]?._children?.DeviceBindings?.bindings ?? [])
         .filter((b) => b?.kind === 'deviceParameter' && b?.parameterId);
       // Store-by-name selectors carry a fixed choice list; keep the param so the
       // choice name ↔ host index mapping stays stable across cascading changes.
       const choiceParam = String(param?.choiceMode ?? '') === 'value' ? param : null;
-      controlByParam[param.id] = { controlId, leaf, bindings, choiceParam };
+      controlByParam[param.id] = { controlId, leaf, bindings, choiceParam, sectionField };
     }
   }
 
   // The numeric value a control currently holds in its preview session (matches the param's range).
-  function controlParamValue(session, leaf, choiceParam = null) {
+  function controlParamValue(session, leaf, choiceParam = null, sectionField = null) {
     if (!session) return undefined;
+    if (sectionField) {
+      const n = Number(sectionValueOf(session.sectionValues, sectionField.section, sectionField.field));
+      return Number.isFinite(n) ? n : undefined;
+    }
     if (leaf && leaf !== 'value') {
       const n = Number(session.customValues?.[leaf]);
       return Number.isFinite(n) ? n : undefined;
@@ -190,10 +202,19 @@
     lastParamValue[parameterId] = v;
     // Store-by-name selector: the host index maps back to a choice name to write.
     const writeValue = m.choiceParam ? choiceValueAt(m.choiceParam, v) : v;
-    // 1. Move the on-screen control (silent — no echo back into the recorded value).
-    updatePanelPreviewSession(m.controlId, (m.leaf && m.leaf !== 'value')
-      ? { customValues: { [m.leaf]: v } }
-      : { valueOverrideEnabled: true, valueOverride: writeValue });
+    // 1. Move the on-screen control (silent — no echo back into the recorded value). Three
+    //    destinations, one per export door: a field on the component's own section, a
+    //    CustomComponent value channel, or the plain Behavior value.
+    let patch;
+    if (m.sectionField) {
+      const existing = get(panelPreviewSessions)?.[m.controlId]?.sectionValues;
+      patch = { sectionValues: sectionValuePatch(existing, m.sectionField.section, m.sectionField.field, v) };
+    } else if (m.leaf && m.leaf !== 'value') {
+      patch = { customValues: { [m.leaf]: v } };
+    } else {
+      patch = { valueOverrideEnabled: true, valueOverride: writeValue };
+    }
+    updatePanelPreviewSession(m.controlId, patch);
     // 2. Send the bound device parameter(s) to the synth — the same call a user drag makes, so
     //    automation playback drives the hardware. 'continuous' = rate-limited stream.
     for (const b of m.bindings ?? []) {
@@ -211,8 +232,8 @@
   // The user moved a control -> tell C++ to drive the matching host parameter (records automation).
   function emitChangedParams(sessions, backend) {
     for (const parameterId in controlByParam) {
-      const { controlId, leaf, choiceParam } = controlByParam[parameterId];
-      const v = controlParamValue(sessions?.[controlId], leaf, choiceParam);
+      const { controlId, leaf, choiceParam, sectionField } = controlByParam[parameterId];
+      const v = controlParamValue(sessions?.[controlId], leaf, choiceParam, sectionField);
       if (v === undefined || lastParamValue[parameterId] === v) continue;
       lastParamValue[parameterId] = v;
       if (paramSyncReady) backend.emitEvent('paramChanged', { id: parameterId, value: v });

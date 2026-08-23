@@ -34,11 +34,14 @@
   import Cpu from 'lucide-svelte/icons/cpu';
   import Hammer from 'lucide-svelte/icons/hammer';
   import Scale from 'lucide-svelte/icons/scale';
+  import ListMusic from 'lucide-svelte/icons/list-music';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';
   import { collectPanelExportScripts } from '../scripting/scriptPanelExport.js';
   import { LICENCE_NOTICE, SIGNING_NOTICE } from '../utils/legalNotices.js';
+  import { presetLibrary } from '../stores/presetLibrarian.js';
+  import { bakeProgramBank, bakeReport, MAX_PROGRAMS } from '../utils/programBank.js';
   import { panelModules, panelModuleCost, allModules, isExtensionModule } from '../scripting/panelApi.js';
   import { missingExtensionsFor } from '../scripting/extensionModules.js';
   import {
@@ -96,6 +99,25 @@
   // Player/RestorePolicy.h's parse so the editor and the plugin cannot disagree about the default.
   let restoreHardwareMode = $derived(['ask', 'always', 'never'].includes(exportSettings.restoreHardware)
     ? exportSettings.restoreHardware : 'ask');
+
+  // --- Total Recall S4: the program list the exported plugin shows a DAW ---
+  // Banks come from the preset librarian, keyed by the profile this panel requires. A panel bound
+  // to no profile has no banks to offer, which is the honest state rather than an empty dropdown.
+  let requiredProfileId = $derived(String(panel?.requiredProfiles?.[0]?.profileId ?? ''));
+  let availableBanks = $derived(requiredProfileId ? ($presetLibrary?.[requiredProfileId]?.banks ?? []) : []);
+  let bakedBank = $derived(panel?.programBank ?? null);
+  let bakedCount = $derived(bakedBank?.programs?.length ?? 0);
+
+  function bakeBank(bankId) {
+    const bank = availableBanks.find((candidate) => candidate.id === bankId);
+    const report = bakeReport(bank);
+    if (!report.ok) return;
+    updatePanel(panel.id, { programBank: report.bank });
+  }
+
+  function clearBank() {
+    updatePanel(panel.id, { programBank: null });
+  }
   // Live preview of the derived codes — identical to what the exporter stamps into the build.
   let identity = $derived(
     deriveIdentity(
@@ -955,6 +977,54 @@
          the button rather than in a menu they would have to think to open. Both sentences come
          from utils/legalNotices.js, the same module the About dialog reads, because the release
          notes promise the program says them in both places. -->
+    <!-- Total Recall S4. The plugin reported one nameless program, so a DAW's program menu was
+         empty and there was no host-automatable way to change patch — while the librarian had
+         banks, captured patches and recall sitting in the editor where the plugin never saw them.
+         The bank is baked at export because a plugin should not scan an instrument's memory on
+         every project load; the note below says which it is. -->
+    <PropertySection title="Programs" icon={ListMusic}>
+      {#if !requiredProfileId}
+        <PropertyCell label="Bank" span={4}
+                      hint="Programs come from a preset librarian bank for the device profile this panel requires. Bind a control to a profile parameter first.">
+          <span class="export-build-note">This panel requires no device profile, so there are no banks to offer.</span>
+        </PropertyCell>
+      {:else if availableBanks.length === 0}
+        <PropertyCell label="Bank" span={4}
+                      hint="Capture or create a bank in the MIDI Workbench's preset librarian, then choose it here.">
+          <span class="export-build-note">No librarian banks for {requiredProfileId} yet.</span>
+        </PropertyCell>
+      {:else}
+        <PropertyCell label="Bank" span={4}
+                      hint="Bakes this bank into the exported plugin as its host program list. Entries with captured patch data send that patch; name-only entries send the profile's recall action for the slot.">
+          <div class="export-row">
+            <select class="shortcut" style="width: auto"
+                    onchange={(e) => (e.currentTarget.value ? bakeBank(e.currentTarget.value) : clearBank())}>
+              <option value="">— none —</option>
+              {#each availableBanks as bank (bank.id)}
+                <option value={bank.id} selected={bakedBank?.label === bank.label}>
+                  {bank.label} ({bank.entries.length})
+                </option>
+              {/each}
+            </select>
+            {#if bakedCount > 0}
+              <span class="export-build-note">{bakedCount} program{bakedCount === 1 ? '' : 's'} baked</span>
+            {/if}
+          </div>
+        </PropertyCell>
+      {/if}
+      <PropertyCell label="" span={4}>
+        <span class="export-build-note">
+          {#if bakedCount > 0}
+            A panel-authored list, not a live view of the synth's memory — the DAW shows these names
+            and can automate program changes between them. Re-bake after changing the bank.
+            {#if bakedCount >= MAX_PROGRAMS}Capped at {MAX_PROGRAMS}.{/if}
+          {:else}
+            No bank baked: the plugin reports one unnamed program, as it always did.
+          {/if}
+        </span>
+      </PropertyCell>
+    </PropertySection>
+
     <PropertySection title="Licence &amp; signing" icon={Scale}>
       <PropertyCell label={LICENCE_NOTICE.title} span={4} hint={LICENCE_NOTICE.detail}>
         <span class="export-build-note">{LICENCE_NOTICE.short}</span>

@@ -35,6 +35,7 @@
     listboxFilterHeight,
   } from '../utils/listboxLayout.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
+  import { applySectionValues } from '../utils/sectionValueOverrides.js';
   import { recallRowSlot } from '../stores/presetChoiceSync.js';
   import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
   import { meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
@@ -454,9 +455,15 @@
     return $panelPreviewSessions?.[controlId] ?? createInteractionPreviewSession(control);
   }
 
-  function resolvedPreviewFor(control) {
-    const session = sessionFor(control);
+  function resolvedPreviewFor(rawControl) {
+    const session = sessionFor(rawControl);
     const previewOverrides = session?.enabled === false ? {} : session;
+    // Host automation of a field on the component's OWN section (an Arp's rate, a joystick's x)
+    // lands here first, so every apply*ValueSource below and the renderer itself read the section
+    // as they always do. It has to happen before the chain rather than inside it: several of those
+    // functions read the ORIGINAL `control` rather than the resolved one, so an overlay applied
+    // later would be visible to some of them and not others. See utils/sectionValueOverrides.js.
+    const control = applySectionValues(rawControl, previewOverrides?.sectionValues);
     const resolved = resolveInteractiveControl(control, previewOverrides);
     return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))))))))));
   }

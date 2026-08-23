@@ -157,11 +157,39 @@ tested against the GAIA profile, and wired to `ce.device.buildDump` in the Playe
 wants is the session-state half: capturing the built dump into `getStateInformation` and sending it
 before the values on restore.
 
-**S4 — Programs.** Bake the librarian bank into the export; wire the three overrides.
+**S4 — Programs.** ✅ **Done, 2026-08-23.** The Export tab offers the preset librarian's banks for
+whichever profile the panel requires; choosing one bakes `panel.programBank` into the document, and
+`CE/src/Player/ProgramBank.h` reads it back in the plugin. `getNumPrograms` returns the bank size,
+`getProgramName` the stored slot name, `setCurrentProgram` queues the recall.
 
-S1, S2 and S3 are done: a reopened project puts the whole patch back on the synth, not just the
-automation-visible slice of it. **S4 is what is left** — host-visible programs off the preset
-librarian.
+Baking is not only plumbing around browser storage. A plugin should not scan an instrument's memory
+on every project load, so the alternative to baking is worse — and the honest limit follows and is
+stated in the Export tab: a *panel-authored* bank is a list somebody curated, not a live view of
+what is in the synth now.
+
+Three things the reading had to get right, all of them invisible in a build:
+
+- **Never zero programs.** Some hosts refuse to instantiate a plugin that claims none, and JUCE
+  assumes at least one. A panel with no bank reports the single unnamed program it always did.
+- **Out-of-range names answer rather than assert.** Hosts do ask past the count they were given,
+  usually while rebuilding a menu.
+- **`setCurrentProgram` sends nothing.** A host may call it from the audio thread — VST3 maps a
+  program change onto a parameter — and the send path runs a script's `interceptMidiOut` filter,
+  which is message-thread work. It sets an atomic flag; the timer performs the recall, the same
+  discipline S2 follows.
+
+Recall has two kinds, and the difference is the librarian's own: an entry that captured the patch
+sends THAT, so the synth ends up on the sound somebody saved; a name-only entry sends the profile's
+recall action for the slot, which is weaker and honest — it tells the synth which of its own
+patches to load, and what is in that slot today is the synth's business.
+
+Restoring a saved program index deliberately does NOT fire a change: the restore push is about to
+put the whole patch back, and a program change on top of it recalls a slot over the patch that was
+just restored.
+
+**All four stages are done.** A reopened project puts the whole patch back on the synth, the DAW
+sees named programs it can automate between, and every parameter arrives as the right kind of host
+parameter rather than an anonymous float.
 
 What has NOT happened is a test against hardware. Everything here is reasoned from the profile and
 driven by unit tests; no restore in this build has reached a synth.

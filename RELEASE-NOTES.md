@@ -31,7 +31,9 @@ move between the two freely.
   the screen: the session stores a full device dump beside the automation values, and a restore
   sends the dump first and the values after. The exported plugin asks once, with the device's name
   in the question, and remembers the answer; the panel author sets the default (Export tab →
-  Hardware Restore). This has never been run against real hardware — see below.
+  Hardware Restore). If you bake a preset librarian bank into the export (Export tab → Programs),
+  the DAW also gets a named program menu it can automate between. This has never been run against
+  real hardware — see below.
 - **Scripting toolchains** managed in-app (Settings → Scripting Toolchains). Lua, JavaScript and
   TypeScript need nothing. Python, C++, C# and Java download a toolchain on first use; C# and Java
   are large (~230 MB and ~195 MB) and entirely optional.
@@ -42,11 +44,15 @@ move between the two freely.
   from published implementation charts and cross-checked in tests, but no message in this build has
   reached hardware. If you have the synth a profile names, you are the first — please report what
   actually happened.
-- **Some components cannot be automated from a host.** A meter, a modulation matrix and an envelope
-  export no plugin parameter, deliberately (see `docs/known-issues.md` for why). Twenty-seven other
-  component types are not yet ruled on and also export nothing — mostly structural ones where that
-  is obviously right, but if you expect to automate something and cannot, that is worth reporting.
-- **No update channel.** There is no in-app update check. Watch the repository.
+- **Some components cannot be automated from a host, on purpose.** All fifty component types are
+  now ruled: 24 export plugin parameters and 26 decline with a stated reason — a meter and a display
+  are outputs, note emitters hold no scalar to sweep, a matrix and an envelope have a variable
+  number of cells against a parameter list that has to be fixed. `docs/known-issues.md` gives the
+  reason for each. If you expect to automate something and cannot, that is worth reporting.
+- **Update check, off by default.** Help → Check for Updates asks GitHub whether a newer release
+  exists, and Settings → General can make it happen once per launch. It is off out of the box
+  because the request tells GitHub this machine's IP address — choosing the menu item is the
+  consent. There is no in-app installer: it tells you and links the release page.
 - **No current editor manual.** Help → Documentation carries the scripting manual, cookbook,
   getting-started, these notes and the known-issues list, all searchable. What it does not carry is
   a manual for the editor itself: the one in the repository describes an editor two refactors ago,

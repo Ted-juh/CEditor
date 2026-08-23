@@ -295,16 +295,20 @@ Everything above is small. These are not, and they are what a beta decision actu
 
    Two things the new sheets surfaced while being built, neither of them a sheet problem:
 
-   - **Forty of the fifty component types export no host parameter**, and not all of that is
-     deliberate. Five decline for a stated reason — a `Behavior` that calls itself a trigger or a
-     text field. The other thirty-five have **no `Behavior` section at all**, so
-     `deriveExportParameters` never looks at them, and the list includes `Crossfader`, `Ribbon`,
-     `VectorJoystick`, `Meter`, `Macro`, `Envelope` and `Matrix` — things a user would plainly
-     expect to automate. QA-08's third group is that list, and reading it is a judgement somebody
-     has to make before the beta, because the failure is invisible in the editor and only appears
-     in a host.
-   - **`Numpad` carries a `Value` section and no `Behavior`**, which is the same gap with a
-     sharper edge: it stores a value and still exports nothing.
+   - ~~**Forty of the fifty component types export no host parameter**, and not all of that is
+     deliberate.~~ *(fixed — every type now says something: 24 export and 26 decline with a stated
+     reason. `Crossfader`, `Ribbon`, `VectorJoystick`, `Macro` and `Numpad` all export; `Meter`,
+     `Envelope` and `Matrix` decline, for reasons in `docs/known-issues.md`. The route was a
+     type-level `exportValues` declaration rather than a `Behavior` section, because
+     `PropertiesPanel.svelte:223` mounts a Behavior tab off the section's mere presence and a
+     crossfader would have grown a tab full of `fireOn` and `buttonType`.)*
+   - ~~**`Numpad` carries a `Value` section and no `Behavior`**, which is the same gap with a
+     sharper edge: it stores a value and still exports nothing.~~ *(fixed with the above.)*
+   - **The judgement this asked for turned up a defect underneath it.** The `exportValues` door led
+     nowhere: a parameter naming a field on the component's own section reached the host,
+     automated, saved with the session, and moved nothing, because the player writes
+     `valueOverride` or `customValues` and a section field is neither.
+     `utils/sectionValueOverrides.js` closes it.
 
    CI also does not run the export smoke test or the installer packaging, by `ci.yml`'s own
    header. That is unchanged.
@@ -317,7 +321,8 @@ Everything above is small. These are not, and they are what a beta decision actu
    (custom components have one; panels do not)~~ *(fixed — File → Share Panel... writes a
    `.cepanelpkg` with every image embedded, File → Open Shared Panel... reads one back; the
    author's file path and bound MIDI ports are stripped on the way out)*, no Ctrlr
-   `.panel`/`.bpanelz` importer, no update channel. The documentation half is closed: Help →
+   `.panel`/`.bpanelz` importer. ~~no update channel~~ *(fixed — Help → Check for Updates, off by
+   default because the request tells GitHub the machine's IP.)* The documentation half is closed: Help →
    Documentation carries the scripting manual, cookbook, getting-started, release notes and known
    issues, searchable and baked into the bundle.
 6. **Export polish**: pipeline **D1** (GUID registry / "update vs new copy") unbuilt, so two panels
