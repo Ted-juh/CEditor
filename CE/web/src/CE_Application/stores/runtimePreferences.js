@@ -25,6 +25,11 @@ export const DEFAULT_GENERAL_SETTINGS = {
   duplicateOffset: 20,
   keyboardNudgeSmall: 1,
   keyboardNudgeLarge: 10,
+  // OFF, and this one is a default rather than a preference in the usual sense. Checking for
+  // updates sends this machine's IP address to GitHub — unremarkable, and still not something a
+  // program should do on its own the first time somebody starts it. Help → Check for Updates works
+  // whatever this says, because choosing it IS the consent. See utils/updateCheck.js.
+  checkForUpdatesOnStartup: false,
 };
 
 export const reopenLastSession = writable(DEFAULT_GENERAL_SETTINGS.reopenLastSession);

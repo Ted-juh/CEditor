@@ -11,6 +11,7 @@
   import ComponentTree from './CE_Application/panels/ComponentTree.svelte';
   import ShortcutsOverlay from './CE_Application/layout/ShortcutsOverlay.svelte';
   import AboutOverlay from './CE_Application/layout/AboutOverlay.svelte';
+  import { runStartupUpdateCheck } from './CE_Application/stores/updateChannel.js';
   import HelpOverlay from './CE_Application/layout/HelpOverlay.svelte';
   import ContextBar from './CE_Application/layout/ContextBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
@@ -351,6 +352,11 @@
 
   onMount(() => {
     maybeLoadCustomComponentStressTest();
+    // Does nothing unless the user turned the setting on, and the store enforces that rather than
+    // this call site — Settings → General → Check for Updates on Startup, off by default.
+    // Delayed past the first frames: a network call has no business competing with panel restore
+    // for the message thread while the window is still painting.
+    setTimeout(() => runStartupUpdateCheck(), 4000);
   });
 
 </script>

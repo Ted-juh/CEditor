@@ -610,6 +610,25 @@ target_link_libraries(CEditorProgramBankTests PRIVATE
 add_test(NAME ProgramBank COMMAND CEditorProgramBankTests)
 ce_configure_test(CEditorProgramBankTests)
 
+# --- Update check: is there a newer CEditor than this one? ---
+# The feature is one HTTP GET and a version comparison. The GET needs Windows and a network; the
+# comparison is the half that can be wrong in a way nobody notices — a build that quietly believes
+# it is up to date — so it is a pure function with its own test.
+add_executable(CEditorUpdateCheckTests
+    "${CE_ROOT}/tests/UpdateCheckTests.cpp"
+)
+
+target_include_directories(CEditorUpdateCheckTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorUpdateCheckTests PRIVATE
+    juce::juce_core
+)
+
+add_test(NAME UpdateCheck COMMAND CEditorUpdateCheckTests)
+ce_configure_test(CEditorUpdateCheckTests)
+
 # --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
 # Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.
 # Design record: tools/docs/screen-builder-design.md.

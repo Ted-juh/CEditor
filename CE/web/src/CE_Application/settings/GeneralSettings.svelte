@@ -47,6 +47,17 @@
       </div>
       <input type="checkbox" checked={general.restoreUnsavedWork} onchange={(event) => setBool('restoreUnsavedWork', event)} />
     </label>
+
+    <label class="setting-row">
+      <div class="setting-copy">
+        <strong>Check for Updates on Startup</strong>
+        <!-- Said plainly, because the honest description IS the reason this is off by default.
+             Help → Check for Updates works whatever this says. -->
+        <span>Ask GitHub once per launch whether a newer CEditor has been released. Off by default:
+          the request tells GitHub this machine's IP address.</span>
+      </div>
+      <input type="checkbox" checked={general.checkForUpdatesOnStartup} onchange={(event) => setBool('checkForUpdatesOnStartup', event)} />
+    </label>
   </section>
 
   <section class="settings-card">

@@ -314,6 +314,10 @@ export function normalizeGeneralSettings(general) {
       600
     ),
     restoreUnsavedWork: general?.restoreUnsavedWork !== false,
+    // `=== true`, not `!== false`: an absent setting must read as OFF. Every other flag here
+    // defaults on and uses the opposite test, which is exactly why this one is spelled out — the
+    // idiom next to it would silently opt every existing installation into a network call.
+    checkForUpdatesOnStartup: general?.checkForUpdatesOnStartup === true,
     defaultSnapToGrid: general?.defaultSnapToGrid !== false,
     defaultGridSize: clampInteger(
       general?.defaultGridSize,

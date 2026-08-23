@@ -1,6 +1,7 @@
 #include "ValueTreeBridge.h"
 #include "AppSettings.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
+#include "UpdateCheck.h"
 
 #include <cstdlib>
 
@@ -662,6 +663,69 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
 
                         browser->emitEventIfBrowserIsVisible ("panelPackageOpened", juce::var (obj));
                     });
+            });
+        })
+        // --- Update check ------------------------------------------------------------------------
+        //
+        // One HTTP GET, on a background thread, reported back as an event. The RULES — which
+        // version is newer, what counts as a readable reply, and when a check is allowed at all —
+        // are in CE/src/UpdateCheck.h with their own test; this is only the fetch.
+        //
+        // OFF BY DEFAULT, and the web side enforces that before it ever gets here. A check sends
+        // this machine's IP address to GitHub: unremarkable, and still not something the program
+        // should do on its own the first time somebody starts it. Help -> Check for Updates is the
+        // always-available path, because choosing it IS the consent.
+        .withEventListener ("checkForUpdates", [this] (const juce::var&)
+        {
+            // Not on the message thread: this blocks on a socket, and a five-second DNS timeout
+            // with the UI frozen behind it is a worse experience than no update check at all.
+            juce::Thread::launch ([this, stillAlive = alive]()
+            {
+                juce::String body, error;
+                juce::URL url (ce::latestReleaseEndpoint());
+                int status = 0;
+
+                // GitHub requires a User-Agent and rejects requests without one. Asking for the
+                // documented media type pins the reply shape this parses.
+                auto options = juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+                                   .withExtraHeaders ("Accept: application/vnd.github+json\r\n"
+                                                      "User-Agent: CEditor\r\n")
+                                   .withConnectionTimeoutMs (8000)
+                                   .withStatusCode (&status);
+
+                if (auto stream = url.createInputStream (options))
+                    body = stream->readEntireStreamAsString();
+
+                if (body.isEmpty())
+                    error = status > 0 ? "The update service answered " + juce::String (status) + "."
+                                       : "Could not reach the update service. Check your connection.";
+
+                const auto reply = error.isEmpty() ? juce::JSON::parse (body) : juce::var();
+
+                juce::MessageManager::callAsync ([this, stillAlive, reply, error]()
+                {
+                    // Eight seconds is long enough to close a window in. Without this the callback
+                    // would dereference a destroyed bridge — the one place here where a background
+                    // thread can genuinely outlive the object that started it.
+                    if (! stillAlive->load() || browser == nullptr)
+                        return;
+
+                    auto* obj = new juce::DynamicObject();
+                    if (error.isNotEmpty())
+                    {
+                        obj->setProperty ("ok", false);
+                        obj->setProperty ("error", error);
+                    }
+                    else
+                    {
+                        // The comparison happens on the web side, which knows the running version
+                        // from the build stamp. Here we only forward what was published — one
+                        // place decides "is this newer", and it is the one with the test.
+                        obj->setProperty ("ok", true);
+                        obj->setProperty ("release", reply);
+                    }
+                    browser->emitEventIfBrowserIsVisible ("updateCheckResult", juce::var (obj));
+                });
             });
         })
         .withEventListener ("revealFile", [] (const juce::var& payload)

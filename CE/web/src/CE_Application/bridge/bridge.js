@@ -841,6 +841,27 @@ export function onPanelOpened(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+// --- Update check ---
+// One HTTP GET in C++, reported back as an event. OFF BY DEFAULT and gated on the web side before
+// it ever reaches here: a check sends this machine's IP to GitHub, which is unremarkable and still
+// not something the program should do on its own the first time somebody starts it.
+
+/** Ask C++ to fetch the latest release. Answers on 'updateCheckResult'. */
+export function checkForUpdates() {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — checkForUpdates ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('checkForUpdates', {});
+}
+
+/** Listen for 'updateCheckResult'. Callback receives { ok, release } or { ok: false, error }. */
+export function onUpdateCheckResult(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('updateCheckResult', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 // --- Panel packages (.cepanelpkg) ---
 // A shareable panel with its images embedded. Both of these are dialogs and nothing more: the
 // package text goes out as the payload, and an opened package comes back as a path that the web

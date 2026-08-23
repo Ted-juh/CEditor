@@ -11,6 +11,7 @@
 
   import { buildInfo } from '../buildInfo.js';
   import { LICENCE_NOTICE, SIGNING_NOTICE } from '../utils/legalNotices.js';
+  import { runUpdateCheck, updateStatus, updateStatusLine } from '../stores/updateChannel.js';
 
   let { show = false, onclose = () => {} } = $props();
 
@@ -43,6 +44,16 @@
         <div class="build">
           <div class="product">CEditor {buildInfo.version}</div>
           <div class="stamp">build {buildInfo.sha} · {buildInfo.branch} · {buildInfo.time}</div>
+          <div class="update">
+            <span class="update-line">{updateStatusLine($updateStatus)}</span>
+            <button class="update-btn" onclick={() => runUpdateCheck({ userAsked: true })}
+                    disabled={$updateStatus?.state === 'checking'}>Check now</button>
+          </div>
+          {#if $updateStatus?.updateAvailable && $updateStatus?.releaseUrl}
+            <a class="update-link" href={$updateStatus.releaseUrl} target="_blank" rel="noreferrer">
+              Open the release page
+            </a>
+          {/if}
         </div>
 
         {#each NOTICES as notice}
@@ -103,6 +114,16 @@
   .build { margin-bottom: 18px; }
   .product { color: #EEE; font-size: 16px; font-weight: 600; }
   .stamp { color: #888; font-size: 11px; margin-top: 3px; user-select: text; }
+
+  .update { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .update-line { color: #AAA; font-size: 12px; }
+  .update-btn {
+    background: #383F47; border: 1px solid #4C555E; border-radius: 4px;
+    color: #DDD; font-family: inherit; font-size: 11px; padding: 2px 9px; cursor: pointer;
+  }
+  .update-btn:hover:not(:disabled) { background: #454E57; color: #FFF; }
+  .update-btn:disabled { opacity: 0.5; cursor: default; }
+  .update-link { display: inline-block; margin-top: 6px; color: #7FB3E0; font-size: 12px; }
 
   .notice { margin-bottom: 16px; }
   .notice:last-child { margin-bottom: 0; }

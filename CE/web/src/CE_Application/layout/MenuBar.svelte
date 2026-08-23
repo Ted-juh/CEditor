@@ -32,6 +32,7 @@
   } from '../stores/panelVisibility.js';
   import { GLOBAL_SHORTCUTS } from '../utils/globalShortcuts.js';
   import { requestAbout, requestDocumentation } from '../stores/editorCommands.js';
+  import { runUpdateCheck } from '../stores/updateChannel.js';
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
   import { openSharedPanelFromFile, sharePanelToFile } from '../stores/panelSharingActions.js';
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
@@ -280,6 +281,11 @@
       // Was a window.alert with a commit hash in it. The release notes claimed the app states
       // its licence and its unsigned status "in About and on the Export tab", and neither sentence
       // existed anywhere in the program. Both now come out of utils/legalNotices.js.
+      { type: 'separator' },
+      // Always available, whatever the startup setting says: choosing this IS the consent for the
+      // one thing a check costs, which is telling GitHub this machine's IP address. The answer
+      // lands in the console and in About.
+      { label: 'Check for Updates', action: () => { runUpdateCheck({ userAsked: true }); requestAbout(); } },
       { label: 'About CEditor', action: () => requestAbout() },
     ],
   };
