@@ -116,10 +116,10 @@
                   onchange={() => set('focusable', !focusable)} />
     {/snippet}
     {#if focusable}
-      <PropertyCell label="Tab Index" span={2} compact hint="Position in the tab order. -1 means reachable by click but skipped by Tab; 0 means natural order. Controls with a role of their own keep the order the surface assigns.">
+      <PropertyCell label="Tab Index" span={1} compact hint="Position in the tab order. -1 means reachable by click but skipped by Tab; 0 means natural order. Controls with a role of their own keep the order the surface assigns.">
         <NumberCell label="Tab" min={-1} max={999} step={1} value={resolveTabIndex(m)} onchange={(v) => set('tabIndex', clampInt(v, -1, 999, -1))} />
       </PropertyCell>
-      <PropertyCell label="Focus Ring" span={2} hint="Draw a ring when focus arrives by keyboard. Clicking never draws it, which is what a plugin UI wants.">
+      <PropertyCell label="Focus Ring" span={1} hint="Draw a ring when focus arrives by keyboard. Clicking never draws it, which is what a plugin UI wants.">
         <PropertyToggle value={m.focusOutline === true} onchange={() => set('focusOutline', !(m.focusOutline === true))} />
       </PropertyCell>
     {/if}
@@ -131,7 +131,7 @@
         {#each DRAG_MODE_OPTIONS as option (option)}<option value={option}>{option}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Sensitivity" span={2} compact hint="Multiplier on the control's own drag rate. 1 leaves it exactly as it is; 2 makes the same travel cover twice the range; 0.5 halves it for fine work.">
+    <PropertyCell label="Sensitivity" span={1} compact hint="Multiplier on the control's own drag rate. 1 leaves it exactly as it is; 2 makes the same travel cover twice the range; 0.5 halves it for fine work.">
       <NumberCell label="Sens" min={0.01} max={10} step={0.05} value={getDragSensitivity(m)} onchange={(v) => set('dragSensitivity', Math.max(0.01, Math.min(10, v)))} />
     </PropertyCell>
     <PropertyCell label="Invert" span={2} hint="Invert X, invert Y. Hover a chip for its name.">

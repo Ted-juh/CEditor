@@ -32,13 +32,13 @@
     <PropertyCell label="Offset" span={1} compact hint="Typed minus offset = emitted. For a machine whose front panel calls its first preset 1 while the wire calls it 0, set 1.">
       <NumberCell label="Offset" min={-99} max={99} step={1} value={x.displayOffset ?? 0} defaultValue={0} onchange={(v) => set('displayOffset', Math.round(v))} />
     </PropertyCell>
-    <PropertyCell label="Commit on length" span={2} hint="Emit as soon as Digits have been typed instead of waiting for Enter. Only safe at a fixed width — a machine numbered 1..128 cannot be entered blind.">
+    <PropertyCell label="Commit on length" span={1} hint="Emit as soon as Digits have been typed instead of waiting for Enter. Only safe at a fixed width — a machine numbered 1..128 cannot be entered blind.">
       <PropertyToggle value={x.commitOnLength === true} onchange={() => set('commitOnLength', !(x.commitOnLength === true))} />
     </PropertyCell>
-    <PropertyCell label="Editable" span={2} hint="Accept presses in preview.">
+    <PropertyCell label="Editable" span={1} hint="Accept presses in preview.">
       <PropertyToggle value={x.editable !== false} onchange={() => set('editable', !(x.editable !== false))} />
     </PropertyCell>
-    <PropertyCell label="Readout" span={2} hint="Show the display strip above the keys.">
+    <PropertyCell label="Readout" span={1} hint="Show the display strip above the keys.">
       <PropertyToggle value={x.showDisplay !== false} onchange={() => set('showDisplay', !(x.showDisplay !== false))} />
     </PropertyCell>
     <PropertyCell label="Idle readout" span={2} hint="What the display shows before anything is typed.">
@@ -53,7 +53,7 @@
     <PropertyCell label="Enter key" span={1} hint="Show the ↵ key. With Commit on length off, hiding it leaves no way to commit.">
       <PropertyToggle value={x.showEnter !== false} onchange={() => set('showEnter', !(x.showEnter !== false))} />
     </PropertyCell>
-    <PropertyCell label="Gap" span={2} compact hint="Pixels between keys.">
+    <PropertyCell label="Gap" span={1} compact hint="Pixels between keys.">
       <NumberCell label="Gap" min={0} max={24} step={1} value={x.gap ?? 4} defaultValue={4} onchange={(v) => set('gap', Math.max(0, v))} />
     </PropertyCell>
     <PropertyCell label="Colours" span={4} hint="Digit keys, action keys (C / ↵), key labels, and the readout. Click a swatch to edit it in the Colors tab.">

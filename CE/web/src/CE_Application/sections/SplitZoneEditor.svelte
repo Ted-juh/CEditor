@@ -135,7 +135,7 @@
     <PropertyCell label="…to" span={1} compact hint="Highest note on the drawn keyboard.">
       <NumberCell label="To" min={MIN_NOTE} max={MAX_NOTE} step={1} value={num(s.highNote, 96)} defaultValue={96} onchange={(v) => set('highNote', clampInt(v, MIN_NOTE, MAX_NOTE, 96))} />
     </PropertyCell>
-    <PropertyCell label="" span={2} hint="The range actually drawn, after snapping to whole white keys.">
+    <PropertyCell label="" span={2} hint="The range actually drawn, after snapping to whole white keys." compact>
       <div class="note">{midiNoteLabel(range.lowNote)} – {midiNoteLabel(range.highNote)}</div>
     </PropertyCell>
     <PropertyCell label="Preset" span={4} hint="Replace the zone list with a common arrangement, built from the drawn keyboard range. Overwrites what's there.">
@@ -159,7 +159,7 @@
     </PropertyCell>
 
     {#if gapRuns.length}
-      <PropertyCell label="" span={4} hint="">
+      <PropertyCell label="" span={4} hint="" compact>
         <div class="warn">
           Silent: {gapRuns.map((r) => (r.lo === r.hi ? midiNoteLabel(r.lo) : `${midiNoteLabel(r.lo)}–${midiNoteLabel(r.hi)}`)).join(', ')}
           — no zone claims {gapRuns.length === 1 && gapRuns[0].lo === gapRuns[0].hi ? 'that key' : 'those keys'}.
@@ -167,7 +167,7 @@
       </PropertyCell>
     {/if}
     {#if velGaps.length}
-      <PropertyCell label="" span={4} hint="">
+      <PropertyCell label="" span={4} hint="" compact>
         <div class="warn">
           {velGaps.join('; ')} — a note played outside a zone's &ldquo;plays at&rdquo; window is not claimed by it,
           so if no other zone catches it the note is {String(s.unmatched ?? 'drop') === 'pass' ? 'passed through' : 'dropped'}.
@@ -175,7 +175,7 @@
       </PropertyCell>
     {/if}
     {#if overlaps.length}
-      <PropertyCell label="" span={4} hint="">
+      <PropertyCell label="" span={4} hint="" compact>
         <div class="info">
           Layered: {overlaps.map((o) => `${midiNoteLabel(o.lowNote)}–${midiNoteLabel(o.highNote)}`).join(', ')}
           — those keys are sent by more than one zone. Deliberate, that's layering; accidental, it's the
@@ -189,7 +189,7 @@
     {#snippet tools()}
       <button type="button" class="hdr-btn" title="Add zone" onclick={addZone}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Zones may overlap — a note inside two is sent twice, on two channels. Drag the split points in preview.">
+    <PropertyCell label="" span={4} hint="Zones may overlap — a note inside two is sent twice, on two channels. Drag the split points in preview." compact>
       <div class="tablewrap">
         <table class="zt">
           <thead>
@@ -207,7 +207,7 @@
           <tbody>
             {#each zones as z, i (z.id)}
               <tr class:off={!z.enabled}>
-                <td><input type="checkbox" checked={z.enabled} onchange={(e) => setZone(i, 'enabled', e.target.checked)} /></td>
+                <td><PropertyToggle compact label="On" value={z.enabled} onchange={(next) => setZone(i, 'enabled', next)} ariaLabel={`Zone ${i + 1} enabled`} /></td>
                 <td><input class="cell name" type="text" value={z.label} onchange={(e) => setZone(i, 'label', e.target.value)} /></td>
                 <td>
                   <span class="n nc-wrap">
@@ -268,7 +268,7 @@
                            onchange={(e) => setCcList(i, e.target.value)} />
                   {/if}
                 </td>
-                <td><input type="checkbox" checked={z.sustain !== false} onchange={(e) => setZone(i, 'sustain', e.target.checked)} /></td>
+                <td><PropertyToggle compact label="Sus" value={z.sustain !== false} onchange={(next) => setZone(i, 'sustain', next)} ariaLabel={`Zone ${i + 1} sustain`} /></td>
                 <td>
                   <select class="cell selsm" value={z.bendMode} onchange={(e) => setZone(i, 'bendMode', e.target.value)}>
                     {#each BEND_MODES as m (m)}<option value={m}>{BEND_MODE_LABELS[m] ?? m}</option>{/each}
@@ -279,7 +279,7 @@
                     {#each BEND_MODES as m (m)}<option value={m}>{BEND_MODE_LABELS[m] ?? m}</option>{/each}
                   </select>
                 </td>
-                <td><input type="checkbox" checked={z.polyPressure !== false} onchange={(e) => setZone(i, 'polyPressure', e.target.checked)} /></td>
+                <td><PropertyToggle compact label="Poly" value={z.polyPressure !== false} onchange={(next) => setZone(i, 'polyPressure', next)} ariaLabel={`Zone ${i + 1} poly pressure`} /></td>
                 <td><SwatchCluster swatches={[
                   { key: `zoneColour_${z.id}`, label: 'Col', value: z.colour ?? 'FF5B9BD5', target: { type: 'callback', apply: (hex) => setZone(i, 'colour', hex) } },
                 ]} /></td>
@@ -297,7 +297,7 @@
         </table>
       </div>
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="note">
         <b>Bend</b> and <b>Press</b> carry no note, so a rule picks the zones: <b>Last played</b> = whichever
         claimed the most recent note-on; <b>While sounding</b> = every zone currently holding a note.

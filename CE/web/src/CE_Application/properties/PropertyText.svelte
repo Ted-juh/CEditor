@@ -26,6 +26,7 @@
     spellcheck = false,
     oninput = null,
     commit = null,
+    onfocus = null,
   } = $props();
 
   function handleKeydown(event) {
@@ -47,6 +48,7 @@
   aria-label={ariaLabel || undefined}
   oninput={(e) => oninput?.(e.currentTarget.value, e)}
   onchange={(e) => commit?.(e.currentTarget.value, e)}
+  onfocus={(e) => onfocus?.(e)}
   onkeydown={handleKeydown}
 />
 

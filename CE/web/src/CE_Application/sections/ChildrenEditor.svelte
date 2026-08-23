@@ -19,6 +19,9 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import Scaling from 'lucide-svelte/icons/scaling';
+  import BoxSelect from 'lucide-svelte/icons/box-select';
+  import Crop from 'lucide-svelte/icons/crop';
 
   let { control = null } = $props();
 
@@ -49,26 +52,26 @@
 </script>
 
 {#if children}
-  <PropertySection title="Size from contents">
-    <PropertyCell label="Width" span={2} hint="Derive the width from the children, or keep the authored width.">
+  <PropertySection title="Size from contents" icon={Scaling}>
+    <PropertyCell label="Width" span={1} hint="Derive the width from the children, or keep the authored width.">
       <PropertyToggle value={fitWidth} onchange={(on) => set('fitWidth', on ? FIT_CONTENTS : FIT_LOCKED)} />
     </PropertyCell>
-    <PropertyCell label="Height" span={2} hint="Derive the height from the children, or keep the authored height.">
+    <PropertyCell label="Height" span={1} hint="Derive the height from the children, or keep the authored height.">
       <PropertyToggle value={fitHeight} onchange={(on) => set('fitHeight', on ? FIT_CONTENTS : FIT_LOCKED)} />
     </PropertyCell>
 
     <!-- Disabled rather than hidden: a floor you set and then locked the axis on is still stored,
          and a row that vanishes makes that look like it was thrown away. -->
-    <PropertyCell label="Min W" span={2} disabled={!fitWidth}
+    <PropertyCell label="Min W" span={1} disabled={!fitWidth}
                   hint="A fitted width never goes below this. 0 is pure fit.">
       <NumberCell value={children.minWidth ?? 0} step={1} min={0} onchange={(v) => set('minWidth', v)} />
     </PropertyCell>
-    <PropertyCell label="Min H" span={2} disabled={!fitHeight}
+    <PropertyCell label="Min H" span={1} disabled={!fitHeight}
                   hint="A fitted height never goes below this. 0 is pure fit.">
       <NumberCell value={children.minHeight ?? 0} step={1} min={0} onchange={(v) => set('minHeight', v)} />
     </PropertyCell>
 
-    <PropertyCell label="" span={4} hint="Fitting changes this container's size only — children never move.">
+    <PropertyCell label="" span={4} hint="Fitting changes this container's size only — children never move." compact>
       <span class="note">
         {#if fitWidth || fitHeight}
           {childCount === 0
@@ -81,12 +84,12 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Padding">
-    <PropertyCell label="All sides" span={2} disabled={perSide}
+  <PropertySection title="Padding" icon={BoxSelect}>
+    <PropertyCell label="All sides" span={1} disabled={perSide}
                   hint="Space between the container's edge and its contents, on every side.">
       <NumberCell value={sharedPadding} step={1} min={0} onchange={(v) => set('padding', v)} />
     </PropertyCell>
-    <PropertyCell label="Per side" span={2} hint="Give each side its own padding — a header needs more room at the top.">
+    <PropertyCell label="Per side" span={1} hint="Give each side its own padding — a header needs more room at the top.">
       <PropertyToggle value={perSide} onchange={setPerSide} />
     </PropertyCell>
 
@@ -106,8 +109,8 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Clipping">
-    <PropertyCell label="Clip" span={2} hint="Hide anything that sticks out past this container's edges.">
+  <PropertySection title="Clipping" icon={Crop}>
+    <PropertyCell label="Clip" span={1} hint="Hide anything that sticks out past this container's edges.">
       <PropertyToggle value={children.clip === true} onchange={(on) => set('clip', on)} />
     </PropertyCell>
   </PropertySection>

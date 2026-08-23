@@ -15,6 +15,7 @@
     validateCustomComponentPackage,
   } from '../utils/customComponentPackage.js';
   import { deepClone } from '../utils/deepClone.js';
+  import LibraryBig from 'lucide-svelte/icons/library-big';
 
   let { control = null } = $props();
 
@@ -493,7 +494,7 @@
 </script>
 
 {#if designer}
-  <PropertySection title="Library">
+  <PropertySection title="Library" icon={LibraryBig}>
     {#if $creatorMode === 'advanced' && currentSourcePackage}
       <PropertyCell label="Source" span={4} hint="Package provenance kept when this component was inserted or loaded from a reusable package.">
         <div class="source-package" class:changed={!currentPackageMatchesSource}>
@@ -747,7 +748,7 @@
     <PropertyCell label="Import" span={3} hint="Paste one package JSON, a package array, or a ceditor-component-library bundle.">
       <textarea class="val package-text" rows="4" bind:value={importText} placeholder="paste package or library JSON"></textarea>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Validate and import pasted package JSON.">
+    <PropertyCell label="" span={1} hint="Validate and import pasted package JSON." compact>
       <div class="import-actions">
         <label class="library-btn file-btn">
           File

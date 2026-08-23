@@ -29,16 +29,16 @@
 
 {#if j}
   <PropertySection title="Joystick" icon={Gamepad2}>
-    <PropertyCell label="Bipolar" span={2} hint="X/Y ports emit −1..1 (vs 0..1). Corner blends are always 0..1.">
+    <PropertyCell label="Bipolar" span={1} hint="X/Y ports emit −1..1 (vs 0..1). Corner blends are always 0..1.">
       <PropertyToggle value={j.bipolar !== false} onchange={() => set('bipolar', !(j.bipolar !== false))} />
     </PropertyCell>
-    <PropertyCell label="Editable" span={2} hint="Drag the puck in preview.">
+    <PropertyCell label="Editable" span={1} hint="Drag the puck in preview.">
       <PropertyToggle value={j.editable !== false} onchange={() => set('editable', !(j.editable !== false))} />
     </PropertyCell>
-    <PropertyCell label="Rest X" span={2} compact hint="Resting puck X (0–1).">
+    <PropertyCell label="Rest X" span={1} compact hint="Resting puck X (0–1).">
       <NumberCell label="X" value={j.x ?? 0.5} min={0} max={1} step={0.01} defaultValue={0.5} onchange={(v) => set('x', Math.max(0, Math.min(1, num(v, 0.5))))} />
     </PropertyCell>
-    <PropertyCell label="Rest Y" span={2} compact hint="Resting puck Y (0–1, bottom = 0).">
+    <PropertyCell label="Rest Y" span={1} compact hint="Resting puck Y (0–1, bottom = 0).">
       <NumberCell label="Y" value={j.y ?? 0.5} min={0} max={1} step={0.01} defaultValue={0.5} onchange={(v) => set('y', Math.max(0, Math.min(1, num(v, 0.5))))} />
     </PropertyCell>
   </PropertySection>
@@ -57,14 +57,14 @@
           <option value="y">Y only</option>
         </select>
       </PropertyCell>
-      <PropertyCell label="Speed" span={2} compact hint="Glide speed (units/sec).">
+      <PropertyCell label="Speed" span={1} compact hint="Glide speed (units/sec).">
         <NumberCell label="Spd" value={j.returnRate ?? 4} min={0.5} step={0.5} defaultValue={4} onchange={(v) => set('returnRate', Math.max(0.1, num(v, 4)))} />
       </PropertyCell>
     {/if}
   </PropertySection>
 
   <PropertySection title="Corners" icon={SquareDashedBottomCode}>
-    <PropertyCell label="Show" span={2} hint="Draw corner markers + labels.">
+    <PropertyCell label="Show" span={1} hint="Draw corner markers + labels.">
       <PropertyToggle value={j.showCorners !== false} onchange={() => set('showCorners', !(j.showCorners !== false))} />
     </PropertyCell>
     <PropertyCell label="↖ Top-left" span={2}>
@@ -94,11 +94,11 @@
     <PropertyCell label="Puck size" span={1} compact hint="Puck radius (px).">
       <NumberCell label="Puck" value={j.puckRadius ?? 9} min={3} step={1} defaultValue={9} onchange={(v) => set('puckRadius', Math.max(3, num(v, 9)))} />
     </PropertyCell>
-    <PropertyCell label="Trail" span={2} hint="Fading motion trail behind the puck.">
+    <PropertyCell label="Trail" span={1} hint="Fading motion trail behind the puck.">
       <PropertyToggle value={j.showTrail === true} onchange={() => toggle('showTrail')} />
     </PropertyCell>
     {#if j.showTrail === true}
-      <PropertyCell label="Trail length" span={2} compact hint="Number of trail points.">
+      <PropertyCell label="Trail length" span={1} compact hint="Number of trail points.">
         <NumberCell label="Len" value={j.trailLength ?? 24} min={2} max={200} step={1} defaultValue={24} onchange={(v) => set('trailLength', Math.max(2, Math.round(num(v, 24))))} />
       </PropertyCell>
     {/if}

@@ -756,7 +756,7 @@
         </div>
       </PropertyCell>
       {#if String(core?.controlType ?? '') === 'Label'}
-        <PropertyCell label="Editable" span={2} hint="Let the user edit this label's text at runtime. Required before an LCD 'edit' zone can rewrite it.">
+        <PropertyCell label="Editable" span={1} hint="Let the user edit this label's text at runtime. Required before an LCD 'edit' zone can rewrite it.">
           <PropertyToggle value={text?.editable === true} onchange={(next) => set('Text.editable', next)} />
         </PropertyCell>
       {/if}
@@ -782,7 +782,7 @@
           </select>
         </PropertyCell>
 
-        <PropertyCell label="Size" span={2} compact hint="Font size in pixels">
+        <PropertyCell label="Size" span={1} compact hint="Font size in pixels">
           <NumberCell
             label="Size"
             value={font?.size ?? 12}
@@ -824,7 +824,7 @@
           </div>
         </PropertyCell>
 
-        <PropertyCell label="Word Spacing" span={2} compact hint="Adjust spacing added to each whitespace character in pixels.">
+        <PropertyCell label="Word Spacing" span={1} compact hint="Adjust spacing added to each whitespace character in pixels.">
           <NumberCell
             label="Word"
             value={font?.wordSpacing ?? 0}
@@ -834,7 +834,7 @@
           />
         </PropertyCell>
 
-        <PropertyCell label="Letter Spacing" span={2} compact hint="Adjust spacing between characters in pixels">
+        <PropertyCell label="Letter Spacing" span={1} compact hint="Adjust spacing between characters in pixels">
           <NumberCell
             label="Letter"
             value={font?.letterSpacing ?? 0}
@@ -1165,17 +1165,15 @@
         collapsed={$sectionCollapse[fillLayerCollapseKey('solid')] ?? false}
         ontoggle={(value) => setCollapsed(fillLayerCollapseKey('solid'), value)}
       >
-        <div class="prop-row full-span">
-          <span class="lbl">Colour</span>
+        <PropertyCell label="Colour" span={2} hint="The text fill colour. The swatch opens it in the display panel.">
           <div class="color-input">
             <button class="mini-swatch" title="Pick colour" style={`background:#${displayTextFillColour}`} onclick={handleFillColorSwatch}></button>
             <input class="val" type="text" value={displayTextFillColour} onfocus={selectAll} onchange={setTextFillDisplayColour} />
           </div>
-        </div>
-        <div class="prop-row full-span">
-          <span class="lbl">Fill Order</span>
+        </PropertyCell>
+        <PropertyCell label="Fill Order" span={2} hint="Paint order among the text fill layers. Lower paints first.">
           <NumberCell value={Number(fillProp('order', 50))} step={1} onchange={(value) => setFillNumber('order', value, 1)} />
-        </div>
+        </PropertyCell>
       </PropertySection>
     {/if}
 
@@ -1186,25 +1184,21 @@
         collapsed={$sectionCollapse[fillLayerCollapseKey('gradient')] ?? false}
         ontoggle={(value) => setCollapsed(fillLayerCollapseKey('gradient'), value)}
       >
-        <div class="prop-row full-span">
-          <span class="lbl">Preview</span>
+        <PropertyCell label="Preview" span={1} hint="The gradient as it will paint. Click to edit it in the display panel.">
           <button class="bg-swatch" style={`background:${textFillGradientPreview}`} title="Edit gradient" onclick={openTextGradientEditor}></button>
-        </div>
-        <div class="prop-row full-span">
-          <span class="lbl">Gradient</span>
+        </PropertyCell>
+        <PropertyCell label="Gradient" span={3} hint="Edit the stops, angle and shape in the display panel.">
           <div class="asset-row">
             <button class="action-btn" onclick={openTextGradientEditor}>Edit</button>
             <span class="hint-text">Display Panel → Gradient</span>
           </div>
-        </div>
-        <div class="prop-row full-span">
-          <span class="lbl">Name</span>
+        </PropertyCell>
+        <PropertyCell label="Name" span={2} hint="A label for this gradient, for your own reference.">
           <input class="val" type="text" value={String(fillProp('gradientName', ''))} placeholder="Unnamed" onfocus={selectAll} onchange={(event) => set('Text.Fill.gradientName', event.target.value)} />
-        </div>
-        <div class="prop-row full-span">
-          <span class="lbl">Fill Order</span>
+        </PropertyCell>
+        <PropertyCell label="Fill Order" span={2} hint="Paint order among the text fill layers. Lower paints first.">
           <NumberCell value={Number(fillProp('order', 50))} step={1} onchange={(value) => setFillNumber('order', value, 1)} />
-        </div>
+        </PropertyCell>
       </PropertySection>
     {/if}
 
@@ -1221,7 +1215,7 @@
         </div>
       </PropertySection>
       {#if !($sectionCollapse[fillLayerCollapseKey('image')] ?? false)}
-        <PropertySection title="Geometry" icon={Move}>
+        <PropertySection title="Image Geometry" icon={Move}>
           <PropertyCell label="Fit" span={2} hint="How the image should fit inside the text fill area.">
             <select class="text-select" value={String(fillProp('imageFit', 'cover'))} onchange={(event) => set('Text.Fill.imageFit', event.target.value)}>
               <option value="cover">Cover</option>
@@ -1237,7 +1231,7 @@
           </PropertyCell>
         </PropertySection>
 
-        <PropertySection title="Colour Effects" icon={Palette}>
+        <PropertySection title="Image Colour" icon={Palette}>
           <PropertyCell label="Opacity" span={1} compact hint="Opacity of the image fill.">
             <NumberCell label="Opac" value={Number(fillProp('imageOpacity', 100))} min={0} max={100} step={1} defaultValue={100} onchange={(value) => set('Text.Fill.imageOpacity', value)} />
           </PropertyCell>
@@ -1268,8 +1262,8 @@
         </div>
       </PropertySection>
       {#if !($sectionCollapse[fillLayerCollapseKey('texture')] ?? false)}
-        <PropertySection title="Geometry" icon={Move}>
-          <PropertyCell label="Scale" span={2} compact hint="Tile scale for the texture pattern.">
+        <PropertySection title="Texture Geometry" icon={Move}>
+          <PropertyCell label="Scale" span={1} compact hint="Tile scale for the texture pattern.">
             <NumberCell label="Scale" value={Number(fillProp('textureTileScale', 1))} min={0.1} step={0.1} defaultValue={1} onchange={(value) => set('Text.Fill.textureTileScale', value)} />
           </PropertyCell>
           <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset of the tiled pattern.">
@@ -1280,7 +1274,7 @@
           </PropertyCell>
         </PropertySection>
 
-        <PropertySection title="Colour Effects" icon={Palette}>
+        <PropertySection title="Texture Colour" icon={Palette}>
           <PropertyCell label="Opacity" span={1} compact hint="Opacity of the texture fill.">
             <NumberCell label="Opac" value={Number(fillProp('textureOpacity', 100))} min={0} max={100} step={1} defaultValue={100} onchange={(value) => set('Text.Fill.textureOpacity', value)} />
           </PropertyCell>
@@ -1363,10 +1357,10 @@
         </select>
       </PropertyCell>
 
-      <PropertyCell label="Start Offset" span={2} compact hint="Offset the text run along the path before the first glyph is placed.">
+      <PropertyCell label="Start Offset" span={1} compact hint="Offset the text run along the path before the first glyph is placed.">
         <NumberCell label="Start" value={Number(position?.flowStartOffset ?? 0)} step={1} defaultValue={0} onchange={(value) => set('Text.Position.flowStartOffset', value)} />
       </PropertyCell>
-      <PropertyCell label="Fixed Advance" span={2} compact disabled={String(position?.flowDistribution ?? 'natural') !== 'fixed'} hint="Advance used by Fixed distribution mode.">
+      <PropertyCell label="Fixed Advance" span={1} compact disabled={String(position?.flowDistribution ?? 'natural') !== 'fixed'} hint="Advance used by Fixed distribution mode.">
         <NumberCell label="Adv" value={Number(position?.flowFixedAdvance ?? 0)} min={0} step={1} defaultValue={0} onchange={(value) => set('Text.Position.flowFixedAdvance', value)} disabled={String(position?.flowDistribution ?? 'natural') !== 'fixed'} />
       </PropertyCell>
 
@@ -1380,7 +1374,7 @@
           />
         </PropertyCell>
       {:else if textFlowModeValue === 'stair'}
-        <PropertyCell label="Step X" span={2} compact hint="Horizontal shift applied to each successive character in stair mode.">
+        <PropertyCell label="Step X" span={1} compact hint="Horizontal shift applied to each successive character in stair mode.">
           <NumberCell
             label="Step X"
             value={position?.flowStepX ?? 8}
@@ -1389,7 +1383,7 @@
             onchange={(value) => set('Text.Position.flowStepX', value)}
           />
         </PropertyCell>
-        <PropertyCell label="Step Y" span={2} compact hint="Vertical shift applied to each successive character in stair mode.">
+        <PropertyCell label="Step Y" span={1} compact hint="Vertical shift applied to each successive character in stair mode.">
           <NumberCell
             label="Step Y"
             value={position?.flowStepY ?? 8}
@@ -1406,14 +1400,14 @@
           </select>
         </PropertyCell>
       {:else if textFlowModeValue === 'vertical'}
-        <PropertyCell label="Step Y" span={2} compact hint="Vertical advance between glyphs in true vertical typesetting.">
+        <PropertyCell label="Step Y" span={1} compact hint="Vertical advance between glyphs in true vertical typesetting.">
           <NumberCell label="Step Y" value={Number(position?.flowStepY ?? 8)} step={1} defaultValue={8} onchange={(value) => set('Text.Position.flowStepY', value)} />
         </PropertyCell>
-        <PropertyCell label="Step X" span={2} compact hint="Horizontal column offset between explicit lines in true vertical typesetting.">
+        <PropertyCell label="Step X" span={1} compact hint="Horizontal column offset between explicit lines in true vertical typesetting.">
           <NumberCell label="Step X" value={Number(position?.flowStepX ?? 8)} step={1} defaultValue={8} onchange={(value) => set('Text.Position.flowStepX', value)} />
         </PropertyCell>
       {:else if textFlowModeValue === 'arc'}
-        <PropertyCell label="Angle" span={2} compact hint="Centre angle for the arc in degrees.">
+        <PropertyCell label="Angle" span={1} compact hint="Centre angle for the arc in degrees.">
           <NumberCell
             label="Angle"
             value={textFlowAngleValue}
@@ -1441,7 +1435,7 @@
           />
         </PropertyCell>
       {:else if textFlowModeValue === 'circle'}
-        <PropertyCell label="Angle" span={2} compact hint="Starting angle for the full-circle text run in degrees.">
+        <PropertyCell label="Angle" span={1} compact hint="Starting angle for the full-circle text run in degrees.">
           <NumberCell
             label="Angle"
             value={textFlowAngleValue}
@@ -1449,7 +1443,7 @@
             onchange={setFlowAngle}
           />
         </PropertyCell>
-        <PropertyCell label="Radius" span={2} compact hint="Distance from the circle centre to the glyph baseline.">
+        <PropertyCell label="Radius" span={1} compact hint="Distance from the circle centre to the glyph baseline.">
           <NumberCell
             label="Rad"
             value={position?.flowRadius ?? 48}
@@ -1460,17 +1454,17 @@
           />
         </PropertyCell>
       {:else if textFlowModeValue === 'wave' || textFlowModeValue === 'zigzag'}
-        <PropertyCell label="Amplitude" span={2} compact hint="Wave or zigzag height from the baseline.">
+        <PropertyCell label="Amplitude" span={1} compact hint="Wave or zigzag height from the baseline.">
           <NumberCell label="Amp" value={Number(position?.flowAmplitude ?? 18)} min={0} step={1} defaultValue={18} onchange={(value) => set('Text.Position.flowAmplitude', value)} />
         </PropertyCell>
-        <PropertyCell label="Frequency" span={2} compact hint="How many wave or zigzag cycles the run should cover.">
+        <PropertyCell label="Frequency" span={1} compact hint="How many wave or zigzag cycles the run should cover.">
           <NumberCell label="Freq" value={Number(position?.flowFrequency ?? 1)} min={0.1} step={0.1} defaultValue={1} onchange={(value) => set('Text.Position.flowFrequency', value)} />
         </PropertyCell>
       {:else if textFlowModeValue === 'spiral'}
-        <PropertyCell label="Turns" span={2} compact hint="How many turns the spiral should complete.">
+        <PropertyCell label="Turns" span={1} compact hint="How many turns the spiral should complete.">
           <NumberCell label="Turns" value={Number(position?.flowTurns ?? 2)} min={0.1} step={0.1} defaultValue={2} onchange={(value) => set('Text.Position.flowTurns', value)} />
         </PropertyCell>
-        <PropertyCell label="Radius" span={2} compact hint="Base radius of the spiral.">
+        <PropertyCell label="Radius" span={1} compact hint="Base radius of the spiral.">
           <NumberCell label="Rad" value={Number(position?.flowRadius ?? 48)} min={1} step={1} defaultValue={48} onchange={(value) => set('Text.Position.flowRadius', value)} />
         </PropertyCell>
       {:else if textFlowModeValue === 'perimeter'}
@@ -1649,7 +1643,7 @@
             onswatchclick={() => handleEffectColorSwatch('stroke2Colour', 'FFFFFFFF')}
           />
         </PropertyCell>
-        <PropertyCell label="Order" span={2} compact hint="Draw order for the secondary stroke layer. Lower draws earlier, higher draws later.">
+        <PropertyCell label="Order" span={1} compact hint="Draw order for the secondary stroke layer. Lower draws earlier, higher draws later.">
           <NumberCell label="Order" value={Number(effectProp('stroke2Order', 45))} step={1} defaultValue={45} onchange={(value) => setEffectNumber('stroke2Order', value, 1)} />
         </PropertyCell>
       {/if}
@@ -1736,7 +1730,7 @@
             onswatchclick={() => handleEffectColorSwatch('glowColour', '80FFFFFF')}
           />
         </PropertyCell>
-        <PropertyCell label="Order" span={2} compact hint="Draw order for the glow layer. Lower draws earlier, higher draws later.">
+        <PropertyCell label="Order" span={1} compact hint="Draw order for the glow layer. Lower draws earlier, higher draws later.">
           <NumberCell label="Order" value={Number(effectProp('glowOrder', 20))} step={1} defaultValue={20} onchange={(value) => setEffectNumber('glowOrder', value, 1)} />
         </PropertyCell>
       {/if}
@@ -1930,7 +1924,7 @@
             </button>
           </div>
         </PropertyCell>
-        <PropertyCell label="Fade Amount" span={2} compact hint="Measured from the near edge of the reflection. Fade Out starts dropping here; Fade In reaches full opacity here.">
+        <PropertyCell label="Fade Amount" span={1} compact hint="Measured from the near edge of the reflection. Fade Out starts dropping here; Fade In reaches full opacity here.">
           <NumberCell
             label="Fade"
             value={reflectionProp('reflectionFadeAmount', 0)}
@@ -2069,23 +2063,8 @@
     flex-direction: column;
   }
 
-  .full-span {
-    width: 100%;
-  }
 
-  .prop-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 2px 0;
-  }
 
-  .lbl {
-    color: #888;
-    font-size: 11px;
-    min-width: 52px;
-    flex-shrink: 0;
-  }
 
   .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
 

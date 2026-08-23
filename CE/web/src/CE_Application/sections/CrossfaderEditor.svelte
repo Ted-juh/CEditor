@@ -37,7 +37,7 @@
         <option value="vertical">Vertical</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Mix" span={2} compact hint="Position: 0 = full A, 1 = full B.">
+    <PropertyCell label="Mix" span={1} compact hint="Position: 0 = full A, 1 = full B.">
       <NumberCell label="Mix" min={0} max={1} step={0.01} value={x.mix ?? 0.5} defaultValue={0.5} onchange={(v) => set('mix', Math.max(0, Math.min(1, v)))} />
     </PropertyCell>
     <PropertyCell label="Bipolar" span={1} hint="Mix port emits −1..1.">
@@ -46,10 +46,10 @@
     <PropertyCell label="Editable" span={1} hint="Drag the handle in preview.">
       <PropertyToggle value={x.editable !== false} onchange={() => set('editable', !(x.editable !== false))} />
     </PropertyCell>
-    <PropertyCell label="Detent" span={2} compact hint="Snap-to-centre threshold (0 = off).">
+    <PropertyCell label="Detent" span={1} compact hint="Snap-to-centre threshold (0 = off).">
       <NumberCell label="Detent" min={0} max={0.5} step={0.01} value={x.detent ?? 0.03} defaultValue={0.03} onchange={(v) => set('detent', Math.max(0, Math.min(0.5, v)))} />
     </PropertyCell>
-    <PropertyCell label="Gain bars" span={2} hint="Draw per-side gain indicators.">
+    <PropertyCell label="Gain bars" span={1} hint="Draw per-side gain indicators.">
       <PropertyToggle value={x.showGains === true} onchange={() => toggle('showGains')} />
     </PropertyCell>
   </PropertySection>
@@ -68,7 +68,7 @@
   </PropertySection>
 
   <PropertySection title="Labels & colours" icon={Palette}>
-    <PropertyCell label="Labels" span={2} hint="Show the A/B end labels.">
+    <PropertyCell label="Labels" span={1} hint="Show the A/B end labels.">
       <PropertyToggle value={x.showLabels !== false} onchange={() => set('showLabels', !(x.showLabels !== false))} />
     </PropertyCell>
     <PropertyCell label="Label A" span={1}>

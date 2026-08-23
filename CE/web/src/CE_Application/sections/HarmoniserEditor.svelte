@@ -143,7 +143,7 @@
       <NumberCell label="Max" min={1} max={MAX_VOICES} step={1} value={num(p.maxVoices, 6)} defaultValue={6} onchange={(v) => set('maxVoices', clampInt(v, 1, MAX_VOICES, 6))} />
     </PropertyCell>
 
-    <PropertyCell label="Keep played note" span={2} hint="Send the played note along with the harmony. Off sends the harmony only.">
+    <PropertyCell label="Keep played note" span={1} hint="Send the played note along with the harmony. Off sends the harmony only.">
       <PropertyToggle value={p.keepPlayed !== false} onchange={() => set('keepPlayed', !(p.keepPlayed !== false))} />
     </PropertyCell>
     <PropertyCell label="In channel" span={1} compact hint="0 listens on every channel.">
@@ -156,10 +156,10 @@
       <NumberCell label="Vel" min={0} max={127} step={1} value={num(p.velocity, 0)} defaultValue={0} onchange={(v) => set('velocity', clampInt(v, 0, 127, 0))} />
     </PropertyCell>
 
-    <PropertyCell label="" span={4} hint={isMemory ? 'The shape applied to C.' : 'The chord built on every degree of the key.'}>
+    <PropertyCell label="" span={4} hint={isMemory ? 'The shape applied to C.' : 'The chord built on every degree of the key.'} compact>
       <div class="preview">{table.length ? table.join('\n') : '—'}</div>
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="note">Playing the tonic gives <b>{example}</b>.</div>
     </PropertyCell>
   </PropertySection>
@@ -189,7 +189,7 @@
 
   {#if !isMemory}
     <PropertySection title="Per-degree chords" icon={Hash}>
-      <PropertyCell label="" span={4} hint="">
+      <PropertyCell label="" span={4} hint="" compact>
         <div class="note">
           An override replaces the stacked chord for <b>one</b> degree and leaves the others alone.
         </div>
@@ -200,11 +200,11 @@
       <PropertyCell label="Chord" span={2} hint="Semitones from the played note, comma separated. Blank uses the stacked thirds.">
         <input class="val" type="text" placeholder="stacked thirds" value={(degreeOverride ?? []).join(', ')} onchange={(e) => setDegreeText(e.target.value)} />
       </PropertyCell>
-      <PropertyCell label="" span={1} hint="">
+      <PropertyCell label="" span={1} hint="" compact>
         <button type="button" class="seed" disabled={!degreeOverride} onclick={() => setDegree(null)}>Clear</button>
       </PropertyCell>
       {#if overriddenDegrees.length}
-        <PropertyCell label="" span={4} hint="Every degree currently overridden.">
+        <PropertyCell label="" span={4} hint="Every degree currently overridden." compact>
           <div class="preview">{overriddenDegrees.join('   ·   ')}</div>
         </PropertyCell>
       {/if}

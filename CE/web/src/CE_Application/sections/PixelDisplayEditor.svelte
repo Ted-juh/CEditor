@@ -336,10 +336,10 @@
 {#if pixel}
   <div class="lcd-inspector">
   <PropertySection title="Screen" icon={Monitor}>
-    <PropertyCell label="Pixels W" span={2} compact hint="Grid resolution: pixel columns. All element coordinates refer to this grid.">
+    <PropertyCell label="Pixels W" span={1} compact hint="Grid resolution: pixel columns. All element coordinates refer to this grid.">
       <NumberCell label="W" value={pixel.pixelsW ?? 128} defaultValue={128} step={1} min={8} max={1024} onchange={(value) => set('pixelsW', Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Pixels H" span={2} compact hint="Grid resolution: pixel rows.">
+    <PropertyCell label="Pixels H" span={1} compact hint="Grid resolution: pixel rows.">
       <NumberCell label="H" value={pixel.pixelsH ?? 64} defaultValue={64} step={1} min={8} max={1024} onchange={(value) => set('pixelsH', Math.round(value))} />
     </PropertyCell>
     <PropertyCell label="Grid" span={2} hint="The working resolution all X/Y/W/H values refer to.">
@@ -605,8 +605,8 @@
                 <span class="en nc-wrap" title="Sprite frame count (0 = animated file)"><NumberCell value={el.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => setElement(i, 'animFrames', Math.max(0, Math.round(value)))} /></span>
                 <span class="en nc-wrap" title="Sprite columns (0 = single horizontal strip)"><NumberCell value={el.animSpriteCols ?? 0} defaultValue={0} step={1} min={0} max={64} onchange={(value) => setElement(i, 'animSpriteCols', Math.max(0, Math.round(value)))} /></span>
                 <span class="en nc-wrap" title="Sprite FPS"><NumberCell value={el.animFps ?? 12} defaultValue={12} step={1} min={1} max={60} onchange={(value) => setElement(i, 'animFps', Math.max(1, Math.round(value)))} /></span>
-                <label class="ex-chk" title="Loop, or hold the last frame"><input type="checkbox" checked={el.animLoop !== false} onchange={(event) => setElement(i, 'animLoop', event.target.checked)} />Loop</label>
-                <label class="ex-chk" title="Keep the file's colours (posterized) instead of 1-bit dither"><input type="checkbox" checked={el.animColour === true} onchange={(event) => setElement(i, 'animColour', event.target.checked)} />Clr</label>
+                <PropertyToggle compact label="Loop" title="Loop, or hold the last frame" value={el.animLoop !== false} onchange={(next) => setElement(i, 'animLoop', next)} />
+                <PropertyToggle compact label="Clr" title="Keep the file's colours (posterized) instead of 1-bit dither" value={el.animColour === true} onchange={(next) => setElement(i, 'animColour', next)} />
               {:else}
                 <select class="val esel" title="Built-in effect" value={el.animPreset ?? 'wave'} onchange={(event) => setElement(i, 'animPreset', event.target.value)}>
                   <option value="wave">Wave</option>
@@ -617,7 +617,7 @@
                   <option value="plasma">Plasma</option>
                 </select>
                 <span class="en nc-wrap" title="Speed multiplier"><NumberCell value={el.animSpeed ?? 1} defaultValue={1} step={0.1} min={0.1} max={5} onchange={(value) => setElement(i, 'animSpeed', value)} /></span>
-                <label class="ex-chk" title="Hue-cycling colour"><input type="checkbox" checked={el.animColour === true} onchange={(event) => setElement(i, 'animColour', event.target.checked)} />Clr</label>
+                <PropertyToggle compact label="Clr" title="Hue-cycling colour" value={el.animColour === true} onchange={(next) => setElement(i, 'animColour', next)} />
               {/if}
             {:else}
               <select class="val en2" title="Text alignment within the W box" value={el.align ?? 'left'} onchange={(event) => setElement(i, 'align', event.target.value)}>
@@ -629,8 +629,8 @@
               <input class="val en" type="text" title="Suffix text" placeholder="suf" value={el.suffix ?? ''} oninput={(event) => setElement(i, 'suffix', event.target.value)} />
               <span class="en nc-wrap" title="Decimal places (value kind)"><NumberCell value={el.precision ?? 0} defaultValue={0} step={1} min={0} max={6} onchange={(value) => setElement(i, 'precision', Math.max(0, Math.round(value)))} /></span>
               <input class="val ex-fill" type="text" title="Caption under the widget, or the name override for name kind" placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
-              <label class="ex-chk" title="Marquee-scroll the text when it overflows the W box"><input type="checkbox" checked={el.scroll === true} onchange={(event) => setElement(i, 'scroll', event.target.checked)} />Scrl</label>
-              <label class="ex-chk" title="Word-wrap into stacked lines (overrides scroll)"><input type="checkbox" checked={el.wrap === true} onchange={(event) => setElement(i, 'wrap', event.target.checked)} />Wrap</label>
+              <PropertyToggle compact label="Scrl" title="Marquee-scroll the text when it overflows the W box" value={el.scroll === true} onchange={(next) => setElement(i, 'scroll', next)} />
+              <PropertyToggle compact label="Wrap" title="Word-wrap into stacked lines (overrides scroll)" value={el.wrap === true} onchange={(next) => setElement(i, 'wrap', next)} />
               {#if pixel.customFont?.src}
                 <select class="val en2" title="Font face" value={el.font ?? ''} onchange={(event) => setElement(i, 'font', event.target.value)}>
                   <option value="">5×7</option>
@@ -638,24 +638,24 @@
                 </select>
               {/if}
               {#if el.kind === 'midiValue'}
-                <label class="ex-chk" title="Show the MIDI value in hexadecimal (00–7F)"><input type="checkbox" checked={el.radix === 'hex'} onchange={(event) => setElement(i, 'radix', event.target.checked ? 'hex' : 'dec')} />Hex</label>
+                <PropertyToggle compact label="Hex" title="Show the MIDI value in hexadecimal (00–7F)" value={el.radix === 'hex'} onchange={(next) => setElement(i, 'radix', next ? 'hex' : 'dec')} />
               {/if}
             {/if}
             <span class="elcol"><SwatchCluster swatches={[
               { key: 'colour', label: 'Colour', value: el.colour || 'FF2BE86A', target: { type: 'callback', apply: (hex) => setElement(i, 'colour', hex) } },
             ]} /></span>
             <input class="val ecol" type="text" title="Element colour AARRGGBB or RRGGBB (empty = panel lit colour)" placeholder="colour" value={el.colour ?? ''} onchange={(event) => setElement(i, 'colour', event.target.value.trim())} />
-            <label class="ex-chk" title="Element visible"><input type="checkbox" checked={el.visible !== false} onchange={(event) => setElement(i, 'visible', event.target.checked)} />Vis</label>
-            <label class="ex-chk" title="Blink this element on/off (~530ms)"><input type="checkbox" checked={el.blink === true} onchange={(event) => setElement(i, 'blink', event.target.checked)} />Blk</label>
+            <PropertyToggle compact label="Vis" title="Element visible" value={el.visible !== false} onchange={(next) => setElement(i, 'visible', next)} />
+            <PropertyToggle compact label="Blk" title="Blink this element on/off (~530ms)" value={el.blink === true} onchange={(next) => setElement(i, 'blink', next)} />
             <input class="val en" type="text" title="Group name — elements in a group drag and hide together" placeholder="grp" value={el.group ?? ''} onchange={(event) => setElement(i, 'group', event.target.value.trim())} />
             {#if WIDGET_KINDS.includes(el.kind)}
-              <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
-              <label class="ex-chk" title="Tick marks"><input type="checkbox" checked={el.ticks === true} onchange={(event) => setElement(i, 'ticks', event.target.checked)} />Tck</label>
-              <label class="ex-chk" title="Peak-hold marker (bars)"><input type="checkbox" checked={el.peakHold === true} onchange={(event) => setElement(i, 'peakHold', event.target.checked)} />Pk</label>
-              <label class="ex-chk" title="Meter ballistics (smoothed movement)"><input type="checkbox" checked={el.smooth === true} onchange={(event) => setElement(i, 'smooth', event.target.checked)} />Sm</label>
-              <label class="ex-chk" title="VU meter colours: green/yellow/red by level"><input type="checkbox" checked={el.meterColours === true} onchange={(event) => setElement(i, 'meterColours', event.target.checked)} />Clr</label>
+              <PropertyToggle compact label="Frm" title="Outline frame" value={el.frame === true} onchange={(next) => setElement(i, 'frame', next)} />
+              <PropertyToggle compact label="Tck" title="Tick marks" value={el.ticks === true} onchange={(next) => setElement(i, 'ticks', next)} />
+              <PropertyToggle compact label="Pk" title="Peak-hold marker (bars)" value={el.peakHold === true} onchange={(next) => setElement(i, 'peakHold', next)} />
+              <PropertyToggle compact label="Sm" title="Meter ballistics (smoothed movement)" value={el.smooth === true} onchange={(next) => setElement(i, 'smooth', next)} />
+              <PropertyToggle compact label="Clr" title="VU meter colours: green/yellow/red by level" value={el.meterColours === true} onchange={(next) => setElement(i, 'meterColours', next)} />
               {#if el.kind === 'hbar' || el.kind === 'vbar'}
-                <label class="ex-chk" title="Brightness gradient along the bar; ignored with VU colours"><input type="checkbox" checked={el.gradient === true} onchange={(event) => setElement(i, 'gradient', event.target.checked)} />Grd</label>
+                <PropertyToggle compact label="Grd" title="Brightness gradient along the bar; ignored with VU colours" value={el.gradient === true} onchange={(next) => setElement(i, 'gradient', next)} />
               {/if}
             {/if}
             {#if el.kind === 'wave'}
@@ -672,7 +672,7 @@
               <span class="ex-lab">Dep</span>
               <span class="en nc-wrap" title="LFO wobble depth (needs an LFO source)"><NumberCell value={el.waveDepth ?? 0.5} defaultValue={0.5} step={0.05} min={0} max={1} onchange={(value) => setElement(i, 'waveDepth', value)} /></span>
               <span class="ex-lab">Frm</span>
-              <input type="checkbox" class="ex-chk" title="Outline frame" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />
+              <PropertyToggle compact label="Frm" title="Outline frame" value={el.frame === true} onchange={(next) => setElement(i, 'frame', next)} />
               <span class="ex-lab">Cut</span>
               <select class="val esel" title="Cutoff source: rolls off harmonics (low-pass)" value={el.cutoffSourceId ?? ''} onchange={(event) => setElement(i, 'cutoffSourceId', event.target.value)}>
                 <option value="">(none)</option>
@@ -731,17 +731,17 @@
                   <option value={src.id}>{src.name}</option>
                 {/each}
               </select>
-              <label class="ex-chk" title="Fill under the curve"><input type="checkbox" checked={el.scopeFill === true} onchange={(event) => setElement(i, 'scopeFill', event.target.checked)} />Fill</label>
-              <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
-              <label class="ex-chk" title="Segment ticks at A/D/S/R boundaries"><input type="checkbox" checked={el.ticks === true} onchange={(event) => setElement(i, 'ticks', event.target.checked)} />Tck</label>
-              <label class="ex-chk" title="Colour the segments (A green, D yellow, S base, R red)"><input type="checkbox" checked={el.meterColours === true} onchange={(event) => setElement(i, 'meterColours', event.target.checked)} />Clr</label>
+              <PropertyToggle compact label="Fill" title="Fill under the curve" value={el.scopeFill === true} onchange={(next) => setElement(i, 'scopeFill', next)} />
+              <PropertyToggle compact label="Frm" title="Outline frame" value={el.frame === true} onchange={(next) => setElement(i, 'frame', next)} />
+              <PropertyToggle compact label="Tck" title="Segment ticks at A/D/S/R boundaries" value={el.ticks === true} onchange={(next) => setElement(i, 'ticks', next)} />
+              <PropertyToggle compact label="Clr" title="Colour the segments (A green, D yellow, S base, R red)" value={el.meterColours === true} onchange={(next) => setElement(i, 'meterColours', next)} />
             {/if}
             {#if el.kind === 'scope'}
               <span class="ex-lab">Secs</span>
               <span class="en nc-wrap" title="Time window the trace spans"><NumberCell value={el.scopeSecs ?? 3} defaultValue={3} step={0.25} min={0.25} max={60} onchange={(value) => setElement(i, 'scopeSecs', value)} /></span>
-              <label class="ex-chk" title="Fill under the trace"><input type="checkbox" checked={el.scopeFill === true} onchange={(event) => setElement(i, 'scopeFill', event.target.checked)} />Fill</label>
-              <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
-              <label class="ex-chk" title="Colour the trace by level (green/yellow/red)"><input type="checkbox" checked={el.meterColours === true} onchange={(event) => setElement(i, 'meterColours', event.target.checked)} />Clr</label>
+              <PropertyToggle compact label="Fill" title="Fill under the trace" value={el.scopeFill === true} onchange={(next) => setElement(i, 'scopeFill', next)} />
+              <PropertyToggle compact label="Frm" title="Outline frame" value={el.frame === true} onchange={(next) => setElement(i, 'frame', next)} />
+              <PropertyToggle compact label="Clr" title="Colour the trace by level (green/yellow/red)" value={el.meterColours === true} onchange={(next) => setElement(i, 'meterColours', next)} />
             {/if}
             <button class="val erm ex-end" type="button" onclick={() => moveElement(i, -1)} title="Move up (paints earlier)" disabled={i === 0}>▲</button>
             <button class="val erm" type="button" onclick={() => moveElement(i, 1)} title="Move down (paints later, wins overlaps)" disabled={i === elements.length - 1}>▼</button>
@@ -753,7 +753,7 @@
 
     {#each groupNames as g (g)}
       <PropertyCell label={`Group “${g}”`} span={4} hint="Elements in this group drag together on screen; toggle to show/hide them all.">
-        <label class="ex-chk" title="Show/hide every element in this group"><input type="checkbox" checked={groupVisible(g)} onchange={(event) => setGroupVisible(g, event.target.checked)} />Visible</label>
+        <PropertyToggle compact label="Visible" title="Show/hide every element in this group" value={groupVisible(g)} onchange={(next) => setGroupVisible(g, next)} />
       </PropertyCell>
     {/each}
 
@@ -787,7 +787,7 @@
       <PropertyCell label="File" span={4} hint="Animated GIF/APNG/WebP (decoded frame-by-frame), or one image holding sprite frames side-by-side.">
         <input class="val" type="file" accept="image/*" onchange={onPickAnim} />
       </PropertyCell>
-      <PropertyCell label="Frames" span={2} compact hint="Sprite-sheet frame count. 0 = the file is an animated GIF/APNG.">
+      <PropertyCell label="Frames" span={1} compact hint="Sprite-sheet frame count. 0 = the file is an animated GIF/APNG.">
         <NumberCell label="Frames" value={pixel.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
       </PropertyCell>
       <PropertyCell label="Cols" span={1} compact hint="Sprite columns. 0 = single horizontal strip; set for a grid or vertical (cols=1) sheet.">
@@ -799,7 +799,7 @@
       <PropertyCell label="Loop" span={1} hint="Loop forever, or hold the last frame.">
         <PropertyToggle value={pixel.animLoop !== false} onchange={() => toggle('animLoop', true)} />
       </PropertyCell>
-      <PropertyCell label="Colour" span={2} hint="Keep the animation's colours (posterized) instead of 1-bit dots.">
+      <PropertyCell label="Colour" span={1} hint="Keep the animation's colours (posterized) instead of 1-bit dots.">
         <PropertyToggle value={pixel.animColour === true} onchange={() => toggle('animColour', false)} />
       </PropertyCell>
       {#if pixel.animSrc}
@@ -822,7 +822,7 @@
       <PropertyCell label="Speed" span={2} hint="Preset speed multiplier.">
         <PropertyScrub value={pixel.animSpeed ?? 1} step={0.1} min={0.1} max={5} defaultValue={1} onchange={(value) => set('animSpeed', value)} />
       </PropertyCell>
-      <PropertyCell label="Colour" span={2} hint="Hue-cycling colour for the preset.">
+      <PropertyCell label="Colour" span={1} hint="Hue-cycling colour for the preset.">
         <PropertyToggle value={pixel.animColour === true} onchange={() => toggle('animColour', false)} />
       </PropertyCell>
     {/if}
@@ -844,7 +844,7 @@
   </PropertySection>
 
   <PropertySection title="Lighting" icon={Lamp}>
-    <PropertyCell label="Backlight" span={2} hint="Turn the backlight wash on or off.">
+    <PropertyCell label="Backlight" span={1} hint="Turn the backlight wash on or off.">
       <PropertyToggle value={pixel.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>
     <PropertyCell label="Brightness" span={2} hint="Dot intensity (0–100).">
@@ -862,7 +862,7 @@
         ontoggle={(key) => toggle(key, key === 'showGhost')}
       />
     </PropertyCell>
-    <PropertyCell label="Snap" span={2} compact hint="Snap element drags to this pixel step (0 = free). Also sets the grid spacing.">
+    <PropertyCell label="Snap" span={1} compact hint="Snap element drags to this pixel step (0 = free). Also sets the grid spacing.">
       <NumberCell label="Snap" value={pixel.snapGrid ?? 0} defaultValue={0} step={1} min={0} max={64} onchange={(value) => set('snapGrid', Math.max(0, Math.round(value)))} />
     </PropertyCell>
     <PropertyCell label="Bright Src" span={2} hint="Drive Brightness live from a slider/knob/number in preview.">
@@ -907,7 +907,7 @@
     <PropertyCell label="Glow" span={2} hint="Bloom halo under lit dots (0 = crisp, 1 = strong glow).">
       <PropertyScrub value={pixel.glow ?? 0} step={0.1} min={0} max={1} defaultValue={0} onchange={(value) => set('glow', value)} />
     </PropertyCell>
-    <PropertyCell label="Padding" span={2} compact hint="Inset from the bezel to the screen (px).">
+    <PropertyCell label="Padding" span={1} compact hint="Inset from the bezel to the screen (px).">
       <NumberCell label="Pad" value={pixel.padding ?? 8} defaultValue={8} step={1} min={0} onchange={(value) => set('padding', value)} />
     </PropertyCell>
   </PropertySection>
@@ -924,7 +924,7 @@
         <option value="digits">0–9</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Max length" span={2} compact hint="Cap on the edited string (0 = unbounded).">
+    <PropertyCell label="Max length" span={1} compact hint="Cap on the edited string (0 = unbounded).">
       <NumberCell label="Len" value={pixel.editMaxLength ?? 16} defaultValue={16} step={1} min={0} max={256} onchange={(value) => set('editMaxLength', Math.max(0, Math.round(value)))} />
     </PropertyCell>
   </PropertySection>
@@ -959,11 +959,6 @@
 
   /* Visible keyboard focus for every inspector control + checkbox. */
   .val:focus-visible,
-  .ex-chk input:focus-visible {
-    outline: 2px solid #5B9BD5;
-    outline-offset: 1px;
-    border-color: #5B9BD5;
-  }
 
   .field-row {
     display: flex;
@@ -1150,22 +1145,7 @@
     align-items: center;
   }
 
-  .ex-chk {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    font-size: 10px;
-    text-transform: uppercase;
-    color: #aaa;
-    cursor: pointer;
-    user-select: none;
-  }
 
-  .ex-chk input {
-    margin: 0;
-    accent-color: #5B9BD5;
-  }
 
   .el-extra .ecol {
     width: 78px;

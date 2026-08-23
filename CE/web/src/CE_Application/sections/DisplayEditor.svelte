@@ -323,10 +323,10 @@
       </PropertyCell>
     {/if}
     {#if String(display.panelType ?? '') === 'graphic'}
-      <PropertyCell label="Pixels W" span={2} compact hint="Graphic pixel columns (0 = auto from Columns).">
+      <PropertyCell label="Pixels W" span={1} compact hint="Graphic pixel columns (0 = auto from Columns).">
         <NumberCell label="W" value={display.pixelWidth ?? 0} defaultValue={0} step={1} min={0} max={512} onchange={(value) => set('pixelWidth', Math.round(value))} />
       </PropertyCell>
-      <PropertyCell label="Pixels H" span={2} compact hint="Graphic pixel rows (0 = auto from Rows).">
+      <PropertyCell label="Pixels H" span={1} compact hint="Graphic pixel rows (0 = auto from Rows).">
         <NumberCell label="H" value={display.pixelHeight ?? 0} defaultValue={0} step={1} min={0} max={512} onchange={(value) => set('pixelHeight', Math.round(value))} />
       </PropertyCell>
       <PropertyCell label="Image" span={3} hint="Optional image dithered onto the grid (overrides text). Clear to show text.">
@@ -348,10 +348,10 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Columns" span={2} compact hint="Characters per line.">
+    <PropertyCell label="Columns" span={1} compact hint="Characters per line.">
       <NumberCell label="Cols" value={display.cols ?? 16} defaultValue={16} step={1} min={1} max={64} onchange={(value) => set('cols', Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Rows" span={2} compact hint="Number of text lines.">
+    <PropertyCell label="Rows" span={1} compact hint="Number of text lines.">
       <NumberCell label="Rows" value={display.rows ?? 2} defaultValue={2} step={1} min={1} max={16} onchange={(value) => set('rows', Math.round(value))} />
     </PropertyCell>
   </PropertySection>
@@ -379,13 +379,13 @@
     <PropertyCell label="Value" span={4} compact hint="Static value that drives the tokens (ignored in preview when a Source is set).">
       <NumberCell label="Val" value={display.value ?? 0} defaultValue={0} step={1} min={display.valueMin ?? 0} max={display.valueMax ?? 127} onchange={(value) => set('value', value)} />
     </PropertyCell>
-    <PropertyCell label="Min" span={2} compact hint="Value range minimum (for the pct and bar tokens).">
+    <PropertyCell label="Min" span={1} compact hint="Value range minimum (for the pct and bar tokens).">
       <NumberCell label="Min" value={display.valueMin ?? 0} defaultValue={0} step={1} onchange={(value) => set('valueMin', value)} />
     </PropertyCell>
-    <PropertyCell label="Max" span={2} compact hint="Value range maximum (for the pct and bar tokens).">
+    <PropertyCell label="Max" span={1} compact hint="Value range maximum (for the pct and bar tokens).">
       <NumberCell label="Max" value={display.valueMax ?? 127} defaultValue={127} step={1} onchange={(value) => set('valueMax', value)} />
     </PropertyCell>
-    <PropertyCell label="Precision" span={2} compact hint="Decimal places for the value token.">
+    <PropertyCell label="Precision" span={1} compact hint="Decimal places for the value token.">
       <NumberCell label="Prec" value={display.valuePrecision ?? 0} defaultValue={0} step={1} min={0} max={6} onchange={(value) => set('valuePrecision', Math.round(value))} />
     </PropertyCell>
     <PropertyCell label="Prefix" span={1} hint="Text before the value token.">
@@ -424,7 +424,7 @@
         <option value="digits">Digits</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Max Length" span={2} compact hint="Maximum characters (0 = unbounded). Usually match the zone width.">
+    <PropertyCell label="Max Length" span={1} compact hint="Maximum characters (0 = unbounded). Usually match the zone width.">
       <NumberCell label="Len" value={display.editMaxLength ?? 16} defaultValue={16} step={1} min={0} max={64} onchange={(value) => set('editMaxLength', Math.round(value))} />
     </PropertyCell>
   </PropertySection>
@@ -695,7 +695,7 @@
         <PropertyCell label="File" span={4} hint="Animated GIF/APNG/WebP (decoded frame-by-frame), or one image holding sprite frames side-by-side.">
           <input class="val" type="file" accept="image/*" onchange={onPickAnim} />
         </PropertyCell>
-        <PropertyCell label="Frames" span={2} compact hint="Sprite-sheet frame count (frames laid out horizontally). 0 = the file is an animated GIF/APNG.">
+        <PropertyCell label="Frames" span={1} compact hint="Sprite-sheet frame count (frames laid out horizontally). 0 = the file is an animated GIF/APNG.">
           <NumberCell label="Frames" value={display.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
         </PropertyCell>
         <PropertyCell label="FPS" span={1} compact hint="Sprite-sheet playback rate (animated files use their own frame timing).">
@@ -744,7 +744,7 @@
   </PropertySection>
 
   <PropertySection title="Lighting" icon={Lamp}>
-    <PropertyCell label="Backlight" span={2} hint="Turn the backlight wash on or off.">
+    <PropertyCell label="Backlight" span={1} hint="Turn the backlight wash on or off.">
       <PropertyToggle value={display.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>
     <PropertyCell label="Brightness" span={2} hint="Foreground intensity (0–100). Drag the track, type a value, or step with ▴▾.">
@@ -781,10 +781,10 @@
       />
     </PropertyCell>
     {#if String(display.panelType ?? '') === 'character'}
-      <PropertyCell label="Dot Matrix" span={2} hint="Render character glyphs as a dot grid for a dot-matrix LCD look.">
+      <PropertyCell label="Dot Matrix" span={1} hint="Render character glyphs as a dot grid for a dot-matrix LCD look.">
         <PropertyToggle value={display.dotMatrix === true} onchange={() => toggle('dotMatrix', false)} />
       </PropertyCell>
-      <PropertyCell label="Dot Pitch" span={2} compact hint="Dot spacing in px (0 = auto from cell size).">
+      <PropertyCell label="Dot Pitch" span={1} compact hint="Dot spacing in px (0 = auto from cell size).">
         <NumberCell label="Pitch" value={display.dotPitch ?? 0} defaultValue={0} step={1} min={0} max={20} onchange={(value) => set('dotPitch', Math.round(value))} />
       </PropertyCell>
     {/if}
@@ -830,16 +830,16 @@
     <PropertyCell label="Speed" span={2} hint="Scroll speed in characters per second.">
       <PropertyScrub value={display.scrollSpeed ?? 4} step={1} min={0} max={60} defaultValue={4} onchange={(value) => set('scrollSpeed', value)} />
     </PropertyCell>
-    <PropertyCell label="Gap" span={2} compact hint="Blank characters between loop repeats.">
+    <PropertyCell label="Gap" span={1} compact hint="Blank characters between loop repeats.">
       <NumberCell label="Gap" value={display.scrollGap ?? 3} defaultValue={3} step={1} min={0} onchange={(value) => set('scrollGap', Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Repeat" span={2} compact hint="Number of times to scroll, then settle. 0 = loop forever.">
+    <PropertyCell label="Repeat" span={1} compact hint="Number of times to scroll, then settle. 0 = loop forever.">
       <NumberCell label="Rep" value={display.scrollRepeat ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('scrollRepeat', Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Blink" span={2} hint="Blink the lit text on and off.">
+    <PropertyCell label="Blink" span={1} hint="Blink the lit text on and off.">
       <PropertyToggle value={display.blink === true} onchange={() => toggle('blink', false)} />
     </PropertyCell>
-    <PropertyCell label="Blink Rate" span={2} compact hint="Milliseconds per blink half-cycle.">
+    <PropertyCell label="Blink Rate" span={1} compact hint="Milliseconds per blink half-cycle.">
       <NumberCell label="Rate" value={display.blinkRate ?? 500} defaultValue={500} step={50} min={60} onchange={(value) => set('blinkRate', value)} />
     </PropertyCell>
     <PropertyCell label="Cursor" span={2} hint="Show a cursor cell.">
@@ -849,28 +849,28 @@
         <option value="underline">Underline</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Cursor Blink" span={2} hint="Blink the cursor.">
+    <PropertyCell label="Cursor Blink" span={1} hint="Blink the cursor.">
       <PropertyToggle value={display.cursorBlink !== false} onchange={() => toggle('cursorBlink', true)} />
     </PropertyCell>
-    <PropertyCell label="Cursor Row" span={2} compact hint="Cursor row (0-based).">
+    <PropertyCell label="Cursor Row" span={1} compact hint="Cursor row (0-based).">
       <NumberCell label="Row" value={display.cursorRow ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('cursorRow', Math.round(value))} />
     </PropertyCell>
-    <PropertyCell label="Cursor Col" span={2} compact hint="Cursor column (0-based).">
+    <PropertyCell label="Cursor Col" span={1} compact hint="Cursor column (0-based).">
       <NumberCell label="Col" value={display.cursorCol ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('cursorCol', Math.round(value))} />
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Layout" icon={Square}>
-    <PropertyCell label="Padding" span={2} compact hint="Inset from the bezel to the screen (px).">
+    <PropertyCell label="Padding" span={1} compact hint="Inset from the bezel to the screen (px).">
       <NumberCell label="Pad" value={display.padding ?? 10} defaultValue={10} step={1} min={0} onchange={(value) => set('padding', value)} />
     </PropertyCell>
     <PropertyCell label="Font Scale" span={2} hint="Relative glyph size.">
       <PropertyScrub value={display.fontScale ?? 1} step={0.05} min={0.3} max={3} defaultValue={1} onchange={(value) => set('fontScale', value)} />
     </PropertyCell>
-    <PropertyCell label="Char Gap" span={2} compact hint="Extra spacing between characters (px).">
+    <PropertyCell label="Char Gap" span={1} compact hint="Extra spacing between characters (px).">
       <NumberCell label="Gap" value={display.charSpacing ?? 1} defaultValue={1} step={1} min={0} onchange={(value) => set('charSpacing', value)} />
     </PropertyCell>
-    <PropertyCell label="Line Gap" span={2} compact hint="Extra spacing between rows (px).">
+    <PropertyCell label="Line Gap" span={1} compact hint="Extra spacing between rows (px).">
       <NumberCell label="Gap" value={display.lineSpacing ?? 3} defaultValue={3} step={1} min={0} onchange={(value) => set('lineSpacing', value)} />
     </PropertyCell>
   </PropertySection>

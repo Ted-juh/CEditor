@@ -332,7 +332,7 @@
     <PropertyCell label="Add" span={3} hint="Create a link between internal values, behaviors, visual properties, or external component API values.">
       <input class="val" type="text" bind:value={newName} placeholder="linkName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Add a logic link.">
+    <PropertyCell label="" span={1} hint="Add a logic link." compact>
       <button class="action-btn" type="button" onclick={addLink}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose which link to edit.">
@@ -342,7 +342,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected link.">
+    <PropertyCell label="" span={1} hint="Remove the selected link." compact>
       <button class="action-btn danger" type="button" onclick={removeLink} disabled={!selectedName}>Remove</button>
     </PropertyCell>
   </PropertySection>
@@ -551,14 +551,14 @@
             />
           </PropertyCell>
         {:else if selected.type === 'offset'}
-          <PropertyCell label="Amount" span={2} compact hint="Amount added to the source before writing the target.">
+          <PropertyCell label="Amount" span={1} compact hint="Amount added to the source before writing the target.">
             <NumberCell label="Amt" value={selected.amount ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('amount', value)} />
           </PropertyCell>
         {:else if selected.type === 'clamp'}
-          <PropertyCell label="Min" span={2} compact hint="Lowest allowed routed value.">
+          <PropertyCell label="Min" span={1} compact hint="Lowest allowed routed value.">
             <NumberCell label="Min" value={selected.min ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('min', value)} />
           </PropertyCell>
-          <PropertyCell label="Max" span={2} compact hint="Highest allowed routed value.">
+          <PropertyCell label="Max" span={1} compact hint="Highest allowed routed value.">
             <NumberCell label="Max" value={selected.max ?? 1} step={0.01} defaultValue={1} onchange={(value) => set('max', value)} />
           </PropertyCell>
         {:else if selected.type === 'condition'}
@@ -582,7 +582,7 @@
             }}></textarea>
           </PropertyCell>
         {:else}
-          <PropertyCell label="Invert" span={2} hint="Invert the boolean source before writing the target.">
+          <PropertyCell label="Invert" span={1} hint="Invert the boolean source before writing the target.">
             <PropertyToggle value={selected.invert === true} onchange={() => set('invert', !(selected.invert === true))} />
           </PropertyCell>
         {/if}

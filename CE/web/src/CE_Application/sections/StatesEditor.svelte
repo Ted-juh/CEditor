@@ -8,6 +8,12 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import ConditionBuilder from './ConditionBuilder.svelte';
   import { BASE_STATE_TARGET, buildStateTargetOptions, resolveSelectedStateName, summarizeStateOverrides } from '../utils/stateTargets.js';
+  import Layers from 'lucide-svelte/icons/layers';
+  import Target from 'lucide-svelte/icons/target';
+  import SquareCheck from 'lucide-svelte/icons/square-check';
+  import GitBranch from 'lucide-svelte/icons/git-branch';
+  import Replace from 'lucide-svelte/icons/replace';
+  import Wrench from 'lucide-svelte/icons/wrench';
 
   let { control = null } = $props();
 
@@ -181,7 +187,7 @@
 {#if multiEdit}
   <div class="placeholder">State editing is single-selection only.</div>
 {:else if states}
-  <PropertySection title="States">
+  <PropertySection title="States" icon={Layers}>
     <PropertyCell label="States" span={4} hint="Choose Base or a state you want to inspect and manage here.">
       <div class="state-strip">
         {#each stateTargetOptions as option}
@@ -203,13 +209,13 @@
     <PropertyCell label="New" span={3} hint="Create a new visual state for this control.">
       <input class="val" type="text" bind:value={newStateName} placeholder="State name" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create the state and make it the current visual target.">
+    <PropertyCell label="" span={1} hint="Create the state and make it the current visual target." compact>
       <button class="action-btn" onclick={addState}>Add</button>
     </PropertyCell>
   </PropertySection>
 
   {#if selectedStateName === BASE_STATE_TARGET}
-    <PropertySection title="Base Target">
+    <PropertySection title="Base Target" icon={Target}>
       <PropertyCell label="Mode" span={4} hint="Base is the unmodified control. Select a state chip to inspect that state directly.">
         <div class="target-banner">
           <div class="target-copy">
@@ -220,7 +226,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if selectedState}
-    <PropertySection title="Selected State">
+    <PropertySection title="Selected State" icon={SquareCheck}>
       <PropertyCell label="Target" span={4} hint="Choose whether visual tabs should currently edit Base or this state.">
         <div class="target-banner">
           <div class="target-copy">
@@ -253,7 +259,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="When">
+    <PropertySection title="When" icon={GitBranch}>
       <!--
         The rule half of `evaluateState()` (utils/interactionRuntime.js): an optional compound
         condition over channels and flags, ANDed with the toggles below. The runtime has honoured
@@ -281,7 +287,7 @@
       {/each}
     </PropertySection>
 
-    <PropertySection title="Overrides">
+    <PropertySection title="Overrides" icon={Replace}>
       <PropertyCell label="Summary" span={4} hint="Visual tabs write overrides here when this state is targeted.">
         <div class="override-card">
           {#if overrideSummary.length}
@@ -308,7 +314,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Advanced">
+    <PropertySection title="Advanced" icon={Wrench}>
       <PropertyCell label="Raw Patches" span={4} hint="Optional JSON editing for advanced state patch work.">
         <div class="advanced-header">
           <span>Use this only when the visual tabs are not enough.</span>
@@ -324,7 +330,7 @@
         <PropertyCell label="Parts" span={2} hint="Per-part patch map keyed by part name.">
           <textarea class="val code" rows="12" bind:value={partsPatchDraft} onblur={() => commitPatchDraft('parts')}></textarea>
         </PropertyCell>
-        <PropertyCell label="" span={4} hint="Shows parse errors while editing the raw JSON.">
+        <PropertyCell label="" span={4} hint="Shows parse errors while editing the raw JSON." compact>
           <div class="patch-footer">
             <span class="error">{parseError}</span>
           </div>

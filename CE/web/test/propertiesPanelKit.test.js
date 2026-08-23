@@ -59,8 +59,9 @@ test('the tokens are declared once, on the panel root', () => {
     assert.match(panel, new RegExp(`${token}:`), `${token} must be defined on .properties-panel`);
   }
   // 26px is PropertyToggle's height; a field that does not match it will not line up beside one.
+  // The toggle now reads the token rather than repeating the number, which is the point.
   assert.match(panel, /--pp-field-height:\s*26px/);
-  assert.match(read('properties/PropertyToggle.svelte'), /height:\s*26px/);
+  assert.match(read('properties/PropertyToggle.svelte'), /height: var\(--pp-field-height, 26px\)/);
 });
 
 test('the purple fork is gone — no editor styles its fields off-palette', () => {
@@ -179,4 +180,162 @@ test('the shared control widgets exist and are token-driven and border-box', () 
   // A select's intrinsic width is set by its longest option, so it needs min-width:0 as well or
   // it widens the grid track instead of merely overflowing it.
   assert.match(read('properties/PropertySelect.svelte'), /min-width: 0/);
+});
+
+// =================================================================================================
+// The migrations — steps 3, 4, 5, 8 and 10 of the review's fix order.
+// =================================================================================================
+
+// --- Step 3: one boolean ------------------------------------------------------------------------
+// Six ways to render a boolean, nine files mixing two of them in one view. All of them are
+// PropertyToggle now; this fails on the seventh way.
+
+test('no section editor renders a raw checkbox any more', () => {
+  const offenders = sections.filter((f) => /type=['"]checkbox['"]/.test(read(`sections/${f}`)));
+  assert.deepEqual(offenders, [], 'use PropertyToggle — it has a compact form for chips and cells');
+});
+
+test('PropertyToggle carries the two props the strays needed', () => {
+  const s = read('properties/PropertyToggle.svelte');
+  // A chip row of eight toggles all reading "On" says nothing about which is which.
+  assert.match(s, /label = '',/, 'named flags: Invert, Loop, Clr');
+  assert.match(s, /compact = false,/, 'chip rows and table cells are not 26px tall');
+  assert.match(s, /\.property-toggle\.compact \{[^}]*width: auto/s, 'a chip sizes to its label');
+  // It is a switch, not a button, and it says so.
+  assert.match(s, /role="switch"/);
+  assert.match(s, /aria-checked=/);
+});
+
+// --- Step 4: density ----------------------------------------------------------------------------
+
+test('a lone toggle or stepper does not take two columns unless it is pairing', () => {
+  // ~145px per column at the panel's minimum width. A 26px On/Off button and a NumberCell stepper
+  // both fit one track; 172 of them were asking for two, which is where most of the wasted height
+  // came from.
+  //
+  // Two-wide is legitimate when it PAIRS — State + Z-Index, Colour + Fill Order — because two
+  // span-2 cells fill a row exactly and narrowing one would leave a hole rather than save a row.
+  // So the rule is about holes, not about width: a lone control at span={2} whose neighbour does
+  // not complete the row is the thing worth catching.
+  const offenders = [];
+  for (const file of sections) {
+    const source = read(`sections/${file}`);
+    const cells = [...source.matchAll(/<PropertyCell\b([^>]*)>(.*?)<\/PropertyCell>/gs)].map((m) => {
+      const span = m[1].match(/span=\{(\d)\}/);
+      const children = [...m[2].matchAll(/<([A-Za-z][\w.]*)/g)].map((c) => c[1]);
+      return { span: span ? Number(span[1]) : 1, children };
+    });
+    cells.forEach((cell, i) => {
+      if (cell.span !== 2) return;
+      if (cell.children.length !== 1) return;
+      if (!['NumberCell', 'PropertyToggle'].includes(cell.children[0])) return;
+      const pairsBack = cells[i - 1]?.span === 2;
+      const pairsForward = cells[i + 1]?.span === 2;
+      if (!pairsBack && !pairsForward) {
+        offenders.push(`${file}: lone <${cell.children[0]}> at span={2}`);
+      }
+    });
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test('an unlabelled cell does not reserve the label strip', () => {
+  const offenders = [];
+  for (const file of sections) {
+    for (const m of read(`sections/${file}`).matchAll(/<PropertyCell\b([^>]*?)>/g)) {
+      if (/label=""/.test(m[1]) && !/compact/.test(m[1])) offenders.push(file);
+    }
+  }
+  assert.deepEqual([...new Set(offenders)], [], 'label="" plus compact, or the 11px strip stays');
+});
+
+// --- Step 5: no editor cancels the shared grid ---------------------------------------------------
+
+test('nothing overrides .property-grid from inside a section', () => {
+  const offenders = sections.filter((f) => /:global\(\.property-grid\)/.test(read(`sections/${f}`)));
+  assert.deepEqual(offenders, [], 'BackgroundEditor turned the 4-column grid into a flex column');
+});
+
+test('the inline-label fork is down to the editor the review holds up as the model', () => {
+  const holdouts = sections.filter((f) => /class="prop-row[ "]/.test(read(`sections/${f}`)));
+  // TransformEditor's paired rows are the best pattern in the panel by the review's own reckoning
+  // (19px/property against the panel average of 29). It is the target, not a holdout.
+  assert.deepEqual(holdouts, ['TransformEditor.svelte']);
+});
+
+test('a full-width row cannot be squeezed into one grid column again', () => {
+  // TextEditor had six `.prop-row full-span` divs in a real 4-column grid, and `.full-span` set
+  // only `width: 100%` — no `grid-column`. Each sat in a ~145px track with a 54px label beside it.
+  for (const file of sections) {
+    const source = read(`sections/${file}`);
+    if (!/class="[^"]*\bfull-span\b/.test(source)) continue;
+    const rule = source.match(/\n[ \t]*\.full-span[^{]*\{([^}]*)\}/);
+    assert.ok(rule && /grid-column/.test(rule[1]),
+      `${file}: .full-span must claim its columns, not just its width`);
+  }
+});
+
+// --- Step 8: icon anchors, and titles that can key their own state -------------------------------
+
+test('almost every section has an icon landmark', () => {
+  let total = 0; let withIcon = 0;
+  for (const file of sections) {
+    for (const m of read(`sections/${file}`).matchAll(/<PropertySection\b(.*?)>/gs)) {
+      total += 1;
+      if (/icon=/.test(m[1])) withIcon += 1;
+    }
+  }
+  // The two without have computed titles, so a fixed icon would be wrong for them.
+  assert.ok(withIcon >= total - 2, `${total - withIcon} sections have no icon (allowed: 2)`);
+});
+
+test('no two sections that render together share a collapse key', () => {
+  // The key is `scope/title`, and the scope is the tab. Two sections with the same title in one
+  // tab therefore collapse as one — which is a bug the moment it happens, and it happened twice
+  // in TextEditor and once across the pair CustomInteractEditor embeds.
+  const sectionKeys = (file) => {
+    const source = read(`sections/${file}`);
+    return [...source.matchAll(/<PropertySection\b(.*?)>/gs)].map((m) => {
+      const key = m[1].match(/collapseKey="([^"]*)"/);
+      const title = m[1].match(/title="([^"]*)"/);
+      return key ? key[1] : (title ? title[1] : null);
+    }).filter(Boolean);
+  };
+
+  // Same file.
+  for (const file of sections) {
+    const keys = sectionKeys(file);
+    const dupes = keys.filter((k, i) => keys.indexOf(k) !== i);
+    assert.deepEqual([...new Set(dupes)], [], `${file} has two sections keyed the same`);
+  }
+
+  // Editors an editor embeds share its scope.
+  for (const file of sections) {
+    const source = read(`sections/${file}`);
+    const embedded = [...source.matchAll(/import (\w+(?:Editor|Library)) from '\.\/(\w+)\.svelte'/g)]
+      .filter(([, name]) => new RegExp(`<${name}\\b`).test(source))
+      .map(([, , mod]) => `${mod}.svelte`);
+    if (!embedded.length) continue;
+    const seen = new Map();
+    for (const mod of [file, ...embedded]) {
+      for (const key of new Set(sectionKeys(mod))) {
+        assert.ok(!seen.has(key),
+          `${file} renders ${mod} and ${seen.get(key)} together, both with a section keyed "${key}"`);
+        seen.set(key, mod);
+      }
+    }
+  }
+});
+
+// --- Step 10: the design surface is a different surface, and says so -----------------------------
+
+test('the design surface dock has its own tokens, not the panel’s literals', () => {
+  const s = read('sections/CustomDesignSurfaceEditor.svelte');
+  for (const token of ['--dk-field-height', '--dk-field-bg', '--dk-field-border', '--dk-field-font']) {
+    assert.match(s, new RegExp(`${token}:`), `${token} must be declared on .surface-shell`);
+  }
+  assert.match(s, /var\(--dk-field-height/, 'and consumed by the dock fields');
+  // It renders in EditorCanvas, not in the properties panel, so --pp-field-* never reaches it.
+  // If that ever changes, the comment explaining the separate palette needs revisiting.
+  assert.match(read('editor/EditorCanvas.svelte'), /<CustomDesignSurfaceEditor\b/);
 });

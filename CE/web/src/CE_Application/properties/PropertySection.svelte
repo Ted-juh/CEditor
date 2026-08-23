@@ -26,8 +26,13 @@
   //
   // `defaultCollapsed` is for sections that should arrive shut. It only seeds the first visit;
   // once the user has an opinion, the store holds it.
+  // `collapseKey` overrides the title in the storage key, for the case where two sections that
+  // legitimately share a title render in the same tab. CustomInteractEditor embeds the Behaviors
+  // and ValueChannels editors side by side and both call their first section "Definition" — right
+  // in each on its own, one collapse state between them once the title is the key.
   let {
     title = '',
+    collapseKey = '',
     collapsed = $bindable(undefined),
     defaultCollapsed = false,
     ontoggle = null,
@@ -50,7 +55,8 @@
   // (BackgroundEditor's, which passes `collapsed` itself and so never gets here), but a key
   // silently pinned to a stale title is the kind of thing that would be found much later, by
   // someone wondering why one section stopped remembering.
-  let storeKey = $derived(!callerOwnsCollapse && scope !== '' && title !== '' ? `${scope}/${title}` : '');
+  let keyName = $derived(collapseKey || title);
+  let storeKey = $derived(!callerOwnsCollapse && scope !== '' && keyName !== '' ? `${scope}/${keyName}` : '');
   let selfManaged = $derived(storeKey !== '');
 
   // Registered so the toolbar's collapse-all knows this section is on screen.

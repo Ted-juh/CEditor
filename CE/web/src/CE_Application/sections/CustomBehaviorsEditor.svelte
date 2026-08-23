@@ -231,7 +231,7 @@
     <PropertyCell label="Add" span={3} hint="Create a behavior module such as slider, button, grid, piano bar, scroll, or filmstrip control.">
       <input class="val" type="text" bind:value={newName} placeholder="behaviorName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Add a behavior module.">
+    <PropertyCell label="" span={1} hint="Add a behavior module." compact>
       <button class="action-btn" type="button" onclick={addBehavior}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose which behavior module to edit.">
@@ -241,7 +241,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected behavior.">
+    <PropertyCell label="" span={1} hint="Remove the selected behavior." compact>
       <button class="action-btn danger" type="button" onclick={removeBehavior} disabled={!selectedName}>Remove</button>
     </PropertyCell>
   </PropertySection>
@@ -286,7 +286,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Definition" icon={Pencil}>
+    <PropertySection title="Definition" collapseKey="Behavior Definition" icon={Pencil}>
       {#snippet tools()}
         <HeaderPill value={selected.enabled !== false}
                     title="Enable or disable this internal behavior module."
@@ -350,7 +350,7 @@
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Sensitivity" span={2} compact hint="Multiplier for vertical, horizontal, or both drag modes. 1 means one control height/width covers the full value range.">
+      <PropertyCell label="Sensitivity" span={1} compact hint="Multiplier for vertical, horizontal, or both drag modes. 1 means one control height/width covers the full value range.">
         <NumberCell label="Sens" min={0.01} max={10} step={0.05} value={selected.dragSensitivity ?? 1} defaultValue={1} onchange={(v) => set('dragSensitivity', Math.max(0.01, Math.min(10, v || 1)))} />
       </PropertyCell>
       <PropertyCell label="Invert" span={2} hint="Flip the horizontal or vertical drag direction for this behavior only. Hover a chip for its name.">
@@ -366,7 +366,7 @@
         />
       </PropertyCell>
       {#if selected.dragMode === 'both' || selected.dragMode === 'free'}
-        <PropertyCell label="Advanced" span={2} hint="How the two drag axes merge into one value — combine mode, per-axis weights, and the increase direction.">
+        <PropertyCell label="Advanced" span={1} hint="How the two drag axes merge into one value — combine mode, per-axis weights, and the increase direction.">
           <PropertyToggle value={showAdvancedDrag} onchange={() => showAdvancedDrag = !showAdvancedDrag} />
         </PropertyCell>
         {#if showAdvancedDrag}
@@ -383,7 +383,7 @@
           <PropertyCell label="Weight Y" span={1} compact hint="Relative contribution of vertical motion.">
             <NumberCell label="Y" min={0} max={4} step={0.1} value={selected.weightY ?? 1} defaultValue={1} onchange={(v) => set('weightY', Math.max(0, Math.min(4, v || 1)))} />
           </PropertyCell>
-          <PropertyCell label="Increase Angle" span={2} compact hint="Direction treated as increase, in degrees: 0 is right, 90 is up, 45 is the up-right default.">
+          <PropertyCell label="Increase Angle" span={1} compact hint="Direction treated as increase, in degrees: 0 is right, 90 is up, 45 is the up-right default.">
             <NumberCell label="Angle" min={0} max={90} step={5} value={selected.increaseAngle ?? 45} defaultValue={45} onchange={(v) => set('increaseAngle', Math.max(0, Math.min(90, v || 45)))} />
           </PropertyCell>
         {/if}

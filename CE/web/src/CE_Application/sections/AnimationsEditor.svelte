@@ -201,7 +201,7 @@
     <PropertyCell label="Add" span={3} hint="Create a new animation node.">
       <input class="val" type="text" bind:value={newAnimationName} placeholder="Animation name" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create the animation with a neutral transition shape.">
+    <PropertyCell label="" span={1} hint="Create the animation with a neutral transition shape." compact>
       <button class="action-btn" onclick={addAnimation}>Add</button>
     </PropertyCell>
     <PropertyCell label="Animations" span={3} hint="Select the animation to edit.">
@@ -211,7 +211,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected animation.">
+    <PropertyCell label="" span={1} hint="Remove the selected animation." compact>
       <button class="action-btn danger" onclick={removeAnimation} disabled={!selectedAnimationName}>Remove</button>
     </PropertyCell>
   </PropertySection>
@@ -307,7 +307,7 @@
       <PropertyCell label="Targets" span={4} hint="JSON array of target descriptors. Each item can provide a path and optional property hints.">
         <textarea class="val code" rows="12" bind:value={targetsDraft} onblur={commitTargets}></textarea>
       </PropertyCell>
-      <PropertyCell label="" span={4} hint="Send the selected animation payload to the Debug panel.">
+      <PropertyCell label="" span={4} hint="Send the selected animation payload to the Debug panel." compact>
         <div class="patch-footer">
           <span class="error">{parseError}</span>
           <button class="action-btn" onclick={dumpAnimationDebug}>Debug animation</button>

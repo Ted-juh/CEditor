@@ -566,10 +566,10 @@
     <PropertyCell label="Add" span={2} hint="Add a public input by name.">
       <input class="val" type="text" bind:value={newInputName} placeholder="inputName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create a new published input.">
+    <PropertyCell label="" span={1} hint="Create a new published input." compact>
       <button class="action-btn" type="button" onclick={addInput}>Add</button>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Publish all value channels marked as public inputs/outputs.">
+    <PropertyCell label="" span={1} hint="Publish all value channels marked as public inputs/outputs." compact>
       <button class="action-btn" type="button" onclick={syncChannels}>Sync</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose a published input to edit.">
@@ -579,7 +579,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected published input.">
+    <PropertyCell label="" span={1} hint="Remove the selected published input." compact>
       <button class="action-btn danger" type="button" onclick={removeInput} disabled={!selectedInput}>Remove</button>
     </PropertyCell>
     {#if selectedInputEntry}
@@ -645,7 +645,7 @@
     <PropertyCell label="Add" span={3} hint="Add a public output by name.">
       <input class="val" type="text" bind:value={newOutputName} placeholder="outputName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create a new published output.">
+    <PropertyCell label="" span={1} hint="Create a new published output." compact>
       <button class="action-btn" type="button" onclick={addOutput}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose a published output to edit.">
@@ -655,7 +655,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected published output.">
+    <PropertyCell label="" span={1} hint="Remove the selected published output." compact>
       <button class="action-btn danger" type="button" onclick={removeOutput} disabled={!selectedOutput}>Remove</button>
     </PropertyCell>
     {#if selectedOutputEntry}
@@ -721,7 +721,7 @@
     <PropertyCell label="Add" span={3} hint="Add a friendly editable property by name.">
       <input class="val" type="text" bind:value={newPropertyName} placeholder="propertyName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create a new editable property.">
+    <PropertyCell label="" span={1} hint="Create a new editable property." compact>
       <button class="action-btn" type="button" onclick={addProperty}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose an editable property to edit.">
@@ -731,7 +731,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected editable property.">
+    <PropertyCell label="" span={1} hint="Remove the selected editable property." compact>
       <button class="action-btn danger" type="button" onclick={removeProperty} disabled={!selectedProperty}>Remove</button>
     </PropertyCell>
     {#if selectedPropertyEntry}

@@ -7,6 +7,8 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
   import { componentListWithElement } from '../utils/componentElements.js';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import ListTree from 'lucide-svelte/icons/list-tree';
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
@@ -32,8 +34,8 @@
 </script>
 
 {#if m}
-  <PropertySection title="Macro">
-    <PropertyCell label="Position" span={2} compact hint="Knob value (0–1). Drag the knob in preview.">
+  <PropertySection title="Macro" icon={SlidersHorizontal}>
+    <PropertyCell label="Position" span={1} compact hint="Knob value (0–1). Drag the knob in preview.">
       <NumberCell label="Pos" value={m.value ?? 0.5} min={0} max={1} step={0.01} defaultValue={0.5} onchange={(v) => set('value', Math.max(0, Math.min(1, num(v, 0.5))))} />
     </PropertyCell>
     <PropertyCell label="Editable" span={1} hint="Turn the knob in preview.">
@@ -61,8 +63,8 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Assignments">
-    <PropertyCell label="" span={4} hint="Each row maps the macro to one bound parameter: depth (−100…+100%), curve, and output range.">
+  <PropertySection title="Assignments" icon={ListTree}>
+    <PropertyCell label="" span={4} hint="Each row maps the macro to one bound parameter: depth (−100…+100%), curve, and output range." compact>
       <div class="slots">
         {#if slots.length === 0}
           <div class="empty">No assignments yet. Add one, then bind its port in Device Bindings.</div>
@@ -71,7 +73,7 @@
           <div class="slot" class:off={s.enabled === false}>
             <div class="srow">
               <input class="val name" type="text" value={s.label ?? ''} placeholder="Destination" onchange={(e) => updateSlot(i, 'label', e.target.value)} />
-              <label class="flag"><input type="checkbox" checked={s.enabled !== false} onchange={(e) => updateSlot(i, 'enabled', e.currentTarget.checked)} /><span>On</span></label>
+              <PropertyToggle compact label="On" value={s.enabled !== false} onchange={(next) => updateSlot(i, 'enabled', next)} ariaLabel={`Slot ${i + 1} enabled`} />
               <button type="button" class="action-btn danger" onclick={() => removeSlot(i)} title="Remove">✕</button>
             </div>
             <div class="srow2">
@@ -112,7 +114,6 @@
   .srow2 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #8a8a8a; }
-  .flag { display: inline-flex; align-items: center; gap: 5px; color: #B9B9B9; font-size: 11px; white-space: nowrap; }
   .empty { border: 1px dashed #3A3A3A; border-radius: 4px; color: #8A8A8A; font-size: 11px; padding: 8px; }
   .action-btn {
     background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD;

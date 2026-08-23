@@ -69,17 +69,17 @@
     <PropertyCell label="Octaves" span={1} compact hint="How far the strip reaches. Wider = more range, narrower = more precision per pixel.">
       <NumberCell label="Oct" value={num(r.octaves, 2)} step={1} min={1} max={5} onchange={(v) => set('octaves', clampInt(v, 1, 5, 2))} />
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="What the strip currently covers.">
+    <PropertyCell label="" span={4} hint="What the strip currently covers." compact>
       <div class="preview">{span}</div>
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Performance" icon={Activity}>
     {#if isGlide}
-      <PropertyCell label="Bend range" span={2} compact hint="Semitones of pitch bend. Must match the synth's own bend range; 2 is the common default.">
+      <PropertyCell label="Bend range" span={1} compact hint="Semitones of pitch bend. Must match the synth's own bend range; 2 is the common default.">
         <NumberCell label="Bend" value={num(r.bendRange, 2)} step={1} min={1} max={48} onchange={(v) => set('bendRange', clampInt(v, 1, 48, 2))} />
       </PropertyCell>
-      <PropertyCell label="" span={2} hint="Bend only reaches ±the range, so past that the note retriggers on a new root.">
+      <PropertyCell label="" span={2} hint="Bend only reaches ±the range, so past that the note retriggers on a new root." compact>
         <div class="note">Retriggers past ±{num(r.bendRange, 2)} semitones</div>
       </PropertyCell>
     {/if}
@@ -105,7 +105,7 @@
       </select>
     </PropertyCell>
     {#if String(r.modAxis ?? 'none') === 'cc'}
-      <PropertyCell label="CC" span={2} compact hint="Which controller that axis sends (1 = mod wheel, 74 = filter cutoff on many synths).">
+      <PropertyCell label="CC" span={1} compact hint="Which controller that axis sends (1 = mod wheel, 74 = filter cutoff on many synths).">
         <NumberCell label="CC" value={num(r.modCc, 1)} step={1} min={0} max={127} onchange={(v) => set('modCc', clampInt(v, 0, 127, 1))} />
       </PropertyCell>
     {/if}
@@ -125,7 +125,7 @@
     <PropertyCell label="Playable" span={1} hint="Allow playing the strip in preview / the player.">
       <PropertyToggle value={r.editable !== false} onchange={() => set('editable', !(r.editable !== false))} />
     </PropertyCell>
-    <PropertyCell label="" span={3} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth.">
+    <PropertyCell label="" span={3} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth." compact>
       <div class="note">Plays MIDI notes · ch {num(r.channel, 1)}{isGlide ? ' · + pitch bend' : ''}{String(r.modAxis ?? 'none') === 'cc' ? ` · + CC${num(r.modCc, 1)}` : ''}</div>
     </PropertyCell>
   </PropertySection>

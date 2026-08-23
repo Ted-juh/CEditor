@@ -11,6 +11,7 @@
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { ensureFillGradientSeeded, openFillGradientEditor } from '../stores/gradientTarget.js';
   import PropertySection from '../properties/PropertySection.svelte';
+  import PropertyCell from '../properties/PropertyCell.svelte';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
   import { deepClone } from '../utils/deepClone.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
@@ -357,6 +358,21 @@
   let gradientPreview = $derived(gradientToCSS(fill?.gradient ?? DEFAULT_FILL_GRADIENT));
 </script>
 
+
+<!--
+  The five layer tools (solo, mute, reset, copy, paste) used to be the first BODY row of every
+  layer section — a full-width row of 18px buttons above the properties they act on. They are a
+  header decision, and PropertySection has a `tools` slot for exactly that, so they sit beside the
+  layer's title now and each layer section is one row shorter.
+-->
+{#snippet layerTools(layerId)}
+  <button class="layer-tool-btn" class:active={isLayerSolo(layerId)} title="Solo layer" onclick={() => toggleLayerSolo(layerId)}>S</button>
+  <button class="layer-tool-btn" class:active={isLayerMuted(layerId)} title="Mute layer" onclick={() => toggleLayerMute(layerId)}>M</button>
+  <button class="layer-tool-btn" title="Reset layer" onclick={() => resetLayer(layerId)}>R</button>
+  <button class="layer-tool-btn" title="Copy layer settings" onclick={() => copyLayer(layerId)}>C</button>
+  <button class="layer-tool-btn" disabled={!canPasteLayer(layerId)} title="Paste layer settings" onclick={() => pasteLayer(layerId)}>P</button>
+{/snippet}
+
 {#if resolvedBackground}
   <div class="bg-editor">
     <PropertySection title={sectionTitle}>
@@ -379,6 +395,7 @@
 
     <PropertySection
       title="Z-Order"
+      icon={Layers}
       collapsed={$sectionCollapse[sectionKey('zorder')] ?? true}
       ontoggle={(v) => setCollapsed(sectionKey('zorder'), v)}
     >
@@ -403,82 +420,63 @@
       {#if layerId === 'solid' && isLayerEnabled('solid')}
         <PropertySection
           title="Solid"
+      icon={PaintBucket}
           collapsed={$sectionCollapse[layerCollapseKey('solid')] ?? false}
           ontoggle={(v) => setCollapsed(layerCollapseKey('solid'), v)}
         >
-          <div class="layer-tools-row">
-            <button class="layer-tool-btn" class:active={isLayerSolo('solid')} title="Solo layer" onclick={() => toggleLayerSolo('solid')}>S</button>
-            <button class="layer-tool-btn" class:active={isLayerMuted('solid')} title="Mute layer" onclick={() => toggleLayerMute('solid')}>M</button>
-            <button class="layer-tool-btn" title="Reset layer" onclick={() => resetLayer('solid')}>R</button>
-            <button class="layer-tool-btn" title="Copy layer settings" onclick={() => copyLayer('solid')}>C</button>
-            <button class="layer-tool-btn" disabled={!canPasteLayer('solid')} title="Paste layer settings" onclick={() => pasteLayer('solid')}>P</button>
-          </div>
-          <div class="prop-row full-span">
-            <span class="lbl">Colour</span>
+          {#snippet tools()}{@render layerTools('solid')}{/snippet}
+          <PropertyCell label="Colour" span={2} hint="The layer colour. The swatch opens it in the display panel; the field takes AARRGGBB or RRGGBB.">
             <div class="color-input">
               <button class="mini-swatch" title="Pick colour" style="background:#{displayColour}" onclick={handleSwatchClick}></button>
               <input class="val" type="text" value={displayColour} onfocus={selectAll} onchange={setColour} />
             </div>
-          </div>
-          <div class="prop-row full-span">
-            <span class="lbl">Blend</span>
+          </PropertyCell>
+          <PropertyCell label="Blend" span={2} hint="How this layer composites with the layers beneath it.">
             <BlendModeSelect value={fill?.solidBlend ?? 'normal'} onchange={(v) => setFillProp('solidBlend', v)} />
-          </div>
-          <div class="prop-row full-span">
-            <span class="lbl">Clipping</span>
+          </PropertyCell>
+          <PropertyCell label="Clipping" span={4} hint="Clip the layer to the component shape, to the inner border, or not at all.">
             <select class="val" value={fill?.solidClipMode ?? 'shape'} onchange={(e) => setFillProp('solidClipMode', e.target.value)}>
               <option value="none">None</option>
               <option value="shape">Shape</option>
               <option value="border-inner">Border Inner</option>
             </select>
-          </div>
+          </PropertyCell>
         </PropertySection>
       {/if}
 
       {#if layerId === 'gradient' && isLayerEnabled('gradient')}
         <PropertySection
           title="Gradient"
+      icon={Blend}
           collapsed={$sectionCollapse[layerCollapseKey('gradient')] ?? false}
           ontoggle={(v) => setCollapsed(layerCollapseKey('gradient'), v)}
         >
-          <div class="layer-tools-row">
-            <button class="layer-tool-btn" class:active={isLayerSolo('gradient')} title="Solo layer" onclick={() => toggleLayerSolo('gradient')}>S</button>
-            <button class="layer-tool-btn" class:active={isLayerMuted('gradient')} title="Mute layer" onclick={() => toggleLayerMute('gradient')}>M</button>
-            <button class="layer-tool-btn" title="Reset layer" onclick={() => resetLayer('gradient')}>R</button>
-            <button class="layer-tool-btn" title="Copy layer settings" onclick={() => copyLayer('gradient')}>C</button>
-            <button class="layer-tool-btn" disabled={!canPasteLayer('gradient')} title="Paste layer settings" onclick={() => pasteLayer('gradient')}>P</button>
-          </div>
-          <div class="prop-row full-span">
-            <span class="lbl">Preview</span>
+          {#snippet tools()}{@render layerTools('gradient')}{/snippet}
+          <PropertyCell label="Preview" span={1} hint="The gradient as it will paint. Click to edit it in the display panel.">
             <button class="bg-swatch" style="background:{gradientPreview}" title="Edit gradient" onclick={openGradientEditor}></button>
-          </div>
-          <div class="prop-row full-span">
-            <span class="lbl">Gradient</span>
+          </PropertyCell>
+          <PropertyCell label="Gradient" span={3} hint="Edit the stops, angle and shape in the display panel.">
             <div class="asset-row">
               <button class="action-btn" onclick={openGradientEditor}>Edit</button>
               <span class="hint-text">Display Panel → Gradient</span>
             </div>
-          </div>
-          <div class="prop-row full-span">
-            <span class="lbl">Name</span>
+          </PropertyCell>
+          <PropertyCell label="Name" span={2} hint="A label for this gradient, for your own reference.">
             <input class="val" type="text" value={fill?.gradientName ?? ''} placeholder="Unnamed" onfocus={selectAll} onchange={(e) => setFillProp('gradientName', e.target.value)} />
-          </div>
-          <div class="prop-row full-span">
-            <span class="lbl">Opacity</span>
+          </PropertyCell>
+          <PropertyCell label="Opacity" span={2} hint="Layer opacity, 0 to 100. Drag the field to scrub it.">
             <PropertyScrub value={fill?.gradientOpacity ?? 100} step={1} min={0} max={100} defaultValue={100} onchange={(v) => setFillProp('gradientOpacity', v)} />
-          </div>
-          <div class="prop-row full-span">
-            <span class="lbl">Blend</span>
+          </PropertyCell>
+          <PropertyCell label="Blend" span={2} hint="How this layer composites with the layers beneath it.">
             <BlendModeSelect value={fill?.gradientBlend ?? 'normal'} onchange={(v) => setFillProp('gradientBlend', v)} />
-          </div>
-          <div class="prop-row full-span">
-            <span class="lbl">Clipping</span>
+          </PropertyCell>
+          <PropertyCell label="Clipping" span={2} hint="Clip the layer to the component shape, to the inner border, or not at all.">
             <select class="val" value={fill?.gradientClipMode ?? 'shape'} onchange={(e) => setFillProp('gradientClipMode', e.target.value)}>
               <option value="none">None</option>
               <option value="shape">Shape</option>
               <option value="border-inner">Border Inner</option>
             </select>
-          </div>
+          </PropertyCell>
         </PropertySection>
       {/if}
 
@@ -539,29 +537,19 @@
     flex-direction: column;
   }
 
-  .bg-editor :global(.property-grid) {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  /* The 4-column grid was cancelled here — `display: flex; flex-direction: column` from inside a
+     section, which is what the 2026-08-14 review meant by the panel having four coexisting row
+     idioms. The rows are PropertyCells now, so the shared grid does the work. The blocks below are
+     the section content that is NOT a cell (the layer picker, the z-order list); each spans the
+     full width explicitly, which is what the flex column was giving them implicitly. */
+  .bg-layer-buttons,
+  .zorder-hint,
+  .zorder-row {
+    grid-column: span 4;
   }
 
-  .full-span {
-    width: 100%;
-  }
 
-  .prop-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 2px 0;
-  }
 
-  .lbl {
-    color: #888;
-    font-size: 11px;
-    min-width: 52px;
-    flex-shrink: 0;
-  }
 
   .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
 
@@ -625,11 +613,6 @@
     font-style: italic;
   }
 
-  .layer-tools-row {
-    display: flex;
-    gap: 4px;
-    padding: 2px 0 4px 0;
-  }
 
   .layer-tool-btn {
     width: 24px;

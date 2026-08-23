@@ -74,16 +74,16 @@
         <NumberCell label="Inv" min={0} max={3} step={1} value={num(cp.inversion, 0)} defaultValue={0} onchange={(v) => set('inversion', clampInt(v, 0, 3, 0))} />
       </PropertyCell>
     {:else}
-      <PropertyCell label="Octaves" span={2} compact hint="How many octaves of scale notes to lay out.">
+      <PropertyCell label="Octaves" span={1} compact hint="How many octaves of scale notes to lay out.">
         <NumberCell label="Oct" min={1} max={3} step={1} value={num(cp.noteSpan, 2)} defaultValue={2} onchange={(v) => set('noteSpan', clampInt(v, 1, 3, 2))} />
       </PropertyCell>
     {/if}
     {#if String(cp.layout ?? 'wheel') === 'grid'}
-      <PropertyCell label="Columns" span={2} compact hint="Grid width.">
+      <PropertyCell label="Columns" span={1} compact hint="Grid width.">
         <NumberCell label="Cols" min={1} max={8} step={1} value={num(cp.gridCols, 4)} defaultValue={4} onchange={(v) => set('gridCols', clampInt(v, 1, 8, 4))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="" span={4} hint="What the pads currently spell.">
+    <PropertyCell label="" span={4} hint="What the pads currently spell." compact>
       <div class="preview">{padPreview}</div>
     </PropertyCell>
   </PropertySection>
@@ -126,7 +126,7 @@
         ]} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="" span={4} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth.">
+    <PropertyCell label="" span={4} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth." compact>
       <div class="note">Plays MIDI notes · ch {num(cp.channel, 1)} · vel {num(cp.velocity, 96)}</div>
     </PropertyCell>
   </PropertySection>

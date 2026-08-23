@@ -415,7 +415,7 @@
 
 {#if !surfaceCount}
   <PropertySection title="Nothing exposed" icon={CircleOff}>
-    <PropertyCell label="" span={4} hint="This component exposes no public inputs, outputs, or editable properties.">
+    <PropertyCell label="" span={4} hint="This component exposes no public inputs, outputs, or editable properties." compact>
       <div class="empty-state">No public controls exposed.</div>
     </PropertyCell>
   </PropertySection>

@@ -161,7 +161,7 @@
     <PropertyCell label="Add" span={3} hint="Create an interaction area independent from visible layers.">
       <input class="val" type="text" bind:value={newName} placeholder="hitZoneName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Add a new hit zone.">
+    <PropertyCell label="" span={1} hint="Add a new hit zone." compact>
       <button class="action-btn" type="button" onclick={addZone}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose which hit zone to edit.">
@@ -172,7 +172,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected hit zone.">
+    <PropertyCell label="" span={1} hint="Remove the selected hit zone." compact>
       <button class="action-btn danger" type="button" onclick={removeZone} disabled={!selectedName}>Remove</button>
     </PropertyCell>
   </PropertySection>

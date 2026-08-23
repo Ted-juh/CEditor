@@ -77,7 +77,7 @@
 
 {#if p}
   <PropertySection title="Recorder" icon={CircleDot}>
-    <PropertyCell label="" span={4} hint="Arming waits for the top of the loop, so the take starts on the loop's downbeat.">
+    <PropertyCell label="" span={4} hint="Arming waits for the top of the loop, so the take starts on the loop's downbeat." compact>
       <div class="transport">
         <button type="button" class="btn rec" class:on={isRecordingState(state) || state === 'armed'}
                 onclick={() => set('state', toggleRecordState(state, !takeIsEmpty(take)))}>
@@ -89,7 +89,7 @@
         <button type="button" class="btn" disabled={!count} onclick={() => { set('take', clearTake()); set('state', 'idle'); }}>Clear</button>
       </div>
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="note">
         <b>{RECORDER_STATE_LABELS[state]}</b> · {count} {count === 1 ? 'note' : 'notes'}{passes > 1 ? ` in ${passes} passes` : ''} · {span}
         {#if count >= MAX_EVENTS}<br />Full — {MAX_EVENTS} notes is the cap.{/if}
@@ -137,7 +137,7 @@
   </PropertySection>
 
   <PropertySection title="Quantise" icon={Magnet}>
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="note">
         Strength pulls the timing toward the grid; full snap removes the feel.
       </div>
@@ -166,13 +166,13 @@
         </select>
       </PropertyCell>
     {/if}
-    <PropertyCell label="" span={4} hint="Rewrites the take. Not live — a live quantise would move notes under the playhead while they sound.">
+    <PropertyCell label="" span={4} hint="Rewrites the take. Not live — a live quantise would move notes under the playhead while they sound." compact>
       <button type="button" class="btn wide" disabled={!count} onclick={applyQuantize}>Apply to the take</button>
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Repair" icon={Wrench}>
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="note">
         Nudge the whole take, or fix a single note.
       </div>
@@ -186,10 +186,10 @@
       </div>
     </PropertyCell>
     {#if count}
-      <PropertyCell label="Note" span={2} compact hint="Which recorded note the fields below edit, in time order.">
+      <PropertyCell label="Note" span={1} compact hint="Which recorded note the fields below edit, in time order.">
         <NumberCell label="Note" min={1} max={count} step={1} value={selIdx + 1} onchange={(v) => { selNote = clampInt(v, 1, count, 1) - 1; }} />
       </PropertyCell>
-      <PropertyCell label="" span={2} hint="">
+      <PropertyCell label="" span={2} hint="" compact>
         <div class="note">{sel ? `${rowLabelFor(sel.note, recorderUseFlats(control))} at ${(sel.t * 100).toFixed(1)}%` : '—'}</div>
       </PropertyCell>
       {#if sel}
@@ -205,7 +205,7 @@
         <PropertyCell label="Length" span={1} compact hint="As a fraction of the loop.">
           <NumberCell label="Len" min={0.1} max={100} step={1} value={Number((sel.dur * 100).toFixed(1))} onchange={(v) => patchNote({ dur: clampNum(v, 0.1, 100, 10) / 100 })} />
         </PropertyCell>
-        <PropertyCell label="" span={4} hint="">
+        <PropertyCell label="" span={4} hint="" compact>
           <button type="button" class="btn" onclick={() => set('take', deleteNote(take, selIdx))}>Delete this note</button>
         </PropertyCell>
       {/if}
@@ -213,12 +213,12 @@
   </PropertySection>
 
   <PropertySection title="Takes" icon={Bookmark}>
-    <PropertyCell label="" span={4} hint="Storing and loading are copies in each direction.">
+    <PropertyCell label="" span={4} hint="Storing and loading are copies in each direction." compact>
       <div class="note">
         {slots.length ? `${slots.length} stored${liveSlot >= 0 ? ` · slot ${liveSlot + 1} was loaded last` : ''}.` : 'No stored takes yet.'}
       </div>
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="slots">
         {#each Array.from({ length: MAX_SLOTS }, (_, i) => i) as i (i)}
           {@const has = slots[i] && slots[i].events.length}
@@ -241,7 +241,7 @@
       ontoggle={(v) => set('chainOn', v)}
       onloop={(v) => set('chainLoop', v)}
     />
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="note">A chain never advances while recording.</div>
     </PropertyCell>
   </PropertySection>

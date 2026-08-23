@@ -57,7 +57,7 @@
         <option value="horizontal">Horizontal</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Value" span={2} compact hint="Current / rest position (0–1).">
+    <PropertyCell label="Value" span={1} compact hint="Current / rest position (0–1).">
       <NumberCell label="Val" min={0} max={1} step={0.01} value={r.value ?? 0.5} defaultValue={0.5} onchange={(v) => set('value', Math.max(0, Math.min(1, v)))} />
     </PropertyCell>
     <PropertyCell label="Bipolar" span={1} hint="Value port emits −1..1 (pitch bend).">
@@ -88,16 +88,16 @@
         <NumberCell label="Spd" min={0} step={0.5} value={r.returnRate ?? 8} defaultValue={8} onchange={(v) => set('returnRate', Math.max(0, v))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Snap" span={2} compact hint="Value snap step (0 = continuous).">
+    <PropertyCell label="Snap" span={1} compact hint="Value snap step (0 = continuous).">
       <NumberCell label="Snap" min={0} max={1} step={0.01} value={r.snap ?? 0} defaultValue={0} onchange={(v) => set('snap', Math.max(0, Math.min(1, v)))} />
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Display" icon={Monitor}>
-    <PropertyCell label="Touch glow" span={2} hint="Glow while held.">
+    <PropertyCell label="Touch glow" span={1} hint="Glow while held.">
       <PropertyToggle value={r.showGlow !== false} onchange={() => set('showGlow', !(r.showGlow !== false))} />
     </PropertyCell>
-    <PropertyCell label="Readout" span={2} hint="Show the numeric value.">
+    <PropertyCell label="Readout" span={1} hint="Show the numeric value.">
       <PropertyToggle value={r.showValue === true} onchange={() => toggle('showValue')} />
     </PropertyCell>
     <PropertyCell label="Label" span={4} hint="Caption under the strip/wheel.">

@@ -208,7 +208,7 @@
     <PropertyCell label="Add" span={3} hint="Create a named value channel for sliders, grids, modes, note selections, scroll offsets, and external links.">
       <input class="val" type="text" bind:value={newName} placeholder="channelName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Add the channel with safe float defaults.">
+    <PropertyCell label="" span={1} hint="Add the channel with safe float defaults." compact>
       <button class="action-btn" type="button" onclick={addChannel}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose which channel to edit.">
@@ -218,7 +218,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected value channel.">
+    <PropertyCell label="" span={1} hint="Remove the selected value channel." compact>
       <button class="action-btn danger" type="button" onclick={removeChannel} disabled={!selectedName}>Remove</button>
     </PropertyCell>
   </PropertySection>
@@ -262,7 +262,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Definition" icon={Pencil}>
+    <PropertySection title="Definition" collapseKey="Channel Definition" icon={Pencil}>
       <PropertyCell label="Label" span={2} hint="Friendly label shown in the designer and public API.">
         <input class="val" type="text" value={selected.label ?? selectedName} onchange={(event) => set('label', event.target.value)} />
       </PropertyCell>

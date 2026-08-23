@@ -85,10 +85,10 @@
       </select>
     </PropertyCell>
     {#if isInput}
-      <PropertyCell label="In channel" span={2} compact hint="Which MIDI channel to take notes from. 0 = omni (any channel).">
+      <PropertyCell label="In channel" span={1} compact hint="Which MIDI channel to take notes from. 0 = omni (any channel).">
         <NumberCell label="Ch" min={0} max={16} step={1} value={num(a.inputChannel, 0)} defaultValue={0} onchange={(v) => set('inputChannel', clampInt(v, 0, 16, 0))} />
       </PropertyCell>
-      <PropertyCell label="" span={2} hint="A hardware output must be selected on the 'mainSynth' device role for the arp's own notes to come back out.">
+      <PropertyCell label="" span={2} hint="A hardware output must be selected on the 'mainSynth' device role for the arp's own notes to come back out." compact>
         <div class="note">Keyboard in → arp out</div>
       </PropertyCell>
     {/if}
@@ -100,7 +100,7 @@
         </select>
       </PropertyCell>
       {#if !chordPads.length}
-        <PropertyCell label="" span={4} hint="Drop a Chord Pad on this panel to link to.">
+        <PropertyCell label="" span={4} hint="Drop a Chord Pad on this panel to link to." compact>
           <div class="note">No Chord Pad on this panel yet.</div>
         </PropertyCell>
       {/if}
@@ -129,13 +129,13 @@
         <NumberCell label="Oct" min={-1} max={8} step={1} value={num(a.baseOctave, 3)} defaultValue={3} onchange={(v) => set('baseOctave', clampInt(v, -1, 8, 3))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="" span={4} hint="The step walk this produces, left to right.">
+    <PropertyCell label="" span={4} hint="The step walk this produces, left to right." compact>
       <div class="preview">{walk || '—'}</div>
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Timing" icon={Clock}>
-    <PropertyCell label="Sync to transport" span={2} hint="Take the step length from the panel's Transport instead of a free rate.">
+    <PropertyCell label="Sync to transport" span={1} hint="Take the step length from the panel's Transport instead of a free rate.">
       <PropertyToggle value={synced} onchange={(v) => set('syncToTransport', v === true)} />
     </PropertyCell>
     {#if synced}
@@ -145,7 +145,7 @@
         </select>
       </PropertyCell>
       {#if !hasTransport}
-        <PropertyCell label="" span={4} hint="">
+        <PropertyCell label="" span={4} hint="" compact>
           <div class="warn">This panel has no Transport, so there is no clock to follow — the Arp will hold at step 1. Add one from the palette.</div>
         </PropertyCell>
       {/if}
@@ -197,7 +197,7 @@
       <PropertyCell label="Rotate" span={1} compact hint="Shift the pattern's starting point.">
         <NumberCell label="Rot" min={0} max={31} step={1} value={num(a.euclidRotate, 0)} defaultValue={0} onchange={(v) => set('euclidRotate', clampInt(v, 0, 31, 0))} />
       </PropertyCell>
-      <PropertyCell label="" span={4} hint="● plays, · rests.">
+      <PropertyCell label="" span={4} hint="● plays, · rests." compact>
         <div class="preview mono">{euclidPreview}</div>
       </PropertyCell>
     {/if}
@@ -205,11 +205,11 @@
       <div class="note">{mutes.length ? mutes.join(', ') : 'none'}</div>
     </PropertyCell>
     {#if mutes.length}
-      <PropertyCell label="" span={2} hint="Clear every hand-mute.">
+      <PropertyCell label="" span={2} hint="Clear every hand-mute." compact>
         <button class="btn" type="button" onclick={() => set('mutes', [])}>Clear mutes</button>
       </PropertyCell>
     {/if}
-    <PropertyCell label="" span={4} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth.">
+    <PropertyCell label="" span={4} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth." compact>
       <div class="note">Plays MIDI notes · ch {num(a.channel, 1)} · vel {num(a.velocity, 96)}</div>
     </PropertyCell>
   </PropertySection>

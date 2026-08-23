@@ -6,6 +6,8 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
+  import Plug from 'lucide-svelte/icons/plug';
+  import Link2 from 'lucide-svelte/icons/link-2';
   import { MIDI_CONTROL_KIND, MIDI_CONTROL_MESSAGES, midiControlBindingFrom, midiControlLabel } from '../utils/midiControlBindings.js';
 
   let { control = null } = $props();
@@ -146,7 +148,7 @@
 {#if multiEdit}
   <div class="placeholder">Device binding editing is single-selection only right now.</div>
 {:else}
-  <PropertySection title="Device Bindings">
+  <PropertySection title="Device Bindings" icon={Plug}>
     <PropertyCell label="Enabled" span={1} hint="Enable semantic device parameter bindings for this component.">
       <PropertyToggle value={deviceBindings?.enabled !== false} onchange={() => setEnabled(!(deviceBindings?.enabled !== false))} />
     </PropertyCell>
@@ -162,7 +164,7 @@
   </PropertySection>
 
   {#if bindings.length > 0}
-    <PropertySection title="Selected Binding">
+    <PropertySection title="Selected Binding" icon={Link2}>
       <PropertyCell label="Binding" span={2} hint="Select which semantic binding to edit.">
         <select class="val" value={selectedIndex} onchange={(e) => selectedIndex = Number(e.target.value)}>
           {#each bindings as binding, index}

@@ -4,6 +4,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import Type from 'lucide-svelte/icons/type';
   import TextEditor from './TextEditor.svelte';
 
   let { control = null } = $props();
@@ -96,7 +97,7 @@
 </script>
 
 {#if behavior && selectedLabelTarget}
-  <PropertySection title="Slider Label">
+  <PropertySection title="Slider Label" icon={Type}>
     <PropertyCell label="Label Part" span={4} hint="Pick the slider-owned label to edit with the full Label/Text editor below.">
       <div class="label-target-grid">
         {#each LABEL_TARGETS as target (target.id)}

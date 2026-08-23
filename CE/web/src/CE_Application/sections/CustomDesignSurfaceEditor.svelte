@@ -25,6 +25,7 @@
   import { setActiveEditorTab } from '../stores/panels.js';
   import EditorRuler from '../editor/EditorRuler.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import PropertyToggle from '../properties/PropertyToggle.svelte';
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
   import {
@@ -3519,10 +3520,7 @@
         <button type="button" class:active={$creatorMode === 'simple'} onclick={() => creatorMode.set('simple')}>Simple</button>
         <button type="button" class:active={$creatorMode === 'advanced'} onclick={() => creatorMode.set('advanced')}>Adv</button>
       </div>
-      <label class="toggle-option">
-        <input type="checkbox" checked={snapEnabled} onchange={(event) => { snapEnabled = event.currentTarget.checked; }} />
-        <span>Snap</span>
-      </label>
+      <PropertyToggle compact label="Snap" value={snapEnabled} onchange={(next) => { snapEnabled = next; }} />
       <label class="snap-size">
         <span>Grid</span>
         <span class="nc-wrap">
@@ -3536,26 +3534,11 @@
           />
         </span>
       </label>
-      <label class="toggle-option" title="Snap to other parts' edges and the artboard (Alt bypasses)">
-        <input type="checkbox" checked={smartSnapEnabled} onchange={(event) => { smartSnapEnabled = event.currentTarget.checked; }} />
-        <span>Smart</span>
-      </label>
-      <label class="toggle-option" title="Show pixel gaps between two selected layers">
-        <input type="checkbox" checked={measureEnabled} onchange={(event) => { measureEnabled = event.currentTarget.checked; }} />
-        <span>Measure</span>
-      </label>
-      <label class="toggle-option">
-        <input type="checkbox" checked={showBounds} onchange={(event) => setPreviewFlag('showBounds', event.currentTarget.checked)} />
-        <span>Bounds</span>
-      </label>
-      <label class="toggle-option" title="Show generated layer names on the canvas">
-        <input type="checkbox" checked={showGeneratedLabels} onchange={(event) => setPreviewFlag('showGeneratedLabels', event.currentTarget.checked)} />
-        <span>Gen Names</span>
-      </label>
-      <label class="toggle-option">
-        <input type="checkbox" checked={showHitZones} onchange={(event) => setPreviewFlag('showHitZones', event.currentTarget.checked)} />
-        <span>Zones</span>
-      </label>
+      <PropertyToggle compact label="Smart" title="Snap to other parts' edges and the artboard (Alt bypasses)" value={smartSnapEnabled} onchange={(next) => { smartSnapEnabled = next; }} />
+      <PropertyToggle compact label="Measure" title="Show pixel gaps between two selected layers" value={measureEnabled} onchange={(next) => { measureEnabled = next; }} />
+      <PropertyToggle compact label="Bounds" value={showBounds} onchange={(next) => { setPreviewFlag('showBounds', next) }} />
+      <PropertyToggle compact label="Gen Names" title="Show generated layer names on the canvas" value={showGeneratedLabels} onchange={(next) => { setPreviewFlag('showGeneratedLabels', next) }} />
+      <PropertyToggle compact label="Zones" value={showHitZones} onchange={(next) => { setPreviewFlag('showHitZones', next) }} />
       <div class="zone-mode-control" aria-label="Zone display mode">
         <button type="button" class:active={zoneDisplayMode === 'selected'} onclick={() => setZoneDisplayMode('selected')} title="Show only the selected hit zone">Sel</button>
         <button type="button" class:active={zoneDisplayMode === 'dim'} onclick={() => setZoneDisplayMode('dim')} title="Show all hit zones dimmed">Dim</button>
@@ -4596,10 +4579,13 @@
                         <option value="trigger">Trigger</option>
                       </select>
                     </label>
-                    <label class="dock-field">
+                    <span class="dock-field">
+
                       <span>Enabled</span>
-                      <input type="checkbox" checked={selectedZone?.enabled !== false} disabled={!selectedZoneEditable} onchange={(event) => setHitZoneProperty('enabled', event.currentTarget.checked)} />
-                    </label>
+
+                      <PropertyToggle compact value={selectedZone?.enabled !== false} disabled={!selectedZoneEditable} onchange={(next) => setHitZoneProperty('enabled', next)} ariaLabel="Enabled" />
+
+                    </span>
                   </div>
                 {/if}
 
@@ -4691,15 +4677,16 @@
                       {/if}
                     </div>
                     {#if activeSelectionKind === 'layer'}
-                      <label class="dock-field" title="Keep this part's authored size and font when instances scale">
+                      <span class="dock-field" title="Keep this part's authored size and font when instances scale">
                         <span>Pin size</span>
-                        <input
-                          type="checkbox"
-                          checked={selectedAuthoredPart?._children?.Layout?.pinned === true}
+                        <PropertyToggle
+                          compact
+                          ariaLabel="Pin size"
+                          value={selectedAuthoredPart?._children?.Layout?.pinned === true}
                           disabled={!selectedPartEditable}
-                          onchange={(event) => setLayerLayoutProperty('pinned', event.currentTarget.checked)}
+                          onchange={(next) => setLayerLayoutProperty('pinned', next)}
                         />
-                      </label>
+                      </span>
                     {/if}
                     {#if activeSelectionKind === 'layer'}
                       <div class="dock-section-subtitle">Rotation Pivot</div>
@@ -4829,10 +4816,13 @@
               {:else if activeSelectionKind === 'hitZone' && selectedZone}
                 <div class="dock-section">
                   <div class="dock-section-title">Zone Display</div>
-                  <label class="dock-field">
+                  <span class="dock-field">
+
                     <span>Visible</span>
-                    <input type="checkbox" checked={selectedZone?.visibleInEditor !== false} disabled={!selectedZoneEditable} onchange={(event) => setHitZoneProperty('visibleInEditor', event.currentTarget.checked)} />
-                  </label>
+
+                    <PropertyToggle compact value={selectedZone?.visibleInEditor !== false} disabled={!selectedZoneEditable} onchange={(next) => setHitZoneProperty('visibleInEditor', next)} ariaLabel="Visible" />
+
+                  </span>
                   <label class="dock-field">
                     <span>Priority</span>
                     <NumberCell value={numberOr(selectedZone?.priority, 0)} defaultValue={0} disabled={!selectedZoneEditable} onchange={(value) => setHitZoneProperty('priority', value)} />
@@ -4868,18 +4858,27 @@
             {:else if inspectorTab === 'states'}
               <div class="dock-section">
                 <div class="dock-section-title">Preview</div>
-                <label class="dock-field">
+                <span class="dock-field">
+
                   <span>Bounds</span>
-                  <input type="checkbox" checked={showBounds} onchange={(event) => setPreviewFlag('showBounds', event.currentTarget.checked)} />
-                </label>
-                <label class="dock-field">
+
+                  <PropertyToggle compact value={showBounds} onchange={(next) => setPreviewFlag('showBounds', next)} ariaLabel="Bounds" />
+
+                </span>
+                <span class="dock-field">
+
                   <span>Gen Names</span>
-                  <input type="checkbox" checked={showGeneratedLabels} onchange={(event) => setPreviewFlag('showGeneratedLabels', event.currentTarget.checked)} />
-                </label>
-                <label class="dock-field">
+
+                  <PropertyToggle compact value={showGeneratedLabels} onchange={(next) => setPreviewFlag('showGeneratedLabels', next)} ariaLabel="Gen Names" />
+
+                </span>
+                <span class="dock-field">
+
                   <span>Zones</span>
-                  <input type="checkbox" checked={showHitZones} onchange={(event) => setPreviewFlag('showHitZones', event.currentTarget.checked)} />
-                </label>
+
+                  <PropertyToggle compact value={showHitZones} onchange={(next) => setPreviewFlag('showHitZones', next)} ariaLabel="Zones" />
+
+                </span>
                 <div class="segmented">
                   <button type="button" class:active={zoneDisplayMode === 'selected'} onclick={() => setZoneDisplayMode('selected')}>Sel</button>
                   <button type="button" class:active={zoneDisplayMode === 'dim'} onclick={() => setZoneDisplayMode('dim')}>Dim</button>
@@ -5068,7 +5067,28 @@
 {/if}
 
 <style>
+  /* --------------------------------------------------------------------------------------
+     Dock field metrics, on this surface's own tokens.
+
+     Step 10 of the 2026-08-14 review asks for these fields to be ported "onto the kit (or at
+     least onto its tokens)". Onto the kit is the wrong target and it is worth writing down why:
+     this editor does not render inside the properties panel. EditorCanvas hosts it as a
+     full-window workspace, so `--pp-field-*` never reaches it, and its darker dock is a
+     deliberately different surface rather than a drifted copy of the panel's. Recolouring it to
+     match would make the design workspace look like the inspector it is not.
+
+     What it did share with the panel was the actual problem: metrics as literals, repeated. They
+     are five values here now, so this dock is internally consistent and has the same density knob
+     the panel gained.
+     -------------------------------------------------------------------------------------- */
   .surface-shell {
+    --dk-field-height: 25px;
+    --dk-field-font: 10px;
+    --dk-field-padding: 0 7px;
+    --dk-field-radius: 4px;
+    --dk-field-bg: #101418;
+    --dk-field-border: #3B4650;
+    --dk-field-fg: #E8EEF5;
     display: grid;
     grid-template-columns: var(--palette-w, 220px) minmax(420px, 1fr) var(--dock-w, clamp(340px, 25vw, 430px));
     grid-template-rows: auto minmax(0, 1fr) auto auto auto;
@@ -5840,9 +5860,6 @@
     color: #FFE6B2;
   }
 
-  .surface-options-strip input[type='checkbox'] {
-    accent-color: #5B9BD5;
-  }
 
   .surface-options-strip .snap-size .nc-wrap {
     width: 52px;
@@ -6283,26 +6300,21 @@
   .dock-field select {
     min-width: 0;
     box-sizing: border-box;
-    border: 1px solid #3B4650;
-    border-radius: 4px;
-    background: #101418;
-    color: #E8EEF5;
+    border: 1px solid var(--dk-field-border, #3B4650);
+    border-radius: var(--dk-field-radius, 4px);
+    background: var(--dk-field-bg, #101418);
+    color: var(--dk-field-fg, #E8EEF5);
     font: inherit;
-    font-size: 10px;
+    font-size: var(--dk-field-font, 10px);
   }
 
-  .dock-field input:not([type='checkbox']):not([type='range']),
+  .dock-field input:not([type='range']),
   .dock-field select {
     width: 100%;
-    height: 25px;
-    padding: 0 7px;
+    height: var(--dk-field-height, 25px);
+    padding: var(--dk-field-padding, 0 7px);
   }
 
-  .dock-field input[type='checkbox'] {
-    width: 16px;
-    height: 16px;
-    accent-color: #5B9BD5;
-  }
 
   .dock-field input[type='range'] {
     width: 100%;
@@ -7755,9 +7767,6 @@
     color: #BFFAF2;
   }
 
-  .surface-options-strip input[type='checkbox'] {
-    accent-color: #14B8A6;
-  }
 
   .surface-viewport {
     position: relative;
@@ -8283,7 +8292,6 @@
     background: #0D1419;
   }
 
-  .dock-field input[type='checkbox'],
   .dock-field input[type='range'] {
     accent-color: #14B8A6;
   }

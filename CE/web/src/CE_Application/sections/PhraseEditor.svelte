@@ -167,7 +167,7 @@
     {/if}
 
     {#if hidden > 0}
-      <PropertyCell label="" span={4} hint="">
+      <PropertyCell label="" span={4} hint="" compact>
         <div class="note">
           {hidden} {hidden === 1 ? 'cell is' : 'cells are'} outside the current grid — kept, not deleted, and back
           if you grow it again.
@@ -187,7 +187,7 @@
         </select>
       </div>
     </PropertyCell>
-    <PropertyCell label="" span={2} hint="">
+    <PropertyCell label="" span={2} hint="" compact>
       <div class="note">{selCell ? 'Editing that cell.' : 'Nothing there — place a note on the grid first.'}</div>
     </PropertyCell>
     {#if selCell}
@@ -208,12 +208,12 @@
       </PropertyCell>
     {/if}
     {#if specialCells.length}
-      <PropertyCell label="" span={4} hint="Every cell doing something other than playing normally, so you can find what you set without hunting the grid.">
+      <PropertyCell label="" span={4} hint="Every cell doing something other than playing normally, so you can find what you set without hunting the grid." compact>
         <div class="preview">{specialCells.join('   ·   ')}</div>
       </PropertyCell>
     {/if}
 
-    <PropertyCell label="" span={4} hint="The notes this pattern currently plays, step by step. A dot is a rest.">
+    <PropertyCell label="" span={4} hint="The notes this pattern currently plays, step by step. A dot is a rest." compact>
       <div class="preview">{walk || '—'}</div>
     </PropertyCell>
   </PropertySection>
@@ -278,13 +278,13 @@
     <PropertyCell label="Row labels" span={1} hint="The degree (or pitch) labels down the left.">
       <PropertyToggle value={p.showGutter !== false} onchange={() => set('showGutter', !(p.showGutter !== false))} />
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="What each row currently means, highest first.">
+    <PropertyCell label="" span={4} hint="What each row currently means, highest first." compact>
       <div class="rowmap">{rowMap.join('   ·   ')}</div>
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Patterns & song" icon={ListMusic}>
-    <PropertyCell label="" span={4} hint="Storing and loading are copies, so editing the grid never rewrites a stored pattern behind your back.">
+    <PropertyCell label="" span={4} hint="Storing and loading are copies, so editing the grid never rewrites a stored pattern behind your back." compact>
       <div class="slots">
         {#each Array.from({ length: MAX_PATTERNS }, (_, i) => i) as i (i)}
           {@const filled = patterns[i] && Object.keys(patterns[i].cells).length}

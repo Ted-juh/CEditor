@@ -108,7 +108,7 @@
     {#snippet tools()}
       <button type="button" class="hdr-btn" title="Add source" onclick={addRow}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Modulation sources — the grid's rows. Each cell is a bindable 'Source → Destination' port.">
+    <PropertyCell label="" span={4} hint="Modulation sources — the grid's rows. Each cell is a bindable 'Source → Destination' port." compact>
       <div class="lst">
         {#each rows as label, i (i)}
           <div class="lrow">
@@ -124,7 +124,7 @@
     {#snippet tools()}
       <button type="button" class="hdr-btn" title="Add destination" onclick={addCol}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Modulation destinations — the grid's columns.">
+    <PropertyCell label="" span={4} hint="Modulation destinations — the grid's columns." compact>
       <div class="lst">
         {#each cols as label, i (i)}
           <div class="lrow">
@@ -137,7 +137,7 @@
   </PropertySection>
 
   <PropertySection title="Amounts" icon={Hash}>
-    <PropertyCell label="" span={4} hint="Set routing amounts numerically (or drag cells in preview).">
+    <PropertyCell label="" span={4} hint="Set routing amounts numerically (or drag cells in preview)." compact>
       <div class="grid" style={`grid-template-columns: 46px repeat(${cols.length}, minmax(0, 1fr));`}>
         <div class="ghdr"></div>
         {#each cols as label, c (`h${c}`)}<div class="ghdr" title={label}>{label}</div>{/each}

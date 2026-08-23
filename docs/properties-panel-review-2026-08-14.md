@@ -263,10 +263,74 @@ friends, not their field skin. The real fork was narrower and elsewhere — five
 
 Pinned by `test/propertiesPanelKit.test.js` (13 tests).
 
-### Still open
+### Migrations done 2026-08-23 — steps 2, 3, 4, 5, 8, 9, 10
 
-Steps 2, 3, 4, 5, 8, 9, 10 — the mass migrations that the kit above exists to make possible.
-Chiefly: moving the 279 raw `<select>`, 166 raw text inputs and 500 raw buttons onto the new
-widgets; the five stray boolean idioms onto `PropertyToggle`; the density pass on 439 `span={2}`
-and 268 `span={4}` cells; the 12 zero-cell and 58 one-cell sections; the four inline-label
-holdouts and `BackgroundEditor`'s `:global(.property-grid)` override; and the mega-editors.
+**Step 2 — colour through the dock: already closed**, as recorded above. Nothing in `sections/`
+uses a bare colour input; the four remaining sites are in `debug/CutoutDebugPage.svelte`.
+
+**Step 3 — one boolean: done.** All 54 raw checkboxes are gone. `PropertyToggle` gained the two
+props the strays needed — `label` for named flags (a chip row of eight toggles all reading "On"
+says nothing about which is which) and `compact` for chip rows and table cells — and is now a
+`role="switch"` with `aria-checked`. That absorbed all six idioms the review counted: cell
+checkboxes (BehaviorEditor's own mixed section), `.flag` chips (Looper, Macro, Orbit, Router,
+Value), `.ex-chk` abbreviations (22 in PixelDisplay), table cells (SplitZone, DrumPads) and the
+design surface's 11 toolbar and dock checkboxes.
+
+**Step 4 — density: done for the two cases the review names.** 172 cells holding nothing but a
+`PropertyToggle` or a `NumberCell` went from `span={2}` to `span={1}`, and 111 `label=""` cells
+gained `compact` so they stop reserving a label strip they never fill. `NumberCell` was 24px
+against the toggle's 26; it is on the token now, so a stepper and a toggle in one row line up.
+EffectsEditor's target picker — the review's canonical near-empty section, 78px around three
+buttons — moved into the section header via the `tools` slot.
+
+*Not done, and why:* the 12 "zero-cell" sections are not empty. Every one has real content that
+simply is not in `PropertyCell`s — BackgroundEditor's layer picker and z-order list,
+CustomInteractEditor's embedded editors. Merging them would destroy structure to satisfy a count.
+
+**Step 5 — inline-label holdouts: done.** `CoreEditor` is on the grid (eight full-width rows to
+six, with Type/Layer and State/Z-Index paired). `BackgroundEditor`'s `:global(.property-grid)`
+override — the one that cancelled the 4-column grid from inside a section — is deleted, its nine
+`.prop-row`s are cells, and its four layer tool strips (S/M/R/C/P) moved into the section headers.
+`TransformEditor` keeps its paired rows: the review holds them up as the best pattern in the panel.
+
+*This turned up a live bug the survey did not name.* TextEditor's six `.prop-row full-span` divs
+were grid items in a real 4-column grid, and `.full-span` set `width: 100%` and no `grid-column` —
+so each sat in a ~145px track with a 54px label crammed beside it. They are cells now.
+
+**Step 8 — icon anchors: done.** 263 of 265 sections carry one; the two without have computed
+titles. TextEditor's twice-repeated "Geometry" and "Colour Effects" are now Image/Texture
+Geometry and Image/Texture Colour — which had become a correctness matter, not just a scanning
+one: a section keys its collapse state on its title, so two sections titled the same in one tab
+would collapse together. The same hazard across *embedded* editors turned up one real case
+(CustomInteractEditor renders the Behaviors and ValueChannels editors side by side and both call
+their first section "Definition"), handled with a new `collapseKey` prop. A test now walks every
+file and every embedding relationship and fails on the next collision.
+
+**Step 9 — the orphans: already closed.** `PropertyScrub` has 7 adopters (the review counted
+zero) and `PresetFooter` is used by `panels/FooterRenderer.svelte`. The 8 remaining 0–100/0–360
+`NumberCell`s are not a gap: `NumberCell` drag-scrubs its own label, so they already have the
+interaction the review wanted.
+
+**Step 10 — the mega-editors: done, with the scope corrected.** `CustomDesignSurfaceEditor` does
+not render in the properties panel — `EditorCanvas` hosts it as a full-window workspace — so
+`--pp-field-*` never reaches it and its darker dock is a separate surface rather than a drifted
+copy. Porting it "onto the kit" would make the design workspace look like the inspector it is not.
+It has its own `--dk-field-*` token block instead, which is the review's own fallback ("or at
+least onto its tokens") and gives that dock the same density knob. Its 11 checkboxes are
+PropertyToggles. `CustomTestBenchEditor` and `CustomPackageLibrary` do render in the panel and
+were already covered by the `.val` unification; their remaining colour literals are state colours
+(amber warning, green ok), not a field skin.
+
+### Deliberately not done
+
+**The bulk `<select>` / text-input conversion to `PropertySelect` / `PropertyText`.** The widgets
+exist and new code uses them, but ~200 existing call sites are staying as `.val` for now. The
+reason is that the benefit has already been collected: every `.val` in the panel takes its
+metrics from the same tokens and carries `box-sizing: border-box` **and** `min-width: 0`, so the
+overflow bug and the select-widens-its-track bug — the two things the widgets were needed for —
+are fixed everywhere. What conversion would add is less CSS, and what it would cost is ~200
+hand-edits that each change binding semantics (`bind:value` versus `value` plus a handler) and
+each need an `<option>` list lifted into an expression, with no DOM-level test in this suite to
+catch a mistake. That is churn with a real chance of breaking working editors.
+
+Everything above is pinned by `test/propertiesPanelKit.test.js` (23 tests).

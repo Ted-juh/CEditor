@@ -6,6 +6,7 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import Shuffle from 'lucide-svelte/icons/shuffle';
   import CustomPublicPropertiesEditor from './CustomPublicPropertiesEditor.svelte';
 
   let { control = null } = $props();
@@ -22,7 +23,7 @@
 </script>
 
 {#if variantNames.length > 1}
-  <PropertySection title="Variant">
+  <PropertySection title="Variant" icon={Shuffle}>
     <PropertyCell label="Active" span={4} hint="Preset look/layout this instance uses. Variants are defined in the Component Designer.">
       <select class="val" value={variants?.active ?? 'default'} onchange={(event) => setActiveVariant(event.target.value)}>
         {#each variantNames as name (name)}
