@@ -182,7 +182,8 @@ This one change removes the worst editing journey in the tool (dial retune = 3 t
 
 ## 6. Phasing
 
-> Superseded by the detailed staged plan in `cc-properties-panel-restructure-stages.md`
+> Superseded by the staged plan that used to be in `cc-properties-panel-restructure-stages.md`
+> — all four of its stages shipped on 2026-07-12 and the document has been retired
 > (per-stage scope, files, acceptance criteria, focus-id remap table, open decisions).
 > The table below remains as the one-glance summary.
 

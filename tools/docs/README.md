@@ -51,9 +51,14 @@ Read in this order; each one is a response to the one before it.
 | # | Document | What it is |
 |---|---|---|
 | 1 | [Creator redesign plan](custom-component-creator-redesign-plan.md) | What was wrong with the creator, the principles constraining the fix, and the phased plan: remove bookkeeping, never remove capability. |
-| 2 | [Properties panel review](cc-properties-panel-review.md) | The diagnosis its predecessor did not touch — the *taxonomy* of the properties panel. Its own phasing sketch (§6) is superseded by 3. |
-| 3 | [Properties panel restructure stages](cc-properties-panel-restructure-stages.md) | The implementation plan for 2: four independently shippable stages. Records all four as shipped on 2026-07-12. |
-| 4 | [Designer workspace review](cc-designer-workspace-review.md) | The other half of the editor — canvas, palette, bars, docks — audited against the code, and the regressions that audit found. |
+| 2 | [Properties panel review](cc-properties-panel-review.md) | The diagnosis its predecessor did not touch — the *taxonomy* of the properties panel. Its own phasing sketch (§6) was superseded by the staged plan, which is now retired too. |
+
+The chain's other two documents are gone. The **restructure stages** plan recorded all four of its
+stages as shipped on 2026-07-12, and its one remaining half — the W0 decomposition — was done on
+2026-08-23. The **designer workspace review** was closed out the same day: its regressions were
+restored, its five bugs fixed or verified, its Tier 0 and Tier 1 lists complete, and the decisions
+it raised and nobody acted on are in [known-issues.md](../../docs/known-issues.md) rather than in a
+document that reads as open. The work is pinned by `CE/web/test/surfaceDecomposition.test.js`.
 
 ## Post-beta bets
 
