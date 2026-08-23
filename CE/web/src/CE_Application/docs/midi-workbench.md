@@ -53,8 +53,8 @@ cohesive surface:
 
 ### Authoring app — concrete GUI gaps
 
-> Re-checked against the tree on 2026-08-23. Items 1, 3, 4, 6 and 7 are still accurate; 2 and 5
-> have changed and are struck through below.
+> Re-checked against the tree on 2026-08-23, item by item. **2, 4 and 5 have changed** and are
+> struck through below; **1, 3, 6 and 7 are still accurate** and are the real remaining list.
 
 1. **No dedicated MIDI connection / port manager** — pickers live only in
    `ParameterBrowserTab`'s toolbar.
@@ -65,8 +65,12 @@ cohesive surface:
    address into a profile).
 3. **No raw MIDI send / test UI** — `compileRawMidiAction` /
    `triggerRawMidiAction` are exposed with no construct-and-send surface.
-4. **Monitor is a peek, not a monitor** — no filters, no CC/NRPN/SysEx decode
-   breakdown, no parameter-annotated stream, no export.
+4. ~~**Monitor is a peek, not a monitor** — no filters, no CC/NRPN/SysEx decode breakdown, no
+   parameter-annotated stream, no export.~~ **Mostly built.** `MidiMonitorTab.svelte` filters by
+   direction, device, type, free-text search and failures-only (`filterMonitorEvents`), and has
+   copy/export. Decode is partial — there is decode wiring, but "parameter-annotated stream", where
+   every row names the parameter it belongs to rather than showing hex, is the part still worth
+   doing, and the inbound parameter index that would name them already exists.
 5. ~~**No preset browser**~~ — **built.** `editor/dpd/DpdPresetsScreen.svelte` browses them, and
    `stores/presetLibrarian.js` backs it with banks, named entries and scan capture.
 6. **No post-handshake identity readout** (manufacturer / product / revision).
