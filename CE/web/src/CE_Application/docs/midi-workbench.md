@@ -53,18 +53,33 @@ cohesive surface:
 
 ### Authoring app — concrete GUI gaps
 
-> Re-checked against the tree on 2026-08-23, item by item. **2, 4 and 5 have changed** and are
-> struck through below; **1, 3, 6 and 7 are still accurate** and are the real remaining list.
+> **Closed 2026-08-23.** All seven are now either built or recorded elsewhere. 2 and 5 had already
+> changed; 4 turned out to be largely built; and **1, 3, 6 and 7 are the new Ports tab**
+> (`components/DeviceWorkbenchTab.svelte`) — port selection, a post-handshake identity readout,
+> raw-MIDI send, and dump capture with decode.
+>
+> They went into ONE surface rather than four, because they are one question: what am I connected
+> to, and what is it saying. Kept out of the Monitor tab on purpose — that answers "what is going
+> past", which you read while doing something else, and burying diagnostics under a scrolling log is
+> exactly wrong at the moment you need them.
+>
+> Each of the four was a store with nothing rendering it. `latestDeviceIdentityReply` is the clearest
+> case: it existed, it was populated, and the app never showed it, so CEditor knew what it was
+> talking to and could not say.
 
-1. **No dedicated MIDI connection / port manager** — pickers live only in
-   `ParameterBrowserTab`'s toolbar.
+1. ~~**No dedicated MIDI connection / port manager**~~ — **built.** Ports tab, bound to the same
+   `selectedMidiDestinationId` / `selectedMidiInputId` the Device tab drives, so the two cannot
+   disagree about where messages are going.
 2. **MIDI Learn** — ~~a disabled "Coming soon" placeholder in `DpdParametersScreen.svelte`~~. The
    placeholder was removed 2026-08-23 rather than left promising something; the feature is still
    unbuilt and is recorded in `docs/known-issues.md`, which also spells out why it is NOT the same
    thing as `MidiLearnChips.svelte` (that binds a CC to a control; this would write a parameter's
    address into a profile).
-3. **No raw MIDI send / test UI** — `compileRawMidiAction` /
-   `triggerRawMidiAction` are exposed with no construct-and-send surface.
+3. ~~**No raw MIDI send / test UI**~~ — **built.** Ports tab. Through `triggerRawMidiAction`, which
+   is the filtered outbound path, so a panel's `interceptMidiOut` sees these too — emitting the
+   bridge event directly would have bypassed every filter, silently and only from this screen.
+   Hex is validated as you type by the engine's own `parseRawMidiHexText`, and Send stays disabled
+   until it parses.
 4. ~~**Monitor is a peek, not a monitor** — no filters, no CC/NRPN/SysEx decode breakdown, no
    parameter-annotated stream, no export.~~ **Mostly built.** `MidiMonitorTab.svelte` filters by
    direction, device, type, free-text search and failures-only (`filterMonitorEvents`), and has
@@ -73,9 +88,11 @@ cohesive surface:
    doing, and the inbound parameter index that would name them already exists.
 5. ~~**No preset browser**~~ — **built.** `editor/dpd/DpdPresetsScreen.svelte` browses them, and
    `stores/presetLibrarian.js` backs it with banks, named entries and scan capture.
-6. **No post-handshake identity readout** (manufacturer / product / revision).
-7. **No incoming bulk-dump capture UI** — send only; parsing is hidden behind
-   the Advanced-screen JSON textarea.
+6. ~~**No post-handshake identity readout**~~ — **built.** Ports tab, from
+   `latestDeviceIdentityReply`, plus MIDI-CI discovery and the profiles it finds.
+7. ~~**No incoming bulk-dump capture UI**~~ — **built.** Ports tab: paste a dump or take the last
+   SysEx that arrived, decode it through `parseProfileDump` (the same decoder the session uses), and
+   read the values back as parameter names rather than hex.
 
 ---
 
