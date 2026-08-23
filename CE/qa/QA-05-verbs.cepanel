@@ -1,0 +1,4284 @@
+{
+  "panelGuid": "0ff29c3e-306b-4088-af99-fcb6ee60eb82",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": true,
+    "exportLv2": true
+  },
+  "name": "QA-05 Component Verbs",
+  "scriptId": "qa_05_verbs",
+  "author": "",
+  "version": "1.0.0",
+  "description": "QA-05 — 23 verb families, 426 verbs",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1600,
+  "height": 6166,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF1C2024",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 20,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "activeNoteIndex": 0,
+    "notes": [
+      {
+        "name": "How to read this sheet",
+        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 426 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
+      }
+    ]
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Arpeggiator_arp_Drive_the_Arpeggiator_pattern_rate_gate_swing_and_the_Euclidean_generator_",
+          "id": "qa_group_0",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 28,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Arpeggiator — arp.*  (Drive the Arpeggiator: pattern, rate, gate, swing and the Euclidean generator.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_0",
+          "id": "qa_cap_0",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 64,
+          "width": 320,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Arp — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_arp",
+          "id": "qa05_arp_component",
+          "controlType": "Arp"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 86
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_1",
+          "id": "qa_cap_1",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 372,
+          "y": 64,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "29 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_arp",
+          "id": "qa05_arp_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 372,
+          "y": 86,
+          "width": 470,
+          "height": 211
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "arp.run[on]                   arp.euclid[on]\narp.pattern(enum)             arp.euclidSteps(int)\narp.rate(num)                 arp.euclidPulses(int)\narp.division(enum)            arp.euclidRotate(int)\narp.sync[on]                  arp.phase(num)\narp.octaves(int)              arp.mute(indexset)\narp.gate(num)                 arp.inputChannel(int)\narp.swing(num)                arp.baseOctave(int)\narp.latch[on]                 arp.source(enum)\narp.key(int)                  arp.link(link)\narp.scale(enum)               arp.editable[on]\narp.degree(int)               arp.showNotes[on]\narp.chordType(enum)           arp.showHeader[on]\narp.velocity(int)             arp.read(read)\narp.channel(int)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Chord_Pad_chordPad_Re_key_re_voice_and_re_channel_the_Chord_Pad_without_touching_the_layout_",
+          "id": "qa_group_1",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 331,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Chord Pad — chordPad.*  (Re-key, re-voice and re-channel the Chord Pad without touching the layout.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_2",
+          "id": "qa_cap_2",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 367,
+          "width": 260,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "ChordPad — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_chordpad",
+          "id": "qa05_chordpad_component",
+          "controlType": "ChordPad"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 389
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_3",
+          "id": "qa_cap_3",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 367,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "21 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_chordpad",
+          "id": "qa05_chordpad_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 389,
+          "width": 470,
+          "height": 159
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "chordPad.mode(enum)           chordPad.layout(enum)\nchordPad.key(int)             chordPad.baseOctave(int)\nchordPad.scale(enum)          chordPad.noteSpan(int)\nchordPad.chordType(enum)      chordPad.gridCols(int)\nchordPad.voicing(enum)        chordPad.echo[on]\nchordPad.inversion(int)       chordPad.echoChannel(int)\nchordPad.octave(int)          chordPad.editable[on]\nchordPad.velocity(int)        chordPad.showPiano[on]\nchordPad.channel(int)         chordPad.showRomans[on]\nchordPad.strum(num)           chordPad.read(read)\nchordPad.latch[on]",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Note_Ribbon_noteRibbon_Re_key_and_re_range_the_Note_Ribbon_scale_span_bend_depth_channel_",
+          "id": "qa_group_2",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 703,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Note Ribbon — noteRibbon.*  (Re-key and re-range the Note Ribbon: scale, span, bend depth, channel.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_4",
+          "id": "qa_cap_4",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 739,
+          "width": 360,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "NoteRibbon — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_noteribbon",
+          "id": "qa05_noteribbon_component",
+          "controlType": "NoteRibbon"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 761
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_5",
+          "id": "qa_cap_5",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 412,
+          "y": 739,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "19 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_noteribbon",
+          "id": "qa05_noteribbon_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 412,
+          "y": 761,
+          "width": 470,
+          "height": 146
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "noteRibbon.mode(enum)         noteRibbon.velocityFrom(enum)\nnoteRibbon.key(int)           noteRibbon.modAxis(enum)\nnoteRibbon.scale(enum)        noteRibbon.modCc(int)\nnoteRibbon.baseNote(int)      noteRibbon.echo[on]\nnoteRibbon.octaves(int)       noteRibbon.echoChannel(int)\nnoteRibbon.bendRange(num)     noteRibbon.editable[on]\nnoteRibbon.velocity(int)      noteRibbon.showNames[on]\nnoteRibbon.channel(int)       noteRibbon.showHeader[on]\nnoteRibbon.latch[on]          noteRibbon.read(read)\nnoteRibbon.orientation(enum)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Drum_Pads_drumPads_Re_map_the_Drum_Pads_the_grid_the_kit_and_each_pad_s_own_note_name_and_choke_group_",
+          "id": "qa_group_3",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 941,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Drum Pads — drumPads.*  (Re-map the Drum Pads — the grid, the kit, and each pad's own note, name and choke group.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_6",
+          "id": "qa_cap_6",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 977,
+          "width": 260,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "DrumPads — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_drumpads",
+          "id": "qa05_drumpads_component",
+          "controlType": "DrumPads"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 999
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_7",
+          "id": "qa_cap_7",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 977,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "37 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_drumpads",
+          "id": "qa05_drumpads_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 999,
+          "width": 470,
+          "height": 263
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "drumPads.map(enum)            drumPads.rollHz(num)\ndrumPads.baseNote(int)        drumPads.rollDelay(num)\ndrumPads.mode(enum)           drumPads.rollVelocity(num)\ndrumPads.gate(num)            drumPads.zones[on]\ndrumPads.velocity(int)        drumPads.cornerSize(num)\ndrumPads.channel(int)         drumPads.cornerTopLeft(enum)\ndrumPads.rows(int)            drumPads.cornerTopRight(enum)\ndrumPads.cols(int)            drumPads.cornerBottomLeft(enum)\ndrumPads.origin(enum)         drumPads.cornerBottomRight(enum)\ndrumPads.velocityFrom(enum)   drumPads.flamMs(num)\ndrumPads.echo[on]             drumPads.ghostVelocity(num)\ndrumPads.echoChannel(int)     drumPads.editable[on]\ndrumPads.note(item)           drumPads.showNotes[on]\ndrumPads.label(item)          drumPads.showLabels[on]\ndrumPads.choke(item)          drumPads.showHeader[on]\ndrumPads.colour(item)         drumPads.read(read)\ndrumPads.roll(item)           drumPads.size(size)\ndrumPads.rollRate(enum)       drumPads.fill(fill)\ndrumPads.rollSync[on]",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Turing_Machine_turing_Drive_the_Turing_Machine_run_rate_length_randomness_and_individual_steps_",
+          "id": "qa_group_4",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1313,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Turing Machine — turing.*  (Drive the Turing Machine: run, rate, length, randomness, and individual steps.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_8",
+          "id": "qa_cap_8",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1349,
+          "width": 260,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Turing — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_turing",
+          "id": "qa05_turing_component",
+          "controlType": "Turing"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1371
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_9",
+          "id": "qa_cap_9",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 1349,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "16 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_turing",
+          "id": "qa05_turing_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 1371,
+          "width": 470,
+          "height": 120
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "turing.run[on]                turing.step(cell)\nturing.rate(num)              turing.phase(num)\nturing.division(enum)         turing.editable[on]\nturing.sync[on]               turing.showGate[on]\nturing.length(int)            turing.showDivisions[on]\nturing.randomness(num)        turing.read(read)\nturing.quantize(int)          turing.size(size)\nturing.gate(num)              turing.fill(fill)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Looper_looper_Drive_the_Looper_run_loop_length_sync_and_per_lane_enable_",
+          "id": "qa_group_5",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1525,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Looper — looper.*  (Drive the Looper: run, loop length, sync, and per-lane enable.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_10",
+          "id": "qa_cap_10",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1561,
+          "width": 300,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Looper — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_looper",
+          "id": "qa05_looper_component",
+          "controlType": "Looper"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1583
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_11",
+          "id": "qa_cap_11",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 352,
+          "y": 1561,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "17 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_looper",
+          "id": "qa05_looper_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 352,
+          "y": 1583,
+          "width": 470,
+          "height": 133
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "looper.run[on]                looper.showPlayhead[on]\nlooper.seconds(num)           looper.showGrid[on]\nlooper.bars(int)              looper.showDivisions[on]\nlooper.sync[on]               looper.read(read)\nlooper.quantize[on]           looper.size(size)\nlooper.lane(item)             looper.fill(fill)\nlooper.laneRest(item)         looper.insert(insert)\nlooper.phase(num)             looper.remove(remove)\nlooper.editable[on]",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Orbit_orbit_Drive_the_Orbit_run_rate_phase_and_each_node_s_radius_angle_and_depth_",
+          "id": "qa_group_6",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1767,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Orbit — orbit.*  (Drive the Orbit: run, rate, phase, and each node's radius, angle and depth.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_12",
+          "id": "qa_cap_12",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1803,
+          "width": 200,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Orbit — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_orbit",
+          "id": "qa05_orbit_component",
+          "controlType": "Orbit"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1825
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_13",
+          "id": "qa_cap_13",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 252,
+          "y": 1803,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "20 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_orbit",
+          "id": "qa05_orbit_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 252,
+          "y": 1825,
+          "width": 470,
+          "height": 146
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "orbit.run[on]                 orbit.editable[on]\norbit.rate(num)               orbit.showTrails[on]\norbit.bars(int)               orbit.showSpokes[on]\norbit.sync[on]                orbit.showRings[on]\norbit.phase(num)              orbit.showValues[on]\norbit.node(item)              orbit.read(read)\norbit.nodeRadius(item)        orbit.size(size)\norbit.nodeAngle(item)         orbit.fill(fill)\norbit.nodeRatio(item)         orbit.insert(insert)\norbit.nodeDepth(item)         orbit.remove(remove)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Kinetic_kinetic_Drive_the_Kinetic_field_run_gravity_bounce_friction_and_launch_the_ball_",
+          "id": "qa_group_7",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2059,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Kinetic — kinetic.*  (Drive the Kinetic field: run, gravity, bounce, friction — and launch the ball.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_14",
+          "id": "qa_cap_14",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2095,
+          "width": 180,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Kinetic — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_kinetic",
+          "id": "qa05_kinetic_component",
+          "controlType": "Kinetic"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2117
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_15",
+          "id": "qa_cap_15",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 232,
+          "y": 2095,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "12 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_kinetic",
+          "id": "qa05_kinetic_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 232,
+          "y": 2117,
+          "width": 470,
+          "height": 94
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "kinetic.run[on]               kinetic.launch(xy)\nkinetic.sync[on]              kinetic.velocity(xy)\nkinetic.gravity(num)          kinetic.editable[on]\nkinetic.bounce(num)           kinetic.showTrail[on]\nkinetic.friction(num)         kinetic.showWalls[on]\nkinetic.keepAlive(num)        kinetic.read(read)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Constellation_constellation_Move_the_Constellation_probe_change_how_it_blends_and_let_it_wander_",
+          "id": "qa_group_8",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2331,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Constellation — constellation.*  (Move the Constellation probe, change how it blends, and let it wander.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_16",
+          "id": "qa_cap_16",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2367,
+          "width": 260,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Constellation — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_constellation",
+          "id": "qa05_constellation_component",
+          "controlType": "Constellation"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2389
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_17",
+          "id": "qa_cap_17",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 2367,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "13 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_constellation",
+          "id": "qa05_constellation_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 2389,
+          "width": 470,
+          "height": 107
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "constellation.probe(xy)       constellation.links(int)\nconstellation.mode(enum)      constellation.editable[on]\nconstellation.blend(num)      constellation.showLinks[on]\nconstellation.run[on]         constellation.showField[on]\nconstellation.rate(num)       constellation.showLabels[on]\nconstellation.sync[on]        constellation.read(read)\nconstellation.bars(int)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Timbre_Pad_timbre_Move_the_Timbre_puck_and_change_how_sharply_it_favours_the_nearest_anchor_",
+          "id": "qa_group_9",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2643,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Timbre Pad — timbre.*  (Move the Timbre puck and change how sharply it favours the nearest anchor.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_18",
+          "id": "qa_cap_18",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2679,
+          "width": 220,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Timbre — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_timbre",
+          "id": "qa05_timbre_component",
+          "controlType": "Timbre"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2701
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_19",
+          "id": "qa_cap_19",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 272,
+          "y": 2679,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "15 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_timbre",
+          "id": "qa05_timbre_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 272,
+          "y": 2701,
+          "width": 470,
+          "height": 120
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "timbre.move(xy)               timbre.showAnchors[on]\ntimbre.power(num)             timbre.showReadout[on]\ntimbre.anchorX(item)          timbre.read(read)\ntimbre.anchorY(item)          timbre.size(size)\ntimbre.axisX(str)             timbre.fill(fill)\ntimbre.axisY(str)             timbre.insert(insert)\ntimbre.editable[on]           timbre.remove(remove)\ntimbre.showField[on]",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Router_router_Re_point_the_Router_source_CC_channel_deadzone_and_each_destination_s_depth_",
+          "id": "qa_group_10",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2955,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Router — router.*  (Re-point the Router: source, CC, channel, deadzone, and each destination's depth.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_20",
+          "id": "qa_cap_20",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2991,
+          "width": 320,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Router — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_router",
+          "id": "qa05_router_component",
+          "controlType": "Router"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3013
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_21",
+          "id": "qa_cap_21",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 372,
+          "y": 2991,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "21 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_router",
+          "id": "qa05_router_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 372,
+          "y": 3013,
+          "width": 470,
+          "height": 159
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "router.source(enum)           router.curveShape(item)\nrouter.cc(int)                router.sourceControl(link)\nrouter.channel(int)           router.editable[on]\nrouter.poly(enum)             router.showGrid[on]\nrouter.invert[on]             router.showDivisions[on]\nrouter.deadzone(num)          router.read(read)\nrouter.input(num)             router.size(size)\nrouter.dest(item)             router.fill(fill)\nrouter.destDepth(item)        router.insert(insert)\nrouter.curveX(item)           router.remove(remove)\nrouter.curveY(item)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Macro_macro_Turn_the_Macro_and_re_weight_what_it_drives_",
+          "id": "qa_group_11",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3237,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Macro — macro.*  (Turn the Macro, and re-weight what it drives.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_22",
+          "id": "qa_cap_22",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3273,
+          "width": 320,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Macro — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_macro",
+          "id": "qa05_macro_component",
+          "controlType": "Macro"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3295
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_23",
+          "id": "qa_cap_23",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 372,
+          "y": 3273,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "16 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_macro",
+          "id": "qa05_macro_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 372,
+          "y": 3295,
+          "width": 470,
+          "height": 120
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "macro.value(num)              macro.showLanes[on]\nmacro.slot(item)              macro.showValues[on]\nmacro.slotDepth(item)         macro.showDivisions[on]\nmacro.slotCurve(item)         macro.read(read)\nmacro.slotMin(item)           macro.size(size)\nmacro.slotMax(item)           macro.fill(fill)\nmacro.label(str)              macro.insert(insert)\nmacro.editable[on]            macro.remove(remove)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Mod_Matrix_matrix_Patch_the_modulation_matrix_from_a_script_one_cell_at_a_time_or_clear_the_lot_",
+          "id": "qa_group_12",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3479,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Mod Matrix — matrix.*  (Patch the modulation matrix from a script: one cell at a time, or clear the lot.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_24",
+          "id": "qa_cap_24",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3515,
+          "width": 260,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Matrix — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_matrix",
+          "id": "qa05_matrix_component",
+          "controlType": "Matrix"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3537
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_25",
+          "id": "qa_cap_25",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 3515,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "11 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_matrix",
+          "id": "qa05_matrix_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 3537,
+          "width": 470,
+          "height": 94
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "matrix.cell(cell)             matrix.showLabels[on]\nmatrix.clear(cell)            matrix.showValues[on]\nmatrix.bipolar[on]            matrix.read(read)\nmatrix.step(int)              matrix.size(size)\nmatrix.cellStyle(enum)        matrix.fill(fill)\nmatrix.editable[on]",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Constraint_constraint_Move_one_member_of_a_Constraint_group_the_others_rebalance_around_it_",
+          "id": "qa_group_13",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3741,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Constraint — constraint.*  (Move one member of a Constraint group — the others rebalance around it.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_26",
+          "id": "qa_cap_26",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3777,
+          "width": 200,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Constraint — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_constraint",
+          "id": "qa05_constraint_component",
+          "controlType": "Constraint"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3799
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_27",
+          "id": "qa_cap_27",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 252,
+          "y": 3777,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "11 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_constraint",
+          "id": "qa05_constraint_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 252,
+          "y": 3799,
+          "width": 470,
+          "height": 94
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "constraint.mode(enum)         constraint.read(read)\nconstraint.gap(num)           constraint.size(size)\nconstraint.member(item)       constraint.fill(fill)\nconstraint.editable[on]       constraint.insert(insert)\nconstraint.showValues[on]     constraint.remove(remove)\nconstraint.showBadge[on]",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Envelope_envelope_Reshape_an_Envelope_a_preset_a_single_breakpoint_the_sustain_point_the_loop_",
+          "id": "qa_group_14",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3973,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Envelope — envelope.*  (Reshape an Envelope: a preset, a single breakpoint, the sustain point, the loop.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_28",
+          "id": "qa_cap_28",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4009,
+          "width": 280,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Envelope — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_envelope",
+          "id": "qa05_envelope_component",
+          "controlType": "Envelope"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4031
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_29",
+          "id": "qa_cap_29",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 332,
+          "y": 4009,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "23 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_envelope",
+          "id": "qa05_envelope_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 332,
+          "y": 4031,
+          "width": 470,
+          "height": 172
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "envelope.preset(enum)         envelope.snapY(num)\nenvelope.pointX(item)         envelope.fillUnder[on]\nenvelope.pointY(item)         envelope.phaseSource(link)\nenvelope.pointCurve(item)     envelope.editable[on]\nenvelope.sustain(int)         envelope.showPlayhead[on]\nenvelope.loop[on]             envelope.showGrid[on]\nenvelope.loopStart(int)       envelope.read(read)\nenvelope.loopEnd(int)         envelope.size(size)\nenvelope.timeMax(num)         envelope.fill(fill)\nenvelope.phase(num)           envelope.insert(insert)\nenvelope.addOnDoubleClick[on] envelope.remove(remove)\nenvelope.snapX(num)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Ribbon_ribbon_Drive_a_Ribbon_and_change_what_it_does_when_you_let_go_",
+          "id": "qa_group_15",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4237,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Ribbon — ribbon.*  (Drive a Ribbon, and change what it does when you let go.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_30",
+          "id": "qa_cap_30",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4273,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Ribbon — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_ribbon",
+          "id": "qa05_ribbon_component",
+          "controlType": "Ribbon"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4295
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_31",
+          "id": "qa_cap_31",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 184,
+          "y": 4273,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "14 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_ribbon",
+          "id": "qa05_ribbon_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 184,
+          "y": 4295,
+          "width": 470,
+          "height": 107
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "ribbon.value(num)             ribbon.style(enum)\nribbon.bipolar[on]            ribbon.label(str)\nribbon.returnMode(enum)       ribbon.valuePrecision(int)\nribbon.returnValue(num)       ribbon.editable[on]\nribbon.returnRate(num)        ribbon.showGlow[on]\nribbon.snap(num)              ribbon.showValue[on]\nribbon.orientation(enum)      ribbon.read(read)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Crossfader_crossfader_Drive_a_Crossfader_and_change_its_law_",
+          "id": "qa_group_16",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4479,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Crossfader — crossfader.*  (Drive a Crossfader and change its law.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_32",
+          "id": "qa_cap_32",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4515,
+          "width": 200,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Crossfader — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_crossfader",
+          "id": "qa05_crossfader_component",
+          "controlType": "Crossfader"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4537
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_33",
+          "id": "qa_cap_33",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 252,
+          "y": 4515,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "13 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_crossfader",
+          "id": "qa05_crossfader_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 252,
+          "y": 4537,
+          "width": 470,
+          "height": 107
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "crossfader.mix(num)           crossfader.labelA(str)\ncrossfader.law(enum)          crossfader.labelB(str)\ncrossfader.bipolar[on]        crossfader.editable[on]\ncrossfader.detent(num)        crossfader.showLabels[on]\ncrossfader.returnToCenter[on] crossfader.showGains[on]\ncrossfader.returnRate(num)    crossfader.read(read)\ncrossfader.orientation(enum)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Vector_Joystick_joystick_Move_a_Vector_Joystick_puck_and_change_what_it_does_when_released_",
+          "id": "qa_group_17",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4678,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Vector Joystick — joystick.*  (Move a Vector Joystick puck, and change what it does when released.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_34",
+          "id": "qa_cap_34",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4714,
+          "width": 160,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "VectorJoystick — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_joystick",
+          "id": "qa05_joystick_component",
+          "controlType": "VectorJoystick"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4736
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_35",
+          "id": "qa_cap_35",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 212,
+          "y": 4714,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "14 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_joystick",
+          "id": "qa05_joystick_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 212,
+          "y": 4736,
+          "width": 470,
+          "height": 107
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "joystick.move(xy)             joystick.showGrid[on]\njoystick.bipolar[on]          joystick.showCrosshair[on]\njoystick.returnToCenter[on]   joystick.showCorners[on]\njoystick.returnAxes(enum)     joystick.showTrail[on]\njoystick.returnRate(num)      joystick.read(read)\njoystick.cornerLabel(line)    joystick.size(size)\njoystick.editable[on]         joystick.fill(fill)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Meter_meter_Drive_a_Meter_from_a_script_a_level_a_panel_computes_itself_has_nowhere_else_to_go_",
+          "id": "qa_group_18",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4930,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Meter — meter.*  (Drive a Meter from a script — a level a panel computes itself has nowhere else to go.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_36",
+          "id": "qa_cap_36",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4966,
+          "width": 220,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Meter — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_meter",
+          "id": "qa05_meter_component",
+          "controlType": "Meter"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4988
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_37",
+          "id": "qa_cap_37",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 272,
+          "y": 4966,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "25 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_meter",
+          "id": "qa05_meter_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 272,
+          "y": 4988,
+          "width": 470,
+          "height": 185
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "meter.value(num)              meter.valuePrefix(str)\nmeter.scale(enum)             meter.valueSuffix(str)\nmeter.peakHold[on]            meter.zoneAt(item)\nmeter.holdMs(num)             meter.source(link)\nmeter.decay(num)              meter.showTicks[on]\nmeter.valueMin(num)           meter.showScaleLabels[on]\nmeter.valueMax(num)           meter.showValue[on]\nmeter.dbFloor(num)            meter.read(read)\nmeter.dbCeil(num)             meter.size(size)\nmeter.orientation(enum)       meter.fill(fill)\nmeter.gradient[on]            meter.insert(insert)\nmeter.label(str)              meter.remove(remove)\nmeter.valuePrecision(int)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Transport_transport_Set_the_panel_Transport_tempo_swing_time_signature_loop_Reading_it_is_ce_time_",
+          "id": "qa_group_19",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5207,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Transport — transport.*  (Set the panel Transport: tempo, swing, time signature, loop. Reading it is ce.time.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_38",
+          "id": "qa_cap_38",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5243,
+          "width": 230,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Transport — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_transport",
+          "id": "qa05_transport_component",
+          "controlType": "Transport"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5265
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_39",
+          "id": "qa_cap_39",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 282,
+          "y": 5243,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "16 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_transport",
+          "id": "qa05_transport_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 282,
+          "y": 5265,
+          "width": 470,
+          "height": 120
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "transport.bpm(num)            transport.countIn(int)\ntransport.swing(num)          transport.clockOut[on]\ntransport.source(enum)        transport.clockDevice(str)\ntransport.beatsPerBar(int)    transport.runOnLoad[on]\ntransport.beatUnit(int)       transport.editable[on]\ntransport.loop[on]            transport.showPosition[on]\ntransport.loopStart(int)      transport.showTap[on]\ntransport.loopBars(int)       transport.read(read)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Panic_panicSet_Configure_what_a_Panic_button_sends_Sending_it_is_the_global_panic_",
+          "id": "qa_group_20",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5419,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Panic — panicSet.*  (Configure what a Panic button sends. Sending it is the global panic().)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_40",
+          "id": "qa_cap_40",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5455,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Panic — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_panic",
+          "id": "qa05_panic_component",
+          "controlType": "Panic"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5477
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_41",
+          "id": "qa_cap_41",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 184,
+          "y": 5455,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "9 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_panic",
+          "id": "qa05_panic_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 184,
+          "y": 5477,
+          "width": 470,
+          "height": 81
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "panicSet.scope(enum)          panicSet.label(str)\npanicSet.channel(int)         panicSet.editable[on]\npanicSet.resetControllers[on] panicSet.showSummary[on]\npanicSet.centreBend[on]       panicSet.read(read)\npanicSet.clearLocal[on]",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_LCD_Display_lcd_Write_to_a_character_LCD_a_line_at_a_time_plus_backlight_brightness_and_scrolling_",
+          "id": "qa_group_21",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5592,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "LCD Display — lcd.*  (Write to a character LCD: a line at a time, plus backlight, brightness and scrolling.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_42",
+          "id": "qa_cap_42",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5628,
+          "width": 260,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "LcdDisplay — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_lcd",
+          "id": "qa05_lcd_component",
+          "controlType": "LcdDisplay"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5650
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_43",
+          "id": "qa_cap_43",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 5628,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "35 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_lcd",
+          "id": "qa05_lcd_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 5650,
+          "width": 470,
+          "height": 250
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "lcd.text(line)                lcd.blinkRate(num)\nlcd.clear(line)               lcd.cursorBlink[on]\nlcd.backlight[on]             lcd.valueMin(num)\nlcd.brightness(num)           lcd.valueMax(num)\nlcd.contrast(num)             lcd.valuePrecision(int)\nlcd.scroll(enum)              lcd.valuePrefix(str)\nlcd.scrollSpeed(num)          lcd.valueSuffix(str)\nlcd.blink[on]                 lcd.valueSource(link)\nlcd.cursor(enum)              lcd.brightnessSource(link)\nlcd.cursorAt(xy)              lcd.backlightSource(link)\nlcd.value(num)                lcd.showGlass[on]\nlcd.anim(enum)                lcd.showGhost[on]\nlcd.animPreset(str)           lcd.showScanlines[on]\nlcd.animSpeed(num)            lcd.showGrid[on]\nlcd.animFps(num)              lcd.read(read)\nlcd.animLoop[on]              lcd.size(size)\nlcd.scrollMode(enum)          lcd.fill(fill)\nlcd.scrollRepeat(int)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Pixel_Display_pixel_Drive_a_pixel_display_s_screen_state_backlight_brightness_and_its_animation_",
+          "id": "qa_group_22",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5934,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Pixel Display — pixel.*  (Drive a pixel display's screen state: backlight, brightness, and its animation.)",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_44",
+          "id": "qa_cap_44",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5970,
+          "width": 260,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "PixelDisplay — the component these drive",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa05_pixel",
+          "id": "qa05_pixel_component",
+          "controlType": "PixelDisplay"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5992
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_45",
+          "id": "qa_cap_45",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 5970,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "19 verbs",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "verbs_pixel",
+          "id": "qa05_pixel_verbs",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 5992,
+          "width": 470,
+          "height": 146
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "pixel.backlight[on]           pixel.layoutTransition(enum)\npixel.brightness(num)         pixel.transitionMs(num)\npixel.contrast(num)           pixel.brightnessSource(link)\npixel.gamma(num)              pixel.backlightSource(link)\npixel.glow(num)               pixel.showGlass[on]\npixel.anim(enum)              pixel.showGhost[on]\npixel.animPreset(str)         pixel.showScanlines[on]\npixel.animSpeed(num)          pixel.showGrid[on]\npixel.animLoop[on]            pixel.read(read)\npixel.animFps(num)",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 6
+        }
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ]
+}

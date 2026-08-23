@@ -92,3 +92,29 @@ the select-widens-its-own-track bug, the two things the widgets were needed for,
 they live. Conversion would buy less CSS and cost ~200 hand-edits that each change binding
 semantics and each need an `<option>` list lifted into an expression, with no DOM-level test in the
 suite to catch a slip.
+
+---
+
+## Thirty-five component types cannot be automated from a host
+
+Found while building QA-08. `deriveExportParameters` reads a control's `Behavior` section to decide
+what parameter it contributes to the exported plugin. Thirty-five of the fifty component types have
+no `Behavior` section at all, so the deriver never looks at them and they export nothing.
+
+For most of the thirty-five that is right — a `Container` is not a parameter. For these it is at
+best a question, because they are things a user would expect to reach from a DAW:
+
+`Crossfader` · `Ribbon` · `VectorJoystick` · `Meter` · `Macro` · `Envelope` · `Matrix` · `Numpad`
+
+`Numpad` is the sharpest case: it carries a `Value` section, so it stores a value, and still
+exports nothing.
+
+Not fixed here, because the fix is not a bug fix. Giving one of these a `Behavior` is deciding what
+its automatable value *is* — a joystick has two, a matrix has a grid of them, a meter is arguably an
+output and not a parameter at all — and each answer changes the exported plugin's interface. That
+is a design call.
+
+The live record is **QA-08**, whose third group is this list, computed from the model rather than
+copied here: open `CE/qa/QA-08-export.cepanel` and it will be current even if this paragraph is not.
+What makes it worth writing down at all is that nothing else shows it. The editor automates all of
+these perfectly; the gap only appears in a host, after export, on somebody else's machine.

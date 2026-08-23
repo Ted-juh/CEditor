@@ -4,10 +4,21 @@
 // checklist grows faster than anyone updates it. That only works if the sheets cannot fall behind
 // the model, which is what this file enforces. Three jobs, in order of how much time they save:
 //
-//   1. COVERAGE RATCHET. Every component type must appear on QA-01; every model section must be
-//      driven by QA-02 or exempted with a written reason. Add either without doing so and this
-//      fails. The same shape as componentCoverage.test.js, for the same reason — a gap has no
-//      symptom, so the gap itself has to be the thing that fails.
+//   1. COVERAGE RATCHET. One per sheet, each reading its list from the model rather than from a
+//      copy of it, so none of them can be satisfied by editing this file:
+//
+//        QA-01  every component type appears, exactly once, filed under a titled group
+//        QA-02  every model section is driven by a recipe or exempted with a written reason
+//        QA-03  every type carrying a States section appears in every state the model resolves
+//        QA-04  every script language × every panel-API event
+//        QA-05  every verb family resolves to a component — an orphaned family fails here
+//        QA-07  every custom-component starter appears, and still validates as a package
+//        QA-08  every component type carries an export verdict, with a reason when it exports
+//               nothing, and every derivation recipe still exercises its branch
+//
+//      Add a component, a section, a state, an event, a verb family or a starter without the sheet
+//      following, and this fails. The same shape as componentCoverage.test.js, for the same reason
+//      — a gap has no symptom, so the gap itself has to be the thing that fails.
 //
 //   2. HEADLESS RENDER. Every control on every sheet is server-rendered through CanvasControl and
 //      asserted to draw something. This catches the failure the sheets were built to catch —
@@ -36,7 +47,21 @@ import { expandControl } from '../src/CE_Application/stores/documentShape.js';
 import { SHEETS, serializeSheet } from '../../../tools/scripts/qa/make-qa-panels.mjs';
 import { coveredTypes, GROUPS } from '../../../tools/scripts/qa/sheets/components.mjs';
 import { coveredSections, EXEMPT, RECIPES } from '../../../tools/scripts/qa/sheets/properties.mjs';
+import { STATE_NAMES, statefulTypes } from '../../../tools/scripts/qa/sheets/states.mjs';
+import { allScripts, EVENTS, LANGUAGES } from '../../../tools/scripts/qa/sheets/scripting.mjs';
+import { componentForSection, familyComponentMap } from '../../../tools/scripts/qa/sheets/verbs.mjs';
 import { gaiaProfile } from '../../../tools/scripts/qa/sheets/gaia.mjs';
+import { STARTER_IDS, buildStarterControl } from '../../../tools/scripts/qa/sheets/packages.mjs';
+import {
+  classifyAllTypes,
+  parametersFor,
+  RECIPES as EXPORT_RECIPES,
+} from '../../../tools/scripts/qa/sheets/export.mjs';
+import { COMPONENT_FAMILIES } from '../src/CE_Application/scripting/componentVerbs.js';
+import { ALL_EVENTS } from '../src/CE_Application/scripting/panelApi.js';
+import { SCRIPT_LANGUAGES } from '../src/CE_Application/scripting/scriptModel.js';
+import { CUSTOM_COMPONENT_STARTERS } from '../src/CE_Application/utils/customComponentFactory.js';
+import { analyzeCustomComponentReadiness } from '../src/CE_Application/utils/customComponentPackage.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const QA_DIR = path.join(REPO, 'CE/qa');
@@ -104,6 +129,138 @@ test('every QA-02 recipe actually builds the sections it claims', () => {
     for (const section of recipe.sections) {
       assert.ok(control._children?.[section], `"${recipe.caption}" claims section "${section}" but the control it builds has no such section`);
     }
+  }
+});
+
+/* --- QA-03: states --- */
+
+test('QA-03 covers every stateful type in every state', () => {
+  // Both halves come from the model — the types by looking for a States section, the state names
+  // from SECTION_DEFAULTS.States.priority — so this cannot be satisfied by editing a list here.
+  // What it defends is the sheet: a state added to the model with no cell on QA-03 is a visual
+  // state nobody ever looks at, which is exactly how a broken :hover ships.
+  const types = statefulTypes();
+  assert.ok(types.length > 0, 'no component type carries a States section — the sheet proves nothing');
+  assert.deepEqual(STATE_NAMES, [...SECTION_DEFAULTS.States.priority],
+    'QA-03 reads its state list from the model; this should be impossible');
+
+  const doc = JSON.parse(serializeSheet(SHEETS.find((s) => s.file === 'QA-03-states.cepanel')));
+  const ids = new Set(doc.controls.map((control) => control._children?.Core?.id));
+
+  const missing = [];
+  for (const type of types) {
+    for (const state of STATE_NAMES) {
+      const id = `qa03_${type}_${state}`;
+      if (!ids.has(id)) missing.push(id);
+    }
+  }
+  assert.deepEqual(missing, [], `QA-03 is missing cells — regenerate: ${missing.slice(0, 8).join(', ')}`);
+});
+
+/* --- QA-04: scripting --- */
+
+test('QA-04 carries every language × event pair', () => {
+  assert.equal(LANGUAGES.length, SCRIPT_LANGUAGES.length, 'a script language appeared without reaching QA-04');
+  assert.equal(EVENTS.length, ALL_EVENTS.length, 'an event appeared without reaching QA-04');
+
+  const scripts = allScripts();
+  assert.equal(scripts.length, LANGUAGES.length * EVENTS.length,
+    'QA-04 is not the full cross product — a language or event pair is missing');
+
+  // Every pair, exactly once. A duplicate would inflate the count and hide an absence.
+  const pairs = new Set(scripts.map((script) => `${script.language}::${script.event}`));
+  assert.equal(pairs.size, scripts.length, 'QA-04 builds the same language/event pair twice');
+});
+
+test('QA-04 scripts all name an event the API actually declares', () => {
+  const declared = new Set(ALL_EVENTS.map((event) => event.fn));
+  const phantom = allScripts().filter((script) => !declared.has(script.event));
+  assert.deepEqual(phantom.map((s) => s.event), [],
+    'QA-04 carries a handler for an event the panel API no longer has');
+});
+
+/* --- QA-05: component verbs --- */
+
+test('QA-05 finds a component for every verb family', () => {
+  // An orphaned family is a real defect, not a sheet problem: 400-odd verbs address a section, and
+  // if no component carries that section the verbs reach nothing. The sheet renders one in red; the
+  // test is what makes it fail rather than merely look odd.
+  const map = familyComponentMap();
+  const orphans = COMPONENT_FAMILIES.filter((family) => !map[family.id]);
+  assert.deepEqual(orphans.map((f) => `${f.id} → section "${f.section}"`), [],
+    'verb families whose section no component carries');
+});
+
+test('QA-05 resolves each family to exactly one section, and the lookup is honest', () => {
+  for (const family of COMPONENT_FAMILIES) {
+    assert.ok(family.section, `family ${family.id} declares no section`);
+    const type = componentForSection(family.section);
+    assert.ok(type, `no component carries section "${family.section}"`);
+    assert.ok(family.verbs.length > 0, `family ${family.id} has no verbs`);
+  }
+});
+
+/* --- QA-07: custom-component packages --- */
+
+test('QA-07 places every custom-component starter', () => {
+  const doc = JSON.parse(serializeSheet(SHEETS.find((s) => s.file === 'QA-07-packages.cepanel')));
+  const ids = new Set(doc.controls.map((control) => control._children?.Core?.id));
+
+  const missing = STARTER_IDS
+    .map((id) => `qa07_${id.replace(/\W+/g, '_')}`)
+    .filter((id) => !ids.has(id));
+  assert.deepEqual(missing, [], `starters with no cell on QA-07 — regenerate: ${missing.join(', ')}`);
+  assert.equal(STARTER_IDS.length, CUSTOM_COMPONENT_STARTERS.length,
+    'QA-07 reads its starter list from the model; this should be impossible');
+});
+
+test('every custom-component starter still validates as a package', () => {
+  // The verdict is printed on the sheet so a human sees it, but a starter that stops validating
+  // should not wait for a human. A user who picks one out of the flyout and cannot publish it has
+  // hit a dead end in the designer, and nothing else in the suite would notice.
+  const broken = [];
+  for (const starter of CUSTOM_COMPONENT_STARTERS) {
+    const control = buildStarterControl(starter, `t_${starter.id.replace(/\W+/g, '_')}`);
+    const readiness = analyzeCustomComponentReadiness(control);
+    if (!readiness.ok) broken.push(`${starter.id}: ${readiness.validation.issues.join('; ') || 'a required step is unmet'}`);
+  }
+  assert.deepEqual(broken, [], `starters that no longer produce a valid package:\n  ${broken.join('\n  ')}`);
+});
+
+/* --- QA-08: export parameters --- */
+
+test('QA-08 accounts for every component type, with a verdict', () => {
+  const classified = classifyAllTypes();
+  assert.equal(classified.length, Object.keys(COMPONENT_TYPES).length,
+    'QA-08 classifies fewer types than the model has');
+
+  const unverdicted = classified.filter((entry) => !['exports', 'declined', 'unseen'].includes(entry.verdict));
+  assert.deepEqual(unverdicted.map((e) => e.type), [], 'a type reached QA-08 with no verdict');
+
+  // Every non-exporting type owes a reason. "It exports nothing" without one is the state this
+  // sheet exists to end.
+  const unexplained = classified.filter((entry) => entry.verdict !== 'exports' && !entry.reason?.trim());
+  assert.deepEqual(unexplained.map((e) => e.type), [], 'a type exports nothing and the sheet does not say why');
+});
+
+test('QA-08 recipes each still cover the derivation branch they claim', () => {
+  // The recipe cards re-check themselves at generation time and go red, which a reader would see.
+  // This is the same check with no reader required — a recipe that stops exercising its branch is
+  // a hole in the coverage, and holes are the thing this suite is for.
+  const lapsed = [];
+  for (const recipe of EXPORT_RECIPES) {
+    const params = parametersFor(recipe.build(), recipe.panel ?? {});
+    if (!recipe.expect(params)) lapsed.push(`${recipe.id} — derived: ${JSON.stringify(params)}`);
+  }
+  assert.deepEqual(lapsed, [], `QA-08 recipes no longer covering their branch:\n  ${lapsed.join('\n  ')}`);
+});
+
+test('QA-08 recipe ids are unique and every recipe explains itself', () => {
+  const ids = EXPORT_RECIPES.map((recipe) => recipe.id);
+  assert.equal(new Set(ids).size, ids.length, 'two QA-08 recipes share an id');
+  for (const recipe of EXPORT_RECIPES) {
+    assert.ok(recipe.caption?.trim(), `recipe ${recipe.id} has no caption`);
+    assert.ok(recipe.note?.trim().length > 10, `recipe ${recipe.id} has no note — a card that does not say what it proves proves nothing`);
   }
 });
 

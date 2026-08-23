@@ -284,11 +284,28 @@ Everything above is small. These are not, and they are what a beta decision actu
 3. **Which install do beta testers get?** A GUI install cannot export, by design. That is a fine
    answer if the beta is "design panels, report bugs" and a fatal one if it is "ship a plugin."
    Decide, then say so in the release notes.
-4. **The QA sheet suite is 3 of 8.** Built: QA-01 (every component at authored default), QA-02
-   (properties driven hard), QA-06 (162 GAIA-bound controls). Unbuilt: **QA-03 states/interaction,
-   QA-04 scripting, QA-05 component verbs, QA-07 custom-component packages, QA-08 export** — which
-   is exactly where the 08-06 pass found its bugs. CI also does not run the export smoke test or
-   the installer packaging, by `ci.yml`'s own header.
+4. **The QA sheet suite is 8 of 8.** *(closed)* QA-03 (15 stateful types × 7 states), QA-04
+   (7 languages × 37 events), QA-05 (23 verb families / 426 verbs beside the components they
+   drive), QA-07 (all 14 custom-component starters, built through the designer's own patch and
+   printing their readiness verdicts) and QA-08 (the export parameter list) now sit alongside the
+   original three. Each carries a coverage ratchet in `qaPanels.test.js` that reads its list from
+   the model, so the suite cannot fall behind it.
+
+   Two things the new sheets surfaced while being built, neither of them a sheet problem:
+
+   - **Forty of the fifty component types export no host parameter**, and not all of that is
+     deliberate. Five decline for a stated reason — a `Behavior` that calls itself a trigger or a
+     text field. The other thirty-five have **no `Behavior` section at all**, so
+     `deriveExportParameters` never looks at them, and the list includes `Crossfader`, `Ribbon`,
+     `VectorJoystick`, `Meter`, `Macro`, `Envelope` and `Matrix` — things a user would plainly
+     expect to automate. QA-08's third group is that list, and reading it is a judgement somebody
+     has to make before the beta, because the failure is invisible in the editor and only appears
+     in a host.
+   - **`Numpad` carries a `Value` section and no `Behavior`**, which is the same gap with a
+     sharper edge: it stores a value and still exports nothing.
+
+   CI also does not run the export smoke test or the installer packaging, by `ci.yml`'s own
+   header. That is unchanged.
 5. **No way in, no way out.** New Panel is a blank canvas across four designers; no templates, no
    example panels, no first run. The Auto-Panel generator (DPD → a bound working panel) is still
    unbuilt and would *be* the onboarding for the core use case. Outward: no panel package format
@@ -297,7 +314,8 @@ Everything above is small. These are not, and they are what a beta decision actu
 6. **Export polish**: pipeline **D1** (GUID registry / "update vs new copy") unbuilt, so two panels
    can collide FUIDs; **E1–E5** unbuilt, so there is no build log surface, export history or
    "Reveal in folder"; every parameter maps to `AudioParameterFloat` (`PanelParameters.h`), so
-   comboboxes and toggles read in the host as anonymous 0–1 floats; `getNumPrograms()` returns 1
+   comboboxes and toggles read in the host as anonymous 0–1 floats — QA-08 prints what the editor
+   derives for each, which is the half of that mismatch you can now look at; `getNumPrograms()` returns 1
    (`PluginProcessor.h:213`), so there are no host-visible programs; `buildDump` still returns an
    empty var (`:809`).
 
