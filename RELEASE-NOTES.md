@@ -23,6 +23,9 @@ move between the two freely.
 ## What you get
 
 - **Panel designer** — 50 component types, seven scripting languages, a device-profile designer.
+- **A whole editor from a device profile** — File → New Panel from Device Profile builds one bound
+  control per parameter, grouped, with the real range, choices and label read off the profile. The
+  GAIA profile's 793 parameters become 1624 controls in a second.
 - **Export** to VST3, CLAP, LV2 and standalone.
 - **Scripting toolchains** managed in-app (Settings → Scripting Toolchains). Lua, JavaScript and
   TypeScript need nothing. Python, C++, C# and Java download a toolchain on first use; C# and Java

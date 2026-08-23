@@ -309,8 +309,11 @@ Everything above is small. These are not, and they are what a beta decision actu
    CI also does not run the export smoke test or the installer packaging, by `ci.yml`'s own
    header. That is unchanged.
 5. **No way in, no way out.** New Panel is a blank canvas across four designers; no templates, no
-   example panels, no first run. The Auto-Panel generator (DPD → a bound working panel) is still
-   unbuilt and would *be* the onboarding for the core use case. Outward: ~~no panel package format
+   example panels, no first run. ~~The Auto-Panel generator (DPD → a bound working panel) is still
+   unbuilt and would *be* the onboarding for the core use case.~~ *(fixed — File → New Panel from
+   Device Profile turns a profile into a bound, adopted panel: 793 GAIA parameters become 1624
+   controls, each with its real range, choices and label. See
+   `CE/web/src/CE_Application/docs/auto-panel.md`.)* Outward: ~~no panel package format
    (custom components have one; panels do not)~~ *(fixed — File → Share Panel... writes a
    `.cepanelpkg` with every image embedded, File → Open Shared Panel... reads one back; the
    author's file path and bound MIDI ports are stripped on the way out)*, no Ctrlr

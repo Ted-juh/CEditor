@@ -176,8 +176,9 @@ Staged, with the ordering rules and the failure modes to test:
 
 ### 3. Auto-Panel — profile in, working editor out
 
-Designed in [`auto-panel.md`](../CE/web/src/CE_Application/docs/auto-panel.md), unbuilt, sitting in
-roadmap Phase 5. It is three things at once and each alone would justify it:
+**Built** — File → New Panel from Device Profile; see
+[`auto-panel.md`](../CE/web/src/CE_Application/docs/auto-panel.md). It is three things at once and
+each alone would justify it:
 
 - **The adoption unlock.** Hours of layout become seconds.
 - **The onboarding fix.** New Panel is a blank canvas in a program with four designers behind it,
@@ -312,7 +313,7 @@ whether they compound or merely impress. Summary:
 | 0 | Reposition around the instrument layer | Already earned | ~zero | **Beta** |
 | 1 | Capture-and-infer profiling | **Highest — structurally uncopyable** | Medium | Beta headline |
 | 2 | Total Recall (3 stubs + parameter types) | High — the #1 user pain | Low–medium | Beta if the schedule allows |
-| 3 | Auto-Panel | High — adoption + onboarding | Medium | Beta+1 |
+| 3 | ~~Auto-Panel~~ **built** | High — adoption + onboarding | Medium | **Beta** |
 | 4 | Ctrlr harvest → profiles | High — network effect, migration | Low (staged) | Beta+1 |
 | 5 | Verified-profile badge | Medium — trust | **Very low** | Beta |
 | 6 | MIDI-CI discovery | Medium — first mover, press | Low (code exists) | Beta+1 |

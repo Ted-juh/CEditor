@@ -94,7 +94,8 @@ math + MIDI). See [groundbreaking-components.md](./groundbreaking-components.md)
 - **Macro control → Snapshot Morph** — one control drives many params / morphs
   the whole patch between A↔B snapshots.
 - **Modulation node-graph** — visual patch-cord routing of sources→destinations.
-- **Auto-Panel generator** — a DPD → a complete editor panel instantly.
+- ~~**Auto-Panel generator** — a DPD → a complete editor panel instantly.~~ *(built — File → New
+  Panel from Device Profile; see [auto-panel.md](./auto-panel.md).)*
 - **Patch Diff / Compare** — A/B "what changed" (semantic + byte-level).
 - **Constrained Randomizer** — generate patches within DPD ranges + locks.
 - Conventional adds (spec'd in [conventional-components.md](./conventional-components.md)):

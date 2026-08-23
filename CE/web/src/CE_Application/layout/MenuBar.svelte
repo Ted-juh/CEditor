@@ -33,6 +33,7 @@
   import { GLOBAL_SHORTCUTS } from '../utils/globalShortcuts.js';
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
   import { openSharedPanelFromFile, sharePanelToFile } from '../stores/panelSharingActions.js';
+  import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
 
   // Menu state predicates, evaluated when a dropdown opens. A menu item that
@@ -106,6 +107,21 @@
     importDeviceProfile();
   }
 
+  // One row per profile, rather than a dialog or a silent pick. Generating a panel is a big,
+  // visible action — 793 parameters is 1624 controls — so the menu should say which device it is
+  // about to do it for before it does it.
+  function generateFromProfileItems() {
+    refreshDeviceProfiles();
+    const profiles = get(deviceProfiles) ?? [];
+    if (profiles.length === 0) {
+      return [{ label: 'No device profiles', enabled: () => false, action: () => {} }];
+    }
+    return profiles.map((profile) => ({
+      label: profile.name || profile.id,
+      action: () => generatePanelFromProfile(profile.id),
+    }));
+  }
+
   /** The Open Recent submenu, rebuilt each time it opens — the list moves under it constantly. */
   function recentSubmenuItems() {
     const rows = [];
@@ -130,6 +146,10 @@
     File: [
       { label: 'New Panel',  shortcut: 'Ctrl+N', action: () => openNewPanelDialog() },
       { label: 'Open Panel', shortcut: 'Ctrl+O', action: () => openPanelFromFile() },
+      // The strongest reason to write a device profile: it already knows every parameter, its
+      // range, its choices and the bytes to send, and until this existed the only way to get that
+      // onto a screen was to place and bind every control by hand.
+      { type: 'submenu', label: 'New Panel from Device Profile', items: generateFromProfileItems },
       { type: 'submenu', label: 'Open Recent', enabled: () => recentGroups.length > 0, items: recentSubmenuItems },
       { type: 'separator' },
       { label: 'New Custom Component', action: () => newCustomComponent() },

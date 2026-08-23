@@ -110,9 +110,10 @@ identity self-check is genuinely good) and the shipping half is scaffolding.
   (panel canvas, custom-component surface with 22 draw tools, Behavior Designer, DPD Designer V2)
   and nothing that introduces any of them. The 60 design docs in `CE_Application/docs/` and the
   scripting manual/cookbook/getting-started are invisible from inside the app. Meanwhile the
-  **Auto-Panel generator** (DPD → complete working panel in one step) — which would *be* the
-  onboarding for the core use case — is designed ([auto-panel.md](../CE/web/src/CE_Application/docs/auto-panel.md))
-  and sits in Phase 5, unbuilt.
+  ~~**Auto-Panel generator** (DPD → complete working panel in one step) — which would *be* the
+  onboarding for the core use case — is designed and sits in Phase 5, unbuilt.~~ *(built — File →
+  New Panel from Device Profile; [auto-panel.md](../CE/web/src/CE_Application/docs/auto-panel.md).
+  The blank canvas is still what New Panel gives you, so the rest of this bullet stands.)*
 - **No way out (sharing):** Ctrlr's actual moat was never the editor — it was the community
   ecosystem of panels. CEditor has no panel-sharing/import/export story: no package format for
   *panels* (custom components have one, with metadata, versioning, and a library — the panel level
@@ -153,7 +154,7 @@ identity self-check is genuinely good) and the shipping half is scaffolding.
 |---|------|----------------|
 | 1 | **Build-verify Phase 0** (inbound MIDI + TimerManager) on hardware | Everything two-way sits on it; currently paper-done |
 | 2 | **Preset model + Workbench librarian** (slot map in `dpd.schema.json`, factory/user ranges, recall action, persisted user banks; un-stub `buildDump`; host programs via `getNumPrograms`) | Closes the sound loop — the core user promise |
-| 3 | **Auto-Panel generator** (even a crude first cut: DPD → bound controls in a grid) | Turns the deepest asset (DPD) into the onboarding; kills the blank-canvas problem |
+| 3 | ~~**Auto-Panel generator** (even a crude first cut: DPD → bound controls in a grid)~~ *(built — File → New Panel from Device Profile, and not crude: every control is bound and adopts the profile's range, choices and label)* | Turns the deepest asset (DPD) into the onboarding; kills the blank-canvas problem |
 | 4 | **Ship the Standalone export path** + wire the stubbed Build menu items; typed parameters (`AudioParameterChoice`/`Bool`) | Cheapest honest step toward the README's promise; standalone also dodges the FUID/compiler constraint per §3a |
 | 5 | **Panel package/share format** + identity registry (D1) + surface the AGPL implication at export | Closes the people loop outward |
 | 6 | **Editor user manual + 2–3 example panels** shipped in-app | The scripting docs proved the pattern; repeat it for the editor |
