@@ -39,8 +39,11 @@ move between the two freely.
   component types are not yet ruled on and also export nothing — mostly structural ones where that
   is obviously right, but if you expect to automate something and cannot, that is worth reporting.
 - **No update channel.** There is no in-app update check. Watch the repository.
-- **No panel package format.** A `.cepanel` references background images by absolute path, so
-  sending one to someone else loses its images.
+- **Panel packaging is new.** A bare `.cepanel` references images by absolute path, so sending one
+  to someone else loses its pictures — the file looks perfect on the machine that made it, which is
+  why this went unnoticed. There is a package format now (`utils/panelPackage.js`) that embeds them;
+  it is tested but has not yet been driven through the UI, so treat sharing as untested in this
+  build and say so if it misbehaves.
 - **AU is absent** (it needs the macOS port) and **AAX and VST2** are not planned — AAX needs Avid's
   SDK and PACE signing, and VST2 licensing closed in 2018.
 

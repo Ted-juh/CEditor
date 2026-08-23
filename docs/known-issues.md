@@ -157,3 +157,29 @@ turns an inbound message into a chip you drop onto a control on a panel to *bind
 "which control should this CC drive". The DPD needs the other direction — "what address does this
 parameter live at" — which writes a profile definition, not a binding. Wiring the button to the
 existing chips would have looked like progress and connected two unrelated subsystems.
+
+
+---
+
+## Panel packaging exists but is not in the UI
+
+*(Was: "no panel package format" — the format is built, the button is not.)*
+
+A bare `.cepanel` holds ABSOLUTE PATHS to its images, so sending one to somebody else sends a panel
+with no pictures. It looks perfect on the author's disk, which is exactly why it survived: the
+failure only exists on the second computer, and the author is the one person who never sees it.
+
+`utils/panelPackage.js` closes the format half — a `ceditor-panel` envelope embedding every asset,
+content-addressed so one image used forty times is stored once, deliberately the same envelope shape
+as the custom-component package so version refusal and a reader's expectations are already
+established. Thirteen tests, the central one a round trip: package a panel, open it where the
+original paths do not exist, get working references back.
+
+**What is left is the UI.** Nothing calls it — there is no File → Share Panel, and the bridge needs
+`readAsset`/`writeAsset` implementations for the editor (both are injected, which is what made the
+format testable off Windows in the first place). Until that exists, the capability is real and
+unreachable.
+
+Three places a panel points outside itself, listed because a fourth would be a package that works
+until it doesn't: `panel.bgImage`, each control's `Background.Fill.imageSrc`, and `Text.path`. They
+live in one collector for that reason.
