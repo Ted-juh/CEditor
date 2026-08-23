@@ -150,6 +150,38 @@ constraints/anchors (plan §12.6).
 
 ## 5. Structural recommendation (do this before Tier 0)
 
+> **DONE, 2026-08-23 — the decomposition half.** `CustomDesignSurfaceEditor.svelte` went from
+> **8,325 lines to 6,298**, with six components beside it: `SurfaceLookBar`, `SurfacePalette`,
+> `SurfaceBottomBar`, `SurfaceToolStrip`, `SurfaceDockLayers` and the pre-existing
+> `SurfaceHelpOverlay`. Each took its own scoped CSS with it — that is most of the reduction, since
+> 3,258 of the original lines were style.
+>
+> The names below are not quite the ones that landed, and the difference is the finding. The dock
+> cannot come out in one piece: it needs **98 props**, and trading an 8,000-line file for a
+> 98-argument signature is not the improvement this section is asking for. Its two tab groups are
+> the real seams, so the Layers tab (35 props) came out and the inspector tabs (60) are the next
+> cut. `surfaceInteraction.js` was already largely done under other names —
+> `customDesignSurfaceGeometry.js` (26 exports), `customDesignSurfaceHelpers.js` (39),
+> `zoomController.js`, `canvasSnapping.js` — so what was missing was the last of the interaction
+> quanta: the zoom clamp, the zoom increment, the grid size and the snap functions are now pure and
+> exported from the geometry module.
+>
+> The smoke tests this section asks for are in `test/surfaceDecomposition.test.js`: tool activation
+> (the guard that would have caught the dead Make Interactive), snap and frame-snap maths including
+> the Alt bypass, and the zoom clamp. Plus a ratchet on the parent's line count, so it cannot grow
+> back quietly.
+>
+> One thing to know before extracting the next region: the shared glyph vocabulary (`.tool-icon`,
+> the mini swatch buttons, the NumberCell wrapper) is defined once in the parent as
+> `.surface-shell :global(...)`. Scoped CSS does not reach a child component, so the alternative is
+> a copy of each rule in every component that draws a tool button — which is the duplication the
+> properties-panel round spent two commits removing. A rule anchored on `.surface-shell` also has
+> to stay in the parent: the child does not own that element.
+>
+> **Still open here:** the inspector tabs and the canvas viewport (171 symbols, the most entangled
+> region, and the one that owns the pointer handlers), and the theming pass below.
+
+
 Decompose `CustomDesignSurfaceEditor.svelte` **as part of the restoration**, not after: extract
 `SurfaceLookBar`, `SurfacePalette`, `SurfaceBottomBar`, `SurfaceStatesStrip`, `SurfaceDock`, and
 a `surfaceInteraction.js` module for the pointer/keyboard/snap logic. Every regression in §1

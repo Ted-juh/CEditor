@@ -101,6 +101,11 @@
     smartGuideStyle,
     smartSnapTargets,
     snapGuides as snapGuidesBase,
+    clampSurfaceZoom,
+    clampZoomIncrement,
+    clampSnapSize,
+    snapToGrid,
+    snapFrameToGrid,
     zoneFrame as zoneFrameBase,
   } from '../utils/customDesignSurfaceGeometry.js';
   import {
@@ -1086,19 +1091,11 @@
   }
 
   function snapValue(value, event = null) {
-    if (!snapEnabled || event?.altKey) return value;
-    const size = Math.max(1, numberOr(snapSize, 10));
-    return Math.round(value / size) * size;
+    return snapToGrid(value, { enabled: snapEnabled, size: numberOr(snapSize, 10), bypass: event?.altKey === true });
   }
 
   function snapFrame(frame, event = null) {
-    if (!frame || !snapEnabled || event?.altKey) return frame;
-    return {
-      left: snapValue(frame.left, event),
-      top: snapValue(frame.top, event),
-      width: Math.max(1, snapValue(frame.width, event)),
-      height: Math.max(1, snapValue(frame.height, event)),
-    };
+    return snapFrameToGrid(frame, { enabled: snapEnabled, size: numberOr(snapSize, 10), bypass: event?.altKey === true });
   }
 
   function draftRect(draft = drawDraft) {
@@ -1748,7 +1745,7 @@
   }
 
   function setZoom(value) {
-    surfaceZoom = Math.max(0.25, Math.min(5, numberOr(value, 1)));
+    surfaceZoom = clampSurfaceZoom(numberOr(value, 1));
   }
 
   // Wheel zoom on the design canvas (parity with the panel editor). Ctrl/Cmd
@@ -1794,8 +1791,8 @@
   }
 
   function setZoomIncrement(value) {
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num > 0) surfaceZoomIncrement = Math.min(100, num);
+    const next = clampZoomIncrement(value);
+    if (next !== null) surfaceZoomIncrement = next;
   }
 
   function openComponentScripts() {
@@ -1805,7 +1802,7 @@
   }
 
   function setSnapSize(value) {
-    snapSize = Math.max(1, Math.min(64, Math.round(numberOr(value, 10))));
+    snapSize = clampSnapSize(numberOr(value, 10));
   }
 
   function fitArtboardToView() {

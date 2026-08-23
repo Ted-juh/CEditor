@@ -373,3 +373,62 @@ export function measurementLinesBetween(frameA, frameB) {
 
   return lines;
 }
+
+// --- Surface interaction quanta ----------------------------------------------------------------
+//
+// The last of the §5 extraction from the 2026-07-12 workspace review: the three numbers that
+// decide where a drag lands and how far a zoom goes. They lived as one-line closures over reactive
+// state inside CustomDesignSurfaceEditor, which meant the only way to check the zoom clamp or the
+// snap quantum was to open the app and try it. The review asks for exactly these as pure-logic
+// tests, on the grounds that a surface which cannot be tested is a surface that regresses quietly.
+
+/** Zoom bounds for the design surface. Below 0.25 parts are unhittable; above 5 a pixel is a tile. */
+export const SURFACE_ZOOM_MIN = 0.25;
+export const SURFACE_ZOOM_MAX = 5;
+
+/** Clamp a zoom factor into the usable range. Non-numeric input falls back to 1:1 rather than NaN. */
+export function clampSurfaceZoom(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(SURFACE_ZOOM_MIN, Math.min(SURFACE_ZOOM_MAX, n));
+}
+
+/** Clamp the zoom step (in percentage points) a +/- press or a wheel notch applies. */
+export function clampZoomIncrement(value) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n) || n <= 0) return null;   // null = leave the current increment alone
+  return Math.min(100, n);
+}
+
+/** Clamp the grid size. 1px is "off in all but name"; past 64 the grid is coarser than most parts. */
+export function clampSnapSize(value) {
+  const n = Number(value);
+  return Math.max(1, Math.min(64, Math.round(Number.isFinite(n) ? n : 10)));
+}
+
+/**
+ * Quantise one coordinate to the grid.
+ *
+ * `enabled` false and Alt-held both pass the value straight through — Alt is the documented
+ * bypass, and it has to be checked here rather than at the call sites, because there are a dozen
+ * of them and the one that forgets is the one that feels broken.
+ */
+export function snapToGrid(value, { enabled = true, size = 10, bypass = false } = {}) {
+  if (!enabled || bypass) return value;
+  const step = Math.max(1, Number(size) || 10);
+  return Math.round(value / step) * step;
+}
+
+/** Quantise a frame, keeping width and height at least one grid step so nothing snaps to nothing. */
+export function snapFrameToGrid(frame, opts = {}) {
+  if (!frame) return frame;
+  const { enabled = true, bypass = false } = opts;
+  if (!enabled || bypass) return frame;
+  return {
+    ...frame,
+    left: snapToGrid(frame.left, opts),
+    top: snapToGrid(frame.top, opts),
+    width: Math.max(1, snapToGrid(frame.width, opts)),
+    height: Math.max(1, snapToGrid(frame.height, opts)),
+  };
+}

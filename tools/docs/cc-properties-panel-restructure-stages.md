@@ -12,8 +12,10 @@
 >
 > **Status (2026-07-12):** W0's *restoration* half is done — the readiness strip, smart guides,
 > align/distribute/measure, cheatsheet, and Make Interactive + halo are all back on main (see
-> the status banner in `cc-designer-workspace-review.md`); the *decomposition* half remains
-> open.
+> the status banner in `cc-designer-workspace-review.md`); the *decomposition* half was done on
+> **2026-08-23** — the surface editor is 8,325 lines down to 6,298 across six components. See
+> §5 of `cc-designer-workspace-review.md` for what came out, what did not, and why the dock
+> had to be cut along its tab groups rather than lifted whole.
 >
 > **STATUS UPDATE (2026-07-12, later the same day): ALL FOUR STAGES SHIPPED** (commits
 > `c07cdfb` A · `15638c0` B · `1c1ece7` C · `18a9e82` D), browser-verified on the stress
