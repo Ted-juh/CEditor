@@ -2,6 +2,7 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats, chordPadPads } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import PanelKeyCell from '../properties/PanelKeyCell.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -46,6 +47,7 @@
         <option value="notes">Notes</option>
       </select>
     </PropertyCell>
+    <PanelKeyCell {control} section="ChordPad" />
     <PropertyCell label="Key" span={2} hint="The tonic. Pads and the wheel's lit wedge follow it.">
       <select class="val" value={String(num(cp.key, 0))} onchange={(e) => set('key', clampInt(e.target.value, 0, 11, 0))}>
         {#each keyNames as nm, i (i)}<option value={String(i)}>{nm}</option>{/each}

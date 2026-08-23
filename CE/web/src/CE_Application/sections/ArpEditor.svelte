@@ -6,6 +6,7 @@
   import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import PanelKeyCell from '../properties/PanelKeyCell.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -106,6 +107,7 @@
       {/if}
     {/if}
     {#if !isExternal}
+      <PanelKeyCell {control} section="Arp" />
       <PropertyCell label="Key" span={1} hint="Tonic of the arp's own chord.">
         <select class="val" value={String(num(a.key, 0))} onchange={(e) => set('key', clampInt(e.target.value, 0, 11, 0))}>
           {#each keyNames as nm, i (i)}<option value={String(i)}>{nm}</option>{/each}

@@ -83,3 +83,22 @@ line to the centre. Per-axis timing would make it curve, which looks like a bug 
 whole job is to be a position.
 
 `returnMode` defaults to `none`, so nothing existing started springing because this landed.
+
+## Wired into the preview surface, 2026-08-23
+
+`startValueReturn` in `PanelPreviewSurface.svelte`, driven by the `returnMode` fields on Behavior and
+editable in the Behavior inspector's "Return to rest" section.
+
+**The three existing springs stay.** The joystick, the crossfader and the ribbon each already had
+one, and each has extras this cannot know about — the joystick's trail and per-axis return, the
+ribbon's touch gate, the crossfader's detent. Replacing them would be a regression risk for no
+user-visible gain. What landed is the generic one for everything else, so a plain slider or a
+pitch/mod wheel can spring without becoming a fourth private implementation.
+
+**Each frame emits.** The glide writes the session and fans out on every tick; only the last one
+commits and raises `onSettled`. A spring-back that moved the on-screen control and told the device
+nothing would leave the synth bent, which is the whole reason the capability produces a series of
+values rather than one.
+
+**A new grab cancels the glide** — the hand on the control wins over the spring — and a release
+during a glide restarts it rather than racing a second one against the first.

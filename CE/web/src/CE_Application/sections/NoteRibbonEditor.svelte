@@ -6,6 +6,7 @@
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats, noteName } from '../utils/chordPadLayout.js';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import PanelKeyCell from '../properties/PanelKeyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -53,6 +54,7 @@
         <option value="vertical">Vertical</option>
       </select>
     </PropertyCell>
+    <PanelKeyCell {control} section="NoteRibbon" />
     <PropertyCell label="Key" span={1} hint="Tonic. Roots are accented; in scale-snap mode only these notes are reachable.">
       <select class="val" value={String(num(r.key, 0))} onchange={(e) => set('key', clampInt(e.target.value, 0, 11, 0))}>
         {#each keyNames as nm, i (i)}<option value={String(i)}>{nm}</option>{/each}

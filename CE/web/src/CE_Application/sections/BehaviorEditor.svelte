@@ -25,6 +25,8 @@
   import Target from 'lucide-svelte/icons/target';
   import Play from 'lucide-svelte/icons/play';
   import Gauge from 'lucide-svelte/icons/gauge';
+  import Undo2 from 'lucide-svelte/icons/undo-2';
+  import { RETURN_CURVE, RETURN_MODE } from '../utils/returnToRest.js';
   import { VALUE_FLOW, valueFlowOf } from '../utils/displayMode.js';
 
   let { control = null } = $props();
@@ -420,6 +422,42 @@
       </PropertyCell>
     </PropertySection>
   {/if}
+
+  <PropertySection title="Return to rest" icon={Undo2}>
+    <PropertyCell
+      label="On release"
+      span={2}
+      hint="Where the control goes when you let go. Latch keeps it where it was left — what most controls want, and the default. The glide EMITS on the way, so the device follows the spring rather than being told only the destination."
+    >
+      <select class="val" value={behavior.returnMode ?? RETURN_MODE.none} onchange={(event) => set('returnMode', event.target.value)}>
+        <option value={RETURN_MODE.none}>Latch (stay put)</option>
+        <option value={RETURN_MODE.center}>Centre</option>
+        <option value={RETURN_MODE.min}>Minimum</option>
+        <option value={RETURN_MODE.max}>Maximum</option>
+        <option value={RETURN_MODE.rest}>A set value</option>
+      </select>
+    </PropertyCell>
+    {#if String(behavior.returnMode ?? RETURN_MODE.none) !== RETURN_MODE.none}
+      {#if String(behavior.returnMode) === RETURN_MODE.rest}
+        <PropertyCell label="Rest value" span={2} hint="Clamped into the control's range.">
+          <input class="val" type="number" value={behavior.returnValue ?? 0} onchange={(event) => set('returnValue', Number(event.target.value))} />
+        </PropertyCell>
+      {/if}
+      <NumberCell
+        label="Time (ms)"
+        min={0} max={5000} step={10}
+        value={behavior.returnTime ?? 120}
+        onchange={(value) => set('returnTime', value)}
+      />
+      <PropertyCell label="Curve" span={2} hint="Exp covers most of the distance early, which is what a real spring does. Zero time snaps and emits nothing on the way.">
+        <select class="val" value={behavior.returnCurve ?? RETURN_CURVE.exp} onchange={(event) => set('returnCurve', event.target.value)}>
+          <option value={RETURN_CURVE.exp}>Spring (exp)</option>
+          <option value={RETURN_CURVE.linear}>Linear</option>
+          <option value={RETURN_CURVE.ease}>Ease</option>
+        </select>
+      </PropertyCell>
+    {/if}
+  </PropertySection>
 
   <PropertySection title="Runtime" icon={Play}>
     <PropertyCell label="Input" span={2} hint="Keyboard focus, keyboard activation. Hover a chip for its name.">

@@ -13,6 +13,7 @@
   import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import PanelKeyCell from '../properties/PanelKeyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
@@ -130,6 +131,7 @@
       </select>
     </PropertyCell>
 
+    <PanelKeyCell {control} section="Phrase" />
     <PropertyCell label="Key" span={1} hint="Tonic. Row 0 is this note at the base octave.">
       <select class="val" value={String(num(p.key, 0))} onchange={(e) => set('key', clampInt(e.target.value, 0, 11, 0))}>
         {#each keyNames as nm, i (i)}<option value={String(i)}>{nm}</option>{/each}

@@ -1161,6 +1161,12 @@ export const SECTION_DEFAULTS = {
     mode: 'chords',               // chords | notes
     key: 0,                       // tonic pitch class (0 = C)
     scale: 'major',               // see SCALES in chordPadLayout.js
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     chordType: 'triad',           // triad | seventh
     voicing: 'close',             // close | spread | drop2
     inversion: 0,
@@ -1209,6 +1215,12 @@ export const SECTION_DEFAULTS = {
     // Its own chord (source = 'chord').
     key: 0,                       // tonic pitch class (0 = C)
     scale: 'minor',
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     degree: 0,                    // scale degree the chord is built on
     chordType: 'triad',           // triad | seventh
     baseOctave: 3,
@@ -1241,6 +1253,12 @@ export const SECTION_DEFAULTS = {
     orientation: 'horizontal',    // horizontal | vertical
     key: 0,                       // tonic pitch class (0 = C)
     scale: 'major',
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     baseNote: 48,                 // lowest note on the strip (C3)
     octaves: 2,                   // how far the strip reaches
     bendRange: 2,                 // glide: semitones, MUST match the synth's setting
@@ -1339,6 +1357,12 @@ export const SECTION_DEFAULTS = {
     mode: 'degree',
     key: 0,                      // tonic pitch class (0 = C)
     scale: 'minor',
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     baseOctave: 3,               // row 0 = the tonic at this octave
     transpose: 0,                // semitones, applied after the row → pitch map
     steps: 16,
@@ -1420,6 +1444,12 @@ export const SECTION_DEFAULTS = {
     mode: 'diatonic',            // diatonic (in key) | memory (fixed shape)
     key: 0,
     scale: 'major',
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     size: 3,                     // notes in the diatonic stack (3 = triad)
     shape: [0, 4, 7],            // memory mode: semitones from the played note
     voicing: 'close',            // close | open | drop2
@@ -1475,6 +1505,12 @@ export const SECTION_DEFAULTS = {
     quantizeLength: false,
     key: 0,
     scale: 'minor',
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     snapToScale: false,          // pitch-correct the take into the key
     take: { events: [], pending: {} },
     editable: true,              // click the roll to arm/record in preview

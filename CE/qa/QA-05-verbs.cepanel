@@ -15,7 +15,7 @@
   "scriptId": "qa_05_verbs",
   "author": "",
   "version": "1.0.0",
-  "description": "QA-05 — 23 verb families, 426 verbs",
+  "description": "QA-05 — 23 verb families, 429 verbs",
   "enabled": true,
   "locked": false,
   "filePath": null,
@@ -114,7 +114,7 @@
     "notes": [
       {
         "name": "How to read this sheet",
-        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 426 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
+        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 429 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
       }
     ]
   },
@@ -604,7 +604,7 @@
           }
         },
         "Text": {
-          "content": "29 verbs",
+          "content": "30 verbs",
           "_children": {
             "Font": {
               "size": 11
@@ -649,7 +649,7 @@
           }
         },
         "Text": {
-          "content": "arp.run[on]                   arp.euclid[on]\narp.pattern(enum)             arp.euclidSteps(int)\narp.rate(num)                 arp.euclidPulses(int)\narp.division(enum)            arp.euclidRotate(int)\narp.sync[on]                  arp.phase(num)\narp.octaves(int)              arp.mute(indexset)\narp.gate(num)                 arp.inputChannel(int)\narp.swing(num)                arp.baseOctave(int)\narp.latch[on]                 arp.source(enum)\narp.key(int)                  arp.link(link)\narp.scale(enum)               arp.editable[on]\narp.degree(int)               arp.showNotes[on]\narp.chordType(enum)           arp.showHeader[on]\narp.velocity(int)             arp.read(read)\narp.channel(int)",
+          "content": "arp.run[on]                   arp.channel(int)\narp.pattern(enum)             arp.euclid[on]\narp.rate(num)                 arp.euclidSteps(int)\narp.division(enum)            arp.euclidPulses(int)\narp.sync[on]                  arp.euclidRotate(int)\narp.octaves(int)              arp.phase(num)\narp.gate(num)                 arp.mute(indexset)\narp.swing(num)                arp.inputChannel(int)\narp.latch[on]                 arp.baseOctave(int)\narp.key(int)                  arp.source(enum)\narp.scale(enum)               arp.link(link)\narp.followPanelKey[on]        arp.editable[on]\narp.degree(int)               arp.showNotes[on]\narp.chordType(enum)           arp.showHeader[on]\narp.velocity(int)             arp.read(read)",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -784,7 +784,7 @@
           }
         },
         "Text": {
-          "content": "21 verbs",
+          "content": "22 verbs",
           "_children": {
             "Font": {
               "size": 11
@@ -829,7 +829,7 @@
           }
         },
         "Text": {
-          "content": "chordPad.mode(enum)           chordPad.layout(enum)\nchordPad.key(int)             chordPad.baseOctave(int)\nchordPad.scale(enum)          chordPad.noteSpan(int)\nchordPad.chordType(enum)      chordPad.gridCols(int)\nchordPad.voicing(enum)        chordPad.echo[on]\nchordPad.inversion(int)       chordPad.echoChannel(int)\nchordPad.octave(int)          chordPad.editable[on]\nchordPad.velocity(int)        chordPad.showPiano[on]\nchordPad.channel(int)         chordPad.showRomans[on]\nchordPad.strum(num)           chordPad.read(read)\nchordPad.latch[on]",
+          "content": "chordPad.mode(enum)           chordPad.latch[on]\nchordPad.key(int)             chordPad.layout(enum)\nchordPad.scale(enum)          chordPad.baseOctave(int)\nchordPad.followPanelKey[on]   chordPad.noteSpan(int)\nchordPad.chordType(enum)      chordPad.gridCols(int)\nchordPad.voicing(enum)        chordPad.echo[on]\nchordPad.inversion(int)       chordPad.echoChannel(int)\nchordPad.octave(int)          chordPad.editable[on]\nchordPad.velocity(int)        chordPad.showPiano[on]\nchordPad.channel(int)         chordPad.showRomans[on]\nchordPad.strum(num)           chordPad.read(read)",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -964,7 +964,7 @@
           }
         },
         "Text": {
-          "content": "19 verbs",
+          "content": "20 verbs",
           "_children": {
             "Font": {
               "size": 11
@@ -1009,7 +1009,7 @@
           }
         },
         "Text": {
-          "content": "noteRibbon.mode(enum)         noteRibbon.velocityFrom(enum)\nnoteRibbon.key(int)           noteRibbon.modAxis(enum)\nnoteRibbon.scale(enum)        noteRibbon.modCc(int)\nnoteRibbon.baseNote(int)      noteRibbon.echo[on]\nnoteRibbon.octaves(int)       noteRibbon.echoChannel(int)\nnoteRibbon.bendRange(num)     noteRibbon.editable[on]\nnoteRibbon.velocity(int)      noteRibbon.showNames[on]\nnoteRibbon.channel(int)       noteRibbon.showHeader[on]\nnoteRibbon.latch[on]          noteRibbon.read(read)\nnoteRibbon.orientation(enum)",
+          "content": "noteRibbon.mode(enum)         noteRibbon.orientation(enum)\nnoteRibbon.key(int)           noteRibbon.velocityFrom(enum)\nnoteRibbon.scale(enum)        noteRibbon.modAxis(enum)\nnoteRibbon.followPanelKey[on] noteRibbon.modCc(int)\nnoteRibbon.baseNote(int)      noteRibbon.echo[on]\nnoteRibbon.octaves(int)       noteRibbon.echoChannel(int)\nnoteRibbon.bendRange(num)     noteRibbon.editable[on]\nnoteRibbon.velocity(int)      noteRibbon.showNames[on]\nnoteRibbon.channel(int)       noteRibbon.showHeader[on]\nnoteRibbon.latch[on]          noteRibbon.read(read)",
           "_children": {
             "Font": {
               "family": "monospace",

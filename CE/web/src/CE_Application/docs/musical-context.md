@@ -70,3 +70,31 @@ approached it is a bug they cannot.
 
 **Twelve-tone, and the file says so.** Microtonal and non-12-TET are real and are not here. Leaving
 that implicit is how a future 24-TET attempt would find the assumption everywhere at once.
+
+## Wired into the components, 2026-08-23
+
+`utils/panelKey.js` + `stores/panelKeyActions.js` + `properties/PanelKeyCell.svelte`, pinned by
+`test/panelKey.test.js`. Six sections carry a key and a scale — ChordPad, Arp, NoteRibbon, Phrase,
+Harmoniser and Recorder — and each can now opt in to the panel's.
+
+**Following is a broadcast, not an indirection.** The obvious implementation is for every component
+to read the panel's key at render time instead of its own: that means rewriting six layout modules
+and every call site, and leaves a `key: 0` in each section that no longer means anything. Instead,
+changing the panel key WRITES the new key into each following component's own section. The
+renderers, editors, undo, export and a panel opened in an older build all keep working untouched. A
+follower is a component that agreed to be kept in step, not one that lost its own setting.
+
+**The two scale vocabularies are not the same, and the gap is reported rather than papered over.**
+`musicalContext.js` knows fourteen scales; the note components know twelve, and spell the two
+pentatonics differently. The aliases are a written table, not derived from interval sets — two
+scales with the same intervals and different names are a naming question, and guessing would
+eventually pick the wrong label for a mode. A panel set to `chromatic`, `wholeTone` or a custom
+interval array leaves its followers alone and names the scale it could not use. Rounding to major
+would have a chord pad quietly playing the wrong mode, which is the kind of bug somebody blames on
+their ears.
+
+**The first control to follow decides the starting key, from what is already on the panel.** Writing
+C major over a panel that is in F minor throughout would be a destructive first impression of a
+convenience feature.
+
+Off by default on every section, so nothing existing started re-harmonising because this landed.

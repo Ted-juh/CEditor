@@ -10,6 +10,7 @@
   } from '../utils/harmoniserLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, noteName, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import PanelKeyCell from '../properties/PanelKeyCell.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -97,6 +98,7 @@
     </PropertyCell>
 
     {#if !isMemory}
+      <PanelKeyCell {control} section="Harmoniser" />
       <PropertyCell label="Key" span={1} hint="">
         <select class="val" value={num(p.key, 0)} onchange={(e) => set('key', clampInt(e.target.value, 0, 11, 0))}>
           {#each keyNames as nm, i (i)}<option value={i}>{nm}</option>{/each}

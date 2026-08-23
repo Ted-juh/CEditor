@@ -10,6 +10,7 @@
   } from '../utils/noteRecorderLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import PanelKeyCell from '../properties/PanelKeyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -155,6 +156,7 @@
       <PropertyToggle value={p.snapToScale === true} onchange={() => set('snapToScale', !(p.snapToScale === true))} />
     </PropertyCell>
     {#if p.snapToScale === true}
+      <PanelKeyCell {control} section="Recorder" />
       <PropertyCell label="Key" span={1} hint="">
         <select class="val" value={num(p.key, 0)} onchange={(e) => set('key', clampInt(e.target.value, 0, 11, 0))}>
           {#each keyNames as nm, i (i)}<option value={i}>{nm}</option>{/each}

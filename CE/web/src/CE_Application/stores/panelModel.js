@@ -180,6 +180,10 @@ export function createPanel(name = null) {
     // Macro's slots and the Router's destinations are READ as routes rather than copied into here;
     // see utils/routeAdapters.js.
     routes: [],
+    // One key and scale the whole panel plays in. Components opt in with `followPanelKey` on their
+    // own section, and changing this WRITES the new key into each of them — see utils/panelKey.js
+    // for why a broadcast beats an indirection here. Absent means nothing follows anything.
+    musicalContext: null,
     parameterSnapshots: {},
     // Host-automatable parameters this panel exposes (Milestone 2 / DAW automation). Empty = derive
     // automatically from the value-bearing controls at export time (see utils/exportParameters.js).
@@ -333,6 +337,10 @@ export function serializePanel(panel, options = {}) {
   // and Router destinations are a view, and writing them here would give the panel a stale second
   // copy of something the component already owns.
   if (!Array.isArray(data.routes) || data.routes.length === 0) delete data.routes;
+
+  // The panel key, on the "right or absent" rule: a panel where nothing follows it writes no key,
+  // so a reader never has to tell "no panel key" from "a panel key nobody uses".
+  if (!data.musicalContext) delete data.musicalContext;
 
   // Bake the host-automatable parameter list (M2) so the exported plugin's APVTS can read it.
   // Author-defined `exportParameters` are kept as-is; an empty list is derived from the controls.

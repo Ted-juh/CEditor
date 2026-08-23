@@ -3,6 +3,7 @@
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
   import { isDisplayOnly } from '../utils/displayMode.js';
+  import { RETURN_MODE, restValueFor, returnStep } from '../utils/returnToRest.js';
   import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout } from '../utils/lcdZones.js';
   import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
@@ -5602,6 +5603,61 @@
     });
   }
 
+  // --- Return to rest (the generic one) ------------------------------------
+  //
+  // A pitch or mod wheel springing back to centre, a spring-loaded fader, a ribbon returning. Three
+  // components already have their OWN spring — the joystick, the crossfader and the ribbon — and
+  // they keep it: each has extras this cannot know about (the joystick's trail, the ribbon's touch
+  // gate, per-axis return). This is the one for everything else, driven by the `returnMode` fields
+  // on Behavior, so a plain slider can spring without a fourth private implementation.
+  //
+  // THE GLIDE EMITS. A spring-back that moves the on-screen control to centre and tells the device
+  // nothing leaves the synth bent — which is the whole reason `returnToRest.js` produces a series of
+  // values rather than one. Each frame writes the session AND fans out; only the last one commits.
+  const activeReturns = new Map();   // controlId -> cancel token
+
+  function cancelReturn(controlId) {
+    const token = activeReturns.get(controlId);
+    if (token) { token.cancelled = true; activeReturns.delete(controlId); }
+  }
+
+  function startValueReturn(control) {
+    const behavior = getBehavior(control);
+    const rest = restValueFor(behavior);
+    // `null` is "this control does not return" and is not a rest value of zero — for a fader whose
+    // minimum is zero those are opposite behaviours.
+    if (rest === null || !isRangeControl(control)) return false;
+
+    const id = getControlId(control);
+    cancelReturn(id);                      // a new release restarts the glide rather than racing it
+
+    const from = currentRangeValue(control);
+    const token = { cancelled: false };
+    activeReturns.set(id, token);
+
+    const startedAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const tick = () => {
+      if (token.cancelled) return;
+      // A new grab cancels the return — the hand on the control wins over the spring.
+      if (pointerActiveControlId === id) { activeReturns.delete(id); return; }
+
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const step = returnStep(from, rest, now - startedAt, behavior);
+      setRangeValue(control, step.value);
+      emitControlPortFanout(control, step.done ? 'commit' : 'continuous');
+      if (step.done) {
+        activeReturns.delete(id);
+        raiseComponent(control, 'onSettled', { value: step.value });
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    // A zero return time snaps: run the first frame now rather than waiting one, so a control
+    // configured to snap does not visibly lag by 16ms.
+    tick();
+    return true;
+  }
+
   function setRangeValue(control, nextValue, extraPatch = {}) {
     if (!isRangeControl(control)) return;
     patchControlSession(getControlId(control), {
@@ -6526,6 +6582,14 @@
     if (ribbonDrag && activeControl) {
       ribbonDrag = null;
       releaseRibbon(activeControl);
+    }
+
+    // The generic spring-back, for the controls without one of their own. After the three
+    // specialised releases above, so a joystick or ribbon that already glided is not glided twice.
+    if (activeControl
+      && !joyDrag && !xfadeDrag && !ribbonDrag
+      && String(getBehavior(activeControl)?.returnMode ?? RETURN_MODE.none) !== RETURN_MODE.none) {
+      startValueReturn(activeControl);
     }
 
     // Release a macro knob: commit the position, drop the session override.
