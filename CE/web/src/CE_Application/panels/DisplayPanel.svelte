@@ -15,6 +15,7 @@
   // Per-icon import, never the lucide-svelte barrel — treeshake is off, so a barrel drags the whole
   // ~1800-icon index in behind it. See the comment on `treeshake: false` in vite.config.js.
   import PlugZap from 'lucide-svelte/icons/plug-zap';
+  import Camera from 'lucide-svelte/icons/camera';
   import LayersIcon from 'lucide-svelte/icons/layers';
   import ColorChooser from '../components/ColorChooser.svelte';
   import ColorSettings from '../components/ColorSettings.svelte';
@@ -50,7 +51,7 @@
   // its last tab sanitises to Colors rather than to nothing at all.
   // ('layers' was missing here while shipping as a tab — same sanitiser, same
   // consequence, so it is listed now.)
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'preview', 'console']);
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'snapshots', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
     notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
     viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
@@ -59,6 +60,7 @@
     device: () => import('../components/ParameterBrowserTab.svelte').then((module) => ({ default: module.default })),
     midi: () => import('../components/MidiMonitorTab.svelte').then((module) => ({ default: module.default })),
     ports: () => import('../components/DeviceWorkbenchTab.svelte').then((module) => ({ default: module.default })),
+    snapshots: () => import('../components/SnapshotsTab.svelte').then((module) => ({ default: module.default })),
     preview: () => import('../components/InteractionPreviewTab.svelte').then((module) => ({ default: module.default })),
     console: async () => {
       const [debugModule, consoleModule] = await Promise.all([
@@ -658,6 +660,7 @@
     { id: 'device',   label: 'Device',   icon: Cable },
     { id: 'midi',     label: 'MIDI',     icon: Activity },
     { id: 'ports',    label: 'Ports',    icon: PlugZap },
+    { id: 'snapshots', label: 'Snapshots', icon: Camera },
     { id: 'preview',  label: 'Preview',  icon: Play },
     { id: 'console',  label: 'Console',  icon: Terminal },
   ];

@@ -795,6 +795,18 @@ export const SECTION_DEFAULTS = {
     dragEnabled: false,
     wheelEnabled: false,
     reverseMouseDirection: false,
+    // --- Return-to-rest (spring-back) ---
+    // One capability, many components: a pitch or mod wheel springing to centre, a ribbon returning
+    // to rest, a joystick recentring, a spring fader. Each was about to reinvent it.
+    //
+    // `none` by default so nothing existing starts springing, and because most controls are
+    // set-and-hold. See utils/returnToRest.js — and note that the glide EMITS: a spring-back that
+    // moves the control and tells the device nothing leaves the synth bent.
+    returnMode: 'none',      // none | center | min | max | rest
+    returnValue: 0,          // the rest value when returnMode is 'rest'
+    returnTime: 120,         // ms; 0 = snap, and exactly 0 emits no intermediate value
+    returnCurve: 'exp',      // linear | exp | ease
+
     snapToStep: true,
     snapToTicks: false,
     emitValueCommit: false,

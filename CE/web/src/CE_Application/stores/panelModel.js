@@ -168,6 +168,11 @@ export function createPanel(name = null) {
     // plugin can reach — and a plugin should not scan an instrument's memory on every project
     // load, so baking is the right answer rather than a workaround. See utils/programBank.js.
     programBank: null,
+    // Captured panel states: named value maps the panel can recall or blend between. Stored on the
+    // document so they travel with it — a shared panel carries the scenes somebody built, not just
+    // the controls. Distinct from `parameterSnapshots` below, which despite the name is a cache of
+    // profile parameter METADATA rather than any captured value. See utils/snapshotModel.js.
+    snapshots: [],
     parameterSnapshots: {},
     // Host-automatable parameters this panel exposes (Milestone 2 / DAW automation). Empty = derive
     // automatically from the value-bearing controls at export time (see utils/exportParameters.js).
@@ -313,6 +318,9 @@ export function serializePanel(panel, options = {}) {
   if (!data.programBank || !Array.isArray(data.programBank.programs) || data.programBank.programs.length === 0) {
     delete data.programBank;
   }
+
+  // Snapshots, same rule. An empty array on every panel would be noise in every committed fixture.
+  if (!Array.isArray(data.snapshots) || data.snapshots.length === 0) delete data.snapshots;
 
   // Bake the host-automatable parameter list (M2) so the exported plugin's APVTS can read it.
   // Author-defined `exportParameters` are kept as-is; an empty list is derived from the controls.
