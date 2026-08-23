@@ -1,5 +1,26 @@
 # Program completeness review — 2026-08-03
 
+> ⚠️ **SUPERSEDED IN PART.** Kept because its framing — three end-to-end journeys, none of which
+> closes — is still the clearest account of what "feels complete but isn't" meant, and one of the
+> three loops is still open. But it was written against a README and a codebase that have both moved,
+> and reading it cold will mislead you. What has changed since:
+>
+> | Its claim | Today |
+> |---|---|
+> | The goal is "a visual editor for designing and building audio plugin UIs" | The README no longer says that. It leads on hardware-synth editors that are instruments in their own right — a change this document's own §3 argued for, by way of `beta-differentiation.md`. |
+> | "45 component types" | 50. |
+> | **The sound loop**: no preset model, no banks, no factory-vs-user slots | Built. `stores/presetLibrarian.js` has banks, named entries, scan capture and attached dump data. The DPD Presets screen is no longer a "not built yet" placeholder. |
+> | **The delivery loop**: VST3-only, source-checkout-only, unsigned | CLAP and LV2 ship beside VST3. Source-checkout-only is gone — a template player exports with no compiler (`docs/scripting-language-options-and-shippable-export.md` §3a). Unsigned is unchanged and is now a named v1 blocker in the 08-10 review. |
+> | Five menu stubs (Panel Properties…, Export Settings…, Build Standalone, Build Settings…) | Gone; none of those strings is in the tree. |
+> | "Undo is 50 whole-panel JSON snapshots — a perf ceiling on large panels" | Fixed. `stores/history.js` keeps a shallow copy sharing the control objects; the GAIA panel's snapshot went from 21 MB and ~190 ms to a few kilobytes. |
+>
+> **What survives, and it is the reason this file is not retired: the people loop.** No templates,
+> no example panels, no first run, no panel package format, no importer. Every word of §3 on that
+> still holds, and it is item 5 in `beta-readiness-review-2026-08-10.md` §3.
+>
+> For current status read the [08-10 beta readiness review](beta-readiness-review-2026-08-10.md) and
+> [known-issues.md](known-issues.md). This is a record of a diagnosis, not a to-do list.
+
 **The question asked:** "The program feels complete, but it's missing something I can't point my
 finger at. Given the program's goal, what is it missing?"
 

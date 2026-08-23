@@ -37,10 +37,8 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
 > accept the 2-arg `on(name, fn)` custom form. Preview: `panelRuntime.js`
 > implements the same semantics (listener registry, emit-chain guard, sync
 > `run()` return for JS/TS/C++/C#/Java targets) — covered by
-> `test/scriptFlow.test.js`. Still open: **`buildDump`** returns an empty var
-> in the Player and null in preview (the panel→bytes codec is not yet exposed
-> to scripts); C++/C#/Java preview interpreters can't register `on()` callbacks
-> (named handlers only).
+> `test/scriptFlow.test.js`. Two things stayed open and are listed under **Still open** below,
+> rather than here — a gap buried in the tail of a ✅ FIXED blockquote is a gap nobody reads.
 
 ## Advertised in `panelApi.js` but NOT wired in C++
 
@@ -58,7 +56,14 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
   **editor-preview (JS)** side of the raw inbound events (`onMidiIn` / `onCcIn` /
   `onNoteIn` / `onSysexIn` via the bridge's midi/sysex input events, plus
   per-parameter `onParameterReceived` from decoded dumps).
-- Still open: `onPanelStateChanged` (no panel-state feature to observe yet).
+- ✅ **WIRED on the C++ side too** (verified 2026-08-23): `PluginProcessor.h` dispatches `onMidiIn`
+  (:679), `onCcIn` (:687), `onNoteIn`/`onNoteOffIn` (:742), `onSysexIn` (:762) and
+  `onParameterReceived` (:819), alongside `onTransport`, `onBeat`, `onBar`, `onValueChanged`,
+  `onPresetChange` and `onDumpReceived`. The entry above described the editor-preview half only.
+- ~~Still open: `onPanelStateChanged`~~ — **gone, not pending.** `panelApi.js:505` records that it
+  was removed: there is no panel-state feature in the model for it to observe, so the event was
+  withdrawn rather than left advertised-and-undispatched. `ALL_EVENTS`' panel group is
+  `onControlChanged` and `onTimer`.
 
 ### Outbound host API
 - ✅ **DONE**: `startTimer` / `stopTimer` — backed by the `juce::Timer`-based
@@ -73,20 +78,38 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
 
 | Capability | JUCE class | Status |
 |------------|-----------|--------|
-| Timers (`startTimer` / `onTimer`) | `juce::Timer` | Used elsewhere; **not** in the scripting layer yet — add via `TimerManager`. |
-| Raw / decoded MIDI in (`onMidiIn` / `onSysexIn` / `onParameterReceived`) | `juce::MidiInput`, `juce::MidiMessage` | Already imported + received in `DeviceProfileService`; **just route to `dispatchEvent`**. |
-| Device connect/disconnect | `juce::MidiInput` device enumeration | Already available in `DeviceProfileService`; wire to events. |
+| Timers (`startTimer` / `onTimer`) | `juce::Timer` | ✅ **Done** — `CE/src/Scripting/TimerManager.h`, held by `PluginProcessor` behind `CEDITOR_SCRIPTING` and built by CI, which configures `-DCEDITOR_SCRIPTING=ON`. Registered in the JS, Lua **and Python** engines (`PythonScriptEngine.cpp:424`). |
+| Raw / decoded MIDI in (`onMidiIn` / `onSysexIn` / `onParameterReceived`) | `juce::MidiInput`, `juce::MidiMessage` | ✅ **Done** — dispatched from `PluginProcessor.h:679–819`. |
+| Device connect/disconnect | `juce::MidiInput` device enumeration | ✅ **Done** — from the DPD session-state `ready` transitions, both runtimes. |
 | MIDI out (`sendCC` / `sendSysex`) | `juce::MidiOutput`, `juce::MidiMessage` | **Already wired** via `BridgeScriptHost` callbacks → `DeviceProfileService`. |
+
+## Still open
+
+The short list, kept at the top level on purpose. Both were previously a trailing sentence inside a
+"✅ FIXED" blockquote above, which is a good way to have a gap and not know it. Re-verified against
+the tree on 2026-08-23.
+
+- [ ] **`buildDump`** returns an empty var in the Player and null in preview. The panel→bytes codec
+  is not exposed to scripts, so a script can read a dump and not write one. The decode direction
+  exists; this is the encode direction, over the `DeviceProfileService` dump definitions the engine
+  already parses.
+- [ ] **C++ / C# / Java preview interpreters cannot register `on()` callbacks** — named handlers
+  only. `compileCpp` and its siblings return functions but no top-level statements, so a script's
+  registration calls never execute; `loadHandlersJs` runs module top-level code and is the shape to
+  copy. Lua and JS are unaffected, and so is every language in the Player.
 
 ## To-do
 
-- [ ] Route `DeviceProfileService`'s existing MIDI-in / decode path to
-  `scriptRuntime->dispatchEvent("onParameterReceived" / "onMidiIn" / "onCcIn" /
-  "onSysexIn", …)` (today its `setEventCallback` only forwards
-  `dumpMessageParsed` → `onDumpReceived`).
-- [ ] Dispatch `onDeviceConnected` / `onDeviceDisconnected` from device
-  enumeration.
-- [ ] Dispatch `onControlChanged` / `onPanelStateChanged`.
+This list drifted badly once: the body above said WIRED while these boxes stayed unchecked and the
+table still said "just route to `dispatchEvent`", so the same file both claimed and denied the same
+three things. Reconciled against the tree on 2026-08-23 — every box below was checked by looking at
+the dispatch site, not at the paragraph above it.
+
+- [x] Route `DeviceProfileService`'s existing MIDI-in / decode path to
+  `scriptRuntime->dispatchEvent(…)` — done; `PluginProcessor.h:679–819`.
+- [x] Dispatch `onDeviceConnected` / `onDeviceDisconnected` from device enumeration.
+- [x] Dispatch `onControlChanged`. (`onPanelStateChanged` was removed from the API instead —
+  see above.)
 - [x] Add `startTimer` / `stopTimer` + `onTimer` via the `TimerManager`
   (see [timer-system.md](./timer-system.md)).
 - [x] Confirm `checksum` / `to14bit` and the other encoding helpers are
@@ -94,7 +117,8 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
 - [x] Surface these gaps to users: `panelApi.js` now carries `availability`
   metadata per member (rendered as badges in the generated
   `docs/scripting-manual.md`). **Update it when closing a gap here.**
-- [ ] Keep `panelApi.js` and the C++ side in sync (the header already says so).
+- [x] Keep `panelApi.js` and the C++ side in sync — `panelApiParity.test.js` fails when they
+  diverge, so this is enforced rather than remembered.
 
 ## Add findings below
 <!-- New gaps go here as they surface. -->

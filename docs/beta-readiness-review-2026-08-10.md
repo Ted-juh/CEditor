@@ -175,9 +175,11 @@ the download, not about a panel.
 - **Four DPD Designer screens are placeholders** — Packing Studio, Share & impact, Import result,
   Assignable list (`DeviceProfileDesignerV2.svelte:129, 209-214`). They sit in the navigation, so
   every DPD user finds them. Either build or hide.
-- **Two DPD Parameters buttons ship disabled** with `title="Coming soon"` — Import CSV, MIDI learn
-  (`DpdParametersScreen.svelte:80-81`).
-- **Display panel Effects tab** is a placeholder: "full editing coming soon" (`DisplayPanel.svelte:517`).
+- ~~**Two DPD Parameters buttons ship disabled** with `title="Coming soon"`~~ *(fixed 2026-08-23)* —
+  both removed. Neither feature is built; both are recorded in `known-issues.md`, along with why
+  MIDI learn here is not the same thing as `MidiLearnChips.svelte`.
+- ~~**Display panel Effects tab** is a placeholder: "full editing coming soon"~~ *(fixed)* — the tab
+  is real; `DisplayPanel.svelte:43` now carries only a comment recording that it used to say so.
 - **`.gitignore` is 1925 lines / 140 KB**, most of it a dead `Source/CPanel_Build/modules/juce_*`
   list from a tree that no longer exists.
 

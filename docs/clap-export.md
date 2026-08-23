@@ -45,11 +45,13 @@ The policy is "every format reachable without a third-party gate ships":
 
 ## Standing caveats
 
-- **First native build still unverified**: this environment cannot run MSVC, and CI cannot build
-  the C++ side until the JUCE helper executables (excluded by `.gitignore`'s `*.exe`) are
-  committed from a machine that has them (`JUCE/bin/JUCE-8.0.7/{juceaide,juce_lv2_helper,juce_vst3_helper}.exe`).
-  The wrapper reads only properties `juce_add_plugin` sets, so the installed-JUCE
-  (`find_package`) setup is expected to work — expected, not yet proven.
+- ~~**First native build still unverified**: … CI cannot build the C++ side until the JUCE helper
+  executables (excluded by `.gitignore`'s `*.exe`) are committed …~~ **Both halves resolved.** All
+  three helpers are committed (`JUCE/bin/JUCE-8.0.7/`, guarded by
+  `CE/web/test/vendoredJuceHelpers.test.js` against the ignore rule creeping back), and CI builds
+  the C++ side on every run. The CLAP target configures and the wrapper attaches — verified on
+  Linux 2026-08-23, where the build reaches the link and stops only on `dwmapi`.
+  What is still unproven is a CLAP **host** loading one, which needs Windows and Bitwig or Reaper.
 - **Python embed**: the CPython stdlib bundler only lays out the VST3 today. A `.clap` with
   embedded Python runs Python window-open only until a CLAP layout lands (the export script
   warns). Lua/JS are unaffected.

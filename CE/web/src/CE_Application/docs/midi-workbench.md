@@ -53,16 +53,22 @@ cohesive surface:
 
 ### Authoring app — concrete GUI gaps
 
+> Re-checked against the tree on 2026-08-23. Items 1, 3, 4, 6 and 7 are still accurate; 2 and 5
+> have changed and are struck through below.
+
 1. **No dedicated MIDI connection / port manager** — pickers live only in
    `ParameterBrowserTab`'s toolbar.
-2. **MIDI Learn** — a **disabled "Coming soon" placeholder** in
-   `DpdParametersScreen.svelte`. Not implemented.
+2. **MIDI Learn** — ~~a disabled "Coming soon" placeholder in `DpdParametersScreen.svelte`~~. The
+   placeholder was removed 2026-08-23 rather than left promising something; the feature is still
+   unbuilt and is recorded in `docs/known-issues.md`, which also spells out why it is NOT the same
+   thing as `MidiLearnChips.svelte` (that binds a CC to a control; this would write a parameter's
+   address into a profile).
 3. **No raw MIDI send / test UI** — `compileRawMidiAction` /
    `triggerRawMidiAction` are exposed with no construct-and-send surface.
 4. **Monitor is a peek, not a monitor** — no filters, no CC/NRPN/SysEx decode
    breakdown, no parameter-annotated stream, no export.
-5. **No preset browser** — scans run (`startPresetListScan`) but presets aren't
-   browsable / selectable.
+5. ~~**No preset browser**~~ — **built.** `editor/dpd/DpdPresetsScreen.svelte` browses them, and
+   `stores/presetLibrarian.js` backs it with banks, named entries and scan capture.
 6. **No post-handshake identity readout** (manufacturer / product / revision).
 7. **No incoming bulk-dump capture UI** — send only; parsing is hidden behind
    the Advanced-screen JSON textarea.
@@ -236,8 +242,10 @@ A patch librarian + device backup:
 
 - **Decode via DPD** so the monitor shows semantic parameter names, not just hex.
 - **Scripting:** the monitor is the natural place to surface `onMidiIn` /
-  `onSysexIn` / `onParameterReceived` — currently unwired
-  (see [scripting-runtime-gaps.md](./scripting-runtime-gaps.md)).
+  `onSysexIn` / `onParameterReceived` — ~~currently unwired~~ **now wired on both sides**
+  (`PluginProcessor.h:679–819` for the player, the bridge's midi/sysex input events for the
+  preview; see [scripting-runtime-gaps.md](./scripting-runtime-gaps.md)). Surfacing them in the
+  monitor is still the open half.
 - **MIDI 2.0 / UMP:** decode/show UMP + MIDI-CI Property Exchange traffic.
 
 ## Panel runtime MIDI — target-aware widgets

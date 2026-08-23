@@ -19,11 +19,12 @@ not a component at all — it is everything that happens *before* a panel exists
 
 Three findings, in order of how much money is on the table:
 
-1. **You are shipping a live instrument and describing it as a UI builder.** The README's first
-   line sells "a visual editor for designing and building audio plugin UIs" — the one thing in this
-   space with real competition. Meanwhile `groundbreaking-components.md` lists nineteen components
-   marked 🟢 shipped that no competing editor has in any form. That gap is a positioning problem,
-   and positioning is free.
+1. ~~**You are shipping a live instrument and describing it as a UI builder.**~~ ***(done)*** The
+   README's first line used to sell "a visual editor for designing and building audio plugin UIs" —
+   the one thing in this space with real competition — while `groundbreaking-components.md` listed
+   nineteen 🟢 shipped components no competing editor has in any form. It now leads on the
+   instrument layer: the note players, the four modulation sources, the live rig, the patch-space
+   navigation. This finding is the one that cost nothing and it was taken.
 2. **The category's true bottleneck is profile acquisition, and nobody has automated it.** Every
    editor ever written — including Ctrlr — begins with a human transcribing a MIDI implementation
    chart out of a manual. Automating that is the one advantage a competitor cannot copy by adding
@@ -243,9 +244,14 @@ So the rigour exists and **the user cannot see any of it**: the DPD Designer's S
 engine. In a category whose folklore is *"that panel works except for the filter section,"* showing
 whether a profile is verified — and how — is worth more than most features.
 
-### 6. MIDI-CI discovery (M1)
+### 6. MIDI-CI discovery (M1) — ***wired since this was written***
 
-`juce_midi_ci` is vendored and compiled in but unwired. `CE/dpd/tools/import-midici.mjs` already
+`CE/src/DeviceProfile/MidiCiSession.cpp` calls `startDiscovery()`, `DeviceProfileServiceMidiCi.cpp`
+emits `midiCiDiscoveryComplete`, and `DeviceRuntimeBridge.cpp:153` exposes
+`startMidiCiDiscovery` to the panel. The paragraph below describes the state before that and is kept
+for the argument it makes about *why* discovery is worth having, which is unchanged.
+
+~~`juce_midi_ci` is vendored and compiled in but unwired.~~ `CE/dpd/tools/import-midici.mjs` already
 converts Property Exchange JSON into a partial profile, offline, today. M1 of
 [`midi2-integration-plan.md`](../tools/docs/midi2-integration-plan.md) connects the two.
 
@@ -330,8 +336,12 @@ The lesson is worth more than the fix: **a QA report is a snapshot, and an undat
 the build it describes.** Every finding table in this repository should carry a status column from
 the day it is written.
 
-What remains is four open Medium/Low workflow defects (004, 008, 009, 010) and half of 007 — no
-crashes among them. Given that, the recommendation is deliberately narrow:
+~~What remains is four open Medium/Low workflow defects (004, 008, 009, 010) and half of 007~~ —
+**all twelve are now closed in code.** 004 and 007b landed after this was written; 009 and 010 never
+needed a patch, sharing the `DataCloneError` root cause fixed in `4f02a12`. What is left of them is a
+**re-test** of 009/010 against a build containing the fix, which is confirmation rather than work,
+and is tracked in `beta-readiness-review-2026-08-10.md` §3. Given that, the recommendation is
+deliberately narrow:
 
 1. **Run a fresh QA pass against a current build.** Not a code change — the open findings are
    workflow bugs that can only be judged in the running application, and the last pass tested a
