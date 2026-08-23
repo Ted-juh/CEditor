@@ -75,6 +75,7 @@
   import SurfaceDockInspector from './SurfaceDockInspector.svelte';
   import SurfaceHelpOverlay from './SurfaceHelpOverlay.svelte';
   import { numberOr } from '../utils/primitives.js';
+  import { confirmDestructive } from '../utils/confirmDiscard.js';
   import { readStoredNumber, writeStoredNumber } from '../utils/localStorageState.js';
   import {
     angleFromCenter,
@@ -1295,8 +1296,21 @@
     }
   }
 
+  /**
+   * Replace everything on the canvas with an empty one.
+   *
+   * The 2026-07-12 review filed the placement rather than the action: a destructive reset sat in
+   * the middle of the insert buttons, one slot from "Dial". It has moved to the end of the strip
+   * and wears the danger colour, and it asks first when there is anything to lose. Undo does cover
+   * it — the component workspace has its own history context — but a one-click wipe of the whole
+   * canvas should not rely on the user knowing that.
+   */
   function resetToBlankCanvas() {
     if (!core?.id) return;
+    const partCount = Object.keys(authoredParts?._children ?? {}).length;
+    if (partCount > 0 && !confirmDestructive(
+      `Clear this component? ${partCount} layer${partCount === 1 ? '' : 's'} and every hit zone and generator will be replaced with a blank canvas.`
+    )) return;
     localSelectedLayerNames = [];
     activeFrame = null;
     activeLayerFrames = {};

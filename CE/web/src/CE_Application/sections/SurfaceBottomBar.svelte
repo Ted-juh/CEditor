@@ -101,12 +101,14 @@
       </div>
       <button type="button" class="surface-command danger" onclick={removeSelectedArpBlock} disabled={!arpSelectedBlock} title="Delete selected note block">Delete note</button>
     {/if}
-    <button type="button" class="surface-command" onclick={resetToBlankCanvas} title="Clear this component to a blank drawing canvas">Blank</button>
     <button type="button" class="surface-command accent" onclick={addDialKit} title="Add a circular value control">Dial</button>
     <button type="button" class="surface-command accent" onclick={addHorizontalScaleKit} title="Add a horizontal value scale with ticks">H Scale</button>
     <button type="button" class="surface-command accent" onclick={addVerticalScaleKit} title="Add a vertical value scale with ticks">V Scale</button>
     <button type="button" class="surface-command accent" onclick={addArpeggiatorKit} title="Add a graphical arpeggiator step editor">Arp Kit</button>
     <button type="button" class="surface-command" class:accent={helpOverlayOpen} onclick={() => setHelpOverlayOpen(!helpOverlayOpen)} title="Shortcuts &amp; glossary (?)">?</button>
+    <!-- Last, and in the danger colour. It used to sit between "Delete note" and "Dial", which put
+         a whole-canvas wipe one slot from the button people press most. -->
+    <button type="button" class="surface-command danger" onclick={resetToBlankCanvas} title="Clear this component to a blank drawing canvas">Blank</button>
     </div>
 
     <div class="surface-zoombar" aria-label="Zoom controls">
