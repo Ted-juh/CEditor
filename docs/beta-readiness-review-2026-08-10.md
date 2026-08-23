@@ -321,7 +321,8 @@ Everything above is small. These are not, and they are what a beta decision actu
    (custom components have one; panels do not)~~ *(fixed — File → Share Panel... writes a
    `.cepanelpkg` with every image embedded, File → Open Shared Panel... reads one back; the
    author's file path and bound MIDI ports are stripped on the way out)*, no Ctrlr
-   `.panel`/`.bpanelz` importer. ~~no update channel~~ *(fixed — Help → Check for Updates, off by
+   ~~`.panel`/`.bpanelz` importer~~ *(built — `node tools/scripts/ctrlr-import.mjs`, all four
+   stages, never run on a real community panel)*. ~~no update channel~~ *(fixed — Help → Check for Updates, off by
    default because the request tells GitHub the machine's IP.)* The documentation half is closed: Help →
    Documentation carries the scripting manual, cookbook, getting-started, release notes and known
    issues, searchable and baked into the bundle.

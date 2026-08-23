@@ -1,8 +1,14 @@
 # Ctrlr import — design record
 
-> Status: **design, 2026-08-11.** Nothing built. Written to answer one objection, because the
-> objection is the reason this has never been attempted: *"converting Ctrlr panels must be
-> enormously hard — Ctrlr is JUCE C++ modules and CEditor is Svelte."*
+> Status: **built, 2026-08-23** — all four stages, in `tools/ctrlr-import/` behind
+> `node tools/scripts/ctrlr-import.mjs`. **Never run on a real community panel:** nobody here has a
+> `.panel` or a `.bpanelz`, so every open question below is answered by refusing-and-reporting
+> rather than by a guess, and the first real file is what turns those refusals into knowledge. See
+> [What was built](#what-was-built) at the end.
+>
+> Originally written to answer one objection, because the objection is the reason this has never
+> been attempted: *"converting Ctrlr panels must be enormously hard — Ctrlr is JUCE C++ modules and
+> CEditor is Svelte."*
 >
 > The short answer is that the difficulty is real but it is **not** where the objection puts it.
 > Ranked in [`docs/beta-differentiation.md`](../../docs/beta-differentiation.md) as Tier 2 #4.
@@ -214,3 +220,62 @@ expensive to guess at now:
 - [Ctrlr identifier table (`CtrlrIDs.xml`)](https://github.com/RomanKubiak/ctrlr/blob/master/Source/Resources/XML/CtrlrIDs.xml)
 - [`CtrlrModulator.cpp`](https://github.com/RomanKubiak/ctrlr/blob/master/Source/Core/CtrlrModulator/CtrlrModulator.cpp)
 - [An example community panel](https://github.com/theacodes/genesynth/blob/master/ctrlr/genesynth.panel)
+
+## What was built
+
+```
+tools/ctrlr-import/xml.mjs          a small XML reader — no dependency, and a DOCTYPE is refused
+tools/ctrlr-import/read.mjs         S1: decode, parse, report. Converts nothing.
+tools/ctrlr-import/harvest.mjs      S2: modulators -> a .ceditor-device profile
+tools/ctrlr-import/reconstruct.mjs  S3: components -> a placement plan
+tools/scripts/ctrlr-import.mjs      the CLI, and S4's Lua triage report
+```
+
+```
+node tools/scripts/ctrlr-import.mjs panel.bpanelz                       # S1 only: report
+node tools/scripts/ctrlr-import.mjs panel.panel --profile out.json      # + S2
+node tools/scripts/ctrlr-import.mjs panel.panel --profile p --panel q   # + S3, + the S4 report
+node tools/scripts/ctrlr-import.mjs --corpus ./panels                   # every file, never stops
+```
+
+### What the open questions turned into
+
+None of them could be answered from here, so none of them was guessed at. Each became a refusal
+that reports itself, which is what makes the first real file informative rather than a debugging
+session:
+
+| Open question | What the code does instead |
+|---|---|
+| The exact `componentRectangle` format | Accepts space- or comma-separated, requires four positive numbers, and **skips the component with the string it could not read**. A control silently placed at 0,0 size 0 is invisible, and a panel full of those looks like the importer worked. |
+| `.bpanelz` compression | Tries gzip, zlib, raw deflate and plain, **reports which worked**, and refuses anything that decodes to something that is not a panel. |
+| The `uiSliderStyle` / `midiMessageType` vocabularies | Both are **histogrammed by S1**. Run the corpus and the vocabulary is a table rather than an assumption. |
+| How widely `modulatorValueExpression` is used | Only the identity is accepted; anything else is **flagged with the expression in the message**, and the corpus run prints the conversion rate. That number is the answer. |
+| `vstIndex` ordering for automation-slot compatibility | Carried through on each parameter as `ctrlr.vstIndex` and otherwise unused, so whoever needs it has it. |
+
+### The one thing that had to be right, and nearly was not
+
+A parameter naming a `messageRecipe` the profile does not define makes `loadFromJson` reject the
+**whole** profile — silently, taking every other parameter with it. The first draft of the harvester
+emitted `messageRecipe: "cc"` with the controller on the parameter, which is not the schema: every
+harvest would have produced a file that looked right and loaded as nothing. It now emits one recipe
+per distinct CC / NRPN / SysEx shape and a test asserts that every parameter names one that exists,
+plus a round trip through the editor's own validator and compiler — a harvested `Filter Cutoff` on
+CC 74 compiles to `B0 4A 64`.
+
+### And the one the reconstruction had to get right
+
+A control bound to a parameter the harvest **flagged** would look connected in the editor and send
+nothing. `planReconstruction` takes the set of ids that actually exist and places anything else
+unbound, with a note saying how many and why.
+
+### Still true
+
+- **No real panel has been through this.** The fixture is hand-built from Ctrlr's identifier table.
+- **No pixel fidelity**, and the reconstruction says so in its own notes rather than leaving it to
+  be discovered — including which components drew themselves with Lua (placed as plain boxes) and
+  which are image-strip controls (which CEditor renders natively and could match near-exactly once
+  resources are extracted).
+- **No Lua runs.** Methods are classified shimmable / port / paint and reported; nothing is
+  translated. The `ctrlr` compatibility shim stays unbuilt until a corpus histogram says it pays.
+- **No resource extraction yet**, so filmstrips are recognised and named but not unpacked.
+- **Nothing is bundled and nothing is fetched.** It converts a file the user already has.

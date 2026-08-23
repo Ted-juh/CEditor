@@ -318,7 +318,7 @@ whether they compound or merely impress. Summary:
 | 1 | Capture-and-infer profiling | **Highest — structurally uncopyable** | Medium | Beta headline |
 | 2 | Total Recall (**all four stages done**) | High — the #1 user pain | Low–medium | **Beta** |
 | 3 | ~~Auto-Panel~~ **built** | High — adoption + onboarding | Medium | **Beta** |
-| 4 | Ctrlr harvest → profiles | High — network effect, migration | Low (staged) | Beta+1 |
+| 4 | ~~Ctrlr harvest → profiles~~ **built** (never run on a real panel) | High — network effect, migration | Low (staged) | **Beta** |
 | 5 | Verified-profile badge | Medium — trust | **Very low** | Beta |
 | 6 | MIDI-CI discovery | Medium — first mover, press | Low (code exists) | Beta+1 |
 | 7 | Patch Diff / Compare | Medium — daily driver | Low | Beta+1 |

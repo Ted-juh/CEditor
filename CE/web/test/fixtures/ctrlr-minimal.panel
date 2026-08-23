@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A HAND-BUILT fixture, not a real community panel.
+     Every attribute here is from Ctrlr's own identifier table (Source/Resources/XML/CtrlrIDs.xml),
+     which is the complete vocabulary a panel file can use. It exercises one of each mapping the
+     importer claims, plus the three things it must refuse. Nobody here has a real .panel or
+     .bpanelz, and the importer's docs say so rather than implying this stands in for one. -->
+<panel panelName="Test Synth Editor" panelAuthor="Somebody" panelVersion="1.2"
+       panelManufacturer="Acme" panelInstrument="TS-1"
+       panelCanvasRectangleWidth="640" panelCanvasRectangleHeight="400"
+       luaPanelLoaded="onLoad" luaPanelPaintBackground="paintBg">
+
+  <modulator modulatorName="Filter Cutoff" modulatorMin="0" modulatorMax="127" modulatorValue="64"
+             vstIndex="0" modulatorVstExported="1">
+    <component uiType="uiSlider" uiSliderStyle="rotary" componentRectangle="10 20 60 60"
+               uiSliderThumbColour="ffcc4400" uiSliderTrackColour="ff202020" uiLabelText="Cutoff" />
+    <midi midiMessageType="cc" midiMessageCtrlrNumber="74" midiMessageChannel="1" />
+  </modulator>
+
+  <modulator modulatorName="Resonance" modulatorMin="0" modulatorMax="127" modulatorValue="0">
+    <component uiType="uiSlider" uiSliderStyle="LinearVertical" componentRectangle="90,20,24,80" />
+    <midi midiMessageType="cc" midiMessageCtrlrNumber="71" midiMessageChannel="1" />
+  </modulator>
+
+  <modulator modulatorName="LFO Shape" modulatorMin="0" modulatorMax="3" modulatorValue="0">
+    <component uiType="uiCombo" componentRectangle="130 20 120 24"
+               uiComboContent="Triangle&#10;Saw&#10;Square&#10;Random" />
+    <midi midiMessageType="cc" midiMessageCtrlrNumber="12" />
+  </modulator>
+
+  <modulator modulatorName="Osc Sync" modulatorMin="0" modulatorMax="1" modulatorValue="0">
+    <component uiType="uiToggleButton" componentRectangle="270 20 80 24" uiLabelText="SYNC" />
+    <midi midiMessageType="cc" midiMessageCtrlrNumber="65" />
+  </modulator>
+
+  <modulator modulatorName="Patch Level" modulatorMin="0" modulatorMax="127" modulatorValue="100">
+    <component uiType="uiSlider" uiSliderStyle="rotary" componentRectangle="360 20 60 60" />
+    <midi midiMessageType="sysex" midiMessageSysExFormula="F0 41 10 00 00 xx F7" />
+  </modulator>
+
+  <!-- Refused: a value expression that is not the identity. -->
+  <modulator modulatorName="Scaled Thing" modulatorMin="0" modulatorMax="100"
+             modulatorValueExpression="modulatorValue * 1.27">
+    <component uiType="uiSlider" componentRectangle="430 20 60 60" />
+    <midi midiMessageType="cc" midiMessageCtrlrNumber="20" />
+  </modulator>
+
+  <!-- Refused: the SysEx formula is Lua, not a byte template. -->
+  <modulator modulatorName="Computed Dump" modulatorMin="0" modulatorMax="127">
+    <component uiType="uiSlider" componentRectangle="500 20 60 60" />
+    <midi midiMessageType="sysex" midiMessageSysExFormula="function() return {0xF0, 0xF7} end" />
+  </modulator>
+
+  <!-- Refused: a program change is a message, not a parameter send. -->
+  <modulator modulatorName="Program" modulatorMin="0" modulatorMax="127">
+    <component uiType="uiSlider" componentRectangle="10 100 60 60" />
+    <midi midiMessageType="programChange" />
+  </modulator>
+
+  <!-- Placed but not bound, and a rectangle the importer must refuse rather than default. -->
+  <uiComponent uiType="uiLabel" uiLabelText="OSCILLATOR" componentRectangle="10 180 200 20"
+               uiLabelBgColour="ff101010" />
+  <uiComponent uiType="uiSlider" uiLabelText="Broken Rect" componentRectangle="not numbers" />
+  <uiComponent uiType="uiTheremin" uiLabelText="Unknown Type" componentRectangle="10 220 60 60" />
+  <uiComponent uiType="uiSlider" uiLabelText="Painted" componentRectangle="90 220 60 60"
+               uiCustomPaintCallback="paintKnob" uiImageSliderResource="knobStrip" />
+
+  <luaMethod luaMethodName="onLoad"><![CDATA[
+    panel:getModulatorByName("Filter Cutoff"):setValue(64)
+  ]]></luaMethod>
+
+  <luaMethod luaMethodName="paintBg"><![CDATA[
+    g:setColour(Colour(0xff101010)); g:fillAll()
+  ]]></luaMethod>
+
+  <luaMethod luaMethodName="assembleBank"><![CDATA[
+    local out = {} for i = 1, 128 do out[i] = i end return out
+  ]]></luaMethod>
+
+  <resource resourceName="knobStrip" resourceType="image" resourceSize="20480" />
+</panel>

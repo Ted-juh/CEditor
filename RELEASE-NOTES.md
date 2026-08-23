@@ -68,6 +68,19 @@ move between the two freely.
 - **AU is absent** (it needs the macOS port) and **AAX and VST2** are not planned — AAX needs Avid's
   SDK and PACE signing, and VST2 licensing closed in 2018.
 
+## Bringing a Ctrlr panel across
+
+`node tools/scripts/ctrlr-import.mjs <your.panel>` reads a Ctrlr `.panel` or `.bpanelz` and tells
+you what is in it. Add `--profile out.json` to harvest a device profile from its modulators, and
+`--panel out.cepanel` to rebuild the interface on top of that profile. It needs a source checkout —
+there is no in-app importer yet.
+
+It converts a file you already have and fetches nothing. Two things it will not do: guess at a MIDI
+message it cannot express (those modulators are flagged with the reason instead), and translate
+Lua (methods are imported as reference text with a note saying which of them could be ported and
+which drew the panel and cannot be). **No real community panel has been through it yet** — if you
+have one, the report alone is useful and worth sending.
+
 ## Reporting something
 
 Open an issue with the panel (if you can share it), what you expected, and what happened. Crashes:
