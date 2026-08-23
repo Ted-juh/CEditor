@@ -331,7 +331,7 @@ Everything above is small. These are not, and they are what a beta decision actu
    issues, searchable and baked into the bundle.
 6. **Export polish**: pipeline **D1** (GUID registry / "update vs new copy") unbuilt, so two panels
    can collide FUIDs; **E1–E5** unbuilt, so there is no build log surface, export history or
-   "Reveal in folder"; ~~every parameter maps to `AudioParameterFloat`~~ *(fixed)* — the editor now emits a
+   "Reveal in folder" *(all built 2026-08-23 — see the export plan's D1 and E1–E5)*; ~~every parameter maps to `AudioParameterFloat`~~ *(fixed)* — the editor now emits a
    `valueKind` and `PanelParameters.h` branches on it, so a selector arrives as an
    `AudioParameterChoice` with its real option names and a toggle as an `AudioParameterBool`. The
    two shipped hardware panels gained 32 (GAIA) and 58 (AN1x) named menus that were anonymous

@@ -331,8 +331,24 @@ user toolchain by default**. Unique-binary-per-panel + the identity policy becom
         `auSubtype`, `clapId`, productName). Deterministic per GUID, unique across panels
         even with identical names, valid 4-char codes (JUCE-safe). Test:
         `CE/tests/PanelExportIdentityTests.cpp` (target `CEditorExportIdentityTests`, all pass).
-      - [ ] Mint a random GUID on first export, persist it in the `.cepanel`, keep a registry
-        of issued GUIDs, and wire the **Update vs New-copy** policy. *(needs generator + file I/O)*
+      - [x] **Done 2026-08-23.** A GUID is minted on first export and persisted in the `.cepanel`;
+        `stores/exportRuns.js` keeps the registry of issued GUIDs (browser storage, since it is a
+        fact about this machine's builds rather than about any panel) and `utils/guidRegistry.js`
+        decides Update vs New-copy.
+
+        The collision is **not** two panels drawing the same random GUID — that will not happen. It
+        is a `.cepanel` being **copied**: duplicate a panel to start a variant, export it, and it
+        takes over the original plugin's identity, silently replacing it in every project that
+        loaded it. So `identityDecision` returns `ask` for *exactly* that case — a GUID owned by a
+        different panel file — and stays silent for a normal re-export. An export that asks a
+        question every time is one people click through without reading, which would put the
+        collision straight back.
+
+        The identity is claimed **before** the build, not after: a failed first export would
+        otherwise leave the panel holding a GUID nothing has claimed, and the next export of a copy
+        would read as "adopt" rather than "ask". A New copy also renames the plugin, because two
+        independent plugins arriving in a DAW's list under one name defeat the point of the fresh
+        GUID.
 - [~] D2/D4. **Export contract + compile backend — PROVEN end-to-end.**
       `tools/scripts/export-panel-vst3.mjs`: given a panel + GUID, derives the identity
       (JS port of `PanelExportIdentity`, **self-checks `pluginCode`/`auSubtype` against the
@@ -370,13 +386,27 @@ non-colliding plugins (the "even if same panel" guarantee). Export a different p
 
 Implements the Hybrid (Candidate 3) UX above.
 
-- [ ] E1. Add the top-level **Export** menu header in `MenuBar.svelte` with quick items
-      (*Export VST3*, *Export Standalone*, *Export As…*, *Export Settings…*).
-- [ ] E2. Add the **Export tab** to `TabBar.svelte` (config + build log + history).
-- [ ] E3. Non-blocking progress: status-bar/toast chip for quick exports; full log in tab.
-- [ ] E4. Identity confirm modal (Update vs New copy); success card with "Reveal in folder."
-- [ ] E5. Export Defaults section in `appSettings` (vendor, manufacturer code, output dir,
-      default format, backend preference, signing).
+- [x] E1. `MenuBar.svelte` carries **Export Plugin**; one build produces every format the panel's
+      Export tab has enabled, which is why it is one item rather than four.
+- [x] E2. The Export tab holds config, and now the **build log** and **history** too
+      (`PanelCardContent.svelte` over `stores/exportRuns.js`). The log is per run and capped at a
+      head and a tail: a configure error is in the first lines and a compile error in the last, so
+      both ends are kept and the dropped middle is *counted* rather than silently swallowed. The
+      console keeps the interleaved copy; a build's output mixed with MIDI traffic is not a build
+      log, which is why the console alone was not enough.
+- [x] E3. The build never blocked the editor, and the tab now shows what it is doing: the button
+      reads *Building…* and is disabled, and the log streams in. Failed runs are kept in history
+      with their last lines — the run somebody wants to look at again is usually the one that did
+      not work.
+- [x] E4. Inline rather than a modal, and shown only when the identity is genuinely in question
+      (see D1). Success card with the output path and **Reveal in folder**, over the existing
+      `revealFile` bridge; every history row carries the same link.
+- [x] E5. **Export Defaults** in Settings → General: vendor, four-character manufacturer code,
+      output folder, default format, backend. They start **empty**, deliberately — a plausible
+      vendor name baked into somebody's plugin is worse than a blank field, because nobody notices
+      the first one. A manufacturer code is padded to four characters and the padded form is shown
+      back, so a three-character code cannot quietly become a plugin identifying as something else.
+      Signing is not here: there is nothing to sign with (see `legalNotices.js`).
 
 **Exit proof (the stated goal):** design a panel in CEditor → click Export → open the
 resulting VST3 in your DAW → it controls the GAIA. Loop closed.

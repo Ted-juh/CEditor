@@ -39,6 +39,9 @@
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';
   import { collectPanelExportScripts } from '../scripting/scriptPanelExport.js';
+  import { activeRun, buildRunning, clearHistory, clearRun, exportHistory, identityFor }
+    from '../stores/exportRuns.js';
+  import { canRevealFiles, revealFile } from '../bridge/revealFile.js';
   import { LICENCE_NOTICE, SIGNING_NOTICE } from '../utils/legalNotices.js';
   import { presetLibrary } from '../stores/presetLibrarian.js';
   import { bakeProgramBank, bakeReport, MAX_PROGRAMS } from '../utils/programBank.js';
@@ -202,6 +205,16 @@
   let exportFormatSuffix = $derived(
     ['.vst3', ...(exportClap ? ['.clap'] : []), ...(exportLv2 ? ['.lv2'] : [])].join(' + ')
   );
+
+  // The identity fork, asked only when it is a real question. `identityFor` returns 'ask' solely
+  // for a GUID that belongs to a DIFFERENT panel — the copied-.cepanel case — so a normal
+  // re-export never sees this and never learns to click through it.
+  let identityAsk = $state(null);
+
+  function runExport(choice = null) {
+    const result = buildActivePanelVst3(choice === null ? {} : { identityChoice: choice });
+    identityAsk = result && result.needsChoice ? result.decision : null;
+  }
 
   function setExportSetting(key, value) {
     if (!panel) return;
@@ -1035,12 +1048,74 @@
     </PropertySection>
 
     <PropertySection title="Build" icon={Hammer}>
-      <PropertyCell label="Output" span={4} hint="Builds every enabled format (see Formats above) from this panel into export-out/. Progress streams into the Console panel.">
+      <PropertyCell label="Output" span={4} hint="Builds every enabled format (see Formats above) from this panel into export-out/. The log below is this run only; the Console panel keeps the interleaved copy.">
         <div class="export-row">
-          <button class="export-action" onclick={() => buildActivePanelVst3()}>Export Plugin</button>
+          <button class="export-action" disabled={$buildRunning} onclick={() => runExport()}>
+            {$buildRunning ? 'Building…' : 'Export Plugin'}
+          </button>
           <span class="export-build-note">→ export-out/{effectivePluginName}{exportFormatSuffix}{pythonWillEmbed ? ` (+~${PYTHON_RUNTIME_MB} MB Python)` : ''}</span>
         </div>
       </PropertyCell>
+
+      <!-- The identity fork (export plan D1). Shown only when it is a real question: a normal
+           re-export of a panel's own plugin must not ask, or it becomes a dialog people click
+           through without reading. -->
+      {#if identityAsk}
+        <PropertyCell label="Plugin identity" span={4} hint="This panel's plugin GUID already belongs to another panel — almost always the file this one was copied from. Updating replaces that plugin everywhere it is loaded; a new copy gets its own identity and can sit beside it in a DAW.">
+          <div class="identity-fork">
+            <p class="identity-why">{identityAsk.reason}.</p>
+            <div class="export-row">
+              <button class="export-action" onclick={() => runExport('update')}>Update that plugin</button>
+              <button class="export-action primary" onclick={() => runExport('new')}>Export as a new plugin</button>
+            </div>
+          </div>
+        </PropertyCell>
+      {/if}
+
+      {#if $activeRun}
+        <PropertyCell label={$activeRun.status === 'running' ? 'Build log' : ($activeRun.status === 'ok' ? 'Built' : 'Failed')} span={4} hint="The head and tail of this run. The middle is dropped when a build is long — a configure error is in the first lines and a compile error in the last, so both ends are kept and the gap is counted rather than hidden.">
+          <div class="build-log" class:ok={$activeRun.status === 'ok'} class:failed={$activeRun.status === 'failed'}>
+            {#if $activeRun.status === 'ok'}
+              <div class="build-result">
+                <b>{$activeRun.productName}</b> → <code>{$activeRun.path || 'export-out/'}</code>
+                {#if canRevealFiles() && $activeRun.path}
+                  <button class="link" onclick={() => revealFile($activeRun.path)}>Reveal in folder</button>
+                {/if}
+                <button class="link" onclick={() => clearRun()}>Dismiss</button>
+              </div>
+            {:else if $activeRun.status === 'failed'}
+              <div class="build-result bad">
+                {$activeRun.message || 'Build failed'}
+                <button class="link" onclick={() => clearRun()}>Dismiss</button>
+              </div>
+            {/if}
+            <pre class="log-lines">{$activeRun.head.join('\n')}{$activeRun.elided ? `\n… ${$activeRun.elided} lines not shown …\n` : '\n'}{$activeRun.tail.join('\n')}</pre>
+          </div>
+        </PropertyCell>
+      {/if}
+
+      {#if $exportHistory.length}
+        <PropertyCell label="History" span={4} hint="What this project has exported and where it went. Failed runs are kept too — the one you want to look at again is usually the one that did not work.">
+          <ul class="export-history">
+            {#each $exportHistory.slice(0, 12) as run (run.guid + run.at)}
+              <li class:bad={!run.ok}>
+                <span class="hist-mark">{run.ok ? '✓' : '✗'}</span>
+                <span class="hist-name">{run.productName || run.panelName}</span>
+                <span class="hist-fmt">{run.format}</span>
+                {#if run.ok && run.path}
+                  <code class="hist-path" title={run.path}>{run.path}</code>
+                  {#if canRevealFiles()}
+                    <button class="link" onclick={() => revealFile(run.path)}>Reveal</button>
+                  {/if}
+                {:else}
+                  <span class="hist-path bad" title={run.message}>{run.message || 'failed'}</span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+          <button class="link" onclick={() => clearHistory()}>Clear history</button>
+        </PropertyCell>
+      {/if}
     </PropertySection>
 
   {:else}
@@ -1049,6 +1124,41 @@
 {/if}
 
 <style>
+  .identity-fork { display: flex; flex-direction: column; gap: 6px; }
+  .identity-why { color: #F2C94C; font-size: 11px; line-height: 1.45; margin: 0; }
+  .export-action.primary { background: #3A5A80; border-color: #4A72A0; color: #FFF; }
+  .export-action:disabled { opacity: 0.5; cursor: default; }
+
+  .build-log { display: flex; flex-direction: column; gap: 5px; }
+  .build-result { display: flex; align-items: center; gap: 8px; font-size: 11px; flex-wrap: wrap; }
+  .build-result.bad { color: #E57373; }
+  .build-result code { color: #AAA; font-size: 10.5px; }
+  .log-lines {
+    margin: 0; max-height: 220px; overflow: auto; background: #141414; border: 1px solid #2E2E2E;
+    border-radius: 4px; padding: 6px 8px; color: #9A9A9A; font-size: 10.5px; line-height: 1.5;
+    font-family: ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word;
+  }
+  .build-log.failed .log-lines { border-color: #4A2A2A; }
+  .build-log.ok .log-lines { border-color: #2A4A38; }
+
+  .export-history { list-style: none; margin: 0 0 6px; padding: 0; font-size: 11px; }
+  .export-history li { display: flex; align-items: center; gap: 6px; padding: 2px 0; min-width: 0; }
+  .export-history li.bad { color: #C08080; }
+  .hist-mark { color: #39D98A; width: 10px; }
+  .export-history li.bad .hist-mark { color: #E57373; }
+  .hist-name { flex: 0 0 auto; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-fmt { color: #777; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .hist-path {
+    flex: 1; min-width: 0; color: #777; font-size: 10px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left;
+  }
+  .hist-path.bad { color: #C08080; direction: ltr; }
+  .link {
+    background: none; border: none; color: #5B9BD5; font-family: inherit; font-size: 10.5px;
+    padding: 0; cursor: pointer; white-space: nowrap;
+  }
+  .link:hover { color: #7BB3E5; text-decoration: underline; }
+
   .shortcut {
     width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; cursor: pointer;

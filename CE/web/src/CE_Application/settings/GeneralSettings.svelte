@@ -4,6 +4,7 @@
   import { activeEditorTab } from '../stores/panels.js';
   import { registerGeneralSettingsHistory } from './generalSettingsHistory.js';
   import NumberCell from '../properties/NumberCell.svelte';
+  import { normalizeManufacturerCode } from '../stores/runtimePreferences.js';
 
   let general = $derived($generalSettings);
 
@@ -22,6 +23,18 @@
 
   function setNumber(key, value) {
     updateGeneralSettings({ [key]: value });
+  }
+
+  function setText(key, event) {
+    updateGeneralSettings({ [key]: event.target.value });
+  }
+
+  // The stored code is the padded, capitalised form; showing it back is what stops a
+  // three-character code being silently widened into a plugin that identifies as something else.
+  function setManufacturerCode(event) {
+    const padded = normalizeManufacturerCode(event.target.value);
+    updateGeneralSettings({ exportManufacturerCode: padded });
+    event.target.value = padded;
   }
 </script>
 
@@ -225,9 +238,84 @@
       </div>
     </div>
   </section>
+
+  <section class="settings-card">
+    <div class="card-head">
+      <h2>Export Defaults</h2>
+      <p>What a new panel inherits when it is exported as a plugin. Each panel can override any of
+        it on its own Export tab — this is the starting point, not the rule.</p>
+    </div>
+
+    <label class="setting-row">
+      <div class="setting-copy">
+        <strong>Vendor</strong>
+        <span>The company name a DAW shows beside the plugin. Left blank on purpose: an invented
+          name baked into a plugin is worse than an empty field, because nobody notices it.</span>
+      </div>
+      <input class="text-setting" type="text" value={general.exportVendor ?? ''}
+             placeholder="Your name or company"
+             onchange={(event) => setText('exportVendor', event)} />
+    </label>
+
+    <label class="setting-row">
+      <div class="setting-copy">
+        <strong>Manufacturer Code</strong>
+        <span>Four characters, which is what VST and AU take. The plugin's unique identity comes
+          from its own GUID, not from this — so a wrong code is cosmetic rather than a collision.</span>
+      </div>
+      <input class="text-setting short" type="text" maxlength="4"
+             value={general.exportManufacturerCode ?? ''}
+             placeholder="Abcd"
+             onchange={setManufacturerCode} />
+    </label>
+
+    <label class="setting-row">
+      <div class="setting-copy">
+        <strong>Output Folder</strong>
+        <span>Where builds are written. Blank means <code>export-out/</code> beside the project.</span>
+      </div>
+      <input class="text-setting" type="text" value={general.exportOutputDir ?? ''}
+             placeholder="export-out/"
+             onchange={(event) => setText('exportOutputDir', event)} />
+    </label>
+
+    <label class="setting-row">
+      <div class="setting-copy">
+        <strong>Default Format</strong>
+        <span>What an unqualified Export produces.</span>
+      </div>
+      <select class="text-setting short" value={general.exportDefaultFormat ?? 'vst3'}
+              onchange={(event) => setText('exportDefaultFormat', event)}>
+        <option value="vst3">VST3</option>
+        <option value="standalone">Standalone</option>
+        <option value="both">Both</option>
+      </select>
+    </label>
+
+    <label class="setting-row">
+      <div class="setting-copy">
+        <strong>Backend</strong>
+        <span>Fast reuses a prebuilt shell and needs no toolchain; Recompile builds from source.
+          Auto picks Fast when it can.</span>
+      </div>
+      <select class="text-setting short" value={general.exportBackend ?? 'auto'}
+              onchange={(event) => setText('exportBackend', event)}>
+        <option value="auto">Auto</option>
+        <option value="fast">Fast</option>
+        <option value="recompile">Recompile</option>
+      </select>
+    </label>
+  </section>
 </div>
 
 <style>
+  .text-setting {
+    background: #1A1A1A; border: 1px solid #3A3A3A; border-radius: 5px; color: #DDD;
+    font-family: inherit; font-size: 12px; padding: 4px 8px; min-width: 190px;
+  }
+  .text-setting:focus { outline: none; border-color: #5B9BD5; }
+  .text-setting.short { min-width: 110px; }
+
   .general-settings {
     display: flex;
     flex-direction: column;

@@ -1,4 +1,4 @@
-import { DEFAULT_GENERAL_SETTINGS } from './runtimePreferences.js';
+import { DEFAULT_GENERAL_SETTINGS, normalizeManufacturerCode } from './runtimePreferences.js';
 import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
 
 const BUILTIN_FONTS = [
@@ -344,6 +344,15 @@ export function normalizeGeneralSettings(general) {
       1,
       400
     ),
+    // Export defaults (plan E5). Empty strings survive as empty: an invented vendor name baked
+    // into somebody's plugin is worse than a blank field, because nobody notices the first one.
+    exportVendor: String(general?.exportVendor ?? '').slice(0, 120),
+    exportManufacturerCode: normalizeManufacturerCode(general?.exportManufacturerCode),
+    exportOutputDir: String(general?.exportOutputDir ?? ''),
+    exportDefaultFormat: ['vst3', 'standalone', 'both'].includes(String(general?.exportDefaultFormat))
+      ? String(general.exportDefaultFormat) : 'vst3',
+    exportBackend: ['auto', 'fast', 'recompile'].includes(String(general?.exportBackend))
+      ? String(general.exportBackend) : 'auto',
   };
 }
 
