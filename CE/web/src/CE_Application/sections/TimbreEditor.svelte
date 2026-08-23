@@ -185,11 +185,8 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
-    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .rows { display: flex; flex-direction: column; gap: 8px; }
   .trow { display: flex; align-items: center; gap: 8px; }
   .trow .name { flex: 1 1 auto; }

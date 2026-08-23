@@ -199,9 +199,9 @@
 
 <style>
   .cond { display: flex; flex-direction: column; gap: 5px; width: 100%; min-width: 0; }
-  .val { width: 100%; min-width: 0; background: #1A1A1A; border: 1px solid #333; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 6px; font-family: inherit; outline: none; box-sizing: border-box; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
   .val.code { font-family: Consolas, 'Courier New', monospace; }
-  .val:focus { border-color: #5B9BD5; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .cond-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(56px, 0.6fr) minmax(0, 1fr) auto; gap: 4px; align-items: center; }
   .cond-op { cursor: pointer; }
   .cond-remove { background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #C8C8C8; font-size: 13px; line-height: 1; width: 22px; height: 24px; cursor: pointer; padding: 0; }

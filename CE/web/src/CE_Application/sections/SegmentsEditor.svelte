@@ -718,6 +718,8 @@
 
   .val,
   .toggle-field {
+
+    box-sizing: border-box;
     flex: 1;
     min-width: 0;
     width: 100%;
@@ -733,7 +735,7 @@
   }
 
   .val:focus {
-    border-color: #5B9BD5;
+    border-color: var(--pp-field-focus, #5B9BD5);
   }
 
   .toggle-field {

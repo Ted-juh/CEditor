@@ -9,6 +9,7 @@
    *   control     — $selectedControl (only used when contextMode is 'component')
    *   fallbackLabel — human label for the placeholder
   */
+  import { setContext } from 'svelte';
   import { isStateScopableTabId } from '../utils/stateTargets.js';
   import { sectionEditorInstanceKey } from './sectionEditorKey.js';
   import {
@@ -58,6 +59,18 @@
       stateTargetKey,
     })
   );
+  // The collapse scope every PropertySection below this point keys itself under. Deliberately
+  // NOT `editorInstanceKey`: that carries the control id, and a key that varies per control is
+  // exactly the behaviour being fixed — you would collapse Geometry on one knob and find it open
+  // on the next.
+  //
+  // A getter, not a string: setContext runs once per SectionRenderer instance, but this component
+  // is NOT re-created when `tabId` changes (only the keyed editor below it is), so a captured
+  // string would pin every later tab's sections to the first tab's scope. The editors themselves
+  // are re-created on that key, so each PropertySection calls this at its own init and reads the
+  // scope as it is then.
+  setContext('propertySectionScope', () => `${contextMode}:${tabId}`);
+
   let hasDedicatedEditor = $derived(hasSectionEditor(contextMode, tabId));
   let EditorComponent = $state(null);
 

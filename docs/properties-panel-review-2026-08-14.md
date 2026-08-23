@@ -221,6 +221,52 @@ migrations that need it.
 
 ## Status
 
-> Written 2026-08-14 on branch `claude/gui-editing-capabilities-review-gvpm5o`.
-> No fixes applied yet — this document is the survey for the properties-panel
-> round scoped out of the 2026-08-13 review.
+> Written 2026-08-14 on branch `claude/gui-editing-capabilities-review-gvpm5o` as the survey for
+> the properties-panel round scoped out of the 2026-08-13 review.
+
+### Re-audited 2026-08-23 — several findings had already closed
+
+The survey was accurate when written and parts of it stopped being true without anyone updating
+it. Measured against the tree, not against this document:
+
+| Finding | Then | Now |
+|---|---|---|
+| **S2** bare `<input type="color">` | 131 sites, 29 files | **0 in `sections/`.** Four remain, all in `debug/CutoutDebugPage.svelte`, which is not the properties panel. |
+| Raw `<input type=number>` | 285 sites | **4**, in one file. `NumberCell` has 52 importers. |
+| `.cswatch` pasted swatch | 16 files | **0** |
+| **S7** icon anchors | `PropertySection` had no icon slot; 0 sections used one | Slot exists (plus a `tools` slot); **207 sections pass an icon**. |
+| Empty-label cells | 122 reserving a 13px strip | `PropertyCell` has `compact`; **407 cells use it**. |
+| `PropertyScrub` | 0 sections | 7 |
+
+One claim was wrong on re-reading rather than out of date: S1 says eight files "use a different
+palette entirely". `#141420`/`#E8E8EE` is the `.preview` readout background in ArpEditor and
+friends, not their field skin. The real fork was narrower and elsewhere — five files
+(Harmoniser, Phrase, Recorder, Setlist, SplitZone) whose **`.val` itself** was purple.
+
+### Fixed 2026-08-23 — steps 1, 6, 7, and a bug the survey missed
+
+- **Step 1, the kit.** `PropertySelect`, `PropertyText`, `PropertyButton` added. Field metrics are
+  now seven custom properties on `.properties-panel`, and all **54 base `.val` rules** consume
+  them — 19 distinct bodies down to one. The five purple `.val` rules are gone with them.
+- **The overflow bug.** 18 `.val` copies had lost `box-sizing: border-box`; in a `min-width: 0`
+  grid column that overflows the row. Fixed, and a test now fails on the next one.
+- **`span={3}` never worked.** `PropertyCell` had `span-1`, `span-2`, `span-4` and no `span-3`, so
+  44 cells asking for three columns silently rendered at one. Not in the survey.
+- **Step 6, collapse.** `PropertySection` now persists its own state, keyed by the tab scope
+  `SectionRenderer` publishes. This closes all **249** sections that had no `collapsed` prop
+  without editing 249 call sites — the reason the previous recommendation reached 2 files in
+  months. An explicit `collapsed` still wins, so BackgroundEditor and TextEditor are untouched.
+  Collapse-all is in the toolbar, acting on the sections actually on screen.
+- **Step 7, search.** The filter machinery was always in `PropertyCell`/`PropertySection`; only
+  its input box was gated behind `selectedIsCustomComponent`. It is in the toolbar now, for every
+  context, and costs no height (it opens into the toolbar's spacer).
+
+Pinned by `test/propertiesPanelKit.test.js` (13 tests).
+
+### Still open
+
+Steps 2, 3, 4, 5, 8, 9, 10 — the mass migrations that the kit above exists to make possible.
+Chiefly: moving the 279 raw `<select>`, 166 raw text inputs and 500 raw buttons onto the new
+widgets; the five stray boolean idioms onto `PropertyToggle`; the density pass on 439 `span={2}`
+and 268 `span={4}` cells; the 12 zero-cell and 58 one-cell sections; the four inline-label
+holdouts and `BackgroundEditor`'s `:global(.property-grid)` override; and the mega-editors.
