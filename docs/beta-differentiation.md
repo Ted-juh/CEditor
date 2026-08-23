@@ -149,26 +149,31 @@ precisely what an exported CEditor panel is positioned to fix and currently does
 **One finding first, because it changes the shape of the work.** The session already remembers more
 than the completeness review implied: `getStateInformation` (`PluginProcessor.h:222`) saves the APVTS
 values, the device role→port mapping, script state and `ce.storage` panel settings, and
-`setStateInformation` restores all four. What it never does is **tell the hardware** — the values are
-restored and the ports reconnected, and nothing is transmitted. The state is known and not sent,
-which from the user's chair is indistinguishable from not being saved at all. That restore push, with
-an Ask / Always / Never policy so the plugin isn't blasting SysEx at whatever is plugged in, is the
+`setStateInformation` restores all four. ~~What it never does is **tell the hardware** — the values
+are restored and the ports reconnected, and nothing is transmitted. The state is known and not sent,
+which from the user's chair is indistinguishable from not being saved at all.~~ *(fixed, S2 —
+`setStateInformation` now arms a pending restore and the message-thread timer pushes it once the
+device reports ready, under an Ask / Always / Never policy authored in the Export tab. The rules are
+a pure function in `CE/src/Player/RestorePolicy.h` with their own test, because they are all
+ordering and timing and `PluginProcessor.h` does not build off Windows.)* That restore push, with
+an Ask / Always / Never policy so the plugin isn't blasting SysEx at whatever is plugged in, was the
 smallest change here and the one that delivers the headline.
 
 **The stubs**, found by the completeness review and all still present at `e007732`:
 
 | Location | Current | Needed |
 |---|---|---|
-| `CE/src/Player/PluginProcessor.h:213` | `getNumPrograms() { return 1; }` | Host-visible programs backed by the preset librarian |
-| `CE/src/Player/PluginProcessor.h:215` | `setCurrentProgram (int) {}` | Recall the bank slot, send it to the device |
-| `CE/src/Player/PluginProcessor.h:809` | `cb.buildDump = [] (const juce::String&) { return juce::var(); }` | Capture live panel state as a dump — window closed |
-| `CE/src/Player/PanelParameters.h:71-84` | every parameter → `AudioParameterFloat` | `AudioParameterChoice` / `AudioParameterBool` where the JS side already carries `choiceMode` / `choiceValues` |
+| `CE/src/Player/PluginProcessor.h:213` | `getNumPrograms() { return 1; }` | Host-visible programs backed by the preset librarian — **still open (S4)** |
+| `CE/src/Player/PluginProcessor.h:215` | `setCurrentProgram (int) {}` | Recall the bank slot, send it to the device — **still open (S4)** |
+| ~~`CE/src/Player/PluginProcessor.h:809`~~ | ~~`cb.buildDump = [] (const juce::String&) { return juce::var(); }`~~ | *(codec done — `DeviceProfileEngine::buildDumpMessage`, wired to `ce.device.buildDump`. The session-state half is S3.)* |
+| ~~`CE/src/Player/PanelParameters.h:71-84`~~ | ~~every parameter → `AudioParameterFloat`~~ | *(done, S1 — `AudioParameterChoice` / `AudioParameterBool` / `AudioParameterFloat` off an explicit `valueKind`)* |
 
 The last one is cosmetic but it is the one a reviewer screenshots: a combobox that reads
 `0.4700` in the automation lane instead of `Saw` makes the whole export look like a debug build.
 
 **The claim it earns:** *save the session, close the lid, come back next year — the synth comes
-back too.* Pair it with Panic and the Setlist and the story is complete: your hardware is a
+back too.* S1 and S2 earn it for the automation-visible values; S3 (the full dump) and S4 (host
+programs) make it complete. Nothing here has yet been run against real hardware. Pair it with Panic and the Setlist and the story is complete: your hardware is a
 session-recallable, automatable, stage-ready instrument.
 
 Staged, with the ordering rules and the failure modes to test:
@@ -312,7 +317,7 @@ whether they compound or merely impress. Summary:
 |---|---|---|---|---|
 | 0 | Reposition around the instrument layer | Already earned | ~zero | **Beta** |
 | 1 | Capture-and-infer profiling | **Highest — structurally uncopyable** | Medium | Beta headline |
-| 2 | Total Recall (3 stubs + parameter types) | High — the #1 user pain | Low–medium | Beta if the schedule allows |
+| 2 | Total Recall (S1+S2 **done**; S3/S4 open) | High — the #1 user pain | Low–medium | **Beta** |
 | 3 | ~~Auto-Panel~~ **built** | High — adoption + onboarding | Medium | **Beta** |
 | 4 | Ctrlr harvest → profiles | High — network effect, migration | Low (staged) | Beta+1 |
 | 5 | Verified-profile badge | Medium — trust | **Very low** | Beta |

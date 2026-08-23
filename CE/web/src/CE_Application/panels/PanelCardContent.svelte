@@ -92,6 +92,10 @@
   let exportSettings = $derived(panel?.exportSettings ?? {});
   // The host-visible plugin name: explicit override, else the panel name.
   let effectivePluginName = $derived((exportSettings.pluginName?.trim()) || panel?.name || 'CEditor Panel');
+  // 'ask' | 'always' | 'never'. A panel saved before the key existed reads as 'ask', matching
+  // Player/RestorePolicy.h's parse so the editor and the plugin cannot disagree about the default.
+  let restoreHardwareMode = $derived(['ask', 'always', 'never'].includes(exportSettings.restoreHardware)
+    ? exportSettings.restoreHardware : 'ask');
   // Live preview of the derived codes — identical to what the exporter stamps into the build.
   let identity = $derived(
     deriveIdentity(
@@ -862,6 +866,37 @@
           Source size across {moduleCost.languages.join(', ')}, plus a {formatKb(moduleCost.shared)}
           baseline every panel pays. These are prelude bytes, not plugin megabytes — Lua and
           JavaScript are compiled in either way. The size lever is the Python runtime below.
+        </span>
+      </PropertyCell>
+    </PropertySection>
+
+    <!-- Total Recall S2. The plugin restores every value when a project reopens and — until this
+         existed — told the hardware nothing, so the synth sat on whatever patch it was left on.
+         The setting is here rather than buried because it decides whether an exported plugin sends
+         SysEx unprompted, which is the panel author's call to make on their users' behalf. -->
+    <PropertySection title="Hardware Restore" icon={Scale}>
+      <PropertyCell label="On project reopen" span={4}
+                    hint="Whether the exported plugin sends the restored session values to the synth. Ask = ask once per project and remember. Always = send without asking. Never = restore the panel only and leave the hardware alone.">
+        <div class="export-row">
+          <div class="seg">
+            {#each [['ask', 'Ask'], ['always', 'Always'], ['never', 'Never']] as [mode, label] (mode)}
+              <button class={['seg-btn', restoreHardwareMode === mode && 'seg-active']}
+                      onclick={() => setExportSetting('restoreHardware', mode)}>{label}</button>
+            {/each}
+          </div>
+        </div>
+      </PropertyCell>
+      <PropertyCell label="" span={4}>
+        <span class="export-build-note">
+          {#if restoreHardwareMode === 'always'}
+            The plugin will push this panel's values to the synth as soon as the device is ready —
+            with no prompt, including mid-session.
+          {:else if restoreHardwareMode === 'never'}
+            The panel restores; the synth is left on whatever patch it is on.
+          {:else}
+            The plugin asks once per project, with the device name in the question, and remembers
+            the answer.
+          {/if}
         </span>
       </PropertyCell>
     </PropertySection>

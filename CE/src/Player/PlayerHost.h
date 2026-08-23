@@ -53,6 +53,16 @@ public:
     // The UI is ready and wants the current value of every parameter (re-push them all).
     std::function<void()> onResyncRequest;
 
+    // --- Total Recall S2: the restore question -------------------------------------------------
+    // A reopened project holds the patch; the synth holds whatever it was left on. Pushing without
+    // asking would be a plugin blasting SysEx at whatever is plugged in whenever a project opens,
+    // so the panel asks once and remembers the answer. The question can only be asked with a window
+    // to ask it in, which is why the processor holds the pending restore until there is one.
+    void showRestorePrompt (const juce::String& deviceName);
+
+    /** The user's answer: "always" or "never". Set by the plugin editor. */
+    std::function<void (const juce::String& answer)> onRestoreAnswer;
+
 private:
     void showStatusMessage (const juce::String& title, const juce::String& message);
     void loadPanelIntoWebView();

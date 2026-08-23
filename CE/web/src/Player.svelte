@@ -45,6 +45,25 @@
   let mappingAdopted = false;
   let currentSession = {};
 
+  // --- Total Recall S2: the restore question ---
+  // A reopened project holds the patch; the synth holds whatever it was left on. The processor
+  // knows when a restore is pending and whether the panel's policy says to ask; this is only the
+  // place the question is put. Empty means no question is on screen.
+  let restorePromptDevice = $state('');
+
+  /**
+   * Answer, and dismiss.
+   *
+   * "Not now" sends nothing on purpose: a restore the user deferred is still pending, so the
+   * processor keeps it and offers it again next time the project opens. Only "always" and "never"
+   * are decisions worth remembering.
+   */
+  function answerRestore(answer) {
+    const backend = typeof window !== 'undefined' && window.__JUCE__ && window.__JUCE__.backend;
+    if (backend && answer) backend.emitEvent('restoreAnswer', { answer });
+    restorePromptDevice = '';
+  }
+
   // --- Incoming MIDI (bidirectional): the panel follows the synth ---
   // Built from the loaded device profile by compiling each parameter and keeping the bytes that do
   // not move — see utils/inboundParameterIndex.js. It replaces a hand-emitted map that covered 39
@@ -497,6 +516,7 @@
     let sessionsUnsub = null;
     let paramSyncToken = null;
     let deviceUnsub = null;
+    let restoreToken = null;
     if (backend) {
       initDeviceProfileBridge();   // register device event listeners (incl. the port-list reply)
       listDeviceProfiles();        // populate the profile list — resolveParameterSend gates on it
@@ -521,6 +541,11 @@
       loadToken = backend.addEventListener('loadPanel', (payload) => {
         loadPanelDocument(payload?.panel ?? payload?.json ?? payload);
       });
+      // Total Recall S2. The processor decides whether and when to ask; this is only where the
+      // question goes. It arrives at most once per project load, and only with a device ready.
+      restoreToken = backend.addEventListener('restorePrompt', (payload) => {
+        restorePromptDevice = String(payload?.deviceName ?? 'the connected device');
+      });
       backend.emitEvent('playerReady', {});
     } else if (window.__CE_PANEL__ != null) {
       // Browser/dev fallback: boot from a pre-injected document.
@@ -533,6 +558,7 @@
       window.removeEventListener('resize', onResize);
       if (backend && loadToken != null) backend.removeEventListener(loadToken);
       if (backend && paramSyncToken != null) backend.removeEventListener(paramSyncToken);
+      if (backend && restoreToken != null) backend.removeEventListener(restoreToken);
       if (portsUnsub) portsUnsub();
       if (inputsUnsub) inputsUnsub();
       if (inMsgUnsub) inMsgUnsub();
@@ -545,6 +571,19 @@
 
 <div class="player-root">
   <!-- No MIDI-out picker: the plugin auto-connects to the synth's hardware port (see autoConnect). -->
+  {#if restorePromptDevice}
+    <!-- A bar rather than a modal: the panel behind it is the thing the question is about, and a
+         modal over a plugin window in a DAW is a good way to lose a take. -->
+    <div class="restore-bar" role="status">
+      <span class="restore-text">
+        Send this session's saved values to <strong>{restorePromptDevice}</strong>?
+        The synth is still on whatever patch it was left on.
+      </span>
+      <button class="restore-btn primary" onclick={() => answerRestore('always')}>Restore</button>
+      <button class="restore-btn" onclick={() => answerRestore('')}>Not now</button>
+      <button class="restore-btn" onclick={() => answerRestore('never')}>Never</button>
+    </div>
+  {/if}
   <div class="player-viewport">
     {#if panel}
       <div class="player-stage" style="width: {panel.width * scale}px; height: {panel.height * scale}px;">
@@ -573,4 +612,31 @@
   }
   .player-stage { position: relative; }
   .placeholder { color: #777; font-size: 13px; }
+
+  .restore-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: #2A3138;
+    border-bottom: 1px solid #3E4750;
+    font-size: 12px;
+    color: #D6DDE4;
+  }
+  .restore-text { flex: 1; }
+  .restore-text strong { color: #FFF; }
+  .restore-btn {
+    background: #383F47;
+    border: 1px solid #4C555E;
+    border-radius: 4px;
+    color: #DDD;
+    font-family: inherit;
+    font-size: 12px;
+    padding: 3px 10px;
+    cursor: pointer;
+  }
+  .restore-btn:hover { background: #454E57; color: #FFF; }
+  .restore-btn.primary { background: #3A5A80; border-color: #4A72A0; color: #FFF; }
+  .restore-btn.primary:hover { background: #44688F; }
 </style>

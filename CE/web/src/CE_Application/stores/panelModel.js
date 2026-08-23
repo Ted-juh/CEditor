@@ -53,6 +53,14 @@ export function createPanel(name = null) {
       // macOS build, so none of those are settings here.
       exportClap: true,
       exportLv2: true,
+      // Total Recall: may the exported plugin push a restored session's values back at the synth
+      // when a project reopens? 'ask' (the default) asks once and remembers; 'always' sends without
+      // asking; 'never' leaves the hardware alone. Ask is the conservative default because a plugin
+      // that blasts SysEx at whatever is plugged in whenever a project opens is a bad citizen —
+      // the device may be a different synth today, or the same synth mid-take. A panel exported
+      // before this key existed reads as 'ask' too (Player/RestorePolicy.h), which is strictly more
+      // than the nothing it used to do.
+      restoreHardware: 'ask',
     },
     name: name ?? `Untitled ${id}`,
     scriptId: `panel_${id}`,

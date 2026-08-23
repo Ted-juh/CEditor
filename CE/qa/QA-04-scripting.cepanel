@@ -8,7 +8,8 @@
     "embedPython": "auto",
     "compileNativeHandlers": "auto",
     "exportClap": true,
-    "exportLv2": true
+    "exportLv2": true,
+    "restoreHardware": "ask"
   },
   "name": "QA-04 Scripting",
   "scriptId": "qa_04_scripting",

@@ -8,7 +8,8 @@
     "embedPython": "auto",
     "compileNativeHandlers": "auto",
     "exportClap": true,
-    "exportLv2": true
+    "exportLv2": true,
+    "restoreHardware": "ask"
   },
   "name": "QA-08 Export Parameters",
   "scriptId": "qa_08_export",

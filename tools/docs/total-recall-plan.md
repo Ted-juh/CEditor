@@ -124,8 +124,30 @@ store-by-name ones; `PanelParameters.h` branches on it into `AudioParameterChoic
 before the field reads as `float`, which is exactly what it had — and `PanelParametersTests` asserts
 the concrete `juce::AudioParameter*` class the layout produces, not just that a string parsed.
 
-**S2 — Restore push.** Pending-restore flag, fire on device-ready, Ask/Always/Never policy. This is
-the one that delivers the headline, and it is small.
+**S2 — Restore push.** ✅ **Done, 2026-08-23.** `setStateInformation` arms a pending flag and sends
+nothing — that call can arrive before the ports are open, before `prepareToPlay`, and on a thread
+with no business emitting SysEx. The message-thread timer then asks `ce::decideRestore` on every
+tick until the question is settled.
+
+The rules live in their own header (`CE/src/Player/RestorePolicy.h`) as a pure function, because
+they are all ordering and timing and `PluginProcessor.h` needs WebView2 and does not build off
+Windows. `RestorePolicyTests` drives every ordering this section warns about on any machine —
+including the two that are easy to get backwards: a remembered *never* outranks a panel that says
+*always* (the author states a default, the person at the desk states a decision about the hardware
+actually plugged in), and an unanswered question is **not** timed out, because a restore waiting on
+a person is not a stalled one and dropping it would silently lose the patch.
+
+Ask/Always/Never is authored in the Export tab (`exportSettings.restoreHardware`) and defaults to
+Ask, which is also what a panel exported before the key existed reads as — strictly more than the
+nothing it used to do. The answer is saved with the project rather than globally: the decision was
+made about this session's patch and this session's synth.
+
+The question is a bar in the Player, not a modal — the panel behind it is what the question is
+about, and a modal over a plugin window in a DAW is a good way to lose a take. "Not now" sends
+nothing and leaves the restore pending, so it is offered again next time.
+
+Every path that does not push logs why. A restore that silently did not happen is the failure this
+whole feature exists to prevent.
 
 **S3 — `buildDump`.** Full-patch capture into session state; restore sends dump then values.
 *Codec done, 2026-08-23* on both sides — C++ (`DeviceProfileEngine::buildDumpMessage`) and the
@@ -137,8 +159,12 @@ before the values on restore.
 
 **S4 — Programs.** Bake the librarian bank into the export; wire the three overrides.
 
-S1 and S2 together are already a shippable claim. **S1 is done**, so S2 is what stands between here
-and that claim. S3 and S4 make it complete.
+S1 and S2 together are already a shippable claim, and **both are now done** — a reopened project
+puts the patch back on the synth. S3 and S4 make it complete: S3 adds the full dump (the APVTS is
+the automation list, not the patch), S4 adds host-visible programs.
+
+What has NOT happened is a test against hardware. Everything here is reasoned from the profile and
+driven by unit tests; no restore in this build has reached a synth.
 
 ## Verification
 

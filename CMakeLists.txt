@@ -571,6 +571,26 @@ target_link_libraries(CEditorPanelParametersTests PRIVATE
 add_test(NAME PanelParameters COMMAND CEditorPanelParametersTests)
 ce_configure_test(CEditorPanelParametersTests)
 
+# --- Total Recall S2: when a restored patch may be pushed at the hardware ---
+# All ordering and timing, which is the class of rule that is easy to get subtly wrong and
+# impossible to test through PluginProcessor.h — that file needs WebView2 and does not build off
+# Windows. RestorePolicy.h is a pure function of the situation for exactly that reason, so every
+# ordering the plan warns about is driven here on any machine. juce_core only.
+add_executable(CEditorRestorePolicyTests
+    "${CE_ROOT}/tests/RestorePolicyTests.cpp"
+)
+
+target_include_directories(CEditorRestorePolicyTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorRestorePolicyTests PRIVATE
+    juce::juce_core
+)
+
+add_test(NAME RestorePolicy COMMAND CEditorRestorePolicyTests)
+ce_configure_test(CEditorRestorePolicyTests)
+
 # --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
 # Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.
 # Design record: tools/docs/screen-builder-design.md.

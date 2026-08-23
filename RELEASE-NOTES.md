@@ -27,6 +27,10 @@ move between the two freely.
   control per parameter, grouped, with the real range, choices and label read off the profile. The
   GAIA profile's 793 parameters become 1624 controls in a second.
 - **Export** to VST3, CLAP, LV2 and standalone.
+- **Total Recall** — a reopened project puts the saved values back on the synth, not just on the
+  screen. The exported plugin asks once, with the device's name in the question, and remembers the
+  answer; the panel author sets the default (Export tab → Hardware Restore). This has never been
+  run against real hardware — see below.
 - **Scripting toolchains** managed in-app (Settings → Scripting Toolchains). Lua, JavaScript and
   TypeScript need nothing. Python, C++, C# and Java download a toolchain on first use; C# and Java
   are large (~230 MB and ~195 MB) and entirely optional.
