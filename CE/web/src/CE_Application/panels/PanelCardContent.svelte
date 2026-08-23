@@ -33,10 +33,12 @@
   import Puzzle from 'lucide-svelte/icons/puzzle';
   import Cpu from 'lucide-svelte/icons/cpu';
   import Hammer from 'lucide-svelte/icons/hammer';
+  import Scale from 'lucide-svelte/icons/scale';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';
   import { collectPanelExportScripts } from '../scripting/scriptPanelExport.js';
+  import { LICENCE_NOTICE, SIGNING_NOTICE } from '../utils/legalNotices.js';
   import { panelModules, panelModuleCost, allModules, isExtensionModule } from '../scripting/panelApi.js';
   import { missingExtensionsFor } from '../scripting/extensionModules.js';
   import {
@@ -911,6 +913,19 @@
       <PropertyCell label="AU / AAX" span={2}
                     hint="AU needs a macOS build — its identity is already derived per panel, so it activates the day a Mac port exists. AAX needs Avid's SDK and PACE signing. VST2 licensing closed in 2018 — permanently out.">
         <span class="export-build-note">gated</span>
+      </PropertyCell>
+    </PropertySection>
+
+    <!-- Two things a person needs to know BEFORE they press Export, which is why this sits above
+         the button rather than in a menu they would have to think to open. Both sentences come
+         from utils/legalNotices.js, the same module the About dialog reads, because the release
+         notes promise the program says them in both places. -->
+    <PropertySection title="Licence &amp; signing" icon={Scale}>
+      <PropertyCell label={LICENCE_NOTICE.title} span={4} hint={LICENCE_NOTICE.detail}>
+        <span class="export-build-note">{LICENCE_NOTICE.short}</span>
+      </PropertyCell>
+      <PropertyCell label={SIGNING_NOTICE.title} span={4} hint={SIGNING_NOTICE.detail}>
+        <span class="export-build-note">{SIGNING_NOTICE.short}</span>
       </PropertyCell>
     </PropertySection>
 

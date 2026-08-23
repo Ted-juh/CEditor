@@ -10,6 +10,7 @@
   import StatusBar from './CE_Application/layout/StatusBar.svelte';
   import ComponentTree from './CE_Application/panels/ComponentTree.svelte';
   import ShortcutsOverlay from './CE_Application/layout/ShortcutsOverlay.svelte';
+  import AboutOverlay from './CE_Application/layout/AboutOverlay.svelte';
   import ContextBar from './CE_Application/layout/ContextBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
@@ -36,7 +37,7 @@
   import { initHistory, undo, redo, flushHistory } from './CE_Application/stores/history.js';
   import { initPresetChoiceSync } from './CE_Application/stores/presetChoiceSync.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
-  import { requestFitToWindow, requestZoomStep, requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
+  import { aboutSignal, requestFitToWindow, requestZoomStep, requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
   import { componentWorkspaceMode } from './CE_Application/stores/componentWorkspace.js';
   import { colorTarget } from './CE_Application/stores/colorTarget.js';
   import { gradientTarget } from './CE_Application/stores/gradientTarget.js';
@@ -178,6 +179,10 @@
   let treePanelWidth = $state(readStoredNumber(UI_STORAGE_KEYS.treePanelWidth, 200));
   let isResizingTree = $state(false);
   let showShortcuts = $state(false);
+  let showAbout = $state(false);
+  // The menu cannot reach the overlay directly — it lives here. A signal rather than a shared
+  // boolean, so the menu asks and the overlay owns its own closing.
+  $effect(() => { if ($aboutSignal > 0) showAbout = true; });
   let isSettingsTab = $derived($activeEditorTab?.type === 'settings');
   let viewportHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 900);
 
@@ -439,6 +444,9 @@
 
   {#if showShortcuts}
     <ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />
+  {/if}
+  {#if showAbout}
+    <AboutOverlay show={showAbout} onclose={() => showAbout = false} />
   {/if}
 {/if}
 

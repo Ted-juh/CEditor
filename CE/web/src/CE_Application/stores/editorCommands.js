@@ -24,3 +24,12 @@ export const zoomStepSignal = writable({ n: 0, direction: 0 });
 export function requestZoomStep(direction) {
   zoomStepSignal.update(({ n }) => ({ n: n + 1, direction }));
 }
+
+/** Incremented to open the About overlay. App.svelte owns the overlay; the menu asks for it.
+ *  A signal rather than a boolean because "show it" is the whole request — the overlay closes
+ *  itself, and a shared boolean would leave the menu holding state it does not own. */
+export const aboutSignal = writable(0);
+
+export function requestAbout() {
+  aboutSignal.update((n) => n + 1);
+}
