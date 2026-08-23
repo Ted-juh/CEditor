@@ -28,6 +28,50 @@ void check (bool cond, const juce::String& label)
     if (! cond) ++failures;
 }
 
+/**
+ * What juce::AudioParameter* class each entry in a built layout actually is.
+ *
+ * Asserting on `valueKind` alone would only prove the parser read a string. The thing that matters
+ * is what the HOST is handed, so this walks the built layout and reports the concrete type.
+ */
+juce::StringArray layoutParameterKinds (juce::AudioProcessorValueTreeState::ParameterLayout&& layout)
+{
+    juce::StringArray kinds;
+    // A layout can only be consumed by an APVTS, so stand up a throwaway processor to hold it.
+    struct Dummy : juce::AudioProcessor
+    {
+        explicit Dummy (juce::AudioProcessorValueTreeState::ParameterLayout&& l)
+            : state (*this, nullptr, "T", std::move (l)) {}
+        juce::AudioProcessorValueTreeState state;
+        const juce::String getName() const override { return "T"; }
+        void prepareToPlay (double, int) override {}
+        void releaseResources() override {}
+        void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override {}
+        juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+        bool hasEditor() const override { return false; }
+        double getTailLengthSeconds() const override { return 0.0; }
+        bool acceptsMidi() const override { return false; }
+        bool producesMidi() const override { return false; }
+        int getNumPrograms() override { return 1; }
+        int getCurrentProgram() override { return 0; }
+        void setCurrentProgram (int) override {}
+        const juce::String getProgramName (int) override { return {}; }
+        void changeProgramName (int, const juce::String&) override {}
+        void getStateInformation (juce::MemoryBlock&) override {}
+        void setStateInformation (const void*, int) override {}
+    };
+
+    Dummy dummy (std::move (layout));
+    for (auto* p : dummy.getParameters())
+    {
+        if (dynamic_cast<juce::AudioParameterChoice*> (p) != nullptr)    kinds.add ("choice");
+        else if (dynamic_cast<juce::AudioParameterBool*> (p) != nullptr) kinds.add ("bool");
+        else if (dynamic_cast<juce::AudioParameterFloat*> (p) != nullptr) kinds.add ("float");
+        else kinds.add ("other");
+    }
+    return kinds;
+}
+
 /** Write a panel carrying these exportParameters to a temp file and read it back. */
 juce::Array<ce::PanelParameter> roundTrip (const juce::String& entriesJson)
 {
@@ -136,6 +180,77 @@ int main()
         int raw = 0;
         for (const auto& p : params) if (p.hasMidiControl) ++raw;
         check (raw == 2, "  two of them are raw-MIDI bound");
+    }
+
+    // ---------------------------------------------------------------- valueKind
+    //
+    // The second silent export defect this file pins. Every parameter used to become an
+    // AudioParameterFloat, so a combobox with five named options arrived in the host as an
+    // anonymous 0..1 number with no menu, and a toggle as a number with no on/off. That looks
+    // correct in the editor and is only visible in a DAW.
+
+    {
+        const auto params = roundTrip (R"JSON({
+          "id": "wave.value", "path": "wave.value", "label": "Waveform",
+          "min": 0, "max": 4, "defaultValue": 2, "valueKind": "choice",
+          "choiceLabels": ["Saw", "Square", "Triangle", "Sine", "Noise"]
+        })JSON");
+        check (params.size() == 1 && params[0].valueKind == "choice", "a selector reads as a choice");
+        check (params.size() == 1 && params[0].choiceLabels.size() == 5, "  all five option names survive");
+        check (params.size() == 1 && params[0].choiceLabels[2] == "Triangle", "  in index order");
+
+        auto kinds = layoutParameterKinds (ce::buildParameterLayout (params));
+        check (kinds.size() == 1 && kinds[0] == "choice", "  and becomes an AudioParameterChoice");
+    }
+
+    {
+        const auto params = roundTrip (R"JSON({
+          "id": "sync.value", "path": "sync.value", "label": "Sync",
+          "min": 0, "max": 1, "defaultValue": 1, "valueKind": "bool"
+        })JSON");
+        check (params.size() == 1 && params[0].valueKind == "bool", "a toggle reads as a bool");
+        auto kinds = layoutParameterKinds (ce::buildParameterLayout (params));
+        check (kinds.size() == 1 && kinds[0] == "bool", "  and becomes an AudioParameterBool");
+    }
+
+    // A bool and a plain 0..1 knob have identical ranges, which is exactly why valueKind has to be
+    // explicit — this is the pair that made inference impossible.
+    {
+        const auto params = roundTrip (R"JSON({
+          "id": "level.value", "path": "level.value", "label": "Level",
+          "min": 0, "max": 1, "defaultValue": 0.5, "valueKind": "float"
+        })JSON");
+        auto kinds = layoutParameterKinds (ce::buildParameterLayout (params));
+        check (kinds.size() == 1 && kinds[0] == "float",
+               "a 0..1 knob stays a float even though its range matches a bool's");
+    }
+
+    // THE MIGRATION CASE, again. A panel exported before valueKind existed has no such field and
+    // must keep the float it already had, not silently change type under a saved session.
+    {
+        const auto params = roundTrip (kDeviceBound);
+        check (params.size() == 1 && params[0].valueKind == "float",
+               "an entry with no valueKind is a float, as it was before the field existed");
+    }
+
+    // A choice with nothing to choose between is not a menu. A one-entry AudioParameterChoice shows
+    // the host a control that cannot move, which is worse than the number it replaced.
+    {
+        const auto params = roundTrip (R"JSON({
+          "id": "only.value", "path": "only.value", "min": 0, "max": 1,
+          "valueKind": "choice", "choiceLabels": ["Only"]
+        })JSON");
+        check (params.size() == 1 && params[0].valueKind == "float",
+               "a single-label choice degrades to a float rather than an unusable menu");
+    }
+
+    // Garbage in the field is not trusted into the layout.
+    {
+        const auto params = roundTrip (R"JSON({
+          "id": "odd.value", "path": "odd.value", "min": 0, "max": 1, "valueKind": "quaternion"
+        })JSON");
+        check (params.size() == 1 && params[0].valueKind == "float",
+               "an unrecognised valueKind falls back to float");
     }
 
     if (failures == 0)

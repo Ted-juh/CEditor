@@ -43,8 +43,13 @@ export function parametersFor(control, panelExtras = {}) {
  *
  * Three verdicts, and the difference between the last two is the point of the sheet:
  *   'exports'    the deriver produced a parameter
- *   'declined'   it has a Behavior and the value model says this is not a value (trigger, text)
- *   'unseen'     it has no Behavior and no ValueChannels, so the deriver never looked at it
+ *   'declined'   the type has RULED that it exports nothing, and says why — either a Behavior whose
+ *                value model is not a value (trigger, text), or an empty `exportValues` list
+ *   'unseen'     nothing in the type says anything, so the deriver never looked at it
+ *
+ * A type that should export nothing must land in 'declined', not 'unseen'. That is the whole
+ * difference between a decision and an oversight, and it is why `exportValues: []` is written out
+ * on Meter, Matrix and Envelope rather than left absent.
  */
 export function classifyType(type) {
   const control = createControl(type, { Core: { id: `qa08_${type}`, name: `qa08_${type}` } });
@@ -56,6 +61,11 @@ export function classifyType(type) {
     const family = String(behavior.family ?? '-');
     const valueType = String(behavior.valueType ?? '-');
     return { type, verdict: 'declined', reason: `family=${family} valueType=${valueType}`, params, control };
+  }
+
+  // An explicit empty list is a ruling: this type exports nothing, on purpose.
+  if (Array.isArray(COMPONENT_TYPES[type]?.exportValues)) {
+    return { type, verdict: 'declined', reason: 'exportValues: [] — ruled, not overlooked', params, control };
   }
   // A Value section without a Behavior is the sharper case: the type stores a value and the
   // deriver still cannot see it, because it only ever reads Behavior. Worth calling out separately
@@ -81,7 +91,11 @@ function describeParam(param) {
   // The id is what a host shows and stores. It matches the path for a derived parameter and
   // usually does not for an authored one, and that difference is the whole of the explicit path.
   const identity = param.id === param.path ? param.path : `${param.id}  →  ${param.path}`;
-  const bits = [`${identity}  [${param.min} … ${param.max}]  default ${param.defaultValue}`];
+  // The host class this becomes. Printed first because it is the thing that decides whether the
+  // parameter shows up in a DAW as a named menu, a switch, or an anonymous number.
+  const HOST_CLASS = { choice: 'AudioParameterChoice', bool: 'AudioParameterBool', float: 'AudioParameterFloat' };
+  const bits = [`${identity}  [${param.min} … ${param.max}]  default ${param.defaultValue}`,
+                `  ${HOST_CLASS[param.valueKind] ?? `?? (valueKind=${param.valueKind})`}`];
   if (param.unit) bits[0] += `  ${param.unit}`;
   const wire = [];
   if (param.deviceParameterId) wire.push(`device ${param.deviceRole}:${param.deviceParameterId}`);
@@ -94,8 +108,9 @@ function describeParam(param) {
   } else if (param.deviceRole && !param.deviceParameterId) {
     wire.push(`role ${param.deviceRole}, no wire`);
   }
+  if (param.choiceLabels?.length) wire.push(`menu: ${param.choiceLabels.join(' / ')}`);
   if (param.choiceMode === 'value') {
-    wire.push(`by name: ${param.choiceValues.join('/')} → default "${param.defaultChoice}"`);
+    wire.push(`stored by name: ${param.choiceValues.join('/')} → default "${param.defaultChoice}"`);
   }
   if (wire.length) bits.push(`  ${wire.join('  ·  ')}`);
   return bits.join('\n');
@@ -168,7 +183,8 @@ export const RECIPES = [
       Core: { id: 'qa08_range_real', name: 'Cutoff' },
       Behavior: { family: 'range', min: 20, max: 20000, defaultCurrentValue: 440, unit: 'Hz' },
     }),
-    expect: (params) => params.length === 1 && params[0].max === 20000 && params[0].unit === 'Hz',
+    expect: (params) => params.length === 1 && params[0].max === 20000 && params[0].unit === 'Hz'
+      && params[0].valueKind === 'float',
   },
   {
     id: 'range_degenerate',
@@ -188,17 +204,18 @@ export const RECIPES = [
       Core: { id: 'qa08_bool_on', name: 'Sync' },
       Behavior: { valueType: 'bool', defaultValue: true },
     }),
-    expect: (params) => params.length === 1 && params[0].min === 0 && params[0].max === 1 && params[0].defaultValue === 1,
+    expect: (params) => params.length === 1 && params[0].valueKind === 'bool' && params[0].defaultValue === 1,
   },
   {
     id: 'enum_index',
     caption: 'enum by index (the default mode)',
-    note: 'Five rows, third selected → [0..4] default 2. The host stores the position.',
+    note: 'Five rows, third selected → [0..4] default 2. The host stores the position, and gets\nthe five names for its menu — an index-mode selector needs labels just as much as a\nstore-by-name one, which is why they ride on every selector now.',
     build: () => createControl('Combobox', {
       Core: { id: 'qa08_enum_index', name: 'Waveform' },
       Value: { rows: enumRows(['Saw', 'Square', 'Triangle', 'Sine', 'Noise'], 2) },
     }),
-    expect: (params) => params.length === 1 && params[0].max === 4 && params[0].defaultValue === 2 && !params[0].choiceMode,
+    expect: (params) => params.length === 1 && params[0].max === 4 && params[0].defaultValue === 2
+      && params[0].valueKind === 'choice' && params[0].choiceLabels.length === 5 && !params[0].choiceMode,
   },
   {
     id: 'enum_by_value',
@@ -209,17 +226,29 @@ export const RECIPES = [
       Value: { storeByValue: true, rows: enumRows(['Bank A', 'Bank B', 'Bank C'], 1) },
     }),
     expect: (params) => params[0]?.choiceMode === 'value' && params[0].choiceValues.length === 3
-      && params[0].defaultChoice === 'bank_b',
+      && params[0].defaultChoice === 'bank_b' && params[0].valueKind === 'choice',
   },
   {
     id: 'enum_header_row',
     caption: 'enum with a header row',
-    note: 'Headers are not pickable and must not take an index. Four rows, one a header → [0..2].',
+    note: 'Headers are not pickable and must not take an index. Four rows, one a header → [0..2],\nand the header must not reach the host menu either.',
     build: () => createControl('Combobox', {
       Core: { id: 'qa08_enum_header', name: 'Category' },
       Value: { rows: [headerRow('— Strings —'), ...enumRows(['Violin', 'Cello', 'Bass'], 0)] },
     }),
-    expect: (params) => params.length === 1 && params[0].max === 2,
+    expect: (params) => params.length === 1 && params[0].max === 2
+      && params[0].choiceLabels.join('/') === 'Violin/Cello/Bass',
+  },
+  {
+    id: 'bool_vs_unit_float',
+    caption: 'a 0..1 knob — the reason valueKind is explicit',
+    note: 'Identical range to the toggle above: min 0, max 1. Nothing about the numbers says which\nis a switch and which is a continuous control, which is why every parameter used to\nexport as an anonymous float. The editor states the kind; the host branches on it.',
+    build: () => createControl('Knob', {
+      Core: { id: 'qa08_unit_float', name: 'Level' },
+      Behavior: { family: 'range', min: 0, max: 1, defaultCurrentValue: 0.5 },
+    }),
+    expect: (params) => params.length === 1 && params[0].valueKind === 'float'
+      && params[0].min === 0 && params[0].max === 1,
   },
   {
     id: 'device_parameter',
@@ -369,26 +398,28 @@ export function buildExportSheet() {
       {
         caption: `${entry.params.length} parameter${entry.params.length === 1 ? '' : 's'}`,
         control: card(`qa08_p_${entry.type}`, entry.params.map(describeParam).join('\n'), {
-          width: 360,
-          height: Math.max(50, 22 + entry.params.length * 26),
+          width: 430,
+          height: Math.max(56, 22 + entry.params.length * 40),
         }),
       },
     ]),
   });
 
   groups.push({
-    title: `Exports nothing, and the value model says so — ${declined.length} types`,
+    title: `Exports nothing, and the type says so — ${declined.length} types`,
     cells: [{
-      caption: 'A Behavior that declares itself a trigger or a text field. Deliberate; nothing to check.',
+      caption: 'Each of these has ruled. A Behavior that calls itself a trigger or a text field, or'
+        + ' an explicit empty exportValues. Deliberate; nothing to check.',
       control: rosterCard('qa08_declined', declined, 3),
     }],
   });
 
   groups.push({
-    title: `Exports nothing because the deriver never looks — ${unseen.length} types`,
+    title: `Exports nothing because nothing in the type says anything — ${unseen.length} types`,
     cells: [{
-      caption: 'No Behavior section, so deriveExportParameters skips them. Read this list and ask of'
-        + ' each one: should a user be able to automate that from a DAW?',
+      caption: 'No Behavior, no ValueChannels, no exportValues — so deriveExportParameters never looks.'
+        + ' Read this list and ask of each: should a user be able to automate that from a DAW? If the'
+        + ' answer is no, the type should SAY so with exportValues: [] and move to the group above.',
       control: rosterCard('qa08_unseen', unseen, 4, { showReason: unseenReasonsDiffer(unseen) }),
     }],
   });

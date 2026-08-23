@@ -134,6 +134,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -147,6 +148,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -160,6 +162,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -173,6 +176,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -186,6 +195,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -199,6 +213,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -212,6 +232,26 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Numpad.value",
+      "label": "qa01_Numpad",
+      "controlName": "qa01_Numpad",
+      "path": "qa01_Numpad.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -225,6 +265,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -238,6 +279,77 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Crossfader.value",
+      "label": "qa01_Crossfader",
+      "controlName": "qa01_Crossfader",
+      "path": "qa01_Crossfader.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Ribbon.value",
+      "label": "qa01_Ribbon",
+      "controlName": "qa01_Ribbon",
+      "path": "qa01_Ribbon.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_VectorJoystick.x",
+      "label": "qa01_VectorJoystick X",
+      "controlName": "qa01_VectorJoystick",
+      "path": "qa01_VectorJoystick.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_VectorJoystick.y",
+      "label": "qa01_VectorJoystick Y",
+      "controlName": "qa01_VectorJoystick",
+      "path": "qa01_VectorJoystick.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Macro.value",
+      "label": "qa01_Macro",
+      "controlName": "qa01_Macro",
+      "path": "qa01_Macro.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.28,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -251,6 +363,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -264,6 +377,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     }

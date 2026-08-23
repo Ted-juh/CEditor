@@ -14,12 +14,12 @@
   "scriptId": "qa_08_export",
   "author": "",
   "version": "1.0.0",
-  "description": "QA-08 — the exported plugin's parameter list, 10 exporting types and 14 branch recipes",
+  "description": "QA-08 — the exported plugin's parameter list, 15 exporting types and 15 branch recipes",
   "enabled": true,
   "locked": false,
   "filePath": null,
   "width": 1600,
-  "height": 2364,
+  "height": 3506,
   "resizable": false,
   "panicShortcut": "Escape",
   "minWidth": 0,
@@ -134,6 +134,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -147,6 +148,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -160,6 +166,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -173,6 +185,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -186,6 +204,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -199,6 +223,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -212,6 +237,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -225,6 +251,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -238,6 +265,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -251,6 +279,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -264,6 +293,91 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Macro.value",
+      "label": "qa08_Macro",
+      "controlName": "qa08_Macro",
+      "path": "qa08_Macro.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.28,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Ribbon.value",
+      "label": "qa08_Ribbon",
+      "controlName": "qa08_Ribbon",
+      "path": "qa08_Ribbon.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Numpad.value",
+      "label": "qa08_Numpad",
+      "controlName": "qa08_Numpad",
+      "path": "qa08_Numpad.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Crossfader.value",
+      "label": "qa08_Crossfader",
+      "controlName": "qa08_Crossfader",
+      "path": "qa08_Crossfader.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_VectorJoystick.x",
+      "label": "qa08_VectorJoystick X",
+      "controlName": "qa08_VectorJoystick",
+      "path": "qa08_VectorJoystick.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_VectorJoystick.y",
+      "label": "qa08_VectorJoystick Y",
+      "controlName": "qa08_VectorJoystick",
+      "path": "qa08_VectorJoystick.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -277,6 +391,7 @@
       "defaultValue": 440,
       "unit": "Hz",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -290,6 +405,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -303,6 +419,7 @@
       "defaultValue": 1,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -316,6 +433,14 @@
       "defaultValue": 2,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Saw",
+        "Square",
+        "Triangle",
+        "Sine",
+        "Noise"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -329,16 +454,17 @@
       "defaultValue": 1,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Bank A",
+        "Bank B",
+        "Bank C"
+      ],
       "choiceMode": "value",
       "choiceValues": [
         "bank_a",
         "bank_b",
         "bank_c"
-      ],
-      "choiceLabels": [
-        "Bank A",
-        "Bank B",
-        "Bank C"
       ],
       "defaultChoice": "bank_b",
       "deviceRole": "",
@@ -354,6 +480,26 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Violin",
+        "Cello",
+        "Bass"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Level.value",
+      "label": "Level",
+      "controlName": "Level",
+      "path": "Level.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -367,6 +513,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "osc1.resonance"
     },
@@ -380,6 +527,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "mainSynth",
       "deviceParameterId": "",
       "midiControl": {
@@ -402,6 +550,7 @@
       "defaultValue": 8192,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "mainSynth",
       "deviceParameterId": "",
       "midiControl": {
@@ -424,6 +573,7 @@
       "defaultValue": 100,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -437,6 +587,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -450,6 +601,7 @@
       "defaultValue": 0.25,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -463,6 +615,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -476,6 +629,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -489,6 +643,7 @@
       "defaultValue": 440,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     }
@@ -503,7 +658,7 @@
     {
       "_children": {
         "Core": {
-          "name": "group_Exports_a_parameter_at_defaults_10_of_50_types",
+          "name": "group_Exports_a_parameter_at_defaults_15_of_50_types",
           "id": "qa_group_0",
           "controlType": "Label"
         },
@@ -528,7 +683,7 @@
           }
         },
         "Text": {
-          "content": "Exports a parameter at defaults — 10 of 50 types",
+          "content": "Exports a parameter at defaults — 15 of 50 types",
           "_children": {
             "Font": {
               "size": 13,
@@ -608,7 +763,7 @@
         "Transform": {
           "x": 188,
           "y": 64,
-          "width": 360,
+          "width": 430,
           "height": 18
         },
         "Background": {
@@ -646,8 +801,8 @@
         "Transform": {
           "x": 188,
           "y": 86,
-          "width": 360,
-          "height": 50
+          "width": 430,
+          "height": 62
         },
         "Background": {
           "_children": {
@@ -664,7 +819,7 @@
           }
         },
         "Text": {
-          "content": "qa08_ToggleButton.value  [0 … 1]  default 0",
+          "content": "qa08_ToggleButton.value  [0 … 1]  default 0\n  AudioParameterBool",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -688,7 +843,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 572,
+          "x": 642,
           "y": 64,
           "width": 240,
           "height": 18
@@ -726,7 +881,7 @@
           "controlType": "RadioButtonGroup"
         },
         "Transform": {
-          "x": 572,
+          "x": 642,
           "y": 86
         }
       },
@@ -740,9 +895,9 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 836,
+          "x": 906,
           "y": 64,
-          "width": 360,
+          "width": 430,
           "height": 18
         },
         "Background": {
@@ -778,10 +933,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 836,
+          "x": 906,
           "y": 86,
-          "width": 360,
-          "height": 50
+          "width": 430,
+          "height": 62
         },
         "Background": {
           "_children": {
@@ -798,7 +953,7 @@
           }
         },
         "Text": {
-          "content": "qa08_RadioButtonGroup.value  [0 … 1]  default 0",
+          "content": "qa08_RadioButtonGroup.value  [0 … 1]  default 0\n  AudioParameterChoice\n  menu: Option 1 / Option 2",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -822,7 +977,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1220,
+          "x": 1360,
           "y": 64,
           "width": 136,
           "height": 18
@@ -860,7 +1015,7 @@
           "controlType": "CyclicButton"
         },
         "Transform": {
-          "x": 1220,
+          "x": 1360,
           "y": 86
         }
       },
@@ -875,8 +1030,8 @@
         },
         "Transform": {
           "x": 28,
-          "y": 164,
-          "width": 360,
+          "y": 176,
+          "width": 430,
           "height": 18
         },
         "Background": {
@@ -913,9 +1068,9 @@
         },
         "Transform": {
           "x": 28,
-          "y": 186,
-          "width": 360,
-          "height": 50
+          "y": 198,
+          "width": 430,
+          "height": 62
         },
         "Background": {
           "_children": {
@@ -932,7 +1087,7 @@
           }
         },
         "Text": {
-          "content": "qa08_CyclicButton.value  [0 … 2]  default 0",
+          "content": "qa08_CyclicButton.value  [0 … 2]  default 0\n  AudioParameterChoice\n  menu: State 1 / State 2 / State 3",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -956,8 +1111,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 412,
-          "y": 164,
+          "x": 482,
+          "y": 176,
           "width": 160,
           "height": 18
         },
@@ -994,8 +1149,8 @@
           "controlType": "Combobox"
         },
         "Transform": {
-          "x": 412,
-          "y": 186
+          "x": 482,
+          "y": 198
         }
       },
       "_type": "Control"
@@ -1008,9 +1163,9 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 596,
-          "y": 164,
-          "width": 360,
+          "x": 666,
+          "y": 176,
+          "width": 430,
           "height": 18
         },
         "Background": {
@@ -1046,10 +1201,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 596,
-          "y": 186,
-          "width": 360,
-          "height": 50
+          "x": 666,
+          "y": 198,
+          "width": 430,
+          "height": 62
         },
         "Background": {
           "_children": {
@@ -1066,7 +1221,7 @@
           }
         },
         "Text": {
-          "content": "qa08_Combobox.value  [0 … 2]  default 0",
+          "content": "qa08_Combobox.value  [0 … 2]  default 0\n  AudioParameterChoice\n  menu: Option 1 / Option 2 / Option 3",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -1090,8 +1245,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 980,
-          "y": 164,
+          "x": 1120,
+          "y": 176,
           "width": 160,
           "height": 18
         },
@@ -1128,8 +1283,8 @@
           "controlType": "Listbox"
         },
         "Transform": {
-          "x": 980,
-          "y": 186
+          "x": 1120,
+          "y": 198
         }
       },
       "_type": "Control"
@@ -1142,9 +1297,9 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1164,
-          "y": 164,
-          "width": 360,
+          "x": 28,
+          "y": 426,
+          "width": 430,
           "height": 18
         },
         "Background": {
@@ -1180,10 +1335,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1164,
-          "y": 186,
-          "width": 360,
-          "height": 50
+          "x": 28,
+          "y": 448,
+          "width": 430,
+          "height": 62
         },
         "Background": {
           "_children": {
@@ -1200,7 +1355,7 @@
           }
         },
         "Text": {
-          "content": "qa08_Listbox.value  [0 … 2]  default 0",
+          "content": "qa08_Listbox.value  [0 … 2]  default 0\n  AudioParameterChoice\n  menu: Option 1 / Option 2 / Option 3",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -1224,8 +1379,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 414,
+          "x": 482,
+          "y": 426,
           "width": 200,
           "height": 18
         },
@@ -1262,8 +1417,8 @@
           "controlType": "Range"
         },
         "Transform": {
-          "x": 28,
-          "y": 436
+          "x": 482,
+          "y": 448
         }
       },
       "_type": "Control"
@@ -1276,9 +1431,9 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 252,
-          "y": 414,
-          "width": 360,
+          "x": 706,
+          "y": 426,
+          "width": 430,
           "height": 18
         },
         "Background": {
@@ -1314,10 +1469,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 252,
-          "y": 436,
-          "width": 360,
-          "height": 50
+          "x": 706,
+          "y": 448,
+          "width": 430,
+          "height": 62
         },
         "Background": {
           "_children": {
@@ -1334,7 +1489,7 @@
           }
         },
         "Text": {
-          "content": "qa08_Range.value  [0 … 100]  default 0",
+          "content": "qa08_Range.value  [0 … 100]  default 0\n  AudioParameterFloat",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -1358,8 +1513,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 636,
-          "y": 414,
+          "x": 1160,
+          "y": 426,
           "width": 132,
           "height": 18
         },
@@ -1396,8 +1551,8 @@
           "controlType": "Number"
         },
         "Transform": {
-          "x": 636,
-          "y": 436
+          "x": 1160,
+          "y": 448
         }
       },
       "_type": "Control"
@@ -1410,9 +1565,9 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 792,
-          "y": 414,
-          "width": 360,
+          "x": 28,
+          "y": 538,
+          "width": 430,
           "height": 18
         },
         "Background": {
@@ -1448,10 +1603,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 792,
-          "y": 436,
-          "width": 360,
-          "height": 50
+          "x": 28,
+          "y": 560,
+          "width": 430,
+          "height": 62
         },
         "Background": {
           "_children": {
@@ -1468,7 +1623,7 @@
           }
         },
         "Text": {
-          "content": "qa08_Number.value  [0 … 100]  default 0",
+          "content": "qa08_Number.value  [0 … 100]  default 0\n  AudioParameterFloat",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -1492,8 +1647,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1176,
-          "y": 414,
+          "x": 482,
+          "y": 538,
           "width": 220,
           "height": 18
         },
@@ -1530,8 +1685,8 @@
           "controlType": "Slider"
         },
         "Transform": {
-          "x": 1176,
-          "y": 436
+          "x": 482,
+          "y": 560
         }
       },
       "_type": "Control"
@@ -1544,9 +1699,9 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 514,
-          "width": 360,
+          "x": 726,
+          "y": 538,
+          "width": 430,
           "height": 18
         },
         "Background": {
@@ -1582,10 +1737,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 536,
-          "width": 360,
-          "height": 50
+          "x": 726,
+          "y": 560,
+          "width": 430,
+          "height": 62
         },
         "Background": {
           "_children": {
@@ -1602,7 +1757,7 @@
           }
         },
         "Text": {
-          "content": "qa08_Slider.value  [0 … 1]  default 0.5",
+          "content": "qa08_Slider.value  [0 … 1]  default 0.5\n  AudioParameterFloat",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -1626,8 +1781,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 412,
-          "y": 514,
+          "x": 1180,
+          "y": 538,
           "width": 132,
           "height": 18
         },
@@ -1664,8 +1819,8 @@
           "controlType": "Knob"
         },
         "Transform": {
-          "x": 412,
-          "y": 536
+          "x": 1180,
+          "y": 560
         }
       },
       "_type": "Control"
@@ -1678,9 +1833,9 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 568,
-          "y": 514,
-          "width": 360,
+          "x": 28,
+          "y": 688,
+          "width": 430,
           "height": 18
         },
         "Background": {
@@ -1716,10 +1871,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 568,
-          "y": 536,
-          "width": 360,
-          "height": 50
+          "x": 28,
+          "y": 710,
+          "width": 430,
+          "height": 62
         },
         "Background": {
           "_children": {
@@ -1736,7 +1891,7 @@
           }
         },
         "Text": {
-          "content": "qa08_Knob.value  [0 … 1]  default 0.5",
+          "content": "qa08_Knob.value  [0 … 1]  default 0.5\n  AudioParameterFloat",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -1760,8 +1915,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 952,
-          "y": 514,
+          "x": 482,
+          "y": 688,
           "width": 200,
           "height": 18
         },
@@ -1798,8 +1953,8 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 952,
-          "y": 536
+          "x": 482,
+          "y": 710
         }
       },
       "_type": "Control"
@@ -1812,9 +1967,9 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1176,
-          "y": 514,
-          "width": 360,
+          "x": 706,
+          "y": 688,
+          "width": 430,
           "height": 18
         },
         "Background": {
@@ -1850,10 +2005,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1176,
-          "y": 536,
-          "width": 360,
-          "height": 74
+          "x": 706,
+          "y": 710,
+          "width": 430,
+          "height": 102
         },
         "Background": {
           "_children": {
@@ -1870,7 +2025,7 @@
           }
         },
         "Text": {
-          "content": "qa08_CustomComponent.mainValue  [0 … 1]  default 0.5\nqa08_CustomComponent.mode  [0 … 1]  default 0",
+          "content": "qa08_CustomComponent.mainValue  [0 … 1]  default 0.5\n  AudioParameterFloat\nqa08_CustomComponent.mode  [0 … 1]  default 0\n  AudioParameterFloat",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -1889,13 +2044,683 @@
     {
       "_children": {
         "Core": {
-          "name": "group_Exports_nothing_and_the_value_model_says_so_5_types",
+          "name": "caption_qa_cap_20",
+          "id": "qa_cap_20",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1160,
+          "y": 688,
+          "width": 320,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Macro",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Macro",
+          "id": "qa08_Macro",
+          "controlType": "Macro"
+        },
+        "Transform": {
+          "x": 1160,
+          "y": 710
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_21",
+          "id": "qa_cap_21",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 938,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Macro",
+          "id": "qa08_p_Macro",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 960,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Macro.value  [0 … 1]  default 0.28\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_22",
+          "id": "qa_cap_22",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 938,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Ribbon",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Ribbon",
+          "id": "qa08_Ribbon",
+          "controlType": "Ribbon"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 960
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_23",
+          "id": "qa_cap_23",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 638,
+          "y": 938,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Ribbon",
+          "id": "qa08_p_Ribbon",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 638,
+          "y": 960,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Ribbon.value  [0 … 1]  default 0.5\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_24",
+          "id": "qa_cap_24",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1092,
+          "y": 938,
+          "width": 168,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Numpad",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Numpad",
+          "id": "qa08_Numpad",
+          "controlType": "Numpad"
+        },
+        "Transform": {
+          "x": 1092,
+          "y": 960
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_25",
+          "id": "qa_cap_25",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1220,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Numpad",
+          "id": "qa08_p_Numpad",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1242,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Numpad.value  [0 … 127]  default 0\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_26",
+          "id": "qa_cap_26",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 1220,
+          "width": 200,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Crossfader",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Crossfader",
+          "id": "qa08_Crossfader",
+          "controlType": "Crossfader"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 1242
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_27",
+          "id": "qa_cap_27",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 706,
+          "y": 1220,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Crossfader",
+          "id": "qa08_p_Crossfader",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 706,
+          "y": 1242,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Crossfader.value  [0 … 1]  default 0.5\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_28",
+          "id": "qa_cap_28",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1160,
+          "y": 1220,
+          "width": 160,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "VectorJoystick",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_VectorJoystick",
+          "id": "qa08_VectorJoystick",
+          "controlType": "VectorJoystick"
+        },
+        "Transform": {
+          "x": 1160,
+          "y": 1242
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_29",
+          "id": "qa_cap_29",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1430,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "2 parameters",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_VectorJoystick",
+          "id": "qa08_p_VectorJoystick",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1452,
+          "width": 430,
+          "height": 102
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_VectorJoystick.x  [0 … 1]  default 0.5\n  AudioParameterFloat\nqa08_VectorJoystick.y  [0 … 1]  default 0.5\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Exports_nothing_and_the_type_says_so_8_types",
           "id": "qa_group_1",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 770,
+          "y": 1588,
           "width": 1544,
           "height": 26
         },
@@ -1914,7 +2739,7 @@
           }
         },
         "Text": {
-          "content": "Exports nothing, and the value model says so — 5 types",
+          "content": "Exports nothing, and the type says so — 8 types",
           "_children": {
             "Font": {
               "size": 13,
@@ -1935,13 +2760,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_20",
-          "id": "qa_cap_20",
+          "name": "caption_qa_cap_30",
+          "id": "qa_cap_30",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 806,
+          "y": 1624,
           "width": 1544,
           "height": 18
         },
@@ -1953,7 +2778,7 @@
           }
         },
         "Text": {
-          "content": "A Behavior that declares itself a trigger or a text field. Deliberate; nothing to check.",
+          "content": "Each of these has ruled. A Behavior that calls itself a trigger or a text field, or an explicit empty exportValues. Deliberate; nothing to check.",
           "_children": {
             "Font": {
               "size": 11
@@ -1979,7 +2804,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 828,
+          "y": 1646,
           "width": 1544,
           "height": 54
         },
@@ -1998,7 +2823,7 @@
           }
         },
         "Text": {
-          "content": "Button           family=trigger valueType=none   TextInput        family=text valueType=text      OneShotButton    family=trigger valueType=none\nMomentaryButton  family=trigger valueType=none   TimedButton      family=trigger valueType=none",
+          "content": "Button           family=trigger valueType=none              TimedButton      family=trigger valueType=none              Envelope         exportValues: [] — ruled, not overlooked\nMomentaryButton  family=trigger valueType=none              OneShotButton    family=trigger valueType=none              Meter            exportValues: [] — ruled, not overlooked\nTextInput        family=text valueType=text                 Matrix           exportValues: [] — ruled, not overlooked",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -2017,13 +2842,13 @@
     {
       "_children": {
         "Core": {
-          "name": "group_Exports_nothing_because_the_deriver_never_looks_35_types",
+          "name": "group_Exports_nothing_because_nothing_in_the_type_says_anything_27_types",
           "id": "qa_group_2",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 916,
+          "y": 1734,
           "width": 1544,
           "height": 26
         },
@@ -2042,7 +2867,7 @@
           }
         },
         "Text": {
-          "content": "Exports nothing because the deriver never looks — 35 types",
+          "content": "Exports nothing because nothing in the type says anything — 27 types",
           "_children": {
             "Font": {
               "size": 13,
@@ -2063,13 +2888,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_21",
-          "id": "qa_cap_21",
+          "name": "caption_qa_cap_31",
+          "id": "qa_cap_31",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 952,
+          "y": 1770,
           "width": 1544,
           "height": 18
         },
@@ -2081,7 +2906,7 @@
           }
         },
         "Text": {
-          "content": "No Behavior section, so deriveExportParameters skips them. Read this list and ask of each one: should a user be able to automate that from a DAW?",
+          "content": "No Behavior, no ValueChannels, no exportValues — so deriveExportParameters never looks. Read this list and ask of each: should a user be able to automate that from a DAW? If the answer is no, the type should SAY so with exportValues: [] and move to the group above.",
           "_children": {
             "Font": {
               "size": 11
@@ -2107,9 +2932,9 @@
         },
         "Transform": {
           "x": 28,
-          "y": 974,
+          "y": 1792,
           "width": 1544,
-          "height": 131
+          "height": 105
         },
         "Background": {
           "_children": {
@@ -2126,7 +2951,7 @@
           }
         },
         "Text": {
-          "content": "Background       no Behavior section              Timbre           no Behavior section              Setlist          no Behavior section              Ribbon           no Behavior section\nLabel            no Behavior section              Router           no Behavior section              Harmoniser       no Behavior section              Numpad           Value section, but no Behavior\nContainer        no Behavior section              Turing           no Behavior section              Recorder         no Behavior section              Crossfader       no Behavior section\nGroup            no Behavior section              Looper           no Behavior section              SplitZone        no Behavior section              VectorJoystick   no Behavior section\nImage            no Behavior section              ChordPad         no Behavior section              Panic            no Behavior section              Matrix           no Behavior section\nLcdDisplay       no Behavior section              Arp              no Behavior section              Transport        no Behavior section              Envelope         no Behavior section\nPixelDisplay     no Behavior section              NoteRibbon       no Behavior section              Constraint       no Behavior section              Meter            no Behavior section\nMacro            no Behavior section              DrumPads         no Behavior section              Kinetic          no Behavior section              TestBox          no Behavior section\nConstellation    no Behavior section              Phrase           no Behavior section              Orbit            no Behavior section",
+          "content": "Background      Constellation   NoteRibbon      Panic\nLabel           Timbre          DrumPads        Transport\nContainer       Router          Phrase          Constraint\nGroup           Turing          Setlist         Kinetic\nImage           Looper          Harmoniser      Orbit\nLcdDisplay      ChordPad        Recorder        TestBox\nPixelDisplay    Arp             SplitZone",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -2145,13 +2970,13 @@
     {
       "_children": {
         "Core": {
-          "name": "group_Derivation_branches_a_default_panel_never_reaches_14_recipes",
+          "name": "group_Derivation_branches_a_default_panel_never_reaches_15_recipes",
           "id": "qa_group_3",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 1139,
+          "y": 1931,
           "width": 1544,
           "height": 26
         },
@@ -2170,7 +2995,7 @@
           }
         },
         "Text": {
-          "content": "Derivation branches a default panel never reaches — 14 recipes",
+          "content": "Derivation branches a default panel never reaches — 15 recipes",
           "_children": {
             "Font": {
               "size": 13,
@@ -2191,13 +3016,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_22",
-          "id": "qa_cap_22",
+          "name": "caption_qa_cap_32",
+          "id": "qa_cap_32",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 1175,
+          "y": 1967,
           "width": 132,
           "height": 18
         },
@@ -2235,7 +3060,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 1197
+          "y": 1989
         },
         "Behavior": {
           "min": 20,
@@ -2249,13 +3074,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_23",
-          "id": "qa_cap_23",
+          "name": "caption_qa_cap_33",
+          "id": "qa_cap_33",
           "controlType": "Label"
         },
         "Transform": {
           "x": 184,
-          "y": 1175,
+          "y": 1967,
           "width": 470,
           "height": 18
         },
@@ -2293,9 +3118,9 @@
         },
         "Transform": {
           "x": 184,
-          "y": 1197,
+          "y": 1989,
           "width": 470,
-          "height": 105
+          "height": 118
         },
         "Background": {
           "_children": {
@@ -2312,7 +3137,7 @@
           }
         },
         "Text": {
-          "content": "A knob authored 20 Hz–20 kHz. The DAW gets that range, not 0–1.\n\nCutoff.value  [20 … 20000]  default 440  Hz\n\n✓ branch still covered",
+          "content": "A knob authored 20 Hz–20 kHz. The DAW gets that range, not 0–1.\n\nCutoff.value  [20 … 20000]  default 440  Hz\n  AudioParameterFloat\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -2331,13 +3156,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_24",
-          "id": "qa_cap_24",
+          "name": "caption_qa_cap_34",
+          "id": "qa_cap_34",
           "controlType": "Label"
         },
         "Transform": {
           "x": 678,
-          "y": 1175,
+          "y": 1967,
           "width": 132,
           "height": 18
         },
@@ -2375,7 +3200,7 @@
         },
         "Transform": {
           "x": 678,
-          "y": 1197
+          "y": 1989
         },
         "Behavior": {
           "min": 64,
@@ -2388,13 +3213,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_25",
-          "id": "qa_cap_25",
+          "name": "caption_qa_cap_35",
+          "id": "qa_cap_35",
           "controlType": "Label"
         },
         "Transform": {
           "x": 834,
-          "y": 1175,
+          "y": 1967,
           "width": 470,
           "height": 18
         },
@@ -2432,9 +3257,9 @@
         },
         "Transform": {
           "x": 834,
-          "y": 1197,
+          "y": 1989,
           "width": 470,
-          "height": 105
+          "height": 118
         },
         "Background": {
           "_children": {
@@ -2451,7 +3276,7 @@
           }
         },
         "Text": {
-          "content": "max is bumped to min+1. A zero-width parameter is one a host cannot represent.\n\nStuck.value  [64 … 65]  default 64\n\n✓ branch still covered",
+          "content": "max is bumped to min+1. A zero-width parameter is one a host cannot represent.\n\nStuck.value  [64 … 65]  default 64\n  AudioParameterFloat\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -2470,13 +3295,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_26",
-          "id": "qa_cap_26",
+          "name": "caption_qa_cap_36",
+          "id": "qa_cap_36",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1328,
-          "y": 1175,
+          "y": 1967,
           "width": 136,
           "height": 18
         },
@@ -2514,7 +3339,7 @@
         },
         "Transform": {
           "x": 1328,
-          "y": 1197
+          "y": 1989
         },
         "Behavior": {
           "defaultValue": true
@@ -2525,13 +3350,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_27",
-          "id": "qa_cap_27",
+          "name": "caption_qa_cap_37",
+          "id": "qa_cap_37",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 1330,
+          "y": 2135,
           "width": 470,
           "height": 18
         },
@@ -2569,9 +3394,9 @@
         },
         "Transform": {
           "x": 28,
-          "y": 1352,
+          "y": 2157,
           "width": 470,
-          "height": 105
+          "height": 118
         },
         "Background": {
           "_children": {
@@ -2588,7 +3413,7 @@
           }
         },
         "Text": {
-          "content": "defaultValue true → 1. A toggle that exports 0 comes up wrong in every saved session.\n\nSync.value  [0 … 1]  default 1\n\n✓ branch still covered",
+          "content": "defaultValue true → 1. A toggle that exports 0 comes up wrong in every saved session.\n\nSync.value  [0 … 1]  default 1\n  AudioParameterBool\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -2607,13 +3432,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_28",
-          "id": "qa_cap_28",
+          "name": "caption_qa_cap_38",
+          "id": "qa_cap_38",
           "controlType": "Label"
         },
         "Transform": {
           "x": 522,
-          "y": 1330,
+          "y": 2135,
           "width": 160,
           "height": 18
         },
@@ -2651,7 +3476,7 @@
         },
         "Transform": {
           "x": 522,
-          "y": 1352
+          "y": 2157
         },
         "Value": {
           "rows": [
@@ -2708,13 +3533,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_29",
-          "id": "qa_cap_29",
+          "name": "caption_qa_cap_39",
+          "id": "qa_cap_39",
           "controlType": "Label"
         },
         "Transform": {
           "x": 706,
-          "y": 1330,
+          "y": 2135,
           "width": 470,
           "height": 18
         },
@@ -2752,9 +3577,9 @@
         },
         "Transform": {
           "x": 706,
-          "y": 1352,
+          "y": 2157,
           "width": 470,
-          "height": 105
+          "height": 157
         },
         "Background": {
           "_children": {
@@ -2771,7 +3596,7 @@
           }
         },
         "Text": {
-          "content": "Five rows, third selected → [0..4] default 2. The host stores the position.\n\nWaveform.value  [0 … 4]  default 2\n\n✓ branch still covered",
+          "content": "Five rows, third selected → [0..4] default 2. The host stores the position, and gets\nthe five names for its menu — an index-mode selector needs labels just as much as a\nstore-by-name one, which is why they ride on every selector now.\n\nWaveform.value  [0 … 4]  default 2\n  AudioParameterChoice\n  menu: Saw / Square / Triangle / Sine / Noise\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -2790,13 +3615,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_30",
-          "id": "qa_cap_30",
+          "name": "caption_qa_cap_40",
+          "id": "qa_cap_40",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1200,
-          "y": 1330,
+          "y": 2135,
           "width": 160,
           "height": 18
         },
@@ -2834,7 +3659,7 @@
         },
         "Transform": {
           "x": 1200,
-          "y": 1352
+          "y": 2157
         },
         "Value": {
           "rows": [
@@ -2874,13 +3699,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_31",
-          "id": "qa_cap_31",
+          "name": "caption_qa_cap_41",
+          "id": "qa_cap_41",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 1485,
+          "y": 2342,
           "width": 470,
           "height": 18
         },
@@ -2918,9 +3743,9 @@
         },
         "Transform": {
           "x": 28,
-          "y": 1507,
+          "y": 2364,
           "width": 470,
-          "height": 131
+          "height": 144
         },
         "Background": {
           "_children": {
@@ -2937,7 +3762,7 @@
           }
         },
         "Text": {
-          "content": "The same list with storeByValue on. The host still automates an index, but the saved\nvalue is the choice name, so it survives the visible rows changing (cascading lists).\n\nBank.value  [0 … 2]  default 1\n  by name: bank_a/bank_b/bank_c → default \"bank_b\"\n\n✓ branch still covered",
+          "content": "The same list with storeByValue on. The host still automates an index, but the saved\nvalue is the choice name, so it survives the visible rows changing (cascading lists).\n\nBank.value  [0 … 2]  default 1\n  AudioParameterChoice\n  menu: Bank A / Bank B / Bank C  ·  stored by name: bank_a/bank_b/bank_c → default \"bank_b\"\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -2956,13 +3781,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_32",
-          "id": "qa_cap_32",
+          "name": "caption_qa_cap_42",
+          "id": "qa_cap_42",
           "controlType": "Label"
         },
         "Transform": {
           "x": 522,
-          "y": 1485,
+          "y": 2342,
           "width": 160,
           "height": 18
         },
@@ -3000,7 +3825,7 @@
         },
         "Transform": {
           "x": 522,
-          "y": 1507
+          "y": 2364
         },
         "Value": {
           "rows": [
@@ -3046,13 +3871,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_33",
-          "id": "qa_cap_33",
+          "name": "caption_qa_cap_43",
+          "id": "qa_cap_43",
           "controlType": "Label"
         },
         "Transform": {
           "x": 706,
-          "y": 1485,
+          "y": 2342,
           "width": 470,
           "height": 18
         },
@@ -3090,9 +3915,9 @@
         },
         "Transform": {
           "x": 706,
-          "y": 1507,
+          "y": 2364,
           "width": 470,
-          "height": 105
+          "height": 144
         },
         "Background": {
           "_children": {
@@ -3109,7 +3934,7 @@
           }
         },
         "Text": {
-          "content": "Headers are not pickable and must not take an index. Four rows, one a header → [0..2].\n\nCategory.value  [0 … 2]  default 0\n\n✓ branch still covered",
+          "content": "Headers are not pickable and must not take an index. Four rows, one a header → [0..2],\nand the header must not reach the host menu either.\n\nCategory.value  [0 … 2]  default 0\n  AudioParameterChoice\n  menu: Violin / Cello / Bass\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -3128,13 +3953,147 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_34",
-          "id": "qa_cap_34",
+          "name": "caption_qa_cap_44",
+          "id": "qa_cap_44",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1200,
-          "y": 1485,
+          "y": 2342,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "a 0..1 knob — the reason valueKind is explicit",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Level",
+          "id": "qa08_unit_float",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 1200,
+          "y": 2364
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_45",
+          "id": "qa_cap_45",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2536,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "bool_vs_unit_float",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_bool_vs_unit_float",
+          "id": "qa08_r_bool_vs_unit_float",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2558,
+          "width": 470,
+          "height": 144
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Identical range to the toggle above: min 0, max 1. Nothing about the numbers says which\nis a switch and which is a continuous control, which is why every parameter used to\nexport as an anonymous float. The editor states the kind; the host branches on it.\n\nLevel.value  [0 … 1]  default 0.5\n  AudioParameterFloat\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_46",
+          "id": "qa_cap_46",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 2536,
           "width": 220,
           "height": 18
         },
@@ -3171,8 +4130,8 @@
           "controlType": "Slider"
         },
         "Transform": {
-          "x": 1200,
-          "y": 1507
+          "x": 522,
+          "y": 2558
         },
         "Behavior": {
           "max": 127,
@@ -3193,13 +4152,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_35",
-          "id": "qa_cap_35",
+          "name": "caption_qa_cap_47",
+          "id": "qa_cap_47",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 1666,
+          "x": 766,
+          "y": 2536,
           "width": 470,
           "height": 18
         },
@@ -3236,10 +4195,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 1688,
+          "x": 766,
+          "y": 2558,
           "width": 470,
-          "height": 131
+          "height": 144
         },
         "Background": {
           "_children": {
@@ -3256,7 +4215,7 @@
           }
         },
         "Text": {
-          "content": "The wire the plugin sends with its window closed. Without it the DAW moves a number\nand the synth hears nothing.\n\nResonance.value  [0 … 127]  default 0\n  device primary:osc1.resonance\n\n✓ branch still covered",
+          "content": "The wire the plugin sends with its window closed. Without it the DAW moves a number\nand the synth hears nothing.\n\nResonance.value  [0 … 127]  default 0\n  AudioParameterFloat\n  device primary:osc1.resonance\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -3275,13 +4234,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_36",
-          "id": "qa_cap_36",
+          "name": "caption_qa_cap_48",
+          "id": "qa_cap_48",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 522,
-          "y": 1666,
+          "x": 1260,
+          "y": 2536,
           "width": 220,
           "height": 18
         },
@@ -3318,8 +4277,8 @@
           "controlType": "Slider"
         },
         "Transform": {
-          "x": 522,
-          "y": 1688
+          "x": 1260,
+          "y": 2558
         },
         "Behavior": {
           "max": 127,
@@ -3341,13 +4300,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_37",
-          "id": "qa_cap_37",
+          "name": "caption_qa_cap_49",
+          "id": "qa_cap_49",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 766,
-          "y": 1666,
+          "x": 28,
+          "y": 2730,
           "width": 470,
           "height": 18
         },
@@ -3384,10 +4343,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 766,
-          "y": 1688,
+          "x": 28,
+          "y": 2752,
           "width": 470,
-          "height": 131
+          "height": 144
         },
         "Background": {
           "_children": {
@@ -3404,7 +4363,7 @@
           }
         },
         "Text": {
-          "content": "No profile parameter, just three bytes. This used to export with an empty wire and\nsend nothing window-closed — indistinguishable from a bad MIDI cable.\n\nExpression.value  [0 … 127]  default 64\n  midi CC11 ch1 7-bit\n\n✓ branch still covered",
+          "content": "No profile parameter, just three bytes. This used to export with an empty wire and\nsend nothing window-closed — indistinguishable from a bad MIDI cable.\n\nExpression.value  [0 … 127]  default 64\n  AudioParameterFloat\n  midi CC11 ch1 7-bit\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -3423,13 +4382,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_38",
-          "id": "qa_cap_38",
+          "name": "caption_qa_cap_50",
+          "id": "qa_cap_50",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1260,
-          "y": 1666,
+          "x": 522,
+          "y": 2730,
           "width": 132,
           "height": 18
         },
@@ -3466,8 +4425,8 @@
           "controlType": "Knob"
         },
         "Transform": {
-          "x": 1260,
-          "y": 1688
+          "x": 522,
+          "y": 2752
         },
         "Behavior": {
           "max": 16383,
@@ -3491,13 +4450,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_39",
-          "id": "qa_cap_39",
+          "name": "caption_qa_cap_51",
+          "id": "qa_cap_51",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 1847,
+          "x": 678,
+          "y": 2730,
           "width": 470,
           "height": 18
         },
@@ -3534,10 +4493,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 1869,
+          "x": 678,
+          "y": 2752,
           "width": 470,
-          "height": 118
+          "height": 131
         },
         "Background": {
           "_children": {
@@ -3554,7 +4513,7 @@
           }
         },
         "Text": {
-          "content": "Two 7-bit halves for the parameter number, and a resolution the send path has to honour.\n\nFilter Track.value  [0 … 16383]  default 8192\n  midi NRPN 1:24 ch1 14-bit\n\n✓ branch still covered",
+          "content": "Two 7-bit halves for the parameter number, and a resolution the send path has to honour.\n\nFilter Track.value  [0 … 16383]  default 8192\n  AudioParameterFloat\n  midi NRPN 1:24 ch1 14-bit\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -3573,13 +4532,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_40",
-          "id": "qa_cap_40",
+          "name": "caption_qa_cap_52",
+          "id": "qa_cap_52",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 522,
-          "y": 1847,
+          "x": 1172,
+          "y": 2730,
           "width": 132,
           "height": 18
         },
@@ -3616,8 +4575,8 @@
           "controlType": "Knob"
         },
         "Transform": {
-          "x": 522,
-          "y": 1869
+          "x": 1172,
+          "y": 2752
         },
         "Behavior": {
           "max": 127,
@@ -3638,13 +4597,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_41",
-          "id": "qa_cap_41",
+          "name": "caption_qa_cap_53",
+          "id": "qa_cap_53",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 678,
-          "y": 1847,
+          "x": 28,
+          "y": 2924,
           "width": 470,
           "height": 18
         },
@@ -3681,10 +4640,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 678,
-          "y": 1869,
+          "x": 28,
+          "y": 2946,
           "width": 470,
-          "height": 131
+          "height": 144
         },
         "Background": {
           "_children": {
@@ -3701,7 +4660,7 @@
           }
         },
         "Text": {
-          "content": "Velocity, poly pressure and pitch bend arrive; they are not things a plugin sends.\nThe parameter is still exported. It must carry no midiControl — a wire here would be a\nDAW control that silently does nothing.\n\nVelocity Depth.value  [0 … 127]  default 100\n\n✓ branch still covered",
+          "content": "Velocity, poly pressure and pitch bend arrive; they are not things a plugin sends.\nThe parameter is still exported. It must carry no midiControl — a wire here would be a\nDAW control that silently does nothing.\n\nVelocity Depth.value  [0 … 127]  default 100\n  AudioParameterFloat\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -3720,13 +4679,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_42",
-          "id": "qa_cap_42",
+          "name": "caption_qa_cap_54",
+          "id": "qa_cap_54",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1172,
-          "y": 1847,
+          "x": 522,
+          "y": 2924,
           "width": 220,
           "height": 18
         },
@@ -3763,8 +4722,8 @@
           "controlType": "Slider"
         },
         "Transform": {
-          "x": 1172,
-          "y": 1869
+          "x": 522,
+          "y": 2946
         },
         "Behavior": {
           "max": 127,
@@ -3786,13 +4745,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_43",
-          "id": "qa_cap_43",
+          "name": "caption_qa_cap_55",
+          "id": "qa_cap_55",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 2028,
+          "x": 766,
+          "y": 2924,
           "width": 470,
           "height": 18
         },
@@ -3829,10 +4788,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 2050,
+          "x": 766,
+          "y": 2946,
           "width": 470,
-          "height": 105
+          "height": 118
         },
         "Background": {
           "_children": {
@@ -3849,7 +4808,7 @@
           }
         },
         "Text": {
-          "content": "The binding is still authored. Disabled means disabled: no wire in the export.\n\nMuted Send.value  [0 … 127]  default 0\n\n✓ branch still covered",
+          "content": "The binding is still authored. Disabled means disabled: no wire in the export.\n\nMuted Send.value  [0 … 127]  default 0\n  AudioParameterFloat\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -3868,13 +4827,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_44",
-          "id": "qa_cap_44",
+          "name": "caption_qa_cap_56",
+          "id": "qa_cap_56",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 522,
-          "y": 2028,
+          "x": 1260,
+          "y": 2924,
           "width": 150,
           "height": 18
         },
@@ -3911,8 +4870,8 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 522,
-          "y": 2050,
+          "x": 1260,
+          "y": 2946,
           "width": 150,
           "height": 100
         },
@@ -3939,13 +4898,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_45",
-          "id": "qa_cap_45",
+          "name": "caption_qa_cap_57",
+          "id": "qa_cap_57",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 696,
-          "y": 2028,
+          "x": 28,
+          "y": 3118,
           "width": 470,
           "height": 18
         },
@@ -3982,10 +4941,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 696,
-          "y": 2050,
+          "x": 28,
+          "y": 3140,
           "width": 470,
-          "height": 105
+          "height": 118
         },
         "Background": {
           "_children": {
@@ -4002,7 +4961,7 @@
           }
         },
         "Text": {
-          "content": "A single channel is labelled with the control name alone — \"Ring\", not \"Ring value\".\n\nRing.value  [0 … 1]  default 0.25\n\n✓ branch still covered",
+          "content": "A single channel is labelled with the control name alone — \"Ring\", not \"Ring value\".\n\nRing.value  [0 … 1]  default 0.25\n  AudioParameterFloat\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -4021,13 +4980,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_46",
-          "id": "qa_cap_46",
+          "name": "caption_qa_cap_58",
+          "id": "qa_cap_58",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1190,
-          "y": 2028,
+          "x": 522,
+          "y": 3118,
           "width": 150,
           "height": 18
         },
@@ -4064,8 +5023,8 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1190,
-          "y": 2050,
+          "x": 522,
+          "y": 3140,
           "width": 150,
           "height": 100
         },
@@ -4110,13 +5069,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_47",
-          "id": "qa_cap_47",
+          "name": "caption_qa_cap_59",
+          "id": "qa_cap_59",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 2183,
+          "x": 696,
+          "y": 3118,
           "width": 470,
           "height": 18
         },
@@ -4153,10 +5112,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 2205,
+          "x": 696,
+          "y": 3140,
           "width": 470,
-          "height": 131
+          "height": 157
         },
         "Background": {
           "_children": {
@@ -4173,7 +5132,7 @@
           }
         },
         "Text": {
-          "content": "One parameter per PUBLIC channel, each labelled. The private one must not appear —\nan internal channel exposed to a host is a parameter nobody can explain.\n\nXY Pad.x  [0 … 127]  default 64\nXY Pad.y  [0 … 127]  default 64\n\n✓ branch still covered",
+          "content": "One parameter per PUBLIC channel, each labelled. The private one must not appear —\nan internal channel exposed to a host is a parameter nobody can explain.\n\nXY Pad.x  [0 … 127]  default 64\n  AudioParameterFloat\nXY Pad.y  [0 … 127]  default 64\n  AudioParameterFloat\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -4192,13 +5151,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_48",
-          "id": "qa_cap_48",
+          "name": "caption_qa_cap_60",
+          "id": "qa_cap_60",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 522,
-          "y": 2183,
+          "x": 1190,
+          "y": 3118,
           "width": 132,
           "height": 18
         },
@@ -4235,8 +5194,8 @@
           "controlType": "Knob"
         },
         "Transform": {
-          "x": 522,
-          "y": 2205
+          "x": 1190,
+          "y": 3140
         },
         "Behavior": {
           "min": 20,
@@ -4249,13 +5208,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_49",
-          "id": "qa_cap_49",
+          "name": "caption_qa_cap_61",
+          "id": "qa_cap_61",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 678,
-          "y": 2183,
+          "x": 28,
+          "y": 3325,
           "width": 470,
           "height": 18
         },
@@ -4292,10 +5251,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 678,
-          "y": 2205,
+          "x": 28,
+          "y": 3347,
           "width": 470,
-          "height": 118
+          "height": 131
         },
         "Background": {
           "_children": {
@@ -4312,7 +5271,7 @@
           }
         },
         "Text": {
-          "content": "panel.exportParameters, when present, is the list. The knob beside this would derive\n\"Cutoff.value\"; the author said otherwise and the author wins.\n\nmacro1  →  Cutoff.value  [0 … 100]  default 50  %\n\n✓ branch still covered",
+          "content": "panel.exportParameters, when present, is the list. The knob beside this would derive\n\"Cutoff.value\"; the author said otherwise and the author wins.\n\nmacro1  →  Cutoff.value  [0 … 100]  default 50  %\n  AudioParameterFloat\n\n✓ branch still covered",
           "_children": {
             "Font": {
               "family": "monospace",

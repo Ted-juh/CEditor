@@ -134,6 +134,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -147,6 +153,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -160,6 +172,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -173,6 +191,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -186,6 +210,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -199,6 +229,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -212,6 +248,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -225,6 +267,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -238,6 +286,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -251,6 +300,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -264,6 +314,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -277,6 +328,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -290,6 +342,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -303,6 +356,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -316,6 +370,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -329,6 +384,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -342,6 +398,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -355,6 +412,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -368,6 +426,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -381,6 +440,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -394,6 +454,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -407,6 +468,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -420,6 +482,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -433,6 +496,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -446,6 +510,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -459,6 +529,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -472,6 +548,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -485,6 +567,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -498,6 +586,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -511,6 +605,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -524,6 +624,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -537,6 +643,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -550,6 +662,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -563,6 +676,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -576,6 +690,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -589,6 +704,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -602,6 +718,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -615,6 +732,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -628,6 +746,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -641,6 +760,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -654,6 +774,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -667,6 +793,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -680,6 +812,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -693,6 +831,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -706,6 +850,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -719,6 +869,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -732,6 +888,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -745,6 +907,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -758,6 +926,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -771,6 +940,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -784,6 +954,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -797,6 +968,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -810,6 +982,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -823,6 +996,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -836,6 +1010,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -849,6 +1024,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -862,6 +1038,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -875,6 +1056,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -888,6 +1074,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -901,6 +1092,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -914,6 +1110,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -927,6 +1128,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -940,6 +1146,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -953,6 +1164,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -966,6 +1182,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -979,6 +1196,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -992,6 +1210,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1005,6 +1224,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1018,6 +1238,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1031,6 +1252,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1044,6 +1266,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1057,6 +1280,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1070,6 +1294,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1083,6 +1308,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1096,6 +1322,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1109,6 +1336,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1122,6 +1350,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1135,6 +1364,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1148,6 +1378,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1161,6 +1392,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1174,6 +1406,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1187,6 +1420,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1200,6 +1434,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1213,6 +1448,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1226,6 +1462,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1239,6 +1476,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1252,6 +1490,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1265,6 +1504,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     }

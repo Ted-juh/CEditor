@@ -313,14 +313,27 @@ Everything above is small. These are not, and they are what a beta decision actu
    channel.
 6. **Export polish**: pipeline **D1** (GUID registry / "update vs new copy") unbuilt, so two panels
    can collide FUIDs; **E1–E5** unbuilt, so there is no build log surface, export history or
-   "Reveal in folder"; every parameter maps to `AudioParameterFloat` (`PanelParameters.h`), so
-   comboboxes and toggles read in the host as anonymous 0–1 floats — QA-08 prints what the editor
-   derives for each, which is the half of that mismatch you can now look at; `getNumPrograms()` returns 1
+   "Reveal in folder"; ~~every parameter maps to `AudioParameterFloat`~~ *(fixed)* — the editor now emits a
+   `valueKind` and `PanelParameters.h` branches on it, so a selector arrives as an
+   `AudioParameterChoice` with its real option names and a toggle as an `AudioParameterBool`. The
+   two shipped hardware panels gained 32 (GAIA) and 58 (AN1x) named menus that were anonymous
+   numbers before; `getNumPrograms()` returns 1
    (`PluginProcessor.h:213`), so there are no host-visible programs; `buildDump` still returns an
    empty var (`:809`).
 
 7. **Formats beyond VST3, LV2 and Standalone** — see §4. AU is blocked behind the macOS port; CLAP
    needs a third-party wrapper. LV2 shipped.
+
+8. **Code signing — decided: unsigned for the beta, a certificate before v1.** §2.6 already covers
+   the beta half, and it is covered properly: About states the unsigned build and the Export tab
+   carries it as a "Before you share" note, so nobody meets SmartScreen without warning. What is
+   recorded here is the other half, which was previously only a line in `known-issues.md` and would
+   have retired with it. **An Authenticode certificate is a v1 blocker, not a beta one.** Unsigned
+   is defensible while testers are people who chose to install a beta; it is not defensible for a
+   download aimed at strangers, where a SmartScreen wall is indistinguishable from malware to the
+   person reading it. The cert has to be in hand *before* the v1 packaging run, and OV validation
+   takes days, so it is a lead-time item rather than a build item — which is exactly the kind that
+   gets discovered on the day it blocks the release.
 
 ---
 

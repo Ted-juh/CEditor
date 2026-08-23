@@ -95,26 +95,38 @@ suite to catch a slip.
 
 ---
 
-## Thirty-five component types cannot be automated from a host
+## Twenty-seven component types cannot be automated from a host
 
-Found while building QA-08. `deriveExportParameters` reads a control's `Behavior` section to decide
-what parameter it contributes to the exported plugin. Thirty-five of the fifty component types have
-no `Behavior` section at all, so the deriver never looks at them and they export nothing.
+`deriveExportParameters` reads a control's `Behavior` to decide what host parameter it contributes.
+Twenty-seven of the fifty component types have no `Behavior`, no `ValueChannels` and no
+`exportValues`, so nothing about them says anything and the deriver never looks. For a `Container`
+or a `Label` that is obviously right, which is most of what remains.
 
-For most of the thirty-five that is right — a `Container` is not a parameter. For these it is at
-best a question, because they are things a user would expect to reach from a DAW:
+**The eight that were the actual question are closed.** They were the ones a user would plainly
+expect to reach from a DAW, and each is now ruled rather than overlooked:
 
-`Crossfader` · `Ribbon` · `VectorJoystick` · `Meter` · `Macro` · `Envelope` · `Matrix` · `Numpad`
+| Type | Ruling |
+|---|---|
+| `Numpad` | one float, over its own declared `min`/`max` |
+| `Crossfader` | one float, `mix`, stored 0–1 |
+| `Ribbon` | one float, `value`, stored 0–1 |
+| `Macro` | one float, the macro's own position; `slots` is routing, not an automation target |
+| `VectorJoystick` | **two** floats, `.x` and `.y` — every host models an XY pad as two lanes, and flattening would lose the axis a user was drawing |
+| `Meter` | **none.** It displays a level arriving from elsewhere (`valueSourceId`). A host parameter would let a DAW write a reading the component is supposed to be reporting |
+| `Matrix` | **none.** A parameter per cell is rows × cols and both are per-panel, but the exported list must be FIXED — a panel whose parameter count changes when someone adds a row breaks every saved session. And a modulation matrix is routing, not performance |
+| `Envelope` | **none.** Same variable-cardinality problem as the matrix, and the thing that does move continuously, `phase`, is an output driven by `phaseSourceId` |
 
-`Numpad` is the sharpest case: it carries a `Value` section, so it stores a value, and still
-exports nothing.
+The three that export nothing say so with `exportValues: []` rather than staying silent. That
+distinction is the point: QA-08 files a declared "no" under *ruled* and an absent one under *nothing
+in the type says anything*, so a future oversight cannot hide among the deliberate ones.
 
-Not fixed here, because the fix is not a bug fix. Giving one of these a `Behavior` is deciding what
-its automatable value *is* — a joystick has two, a matrix has a grid of them, a meter is arguably an
-output and not a parameter at all — and each answer changes the exported plugin's interface. That
-is a design call.
+Why the ruling did not take the obvious route: giving those five a `Behavior` section would have
+worked for the exporter and broken the editor. `PropertiesPanel.svelte:223` mounts a Behavior tab
+off the section's mere presence, so a crossfader would have grown a tab full of button fields —
+`fireOn`, `repeatEnabled`, `buttonType`. The type declares what it exports instead, beside its own
+section, and no UI changes.
 
-The live record is **QA-08**, whose third group is this list, computed from the model rather than
-copied here: open `CE/qa/QA-08-export.cepanel` and it will be current even if this paragraph is not.
-What makes it worth writing down at all is that nothing else shows it. The editor automates all of
-these perfectly; the gap only appears in a host, after export, on somebody else's machine.
+**What is left is the remaining twenty-seven**, and it is a smaller question than it looks: go down
+QA-08's third group and either rule a type out with `exportValues: []` or give it a declaration.
+Open `CE/qa/QA-08-export.cepanel` for the current list — it is computed from the model, so it will
+be right even when this paragraph is not.

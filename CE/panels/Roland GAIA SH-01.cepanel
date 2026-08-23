@@ -140,6 +140,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.patchLevel"
     },
@@ -153,6 +154,7 @@
       "defaultValue": 5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.patchTempo"
     },
@@ -166,6 +168,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.octaveShift"
     },
@@ -179,6 +182,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.monoSwitch"
     },
@@ -192,6 +200,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.portamentoSwitch"
     },
@@ -205,6 +218,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.portamentoTime"
     },
@@ -218,6 +232,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.pitchBendRangeUp"
     },
@@ -231,6 +246,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.pitchBendRangeDown"
     },
@@ -244,6 +260,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone1Switch"
     },
@@ -257,6 +278,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone1Select"
     },
@@ -270,6 +296,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone2Switch"
     },
@@ -283,6 +314,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone2Select"
     },
@@ -296,6 +332,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone3Switch"
     },
@@ -309,6 +350,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tone3Select"
     },
@@ -322,6 +368,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.syncRingSelect"
     },
@@ -335,6 +382,39 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "LFO-RATE",
+        "LFO-FADE-TIME",
+        "LFO-PITCH-MOD",
+        "LFO-FILTER-MOD",
+        "LFO-AMP-MOD",
+        "OSC-PITCH",
+        "OSC-DETUNE",
+        "OSC-PWM",
+        "OSC-PW",
+        "OSC-ENV-A",
+        "OSC-ENV-D",
+        "OSC-ENV-MOD",
+        "FILTER-CUTOFF",
+        "FILTER-RESONANCE",
+        "FILTER-ENV-A",
+        "FILTER-ENV-D",
+        "FILTER-ENV-S",
+        "FILTER-ENV-R",
+        "FILTER-ENV-MOD",
+        "AMP-LEVEL",
+        "AMP-ENV-A",
+        "AMP-ENV-D",
+        "AMP-ENV-S",
+        "AMP-ENV-R",
+        "EFX-CTRL",
+        "PORT-TIME",
+        "BENDER",
+        "MODULATION",
+        "FILTER-CUTOFF-KF",
+        "EFX-LEVEL"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.dBeamAssign"
     },
@@ -348,6 +428,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.dBeamPolarity"
     },
@@ -361,6 +442,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.effectsMasterSwitch"
     },
@@ -374,6 +460,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.effectsDistortionSelect"
     },
@@ -387,6 +478,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.effectsFlangerSelect"
     },
@@ -400,6 +496,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.effectsDelaySelect"
     },
@@ -413,6 +514,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.effectsReverbSelect"
     },
@@ -426,6 +532,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.lowBoostSwitch"
     },
@@ -439,6 +550,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.tempoSyncSwitch"
     },
@@ -452,6 +568,7 @@
       "defaultValue": 100,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "master.volume"
     },
@@ -465,6 +582,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.shape"
     },
@@ -478,6 +596,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.rate"
     },
@@ -491,6 +610,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.tempoSyncSwitch"
     },
@@ -504,6 +628,29 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "16",
+        "12",
+        "8",
+        "4",
+        "2",
+        "1",
+        "3/4",
+        "2/3",
+        "1/2",
+        "3/8",
+        "1/3",
+        "1/4",
+        "3/16",
+        "1/6",
+        "1/8",
+        "3/32",
+        "1/12",
+        "1/16",
+        "1/24",
+        "1/32"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.tempoSyncNote"
     },
@@ -517,6 +664,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.keyTrigger"
     },
@@ -530,6 +682,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.fadeTime"
     },
@@ -543,6 +696,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.pitchDepth"
     },
@@ -556,6 +710,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.filterDepth"
     },
@@ -569,6 +724,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.lfo.ampDepth"
     },
@@ -582,6 +738,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -595,6 +752,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.wave"
     },
@@ -608,6 +766,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.waveVariation"
     },
@@ -621,6 +780,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pitch"
     },
@@ -634,6 +794,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.detune"
     },
@@ -647,6 +808,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pulseWidthModDepth"
     },
@@ -660,6 +822,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pulseWidth"
     },
@@ -673,6 +836,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pitchEnvAttackTime"
     },
@@ -686,6 +850,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pitchEnvDecay"
     },
@@ -699,6 +864,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.osc.pitchEnvDepth"
     },
@@ -712,6 +878,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -725,6 +892,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.mode"
     },
@@ -738,6 +906,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.slope"
     },
@@ -751,6 +920,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.cutoff"
     },
@@ -764,6 +934,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.resonance"
     },
@@ -777,6 +948,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envAttackTime"
     },
@@ -790,6 +962,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envDecayTime"
     },
@@ -803,6 +976,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envSustainLevel"
     },
@@ -816,6 +990,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envReleaseTime"
     },
@@ -829,6 +1004,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envDepth"
     },
@@ -842,6 +1018,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.envVelocitySens"
     },
@@ -855,6 +1032,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.filter.cutoffKeyfollow"
     },
@@ -868,6 +1046,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -881,6 +1060,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.level"
     },
@@ -894,6 +1074,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.pan"
     },
@@ -907,6 +1088,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.levelVelocitySens"
     },
@@ -920,6 +1102,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.envAttackTime"
     },
@@ -933,6 +1116,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.envDecayTime"
     },
@@ -946,6 +1130,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.envSustainLevel"
     },
@@ -959,6 +1144,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.amp.envReleaseTime"
     },
@@ -972,6 +1158,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.shape"
     },
@@ -985,6 +1172,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.rate"
     },
@@ -998,6 +1186,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.tempoSyncSwitch"
     },
@@ -1011,6 +1204,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.pitchDepth"
     },
@@ -1024,6 +1218,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.filterDepth"
     },
@@ -1037,6 +1232,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.ampDepth"
     },
@@ -1050,6 +1246,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone1.modLfo.panDepth"
     },
@@ -1063,6 +1260,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.shape"
     },
@@ -1076,6 +1274,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.rate"
     },
@@ -1089,6 +1288,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.tempoSyncSwitch"
     },
@@ -1102,6 +1306,29 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "16",
+        "12",
+        "8",
+        "4",
+        "2",
+        "1",
+        "3/4",
+        "2/3",
+        "1/2",
+        "3/8",
+        "1/3",
+        "1/4",
+        "3/16",
+        "1/6",
+        "1/8",
+        "3/32",
+        "1/12",
+        "1/16",
+        "1/24",
+        "1/32"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.tempoSyncNote"
     },
@@ -1115,6 +1342,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.keyTrigger"
     },
@@ -1128,6 +1360,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.fadeTime"
     },
@@ -1141,6 +1374,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.pitchDepth"
     },
@@ -1154,6 +1388,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.filterDepth"
     },
@@ -1167,6 +1402,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.lfo.ampDepth"
     },
@@ -1180,6 +1416,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1193,6 +1430,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.wave"
     },
@@ -1206,6 +1444,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.waveVariation"
     },
@@ -1219,6 +1458,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pitch"
     },
@@ -1232,6 +1472,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.detune"
     },
@@ -1245,6 +1486,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pulseWidthModDepth"
     },
@@ -1258,6 +1500,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pulseWidth"
     },
@@ -1271,6 +1514,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pitchEnvAttackTime"
     },
@@ -1284,6 +1528,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pitchEnvDecay"
     },
@@ -1297,6 +1542,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.osc.pitchEnvDepth"
     },
@@ -1310,6 +1556,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1323,6 +1570,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.mode"
     },
@@ -1336,6 +1584,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.slope"
     },
@@ -1349,6 +1598,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.cutoff"
     },
@@ -1362,6 +1612,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.resonance"
     },
@@ -1375,6 +1626,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envAttackTime"
     },
@@ -1388,6 +1640,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envDecayTime"
     },
@@ -1401,6 +1654,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envSustainLevel"
     },
@@ -1414,6 +1668,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envReleaseTime"
     },
@@ -1427,6 +1682,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envDepth"
     },
@@ -1440,6 +1696,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.envVelocitySens"
     },
@@ -1453,6 +1710,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.filter.cutoffKeyfollow"
     },
@@ -1466,6 +1724,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1479,6 +1738,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.level"
     },
@@ -1492,6 +1752,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.pan"
     },
@@ -1505,6 +1766,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.levelVelocitySens"
     },
@@ -1518,6 +1780,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.envAttackTime"
     },
@@ -1531,6 +1794,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.envDecayTime"
     },
@@ -1544,6 +1808,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.envSustainLevel"
     },
@@ -1557,6 +1822,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.amp.envReleaseTime"
     },
@@ -1570,6 +1836,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.shape"
     },
@@ -1583,6 +1850,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.rate"
     },
@@ -1596,6 +1864,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.tempoSyncSwitch"
     },
@@ -1609,6 +1882,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.pitchDepth"
     },
@@ -1622,6 +1896,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.filterDepth"
     },
@@ -1635,6 +1910,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.ampDepth"
     },
@@ -1648,6 +1924,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone2.modLfo.panDepth"
     },
@@ -1661,6 +1938,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.shape"
     },
@@ -1674,6 +1952,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.rate"
     },
@@ -1687,6 +1966,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.tempoSyncSwitch"
     },
@@ -1700,6 +1984,29 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "16",
+        "12",
+        "8",
+        "4",
+        "2",
+        "1",
+        "3/4",
+        "2/3",
+        "1/2",
+        "3/8",
+        "1/3",
+        "1/4",
+        "3/16",
+        "1/6",
+        "1/8",
+        "3/32",
+        "1/12",
+        "1/16",
+        "1/24",
+        "1/32"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.tempoSyncNote"
     },
@@ -1713,6 +2020,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.keyTrigger"
     },
@@ -1726,6 +2038,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.fadeTime"
     },
@@ -1739,6 +2052,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.pitchDepth"
     },
@@ -1752,6 +2066,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.filterDepth"
     },
@@ -1765,6 +2080,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.lfo.ampDepth"
     },
@@ -1778,6 +2094,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1791,6 +2108,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.wave"
     },
@@ -1804,6 +2122,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.waveVariation"
     },
@@ -1817,6 +2136,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pitch"
     },
@@ -1830,6 +2150,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.detune"
     },
@@ -1843,6 +2164,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pulseWidthModDepth"
     },
@@ -1856,6 +2178,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pulseWidth"
     },
@@ -1869,6 +2192,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pitchEnvAttackTime"
     },
@@ -1882,6 +2206,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pitchEnvDecay"
     },
@@ -1895,6 +2220,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.osc.pitchEnvDepth"
     },
@@ -1908,6 +2234,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -1921,6 +2248,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.mode"
     },
@@ -1934,6 +2262,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.slope"
     },
@@ -1947,6 +2276,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.cutoff"
     },
@@ -1960,6 +2290,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.resonance"
     },
@@ -1973,6 +2304,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envAttackTime"
     },
@@ -1986,6 +2318,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envDecayTime"
     },
@@ -1999,6 +2332,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envSustainLevel"
     },
@@ -2012,6 +2346,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envReleaseTime"
     },
@@ -2025,6 +2360,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envDepth"
     },
@@ -2038,6 +2374,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.envVelocitySens"
     },
@@ -2051,6 +2388,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.filter.cutoffKeyfollow"
     },
@@ -2064,6 +2402,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -2077,6 +2416,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.level"
     },
@@ -2090,6 +2430,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.pan"
     },
@@ -2103,6 +2444,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.levelVelocitySens"
     },
@@ -2116,6 +2458,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.envAttackTime"
     },
@@ -2129,6 +2472,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.envDecayTime"
     },
@@ -2142,6 +2486,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.envSustainLevel"
     },
@@ -2155,6 +2500,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.amp.envReleaseTime"
     },
@@ -2168,6 +2514,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.shape"
     },
@@ -2181,6 +2528,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.rate"
     },
@@ -2194,6 +2542,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.tempoSyncSwitch"
     },
@@ -2207,6 +2560,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.pitchDepth"
     },
@@ -2220,6 +2574,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.filterDepth"
     },
@@ -2233,6 +2588,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.ampDepth"
     },
@@ -2246,6 +2602,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "tone3.modLfo.panDepth"
     },
@@ -2259,6 +2616,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "common.switch"
     },
@@ -2272,6 +2634,18 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "04_",
+        "08_",
+        "08L",
+        "08H",
+        "08t",
+        "16_",
+        "16L",
+        "16H",
+        "16t"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.grid"
     },
@@ -2285,6 +2659,19 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "30",
+        "40",
+        "50",
+        "60",
+        "70",
+        "80",
+        "90",
+        "100",
+        "120",
+        "FUL"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.duration"
     },
@@ -2298,6 +2685,21 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "UP/L",
+        "UP/L&H",
+        "UP/_",
+        "DOWN/L",
+        "DOWN/L&H",
+        "DOWN/_",
+        "UP&DOWN/L",
+        "UP&DOWN/L&H",
+        "UP&DOWN/_",
+        "RANDOM/L",
+        "RANDOM/_",
+        "PHRASE"
+      ],
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.motif"
     },
@@ -2311,6 +2713,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.octaveRange"
     },
@@ -2324,6 +2727,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.accentRate"
     },
@@ -2337,6 +2741,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.velocity"
     },
@@ -2350,6 +2755,7 @@
       "defaultValue": 1,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "arp.endStep"
     },
@@ -2363,6 +2769,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "distortion.type"
     },
@@ -2376,6 +2783,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "distortion.parameter1"
     },
@@ -2389,6 +2797,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "distortion.parameter2"
     },
@@ -2402,6 +2811,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "distortion.parameter3"
     },
@@ -2415,6 +2825,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "distortion.parameter4"
     },
@@ -2428,6 +2839,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "flanger.type"
     },
@@ -2441,6 +2853,7 @@
       "defaultValue": 32826,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "flanger.parameter1"
     },
@@ -2454,6 +2867,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "flanger.parameter2"
     },
@@ -2467,6 +2881,7 @@
       "defaultValue": 32826,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "flanger.parameter3"
     },
@@ -2480,6 +2895,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "flanger.parameter4"
     },
@@ -2493,6 +2909,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "delay.type"
     },
@@ -2506,6 +2923,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "delay.parameter1"
     },
@@ -2519,6 +2937,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "delay.parameter2"
     },
@@ -2532,6 +2951,7 @@
       "defaultValue": 32750,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "delay.parameter3"
     },
@@ -2545,6 +2965,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "delay.parameter4"
     },
@@ -2558,6 +2979,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "reverb.type"
     },
@@ -2571,6 +2993,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "reverb.parameter1"
     },
@@ -2584,6 +3007,7 @@
       "defaultValue": 32769,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "reverb.parameter2"
     },
@@ -2597,6 +3021,7 @@
       "defaultValue": 32819,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "reverb.parameter3"
     },
@@ -2610,6 +3035,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "reverb.parameter4"
     },
@@ -2623,6 +3049,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -2636,6 +3063,7 @@
       "defaultValue": 32,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -2649,6 +3077,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -2662,6 +3091,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -2675,6 +3105,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -2688,6 +3119,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     }

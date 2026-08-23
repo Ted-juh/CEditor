@@ -39,7 +39,7 @@ import { assertSameText, readText } from './support/readText.mjs';
 
 import { render } from 'svelte/server';
 
-import { COMPONENT_TYPES } from '../src/CE_Application/models/componentTypes.js';
+import { COMPONENT_TYPES, createControl } from '../src/CE_Application/models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import CanvasControl from '../src/CE_Application/editor/CanvasControl.svelte';
 import { expandControl } from '../src/CE_Application/stores/documentShape.js';
@@ -243,6 +243,51 @@ test('QA-08 accounts for every component type, with a verdict', () => {
   assert.deepEqual(unexplained.map((e) => e.type), [], 'a type exports nothing and the sheet does not say why');
 });
 
+// The eight types that were named in known-issues.md as unautomatable-and-undecided. Each is now
+// ruled: five export, three declare that they do not. Listed here rather than derived, because the
+// point of the test is that a specific list of open questions got specific answers — a derived
+// version would go green again the moment someone quietly deleted a ruling.
+const RULED = {
+  Numpad: 1, Crossfader: 1, Ribbon: 1, Macro: 1, VectorJoystick: 2,
+  Meter: 0, Matrix: 0, Envelope: 0,
+};
+
+test('the eight undecided types are all ruled, none of them by accident', () => {
+  const byType = new Map(classifyAllTypes().map((entry) => [entry.type, entry]));
+  const wrong = [];
+
+  for (const [type, expected] of Object.entries(RULED)) {
+    const entry = byType.get(type);
+    if (!entry) { wrong.push(`${type}: no longer a component type`); continue; }
+
+    if (entry.params.length !== expected) {
+      wrong.push(`${type}: exports ${entry.params.length} parameters, the ruling was ${expected}`);
+    }
+    // Zero parameters is only acceptable as a DECISION. 'unseen' means the type says nothing and
+    // the deriver never looked, which is the state this whole exercise existed to end.
+    if (expected === 0 && entry.verdict !== 'declined') {
+      wrong.push(`${type}: exports nothing but is "${entry.verdict}" — it must say so with exportValues: []`);
+    }
+  }
+  assert.deepEqual(wrong, [], `rulings that no longer hold:\n  ${wrong.join('\n  ')}`);
+});
+
+test('a declared export range matches what the component actually stores', () => {
+  // The trap this pins: Crossfader, Ribbon and VectorJoystick all carry a `bipolar` flag, and it is
+  // a DISPLAY flag — RibbonRenderer's readout does `value * 2 - 1` while storage stays 0..1.
+  // Exporting -1..1 for them would hand the host a range the control never holds, and the first
+  // draft of exportValues did exactly that.
+  for (const type of ['Crossfader', 'Ribbon', 'VectorJoystick', 'Macro']) {
+    const control = createControl(type, { Core: { id: `t_${type}`, name: type } });
+    for (const param of parametersFor(control)) {
+      assert.equal(param.min, 0, `${param.path} exports a min of ${param.min}; these store 0..1`);
+      assert.equal(param.max, 1, `${param.path} exports a max of ${param.max}; these store 0..1`);
+      assert.ok(param.defaultValue >= param.min && param.defaultValue <= param.max,
+        `${param.path} defaults to ${param.defaultValue}, outside its own range`);
+    }
+  }
+});
+
 test('QA-08 recipes each still cover the derivation branch they claim', () => {
   // The recipe cards re-check themselves at generation time and go red, which a reader would see.
   // This is the same check with no reader required — a recipe that stops exercising its branch is
@@ -253,6 +298,42 @@ test('QA-08 recipes each still cover the derivation branch they claim', () => {
     if (!recipe.expect(params)) lapsed.push(`${recipe.id} — derived: ${JSON.stringify(params)}`);
   }
   assert.deepEqual(lapsed, [], `QA-08 recipes no longer covering their branch:\n  ${lapsed.join('\n  ')}`);
+});
+
+test('every derived parameter declares what kind of host parameter it is', () => {
+  // The gap this closes: PanelParameters.h branches on `valueKind` to choose an
+  // AudioParameterChoice / Bool / Float, and a parameter that omits it silently reads as a float.
+  // That is what shipped for a long time — every combobox arrived in the DAW as an anonymous 0..1
+  // number — and nothing in the editor showed it, because the editor never reads valueKind.
+  const KINDS = new Set(['float', 'bool', 'choice']);
+  const bad = [];
+  for (const entry of classifyAllTypes()) {
+    for (const param of entry.params) {
+      if (!KINDS.has(param.valueKind)) bad.push(`${entry.type}: ${param.path} → ${param.valueKind}`);
+      // A choice with no menu is a menu the host cannot draw; the C++ side degrades it to a float,
+      // and a selector that reaches that fallback has lost its option names somewhere.
+      if (param.valueKind === 'choice' && !(param.choiceLabels?.length > 1)) {
+        bad.push(`${entry.type}: ${param.path} is a choice with ${param.choiceLabels?.length ?? 0} labels`);
+      }
+    }
+  }
+  assert.deepEqual(bad, [], `parameters with a missing or unusable valueKind:\n  ${bad.join('\n  ')}`);
+});
+
+test('QA-06 exports the GAIA\'s switches and menus as switches and menus', () => {
+  // The end-to-end version of the above, on the one sheet that is a real instrument. Before
+  // valueKind, all 162-odd of the GAIA's bound controls exported as anonymous floats — every
+  // waveform selector, every on/off. This asserts the shape a host would actually be handed.
+  const doc = JSON.parse(serializeSheet(SHEETS.find((s) => s.file === 'QA-06-roland-gaia.cepanel')));
+  const byKind = { float: 0, bool: 0, choice: 0, other: 0 };
+  for (const param of doc.exportParameters ?? []) {
+    byKind[param.valueKind] = (byKind[param.valueKind] ?? byKind.other) + 1;
+  }
+  assert.ok(byKind.choice > 0,
+    'not one of the GAIA\'s choice parameters exports as a choice — they are all anonymous numbers again');
+  const menuless = (doc.exportParameters ?? [])
+    .filter((p) => p.valueKind === 'choice' && !(p.choiceLabels?.length > 1));
+  assert.deepEqual(menuless.map((p) => p.id), [], 'a GAIA choice parameter carries no option names');
 });
 
 test('QA-08 recipe ids are unique and every recipe explains itself', () => {

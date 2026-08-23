@@ -615,6 +615,9 @@ export const COMPONENT_TYPES = {
 
   Macro: {
     sections: ['Background', 'Macro', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. The macro's own position, 0..1. `slots` is where it is routed, which is
+    // panel wiring rather than something a host moves.
+    exportValues: [{ field: 'value', section: 'Macro', kind: 'float' }],
     ports: getComponentPorts('Macro'),
     defaultOverrides: {
       // A macro knob + assignment lanes in a dark panel by default.
@@ -949,6 +952,8 @@ export const COMPONENT_TYPES = {
 
   Ribbon: {
     sections: ['Background', 'Ribbon', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. Same shape as the crossfader — one scalar stored 0..1.
+    exportValues: [{ field: 'value', section: 'Ribbon', kind: 'float' }],
     ports: getComponentPorts('Ribbon'),
     defaultOverrides: {
       // A tall vertical touch strip / wheel by default.
@@ -967,6 +972,11 @@ export const COMPONENT_TYPES = {
     // Value + DeviceBindings, so a typed number binds like any other value — to a device parameter,
     // or through a script to a preset recall. Nothing about Program Change lives in the component.
     sections: ['Background', 'Numpad', 'Value', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. A keypad is one number, and it already declares its own range. It carries a
+    // Value section and no Behavior, which is why deriveExportParameters could not see it: that
+    // function's only door for a standard control was `Behavior`, so the one component here that
+    // visibly stores a number exported nothing at all.
+    exportValues: [{ field: 'value', section: 'Numpad', kind: 'float', minField: 'min', maxField: 'max' }],
     ports: getComponentPorts('Numpad'),
     defaultOverrides: {
       // Three columns of keys plus a readout: taller than it is wide, like the thing it imitates.
@@ -983,6 +993,10 @@ export const COMPONENT_TYPES = {
 
   Crossfader: {
     sections: ['Background', 'Crossfader', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. `mix` is the whole value, stored 0..1 with 0.5 as centre. `bipolar` is a
+    // DISPLAY flag — RibbonRenderer's readout does `value * 2 - 1` for it — so the exported range
+    // is the stored domain, not the displayed one.
+    exportValues: [{ field: 'mix', section: 'Crossfader', kind: 'float' }],
     ports: getComponentPorts('Crossfader'),
     defaultOverrides: {
       // A wide horizontal A/B fader by default.
@@ -999,6 +1013,13 @@ export const COMPONENT_TYPES = {
 
   VectorJoystick: {
     sections: ['Background', 'Joystick', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. Two parameters, not one. Every host models an XY pad as two automation
+    // lanes, and flattening them to a single scalar would lose the axis a user was drawing. Both
+    // are stored 0..1 with 0.5 as centre, whatever `bipolar` shows.
+    exportValues: [
+      { field: 'x', section: 'Joystick', kind: 'float', suffix: 'x', label: 'X' },
+      { field: 'y', section: 'Joystick', kind: 'float', suffix: 'y', label: 'Y' },
+    ],
     ports: getComponentPorts('VectorJoystick'),
     defaultOverrides: {
       // A square XY pad in a dark panel by default.
@@ -1015,6 +1036,11 @@ export const COMPONENT_TYPES = {
 
   Matrix: {
     sections: ['Background', 'Matrix', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION: none, deliberately. Two reasons, either sufficient. A parameter per cell is
+    // rows x cols parameters and both are per-panel, but the exported list has to be FIXED — a
+    // panel whose parameter count changes when someone adds a row is a panel that breaks every
+    // saved session. And a modulation matrix is routing configuration, not a performance control.
+    exportValues: [],
     ports: getComponentPorts('Matrix'),
     defaultOverrides: {
       // A 4×4 routing grid in a dark panel by default.
@@ -1031,6 +1057,10 @@ export const COMPONENT_TYPES = {
 
   Envelope: {
     sections: ['Background', 'Envelope', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION: none, deliberately. An envelope is a shape with a variable number of
+    // points, so it has the same fixed-list problem as the matrix; and the thing that does move
+    // continuously, `phase`, is driven by `phaseSourceId` — an output, like the meter's.
+    exportValues: [],
     ports: getComponentPorts('Envelope'),
     defaultOverrides: {
       // A wide ADSR editing area in a dark panel by default.
@@ -1047,6 +1077,11 @@ export const COMPONENT_TYPES = {
 
   Meter: {
     sections: ['Background', 'Meter', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION: none, deliberately. A meter DISPLAYS a level that arrives from somewhere
+    // else — `valueSourceId` names where — so a host parameter would let a DAW write a reading the
+    // component is supposed to be reporting. An output is not an automation target. Declared
+    // empty rather than left absent, so QA-08 files it as a decision instead of an oversight.
+    exportValues: [],
     ports: getComponentPorts('Meter'),
     defaultOverrides: {
       // A horizontal level meter in a dark inset by default.
