@@ -18,6 +18,7 @@
   import DisplayPanel from '../panels/DisplayPanel.svelte';
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
+  import { displayTabRequest } from '../stores/displayTab.js';
   import { openFillGradientEditor } from '../stores/gradientTarget.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { clipPathForKind } from '../utils/shapeGeometry.js';
@@ -1711,12 +1712,30 @@
     stops: [{ color: '555555', position: 0 }, { color: 'AAAAAA', position: 100 }],
   };
 
+  /**
+   * Reveal the editor a swatch just targeted.
+   *
+   * Setting the colour or gradient target only says WHAT is being edited. The thing that edits it
+   * is the DisplayPanel dock, and on this surface the dock can be hidden (the palette's third
+   * toggle) or sitting on Notepad or Console. So a swatch click could set a target perfectly and
+   * produce no visible effect at all — the 2026-07-12 review's bug §2.1, and the reason it called
+   * the dock "a fragile dependency".
+   *
+   * Both halves are needed. Un-hiding without the tab request lands the user on whatever tab they
+   * left open; the tab request without un-hiding switches a panel nobody can see.
+   */
+  function revealDisplayDock(tab) {
+    displayDockHidden = false;
+    displayTabRequest.set({ tab });
+  }
+
   function openLayerColour(relativePath, currentValue) {
     if (!core?.id || !selectedLayer) return;
     activateColorTarget(
       { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.${relativePath}` },
       currentValue ?? 'FF5B9BD5'
     );
+    revealDisplayDock('colors');
   }
 
   function openArcColour() {
@@ -1725,10 +1744,12 @@
       { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.meta.arcTrack.colour` },
       selectedArcMeta?.colour ?? 'FF5B9BD5'
     );
+    revealDisplayDock('colors');
   }
 
   function openLayerGradient() {
     if (!core?.id || !selectedLayer || !selectedFill) return;
+    revealDisplayDock('gradient');
     openFillGradientEditor({
       controlId: core.id,
       targetPath: `Parts.${selectedLayer}.Background.Fill`,
@@ -2728,6 +2749,44 @@
     activeSmartGuides = [];
   }
 
+  /**
+   * The dock's X/Y/W/H, with a multi-selection meaning what it looks like it means.
+   *
+   * These four fields READ `activeSelectionFrame`, which is the group's bounding box when several
+   * layers are selected — and used to WRITE through `patchFromFrame(selectedAuthoredPart, ...)`,
+   * which is the primary layer alone. Typing an X with three layers selected moved one of them and
+   * left the field showing a recomputed bounds, so the number you typed was not the number that
+   * came back. Bug §2.2 of the 2026-07-12 review, and the kind that reads as the editor being
+   * flaky rather than as a wiring mistake.
+   *
+   * X and Y translate the whole selection by the delta, which is the only reading of "move the
+   * group to X" that is not a guess — and it is the same operation the arrow keys already do
+   * through `moveSelectedLayersBy`.
+   *
+   * W and H are NOT applied to a group. "Make the selection 200 wide" could mean scale every
+   * member proportionally, stretch each to 200, or resize the box and reflow — three different
+   * results with nothing to choose between them. The fields are disabled with a title that says
+   * so, which is the review's own second option and better than picking one silently.
+   */
+  function setSelectionFramePosition(axis, value) {
+    if (multiSelectionActive) {
+      const from = axis === 'left' ? activeSelectionFrame?.left : activeSelectionFrame?.top;
+      const delta = Math.round(value) - Math.round(from ?? 0);
+      if (delta) moveSelectedLayersBy(axis === 'left' ? delta : 0, axis === 'left' ? 0 : delta);
+      return;
+    }
+    const frame = { ...activeSelectionFrame, [axis]: value };
+    if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
+    else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
+  }
+
+  function setSelectionFrameSize(axis, value) {
+    if (multiSelectionActive) return;   // see above — no single honest meaning for a group
+    const frame = { ...activeSelectionFrame, [axis]: Math.max(1, value) };
+    if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
+    else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
+  }
+
   function nudgeSelected(dx, dy) {
     if (multiSelectionActive) {
       moveSelectedLayersBy(dx, dy);
@@ -3517,7 +3576,6 @@
             <div class="dock-tab-row" role="tablist" aria-label="Right dock sections">
               <button type="button" class:active={dockTab === 'layers'} role="tab" aria-selected={dockTab === 'layers'} onclick={() => { dockTab = 'layers'; }}>Layers</button>
               <button type="button" class:active={dockTab === 'generators'} role="tab" aria-selected={dockTab === 'generators'} onclick={() => { dockTab = 'generators'; }}>Generators</button>
-              <button type="button" class:active={dockTab === 'assets'} role="tab" aria-selected={dockTab === 'assets'} onclick={() => { dockTab = 'assets'; }} title="Assets stay in the inspector for now">Assets</button>
               <button type="button" class:active={dockTab === 'live'} role="tab" aria-selected={dockTab === 'live'} onclick={() => { dockTab = 'live'; }} title="Persistent live preview — what you build is what runs">Live</button>
             </div>
             <strong>{dockTab === 'generators' ? generatorEntries.length : topLevelPartEntries.length + kitEntries.length + generatedSourceEntries.length}</strong>
@@ -3555,10 +3613,6 @@
                 onclick={() => { livePreviewSession = createInteractionPreviewSession(control); }}
                 title="Reset the live session to the component defaults"
               >Reset session</button>
-            </div>
-          {:else}
-            <div class="dock-empty dock-empty-tab">
-              Assets are edited in the inspector for now.
             </div>
           {/if}
         </section>
@@ -3756,11 +3810,7 @@
                         <NumberCell
                           value={Math.round(activeSelectionFrame.left)}
                           disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(value) => {
-                            const frame = { ...activeSelectionFrame, left: value };
-                            if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                            else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-                          }}
+                          onchange={(value) => setSelectionFramePosition('left', value)}
                         />
                       </label>
                       <label>
@@ -3768,11 +3818,7 @@
                         <NumberCell
                           value={Math.round(activeSelectionFrame.top)}
                           disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(value) => {
-                            const frame = { ...activeSelectionFrame, top: value };
-                            if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                            else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-                          }}
+                          onchange={(value) => setSelectionFramePosition('top', value)}
                         />
                       </label>
                       <label>
@@ -3780,12 +3826,9 @@
                         <NumberCell
                           min={1}
                           value={Math.round(activeSelectionFrame.width)}
-                          disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(value) => {
-                            const frame = { ...activeSelectionFrame, width: Math.max(1, value) };
-                            if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                            else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-                          }}
+                          disabled={multiSelectionActive || (activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable)}
+                          title={multiSelectionActive ? 'Resize one layer at a time — a group width has no single meaning' : undefined}
+                          onchange={(value) => setSelectionFrameSize('width', value)}
                         />
                       </label>
                       <label>
@@ -3793,12 +3836,9 @@
                         <NumberCell
                           min={1}
                           value={Math.round(activeSelectionFrame.height)}
-                          disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(value) => {
-                            const frame = { ...activeSelectionFrame, height: Math.max(1, value) };
-                            if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                            else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-                          }}
+                          disabled={multiSelectionActive || (activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable)}
+                          title={multiSelectionActive ? 'Resize one layer at a time — a group width has no single meaning' : undefined}
+                          onchange={(value) => setSelectionFrameSize('height', value)}
                         />
                       </label>
                       {#if activeSelectionKind === 'layer'}
