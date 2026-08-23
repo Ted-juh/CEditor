@@ -106,8 +106,13 @@ the tree on 2026-08-23.
   gives 0.0, which is in range, and that is the shared encoder every knob move goes through — pinned
   by test rather than changed, since changing it would change the knob path too.
 
-  **Still open: the editor preview**, which returns null. The preview has no `DeviceProfileEngine`
-  in-process, so it needs the bridge round-trip the other device reads use.
+  **The editor preview: half closed, 2026-08-23.** A layout the script declared with `defineDump` is
+  one the runtime owns outright, so it now builds there too — `localBuildDumpMessage` mirrors the C++
+  over the same synthetic profile, and is round-tripped against `localParseDumpMessage` the same way.
+  A PROFILE dump still returns null with an explanation, because its codec is in the C++ engine and
+  the preview has no synchronous way to reach it. That is the same split `requestDump` already makes,
+  and it means a script developing against a declared layout now behaves the same in the editor as in
+  the exported plugin.
 - [x] ~~**C++ / C# / Java preview interpreters cannot register `on()` callbacks**~~ — **done
   2026-08-23**, via a `setup` entry point rather than the top-level execution this line proposed.
   That proposal was wrong: a bare statement at file scope is illegal in all three languages, so

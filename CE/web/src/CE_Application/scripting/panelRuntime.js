@@ -56,7 +56,7 @@ import { mapDeviceRole } from '../stores/deviceProfileSession.js';
 import {
   defineParameter as defineRuntimeParameter, defineDump as defineRuntimeDump,
   definedParameters, definedParameter, encodeParameter as encodeRuntimeParameter,
-  dumpRequestBytes, decodeDump as decodeRuntimeDump, clearDeviceDefinitions,
+  dumpRequestBytes, decodeDump as decodeRuntimeDump, buildDump as buildRuntimeDump, clearDeviceDefinitions,
   hasDefinedParameter, hasDefinedDump,
 } from './deviceDefinitions.js';
 import {
@@ -2139,16 +2139,32 @@ const midiApi = {
       addScriptTrace('midi', '', `sendDump(${JSON.stringify(kind ?? '')}) — no device host`);
     }
   },
-  // buildDump (panel → bytes) is encoded by the device profile's codec, which lives in the device
-  // host. This runtime cannot produce the bytes, so it reports at ERROR level and returns null —
-  // it used to report at 'midi' level, which reads as ordinary chatter, so a script that built a
-  // dump here got a quiet null and no indication that anything was wrong. Declared
-  // requiresDeviceHost in panelApi.js so the docs and the picker say it too.
-  buildDump: (kind) => {
-    addScriptTrace('error', '',
-      `buildDump(${JSON.stringify(kind ?? '')}) needs the device host — panel→bytes encoding is the device profile's codec, `
-      + 'which runs in the host, not the panel view. It returns bytes in the exported plugin; use sendDump to transmit from here.');
-    return null;
+  // buildDump (panel → bytes). Two cases, and only one of them still needs the host.
+  //
+  // A layout the SCRIPT declared with defineDump is one this runtime owns outright — the same reason
+  // requestDump can send its request bytes with no profile at all — so it is built here, by the
+  // local engine, and returns real bytes in the preview. A PROFILE dump's codec lives in the C++
+  // DeviceProfileEngine and the preview has no synchronous way to reach it, so that case still
+  // reports and returns null, which is what requiresDeviceHost in panelApi.js is about.
+  //
+  // The error is at ERROR level, not 'midi': it used to be the latter, which reads as ordinary
+  // chatter, so a script got a quiet null and no indication anything was wrong.
+  buildDump: (kind, values) => {
+    const built = buildRuntimeDump(DEFAULT_ROLE, String(kind ?? ''), values ?? {});
+    if (built === null) {
+      addScriptTrace('error', '',
+        `buildDump(${JSON.stringify(kind ?? '')}) needs the device host — panel→bytes encoding for a PROFILE dump is `
+        + "the device profile's codec, which runs in the host, not the panel view. It returns bytes in the exported "
+        + 'plugin. A layout you declare yourself with defineDump builds here and now.');
+      return null;
+    }
+    if (!built.ok) {
+      addScriptTrace('error', '', `buildDump(${JSON.stringify(kind ?? '')}): ${built.error}`);
+      return null;
+    }
+    if (built.unmapped?.length)
+      addScriptTrace('midi', '', `buildDump(${JSON.stringify(kind ?? '')}) — ${built.unmapped.length} parameter(s) left at their defaults`);
+    return built;
   },
 };
 
