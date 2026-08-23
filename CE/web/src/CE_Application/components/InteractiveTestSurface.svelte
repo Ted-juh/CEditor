@@ -3,6 +3,7 @@
   import CanvasControl from '../editor/CanvasControl.svelte';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { deepClone } from '../utils/deepClone.js';
+  import { isDisplayOnly } from '../utils/displayMode.js';
   import { getNextEnumValue } from '../utils/enumBehavior.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
   import { numberOr, clamp } from '../utils/primitives.js';
@@ -178,6 +179,8 @@
   }
 
   let behavior = $derived(control?._children?.Behavior ?? null);
+  // A display shows and does not listen — distinct from disabled, which is greyed out and dead.
+  let isReadOnly = $derived(isDisplayOnly(behavior));
   // Rides alongside behavior into every scrub so the Mouse tab's drag
   // settings apply here exactly as they do on the panel preview surface.
   let mouse = $derived(control?._children?.Mouse ?? null);
@@ -1241,6 +1244,7 @@
   }
 
   function handleWheel(event) {
+    if (isReadOnly) return;
     if (isCustomComponent) {
       if (isDisabled) return;
       event.preventDefault();
@@ -1310,6 +1314,7 @@
   }
 
   function handlePointerDown(event) {
+    if (isReadOnly) return;
     if (isDisabled) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1510,6 +1515,7 @@
   }
 
   function handleKeyDown(event) {
+    if (isReadOnly) return;
     if (isDisabled) return;
     if (isCustomComponent) {
       lastInputMode = 'keyboard';

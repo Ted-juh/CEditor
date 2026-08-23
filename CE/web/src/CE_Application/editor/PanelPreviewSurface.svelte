@@ -2,6 +2,7 @@
   import { onDestroy, untrack } from 'svelte';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
+  import { isDisplayOnly } from '../utils/displayMode.js';
   import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout } from '../utils/lcdZones.js';
   import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
@@ -4503,6 +4504,15 @@
       || control?._children?.Core?.enabled === false;
   }
 
+  /**
+   * A read-only control takes no input. Separate from `isDisabled` on purpose: a disabled control
+   * is greyed out and its `disabled` state fires, while a display is fully live — it just does not
+   * listen. Conflating them would make every meter look switched off.
+   */
+  function isReadOnly(control) {
+    return isDisplayOnly(getBehavior(control));
+  }
+
   function isRangeControl(control) {
     return isRangeBehavior(getBehavior(control));
   }
@@ -5835,6 +5845,9 @@
   }
 
   function handleRangeWheel(control, event) {
+    // A display does not scroll to a new value. The script dispatch below is skipped with it: a
+    // read-only control that still fired onWheel would let a script do what the wheel may not.
+    if (isReadOnly(control)) return;
     // Fire onWheel for ANY control (before the range-only built-in below returns), so a script can
     // react to the wheel even on non-range controls. delta = +1 up / -1 down; raw deltas included.
     dispatchInteraction(getControlId(control), 'onWheel', {
@@ -6190,6 +6203,8 @@
   function handlePointerDown(control, event) {
     if (event.button !== 0) return;
     if (isDisabled(control)) return;
+    // Before the double-tap bookkeeping, or a display would still register clicks it never acts on.
+    if (isReadOnly(control)) return;
 
     // Double-click: two presses on the same control within 350ms (CanvasControl has no native dblclick).
     const downId = getControlId(control);
@@ -6719,6 +6734,7 @@
 
   function handleKeyDown(control, event) {
     if (isDisabled(control)) return;
+    if (isReadOnly(control)) return;
 
     const controlId = getControlId(control);
     lastInputMode = 'keyboard';

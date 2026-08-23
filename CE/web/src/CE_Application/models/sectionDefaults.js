@@ -795,6 +795,13 @@ export const SECTION_DEFAULTS = {
     dragEnabled: false,
     wheelEnabled: false,
     reverseMouseDirection: false,
+    // --- Value flow (the feedback/input direction) ---
+    // `twoWay` is what every control has always been: the device's value moves it, and moving it
+    // sends. `display` is the read-only half the output components need — a meter, an LCD bound
+    // field, a pad-grid LED — and `input` is the opposite, a control that sends and is not moved by
+    // feedback. See utils/displayMode.js; `readOnly: true` is accepted as the older spelling.
+    valueFlow: 'twoWay',     // twoWay | display | input
+
     // --- Return-to-rest (spring-back) ---
     // One capability, many components: a pitch or mod wheel springing to centre, a ribbon returning
     // to rest, a joystick recentring, a spring fader. Each was about to reinvent it.

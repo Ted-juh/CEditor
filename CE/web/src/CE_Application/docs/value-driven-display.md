@@ -78,3 +78,45 @@ progress bar · status indicators.
   scripting-runtime gap fix.
 - New display visual maps (lit cells, segment states, text-from-value) — define
   the binding targets.
+
+---
+
+## Built, 2026-08-23
+
+`utils/displayMode.js` + `utils/displayMaps.js`, pinned by `test/displayMode.test.js`.
+
+**Three things the design note asked for turned out to be two.** The inbound dependency was already
+closed: `PluginProcessor.h` dispatches `onParameterReceived` (verified in
+[scripting-runtime-gaps.md](./scripting-runtime-gaps.md)), and in the editor
+`followInboundMessage` decodes a live CC against the profile's `inbound` declaration and
+`queueDeviceParameterPanelPreviewSync` writes it into the control's session — coalesced per
+animation frame, keyed by role and parameter. The rate limiting this note asked for was already
+there and had been for a while.
+
+**The flag is `Behavior.valueFlow`, not `role: 'display'`.** The note offered both. `role` already
+names the control's kind — `slider`, `knob`, `button` — so `role: 'display'` would leave a display
+unable to say *which kind* of display it is. `readOnly: true` is accepted as an older spelling.
+There are three values, not two: `input` (sends, is not moved by feedback) falls out for free and is
+what a trigger button actually is.
+
+**Pointer events are deliberately NOT turned off**, and the note asked for them. `interceptClicks:
+false` is `pointer-events: none`, which also kills hover — so a meter you can hover to read would
+lose its tooltip, and clicks would start landing on whatever sits behind it, which is a layout
+change nobody asked for. Read-only means "your input does not change the value", not "you cannot
+point at it". What it *does* turn off: drag, wheel, keyboard, focus and tab order — and the host
+parameter, which is the one that would otherwise have been found last. A DAW automation lane on a
+meter records perfectly and moves nothing, because the next feedback frame overwrites every value
+it writes.
+
+**The drag guard needed the flow.** `syncDeviceParameterToPanelPreview` skips a control the user is
+dragging, so a device echo does not fight the hand on a knob. On a display that guard can only
+misfire: a stale `dragging: true` would freeze the meter for the rest of the session. It now asks
+`shouldAcceptFeedback(behavior, session)` instead.
+
+**The new maps are the ones where the arithmetic is the feature** — the rest was already covered by
+`Bindings`. `litCells` (bar / point / centre), `peakHold` (rises instantly, falls slowly — a marker
+that smoothed its rise would defeat its own purpose), `segmentStates` (by choice index, not by
+level: a five-way's third position is segment 2, not "40% along"), `textFromValue`, `barGeometry`
+and `bandFor`. Every one of them distinguishes **no reading** from **a zero reading**, which is the
+trap the whole module is built around: a meter with nothing connected and a meter reading silence
+look identical the moment `undefined` coerces to 0.

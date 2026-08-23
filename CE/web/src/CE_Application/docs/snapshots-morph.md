@@ -78,3 +78,30 @@ the models separate; allow conversion.
 - MIDI flood throttling policy (coalesce + send budget) — concrete numbers.
 - Enum/stepped interpolation policy (nearest vs threshold) default.
 - Whether morph runs in C++ (PanelValueModel) or JS over the mirror.
+
+---
+
+## Built, 2026-08-23
+
+`utils/snapshotModel.js`, `stores/snapshots.js`, `utils/panelValueAccess.js` and the Snapshots tab,
+pinned by `test/snapshots.test.js`.
+
+**Interpolation policy comes from `valueKind`**, the field Total Recall S1 added so a selector
+reaches a host as an `AudioParameterChoice` rather than an anonymous float. It answers this question
+too, so nothing new is declared per parameter: `choice`/`bool` → nearest, text and patch names →
+hold, everything else → lerp. There is no waveform 1.5.
+
+**Reading a value needed its own module first.** `panelValueAccess.js` exists because a control's
+current value lived in three different places depending on which export door the parameter came
+through — `valueOverride`, `customValues[leaf]`, `sectionValues`. `readParameterValue` returns
+`undefined` rather than a fallback number for a control nobody has touched: a snapshot full of
+zeroes recalls a panel to zero, which is a reset wearing a snapshot's clothes.
+
+**A parameter present in only one snapshot is carried through, not blended toward nothing.** That is
+what makes a partial snapshot — "just the filter" — composable with a whole-panel one instead of
+quietly resetting everything it does not mention.
+
+**Sending is budgeted.** DIN MIDI is 31,250 baud, about a thousand three-byte messages a second for
+everything the panel wants to say. `morphSendPlan` coalesces per frame, caps at 32, orders by how
+far each parameter moved so a sweep still looks right while throttled, and *counts* what it deferred
+rather than dropping it silently.

@@ -13,6 +13,7 @@
 // half into DragScrubOptions. Keeping the decisions in one pure module is what
 // lets both be tested without a browser.
 import { numberOr } from './primitives.js';
+import { isDisplayOnly } from './displayMode.js';
 
 /** Cursors offered in the Mouse tab. `default` means "inherit the surface's". */
 export const CURSOR_OPTIONS = [
@@ -110,6 +111,22 @@ export function resolveHitTestClipPath(mouse = null) {
 
 export function isFocusable(mouse = null) {
   return mouse?.focusable === true;
+}
+
+/**
+ * Focus and tab order with the control's value flow taken into account.
+ *
+ * A display is not a tab stop. Reaching it with the keyboard would put a focus ring on something
+ * that cannot be operated, and then swallow the Tab press that was heading for the next real
+ * control. The read-only answer WINS over an author's `focusable: true`, because the two settings
+ * are not equals — one says what kind of control this is, the other configures how it focuses.
+ */
+export function isFocusableFor(mouse = null, behavior = null) {
+  return isDisplayOnly(behavior) ? false : isFocusable(mouse);
+}
+
+export function resolveTabIndexFor(mouse = null, behavior = null) {
+  return isDisplayOnly(behavior) ? -1 : resolveTabIndex(mouse);
 }
 
 export function showsFocusOutline(mouse = null) {

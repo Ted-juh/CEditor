@@ -1,4 +1,5 @@
 import { COMPONENT_TYPES } from '../models/componentTypes.js';
+import { isDisplayOnly } from './displayMode.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { canSendMidiControl, isMidiControlBinding, midiControlResolution } from './midiControlBindings.js';
 // exportParameters.js — the host-automatable parameter list a panel exposes (Milestone 2).
@@ -292,6 +293,13 @@ export function deriveExportParameters(panel) {
     const name = core?.name ?? core?.id;
     if (!name) continue;
     const kids = control._children;
+
+    // A DISPLAY EXPORTS NOTHING. A read-only control is not an input, and a host parameter for one
+    // would give the DAW an automation lane whose every value is overwritten by the next feedback
+    // frame — a lane that appears to work, records fine, and moves nothing. Gated here rather than
+    // per door, because all three doors below would otherwise need the same check.
+    if (isDisplayOnly(kids.Behavior)) continue;
+
     const wire = deviceWireFor(control); // which synth parameter this control drives
 
     // Custom-component value channels — one parameter per PUBLIC channel.

@@ -49,3 +49,24 @@ minor, dorian, …, or custom intervals), octave? }`. Components read it; any ma
 - Where it lives (panel-root section vs dedicated store).
 - Custom scales; multiple contexts (per-zone); binding the key to a control/device.
 - Microtonal / non-12-TET (future).
+
+---
+
+## Built, 2026-08-23
+
+`utils/musicalContext.js`, pinned by `test/musicalCapabilities.test.js`.
+
+Fourteen scales, roots by number or note name (flats included — a user types Eb and no sharp table
+carries it), `isInScale`, `quantizeToScale`, `scaleDegrees` and `diatonicChord`.
+
+**Chords are built by stacking scale degrees, not fixed semitone intervals.** That is what makes
+them diatonic: degree ii of a major scale comes out minor and vii diminished without either being
+written down anywhere, and changing the scale changes the qualities with it — which is the whole
+point of a *shared* context rather than a per-component one.
+
+**Ties go down, consistently.** A note exactly between two scale tones has to go somewhere. The same
+choice every time is a musical decision a player can learn; one that depends on which way they
+approached it is a bug they cannot.
+
+**Twelve-tone, and the file says so.** Microtonal and non-12-TET are real and are not here. Leaving
+that implicit is how a future 24-TET attempt would find the assumption everywhere at once.

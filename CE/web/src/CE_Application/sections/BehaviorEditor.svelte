@@ -24,6 +24,8 @@
   import Clock from 'lucide-svelte/icons/clock';
   import Target from 'lucide-svelte/icons/target';
   import Play from 'lucide-svelte/icons/play';
+  import Gauge from 'lucide-svelte/icons/gauge';
+  import { VALUE_FLOW, valueFlowOf } from '../utils/displayMode.js';
 
   let { control = null } = $props();
 
@@ -190,6 +192,30 @@
 </script>
 
 {#if behavior}
+  <PropertySection title="Value flow" icon={Gauge}>
+    <PropertyCell
+      label="Direction"
+      span={4}
+      hint="Two-way is a normal control: the device moves it and moving it sends. Display is read-only — it shows an inbound value and takes no input, which is what a meter, a bound LCD field or a lit pad is. Input sends but is not moved by feedback."
+    >
+      <Segmented
+        ariaLabel="Value flow"
+        value={valueFlowOf(behavior)}
+        options={[
+          { value: VALUE_FLOW.twoWay, label: 'Two-way' },
+          { value: VALUE_FLOW.display, label: 'Display' },
+          { value: VALUE_FLOW.input, label: 'Input' },
+        ]}
+        onchange={(next) => set('valueFlow', next)}
+      />
+    </PropertyCell>
+    {#if valueFlowOf(behavior) === VALUE_FLOW.display}
+      <PropertyCell label="Read-only" span={4} hint="A display takes no drag, wheel, keyboard or focus, and exports no host parameter — a DAW lane on it would be overwritten by the next feedback frame.">
+        <span class="val" style="opacity:.75">Input off · not a tab stop · no host parameter</span>
+      </PropertyCell>
+    {/if}
+  </PropertySection>
+
   <PropertySection title="Behavior" icon={Settings2}>
     <PropertyCell label="Type" span={showSubtypeSelector ? 2 : 4} hint="Behavior is defined by the inserted button type.">
       <input class="val" type="text" value={buttonType} readonly />

@@ -64,11 +64,12 @@
     getMouseSection,
     resolveCursorCss,
     resolveHitTestClipPath,
+    resolveTabIndexFor,
     resolveTabIndex,
     acceptsPointer,
     childrenAcceptPointer,
     showsFocusOutline,
-    isFocusable,
+    isFocusableFor,
     raisesOnClick,
   } from '../utils/mouseBehavior.js';
   import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
@@ -433,7 +434,11 @@
   // makes something focusable should take effect while that state is active.
   let mouseSection = $derived(getMouseSection(renderControl ?? control));
   let mouseAppliesToSurface = $derived(editorInteractionEnabled === false);
-  let mouseFocusable = $derived(mouseAppliesToSurface && isFocusable(mouseSection));
+  // Behavior rides alongside for the value-flow question: a display is not a tab stop, whatever
+  // the Mouse tab says, because focusing something that cannot be operated swallows the Tab press
+  // that was heading for the next real control.
+  let flowBehavior = $derived((renderControl ?? control)?._children?.Behavior ?? null);
+  let mouseFocusable = $derived(mouseAppliesToSurface && isFocusableFor(mouseSection, flowBehavior));
   let mouseCursorCSS = $derived(mouseAppliesToSurface ? resolveCursorCss(mouseSection) : '');
   let mouseClipCSS = $derived(mouseAppliesToSurface ? resolveHitTestClipPath(mouseSection) : '');
   let mouseBlocksPointer = $derived(mouseAppliesToSurface && !acceptsPointer(mouseSection));
@@ -487,7 +492,11 @@
   // The surface's own tab index wins when it set one — it knows about roles and
   // handle counts. The Mouse section fills in for everything else.
   let effectiveTabIndex = $derived(
-    previewTabIndex !== undefined ? previewTabIndex : resolveTabIndex(mouseSection)
+    // ...except for a display, where the surface does not know it is one. -1 wins over the
+    // surface's own index there, because a read-only control is never in the tab order.
+    mouseAppliesToSurface && resolveTabIndexFor(mouseSection, flowBehavior) === -1
+      ? -1
+      : (previewTabIndex !== undefined ? previewTabIndex : resolveTabIndex(mouseSection))
   );
 
   // --- Drag state (internal $state per feedback) ---
