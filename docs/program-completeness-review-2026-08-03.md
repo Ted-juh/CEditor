@@ -122,7 +122,7 @@ identity self-check is genuinely good) and the shipping half is scaffolding.
   ecosystem of panels. CEditor has no panel-sharing/import/export story: no package format for
   *panels* (custom components have one, with metadata, versioning, and a library — the panel level
   has nothing), no Ctrlr `.panel`/`.bpanelz` importer to bootstrap the existing community's work,
-  and the DPD "Share & impact" screen is another "not built yet" stub. The
+  and the DPD "Share & impact" screen is another "not built yet" stub *(built 2026-08-23)*. The
   identity-registry/"update vs new copy" policy from the export plan (D1) is also unbuilt, which is
   the piece sharing would need to not collide FUIDs.
 - **End-user docs exist only for scripting.** The 2026-08-02 review fixed that for the scripting

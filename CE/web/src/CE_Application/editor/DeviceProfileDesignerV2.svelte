@@ -12,6 +12,7 @@
   import DpdAdvancedScreen from './dpd/DpdAdvancedScreen.svelte';
   import DpdDiscoveryScreen from './dpd/DpdDiscoveryScreen.svelte';
   import DpdPresetsScreen from './dpd/DpdPresetsScreen.svelte';
+  import DpdShareImpactScreen from './dpd/DpdShareImpactScreen.svelte';
   import dpdLibrary from '../generated/dpd/dpdLibrary.json';
   import dpdProfileMap from '../generated/dpdProfileMap.json';
   import { resolveParams, resolveModel } from '../generated/dpd/resolve.mjs';
@@ -215,7 +216,7 @@
     ] },
   ]);
 
-  const realScreens = new Set(['detect', 'params', 'overview', 'device', 'messages', 'dumps', 'advanced', 'presets']);
+  const realScreens = new Set(['detect', 'params', 'overview', 'device', 'messages', 'dumps', 'advanced', 'presets', 'share']);
 
   // Adopt a model discovered via MIDI-CI (or any source) into the editable working copy.
   // Deliberately NOT flagged as a new document: this replaces the contents of the
@@ -297,6 +298,9 @@
         </div>
         <div class={['screen', activeScreen === 'presets' && 'active']}>
           <DpdPresetsScreen {model} {merged} {profileId} />
+        </div>
+        <div class={['screen', activeScreen === 'share' && 'active']}>
+          <DpdShareImpactScreen {model} {merged} {profileId} />
         </div>
 
       {/if}

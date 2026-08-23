@@ -175,6 +175,8 @@ the download, not about a panel.
 - **Four DPD Designer screens are placeholders** — Packing Studio, Share & impact, Import result,
   Assignable list (`DeviceProfileDesignerV2.svelte:129, 209-214`). They sit in the navigation, so
   every DPD user finds them. Either build or hide.
+  *(Share & impact built 2026-08-23 — `DpdShareImpactScreen.svelte` over `utils/profileImpact.js`.
+  Three remain badged and dimmed.)*
 - ~~**Two DPD Parameters buttons ship disabled** with `title="Coming soon"`~~ *(fixed 2026-08-23)* —
   both removed. Neither feature is built; both are recorded in `known-issues.md`, along with why
   MIDI learn here is not the same thing as `MidiLearnChips.svelte`.
