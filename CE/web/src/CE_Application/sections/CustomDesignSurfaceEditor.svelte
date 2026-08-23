@@ -71,6 +71,7 @@
   import SurfacePalette from './SurfacePalette.svelte';
   import SurfaceLookBar from './SurfaceLookBar.svelte';
   import SurfaceDockLayers from './SurfaceDockLayers.svelte';
+  import SurfaceContextMenu from './SurfaceContextMenu.svelte';
   import SurfaceHelpOverlay from './SurfaceHelpOverlay.svelte';
   import { numberOr } from '../utils/primitives.js';
   import {
@@ -107,6 +108,10 @@
     clampSnapSize,
     snapToGrid,
     snapFrameToGrid,
+    marqueeRect,
+    isMarqueeDrag,
+    partsInMarquee,
+    mergeMarqueeSelection,
     zoneFrame as zoneFrameBase,
   } from '../utils/customDesignSurfaceGeometry.js';
   import {
@@ -216,6 +221,7 @@
   // '?'-toggled overlay listing shortcuts plus a plain-language glossary.
   let helpOverlayOpen = $state(false);
   let surfaceShellEl = $state(null);
+  let surfaceArtboardEl = $state(null);
   // Inline readiness nudge: open required/recommended steps, dismissible. Steps that can be
   // scaffolded mechanically carry their fix inline, so the nudge is actionable rather than
   // just a scolding — readinessAutoFix returns null for anything needing a human decision.
@@ -1731,10 +1737,19 @@
 
   function openLayerColour(relativePath, currentValue) {
     if (!core?.id || !selectedLayer) return;
-    activateColorTarget(
-      { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.${relativePath}` },
-      currentValue ?? 'FF5B9BD5'
-    );
+    // A colour dock edits one target, so a multi-selection goes through the callback form and
+    // writes to every selected layer. Without this the corner radius would reach all three layers
+    // and the colour beside it only one, which is a worse kind of confusing than neither working.
+    const target = multiSelectionActive
+      ? {
+          type: 'callback',
+          _swatchKey: `surface:${relativePath}`,
+          apply: (hex) => {
+            for (const name of selectedLayerNames) setLayerPropertyFor(name, relativePath, hex);
+          },
+        }
+      : { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.${relativePath}` };
+    activateColorTarget(target, currentValue ?? 'FF5B9BD5');
     revealDisplayDock('colors');
   }
 
@@ -1856,8 +1871,25 @@
     }
   }
 
+  /**
+   * Write a styling property to the selection.
+   *
+   * This used to write to `selectedLayer` alone, which made the Look bar and the palette
+   * multi-select-blind: with three layers selected, setting a corner radius changed one of them
+   * and left the field showing that one's value. The 2026-07-12 review filed it against the Look
+   * bar ("no multi-select awareness — with three layers selected it silently shows/edits the
+   * primary"), and it was the same one line behind both.
+   *
+   * Styling fans out and geometry does not, and the difference is not arbitrary: "make these three
+   * layers 4px-cornered" has exactly one meaning, while "make these three layers 200 wide" has
+   * several (see setSelectionFrameSize). Where the answer is unambiguous, do it to all of them.
+   */
   function setLayerProperty(relativePath, value) {
     if (!canPaintLayer || !relativePath) return;
+    if (multiSelectionActive) {
+      for (const name of selectedLayerNames) setLayerPropertyFor(name, relativePath, value);
+      return;
+    }
     updateControlProperty(core.id, `Parts.${selectedLayer}.${relativePath}`, value);
   }
 
@@ -2787,6 +2819,80 @@
     else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
   }
 
+  // --- Marquee selection -------------------------------------------------------------------
+  //
+  // Tier 1 of the 2026-07-12 workspace review: the panel editor has had a rubber band since the
+  // beginning and this surface never did, so the only way to select several layers was to click
+  // one and then `+`-click the rest, or work down the dock list.
+  //
+  // The geometry is in customDesignSurfaceGeometry.js so it can be tested without a DOM. What
+  // stays here is the gesture: it starts on bare artboard with the select tool, tracks in
+  // artboard space (so it survives zoom and scroll), and commits on mouseup.
+  let marquee = $state(null);   // { start: {x,y}, end: {x,y}, additive: boolean } | null
+
+  let marqueeBox = $derived(marquee ? marqueeRect(marquee.start, marquee.end) : null);
+  let marqueeStyle = $derived(marqueeBox
+    ? `left:${marqueeBox.left}px;top:${marqueeBox.top}px;width:${marqueeBox.width}px;height:${marqueeBox.height}px;`
+    : '');
+
+  // --- Right-click menu ---------------------------------------------------------------------
+  //
+  // Tier 1 of the 2026-07-12 review. Every action it offers already existed; none of them was
+  // reachable from the canvas, which is where you are when you want them.
+  let contextMenuTarget = $state(null);
+
+  let contextGeneratorName = $derived(
+    activeSelectionKind === 'layer' && selectedAuthoredPart
+      ? (generatedSourceForNode(selectedAuthoredPart) ?? '')
+      : ''
+  );
+  let contextKitId = $derived(selectedKit || (selectedAuthoredPart ? (kitIdFor(selectedAuthoredPart) ?? '') : ''));
+
+  function openSurfaceContextMenu(event, name = '', part = null) {
+    if (designerPreviewing || activeTool !== 'select') return;
+    event.preventDefault();
+    event.stopPropagation();
+    // Right-clicking a part that is not selected selects it first — otherwise the menu acts on
+    // whatever happened to be selected before, which is the classic way to delete the wrong thing.
+    if (name && !isLayerSelected(name)) selectLayer(name, part, event);
+    contextMenuTarget = { screenX: event.clientX, screenY: event.clientY };
+  }
+
+  function beginMarquee(event) {
+    if (designerPreviewing || activeTool !== 'select' || event.button !== 0) return false;
+    const start = pointInArtboard(event);
+    if (!start) return false;
+    marquee = { start, end: start, additive: event.shiftKey === true };
+    window.addEventListener('mousemove', handleMarqueeMove);
+    window.addEventListener('mouseup', handleMarqueeEnd);
+    return true;
+  }
+
+  function handleMarqueeMove(event) {
+    if (!marquee || !surfaceArtboardEl) return;
+    const point = pointInArtboardFromElement(event, surfaceArtboardEl, artboardWidth, artboardHeight, surfaceZoom);
+    if (point) marquee = { ...marquee, end: point };
+  }
+
+  function handleMarqueeEnd() {
+    window.removeEventListener('mousemove', handleMarqueeMove);
+    window.removeEventListener('mouseup', handleMarqueeEnd);
+    const band = marquee;
+    marquee = null;
+    if (!band) return;
+    const rect = marqueeRect(band.start, band.end);
+    // A press with no drag is a click on empty canvas, which means deselect — but only when it is
+    // not extending, or Shift-clicking the background would throw the selection away.
+    if (!isMarqueeDrag(rect)) {
+      if (!band.additive) clearSurfaceSelection();
+      return;
+    }
+    const hits = partsInMarquee(topLevelPartEntries, rect, partFrame);
+    const names = mergeMarqueeSelection(band.additive ? selectedLayerNames : [], hits, band.additive);
+    if (names.length) commitLayerSelection(names, names[names.length - 1]);
+    else if (!band.additive) clearSurfaceSelection();
+  }
+
   function nudgeSelected(dx, dy) {
     if (multiSelectionActive) {
       moveSelectedLayersBy(dx, dy);
@@ -3266,9 +3372,19 @@
             class="artboard"
             class:drawing={activeTool !== 'select'}
             style={artboardStyle}
-            onclick={() => { if (!designerPreviewing) clearSurfaceSelection(); }}
-            onmousedown={(event) => { if (!designerPreviewing && !beginDraw(event)) clearSurfaceSelection(); }}
+            bind:this={surfaceArtboardEl}
+            oncontextmenu={(event) => openSurfaceContextMenu(event)}
+            onmousedown={(event) => {
+              if (designerPreviewing) return;
+              // Draw tool first, then the rubber band. The click handler that used to clear the
+              // selection here is gone: a click is now a zero-area marquee, so deselecting happens
+              // on mouseup in one place instead of racing the drag.
+              if (!beginDraw(event)) beginMarquee(event);
+            }}
           >
+            {#if marquee}
+              <div class="marquee-band" style={marqueeStyle} aria-hidden="true"></div>
+            {/if}
             {#if !designerPreviewing && surfaceNameTrayEntries.length}
               <div class="surface-name-tray" onmousedown={stopSelectionAction} onclick={stopSelectionAction}>
                 {#each surfaceNameTrayEntries as entry (`${entry.kind}:${entry.label}`)}
@@ -3345,6 +3461,7 @@
                   onpointerenter={() => setSurfaceHover('layer', name)}
                   onpointerleave={() => clearSurfaceHover('layer', name)}
                   onmousedown={(event) => beginMove(name, part, event)}
+                oncontextmenu={(event) => openSurfaceContextMenu(event, name, part)}
                 >
                   <span class="selection-label">{name}</span>
                   {#if activeSelectionKind === 'layer' && selectedLayer === name && selectedPartEditable && !multiSelectionActive}
@@ -4132,6 +4249,27 @@
       {addQuickState}
     />
     {/if}
+
+    <SurfaceContextMenu
+      bind:target={contextMenuTarget}
+      {canManageLayer}
+      {canDetachLayer}
+      selectionLabel={activeSelectionLabel}
+      generatorName={contextGeneratorName}
+      kitId={contextKitId}
+      onDuplicate={duplicateSelectedLayer}
+      onBringToFront={() => moveSelectedLayerToExtreme('front')}
+      onSendToBack={() => moveSelectedLayerToExtreme('back')}
+      onBringForward={() => moveLayer(selectedLayer, 1)}
+      onSendBackward={() => moveLayer(selectedLayer, -1)}
+      onToggleLock={toggleSelectedLock}
+      onToggleVisibility={toggleSelectedVisibility}
+      onMakeInteractive={makeSelectedLayerInteractive}
+      onJumpToGenerator={() => editGeneratorForLayer(selectedLayer, selectedAuthoredPart)}
+      onEditKit={() => editKitParts(contextKitId)}
+      onDetach={detachSelectedLayer}
+      onDelete={removeSelectedLayer}
+    />
 
     {#if !designerPreviewing && !displayDockHidden}
       <div class="surface-display-dock"><DisplayPanel /></div>
@@ -5911,5 +6049,14 @@
   }
   .surface-shell.previewing :global(.surface-options-strip) {
     display: none;
+  }
+
+  /* The rubber band. Teal to match the surface identity rather than the panel editor's blue. */
+  .marquee-band {
+    position: absolute;
+    z-index: 40;
+    pointer-events: none;
+    border: 1px solid #14B8A6;
+    background: rgba(20, 184, 166, 0.12);
   }
 </style>

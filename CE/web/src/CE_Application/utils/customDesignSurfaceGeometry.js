@@ -432,3 +432,59 @@ export function snapFrameToGrid(frame, opts = {}) {
     height: Math.max(1, snapToGrid(frame.height, opts)),
   };
 }
+
+// --- Marquee selection ---------------------------------------------------------------------------
+//
+// Tier 1 of the 2026-07-12 workspace review: "Marquee selection (none exists — unlike the panel
+// editor)." The panel editor has `createMarqueeController`, but it is built around the panel's DOM
+// and zoom model; the design surface already has its own artboard-space point conversion, so what
+// was actually missing is the geometry, which is this.
+
+/** Normalise two artboard-space corners into a positive-area rect. */
+export function marqueeRect(start, end) {
+  const left = Math.min(start.x, end.x);
+  const top = Math.min(start.y, end.y);
+  return { left, top, width: Math.abs(end.x - start.x), height: Math.abs(end.y - start.y) };
+}
+
+/**
+ * A marquee smaller than this (in artboard units) is a click, not a drag.
+ *
+ * Without a threshold, every click on empty canvas is a zero-area rubber band that selects
+ * nothing and clears the selection — which is the wanted behaviour, but it has to be reached
+ * deliberately rather than as a side effect of the maths.
+ */
+export const MARQUEE_MIN_DRAG = 3;
+
+export function isMarqueeDrag(rect) {
+  return rect.width >= MARQUEE_MIN_DRAG || rect.height >= MARQUEE_MIN_DRAG;
+}
+
+/**
+ * The parts a marquee catches.
+ *
+ * Intersection, not containment: a rubber band that only takes parts it fully encloses cannot
+ * select a background plate that runs past the band on both sides, and reaching for one is the
+ * commonest use of the gesture. Locked and hidden parts are skipped — selecting something you
+ * cannot see or move is not a selection, it is a puzzle.
+ */
+export function partsInMarquee(entries, rect, frameOf) {
+  const x2 = rect.left + rect.width;
+  const y2 = rect.top + rect.height;
+  const hits = [];
+  for (const [name, part] of entries ?? []) {
+    if (part?.locked === true || part?.visible === false) continue;
+    const f = frameOf(part);
+    if (!f) continue;
+    if (f.left < x2 && f.left + f.width > rect.left && f.top < y2 && f.top + f.height > rect.top) {
+      hits.push(name);
+    }
+  }
+  return hits;
+}
+
+/** Shift-drag extends rather than replaces, matching the panel editor and every drawing tool. */
+export function mergeMarqueeSelection(existing, hits, additive) {
+  if (!additive) return hits;
+  return [...new Set([...(existing ?? []), ...hits])];
+}

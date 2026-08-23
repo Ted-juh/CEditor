@@ -154,3 +154,115 @@ test('tool activation only accepts tools that exist', async () => {
   assert.match(src, /shapeTools=\{SHAPE_TOOLS\}/);
   assert.match(src, /interactiveArchetypes=\{INTERACTIVE_ARCHETYPES\}/);
 });
+
+// =================================================================================================
+// Tier 1 of the workspace review: the three gestures the surface did not have.
+// =================================================================================================
+
+test('a marquee catches what it overlaps, not only what it encloses', async () => {
+  const g = await import('../src/CE_Application/utils/customDesignSurfaceGeometry.js');
+  const frames = {
+    plate:  { left: -20, top: -20, width: 300, height: 300 },  // runs past the band both ways
+    knob:   { left: 40, top: 40, width: 30, height: 30 },
+    offside:{ left: 500, top: 500, width: 10, height: 10 },
+    locked: { left: 45, top: 45, width: 10, height: 10 },
+    hidden: { left: 46, top: 46, width: 10, height: 10 },
+  };
+  const entries = [
+    ['plate', {}], ['knob', {}], ['offside', {}],
+    ['locked', { locked: true }], ['hidden', { visible: false }],
+  ];
+  const rect = g.marqueeRect({ x: 30, y: 30 }, { x: 90, y: 90 });
+  const hits = g.partsInMarquee(entries, rect, (p) => frames[Object.keys(frames)[entries.findIndex(([, q]) => q === p)]]);
+  // Containment-only would miss the plate, and reaching for a background plate is the commonest
+  // use of a rubber band.
+  assert.ok(hits.includes('plate'));
+  assert.ok(hits.includes('knob'));
+  assert.ok(!hits.includes('offside'));
+  // Selecting something you cannot see or move is a puzzle, not a selection.
+  assert.ok(!hits.includes('locked'));
+  assert.ok(!hits.includes('hidden'));
+});
+
+test('a marquee normalises whichever way it is dragged', async () => {
+  const { marqueeRect } = await import('../src/CE_Application/utils/customDesignSurfaceGeometry.js');
+  const forward = marqueeRect({ x: 10, y: 20 }, { x: 50, y: 80 });
+  const backward = marqueeRect({ x: 50, y: 80 }, { x: 10, y: 20 });
+  assert.deepEqual(forward, { left: 10, top: 20, width: 40, height: 60 });
+  assert.deepEqual(backward, forward, 'dragging up-left is the same band as down-right');
+});
+
+test('a click is not a marquee', async () => {
+  const { marqueeRect, isMarqueeDrag } = await import('../src/CE_Application/utils/customDesignSurfaceGeometry.js');
+  assert.equal(isMarqueeDrag(marqueeRect({ x: 10, y: 10 }, { x: 10, y: 10 })), false);
+  assert.equal(isMarqueeDrag(marqueeRect({ x: 10, y: 10 }, { x: 12, y: 11 })), false, 'a shaky click');
+  assert.equal(isMarqueeDrag(marqueeRect({ x: 10, y: 10 }, { x: 40, y: 11 })), true, 'a thin band is still a band');
+});
+
+test('shift extends the selection instead of replacing it', async () => {
+  const { mergeMarqueeSelection } = await import('../src/CE_Application/utils/customDesignSurfaceGeometry.js');
+  assert.deepEqual(mergeMarqueeSelection(['a'], ['b', 'c'], false), ['b', 'c']);
+  assert.deepEqual(mergeMarqueeSelection(['a'], ['b', 'c'], true), ['a', 'b', 'c']);
+  assert.deepEqual(mergeMarqueeSelection(['a', 'b'], ['b', 'c'], true), ['a', 'b', 'c'], 'no duplicates');
+});
+
+test('the surface has its own context menu, not the panel editor’s', () => {
+  const menu = read('sections/SurfaceContextMenu.svelte');
+  // Every action the review named.
+  for (const label of ['Duplicate', 'Bring to front', 'Send to back', 'Lock / unlock',
+                       'Show / hide', 'Make interactive', 'Jump to generator', 'Delete']) {
+    assert.ok(menu.includes(label), `the menu is missing "${label}"`);
+  }
+  // It shares the placement helper with the panel menu — a menu opened near a window edge has to
+  // be measured before it is placed, and that problem is the same on both surfaces.
+  assert.match(menu, /import \{ placeMenu \} from '\.\.\/utils\/menuPlacement\.js'/);
+  // But not the panel model: none of this reaches a part inside a component document. Checked
+  // against the code with the doc comment stripped, since that comment names them to explain why.
+  const code = menu.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(!/selectedComponentIds|removeControl|flatControls/.test(code));
+
+  const surface = read('sections/CustomDesignSurfaceEditor.svelte');
+  assert.match(surface, /oncontextmenu=\{\(event\) => openSurfaceContextMenu\(event\)\}/, 'empty canvas');
+  assert.match(surface, /oncontextmenu=\{\(event\) => openSurfaceContextMenu\(event, name, part\)\}/, 'a part');
+  // Right-clicking an unselected part must select it first, or the menu acts on something else.
+  const fn = surface.slice(surface.indexOf('function openSurfaceContextMenu'));
+  assert.match(fn.slice(0, fn.indexOf('\n  }')), /if \(name && !isLayerSelected\(name\)\) selectLayer/);
+});
+
+test('styling fans out over a multi-selection, geometry does not', () => {
+  const s = read('sections/CustomDesignSurfaceEditor.svelte');
+
+  // "Make these three 4px-cornered" has one meaning, so it reaches all three.
+  const style = s.slice(s.indexOf('function setLayerProperty('));
+  assert.match(style.slice(0, style.indexOf('\n  }')),
+    /multiSelectionActive[\s\S]*for \(const name of selectedLayerNames\) setLayerPropertyFor/);
+
+  // "Make these three 200 wide" has several, so it is refused rather than guessed.
+  const size = s.slice(s.indexOf('function setSelectionFrameSize'));
+  assert.match(size.slice(0, size.indexOf('\n  }')), /if \(multiSelectionActive\) return;/);
+  assert.match(s, /disabled=\{multiSelectionActive \|\|/, 'and the field says so');
+
+  // Position does have one meaning: translate the group by the delta.
+  const pos = s.slice(s.indexOf('function setSelectionFramePosition'));
+  assert.match(pos.slice(0, pos.indexOf('\n  }')), /moveSelectedLayersBy/);
+});
+
+test('a swatch reveals the editor it just targeted', () => {
+  const s = read('sections/CustomDesignSurfaceEditor.svelte');
+  const fn = s.slice(s.indexOf('function revealDisplayDock'));
+  const body = fn.slice(0, fn.indexOf('\n  }'));
+  // Both halves: un-hiding without the tab lands on whatever was open; the tab without un-hiding
+  // switches a panel nobody can see.
+  assert.match(body, /displayDockHidden = false/);
+  assert.match(body, /displayTabRequest\.set\(\{ tab \}\)/);
+  assert.match(s, /revealDisplayDock\('colors'\)/);
+  assert.match(s, /revealDisplayDock\('gradient'\)/);
+});
+
+test('the dead canvas strips are gone, rule and all', () => {
+  const s = read('sections/CustomDesignSurfaceEditor.svelte');
+  for (const cls of ['layer-action-strip', 'precision-strip', 'arc-strip']) {
+    assert.ok(!s.includes(cls), `${cls} was built and then display:none'd — it should not be back`);
+  }
+  assert.ok(!s.includes('Assets are edited in the inspector for now'), 'the dead Assets tab');
+});
