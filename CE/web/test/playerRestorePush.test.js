@@ -125,6 +125,55 @@ test('a question nobody could see is asked again', () => {
     'the prompt must not be marked sent when there is nothing to send it to');
 });
 
+// --- S3: the whole patch, not just the automation list ----------------------------------------
+
+test('the dump goes out before the values', () => {
+  // The values belong to the patch the dump IS, so sending them first has the dump overwrite them
+  // a moment later. Same ordering rule the Setlist follows when it sends MIDI before values.
+  const push = PROCESSOR.slice(PROCESSOR.indexOf('void runRestorePush'));
+  const dumps = push.indexOf('sendRestoredDumps()');
+  const values = push.indexOf('sendParamMidi');
+  assert.ok(dumps > -1, 'the restore never sends the captured dump');
+  assert.ok(dumps < values, 'the dump must be sent before the parameter values');
+});
+
+test('the dump is captured off the message thread, not inside getStateInformation', () => {
+  // A host may call getStateInformation from any thread, and building a dump walks the whole
+  // profile and runs the shared encoder over every parameter in it.
+  const save = PROCESSOR.slice(PROCESSOR.indexOf('void getStateInformation'),
+    PROCESSOR.indexOf('void setStateInformation'));
+  assert.ok(!save.includes('buildDumpMessage'), 'getStateInformation must not build dumps itself');
+  assert.match(save, /capturedDumpsLock/, 'the cached dump must be read under its lock');
+  assert.match(save, /createNewChildElement \("DeviceDumps"\)/);
+  assert.match(PROCESSOR, /void refreshCapturedDumps\(\)/);
+});
+
+test('capture is throttled and skipped when the patch has not moved', () => {
+  // A dump is a walk over the whole profile. A knob being dragged would otherwise rebuild it
+  // thirty times a second for a save that may never come.
+  const capture = PROCESSOR.slice(PROCESSOR.indexOf('void serviceDumpCapture'),
+    PROCESSOR.indexOf('void serviceRestorePush'));
+  assert.match(capture, /dumpsLastCapturedMs/, 'the capture is not throttled');
+  assert.match(capture, /if \(! changed\) return;/, 'an unchanged patch must cost nothing');
+});
+
+test('dumps are sent in the profile\'s declared order', () => {
+  // A device with a common block and per-part blocks wants the common block first, and the profile
+  // author is the only one who knows which is which.
+  const send = PROCESSOR.slice(PROCESSOR.indexOf('int sendRestoredDumps'),
+    PROCESSOR.indexOf('void runRestorePush'));
+  assert.match(send, /dumpDefinitionIds\(\)/, 'the send order does not come from the profile');
+});
+
+test('one unbuildable dump does not cost the others', () => {
+  // A profile can declare a dump this panel binds nothing in. Aborting the whole capture for it
+  // would lose the block that would have worked.
+  const refresh = PROCESSOR.slice(PROCESSOR.indexOf('void refreshCapturedDumps'),
+    PROCESSOR.indexOf('int sendRestoredDumps'));
+  assert.match(refresh, /if \(result\.ok && result\.hex\.isNotEmpty\(\)\)/,
+    'a failed dump must be skipped, not fatal');
+});
+
 test('the Player asks in a bar, and "not now" answers nothing', () => {
   // A modal over a plugin window in a DAW is a good way to lose a take. And a deferred restore is
   // still pending — sending "not now" to the processor would turn it into a third permanent answer.

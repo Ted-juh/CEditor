@@ -392,6 +392,46 @@ int runDumpBuildTests (const juce::File& file)
         }
     }
 
+    // dumpDefinitionIds — added for Total Recall S3, which has to capture a whole patch into the
+    // DAW session with no script naming a dump first: the plugin asks the profile what patches
+    // exist. Two things are asserted, and the second is the one that matters on restore.
+    {
+        const auto ids = engine.dumpDefinitionIds();
+        if (! ids.contains ("common"))
+        {
+            std::cerr << "[FAIL] dumpDefinitionIds: the profile's own dump is not listed\n";
+            ++failures;
+        }
+
+        // Every id it reports must build, or S3 stores a patch with a hole in it and says nothing.
+        for (const auto& id : ids)
+            if (! engine.buildDumpMessage (id, values).ok)
+            {
+                std::cerr << "[FAIL] dumpDefinitionIds: listed \"" << id << "\" which does not build\n";
+                ++failures;
+            }
+
+        // DECLARATION ORDER, not sorted and not hash order. A device with a common block and
+        // per-part blocks wants the common block sent first on restore, and the profile author is
+        // the only one who knows which is which — so the list has to preserve what they wrote.
+        const auto document = juce::JSON::parse (file.loadFileAsString());
+        auto* object = document.getDynamicObject();
+        auto* declared = object != nullptr ? object->getProperty ("dumpDefinitions").getArray() : nullptr;
+        if (declared != nullptr)
+        {
+            juce::StringArray expected;
+            for (const auto& entry : *declared)
+                if (auto* o = entry.getDynamicObject())
+                    if (o->getProperty ("id").toString().isNotEmpty())
+                        expected.add (o->getProperty ("id").toString());
+            if (expected != ids)
+            {
+                std::cerr << "[FAIL] dumpDefinitionIds: order does not match the profile's own\n";
+                ++failures;
+            }
+        }
+    }
+
     return failures;
 }
 

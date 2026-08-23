@@ -263,6 +263,22 @@ public:
         // this session's synth, and a different project is a different question.
         if (restoreAnswer.isNotEmpty())
             root.createNewChildElement ("RestoreAnswer")->addTextElement (restoreAnswer);
+
+        // S3: the whole patch, as bytes, beside the automation list.
+        //
+        // The APVTS is NOT the patch and was never going to be. buildParameterLayout builds one
+        // parameter per entry in `exportParameters` — the controls the author chose to expose to the
+        // host — and a sensible panel exposes a few dozen of a synth's several hundred. Restoring
+        // only those is a patch with the other four hundred left wherever the instrument had them.
+        //
+        // Read from a cache the message-thread timer maintains rather than built here: the host may
+        // call this from any thread, and assembling two dumps means walking the profile and running
+        // the shared encoder over every parameter in it.
+        {
+            const juce::SpinLock::ScopedLockType lock (capturedDumpsLock);
+            if (capturedDumps.isNotEmpty())
+                root.createNewChildElement ("DeviceDumps")->addTextElement (capturedDumps);
+        }
        #if CEDITOR_SCRIPTING
         if (scriptRuntime != nullptr)
         {
@@ -296,6 +312,9 @@ public:
                 deviceService.importRoleMappings (juce::JSON::parse (dev->getAllSubText()));
             if (auto* answer = xml->getChildByName ("RestoreAnswer"))
                 restoreAnswer = answer->getAllSubText().trim();
+            restoredDumps = juce::var();
+            if (auto* dumps = xml->getChildByName ("DeviceDumps"))
+                restoredDumps = juce::JSON::parse (dumps->getAllSubText());
 
             // ARM THE RESTORE PUSH — do not send here. This call can arrive before the ports are
             // open, before prepareToPlay, and on a thread with no business emitting SysEx. The
@@ -438,6 +457,7 @@ private:
         // then as it is with the window closed. It is also the only state in which the question can
         // be asked at all.
         serviceRestorePush (windowOpen);
+        serviceDumpCapture();
 
         if (windowOpen) { wasWindowOpen = true; return; }
         if (wasWindowOpen) { lastSentMidi.clear(); wasWindowOpen = false; } // just closed -> resend all
@@ -534,6 +554,38 @@ private:
         return false;
     }
 
+    /**
+     * Keep the captured-dump cache roughly current, cheaply.
+     *
+     * Every four seconds, and only when the patch has actually moved. A dump is a walk over the
+     * whole profile, and a knob being dragged would otherwise rebuild it thirty times a second for
+     * a save that may never come. Four seconds of staleness costs at most the last few knob moves
+     * before a save, and the APVTS values — which restore after the dump — carry those anyway.
+     */
+    void serviceDumpCapture()
+    {
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        if (now - dumpsLastCapturedMs < 4000.0) return;
+
+        // Cheap change detection off the same map the send loop keeps. An unchanged patch is the
+        // common case — a project sitting open — and it must cost nothing.
+        bool changed = capturedDumps.isEmpty();
+        for (const auto& desc : panelParams)
+        {
+            if (desc.deviceParameterId.isEmpty()) continue;
+            auto* raw = apvts.getRawParameterValue (desc.id);
+            if (raw == nullptr) continue;
+            const float v = raw->load();
+            const auto it = lastCapturedValue.find (desc.id);
+            if (it == lastCapturedValue.end() || it->second != v) { changed = true; }
+            lastCapturedValue[desc.id] = v;
+        }
+        if (! changed) return;
+
+        dumpsLastCapturedMs = now;
+        refreshCapturedDumps();
+    }
+
     void serviceRestorePush (bool windowOpen)
     {
         if (! restorePending) return;
@@ -627,6 +679,102 @@ private:
         return profileFallback.isNotEmpty() ? profileFallback : juce::String ("the connected device");
     }
 
+    // --- Total Recall S3: the whole patch, not just the automation list ---------------------------
+    //
+    // The APVTS holds `exportParameters` — the controls the author exposed to the host, a few dozen
+    // of a synth's several hundred. A restore built only from those puts the automatable values
+    // back and leaves everything else wherever the instrument happened to be, which is a patch
+    // nobody saved. The dump is the patch.
+    //
+    // Two layers on restore, in this order: send the DUMP (the whole thing, exactly), then apply
+    // the VALUES (the automation-visible ones, which the host may have moved since the dump was
+    // captured). Dump first — the same rule the Setlist follows when it sends MIDI before values,
+    // and for the same reason: the stored values belong to the patch being restored, so the patch
+    // has to land first or they are overwritten by it.
+
+    /** Semantic values for every device-bound parameter, keyed by parameter id, out of the APVTS. */
+    juce::var boundParameterValues() const
+    {
+        auto* values = new juce::DynamicObject();
+        for (const auto& desc : panelParams)
+        {
+            if (desc.deviceParameterId.isEmpty()) continue;
+            if (auto* raw = apvts.getRawParameterValue (desc.id))
+                values->setProperty (desc.deviceParameterId, (double) raw->load());
+        }
+        return juce::var (values);
+    }
+
+    /**
+     * Rebuild the captured-dump cache. Message thread only.
+     *
+     * Not done inside getStateInformation, because a host may call that from any thread and this
+     * walks the profile and runs the shared encoder over every parameter in every dump. The cache
+     * is a string under a spin lock; the lock is held only for the swap.
+     */
+    void refreshCapturedDumps()
+    {
+        auto* engine = deviceService.engineForRole ({});
+        if (engine == nullptr) return;
+
+        const auto ids = engine->dumpDefinitionIds();
+        if (ids.isEmpty()) return;
+
+        const auto values = boundParameterValues();
+        auto* built = new juce::DynamicObject();
+        for (const auto& id : ids)
+        {
+            const auto result = engine->buildDumpMessage (id, values);
+            // A dump that will not build is skipped rather than aborting the others: a profile can
+            // declare a dump this panel binds nothing in, and one unbuildable block should not cost
+            // the user the block that would have worked.
+            if (result.ok && result.hex.isNotEmpty())
+                built->setProperty (id, result.hex);
+        }
+
+        auto json = juce::JSON::toString (juce::var (built), true);
+        const juce::SpinLock::ScopedLockType lock (capturedDumpsLock);
+        capturedDumps = built->getProperties().size() > 0 ? json : juce::String();
+    }
+
+    /**
+     * Send the restored dumps, in the profile's declared order.
+     *
+     * Order is the profile's own and it matters: a device with a common block and per-part blocks
+     * wants the common block first, and the profile author is the only one who knows which is
+     * which. Returns how many were sent, for the log.
+     */
+    int sendRestoredDumps()
+    {
+        auto* stored = restoredDumps.getDynamicObject();
+        if (stored == nullptr) return 0;
+
+        auto* engine = deviceService.engineForRole ({});
+        // Order from the profile when there is one to ask; otherwise whatever the saved object
+        // holds, which at least sends them.
+        juce::StringArray order = engine != nullptr ? engine->dumpDefinitionIds() : juce::StringArray();
+        if (order.isEmpty())
+            for (const auto& property : stored->getProperties())
+                order.add (property.name.toString());
+
+        int sent = 0;
+        for (const auto& id : order)
+        {
+            const auto hex = stored->getProperty (id).toString();
+            if (hex.isEmpty()) continue;
+
+            juce::Array<int> bytes;
+            for (const auto& token : juce::StringArray::fromTokens (hex, " ", ""))
+                if (token.isNotEmpty())
+                    bytes.add (token.getHexValue32() & 0xff);
+
+            if (bytes.isEmpty()) continue;
+            sendRawMidiBytes ("restore_dump_" + id, bytes);
+            ++sent;
+        }
+        return sent;
+    }
+
     /**
      * Send every bound parameter's restored value.
      *
@@ -638,6 +786,11 @@ private:
      */
     void runRestorePush (const juce::String& reason)
     {
+        // THE DUMP FIRST. The values below belong to the patch this dump IS, so sending them first
+        // would have the dump overwrite them a moment later — the same ordering rule the Setlist
+        // follows when it sends MIDI before values.
+        const int dumps = sendRestoredDumps();
+
         lastSentMidi.clear();
 
         int sent = 0;
@@ -653,8 +806,11 @@ private:
             }
         }
 
-        scriptLogLine ("[restore] pushed " + juce::String (sent) + " parameter(s) to the device ("
-                       + reason + ")");
+        scriptLogLine ("[restore] pushed " + juce::String (dumps) + " dump(s) and "
+                       + juce::String (sent) + " parameter(s) to the device (" + reason + ")");
+        // The instrument is now on the restored patch, so the cache should describe that rather
+        // than whatever it held from the previous project.
+        refreshCapturedDumps();
     }
 
 public:
@@ -771,6 +927,15 @@ private:
     bool restorePromptSent = false;
     double restoreArmedAtMs = 0.0;
     double restoreLastCheckedMs = 0.0;
+
+    // S3. `capturedDumps` is a JSON object of dumpId -> hex, rebuilt on the message thread and read
+    // by getStateInformation, which the host may call from another one — hence the lock, held only
+    // for the swap. `restoredDumps` is what came back out of the project file.
+    juce::String capturedDumps;
+    juce::SpinLock capturedDumpsLock;
+    juce::var restoredDumps;
+    double dumpsLastCapturedMs = 0.0;
+    std::map<juce::String, float> lastCapturedValue;
     // What preset each role is on, as far as anything has said — a recall going out or a Program
     // Change coming in. Not a reading of the instrument: a synth does not announce its patch, so
     // "unknown" (-1) is a real answer a script can act on rather than a confident wrong one.

@@ -1674,6 +1674,25 @@ const juce::DynamicObject* DeviceProfileEngine::findDeviceRequest (const juce::S
     return nullptr;
 }
 
+juce::StringArray DeviceProfileEngine::dumpDefinitionIds() const
+{
+    juce::StringArray ids;
+    auto* root = profileObject();
+    auto* dumps = root != nullptr ? asArray (root->getProperty ("dumpDefinitions")) : nullptr;
+    if (dumps == nullptr)
+        return ids;
+
+    for (const auto& dumpValue : *dumps)
+        if (auto* dump = asObject (dumpValue))
+        {
+            const auto id = propString (*dump, "id");
+            if (id.isNotEmpty())
+                ids.add (id);
+        }
+
+    return ids;
+}
+
 const juce::DynamicObject* DeviceProfileEngine::findDumpDefinition (const juce::String& dumpId) const
 {
     auto* root = profileObject();

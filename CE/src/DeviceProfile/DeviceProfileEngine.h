@@ -180,6 +180,16 @@ public:
     [[nodiscard]] DumpBuildResult buildDumpMessage (const juce::String& dumpId,
                                                     const juce::var& values) const;
 
+    /**
+     * Every dump this profile declares, in the order it declares them.
+     *
+     * Added for Total Recall S3, which needs to capture a whole patch into the DAW session without
+     * a script naming a dump first: the plugin has to ask the profile what patches exist. Order is
+     * the profile's own, and it matters on restore — a device with a common block and per-part
+     * blocks wants the common block sent first, and the profile author is the only one who knows.
+     */
+    [[nodiscard]] juce::StringArray dumpDefinitionIds() const;
+
     CompileResult compileSetParameter (const juce::String& deviceRole,
                                        const juce::String& parameterId,
                                        const juce::var& value,

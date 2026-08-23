@@ -159,9 +159,9 @@ before the values on restore.
 
 **S4 — Programs.** Bake the librarian bank into the export; wire the three overrides.
 
-S1 and S2 together are already a shippable claim, and **both are now done** — a reopened project
-puts the patch back on the synth. S3 and S4 make it complete: S3 adds the full dump (the APVTS is
-the automation list, not the patch), S4 adds host-visible programs.
+S1, S2 and S3 are done: a reopened project puts the whole patch back on the synth, not just the
+automation-visible slice of it. **S4 is what is left** — host-visible programs off the preset
+librarian.
 
 What has NOT happened is a test against hardware. Everything here is reasoned from the profile and
 driven by unit tests; no restore in this build has reached a synth.
