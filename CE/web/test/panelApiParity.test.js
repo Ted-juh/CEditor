@@ -325,7 +325,7 @@ test('the generated namespace blocks in the C++ engines are up to date', async (
   const gen = await import('../../../tools/scripts/gen-script-modules.mjs');
   const blocks = { 'LuaScriptEngine.cpp': gen.luaBlock(), 'JsScriptEngine.cpp': gen.jsBlock(), 'PythonScriptEngine.cpp': gen.pythonBlock() };
   for (const [file, block] of Object.entries(blocks)) {
-    assert.ok(readEngine(file).includes(block), `${file} has a stale generated block — run: node tools/scripts/gen-script-modules.mjs --write`);
+    assert.ok(readEngine(file).includes(block), `${file} has a stale generated block — run: node --import ./CE/web/test/support/register-svelte.mjs tools/scripts/gen-script-modules.mjs --write`);
   }
 });
 
@@ -448,7 +448,7 @@ test('the measured cost table matches what the preludes actually weigh', async (
   const committed = readText(
     join(here, '..', 'src', 'CE_Application', 'scripting', 'moduleCost.generated.js'));
   assert.equal(committed, fresh,
-    'moduleCost.generated.js is stale — run: node tools/scripts/gen-script-modules.mjs --write');
+    'moduleCost.generated.js is stale — run: node --import ./CE/web/test/support/register-svelte.mjs tools/scripts/gen-script-modules.mjs --write');
 
   for (const m of MODULES) {
     if (m.global) continue;

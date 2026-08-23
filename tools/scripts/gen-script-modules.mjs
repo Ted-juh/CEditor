@@ -6,7 +6,16 @@
 // contract and committed alongside the hand-written prelude.
 //
 //   node tools/scripts/gen-script-modules.mjs            # print all three blocks
-//   node tools/scripts/gen-script-modules.mjs --write    # splice them into the .cpp files
+//   node --import ./CE/web/test/support/register-svelte.mjs \
+//        tools/scripts/gen-script-modules.mjs --write        # splice them into the .cpp files
+//
+// THE LOADER HOOK IS NOT OPTIONAL, and the reason is easy to lose an hour to. Measuring the webview
+// prelude walks the panel runtime's import graph, and that graph reaches
+// `utils/customComponentInteraction.js`, which imports `'../scrub/dragScrub'` — extensionless, and
+// the file behind it is `dragScrub.ts`. Vite resolves that; plain Node ESM does not, and fails with
+// a bare ERR_MODULE_NOT_FOUND naming a path that looks like it should exist. The test harness's
+// hook already understands both .svelte and .ts, so borrowing it is cheaper than either adding
+// extensions across the tree or teaching this script its own resolver.
 //   node tools/scripts/gen-script-modules.mjs --check    # exit 1 if a committed block is stale
 //
 // panelApiParity.test.js runs --check, so a module added to the contract and not regenerated fails

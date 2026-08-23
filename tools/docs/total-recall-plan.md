@@ -115,8 +115,14 @@ argument for the beta, not against it. And `PanelParameter` is parsed from the b
 
 ## Stages
 
-**S1 — Typed parameters.** Choice/Bool/Float from the metadata that already crosses. Self-contained,
-visible in every DAW screenshot, and best done before anyone has automation to break.
+**S1 — Typed parameters.** ✅ **Done, 2026-08-23.** Every derived parameter now carries an explicit
+`valueKind` (`float` / `bool` / `choice`) and `choiceLabels` ride on every selector, not only the
+store-by-name ones; `PanelParameters.h` branches on it into `AudioParameterChoice` /
+`AudioParameterBool` / `AudioParameterFloat`. The explicit kind was unavoidable: a toggle and a plain
+0..1 knob have identical ranges, so nothing could be inferred. The two shipped hardware panels gained
+32 (GAIA) and 58 (AN1x) named menus that had been anonymous numbers. Migration holds — a panel baked
+before the field reads as `float`, which is exactly what it had — and `PanelParametersTests` asserts
+the concrete `juce::AudioParameter*` class the layout produces, not just that a string parsed.
 
 **S2 — Restore push.** Pending-restore flag, fire on device-ready, Ask/Always/Never policy. This is
 the one that delivers the headline, and it is small.
@@ -125,7 +131,8 @@ the one that delivers the headline, and it is small.
 
 **S4 — Programs.** Bake the librarian bank into the export; wire the three overrides.
 
-S1 and S2 together are already a shippable claim. S3 and S4 make it complete.
+S1 and S2 together are already a shippable claim. **S1 is done**, so S2 is what stands between here
+and that claim. S3 and S4 make it complete.
 
 ## Verification
 

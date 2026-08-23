@@ -93,10 +93,18 @@ the tree on 2026-08-23.
   is not exposed to scripts, so a script can read a dump and not write one. The decode direction
   exists; this is the encode direction, over the `DeviceProfileService` dump definitions the engine
   already parses.
-- [ ] **C++ / C# / Java preview interpreters cannot register `on()` callbacks** — named handlers
-  only. `compileCpp` and its siblings return functions but no top-level statements, so a script's
-  registration calls never execute; `loadHandlersJs` runs module top-level code and is the shape to
-  copy. Lua and JS are unaffected, and so is every language in the Player.
+- [x] ~~**C++ / C# / Java preview interpreters cannot register `on()` callbacks**~~ — **done
+  2026-08-23**, via a `setup` entry point rather than the top-level execution this line proposed.
+  That proposal was wrong: a bare statement at file scope is illegal in all three languages, so
+  there is no top-level code to run and copying `loadHandlersJs` could not have worked. What a
+  person writes is a function, so `setup` (or `Setup`) is called once at load with the same `ctx`
+  the handlers get.
+
+  Everything it needed already existed — `api.on` is spread into `ctx`, and the interpreters already
+  turn a named function into a JS callable when it is referenced as a value. The only missing piece
+  was that nobody called `setup`. Pinned by `test/compiledPreviewSetup.test.js`, which checks both
+  halves: that the listener registers, and that what `on()` receives is genuinely callable and
+  reaches the script's body — the half that would otherwise fail at fire time rather than at load.
 
 ## To-do
 
