@@ -1,41 +1,59 @@
 # CLAUDE.md
 
 Working notes for Claude Code in this repository. Read this before touching anything, and read
-[the CI budget section](#ci-minutes-are-a-hard-budget) before you push.
+[the CI section](#ci-is-free-here-and-that-is-not-a-licence-to-iterate-against-it) before you push.
 
 ---
 
-## CI minutes are a hard budget
+## CI is free here, and that is not a licence to iterate against it
 
-This account's GitHub Actions allowance is the binding constraint on this repo. It is close to
-exhausted and it only resets once a month. Overrunning it does not queue — it bills.
+**This repository is public, so GitHub Actions costs nothing.** Standard GitHub-hosted runners are
+free and unmetered on public repositories, and `windows-latest` is a standard runner. There is no
+allowance to exhaust and no 2× multiplier to pay.
 
-Why it drains so fast:
+Checked rather than assumed, on 2026-08-23:
 
-- The only workflow is `.github/workflows/ci.yml`, and it runs on `windows-latest`. **Windows
-  runners bill at 2× minutes.** A 25-minute run costs 50 minutes of allowance. The job's ceiling is
-  `timeout-minutes: 90`, so a hung run can cost 180.
-- It builds the whole thing: `npm ci`, the web test suite, the Vite bundle, a full MSVC Release
-  build of every CMake target, then CTest. There is no fast path and no cheap subset.
-- It triggers on push to `main`, on **every** `pull_request` — drafts included — and on manual
-  dispatch. Once a PR is open, *each push to that branch starts another full run.* Ten small
-  "just one more fix" pushes is ten full Windows builds.
+- The repo API reports `"private": false, "visibility": "public"`.
+- `GET /repos/Ted-juh/CEditor/actions/runs/32562104194/timing` — run #161, a full Windows build
+  that took 21.9 minutes of wall clock — returns `billable.WINDOWS.total_ms: 0`. Nothing to bill is
+  what zero billable milliseconds means.
 
-So: a CI run is something you spend, not something you get for free. The rules below follow from
-that and are not negotiable without asking first.
+### Why this file used to say the opposite
 
-### Rules
+It is worth recording, because the claim was emphatic and somebody will be tempted to put it back.
+Commit `e91a55f` (2026-08-21) introduced a section headed "CI minutes are a hard budget", stating
+that the allowance was "close to exhausted" and that Windows runners "bill at 2× minutes". The
+second half is true of private repositories and irrelevant to a public one.
 
-1. **Verify locally, then push.** Everything except the Windows-only targets runs on this machine —
-   see [Local verification](#local-verification). Do that work before involving GitHub, every time.
-2. **Batch your commits.** Commit locally as often as you like; that is free. Push when the change
-   is *finished and locally green*, not when a file is saved. One push per completed change.
-3. **Do not push work-in-progress to a branch that has an open PR.** That is the most expensive
-   habit available. If the work needs several rounds, keep them local and push the result.
-4. **Open the PR last**, after local verification passes. A draft PR is not a saving — this
-   workflow has no `types:` filter, so drafts run CI in full exactly like ready PRs.
-5. **Use `[skip ci]` for changes that cannot affect the build.** Markdown and docs, comments,
-   `.gitignore`, `LICENSE`, review notes. Put it in the commit message:
+Whether the repo was private then and has since been flipped, or whether the allowance was asserted
+without checking visibility, is not recoverable from here — GitHub does not expose a history of it.
+Either way the rules were derived from a cost that is not being charged today, and the lesson is the
+same in both cases: the premise was never in the file, only the conclusion, so nobody could check
+it. That is why the evidence above is written down with the run number in it.
+
+**The condition that brings it back.** If this repository is ever made private, all of it becomes
+true again the same minute — Windows at 2×, a monthly allowance, and a hung run at
+`timeout-minutes: 90` costing 180 minutes. Larger or custom runners bill even on a public repo. If
+either changes, restore the budget framing; until then, do not reason about CI as if it were
+metered.
+
+### The rules that survive, and what actually justifies them
+
+Most of the old rules were right for the wrong reason. A CI run costs no money and still costs
+twenty minutes of somebody's attention and a main branch that may be broken while they wait.
+
+1. **Verify locally, then push.** Unchanged, and it was never really about minutes: a red run is
+   twenty minutes of *your* wall clock before you learn anything, and everything except the
+   Windows-only targets runs on this machine — see [Local verification](#local-verification).
+2. **Batch your commits.** Commit locally as often as you like. Push when the change is *finished
+   and locally green*. One push per completed change keeps the run history a record of changes
+   rather than of keystrokes.
+3. **Do not iterate against the runner.** `concurrency: cancel-in-progress` is set, so a second
+   push kills the first run mid-flight. Pushing three speculative fixes does not get you three
+   answers — it gets you one, twenty minutes later, and you will not know which fix produced it.
+4. **Use `[skip ci]` for changes that cannot affect the build.** Markdown and docs, comments,
+   `.gitignore`, `LICENSE`, review notes. Not a saving any more — a signal-to-noise one. A run
+   history where every entry means something is a history somebody reads.
 
    ```
    git commit -m "docs: correct the export gate ordering [skip ci]"
@@ -46,16 +64,24 @@ that and are not negotiable without asking first.
    pushing several commits, the marker must be on the last one. Never put it on the final commit of
    a change that does need verifying; a skipped run on real code is worse than no run, because it
    looks green.
-6. **Never spend a run to look at something.** No `workflow_dispatch` to "check", no empty commit
-   to kick CI, no close-and-reopen of a PR. If you want to know whether something builds, build it
-   locally.
-7. **When CI is red, fix it in one push.** Read the job log, reproduce the failure locally, fix
-   everything you can see, verify locally, push once. Do not iterate against the runner. Note that
-   `concurrency: cancel-in-progress` is set, so a second push cancels the first run mid-flight —
-   that limits the damage, but the cancelled run still bills for the minutes it burned.
-8. **Do not widen CI without asking.** No new workflow, no extra job, no build matrix, no
-   `schedule:` trigger, no `push:` on all branches, no self-hosted anything. If a change seems to
-   call for it, propose it and wait.
+5. **When CI is red, reproduce it locally before pushing a fix.** Read the job log, make the
+   failure happen here, fix everything you can see, then push once. You may now push a second time
+   without it costing anything, which is exactly why the discipline has to come from somewhere
+   else: a fix you have not reproduced is a guess, and guessing at twenty minutes a turn is slow
+   however free it is.
+6. **Do not widen CI without asking.** Kept, with a different justification — not cost, but that
+   the shape of the project's automation is the owner's call, and every job added is time on
+   every future PR. No new workflow, no extra job, no build matrix, no `schedule:` trigger, no
+   `push:` on all branches, no self-hosted anything. Propose it and wait.
+
+Dropped outright: the old rules 3 and 4 (never push WIP to a branch with an open PR; open the PR
+last). Both existed only to avoid paying for runs. Push work in progress and open a draft PR
+whenever it is useful — a draft still runs CI in full, and that is now a feature.
+
+**Do check the premise if something feels off.** `visibility` on the repo API and
+`billable.*.total_ms` on a run's timing endpoint are the two facts this section rests on. They take
+a moment to look up and they beat inheriting an assumption, which is the whole lesson of this
+section.
 
 ### What actually needs CI
 
@@ -79,10 +105,8 @@ of work here as an excuse not to check anything at all off it.
   `BinaryData.h` correctly. See [the app target off Windows](#the-app-target-off-windows).
 
 So a change to `CE/src/**` that never gets compiled locally is a choice, not a limitation. Compile
-it, then spend the run — **once**, on the finished change.
-
-Remaining allowance is visible under the account's Settings → Billing → Plans and usage. If you are
-about to do something that will cost several runs, say what it will cost before you do it.
+it first; the run then confirms the two things above rather than telling you something a local
+build would have told you twenty minutes sooner.
 
 ---
 
