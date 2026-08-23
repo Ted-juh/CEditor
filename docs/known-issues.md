@@ -95,44 +95,45 @@ suite to catch a slip.
 
 ---
 
-## Twenty-seven component types cannot be automated from a host
+## Eight component types are undecided for host automation
 
-`deriveExportParameters` reads a control's `Behavior` to decide what host parameter it contributes.
-Twenty-seven of the fifty component types have no `Behavior`, no `ValueChannels` and no
-`exportValues`, so nothing about them says anything and the deriver never looks. For a `Container`
-or a `Label` that is obviously right, which is most of what remains.
+*(Was "twenty-seven cannot be automated". All fifty are now ruled; this is what is left.)*
 
-**The eight that were the actual question are closed.** They were the ones a user would plainly
-expect to reach from a DAW, and each is now ruled rather than overlooked:
+`deriveExportParameters` reads a control's `Behavior`, its `ValueChannels`, or its type's own
+`exportValues` declaration. As of 2026-08-23 every one of the fifty types says something:
+**17 export parameters, 25 decline with a stated reason, 8 are deferred.** Nothing is silent any
+more, and `qaPanels.test.js` fails if a new type reintroduces silence.
 
-| Type | Ruling |
+**The eight deferred, and why each is a question rather than an oversight.** Each has real
+candidates and no obvious single answer, and an exported parameter is permanent once a saved session
+references it — which is the whole reason these were not just decided in passing.
+
+| Type | The candidates, and the snag |
 |---|---|
-| `Numpad` | one float, over its own declared `min`/`max` |
-| `Crossfader` | one float, `mix`, stored 0–1 |
-| `Ribbon` | one float, `value`, stored 0–1 |
-| `Macro` | one float, the macro's own position; `slots` is routing, not an automation target |
-| `VectorJoystick` | **two** floats, `.x` and `.y` — every host models an XY pad as two lanes, and flattening would lose the axis a user was drawing |
-| `Meter` | **none.** It displays a level arriving from elsewhere (`valueSourceId`). A host parameter would let a DAW write a reading the component is supposed to be reporting |
-| `Matrix` | **none.** A parameter per cell is rows × cols and both are per-panel, but the exported list must be FIXED — a panel whose parameter count changes when someone adds a row breaks every saved session. And a modulation matrix is routing, not performance |
-| `Envelope` | **none.** Same variable-cardinality problem as the matrix, and the thing that does move continuously, `phase`, is an output driven by `phaseSourceId` |
+| `Arp` | `rate`, `gate`, `swing`, `octaves` — four genuine ones |
+| `Turing` | `rate`, `randomness`, `gateThreshold`, `length` are all knobs; `phase` is generated output and must **not** become one |
+| `Orbit` | `rate` is obvious, but `nodes` carries per-node values, so "one parameter" may be the wrong shape |
+| `Kinetic` | `gravity`, `restitution`, `friction` — picking one would be arbitrary |
+| `Looper` | `loopSeconds`/`loopBars` are settings, `phase` is output; there may be no automatable value here at all |
+| `Phrase` | `transpose`, `swing`, `gate`; `steps` is a pattern, with the Matrix's variable-cardinality problem |
+| `Transport` | `bpm` and `swing` in principle — but a Transport that FOLLOWS the host already takes tempo from it, so a host parameter would fight its own source |
+| `Setlist` | `index` is the obvious one and the trap: its range is the number of songs, which is per-panel, and the exported list must be FIXED |
 
-The three that export nothing say so with `exportValues: []` rather than staying silent. That
-distinction is the point: QA-08 files a declared "no" under *ruled* and an absent one under *nothing
-in the type says anything*, so a future oversight cannot hide among the deliberate ones.
+The live version of this table is **QA-08**'s "Not decided yet" group, computed from the model.
+Deciding one means giving the type an `exportValues` entry and removing it from `DEFERRED_TYPES` in
+`tools/scripts/qa/sheets/export.mjs`; the test fails until both happen, in either direction.
 
-Why the ruling did not take the obvious route: giving those five a `Behavior` section would have
-worked for the exporter and broken the editor. `PropertiesPanel.svelte:223` mounts a Behavior tab
-off the section's mere presence, so a crossfader would have grown a tab full of button fields —
-`fireOn`, `repeatEnabled`, `buttonType`. The type declares what it exports instead, beside its own
-section, and no UI changes.
+**What was decided, for the record.** Structural types (`Background`, `Container`, `Group`, `Image`,
+`Label`, `TestBox`) hold no value. Displays (`LcdDisplay`, `PixelDisplay`, `Meter`) are outputs — a
+host parameter would let a DAW write what the component is meant to be reporting. Note emitters
+(`ChordPad`, `NoteRibbon`, `DrumPads`, `Harmoniser`) send notes and hold no scalar to sweep.
+`Router`, `SplitZone`, `Constraint` and `Recorder` are configuration or state machines. `Matrix` and
+`Envelope` have variable cardinality against a fixed export list. `Timbre` and `Constellation` got
+two parameters each — an XY space, the same ruling `VectorJoystick` got.
 
-**What is left is the remaining twenty-seven**, and it is a smaller question than it looks: go down
-QA-08's third group and either rule a type out with `exportValues: []` or give it a declaration.
-Open `CE/qa/QA-08-export.cepanel` for the current list — it is computed from the model, so it will
-be right even when this paragraph is not.
-
-
----
+Why none of them got a `Behavior` section, which was the obvious route: `PropertiesPanel.svelte:223`
+mounts a Behavior tab off the section's mere presence, so a crossfader would have grown a tab full
+of `fireOn` and `buttonType`. The type declares what it exports instead, beside its own section.
 
 ## Two things the DPD Parameters screen wants and does not have
 

@@ -51,6 +51,17 @@ export function parametersFor(control, panelExtras = {}) {
  * difference between a decision and an oversight, and it is why `exportValues: []` is written out
  * on Meter, Matrix and Envelope rather than left absent.
  */
+/**
+ * Types whose empty `exportValues` means "not decided yet", not "decided no".
+ *
+ * Listed here rather than parsed out of a source comment, because a marker the sheet depends on
+ * should not live in prose the linter is free to reflow. When one of these is decided, it moves out
+ * of this set and the ratchet in `qaPanels.test.js` notices.
+ */
+export const DEFERRED_TYPES = new Set([
+  'Turing', 'Orbit', 'Kinetic', 'Looper', 'Arp', 'Phrase', 'Transport', 'Setlist',
+]);
+
 export function classifyType(type) {
   const control = createControl(type, { Core: { id: `qa08_${type}`, name: `qa08_${type}` } });
   const params = parametersFor(control);
@@ -63,9 +74,19 @@ export function classifyType(type) {
     return { type, verdict: 'declined', reason: `family=${family} valueType=${valueType}`, params, control };
   }
 
-  // An explicit empty list is a ruling: this type exports nothing, on purpose.
+  // An explicit empty list is a ruling: this type exports nothing. The reason lives in a comment
+  // beside the declaration, and a few of them say DEFERRED rather than declined — a question nobody
+  // has answered yet, which is a different thing from a question answered "no". Both beat silence;
+  // only one of them is finished.
   if (Array.isArray(COMPONENT_TYPES[type]?.exportValues)) {
-    return { type, verdict: 'declined', reason: 'exportValues: [] — ruled, not overlooked', params, control };
+    const deferred = DEFERRED_TYPES.has(type);
+    return {
+      type,
+      verdict: deferred ? 'deferred' : 'declined',
+      reason: deferred ? 'exportValues: [] — DEFERRED, awaiting a decision' : 'exportValues: [] — ruled, not overlooked',
+      params,
+      control,
+    };
   }
   // A Value section without a Behavior is the sharper case: the type stores a value and the
   // deriver still cannot see it, because it only ever reads Behavior. Worth calling out separately
@@ -387,6 +408,7 @@ export function buildExportSheet() {
   const classified = classifyAllTypes();
   const exporting = classified.filter((entry) => entry.verdict === 'exports');
   const declined = classified.filter((entry) => entry.verdict === 'declined');
+  const deferred = classified.filter((entry) => entry.verdict === 'deferred');
   const unseen = classified.filter((entry) => entry.verdict === 'unseen');
 
   const groups = [];
@@ -411,6 +433,16 @@ export function buildExportSheet() {
       caption: 'Each of these has ruled. A Behavior that calls itself a trigger or a text field, or'
         + ' an explicit empty exportValues. Deliberate; nothing to check.',
       control: rosterCard('qa08_declined', declined, 3),
+    }],
+  });
+
+  groups.push({
+    title: `Not decided yet — ${deferred.length} types`,
+    cells: [{
+      caption: 'These have real candidates and no obvious single answer, and an exported parameter is'
+        + ' permanent once a saved session references it. The reason is beside each declaration in'
+        + ' componentTypes.js. This group should shrink to nothing; it is the work, not the answer.',
+      control: rosterCard('qa08_deferred', deferred, 4, { showReason: false }),
     }],
   });
 

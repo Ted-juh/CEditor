@@ -32,6 +32,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -54,6 +55,7 @@ import { gaiaProfile } from '../../../tools/scripts/qa/sheets/gaia.mjs';
 import { STARTER_IDS, buildStarterControl } from '../../../tools/scripts/qa/sheets/packages.mjs';
 import {
   classifyAllTypes,
+  DEFERRED_TYPES,
   parametersFor,
   RECIPES as EXPORT_RECIPES,
 } from '../../../tools/scripts/qa/sheets/export.mjs';
@@ -234,7 +236,9 @@ test('QA-08 accounts for every component type, with a verdict', () => {
   assert.equal(classified.length, Object.keys(COMPONENT_TYPES).length,
     'QA-08 classifies fewer types than the model has');
 
-  const unverdicted = classified.filter((entry) => !['exports', 'declined', 'unseen'].includes(entry.verdict));
+  // 'deferred' joined the three on 2026-08-23, when the last unexamined types were ruled: it marks
+  // a question nobody has answered yet, which is not the same as one answered "no".
+  const unverdicted = classified.filter((entry) => !['exports', 'declined', 'deferred', 'unseen'].includes(entry.verdict));
   assert.deepEqual(unverdicted.map((e) => e.type), [], 'a type reached QA-08 with no verdict');
 
   // Every non-exporting type owes a reason. "It exports nothing" without one is the state this
@@ -286,6 +290,52 @@ test('a declared export range matches what the component actually stores', () =>
         `${param.path} defaults to ${param.defaultValue}, outside its own range`);
     }
   }
+});
+
+test('no component type is unexamined for export', () => {
+  // All fifty are ruled as of 2026-08-23: they export something, or they declare exportValues: []
+  // with a reason. "Unseen" — nothing in the type says anything, so the deriver never looks — is the
+  // state this whole exercise existed to end, and a new type must not quietly reintroduce it.
+  const unseen = classifyAllTypes().filter((entry) => entry.verdict === 'unseen');
+  assert.deepEqual(unseen.map((e) => e.type), [],
+    'a component type says nothing about what it exports. Give it an exportValues declaration —\n'
+    + '  a list if it has automatable values, or [] with a comment saying why not.');
+});
+
+test('every deferred type is genuinely undecided, and every decided one is not deferred', () => {
+  // DEFERRED_TYPES is what stops "we have not decided" being filed as "we decided no". It has to
+  // stay in step with the model in both directions: a type that gains real exportValues has been
+  // decided and must leave the set, and a type in the set must actually export nothing.
+  const byType = new Map(classifyAllTypes().map((entry) => [entry.type, entry]));
+  const wrong = [];
+
+  for (const type of DEFERRED_TYPES) {
+    const entry = byType.get(type);
+    if (!entry) { wrong.push(`${type}: no longer a component type — drop it from DEFERRED_TYPES`); continue; }
+    if (entry.params.length) {
+      wrong.push(`${type}: now exports ${entry.params.length} parameter(s) — it has been decided, remove it from DEFERRED_TYPES`);
+    }
+  }
+  assert.deepEqual(wrong, [], `DEFERRED_TYPES is out of step with the model:\n  ${wrong.join('\n  ')}`);
+});
+
+test('an empty exportValues always comes with a stated reason', () => {
+  // The declaration alone says "nothing"; the comment beside it says why, and the why is the whole
+  // difference between a ruling and a shrug. Checked against the source, since a comment is the one
+  // thing the model cannot carry.
+  const source = readFileSync(
+    path.join(REPO, 'CE/web/src/CE_Application/models/componentTypes.js'), 'utf8');
+  const bare = [];
+  for (const entry of classifyAllTypes()) {
+    if (entry.params.length) continue;
+    if (!COMPONENT_TYPES[entry.type]?.exportValues) continue;   // declines via Behavior, not a list
+    const at = source.indexOf(`  ${entry.type}: {`);
+    if (at < 0) continue;
+    const block = source.slice(at, source.indexOf('exportValues:', at));
+    if (!block.includes('// HOST AUTOMATION')) bare.push(entry.type);
+  }
+  assert.deepEqual(bare, [],
+    `exportValues: [] with no "// HOST AUTOMATION" comment explaining it: ${bare.join(', ')}`);
 });
 
 test('QA-08 recipes each still cover the derivation branch they claim', () => {
