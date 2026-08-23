@@ -250,7 +250,7 @@
   }
 
   .paint-strip label:focus-within {
-    border-color: #5B9BD5;
+    border-color: var(--surface-accent, #14B8A6);
     box-shadow: 0 0 0 1px rgba(91, 155, 213, 0.35);
   }
 
@@ -279,7 +279,7 @@
   }
 
   .lb-s-chip {
-    color: #14B8A6;
+    color: var(--surface-accent, #14B8A6);
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.03em;
@@ -332,7 +332,7 @@
   }
 
   .fill-toggle.active {
-    border-color: #14B8A6;
+    border-color: var(--surface-accent, #14B8A6);
     background: rgba(20, 184, 166, 0.22);
     color: #8FEDE3;
   }
@@ -364,7 +364,7 @@
 
   .paint-opacity input {
     width: 78px;
-    accent-color: #5B9BD5;
+    accent-color: var(--surface-accent, #14B8A6);
   }
 
   .paint-opacity strong {

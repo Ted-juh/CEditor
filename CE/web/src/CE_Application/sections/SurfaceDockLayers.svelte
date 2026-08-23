@@ -54,7 +54,65 @@
     editKitParts = () => {},
     editGeneratorForLayer = () => {},
     removeKitEntry = () => {},
+    renameLayer = () => {},
   } = $props();
+
+  /**
+   * Filter the tree.
+   *
+   * Tier 2 of the 2026-07-12 review ("layer search + inline rename in the list"). The GAIA panel's
+   * component has 413 rows; without a filter, finding one by name is a scroll and a squint.
+   *
+   * Matching is on the visible label, case-insensitively, and a kit or a generated source survives
+   * if ANY of its children match — hiding a group because its own name does not match would hide
+   * the row you searched for.
+   */
+  let layerFilter = $state('');
+  let filterText = $derived(layerFilter.trim().toLowerCase());
+  let filtering = $derived(filterText !== '');
+
+  const hits = (text) => String(text ?? '').toLowerCase().includes(filterText);
+
+  let shownKits = $derived(
+    !filtering ? kitEntries
+      : kitEntries.filter((kit) => hits(kit.label) || (kit.layerNames ?? []).some(hits))
+  );
+  let shownSources = $derived(
+    !filtering ? generatedSourceEntries
+      : generatedSourceEntries.filter((s) => hits(s.label ?? s.source) || (s.layerNames ?? []).some(hits))
+  );
+  let shownParts = $derived(
+    !filtering ? topLevelPartEntries : topLevelPartEntries.filter(([name]) => hits(name))
+  );
+  let shownZones = $derived(
+    !filtering ? dockHitZoneEntries : dockHitZoneEntries.filter(([name]) => hits(name))
+  );
+  let noMatches = $derived(
+    filtering && !shownKits.length && !shownSources.length && !shownParts.length && !shownZones.length
+  );
+
+  /**
+   * Inline rename.
+   *
+   * Renaming was inspector-only, which means: select the row, look away from the list, find the
+   * Name field, type, look back. The list is where the name is, so the name is edited there —
+   * double-click a row's text, Enter commits, Escape abandons.
+   */
+  let renamingLayer = $state('');
+  let renameDraft = $state('');
+
+  function beginRename(name) {
+    if (!canManagePartName(name)) return;
+    renamingLayer = name;
+    renameDraft = name;
+  }
+
+  function commitRename() {
+    const from = renamingLayer;
+    const to = renameDraft.trim();
+    renamingLayer = '';
+    if (from && to && to !== from) renameLayer(from, to);
+  }
 </script>
 
   <div class="dock-add-strip" aria-label="Create layer">
@@ -71,8 +129,23 @@
       <span class="tool-icon hitZone"></span>
     </button>
   </div>
+  <div class="layer-filter">
+    <input
+      type="text"
+      placeholder="Filter layers…"
+      bind:value={layerFilter}
+      aria-label="Filter layers"
+      onkeydown={(event) => { if (event.key === 'Escape') layerFilter = ''; }}
+    />
+    {#if filtering}
+      <button type="button" onclick={() => { layerFilter = ''; }} aria-label="Clear filter">&times;</button>
+    {/if}
+  </div>
   <div class="list-scroll layer-scroll">
-  {#each kitEntries as kit (kit.id)}
+  {#if noMatches}
+    <div class="list-empty">No layer matches “{layerFilter.trim()}”</div>
+  {/if}
+  {#each shownKits as kit (kit.id)}
     <div
       class="list-row kit-row"
       class:selected={activeSelectionKind === 'kit' && selectedKit === kit.id}
@@ -112,7 +185,7 @@
       </div>
     </div>
   {/each}
-  {#each generatedSourceEntries as source (source.source)}
+  {#each shownSources as source (source.source)}
     <div
       class="list-row generated-group-row"
       class:collapsed={source.collapsed}
@@ -143,7 +216,7 @@
       </div>
     </div>
   {/each}
-  {#each topLevelPartEntries as [name, part] (name)}
+  {#each shownParts as [name, part] (name)}
     <div
       class="list-row"
       class:selected={isLayerSelected(name)}
@@ -162,14 +235,32 @@
       ondragover={(event) => event.preventDefault()}
       ondrop={(event) => dropLayerOn(name, event)}
   >
-    <button type="button" class="row-main" onclick={(event) => selectLayer(name, event)}>
+    <button type="button" class="row-main" onclick={(event) => selectLayer(name, event)} ondblclick={() => beginRename(name)}>
         <span class="layer-thumb" aria-hidden="true">
           <span class={`layer-thumb-shape ${layerKindClass(part)}`} style={layerThumbPartStyle(name, part)}>
             {#if layerKind(part) === 'text'}T{/if}
           </span>
         </span>
         <span class="row-text">
-          <strong>{name}</strong>
+          {#if renamingLayer === name}
+            <!-- svelte-ignore a11y_autofocus -->
+            <input
+              class="rename-input"
+              type="text"
+              autofocus
+              bind:value={renameDraft}
+              aria-label={`Rename ${name}`}
+              onclick={(event) => event.stopPropagation()}
+              onblur={commitRename}
+              onkeydown={(event) => {
+                event.stopPropagation();
+                if (event.key === 'Enter') event.currentTarget.blur();
+                else if (event.key === 'Escape') { renamingLayer = ''; event.currentTarget.blur(); }
+              }}
+            />
+          {:else}
+            <strong>{name}</strong>
+          {/if}
           <em>{part?.visible === false ? 'hidden · ' : ''}{part?.locked === true || part?.meta?.locked === true ? 'locked · ' : ''}{layerKindLabel(part)}</em>
         </span>
         <span class="row-badge">{part?.generated === true || part?.meta?.generated === true ? 'GEN' : layerKindLabel(part)}</span>
@@ -223,7 +314,7 @@
   </div>
   <div class="list-scroll zones">
   {#if dockHitZoneEntries.length}
-    {#each dockHitZoneEntries as [name, zone] (name)}
+    {#each shownZones as [name, zone] (name)}
       <div
         class="list-row zone-row"
         class:selected={activeSelectionKind === 'hitZone' && selectedHitZone === name}
@@ -279,7 +370,7 @@
   }
 
   .dock-add-strip button:hover {
-    border-color: #5B9BD5;
+    border-color: var(--surface-accent, #14B8A6);
     background: #173449;
   }
 
@@ -322,7 +413,7 @@
     background: #173449;
     color: #F1F8FF;
     box-shadow:
-      inset 3px 0 0 #5B9BD5,
+      inset 3px 0 0 var(--surface-accent, #14B8A6),
       inset 0 0 0 1px rgba(91, 155, 213, 0.34);
   }
 
@@ -368,7 +459,7 @@
     background: #18333A;
     color: #F2FCFF;
     box-shadow:
-      inset 3px 0 0 #14B8A6,
+      inset 3px 0 0 var(--surface-accent, #14B8A6),
       inset 0 0 0 1px rgba(20, 184, 166, 0.34);
   }
 
@@ -428,7 +519,7 @@
   .kit-thumb.vertical .kit-thumb-ring {
     border: 0 !important;
     border-radius: 999px !important;
-    background: #5B9BD5 !important;
+    background: var(--surface-accent, #14B8A6) !important;
   }
 
   .kit-thumb.horizontal .kit-thumb-ring {
@@ -456,8 +547,8 @@
   .kit-thumb-ring {
     width: 20px;
     height: 20px;
-    border: 3px solid #5B9BD5;
-    border-right-color: #14B8A6;
+    border: 3px solid var(--surface-accent, #14B8A6);
+    border-right-color: var(--surface-accent, #14B8A6);
     border-radius: 999px;
   }
 
@@ -499,7 +590,7 @@
     place-items: center;
     min-width: 4px;
     min-height: 4px;
-    border: 1px solid #5B9BD5;
+    border: 1px solid var(--surface-accent, #14B8A6);
     color: #0A1116;
     font-size: 9px;
     font-weight: 900;
@@ -596,7 +687,7 @@
   }
 
   .row-actions button:hover {
-    border-color: #5B9BD5;
+    border-color: var(--surface-accent, #14B8A6);
     background: rgba(91, 155, 213, 0.18);
     color: #EAF5FF;
   }
@@ -652,7 +743,7 @@
     background: #1B2730;
   }
   .dock-add-strip button:hover {
-    border-color: #14B8A6;
+    border-color: var(--surface-accent, #14B8A6);
     background: rgba(20, 184, 166, 0.17);
     color: #F0FFFC;
   }
@@ -669,7 +760,7 @@
   .list-row.selected {
     background: linear-gradient(90deg, rgba(20, 184, 166, 0.28), rgba(20, 184, 166, 0.13));
     box-shadow:
-      inset 3px 0 0 #14B8A6,
+      inset 3px 0 0 var(--surface-accent, #14B8A6),
       inset 0 0 0 1px rgba(20, 184, 166, 0.28);
   }
 
@@ -679,7 +770,7 @@
   }
 
   .list-row.selected .layer-thumb {
-    border-color: #14B8A6;
+    border-color: var(--surface-accent, #14B8A6);
     box-shadow:
       inset 0 0 0 1px rgba(20, 184, 166, 0.24),
       0 0 14px rgba(20, 184, 166, 0.12);
@@ -688,5 +779,62 @@
   .row-badge {
     border-color: #31404A;
     background: rgba(13, 20, 25, 0.92);
+  }
+
+  .layer-filter {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0 6px 6px;
+  }
+
+  .layer-filter input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 22px;
+    padding: 0 22px 0 7px;
+    background: var(--dk-field-bg, #101418);
+    border: 1px solid var(--dk-field-border, #3B4650);
+    border-radius: var(--dk-field-radius, 4px);
+    color: var(--dk-field-fg, #E8EEF5);
+    font-family: inherit;
+    font-size: 10px;
+    outline: none;
+  }
+
+  .layer-filter input:focus {
+    border-color: var(--surface-accent, #14B8A6);
+  }
+
+  .layer-filter button {
+    position: absolute;
+    right: 10px;
+    padding: 0 4px;
+    background: none;
+    border: none;
+    color: #6C7A88;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .layer-filter button:hover {
+    color: #E8EEF5;
+  }
+
+  /* Sized to sit exactly where the name it replaces sat, so the row does not jump on rename. */
+  .rename-input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 16px;
+    padding: 0 3px;
+    background: #0B1013;
+    border: 1px solid var(--surface-accent, #14B8A6);
+    border-radius: 3px;
+    color: #E8EEF5;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    outline: none;
   }
 </style>

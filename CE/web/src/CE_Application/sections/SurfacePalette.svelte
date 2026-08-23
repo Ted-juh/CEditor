@@ -342,7 +342,7 @@
   }
 
   .palette-toggles button.active {
-    color: #14B8A6;
+    color: var(--surface-accent, #14B8A6);
     border-color: rgba(20, 184, 166, 0.5);
     background: rgba(20, 184, 166, 0.12);
   }
@@ -408,7 +408,7 @@
 
   .palette-grid button:hover,
   .palette-grid button.active {
-    border-color: #14B8A6;
+    border-color: var(--surface-accent, #14B8A6);
     background: rgba(20, 184, 166, 0.18);
     color: #F3FFFD;
   }
@@ -451,7 +451,7 @@
     width: 2px;
     height: 8px;
     border-radius: 999px;
-    background: #14B8A6;
+    background: var(--surface-accent, #14B8A6);
   }
 
   .palette-glyph.hscale::before,
@@ -481,7 +481,7 @@
     content: '';
     position: absolute;
     background:
-      linear-gradient(90deg, #14B8A6 0 2px, transparent 2px 6px, #14B8A6 6px 8px, transparent 8px 12px, #14B8A6 12px 14px);
+      linear-gradient(90deg, var(--surface-accent, #14B8A6) 0 2px, transparent 2px 6px, var(--surface-accent, #14B8A6) 6px 8px, transparent 8px 12px, var(--surface-accent, #14B8A6) 12px 14px);
   }
 
   .palette-glyph.hscale::after {

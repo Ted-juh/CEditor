@@ -74,6 +74,7 @@
   import SurfaceContextMenu from './SurfaceContextMenu.svelte';
   import SurfaceHelpOverlay from './SurfaceHelpOverlay.svelte';
   import { numberOr } from '../utils/primitives.js';
+  import { readStoredNumber, writeStoredNumber } from '../utils/localStorageState.js';
   import {
     angleFromCenter,
     computeResizedRect,
@@ -1946,29 +1947,42 @@
     return inlineTextEditorStyleBase(frameForPart(name, part), part);
   }
 
-  function renameSelectedLayer(event) {
-    if (!core?.id || !selectedLayer || !selectedAuthoredPart) return;
-    const currentName = selectedLayer;
-    const nextName = String(event?.currentTarget?.value ?? '').trim().replace(/[^a-zA-Z0-9_]/g, '');
-    if (!nextName || nextName === currentName) {
-      event.currentTarget.value = currentName;
-      return;
-    }
-    if (authoredParts?._children?.[nextName]) {
-      event.currentTarget.value = currentName;
-      return;
-    }
+  /**
+   * Rename a part, by name.
+   *
+   * Was `renameSelectedLayer(event)` — event-shaped, and able to rename only the current
+   * selection, which is why renaming was inspector-only. The dock list can rename in place now
+   * (Tier 2 of the 2026-07-12 review), and both call sites want the same rules: a name is an
+   * identifier, it has to be unique, and a rejected rename must put the old one back rather than
+   * leave the field showing something that is not the part's name.
+   *
+   * Returns the applied name so an inline editor can restore it on rejection.
+   */
+  function renameLayer(currentName, requested) {
+    const part = authoredParts?._children?.[currentName];
+    if (!core?.id || !currentName || !part) return currentName;
+    const nextName = String(requested ?? '').trim().replace(/[^a-zA-Z0-9_]/g, '');
+    if (!nextName || nextName === currentName) return currentName;
+    if (authoredParts?._children?.[nextName]) return currentName;   // taken
 
-    const renamed = cloneValue(selectedAuthoredPart);
+    const renamed = cloneValue(part);
     renamed.name = nextName;
-    localSelectedLayerNames = selectedLayerNames.map((name) => name === currentName ? nextName : name);
+    const nextSelection = selectedLayerNames.map((name) => name === currentName ? nextName : name);
+    localSelectedLayerNames = nextSelection;
     applyControlPatch(core.id, {
       [`Parts.${nextName}`]: renamed,
       'Designer.selectedLayer': nextName,
-      'Designer.selectedLayers': selectedLayerNames.map((name) => name === currentName ? nextName : name),
+      'Designer.selectedLayers': nextSelection,
       'Designer.selectedSurfaceKind': 'layer',
     });
     removeControlNode(core.id, `Parts.${currentName}`);
+    return nextName;
+  }
+
+  function renameSelectedLayer(event) {
+    if (!selectedLayer) return;
+    const applied = renameLayer(selectedLayer, event?.currentTarget?.value);
+    if (event?.currentTarget) event.currentTarget.value = applied;
   }
 
   function duplicateSelectedLayer() {
@@ -2858,6 +2872,37 @@
     contextMenuTarget = { screenX: event.clientX, screenY: event.clientY };
   }
 
+  // --- Display dock height ------------------------------------------------------------------
+  //
+  // Tier 2 of the 2026-07-12 review, and §3's note on the dock: "Fixed 340px, not resizable, and
+  // the only place colours/gradients/align actually get edited". A gradient with a dozen stops and
+  // a 340px box is a scroll; a solid colour and the same box is wasted canvas. It is a drag now,
+  // remembered across sessions because a height you set once you meant.
+  const DISPLAY_DOCK_MIN = 160;
+  const DISPLAY_DOCK_MAX = 720;
+  let displayDockHeight = $state(readStoredNumber('ce.surface.displayDockHeight', 340));
+  let resizingDisplayDock = $state(false);
+
+  function beginDisplayDockResize(event) {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = displayDockHeight;
+    resizingDisplayDock = true;
+    // Dragging the divider UP grows the dock, because the dock is below it.
+    const move = (moveEvent) => {
+      const next = startHeight + (startY - moveEvent.clientY);
+      displayDockHeight = Math.max(DISPLAY_DOCK_MIN, Math.min(DISPLAY_DOCK_MAX, Math.round(next)));
+    };
+    const end = () => {
+      resizingDisplayDock = false;
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', end);
+      writeStoredNumber('ce.surface.displayDockHeight', displayDockHeight);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+  }
+
   function beginMarquee(event) {
     if (designerPreviewing || activeTool !== 'select' || event.button !== 0) return false;
     const start = pointInArtboard(event);
@@ -3708,6 +3753,7 @@
             {toggleLayerVisibility} {toggleLayerLock} {toggleGeneratedSource}
             {moveLayer} {beginLayerDrag} {dropLayerOn}
             {addLayerAtCenter} {addHitZoneAtCenter} {editKitParts} {editGeneratorForLayer} {removeKitEntry}
+            {renameLayer}
           />
           {:else if dockTab === 'generators'}
             <div class="dock-generator-editor">
@@ -4272,7 +4318,27 @@
     />
 
     {#if !designerPreviewing && !displayDockHidden}
-      <div class="surface-display-dock"><DisplayPanel /></div>
+      <div class="surface-display-dock" style={`height:${displayDockHeight}px;`}>
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <div
+          class="display-dock-grip"
+          class:dragging={resizingDisplayDock}
+          role="separator"
+          aria-label="Resize the display panel"
+          aria-orientation="horizontal"
+          tabindex="0"
+          onmousedown={beginDisplayDockResize}
+          ondblclick={() => { displayDockHeight = 340; writeStoredNumber('ce.surface.displayDockHeight', 340); }}
+          onkeydown={(event) => {
+            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+            event.preventDefault();
+            const delta = event.key === 'ArrowUp' ? 16 : -16;
+            displayDockHeight = Math.max(DISPLAY_DOCK_MIN, Math.min(DISPLAY_DOCK_MAX, displayDockHeight + delta));
+            writeStoredNumber('ce.surface.displayDockHeight', displayDockHeight);
+          }}
+        ></div>
+        <DisplayPanel />
+      </div>
     {/if}
 
     <SurfaceHelpOverlay open={helpOverlayOpen} onclose={() => { helpOverlayOpen = false; }} />
@@ -4297,6 +4363,17 @@
      the panel gained.
      -------------------------------------------------------------------------------------- */
   .surface-shell {
+    /* The surface's accent. The 2026-07-12 review found the teal identity half-applied — the
+       Scripts chip, the ruler toggle and the zoom cluster wore it while the tool strip, the paint
+       focus rings and every selection outline were still the properties panel's blue. Half a
+       colour scheme reads as a bug in the other half. One token, inherited by the extracted
+       components, so the next person changes it in one place.
+
+       Only CHROME moved. `FF5B9BD5` also appears in the script as the fill a new layer is created
+       with, and that is document data: recolouring it would change what users' components look
+       like, which is not a theming pass. */
+    --surface-accent: #14B8A6;
+    --surface-accent-soft: rgba(20, 184, 166, 0.35);
     --dk-field-height: 25px;
     --dk-field-font: 10px;
     --dk-field-padding: 0 7px;
@@ -4334,11 +4411,30 @@
 
   /* Shared DisplayPanel docked at the bottom of the centre column. */
   .surface-display-dock {
+    position: relative;
     min-height: 0;
-    height: 340px;
+    /* height comes from the inline style — see beginDisplayDockResize */
     overflow: hidden;
     border-top: 1px solid #26313A;
     background: #0E141A;
+  }
+
+  /* A 6px grab strip over the top border. Double-click restores 340, the height it always was. */
+  .display-dock-grip {
+    position: absolute;
+    top: -3px;
+    left: 0;
+    right: 0;
+    height: 6px;
+    z-index: 5;
+    cursor: ns-resize;
+  }
+
+  .display-dock-grip:hover,
+  .display-dock-grip.dragging,
+  .display-dock-grip:focus-visible {
+    background: var(--surface-accent, #14B8A6);
+    outline: none;
   }
 
   .surface-display-dock :global(.display-panel) {
@@ -4346,7 +4442,7 @@
   }
 
   .surface-shell:focus-within {
-    border-color: #3D6688;
+    border-color: var(--surface-accent-soft, rgba(20, 184, 166, 0.35));
   }
 
 
@@ -4359,7 +4455,7 @@
     font-weight: 700;
   }
 
-  .lb-s-badge.on { color: #14B8A6; }
+  .lb-s-badge.on { color: var(--surface-accent, #14B8A6); }
   .lb-s-badge.off { color: #7F8B94; }
   .surface-shell :global(.mini-swatch-btn) {
     width: 22px;
@@ -4439,7 +4535,7 @@
     gap: 4px;
   }
   .surface-shell :global(.preset-swatches .mini-swatch-btn.active) {
-    outline: 2px solid #5B9BD5;
+    outline: 2px solid var(--surface-accent, #14B8A6);
     outline-offset: 1px;
   }
 
@@ -4656,7 +4752,7 @@
   }
 
   .dock-live-reset:hover {
-    border-color: #5B9BD5;
+    border-color: var(--surface-accent, #14B8A6);
     color: #FFF;
   }
 
@@ -4844,7 +4940,7 @@
 
   .dock-field input[type='range'] {
     width: 100%;
-    accent-color: #5B9BD5;
+    accent-color: var(--surface-accent, #14B8A6);
   }
 
   .dock-field strong {
@@ -4898,7 +4994,7 @@
   .pivot-actions button:hover:not(:disabled),
   .segmented button:hover,
   .segmented button.active {
-    border-color: #5B9BD5;
+    border-color: var(--surface-accent, #14B8A6);
     background: #173449;
     color: #EAF5FF;
   }
@@ -5171,7 +5267,7 @@
   }
 
   .part-bound.kit-bound {
-    border: 2px solid #14B8A6;
+    border: 2px solid var(--surface-accent, #14B8A6);
     color: #DFFFFB;
     background: rgba(20, 184, 166, 0.04);
     box-shadow:
@@ -5186,7 +5282,7 @@
   }
 
   .part-bound.selected {
-    border: 2px solid #5B9BD5;
+    border: 2px solid var(--surface-accent, #14B8A6);
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.82),
       0 0 0 4px rgba(91, 155, 213, 0.18),
@@ -5223,7 +5319,7 @@
   }
 
   .part-bound.bounds-hidden.selected {
-    border-color: #5B9BD5;
+    border-color: var(--surface-accent, #14B8A6);
   }
 
   .part-bound > .selection-label,
@@ -5291,7 +5387,7 @@
   .hit-zone > .resize-handle {
     width: 8px;
     height: 8px;
-    background: #5B9BD5;
+    background: var(--surface-accent, #14B8A6);
     border: 1px solid #FFF;
     box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
   }
@@ -5854,8 +5950,36 @@
     color: #DCEBFA;
   }
 
-  .surface-shell.palette-collapsed .palette-scroll {
+  /* Collapsed is an ICON STRIP, not an empty rail.
+     
+     It used to be `display: none` on the whole scroll, so collapsing the palette left a 46px
+     column containing the three pane toggles and nothing else — the 2026-07-12 review's Tier 2
+     item, and a collapse that removes the feature rather than compacting it. The draw tools stay;
+     what goes is everything that needs width to be legible: the group captions, and the rows
+     built around a field or a hex readout rather than a button.
+
+     These reach into SurfacePalette, so they are :global — the state class lives on the shell and
+     the elements belong to the child. */
+  .surface-shell.palette-collapsed :global(.palette-scroll) {
+    padding: 4px 0;
+  }
+
+  .surface-shell.palette-collapsed :global(.palette-header),
+  .surface-shell.palette-collapsed :global(.palette-group > span),
+  .surface-shell.palette-collapsed :global(.palette-stepper),
+  .surface-shell.palette-collapsed :global(.palette-swatch-row),
+  .surface-shell.palette-collapsed :global(.palette-corner) {
     display: none;
+  }
+
+  .surface-shell.palette-collapsed :global(.palette-group) {
+    gap: 0;
+    padding: 2px 0;
+  }
+
+  .surface-shell.palette-collapsed :global(.palette-grid) {
+    grid-template-columns: 1fr;
+    padding: 0 6px;
   }
 
   .surface-shell.palette-collapsed .palette-toggles {
@@ -5903,7 +6027,7 @@
   }
 
   .part-bound.selected {
-    border-color: #14B8A6;
+    border-color: var(--surface-accent, #14B8A6);
     box-shadow:
       0 0 0 1px rgba(236, 255, 251, 0.82),
       0 0 0 5px rgba(20, 184, 166, 0.18),
@@ -5914,7 +6038,7 @@
   .rotate-handle,
   .arc-handle {
     border-color: #DAFFFA;
-    background: #14B8A6;
+    background: var(--surface-accent, #14B8A6);
   }
 
   .selection-quickbar {
@@ -5992,7 +6116,7 @@
   .segmented button.active,
   .inspector-tabs button:hover,
   .inspector-tabs button.active {
-    border-color: #14B8A6;
+    border-color: var(--surface-accent, #14B8A6);
     background: rgba(20, 184, 166, 0.17);
     color: #F0FFFC;
   }
@@ -6014,7 +6138,7 @@
   }
 
   .dock-field input[type='range'] {
-    accent-color: #14B8A6;
+    accent-color: var(--surface-accent, #14B8A6);
   }
 
   @media (max-width: 1380px) {
@@ -6056,7 +6180,7 @@
     position: absolute;
     z-index: 40;
     pointer-events: none;
-    border: 1px solid #14B8A6;
+    border: 1px solid var(--surface-accent, #14B8A6);
     background: rgba(20, 184, 166, 0.12);
   }
 </style>

@@ -226,7 +226,7 @@
 
   .tool-strip button:hover,
   .tool-strip button.active {
-    border-color: #5B9BD5;
+    border-color: var(--surface-accent, #14B8A6);
     background: #173449;
     color: #EAF5FF;
   }
@@ -391,7 +391,7 @@
 
   .tool-strip button:hover,
   .tool-strip button.active {
-    border-color: #14B8A6;
+    border-color: var(--surface-accent, #14B8A6);
     background: rgba(20, 184, 166, 0.18);
     box-shadow:
       0 0 0 1px rgba(20, 184, 166, 0.22),

@@ -168,7 +168,7 @@
   }
 
   .surface-options-strip button:hover {
-    border-color: #5B9BD5;
+    border-color: var(--surface-accent, #14B8A6);
     background: #173449;
     color: #EAF5FF;
   }
@@ -271,7 +271,7 @@
   }
 
   .surface-zoombar .szb-btn.toggle-on {
-    color: #14B8A6;
+    color: var(--surface-accent, #14B8A6);
     border-color: rgba(20, 184, 166, 0.5);
     background: rgba(20, 184, 166, 0.14);
   }
@@ -294,7 +294,7 @@
   .szb-zoom-input {
     width: 42px;
     background: #0D1419;
-    border: 1px solid #14B8A6;
+    border: 1px solid var(--surface-accent, #14B8A6);
     border-radius: 3px;
     color: #E8EEF5;
     font-size: 11px;
