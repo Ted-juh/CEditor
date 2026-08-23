@@ -1303,27 +1303,43 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
 
                 const auto sourceRoot = ceditorSourceRoot();   // dev checkout OR installed tools/ beside the exe
 
-                const auto script = sourceRoot.getChildFile ("tools")
-                                              .getChildFile ("scripts")
-                                              .getChildFile ("export-panel-vst3.mjs");
-                if (! script.existsAsFile())
-                {
-                    emitFail ("Exporter not found: " + script.getFullPathName());
-                    return;
-                }
-
-                // A full VST3 export AOT-compiles a unique-identity plugin, which needs the C++ build
-                // environment (player source + CMake + a compiler). A GUI-only install ships the exporter
-                // script + toolchains but not the source tree, so fail with a clear message instead of the
-                // raw node module-resolution error from the exporter's source-tree imports.
+                // TWO EXPORT PATHS, and which one runs depends on what this install actually has.
+                //
+                // The compiling path relinks the player per panel and needs the C++ build environment.
+                // The template path copies a prebuilt player and writes the panel inside it -- no
+                // compiler, no CMake, no source tree -- and produces byte-identical plugin ids, so a
+                // session saved against either keeps working. See CE/src/Export/PanelIdentitySidecar.h.
+                //
+                // The compiling path is preferred WHERE IT IS AVAILABLE, because it is the one with the
+                // mileage on it and a source checkout is by definition a developer machine. An install
+                // that ships templates and no source tree takes the other, which is what turns "export
+                // runs from a source checkout" from a limitation into a preference.
                 const bool hasBuildEnv = sourceRoot.getChildFile ("CMakeLists.txt").existsAsFile()
                                        && sourceRoot.getChildFile ("CE").getChildFile ("web")
                                                     .getChildFile ("src").isDirectory();
-                if (! hasBuildEnv)
+
+                const auto templatesDir = sourceRoot.getChildFile ("templates");
+                const bool hasTemplates = templatesDir.isDirectory()
+                                       && ! templatesDir.findChildFiles (juce::File::findFilesAndDirectories, false,
+                                                                         "*.vst3").isEmpty();
+
+                const auto scriptName = hasBuildEnv ? "export-panel-vst3.mjs" : "export-panel-template.mjs";
+                const auto script = sourceRoot.getChildFile ("tools")
+                                              .getChildFile ("scripts")
+                                              .getChildFile (scriptName);
+
+                if (! hasBuildEnv && ! hasTemplates)
                 {
-                    emitFail ("Full VST3 export needs the C++ build environment (the player source, CMake "
-                              "and a compiler), which isn't part of this install. Run exports from a source "
-                              "checkout. This install can still design panels and manage scripting toolchains.");
+                    emitFail ("This install can't export yet: it has neither the C++ build environment "
+                              "(player source, CMake and a compiler) nor a prebuilt player template in "
+                              "templates/. Reinstall including the plugin templates, or run exports from a "
+                              "source checkout. Designing panels and managing scripting toolchains still work.");
+                    return;
+                }
+
+                if (! script.existsAsFile())
+                {
+                    emitFail ("Exporter not found: " + script.getFullPathName());
                     return;
                 }
 
@@ -1346,11 +1362,17 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 const auto exportPath = sourceRoot.getChildFile ("export-out")
                                                   .getChildFile (productName + ".vst3").getFullPathName();
 
-                const juce::StringArray command { node.getFullPathName(),
-                                                  script.getFullPathName(),
-                                                  tempPanel.getFullPathName(),
-                                                  guid,
-                                                  productName };
+                // The two exporters take the same first two arguments deliberately. The third differs:
+                // the compiling one accepts a product-name override on the command line, the template
+                // one takes the directory to copy from.
+                juce::StringArray command { node.getFullPathName(),
+                                            script.getFullPathName(),
+                                            tempPanel.getFullPathName(),
+                                            guid };
+                if (hasBuildEnv)
+                    command.add (productName);
+                else
+                    command.addArray ({ "--templates", templatesDir.getFullPathName() });
 
                 buildJob = std::make_unique<VstBuildJob> (browser, command, exportPath);
             });

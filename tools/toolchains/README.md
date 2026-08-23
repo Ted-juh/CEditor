@@ -11,7 +11,7 @@ the compiler is free to choose — a self-contained Clang loads into an MSVC-bui
 
 | id | what | replaces | ships |
 |---|---|---|---|
-| `llvm-mingw` | self-contained Clang/LLD (no VS, no Windows SDK) — builds the JUCE plugin, the C++ handler module, and the C# host shim | **Visual Studio** | download (~178 MB win) |
+| `llvm-mingw` | self-contained Clang/LLD (no VS, no Windows SDK) — builds the C++ handler module and the C# host shim. **Not the JUCE plugin**: JUCE `#error`s on `__MINGW32__` (`juce_TargetPlatform.h:113`) and `WebView2LoaderStatic.lib` is MSVC-mangled, so neither the compile nor the link can work. See below. | — | download (~178 MB win) |
 | `python-embed` | CPython embeddable runtime, bundled *into* the exported plugin | system Python | download (~11 MB) |
 | `dotnet` | portable .NET SDK (Roslyn + publish) via Microsoft's `dotnet-install` — compiles C# handlers to managed IL + self-contained-publishes a CoreCLR | **.NET SDK / Visual Studio** | download (~230 MB) |
 | `jdk` | Temurin JDK 21 — `javac` + `jlink` to ship a ~30–50 MB JRE inside the plugin (JNI) | **GraalVM** | download (~195 MB) |
@@ -47,3 +47,35 @@ run `provision.mjs`) with the user's Node.js from the source tree.
 > (tracked) — it must stage the exporter scripts + their `node_modules` too, not just download binaries.
 
 Binaries are **gitignored** (never committed); only the manifest + scripts live here.
+
+
+## llvm-mingw cannot build the plugin shell
+
+Worth stating plainly, because three documents used to say it could and one code path still tried.
+
+`export-panel-vst3.mjs` had a fallback that configured the whole JUCE plugin with
+`llvm-mingw-win.cmake` when no Visual Studio was found, logging `[EXPERIMENTAL]`. It was never
+validated, and it cannot be: it fails twice over, for reasons that are not fixable here.
+
+1. **JUCE rejects the compiler.** `juce_TargetPlatform.h:113` is `#error "MinGW is not supported."`
+   under `#ifdef __MINGW32__`, and clang targeting `x86_64-w64-mingw32` — the exact triple that
+   toolchain file sets — defines `__MINGW32__`. Reproducible in one command:
+
+   ```
+   clang++ -target x86_64-w64-mingw32 -fsyntax-only \
+     -I JUCE/include/JUCE-8.0.7/modules some_file_including_juce.cpp
+   ```
+
+2. **The link would fail even with the `#error` patched out.** `WebView2LoaderStatic.lib` is a
+   Microsoft-built MSVC static library, and its C++ symbols carry MSVC mangling
+   (`?HexEncode@internal@embedded_browser_webview@@YA_NPEBX_K_NPEAV...@Z`). A MinGW/Itanium-ABI
+   link cannot resolve them.
+
+The toolchain file's own header already conceded that Direct2D is unavailable and "the VST3 wrapper
+needs a known link tweak". Both were understatements.
+
+**What replaced it.** Not another compiler — no compiler. `CEDITOR_TEMPLATE_PLAYER` builds a
+panel-agnostic player that reads its identity and its panel from the `.cepanel` beside it, so an
+export is a file copy (`tools/scripts/export-panel-template.mjs`). llvm-mingw stays exactly where it
+was always genuinely needed: the ~100-line C shims for the C++, C# and Java handler modules, which
+contain no JUCE and no WebView2.

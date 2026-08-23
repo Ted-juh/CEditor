@@ -14,6 +14,10 @@
 /tmp/
 # Per-panel export output (generated VST3s).
 /export-out/
+
+# Prebuilt player templates. Build outputs (cmake -DCEDITOR_TEMPLATE_PLAYER=ON), staged here for
+# the compiler-free export path and by the installer. Tens of MB per format, and reproducible.
+/templates/
 # Publish-only build of the API explorer: gen-api-explorer.mjs --standalone, with the screenshots
 # baked in as data URIs. docs/api-explorer.html is the checked-in page; this one is ~1.9MB of the
 # same content and is regenerated whenever it is hosted.

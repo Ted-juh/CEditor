@@ -297,8 +297,29 @@ if(CEDITOR_BUILD_APP)
     # meant to be panel-less", and gets a status line instead. A hand build still gets the warning.
     set(CE_VST_PANEL_PATH   ""                   CACHE STRING "Panel document the plugin loads")
     option(CE_VST_GENERIC_PLAYER "Building the panel-less player deliberately (suppresses the no-panel warning)" OFF)
+
+    # The compiler-free export path.
+    #
+    # Normally each exported panel is its own relink, because the VST3 FUID is derived from
+    # PLUGIN_CODE + MANUFACTURER_CODE and those are #defines. That is what made a C++ toolchain a
+    # requirement on the USER's machine, and it is the reason "export runs from a source checkout"
+    # was a product limitation rather than a preference.
+    #
+    # A template build drops that. The binary takes both its identity and its panel from the single
+    # .cepanel sitting beside it, so exporting becomes "copy a prebuilt (and signable, once)
+    # binary, write the panel next to it" with no compiler anywhere. The ids it reports are
+    # byte-identical to the ones the relinking path produced -- CE/tests/PanelIdentitySidecarTests
+    # asserts that against JUCE's own convertJucePluginId -- so a session saved against a
+    # compile-per-panel export keeps finding its plugin.
+    #
+    # It needs a one-line patch in vendored JUCE (JUCE/VENDORED.md; guarded by the define below and
+    # pinned by CE/web/test/vendoredJucePatches.test.js). OFF by default: the per-panel build is
+    # still what a developer wants, and it is the path with the mileage on it.
+    option(CEDITOR_TEMPLATE_PLAYER "Build a panel-agnostic player that reads its identity and panel from a .cepanel beside the binary" OFF)
     if (CE_VST_PANEL_PATH STREQUAL "")
-        if (CE_VST_GENERIC_PLAYER)
+        if (CEDITOR_TEMPLATE_PLAYER)
+            message(STATUS "CEditorPlayerVST: TEMPLATE build -- identity and panel come from the .cepanel beside the binary.")
+        elseif (CE_VST_GENERIC_PLAYER)
             message(STATUS "CEditorPlayerVST: generic player build, no panel baked in (as intended).")
         else()
             message(WARNING "CE_VST_PANEL_PATH is not set — CEditorPlayerVST will build but load no panel. "
@@ -361,12 +382,21 @@ if(CEDITOR_BUILD_APP)
         CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
         CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
         CEDITOR_PLAYER_PANEL_PATH="${CE_VST_PANEL_PATH}"
+        CEDITOR_SIDECAR_IDENTITY=$<IF:$<BOOL:${CEDITOR_TEMPLATE_PLAYER}>,1,0>
     )
 
+    # PUBLIC for CE_ROOT/src, not PRIVATE, and the reason is easy to trip over: juce_add_plugin puts
+    # the format wrappers in their own targets that LINK this one, so a PRIVATE include never
+    # reaches the translation unit that compiles juce_audio_plugin_client_VST3.cpp -- which is
+    # exactly the file that needs Export/Vst3SidecarIdentity.h. The compile definitions above are
+    # PUBLIC for the same reason.
     target_include_directories(CEditorPlayerVST PRIVATE
         "${WEBVIEW2_INCLUDE}"
-        "${CE_ROOT}/src"
         "${CMAKE_BINARY_DIR}/PlayerWebData"
+    )
+
+    target_include_directories(CEditorPlayerVST PUBLIC
+        "${CE_ROOT}/src"
     )
 
     target_link_libraries(CEditorPlayerVST PRIVATE
@@ -475,6 +505,29 @@ target_link_libraries(CEditorExportIdentityTests PRIVATE
 
 add_test(NAME PanelExportIdentity COMMAND CEditorExportIdentityTests)
 ce_configure_test(CEditorExportIdentityTests)
+
+# --- Export pipeline: compiler-free identity (the template player) ---
+#
+# The one that decides whether a prebuilt binary can carry a per-panel identity. It links
+# juce_audio_processors rather than juce_core alone, because the assertion that matters is against
+# JUCE's OWN VST3ClientExtensions::convertJucePluginId -- comparing our runtime derivation to a
+# reimplementation of it here would prove only that two copies of our arithmetic agree.
+add_executable(CEditorIdentitySidecarTests
+    "${CE_ROOT}/tests/PanelIdentitySidecarTests.cpp"
+)
+
+target_compile_features(CEditorIdentitySidecarTests PRIVATE cxx_std_23)
+
+target_include_directories(CEditorIdentitySidecarTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorIdentitySidecarTests PRIVATE
+    juce::juce_audio_processors
+)
+
+add_test(NAME PanelIdentitySidecar COMMAND CEditorIdentitySidecarTests)
+ce_configure_test(CEditorIdentitySidecarTests)
 
 # --- Window-closed script runtime (M2): C++ panel value model (full mirror) ---
 # Pure juce_core; verifies PanelValueModel.h resolves get/set paths identically to the WebView JS

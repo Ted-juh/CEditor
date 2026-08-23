@@ -14,6 +14,7 @@ import path from 'node:path';
 // codes shown in the editor are exactly what gets built. The self-check below still validates it
 // against the canonical C++ output (PanelExportIdentity) on every run.
 import { deriveIdentity } from '../../CE/web/src/CE_Application/utils/exportIdentity.js';
+import { identityInputsFromPanel } from '../../CE/web/src/CE_Application/utils/panelIdentityInputs.js';
 import { panelScriptLanguages, shouldEmbedPython } from './pythonEmbed.mjs';
 
 // Self-check against the canonical C++ output (PanelExportIdentityTests).
@@ -41,12 +42,12 @@ const outDir = path.join(repo, 'export-out');
 // the CLI productName arg and built-in defaults are fallbacks (keeps the CLI and in-app paths aligned).
 const panelDoc = JSON.parse(readFileSync(panel, 'utf8'));
 const es = panelDoc.exportSettings ?? {};
-const productName = (es.pluginName && es.pluginName.trim())
-  || productNameArg || panelDoc.name || ('CEditor ' + path.basename(panel).replace(/\.[^.]+$/, ''));
-const vendor = (es.vendor && es.vendor.trim()) || 'Tedjuh';
-const version = (es.version && es.version.trim()) || '1.0.0';
-let mfrCode = (es.manufacturerCode ?? '').trim() || 'Tdjh';
-mfrCode = (mfrCode + 'xxxx').slice(0, 4);   // JUCE plugin manufacturer code must be exactly 4 chars
+// The fallback chain lives in panelIdentityInputs.js rather than here, because the template
+// exporter and the C++ a prebuilt player uses at load have to agree with it exactly — a different
+// default is a different FUID, and the symptom is a saved DAW session that stops finding its
+// plugin rather than anything that looks like a bug.
+const { productName, vendor, version, manufacturerCode: mfrCode } =
+  identityInputsFromPanel(panelDoc, path.basename(panel), { productName: productNameArg });
 const id = deriveIdentity(guid, productName, vendor, mfrCode, version);
 console.log('Export identity:', id);
 

@@ -10,6 +10,32 @@
  #define CEDITOR_PLAYER_PANEL_PATH ""
 #endif
 
+#ifndef CEDITOR_SIDECAR_IDENTITY
+ #define CEDITOR_SIDECAR_IDENTITY 0
+#endif
+
+#if CEDITOR_SIDECAR_IDENTITY
+ #include "Export/PanelIdentitySidecar.h"
+#endif
+
+/**
+ * The panel this build loads.
+ *
+ * A per-panel build bakes the path and this is that path, exactly as before. A TEMPLATE build --
+ * one prebuilt binary copied per panel rather than relinked -- has no meaningful path baked in and
+ * finds the panel sitting beside itself instead. See CE/src/Export/PanelIdentitySidecar.h.
+ *
+ * Behind the guard so a build that does not opt in cannot start reading files next to itself.
+ */
+static inline juce::File ceditorPlayerPanelFile()
+{
+   #if CEDITOR_SIDECAR_IDENTITY
+    return ceditor::exporter::resolvePlayerPanelFile (CEDITOR_PLAYER_PANEL_PATH);
+   #else
+    return juce::File (CEDITOR_PLAYER_PANEL_PATH);
+   #endif
+}
+
 #ifndef CEDITOR_VALUE_LAYER
  #define CEDITOR_VALUE_LAYER 0
 #endif
@@ -47,7 +73,7 @@ public:
               .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
               .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 #if CEDITOR_VALUE_LAYER
-        , panelParams (ce::parseExportParameters (juce::File (CEDITOR_PLAYER_PANEL_PATH)))
+        , panelParams (ce::parseExportParameters (ceditorPlayerPanelFile()))
         , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams))
 #endif
     {
@@ -282,7 +308,7 @@ public:
 
     bool isBusesLayoutSupported (const BusesLayout&) const override { return true; }
 
-    juce::File panelFile() const { return juce::File (CEDITOR_PLAYER_PANEL_PATH); }
+    juce::File panelFile() const { return ceditorPlayerPanelFile(); }
 
 #if CEDITOR_VALUE_LAYER
     juce::AudioProcessorValueTreeState& parameters() { return apvts; }
@@ -807,7 +833,7 @@ private:
 
     void setupScripting()
     {
-        const auto json = juce::File (CEDITOR_PLAYER_PANEL_PATH).loadFileAsString();
+        const auto json = ceditorPlayerPanelFile().loadFileAsString();
         if (json.isEmpty() || ! scriptValues.loadFromJson (json)) return;
 
         using namespace ceditor::scripting;
