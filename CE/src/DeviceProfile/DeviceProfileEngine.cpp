@@ -234,6 +234,29 @@ juce::Array<int> dumpUnpack8to7 (const juce::Array<int>& wire, const juce::Strin
     return out;
 }
 
+// The inverse: 8->7 block PACK. Kept immediately below the unpacker on purpose — these two have to
+// agree bit for bit or a dump built here will not decode there, and a round-trip that fails only on
+// the high bit of every eighth byte is a miserable thing to debug. `dumpBuildRoundTrips` in
+// DeviceProfileEngineTests drives both over the same bytes.
+juce::Array<int> dumpPack8to7 (const juce::Array<int>& raw, const juce::String& order, int groupSize)
+{
+    juce::Array<int> out;
+    const bool highFirst = order != "msb-low-first"; // default msb-high-first, matching the unpacker
+    for (int g = 0; g < raw.size(); g += groupSize)
+    {
+        const auto lowCount = juce::jmin (groupSize, raw.size() - g);
+        int msb = 0;
+        for (int i = 0; i < lowCount; ++i)
+            if ((raw[g + i] & 0x80) != 0)
+                msb |= 1 << (highFirst ? (groupSize - 1 - i) : i);
+
+        out.add (msb & 0x7f);
+        for (int i = 0; i < lowCount; ++i)
+            out.add (raw[g + i] & 0x7f);
+    }
+    return out;
+}
+
 juce::String normalisedTextCodec (const juce::String& codec)
 {
     if (codec == "ascii" || codec == "fixed-ascii")
@@ -1113,6 +1136,184 @@ DumpParseResult DeviceProfileEngine::parseDumpMessage (const juce::String& hex) 
         return bestError;
 
     return fail ("noMatch", "No dump definition matched message");
+}
+
+DumpBuildResult DeviceProfileEngine::buildDumpMessage (const juce::String& dumpId, const juce::var& values) const
+{
+    auto fail = [&dumpId] (const juce::String& error)
+    {
+        DumpBuildResult result;
+        result.dumpId = dumpId;
+        result.error = error;
+        return result;
+    };
+
+    if (hasErrors())
+        return fail ("Profile has validation errors");
+
+    auto* root = profileObject();
+    auto* dumps = root != nullptr ? asArray (root->getProperty ("dumpDefinitions")) : nullptr;
+    if (dumps == nullptr || dumps->isEmpty())
+        return fail ("Profile has no dump definitions");
+
+    // By id, then by name. A script author reaches for whichever of the two they can see in the DPD,
+    // and refusing the name would be a needless papercut.
+    const juce::DynamicObject* dump = nullptr;
+    for (const auto& dumpValue : *dumps)
+    {
+        auto* candidate = asObject (dumpValue);
+        if (candidate == nullptr)
+            continue;
+        if (propString (*candidate, "id") == dumpId || propString (*candidate, "name") == dumpId)
+        {
+            dump = candidate;
+            break;
+        }
+    }
+    if (dump == nullptr)
+        return fail ("No dump definition named: " + dumpId);
+
+    DumpBuildResult result;
+    result.dumpId = propString (*dump, "id");
+    result.dumpName = propString (*dump, "name");
+
+    auto* matcher = asObject (dump->getProperty ("matcher"));
+    const auto resolver = [this] (const juce::String& name) { return resolveVariable (name); };
+    auto prefix = matcher != nullptr ? parsePatternBytes (matcher->getProperty ("prefix"), resolver) : juce::Array<int> {};
+    auto suffix = matcher != nullptr ? parsePatternBytes (matcher->getProperty ("suffix"), resolver) : juce::Array<int> {};
+
+    auto* payload = asObject (dump->getProperty ("payload"));
+    const auto payloadOffset = payload != nullptr ? propInt (*payload, "offset", prefix.size()) : prefix.size();
+    const auto payloadSize = payload != nullptr ? propInt (*payload, "size", 0) : 0;
+    if (payloadSize <= 0)
+        return fail ("Dump definition has no payload size: " + result.dumpId);
+
+    auto* payloadPack = payload != nullptr ? asObject (payload->getProperty ("pack")) : nullptr;
+    const bool payloadPacked = payloadPack != nullptr && propString (*payloadPack, "type") == "packed8to7";
+    const auto packGroupSize = payloadPacked ? juce::jmax (1, propInt (*payloadPack, "groupSize", 7)) : 7;
+    const auto packOrder = payloadPacked ? propString (*payloadPack, "packOrder") : juce::String();
+
+    auto* mappings = asArray (dump->getProperty ("mappings"));
+    if (mappings == nullptr || mappings->isEmpty())
+        return fail ("Dump definition has no mappings: " + result.dumpId);
+
+    // The payload is built UNPACKED, because mapping offsets address unpacked bytes — the same
+    // convention parseDumpWithDefinition uses when it unpacks before decoding. Packing happens once,
+    // at the end, over the finished buffer.
+    const auto defaultByte = payload != nullptr ? propInt (*payload, "defaultByte", 0) : 0;
+    juce::Array<int> body;
+    for (int index = 0; index < payloadSize; ++index)
+        body.add (defaultByte & 0x7f);
+
+    auto* given = values.getDynamicObject();
+    std::set<juce::String> consumed;
+
+    for (const auto& mappingValue : *mappings)
+    {
+        auto* mapping = asObject (mappingValue);
+        if (mapping == nullptr)
+            continue;
+
+        const auto parameterId = propString (*mapping, "parameter");
+        auto* parameter = findParameter (parameterId);
+        if (parameter == nullptr)
+            return fail ("Dump mapping references unknown parameter: " + parameterId);
+
+        // A value the caller did not supply leaves the definition's default bytes in place. This is
+        // the ordinary case for a panel that binds part of a dump, so it is reported, not refused.
+        if (given == nullptr || ! given->hasProperty (parameterId))
+        {
+            result.unmappedParameters.add (parameterId);
+            continue;
+        }
+        consumed.insert (parameterId);
+
+        juce::var semanticValue;
+        juce::Array<int> encodedBytes;
+        double normalizedValue = 0.0;
+        juce::String displayedValue;
+        auto encoded = validateAndEncodeValue (*parameter, given->getProperty (parameterId),
+                                               semanticValue, encodedBytes, normalizedValue, displayedValue);
+        if (encoded.failed())
+            return fail ("Cannot encode " + parameterId + ": " + encoded.getErrorMessage());
+
+        const auto offset = propInt (*mapping, "offset");
+        if (offset < 0 || offset + encodedBytes.size() > body.size())
+            return fail ("Mapping for " + parameterId + " writes outside the payload (offset "
+                         + juce::String (offset) + ", " + juce::String (encodedBytes.size()) + " byte(s), payload "
+                         + juce::String (payloadSize) + ")");
+
+        for (int index = 0; index < encodedBytes.size(); ++index)
+            body.set (offset + index, encodedBytes[index] & 0x7f);
+    }
+
+    if (given != nullptr)
+        for (const auto& property : given->getProperties())
+            if (consumed.find (property.name.toString()) == consumed.end())
+                result.unknownParameters.add (property.name.toString());
+
+    const auto wireBody = payloadPacked ? dumpPack8to7 (body, packOrder, packGroupSize) : body;
+
+    // Frame it: prefix, payload at its declared offset, room for the checksum, then suffix. The gap
+    // between the prefix and the payload offset is real in some profiles (a device id or a bank byte
+    // the matcher does not claim), so it is filled rather than assumed empty.
+    juce::Array<int> bytes (prefix);
+    while (bytes.size() < payloadOffset)
+        bytes.add (0);
+    bytes.addArray (wireBody);
+
+    // The checksum FIELD has to exist before the suffix goes on. In the Roland shape the byte sits
+    // between the last data byte and F7 (`byteOffset: 72`, payload ending at 71), so appending the
+    // suffix first would put the checksum on top of F7 and produce a message that neither ends
+    // correctly nor verifies. Reserved here, filled in below once the frame is complete.
+    auto* checksumSpec = asObject (dump->getProperty ("checksum"));
+    if (checksumSpec != nullptr)
+    {
+        const auto reserveAt = propInt (*checksumSpec, "byteOffset", bytes.size());
+        const auto reserveCount = juce::jmax (1, propInt (*checksumSpec, "byteCount", 1));
+        while (bytes.size() < reserveAt + reserveCount)
+            bytes.add (0);
+    }
+
+    bytes.addArray (suffix);
+
+    // Checksum last, over the finished frame, using the same shared table the verifier reads — which
+    // is the point: a dump built here has to satisfy the checksum check in parseDumpWithDefinition.
+    if (auto* checksum = checksumSpec)
+    {
+        const auto type = propString (*checksum, "type");
+        const auto fromOffset = propInt (*checksum, "fromOffset", 0);
+        const auto toOffset = propInt (*checksum, "toOffset", bytes.size() - 2);
+        const auto byteOffset = propInt (*checksum, "byteOffset", bytes.size() - 2);
+
+        if (fromOffset < 0 || toOffset >= bytes.size() || fromOffset > toOffset || byteOffset < 0)
+            return fail ("Dump checksum range is outside the built message");
+
+        juce::Array<int> covered;
+        for (int index = fromOffset; index <= toOffset; ++index)
+            covered.add (bytes[index]);
+
+        const auto computed = ce::checksums::toBytes (type, covered, propInt (*checksum, "offset", 0xa5));
+        if (computed.isEmpty())
+            return fail ("Unsupported dump checksum type: " + type);
+
+        const auto byteCount = juce::jmax (1, propInt (*checksum, "byteCount", computed.size()));
+        if (byteOffset + byteCount > bytes.size())
+            return fail ("Dump checksum does not fit in the built message");
+
+        for (int index = 0; index < byteCount && index < computed.size(); ++index)
+            bytes.set (byteOffset + index, computed[index]);
+        result.checksumStatus = "ok";
+    }
+
+    juce::StringArray hexBytes;
+    for (const auto byte : bytes)
+        hexBytes.add (byteToHex (byte));
+
+    result.ok = true;
+    result.bytes = bytes;
+    result.hex = hexBytes.joinIntoString (" ");
+    return result;
 }
 
 DumpCollectionResult DeviceProfileEngine::collectDumpMessages (const juce::StringArray& hexMessages) const

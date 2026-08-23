@@ -128,6 +128,10 @@ the concrete `juce::AudioParameter*` class the layout produces, not just that a 
 the one that delivers the headline, and it is small.
 
 **S3 — `buildDump`.** Full-patch capture into session state; restore sends dump then values.
+*Half done, 2026-08-23*: the codec exists — `DeviceProfileEngine::buildDumpMessage`, round-trip
+tested against the GAIA profile, and wired to `ce.device.buildDump` in the Player. What S3 still
+wants is the session-state half: capturing the built dump into `getStateInformation` and sending it
+before the values on restore.
 
 **S4 — Programs.** Bake the librarian bank into the export; wire the three overrides.
 

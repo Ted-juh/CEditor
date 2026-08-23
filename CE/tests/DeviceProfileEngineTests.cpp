@@ -214,6 +214,187 @@ int runNibbledEncoderTests (const juce::File& file)
  * whose addresses the manual prints, and on a name that must survive a round trip through the
  * encoder and the dump reader unchanged.
  */
+/**
+ * buildDumpMessage — the encode direction, and the only assertion that really matters for it.
+ *
+ * `parseDumpMessage` has existed for a long time; `buildDump` returned an empty var, so a script
+ * could read a patch out of a synth and had no way to assemble one to send back. That asymmetry is
+ * what these tests close.
+ *
+ * The central one is a ROUND TRIP against the real GAIA profile: build a dump from semantic values,
+ * parse the result with the existing decoder, and require the values to come back. Asserting on the
+ * bytes instead would only prove the builder agrees with whatever it produced the day it was
+ * written. Round-tripping proves it agrees with the decoder — and the decoder is what a synth's
+ * reply goes through, so agreement with it is the real contract.
+ */
+int runDumpBuildTests (const juce::File& file)
+{
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromFile (file, error))
+    {
+        std::cerr << "[FAIL] buildDump: could not load " << file.getFileName() << ": " << error << "\n";
+        return 1;
+    }
+
+    auto failures = 0;
+    const juce::String patchName { "ROUND TRIP" };
+
+    auto* wanted = new juce::DynamicObject();
+    wanted->setProperty ("common.patchName", patchName);
+    wanted->setProperty ("common.patchLevel", 100);
+    const juce::var values { wanted };
+
+    const auto built = engine.buildDumpMessage ("common", values);
+    if (! built.ok)
+    {
+        std::cerr << "[FAIL] buildDump: Patch Common did not build: " << built.error << "\n";
+        return failures + 1;
+    }
+
+    if (built.checksumStatus != "ok")
+    {
+        std::cerr << "[FAIL] buildDump: checksum reported \"" << built.checksumStatus << "\"\n";
+        ++failures;
+    }
+
+    // THE ROUND TRIP. If this passes, the builder and the decoder agree about framing, mapping
+    // offsets, codecs and the checksum all at once — and disagreeing about any one of them is the
+    // failure mode that would otherwise reach a synth.
+    const auto parsed = engine.parseDumpMessage (built.hex);
+    if (! parsed.ok)
+    {
+        std::cerr << "[FAIL] buildDump: the built message does not parse: " << parsed.error
+                  << "\n         " << built.hex << "\n";
+        ++failures;
+    }
+    else
+    {
+        if (parsed.dumpId != "common")
+        {
+            std::cerr << "[FAIL] buildDump: built message matched \"" << parsed.dumpId << "\"\n";
+            ++failures;
+        }
+        if (parsed.checksumStatus != "ok")
+        {
+            std::cerr << "[FAIL] buildDump: the decoder rejected the built checksum ("
+                      << parsed.checksumStatus << ")\n";
+            ++failures;
+        }
+
+        auto* got = parsed.values.getDynamicObject();
+        const auto valueOf = [got] (const char* id) { return got != nullptr ? got->getProperty (id) : juce::var(); };
+
+        if (valueOf ("common.patchName").toString() != patchName)
+        {
+            std::cerr << "[FAIL] buildDump: name round-tripped as \"" << valueOf ("common.patchName").toString()
+                      << "\", not \"" << patchName << "\"\n";
+            ++failures;
+        }
+        if ((int) valueOf ("common.patchLevel") != 100)
+        {
+            std::cerr << "[FAIL] buildDump: level round-tripped as " << (int) valueOf ("common.patchLevel") << "\n";
+            ++failures;
+        }
+
+        if (failures == 0)
+            std::cout << "[PASS] buildDump :: a built Patch Common parses back to the values it was given\n";
+    }
+
+    // Partial coverage is the NORMAL case, not an error: a panel binds some of a dump's parameters.
+    // The rest keep the definition's default bytes and are reported so a caller can tell.
+    if (built.unmappedParameters.isEmpty())
+    {
+        std::cerr << "[FAIL] buildDump: 26 mappings, 2 values given, and nothing reported unmapped\n";
+        ++failures;
+    }
+    else if (built.unmappedParameters.contains ("common.patchName"))
+    {
+        std::cerr << "[FAIL] buildDump: a parameter that WAS given is reported unmapped\n";
+        ++failures;
+    }
+    else
+    {
+        std::cout << "[PASS] buildDump :: " << built.unmappedParameters.size()
+                  << " unsupplied parameters reported, not silently zeroed\n";
+    }
+
+    // A value the dump does not carry is reported rather than dropped — otherwise a typo in a
+    // parameter id is a dump that builds cleanly and does nothing.
+    {
+        auto* withJunk = new juce::DynamicObject();
+        withJunk->setProperty ("common.patchLevel", 64);
+        withJunk->setProperty ("common.notAThing", 1);
+        const auto r = engine.buildDumpMessage ("common", juce::var (withJunk));
+        if (! r.ok || ! r.unknownParameters.contains ("common.notAThing"))
+        {
+            std::cerr << "[FAIL] buildDump: an unknown parameter id was not reported back\n";
+            ++failures;
+        }
+        else
+            std::cout << "[PASS] buildDump :: an unknown parameter id is reported, not silently ignored\n";
+    }
+
+    // Refusals, each naming what went wrong. A dump that builds "successfully" from a bad request is
+    // worse than one that fails, because the bytes reach the instrument.
+    {
+        const auto missing = engine.buildDumpMessage ("no-such-dump", values);
+        if (missing.ok || ! missing.error.contains ("no-such-dump"))
+        {
+            std::cerr << "[FAIL] buildDump: an unknown dump id did not fail by name\n";
+            ++failures;
+        }
+
+        auto* outOfRange = new juce::DynamicObject();
+        outOfRange->setProperty ("common.patchLevel", 9999);   // range is 0-127
+        const auto refused = engine.buildDumpMessage ("common", juce::var (outOfRange));
+        if (refused.ok || ! refused.error.contains ("common.patchLevel"))
+        {
+            std::cerr << "[FAIL] buildDump: an out-of-range value still produced a message\n";
+            ++failures;
+        }
+        else
+            std::cout << "[PASS] buildDump :: unknown dumps and out-of-range values are refused by name\n";
+
+        // WHAT IS *NOT* REFUSED, recorded because it surprised the author of this test. A
+        // non-numeric string is COERCED, not rejected: JUCE's var gives 0.0 for it, which is finite
+        // and inside 0-127, so validateAndEncodeValue accepts it. That is the shared encoder every
+        // knob move already goes through, where the value cannot be a string — buildDump is the
+        // first caller that can hand it one. Changing the encoder would change the knob path too,
+        // so the behaviour is pinned here rather than quietly altered.
+        auto* coerced = new juce::DynamicObject();
+        coerced->setProperty ("common.patchLevel", "not a number");
+        const auto accepted = engine.buildDumpMessage ("common", juce::var (coerced));
+        if (! accepted.ok)
+        {
+            std::cerr << "[FAIL] buildDump: a coercible value should build (this pins existing behaviour)\n";
+            ++failures;
+        }
+    }
+
+    // Building by NAME as well as by id — a script author reaches for whichever the DPD shows them.
+    {
+        const auto byName = engine.buildDumpMessage (built.dumpName, values);
+        if (built.dumpName.isNotEmpty() && (! byName.ok || byName.hex != built.hex))
+        {
+            std::cerr << "[FAIL] buildDump: building by name did not match building by id\n";
+            ++failures;
+        }
+    }
+
+    // Determinism. The same values must produce the same bytes, or a re-send is a different message.
+    {
+        const auto again = engine.buildDumpMessage ("common", values);
+        if (again.hex != built.hex)
+        {
+            std::cerr << "[FAIL] buildDump: two builds of the same values differ\n";
+            ++failures;
+        }
+    }
+
+    return failures;
+}
+
 int runPatchDumpTests (const juce::File& file)
 {
     ceditor::device::DeviceProfileEngine engine;
@@ -1927,6 +2108,7 @@ int main()
     failures += runChecksumTableTests();
     failures += runNibbledEncoderTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runPatchDumpTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
+    failures += runDumpBuildTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runPresetRecallTests (root);
 
     if (failures == 0)

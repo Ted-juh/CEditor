@@ -50,6 +50,28 @@ struct CompileResult
     MidiTransaction transaction;
 };
 
+/**
+ * The result of building a dump message from current values — `ce.device.buildDump`'s encode side.
+ *
+ * The decode direction (parseDumpMessage) has existed for a long time; this is its inverse, and the
+ * asymmetry was user-visible: a script could read a patch out of a synth and had no way to assemble
+ * one to send back. `unmappedParameters` is reported rather than treated as an error, because a
+ * panel that binds forty of a dump's sixty parameters is the normal case, not a broken one — those
+ * bytes keep whatever `defaultByte` the definition gives them.
+ */
+struct DumpBuildResult
+{
+    bool ok = false;
+    juce::String error;
+    juce::String dumpId;
+    juce::String dumpName;
+    juce::Array<int> bytes;
+    juce::String hex;
+    juce::String checksumStatus = "none";
+    juce::StringArray unmappedParameters;   // in the definition, absent from the values given
+    juce::StringArray unknownParameters;    // values given that the definition does not carry
+};
+
 struct DeviceRequestResult
 {
     bool ok = false;
@@ -142,6 +164,21 @@ public:
     [[nodiscard]] juce::String getDefaultSyncDirection() const;
     [[nodiscard]] const juce::Array<ValidationMessage>& getValidationMessages() const { return validationMessages; }
     [[nodiscard]] bool hasErrors() const;
+
+    /**
+     * Assemble a dump message for `dumpId` from semantic parameter values.
+     *
+     * The exact inverse of parseDumpMessage, and deliberately built from the same pieces so the two
+     * cannot drift: `validateAndEncodeValue` is the same encoder a knob move uses,
+     * `parsePatternBytes` builds the same prefix/suffix the parser matches, and the checksum comes
+     * from the shared `ce::checksums` table the verifier reads. A dump this produces is required to
+     * parse back to the values it was given — asserted directly in DeviceProfileEngineTests, which
+     * is the only assertion here that really matters.
+     *
+     * `values` is keyed by parameter id, holding SEMANTIC values (what a script sees), not raw bytes.
+     */
+    [[nodiscard]] DumpBuildResult buildDumpMessage (const juce::String& dumpId,
+                                                    const juce::var& values) const;
 
     CompileResult compileSetParameter (const juce::String& deviceRole,
                                        const juce::String& parameterId,

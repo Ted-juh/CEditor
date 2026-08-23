@@ -89,10 +89,25 @@ The short list, kept at the top level on purpose. Both were previously a trailin
 "✅ FIXED" blockquote above, which is a good way to have a gap and not know it. Re-verified against
 the tree on 2026-08-23.
 
-- [ ] **`buildDump`** returns an empty var in the Player and null in preview. The panel→bytes codec
-  is not exposed to scripts, so a script can read a dump and not write one. The decode direction
-  exists; this is the encode direction, over the `DeviceProfileService` dump definitions the engine
-  already parses.
+- [x] ~~**`buildDump`** returns an empty var in the Player~~ — **done 2026-08-23** in the Player.
+  `DeviceProfileEngine::buildDumpMessage` is the inverse of `parseDumpMessage`, built from the same
+  pieces so the two cannot drift: `validateAndEncodeValue` is the encoder a knob move already uses,
+  `parsePatternBytes` builds the prefix the parser matches, and the checksum comes from the shared
+  `ce::checksums` table the verifier reads. The Player gathers values from the panel — every dump
+  mapping names a device parameter, and `panelParams` already knows which control drives which.
+
+  The assertion that matters is a ROUND TRIP, in `DeviceProfileEngineTests`: build a GAIA Patch
+  Common from semantic values, parse the bytes back with the existing decoder, require the values to
+  return. Asserting on bytes would only prove the builder agrees with itself.
+
+  Two things worth knowing. Parameters no control is bound to are **not** an error — they keep the
+  definition's default bytes and come back in `unmapped`, so a script can tell it is about to send a
+  patch that is mostly defaults. And a non-numeric value is **coerced, not refused**: JUCE's `var`
+  gives 0.0, which is in range, and that is the shared encoder every knob move goes through — pinned
+  by test rather than changed, since changing it would change the knob path too.
+
+  **Still open: the editor preview**, which returns null. The preview has no `DeviceProfileEngine`
+  in-process, so it needs the bridge round-trip the other device reads use.
 - [x] ~~**C++ / C# / Java preview interpreters cannot register `on()` callbacks**~~ — **done
   2026-08-23**, via a `setup` entry point rather than the top-level execution this line proposed.
   That proposal was wrong: a bare statement at file scope is illegal in all three languages, so

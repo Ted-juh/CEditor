@@ -831,6 +831,15 @@ private:
     }
    #endif
 
+    /** The `{ ok: false, error }` shape a script-facing callback returns when it cannot answer. */
+    static juce::var errorVar (const juce::String& message)
+    {
+        auto* out = new juce::DynamicObject();
+        out->setProperty ("ok", false);
+        out->setProperty ("error", message);
+        return juce::var (out);
+    }
+
     void setupScripting()
     {
         const auto json = ceditorPlayerPanelFile().loadFileAsString();
@@ -961,7 +970,51 @@ private:
         cb.applyDump  = [] (const juce::var&) {};
         cb.sendDump   = [] (const juce::String&) {};
        #endif
-        cb.buildDump  = [] (const juce::String&) { return juce::var(); };
+        // buildDump — the encode direction, and the counterpart to the requestDump/onDumpReceived
+        // pair above. It returned an empty var for a long time, which meant a script could read a
+        // patch out of an instrument and had no way to assemble one to send back.
+        //
+        // Values come from the panel itself. Every mapping in a dump definition names a device
+        // PARAMETER, and `panelParams` already knows which control drives which parameter (its
+        // `deviceParameterId`, derived at export), so the control's current value in `scriptValues`
+        // is the value that parameter should carry. Parameters no control is bound to are simply not
+        // supplied, and the engine leaves the definition's default bytes in place and says which
+        // they were — the ordinary case for a panel that covers part of a dump.
+        cb.buildDump = [this] (const juce::String& kind) -> juce::var
+        {
+            auto* engine = deviceService.engineForRole ({});
+            if (engine == nullptr)
+                return errorVar ("No device profile is loaded");
+
+            auto* values = new juce::DynamicObject();
+            for (const auto& desc : panelParams)
+            {
+                if (desc.deviceParameterId.isEmpty())
+                    continue;
+                const auto value = scriptValues.getValue (desc.path, {});
+                if (! value.isVoid())
+                    values->setProperty (desc.deviceParameterId, value);
+            }
+
+            const auto built = engine->buildDumpMessage (kind, juce::var (values));
+            if (! built.ok)
+                return errorVar (built.error);
+
+            // The shape a script gets back: the bytes to send, plus what was and was not covered.
+            // `unmapped` is the interesting field — it is how a script can tell it is about to send
+            // a patch with forty of sixty parameters left at their defaults.
+            auto* out = new juce::DynamicObject();
+            out->setProperty ("ok", true);
+            out->setProperty ("dumpId", built.dumpId);
+            out->setProperty ("hex", built.hex);
+            out->setProperty ("checksum", built.checksumStatus);
+            juce::Array<juce::var> byteVars;
+            for (const auto byte : built.bytes)
+                byteVars.add (byte);
+            out->setProperty ("bytes", byteVars);
+            out->setProperty ("unmapped", juce::var (built.unmappedParameters.joinIntoString (",")));
+            return juce::var (out);
+        };
         // ce.device reads. Window-CLOSED these are synchronous calls straight into
         // DeviceProfileService, so a script gets the complete answer on the first call — unlike
         // the editor, where the parameter table arrives over the async bridge (documented there).
