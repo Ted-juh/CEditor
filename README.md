@@ -15,7 +15,8 @@ into a map you navigate by musical intention rather than by parameter number.
 Panels carry behaviour written in any of seven languages, and export as a VST3, CLAP, LV2 or
 standalone application, so the hardware ends up in a DAW session behaving like a plugin.
 
-Windows only for now. See [docs/README.md](docs/README.md) for the full documentation index.
+Windows only for now, and unsigned — see [RELEASE-NOTES.md](RELEASE-NOTES.md) before installing.
+[docs/README.md](docs/README.md) is the full documentation index.
 
 ## Architecture
 

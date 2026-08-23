@@ -159,6 +159,61 @@ function Build-And-Stage-Native([string]$RepoRoot, [string]$StageDir, [string]$C
     }
 }
 
+function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string]$Configuration) {
+    # The prebuilt player templates -- what makes the installed app able to export with no compiler.
+    #
+    # A template player takes its identity AND its panel from the single .cepanel beside it
+    # (CE/src/Export/PanelIdentitySidecar.h), so exporting becomes: copy one of these, write the
+    # panel inside it. The ids it reports are byte-identical to the ones a per-panel relink would
+    # have produced, so a session saved against an older compiled export keeps finding its plugin.
+    #
+    # This is a SECOND build of the player, because the template flag changes how it identifies
+    # itself and the generic player staged above must stay as it is. It costs one more link; the
+    # payoff is that an install without Visual Studio can export at all, which it previously could
+    # not by design.
+    #
+    # ONE binary per format serves every panel, which is also what makes signing tractable: sign
+    # these three once here rather than every artefact a user ever exports.
+    $vcvars = Find-VcVars64
+    $buildDir = Join-Path $RepoRoot "build\package\template"
+    $templatesDir = Join-Path $StageDir "templates"
+
+    Reset-Directory $buildDir
+    Reset-Directory $templatesDir
+
+    Push-Location $RepoRoot
+    try {
+        $cmd = "`"$vcvars`" && cmake -S . -B `"$buildDir`" -G `"Ninja Multi-Config`" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_TEMPLATE_PLAYER=ON -DCE_VST_GENERIC_PLAYER=ON && cmake --build `"$buildDir`" --config $Configuration --target CEditorPlayerVST_VST3 CEditorPlayerVST_CLAP CEditorPlayerVST_LV2"
+        cmd /c $cmd
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Template player build failed ($Configuration)."
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    # Copy the artefacts out by extension rather than by name: JUCE names them from
+    # CE_VST_PRODUCT_NAME, and the exporter finds a template by extension anyway.
+    $artefacts = Join-Path $buildDir "CEditorPlayerVST_artefacts\$Configuration"
+    $found = 0
+    foreach ($ext in @("vst3", "clap", "lv2")) {
+        Get-ChildItem -Path $artefacts -Filter "*.$ext" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            Copy-Item $_.FullName -Destination (Join-Path $templatesDir $_.Name) -Recurse -Force
+            Write-Host "Staged template: $($_.Name)"
+            $found++
+        }
+    }
+
+    if ($found -eq 0) {
+        # Not fatal -- an installer with no templates is still a working panel designer, and says so
+        # when someone presses Export. But it is the difference between the two installs, so it is a
+        # warning rather than a silent omission.
+        Write-Warning "No player templates were produced; this installer will NOT be able to export without a source checkout."
+    }
+}
+
 function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     # Stage the export pipeline + toolchain provisioning SCRIPTS (never the provisioned binaries — those
     # are downloaded on demand). This makes Settings -> Scripting Toolchains work in the installed app and
@@ -254,6 +309,7 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
 Build-Frontend -RepoRoot $repoRoot
 Build-And-Stage-Native -RepoRoot $repoRoot -StageDir $stageDir -Configuration $Configuration
+Build-And-Stage-Templates -RepoRoot $repoRoot -StageDir $stageDir -Configuration $Configuration
 Stage-ExportPipeline -RepoRoot $repoRoot -StageDir $stageDir
 Stage-NodeRuntime -StageDir $stageDir
 Copy-OptionalPrerequisites -RepoRoot $repoRoot -StageDir $stageDir -WebView2InstallerPath $WebView2InstallerPath

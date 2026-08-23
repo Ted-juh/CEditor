@@ -63,6 +63,11 @@ Source: "{#MySourceDir}\web\dist\*"; DestDir: "{app}\web\dist"; Flags: ignorever
 ; demand, never bundled. Staged by tools/scripts/package-installer.ps1. skipifsourcedoesntexist keeps the
 ; editor-only installer valid if the pipeline wasn't staged.
 Source: "{#MySourceDir}\tools\*"; DestDir: "{app}\tools"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+; Prebuilt player templates (one per format). These are what let the installed app export a plugin
+; with no compiler: the exporter copies one and writes the panel inside it, and the plugin derives
+; its identity from that panel at load. Without them the app still designs panels and says so when
+; someone presses Export. skipifsourcedoesntexist so an editor-only installer stays valid.
+Source: "{#MySourceDir}\templates\*"; DestDir: "{app}\templates"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 Source: "{#MySourceDir}\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall ignoreversion skipifsourcedoesntexist
 Source: "{#MySourceDir}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall ignoreversion skipifsourcedoesntexist
 

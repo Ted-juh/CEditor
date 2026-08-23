@@ -28,6 +28,8 @@ API advertises vs what the C++ runtime backs) and [timer system](../CE/web/src/C
   three bets that would define the product.
 - [License decision](license-decision.md)
 - [Known issues](known-issues.md) — found, not fixed, not forgotten.
+- [Release notes](../RELEASE-NOTES.md) — what a beta tester is told before installing: Windows only,
+  unsigned, and what this build can and cannot do.
 - [Verify end-to-end](verify-end-to-end.md)
 - [Editor manual — snapshot of 2026-08-10](editor-manual-2026-08-10.md) — ⚠️ **not generated, not
   tested.** The user-facing manual for everything *before* scripting: components, bindings, export.

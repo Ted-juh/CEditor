@@ -130,3 +130,29 @@ section, and no UI changes.
 QA-08's third group and either rule a type out with `exportValues: []` or give it a declaration.
 Open `CE/qa/QA-08-export.cepanel` for the current list — it is computed from the model, so it will
 be right even when this paragraph is not.
+
+
+---
+
+## Two things the DPD Parameters screen wants and does not have
+
+Both shipped for a while as disabled "Coming soon" buttons in the Parameters toolbar. They were
+removed before the beta rather than left there: a permanently greyed button is a promise nobody is
+keeping, and in a toolbar with one working action it was two-thirds clutter. Recorded here so the
+intent is not lost with the buttons.
+
+**Import CSV.** Every editor ever written starts with a human copying a MIDI implementation chart
+out of a manual, and a chart is a table. Pasting or importing one and mapping its columns onto
+`{ id, name, valueType, address, range, encoding }` is the single biggest saving available on the
+authoring side, and `beta-differentiation.md` argues at length that profile acquisition — not any
+component — is the category's real bottleneck.
+
+**MIDI learn, for a parameter's address.** Wiggle a control on the synth and let the arriving
+message fill in the address, rather than transcribing `F0 41 10 ...` by hand.
+
+Worth being precise about what this is *not*, because the app already has something called MIDI
+learn and it is a different thing. `MidiLearnChips.svelte` is a drag source in the MIDI Monitor: it
+turns an inbound message into a chip you drop onto a control on a panel to *bind* it. That answers
+"which control should this CC drive". The DPD needs the other direction — "what address does this
+parameter live at" — which writes a profile definition, not a binding. Wiring the button to the
+existing chips would have looked like progress and connected two unrelated subsystems.
