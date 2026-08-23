@@ -13,6 +13,7 @@
   import DpdDiscoveryScreen from './dpd/DpdDiscoveryScreen.svelte';
   import DpdPresetsScreen from './dpd/DpdPresetsScreen.svelte';
   import DpdShareImpactScreen from './dpd/DpdShareImpactScreen.svelte';
+  import DpdCaptureScreen from './dpd/DpdCaptureScreen.svelte';
   import dpdLibrary from '../generated/dpd/dpdLibrary.json';
   import dpdProfileMap from '../generated/dpdProfileMap.json';
   import { resolveParams, resolveModel } from '../generated/dpd/resolve.mjs';
@@ -202,6 +203,7 @@
       { id: 'detect', icon: '◉', label: 'Detect devices' },
       { id: 'overview', icon: '◉', label: 'Overview' },
       { id: 'params', icon: '▦', label: 'Parameters', count: paramCount },
+      { id: 'capture', icon: '◎', label: 'Capture' },
       { id: 'dumps', icon: '⬓', label: 'Bulk dumps', count: dumpCount || undefined },
       { id: 'device', icon: '⚙', label: 'Device structure' },
       { id: 'messages', icon: '⬡', label: 'Message shapes', count: merged?.messageShapes?.length || undefined },
@@ -216,7 +218,7 @@
     ] },
   ]);
 
-  const realScreens = new Set(['detect', 'params', 'overview', 'device', 'messages', 'dumps', 'advanced', 'presets', 'share']);
+  const realScreens = new Set(['detect', 'params', 'overview', 'device', 'messages', 'dumps', 'advanced', 'presets', 'share', 'capture']);
 
   // Adopt a model discovered via MIDI-CI (or any source) into the editable working copy.
   // Deliberately NOT flagged as a new document: this replaces the contents of the
@@ -301,6 +303,9 @@
         </div>
         <div class={['screen', activeScreen === 'share' && 'active']}>
           <DpdShareImpactScreen {model} {merged} {profileId} />
+        </div>
+        <div class={['screen', activeScreen === 'capture' && 'active']}>
+          <DpdCaptureScreen {model} {profileId} />
         </div>
 
       {/if}
