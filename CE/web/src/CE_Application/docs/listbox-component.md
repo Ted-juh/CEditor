@@ -1,8 +1,12 @@
 # Listbox — Component Integration Spec
 
-> Status: **spec / ready to build (single-select MVP).** A new `controlType`:
-> an always-visible, scrollable list of choices. Part of the
-> [panel parts backlog](./README.md); see [component-gaps.md](./component-gaps.md).
+> Status: **shipped 🟢** — single-select, cascading selectors AND the multi-select variant, all of
+> which this document's own body marks 🟢 further down. `Listbox` is a component type,
+> `ListboxRenderer.svelte` draws it, `ListboxEditor.svelte` edits it, and it is on QA-01.
+>
+> It said "spec / ready to build" until 2026-08-23, while three sections below it said shipped. Kept
+> as the design record — the value-model reasoning and the multi-select port decision are still the
+> only written account of why it works this way — but read it as history, not as a plan.
 
 ## Decision
 
@@ -19,7 +23,8 @@ Implement **Listbox as a new `controlType`** (not a Combobox variant), and
 
 **Scope this MVP to single-select.** Multi-select is a later variant — it needs a
 different port (`selectedChoices`) and an export strategy (bitmap/custom), so
-keep it out of v1 (see "Later: multi-select").
+keep it out of v1 (see "Later: multi-select"). *That was the plan, and the later variant has since
+shipped too — see "Multi-select variant" below.*
 
 Effort: more than the Knob (which reused everything) — **~1 new file + ~7 edits.**
 
