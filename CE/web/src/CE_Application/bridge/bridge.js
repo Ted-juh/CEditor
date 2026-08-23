@@ -841,6 +841,43 @@ export function onPanelOpened(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+// --- Panel packages (.cepanelpkg) ---
+// A shareable panel with its images embedded. Both of these are dialogs and nothing more: the
+// package text goes out as the payload, and an opened package comes back as a path that the web
+// side reads through requestFileData.
+
+/** Request a "Share Panel As" dialog. C++ emits 'panelPackageSaved' with { filePath, name, ok }. */
+export function savePanelPackageAs(suggestedName, data) {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — savePanelPackageAs ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('savePanelPackageAs', { suggestedName, data });
+}
+
+/** Request an "Open Shared Panel" dialog. C++ emits 'panelPackageOpened' with { filePath, name }. */
+export function openPanelPackage() {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — openPanelPackage ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('openPanelPackage', {});
+}
+
+/** Listen for 'panelPackageSaved'. Callback receives { filePath, name, ok }. */
+export function onPanelPackageSaved(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('panelPackageSaved', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Listen for 'panelPackageOpened'. Callback receives { filePath, name, byteSize }. */
+export function onPanelPackageOpened(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('panelPackageOpened', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Listen for 'openPanelPaths' events (session restore). Callback receives string[]. */
 export function onOpenPanelPaths(callback) {
   if (!isJuceAvailable()) return () => {};

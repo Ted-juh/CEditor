@@ -161,25 +161,44 @@ existing chips would have looked like progress and connected two unrelated subsy
 
 ---
 
-## Panel packaging exists but is not in the UI
+## ~~Panel packaging exists but is not in the UI~~ — CLOSED
 
-*(Was: "no panel package format" — the format is built, the button is not.)*
+*(Was "no panel package format", then "the format is built, the button is not". Both halves now
+exist: File → Share Panel... and File → Open Shared Panel....)*
 
 A bare `.cepanel` holds ABSOLUTE PATHS to its images, so sending one to somebody else sends a panel
 with no pictures. It looks perfect on the author's disk, which is exactly why it survived: the
 failure only exists on the second computer, and the author is the one person who never sees it.
 
-`utils/panelPackage.js` closes the format half — a `ceditor-panel` envelope embedding every asset,
-content-addressed so one image used forty times is stored once, deliberately the same envelope shape
-as the custom-component package so version refusal and a reader's expectations are already
-established. Thirteen tests, the central one a round trip: package a panel, open it where the
-original paths do not exist, get working references back.
+Three layers, kept apart on purpose:
 
-**What is left is the UI.** Nothing calls it — there is no File → Share Panel, and the bridge needs
-`readAsset`/`writeAsset` implementations for the editor (both are injected, which is what made the
-format testable off Windows in the first place). Until that exists, the capability is real and
-unreachable.
+| | | |
+| --- | --- | --- |
+| `utils/panelPackage.js` | the format | no filesystem, no bridge — testable anywhere |
+| `stores/panelSharing.js` | the assets | supplies `readAsset`/`writeAsset` out of `fileCache` |
+| `stores/panelSharingActions.js` | the commands | dialogs, file IO, landing the result in a tab |
+
+A `ceditor-panel` envelope embeds every asset, content-addressed so one image used forty times is
+stored once, deliberately the same envelope shape as the custom-component package so version
+refusal and a reader's expectations are already established.
+
+**The editor half needed almost no new code**, which is worth recording because the estimate was
+much larger. Reading is `fileCache`, which already exists to show local images in the WebView: it
+asks the bridge for a path and hands back a data URL, exactly the bytes the packager wants. Writing
+turned out not to be needed at all — `CanvasControl.svelte:1789` accepts a `data:` URL wherever it
+accepts a path, so an opened package puts the embedded bytes straight back into `imageSrc` and
+`bgImage`. No temp files, no cleanup, and an opened panel is self-contained rather than pointing at
+a folder the next person also needs. The only native support the format required is two file
+dialogs (`savePanelPackageAs`, `openPanelPackage`).
 
 Three places a panel points outside itself, listed because a fourth would be a package that works
 until it doesn't: `panel.bgImage`, each control's `Background.Fill.imageSrc`, and `Text.path`. They
 live in one collector for that reason.
+
+Two things are stripped on the way out, and both are the kind of leak nobody notices until it is
+in somebody else's hands: `filePath`, which is the author's name and folder layout, and
+`deviceSession`, which names MIDI hardware the recipient does not have.
+
+**Not yet driven on Windows.** Thirty-two tests cover the format, the asset binding and the
+commands, but no package has been through a real FileChooser. Sharing is the one feature in this
+build whose end-to-end path has only been exercised in Node.

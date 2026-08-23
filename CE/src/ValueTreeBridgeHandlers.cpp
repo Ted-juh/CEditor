@@ -579,6 +579,91 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                                + " emitCall=" + juce::String (juce::Time::getMillisecondCounterHiRes() - emitStartMs, 1) + "ms");
             });
         })
+        // --- Panel packages (.cepanelpkg) ------------------------------------------------------
+        // A .cepanel references its images by absolute path, so sending one to another person
+        // sends a panel with no pictures. utils/panelPackage.js embeds them instead; these two
+        // listeners are the only native support that format needs — a save dialog and an open
+        // dialog. Reading is deliberately not here: the chooser emits a path and the web side
+        // reads it back through requestFileData, which already base64-encodes for the reason
+        // documented on that listener, and a package full of embedded images is exactly the
+        // payload that makes the difference.
+        .withEventListener ("savePanelPackageAs", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                auto suggestedName = payloadObj->getProperty ("suggestedName").toString();
+                auto jsonData = payloadObj->getProperty ("data").toString();
+
+                auto startIn = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+                if (suggestedName.isNotEmpty())
+                    startIn = startIn.getChildFile (suggestedName);
+
+                fileChooser = std::make_unique<juce::FileChooser> (
+                    "Share Panel As",
+                    startIn,
+                    "*.cepanelpkg");
+
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                    [this, jsonData] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+
+                        if (result == juce::File())
+                            return;
+
+                        auto file = result.withFileExtension ("cepanelpkg");
+
+                        auto* obj = new juce::DynamicObject();
+                        obj->setProperty ("filePath", file.getFullPathName());
+                        obj->setProperty ("name", file.getFileNameWithoutExtension());
+                        // replaceWithText's return value is reported rather than dropped: a
+                        // package is the thing you are about to send somebody, so "saved" has to
+                        // mean it. A full disk or a read-only folder should say so here, not when
+                        // the recipient opens nothing.
+                        obj->setProperty ("ok", file.replaceWithText (jsonData));
+
+                        browser->emitEventIfBrowserIsVisible ("panelPackageSaved", juce::var (obj));
+                    });
+            });
+        })
+        .withEventListener ("openPanelPackage", [this] (const juce::var&)
+        {
+            juce::MessageManager::callAsync ([this]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                fileChooser = std::make_unique<juce::FileChooser> (
+                    "Open Shared Panel",
+                    juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                    "*.cepanelpkg");
+
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                    [this] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+
+                        if (result == juce::File() || ! result.existsAsFile())
+                            return;
+
+                        auto* obj = new juce::DynamicObject();
+                        obj->setProperty ("filePath", result.getFullPathName());
+                        obj->setProperty ("name", result.getFileNameWithoutExtension());
+                        obj->setProperty ("byteSize", (juce::int64) result.getSize());
+
+                        browser->emitEventIfBrowserIsVisible ("panelPackageOpened", juce::var (obj));
+                    });
+            });
+        })
         .withEventListener ("revealFile", [] (const juce::var& payload)
         {
             // "Show me where this actually is" — the tab strip's context menu (review finding D8).
@@ -792,7 +877,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 else if (ext == ".woff") mimeType = "font/woff";
                 else if (ext == ".woff2") mimeType = "font/woff2";
                 else if (ext == ".svg") mimeType = "image/svg+xml";
-                else if (ext == ".json" || ext == ".cepanel") mimeType = "application/json";
+                else if (ext == ".json" || ext == ".cepanel" || ext == ".cepanelpkg") mimeType = "application/json";
 
                 auto* obj = new juce::DynamicObject();
                 obj->setProperty ("requestId", requestId);

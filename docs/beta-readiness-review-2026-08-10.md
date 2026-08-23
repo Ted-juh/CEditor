@@ -310,9 +310,11 @@ Everything above is small. These are not, and they are what a beta decision actu
    header. That is unchanged.
 5. **No way in, no way out.** New Panel is a blank canvas across four designers; no templates, no
    example panels, no first run. The Auto-Panel generator (DPD → a bound working panel) is still
-   unbuilt and would *be* the onboarding for the core use case. Outward: no panel package format
-   (custom components have one; panels do not), no Ctrlr `.panel`/`.bpanelz` importer, no update
-   channel.
+   unbuilt and would *be* the onboarding for the core use case. Outward: ~~no panel package format
+   (custom components have one; panels do not)~~ *(fixed — File → Share Panel... writes a
+   `.cepanelpkg` with every image embedded, File → Open Shared Panel... reads one back; the
+   author's file path and bound MIDI ports are stripped on the way out)*, no Ctrlr
+   `.panel`/`.bpanelz` importer, no update channel.
 6. **Export polish**: pipeline **D1** (GUID registry / "update vs new copy") unbuilt, so two panels
    can collide FUIDs; **E1–E5** unbuilt, so there is no build log surface, export history or
    "Reveal in folder"; ~~every parameter maps to `AudioParameterFloat`~~ *(fixed)* — the editor now emits a

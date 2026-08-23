@@ -32,6 +32,7 @@
   } from '../stores/panelVisibility.js';
   import { GLOBAL_SHORTCUTS } from '../utils/globalShortcuts.js';
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
+  import { openSharedPanelFromFile, sharePanelToFile } from '../stores/panelSharingActions.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
 
   // Menu state predicates, evaluated when a dropdown opens. A menu item that
@@ -152,6 +153,13 @@
         if (tab?.type === 'script') saveActiveScriptWorkspaceAs();
         else saveActivePanelAs();
       } },
+      { type: 'separator' },
+      // Sharing is a separate command from Save, and has to be: a .cepanel points at its images
+      // by absolute path, so the file that is correct to keep is the file that arrives blank on
+      // somebody else's computer. A package embeds them. Naming both "Save" would hide exactly
+      // the distinction the user has to make.
+      { label: 'Share Panel...', enabled: hasPanel, action: () => sharePanelToFile() },
+      { label: 'Open Shared Panel...', action: () => openSharedPanelFromFile() },
       { type: 'separator' },
       { label: 'Close Tab', shortcut: 'Ctrl+W', action: () => closeActiveEditorTab() },
       { label: 'Settings...', shortcut: 'Ctrl+,', action: () => openSettingsTab() },
