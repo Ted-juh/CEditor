@@ -1,5 +1,55 @@
 # Custom Component Designer Workspace — Honest Review
 
+> ## CLOSED, 2026-08-23
+>
+> Everything in this document is either done, verified already-done, or recorded below as
+> deliberately not done with the reason. Pinned by `CE/web/test/surfaceDecomposition.test.js`.
+>
+> **§1 regressions** — restored on `main` before this round (see the 2026-07-12 banner below).
+>
+> **§2 bugs** — all five closed. 2.1 swatches now reveal the DisplayPanel dock *and* request its
+> tab, which the `displayTabRequest` store already existed for. 2.2 the dock's X/Y translate the
+> whole multi-selection; W/H are disabled for a group with a title saying why, because "make these
+> three 200 wide" has at least three meanings. 2.3 the layer-action, precision and arc strips —
+> 270 lines built and then `display:none`d — are deleted. 2.4 the dead Assets tab is gone; the
+> "Make transparent" toggle beside it is **not** zombie UI and was left alone. 2.5 verified rather
+> than changed: `history.js` has per-context stacks and picks the component context in surface mode.
+>
+> **§3 region gaps** — the substantive ones are closed: the collapsed palette is an icon strip
+> rather than an empty rail; the DisplayPanel dock resizes and remembers; the destructive "Blank"
+> command moved out of the insert cluster, wears the danger colour and asks first; the layer list
+> filters and renames inline. The read-only inspector mini-lists are already gone. The Look bar's
+> fill/stroke/corner *triplication* remains — collapsing three quick-property homes into one is a
+> design decision with no obviously right answer, and is left for whoever makes it.
+>
+> **§4 Tier 0** — restored. **Tier 1** — complete: marquee selection and a right-click context menu
+> are new here; multi-select property editing fans styling out over the selection; wheel zoom and
+> cross-component copy/paste had already shipped.
+>
+> **Tier 2** — layer search, inline rename, the palette icon strip and the resizable dock are done.
+> Scrubbable numeric fields, per-field reset and aspect-lock were already done (NumberCell
+> drag-scrubs its label, `defaultValue` feeds that scrub, Shift constrains a resize). Drag-from-
+> palette and the px/% unit toggle are not done. **Hit-zone rotation is not done and should not be
+> attempted as a UI job**: zones have no rotation in the model, so it needs the field, the renderer
+> and the runtime hit test together, and a zone that draws rotated while testing unrotated is worse
+> than one that does neither.
+>
+> **Tier 3 stays Tier 3.** Containers, image fill on shapes, colour tokens and constraints are
+> capability features spanning the model, the renderer, the runtime and the exporter — which is
+> what this document's own heading for them says. Two notes for whoever picks them up: shared
+> swatches already exist (`stores/palettes.js`, a persisted named palette library), so what is
+> missing from "colour tokens" is the *reference* — a part storing a token name rather than a
+> literal. And `SECTION_DEFAULTS.Background.Fill` already declares `imageEnabled`/`imageSrc`, but
+> `InteractivePartRenderer` never reads them, so image fill is renderer work rather than a model
+> change.
+>
+> **§5 decomposition** — see the note in that section. Eight components; 8,325 lines to ~5,500.
+> The canvas viewport is the one region deliberately left whole, with the measurement that says why.
+>
+> **Theming** — one `--surface-accent` token, 45 chrome colours through it. Document colours were
+> left alone: `FF5B9BD5` is also the fill a new layer is created with, and recolouring that would
+> change what users' components look like.
+
 > Companion to `cc-properties-panel-review.md` / `…-restructure-stages.md`, covering the other
 > half of the editor: the workspace itself — canvas, left Shapes palette, the Look bar above,
 > the function+zoom bar / States strip / DisplayPanel dock below, and the right dock.
@@ -178,8 +228,16 @@ constraints/anchors (plan §12.6).
 > properties-panel round spent two commits removing. A rule anchored on `.surface-shell` also has
 > to stay in the parent: the child does not own that element.
 >
-> **Still open here:** the inspector tabs and the canvas viewport (171 symbols, the most entangled
-> region, and the one that owns the pointer handlers), and the theming pass below.
+> **The inspector came out too**, as `SurfaceDockInspector` — 442 lines of markup and 256 of CSS,
+> at 57 props. Eight components now, and the parent is ~5,500 lines from 8,325.
+>
+> **The canvas viewport stays whole, and here is the measurement.** It needs **116 props**, and
+> **68 pieces of parent state that its own handlers mutate** — the interaction record, the active
+> frame, the draw draft, the smart guides, the arp editing state. Extracting it means 68 bindable
+> props or 68 setters on top of the 116, or moving the handlers with it — and the handlers are
+> called from the keyboard shortcuts and the dock as well as the canvas. That is not a smaller
+> file, it is the same coupling with a boundary drawn through the middle of it. Left whole
+> deliberately; the ratchet in the test keeps the rest from growing back into it.
 
 
 Decompose `CustomDesignSurfaceEditor.svelte` **as part of the restoration**, not after: extract
