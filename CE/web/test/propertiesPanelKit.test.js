@@ -334,7 +334,11 @@ test('the design surface dock has its own tokens, not the panel’s literals', (
   for (const token of ['--dk-field-height', '--dk-field-bg', '--dk-field-border', '--dk-field-font']) {
     assert.match(s, new RegExp(`${token}:`), `${token} must be declared on .surface-shell`);
   }
-  assert.match(s, /var\(--dk-field-height/, 'and consumed by the dock fields');
+  // Declared on the shell, consumed wherever the dock fields ended up. They are in the extracted
+  // SurfaceDockInspector now, and a token crossing that component boundary is exactly what a
+  // literal could not have done.
+  const consumers = [s, read('sections/SurfaceDockInspector.svelte'), read('sections/SurfaceDockLayers.svelte')];
+  assert.ok(consumers.some((f) => /var\(--dk-field-height/.test(f)), 'the token must be consumed somewhere');
   // It renders in EditorCanvas, not in the properties panel, so --pp-field-* never reaches it.
   // If that ever changes, the comment explaining the separate palette needs revisiting.
   assert.match(read('editor/EditorCanvas.svelte'), /<CustomDesignSurfaceEditor\b/);

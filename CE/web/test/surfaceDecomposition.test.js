@@ -29,8 +29,10 @@ const EXTRACTED = [
   'SurfacePalette',     // the Shapes palette down the left
   'SurfaceBottomBar',   // snapping/view options and the zoom cluster
   'SurfaceToolStrip',   // the floating tool strip over the canvas
-  'SurfaceDockLayers',  // the dock's Layers tab
-  'SurfaceHelpOverlay', // the ? cheatsheet, extracted before this round
+  'SurfaceDockLayers',    // the dock's Layers tab
+  'SurfaceDockInspector', // the dock's Object / Display / Behavior / States tabs
+  'SurfaceContextMenu',   // the right-click menu
+  'SurfaceHelpOverlay',   // the ? cheatsheet, extracted before this round
 ];
 
 test('the surface is assembled from components, not written as one file', () => {
@@ -43,10 +45,11 @@ test('the surface is assembled from components, not written as one file', () => 
 
 test('the surface editor stays under the size that caused the regressions', () => {
   const lines = read('sections/CustomDesignSurfaceEditor.svelte').split('\n').length;
-  // It was 8,325 when the decomposition started and ~6,300 after. The ceiling is set above the
-  // current size, not at it: this is a ratchet against growing back, not a style rule to satisfy
-  // by moving code somewhere worse. Extract another region before raising it.
-  assert.ok(lines < 6800, `CustomDesignSurfaceEditor is ${lines} lines; extract a region rather than raising this`);
+  // 8,325 when the decomposition started; ~5,500 now, across eight components. The ceiling sits
+  // above the current size, not at it: this is a ratchet against growing back, not a style rule to
+  // satisfy by moving code somewhere worse. Extract another region before raising it — the canvas
+  // viewport is the one still in here, and it is the most entangled of them.
+  assert.ok(lines < 5800, `CustomDesignSurfaceEditor is ${lines} lines; extract a region rather than raising this`);
 });
 
 test('every extracted component brought its own styles', () => {
@@ -240,7 +243,8 @@ test('styling fans out over a multi-selection, geometry does not', () => {
   // "Make these three 200 wide" has several, so it is refused rather than guessed.
   const size = s.slice(s.indexOf('function setSelectionFrameSize'));
   assert.match(size.slice(0, size.indexOf('\n  }')), /if \(multiSelectionActive\) return;/);
-  assert.match(s, /disabled=\{multiSelectionActive \|\|/, 'and the field says so');
+  // The field that has to say so lives in the extracted inspector now.
+  assert.match(read('sections/SurfaceDockInspector.svelte'), /disabled=\{multiSelectionActive \|\|/);
 
   // Position does have one meaning: translate the group by the delta.
   const pos = s.slice(s.indexOf('function setSelectionFramePosition'));
