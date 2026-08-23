@@ -283,9 +283,10 @@ Everything above is small. These are not, and they are what a beta decision actu
    because "this one needs a person" was the reason it stayed open for four days. What remains is
    a **re-test of 009 and 010**, whose root cause was fixed in `4f02a12` and which nobody has
    confirmed against a build containing the fix. That is confirmation of a fix, not an open defect.
-3. **Which install do beta testers get?** A GUI install cannot export, by design. That is a fine
-   answer if the beta is "design panels, report bugs" and a fatal one if it is "ship a plugin."
-   Decide, then say so in the release notes.
+3. ~~**Which install do beta testers get?** A GUI install cannot export, by design.~~ *(decided —
+   there is no cut-down beta build: the installer is the whole program and it exports, because the
+   template exporter ships prebuilt player templates and needs no Visual Studio, CMake or source
+   checkout. The release notes say so under "One install, and it can export".)*
 4. **The QA sheet suite is 8 of 8.** *(closed)* QA-03 (15 stateful types × 7 states), QA-04
    (7 languages × 37 events), QA-05 (23 verb families / 426 verbs beside the components they
    drive), QA-07 (all 14 custom-component starters, built through the designer's own patch and
