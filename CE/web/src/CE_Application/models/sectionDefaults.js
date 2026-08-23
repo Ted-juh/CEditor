@@ -1894,6 +1894,128 @@ export const SECTION_DEFAULTS = {
     _children: {},
   },
 
+  /**
+   * Keyboard — a piano keyboard that sends notes on click or touch.
+   *
+   * The key geometry is `splitZoneLayout.js`'s, unchanged: the Zone Splitter's keyboard strip
+   * already knew where every white and black key goes, and a second implementation would put two
+   * keyboards on one panel that disagree about where middle C is. What is here is what a splitter
+   * never needed — latch, scale lock, and the octave/transpose a player reaches for.
+   */
+  Keyboard: {
+    _type: 'Keyboard',
+    lowNote: 48,                  // C3
+    highNote: 72,                 // C5
+    channel: 1,
+    velocity: 100,
+    octave: 0,                    // whole octaves added to every note sent
+    transpose: 0,                 // semitones, on top of the octave
+    // Latch is what makes a keyboard playable with ONE pointer: without it a chord is impossible,
+    // and a chord is most of the point of having a keyboard rather than a note ribbon.
+    latch: false,
+    // How a note outside the panel's key is treated. `off` plays it; `quantize` moves it to the
+    // nearest in-key note; `refuse` sends nothing. Out-of-key keys are shaded either way, so the
+    // player can see the rule before they meet it.
+    scaleLock: 'off',             // off | quantize | refuse
+    followPanelKey: false,
+    key: 0,
+    scale: 'major',
+    showLabels: true,             // C3, C4… on the C keys
+    padding: 6,
+    // Colours.
+    whiteColour: 'FFE8E8E8',
+    blackColour: 'FF1A1A1A',
+    heldColour: 'FF5B9BD5',
+    outOfKeyColour: 'FF9A9A9A',
+    labelColour: 'FF555555',
+  },
+
+  /**
+   * StepSequencer — steps across, tracks down, a playhead walking left to right.
+   *
+   * SEPARATE from the Drum Pads and the Mod Matrix on purpose. All three are steps × tracks grids
+   * and they answer three different questions: pads trigger, a matrix routes, and a sequencer
+   * PLAYS — it owns a position in time, and nothing else here does.
+   *
+   * The clock is WALL-CLOCK. A sequence at 120 BPM runs at 120 BPM on its own and drifts against a
+   * DAW's transport; tempo-sync needs MIDI clock in, which does not exist yet. Said here rather
+   * than discovered later.
+   */
+  StepSequencer: {
+    _type: 'StepSequencer',
+    steps: 16,
+    bpm: 120,
+    division: '1/16',             // 1/4 | 1/8 | 1/8T | 1/16 | 1/16T | 1/32
+    direction: 'forward',         // forward | reverse | pingpong | random
+    gate: 60,                     // % of a step the note is held; capped under 100 so repeats retrigger
+    running: false,
+    position: 0,
+    channel: 10,
+    beatEvery: 4,                 // heavier grid line every N steps — 16 identical boxes are unreadable
+    trackHeaderWidth: 64,
+    padding: 6,
+    tracks: [
+      { id: 't0', label: 'Kick', note: 36, channel: 10, colour: 'FF5B9BD5', muted: false },
+      { id: 't1', label: 'Snare', note: 38, channel: 10, colour: 'FFF2C94C', muted: false },
+      { id: 't2', label: 'Hat', note: 42, channel: 10, colour: 'FF39D98A', muted: false },
+    ],
+    // Sparse: a cell is `{ on, velocity }` keyed "trackId:step", and an absent one is off. A dense
+    // 64 × 16 grid would put a thousand `false`s in every panel file that carried a sequencer.
+    pattern: {},
+    // Colours.
+    cellColour: 'FF1E1E24',
+    cellOnColour: 'FF5B9BD5',
+    playheadColour: '885B9BD5',
+    gridColour: 'FF2E2E36',
+    labelColour: 'FFB9B9B9',
+  },
+
+  /**
+   * TabContainer — a container with pages and a strip to switch between them.
+   *
+   * `pageIndex` is a BINDABLE PORT, which is the reason this is a component rather than a Group
+   * with some visibility toggles: a footswitch changing the page is a real performance gesture and
+   * it needs somewhere to send its value.
+   */
+  TabContainer: {
+    _type: 'TabContainer',
+    pageIndex: 0,
+    edge: 'top',                  // top | bottom | left | right
+    stripSize: 26,
+    showStrip: true,
+    pages: [
+      { id: 'p0', label: 'Page 1' },
+      { id: 'p1', label: 'Page 2' },
+    ],
+    // Colours.
+    stripColour: 'FF1B1B20',
+    tabColour: 'FF26262E',
+    activeTabColour: 'FF3A5A80',
+    labelColour: 'FFB9B9B9',
+    activeLabelColour: 'FFFFFFFF',
+  },
+
+  /**
+   * ScrollArea — a clipping container with a scrollbar for oversized content.
+   *
+   * The scroll extent is measured from the CHILDREN, never set by the author. An author-set extent
+   * goes stale the moment a control moves, and then the scrollbar either stops short of a control
+   * that is really there or scrolls past the end into nothing — both of which look like the scroll
+   * area is broken rather than like the number is.
+   */
+  ScrollArea: {
+    _type: 'ScrollArea',
+    direction: 'vertical',        // vertical | horizontal | both
+    scrollMode: 'line',           // line (a notch is a stated distance) | smooth (raw delta)
+    lineHeight: 24,
+    scrollbarSize: 10,
+    scrollX: 0,
+    scrollY: 0,
+    // Colours.
+    trackColour: 'FF1A1A1A',
+    thumbColour: 'FF454550',
+  },
+
   /** Bindings — value-driven mappings into root or part properties. */
   Bindings: {
     _type: 'Bindings',

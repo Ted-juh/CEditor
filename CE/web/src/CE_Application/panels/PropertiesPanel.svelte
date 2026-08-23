@@ -44,6 +44,7 @@
   import Grid2x2Check from 'lucide-svelte/icons/grid-2x2-check';
   import Disc3 from 'lucide-svelte/icons/disc-3';
   import Layers from 'lucide-svelte/icons/layers';
+  import ScrollText from 'lucide-svelte/icons/scroll-text';
   import ListOrdered from 'lucide-svelte/icons/list-ordered';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
@@ -188,6 +189,10 @@
     { id: 'pixel',      icon: Grid3x3,       label: 'Pixels',     section: 'Pixel' },
     { id: 'listbox',    icon: Rows3,         label: 'Listbox',    section: 'Listbox' },
     { id: 'meter',      icon: Gauge,         label: 'Meter',      section: 'Meter' },
+    { id: 'keyboard',   icon: Piano,         label: 'Keyboard',   section: 'Keyboard' },
+    { id: 'stepsequencer', icon: Grid3x3,    label: 'Sequencer',  section: 'StepSequencer' },
+    { id: 'tabcontainer', icon: Layers,      label: 'Pages',      section: 'TabContainer' },
+    { id: 'scrollarea', icon: ScrollText,    label: 'Scroll',     section: 'ScrollArea' },
     { id: 'envelope',   icon: Spline,        label: 'Envelope',   section: 'Envelope' },
     { id: 'matrix',     icon: Grid2x2,       label: 'Matrix',     section: 'Matrix' },
     { id: 'joystick',   icon: Crosshair,     label: 'Joystick',   section: 'Joystick' },

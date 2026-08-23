@@ -1,0 +1,380 @@
+// remainingComponents.test.js — the last four components, and the three that turned out to be presets.
+//
+// The backlog's "remaining components" row listed nine. Three of them were already built as
+// something else and only needed surfacing, two were the substantial work it said they were, and
+// two more were containers. What this pins is mostly the decisions:
+//
+//   * a progress bar, a pitch wheel and a rectangle are PRESETS of components that already exist,
+//     not new controlTypes — minting a type for each would have duplicated a working engine;
+//   * the keyboard reuses the Zone Splitter's key geometry rather than growing its own, because two
+//     keyboards on one panel must not disagree about where middle C is;
+//   * a scroll area measures its own extent from its children, because an author-set one goes stale.
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { INSERT_CATEGORIES } from '../src/CE_Application/models/insertCatalog.js';
+import { COMPONENT_TYPES } from '../src/CE_Application/models/componentTypes.js';
+import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
+import { getComponentPorts } from '../src/CE_Application/models/componentPorts.js';
+import { deriveExportParameters } from '../src/CE_Application/utils/exportParameters.js';
+import {
+  keyboardGlide, keyboardHold, keyboardKeys, keyboardNoteAt, keyboardPress, keyboardRange,
+} from '../src/CE_Application/utils/keyboardLayout.js';
+import {
+  STEP_DIRECTION, advanceStep, beatLines, cellAtPoint, gateMs, sequencerGeometry, stepMs,
+  stepNotes, toggleCell,
+} from '../src/CE_Application/utils/stepSequencerLayout.js';
+import {
+  activePageIndex, childPageId, isChildOnActivePage, tabAtPoint, tabGeometry, tabPages, tabRect,
+} from '../src/CE_Application/utils/tabContainerLayout.js';
+import {
+  clampScroll, contentExtent, isChildVisible, maxScroll, scrollByWheel, thumbRect,
+} from '../src/CE_Application/utils/scrollAreaLayout.js';
+
+const allItems = INSERT_CATEGORIES.flatMap((category) => category.items);
+const itemById = (id) => allItems.find((item) => item.id === id);
+
+function control(type, section, patch = {}) {
+  return {
+    _children: {
+      Core: { id: 'c1', name: type, controlType: type },
+      [section]: { ...JSON.parse(JSON.stringify(SECTION_DEFAULTS[section])), ...patch },
+    },
+  };
+}
+
+// --- the three that were presets ------------------------------------------------------------------
+
+test('a progress bar is a Meter, not a second Meter', () => {
+  // The design note offered the choice — "its own entry if wanted, else a Meter preset" — and a new
+  // controlType would have been a worse copy of a working engine.
+  const item = itemById('Meter:progress');
+  assert.ok(item, 'no Progress Bar in the catalog');
+  assert.equal(item.type, 'Meter');
+  assert.equal(item.overrides.Meter.peakHold, false, 'a progress bar has no peak to hold');
+  assert.equal(item.overrides.Meter.zones.length, 1, 'and no threshold zones — it is not a level');
+  assert.equal(COMPONENT_TYPES.ProgressBar, undefined);
+});
+
+test('the two wheels differ only in whether they spring back', () => {
+  // Which is exactly why they are two presets of one Ribbon rather than two components.
+  const pitch = itemById('Ribbon:pitch');
+  const mod = itemById('Ribbon:mod');
+  assert.equal(pitch.type, 'Ribbon');
+  assert.equal(mod.type, 'Ribbon');
+  assert.equal(pitch.overrides.Ribbon.returnMode, 'center');
+  assert.equal(pitch.overrides.Ribbon.bipolar, true);
+  assert.equal(mod.overrides.Ribbon.returnMode, 'none');
+  assert.equal(mod.overrides.Ribbon.bipolar, false);
+  assert.equal(pitch.overrides.Ribbon.style, mod.overrides.Ribbon.style, 'both are wheels');
+});
+
+test('the shape primitives are Backgrounds', () => {
+  for (const id of ['Background:rect', 'Background:circle', 'Background:divider']) {
+    const item = itemById(id);
+    assert.ok(item, id);
+    assert.equal(item.type, 'Background', id);
+  }
+  // A circle is a square with a radius large enough to round it. Stretch it and you get a stadium,
+  // which is a shape somebody may well want — hence the square default rather than a special case.
+  const circle = itemById('Background:circle');
+  assert.equal(circle.overrides.Transform.width, circle.overrides.Transform.height);
+  assert.ok(circle.overrides.Background._children.Corners.radius >= circle.overrides.Transform.width / 2);
+});
+
+test('every catalog item names a real type, and presets are distinguishable from plain ones', () => {
+  for (const item of allItems) {
+    assert.ok(item.type, JSON.stringify(item));
+    assert.ok(item.label, item.type);
+  }
+  const keys = allItems.map((item) => String(item.id ?? item.type));
+  assert.equal(new Set(keys).size, keys.length, 'two catalog entries share a key');
+});
+
+// --- the keyboard -----------------------------------------------------------------------------------
+
+test('the keyboard reuses the splitter key geometry rather than growing its own', () => {
+  // Two keyboards on one panel that disagree about where middle C is would be a genuinely
+  // maddening bug, and a second implementation is the only way to get one.
+  const keyboard = control('Keyboard', 'Keyboard');
+  const keys = keyboardKeys(keyboard, 320, 90);
+  assert.equal(keys.length, 25, 'C3 to C5 inclusive');
+  assert.ok(keys.every((key) => key.rect.w > 0 && key.rect.h > 0));
+
+  // Blacks draw last, because they overlap the whites and painter's order is what decides which
+  // one you can see.
+  const firstBlack = keys.findIndex((key) => key.black);
+  const lastWhite = keys.map((key) => key.black).lastIndexOf(false);
+  assert.ok(firstBlack > lastWhite, 'blacks must come after whites');
+});
+
+test('a reversed note range is a typo, not an instruction', () => {
+  // Rendering it produces a keyboard of negative width that swallows the rest of the panel.
+  const keyboard = control('Keyboard', 'Keyboard', { lowNote: 72, highNote: 48 });
+  assert.deepEqual(keyboardRange(keyboard), { lowNote: 48, highNote: 72 });
+});
+
+test('a point lands on the key that is drawn there', () => {
+  const keyboard = control('Keyboard', 'Keyboard');
+  const keys = keyboardKeys(keyboard, 320, 90);
+  const white = keys.find((key) => !key.black && key.note === 50);
+  const hit = keyboardNoteAt(keyboard, 320, 90, white.rect.x + white.rect.w / 2, white.rect.y + white.rect.h * 0.9);
+  assert.equal(hit, 50);
+});
+
+test('transpose and octave apply to what is sent, not to what is drawn', () => {
+  const keyboard = control('Keyboard', 'Keyboard', { octave: 1, transpose: 2, velocity: 90, channel: 3 });
+  const press = keyboardPress(keyboard, 60);
+  assert.equal(press.note, 74, '60 + 12 + 2');
+  assert.equal(press.velocity, 90);
+  assert.equal(press.channel, 3);
+  // ...and the keys drawn are still the authored range.
+  assert.equal(keyboardKeys(keyboard, 320, 90).some((key) => key.note === 60), true);
+});
+
+test('a scale lock refuses or quantises, and says which — it never silently moves a finger', () => {
+  const context = { root: 0, scale: 'major' };
+  const off = control('Keyboard', 'Keyboard', { scaleLock: 'off' });
+  assert.equal(keyboardPress(off, 61, { context }).note, 61, 'C# plays when nothing is locked');
+
+  const refuse = control('Keyboard', 'Keyboard', { scaleLock: 'refuse' });
+  assert.equal(keyboardPress(refuse, 61, { context }), null, 'refused, rather than nudged');
+
+  const quantize = control('Keyboard', 'Keyboard', { scaleLock: 'quantize' });
+  assert.equal(keyboardPress(quantize, 61, { context }).note, 60, 'ties go down, as in quantizeToScale');
+});
+
+test('out-of-key keys are shaded whichever lock is on, so the rule is visible before it bites', () => {
+  const keyboard = control('Keyboard', 'Keyboard', { scaleLock: 'off' });
+  const keys = keyboardKeys(keyboard, 320, 90, { context: { root: 0, scale: 'major' } });
+  assert.equal(keys.find((key) => key.note === 60).inKey, true);
+  assert.equal(keys.find((key) => key.note === 61).inKey, false);
+});
+
+test('latch is what makes a chord possible with one pointer', () => {
+  let held = keyboardHold(new Set(), 60, { latch: true });
+  held = keyboardHold(held, 64, { latch: true });
+  assert.deepEqual([...held].sort((a, b) => a - b), [60, 64]);
+  held = keyboardHold(held, 60, { latch: true });
+  assert.deepEqual([...held], [64], 'pressing a latched key again releases it');
+});
+
+test('a glissando releases before it presses', () => {
+  // Emitting note-ons first leaves notes hanging after a fast drag, which is the classic
+  // on-screen-keyboard bug.
+  const glide = keyboardGlide(new Set([60]), 62);
+  assert.deepEqual(glide.release, [60]);
+  assert.deepEqual(glide.press, [62]);
+  assert.deepEqual([...glide.held], [62]);
+
+  const same = keyboardGlide(new Set([62]), 62);
+  assert.deepEqual(same.press, [], 'staying on one key does not retrigger it');
+
+  const off = keyboardGlide(new Set([62]), null);
+  assert.deepEqual(off.release, [62], 'dragging off the keyboard releases what was held');
+});
+
+test('a keyboard exports no host parameter', () => {
+  // A DAW automating "note" on a keyboard would be a DAW playing it, which is what its own MIDI
+  // track is for.
+  assert.deepEqual(COMPONENT_TYPES.Keyboard.exportValues, []);
+  assert.deepEqual(getComponentPorts('Keyboard').map((port) => port.id), ['note', 'velocity']);
+});
+
+// --- the step sequencer ------------------------------------------------------------------------------
+
+test('the pattern is sparse — an off cell is deleted, not stored as false', () => {
+  // A 64-step, 16-track grid is a thousand cells, and a panel file carrying a thousand `false`s for
+  // every sequencer would be mostly punctuation.
+  let pattern = toggleCell({}, 't0', 3);
+  assert.deepEqual(Object.keys(pattern), ['t0:3']);
+  pattern = toggleCell(pattern, 't0', 3);
+  assert.deepEqual(Object.keys(pattern), []);
+});
+
+test('the playhead walks, and ping-pong does not repeat the ends', () => {
+  // Repeating the end is the naïve ping-pong: it makes a sixteen-step pattern sound thirty steps
+  // long with two stutters in it.
+  assert.deepEqual(advanceStep(0, 4), { position: 1, forward: true, wrapped: false });
+  assert.deepEqual(advanceStep(3, 4), { position: 0, forward: true, wrapped: true });
+  assert.deepEqual(advanceStep(0, 4, STEP_DIRECTION.reverse), { position: 3, forward: false, wrapped: true });
+
+  const turn = advanceStep(3, 4, STEP_DIRECTION.pingpong, { forward: true });
+  assert.deepEqual(turn, { position: 2, forward: false, wrapped: false });
+  const back = advanceStep(0, 4, STEP_DIRECTION.pingpong, { forward: false });
+  assert.deepEqual(back, { position: 1, forward: true, wrapped: true });
+});
+
+test('a random walk never repeats a step, because a repeat reads as a stuck sequencer', () => {
+  for (let i = 0; i < 40; i += 1) {
+    assert.notEqual(advanceStep(2, 8, STEP_DIRECTION.random).position, 2);
+  }
+  assert.equal(advanceStep(0, 1, STEP_DIRECTION.random).position, 0, 'a one-step pattern is the exception');
+});
+
+test('the gate follows the tempo, and never merges two repeated notes', () => {
+  const fast = control('StepSequencer', 'StepSequencer', { bpm: 240, division: '1/16' });
+  const slow = control('StepSequencer', 'StepSequencer', { bpm: 120, division: '1/16' });
+  assert.ok(stepMs(fast) < stepMs(slow));
+  assert.ok(gateMs(slow) < stepMs(slow), 'a gate at 100% would make repeats into one long note');
+
+  const long = control('StepSequencer', 'StepSequencer', { gate: 500 });
+  assert.ok(gateMs(long) < stepMs(long), 'and an over-100 gate is clamped rather than obeyed');
+});
+
+test('a step fires only the tracks that are on and not muted', () => {
+  const sequencer = control('StepSequencer', 'StepSequencer', {
+    pattern: { 't0:0': { on: true, velocity: 110 }, 't1:0': { on: true, velocity: 60 } },
+    tracks: [
+      { id: 't0', label: 'Kick', note: 36, channel: 10 },
+      { id: 't1', label: 'Snare', note: 38, channel: 10, muted: true },
+    ],
+  });
+  const notes = stepNotes(sequencer, 0);
+  assert.equal(notes.length, 1);
+  assert.equal(notes[0].note, 36);
+  assert.equal(notes[0].velocity, 110);
+  assert.deepEqual(stepNotes(sequencer, 1), [], 'a step with no cells fires nothing');
+});
+
+test('the grid has beat lines, because sixteen identical boxes are unreadable', () => {
+  assert.deepEqual(beatLines(control('StepSequencer', 'StepSequencer')), [4, 8, 12]);
+});
+
+test('a point lands in the cell it is drawn in, and outside the grid lands nowhere', () => {
+  const sequencer = control('StepSequencer', 'StepSequencer');
+  const geom = sequencerGeometry(420, 130, sequencer);
+  const hit = cellAtPoint(geom, geom.x0 + geom.cellW * 2.5, geom.y0 + geom.cellH * 1.5);
+  assert.deepEqual(hit, { step: 2, trackIndex: 1 });
+  assert.equal(cellAtPoint(geom, 2, 2), null, 'the track header is not a cell');
+});
+
+test('a sequencer exports tempo and run state, and not its pattern', () => {
+  // A host parameter per cell would be a thousand lanes.
+  const fields = COMPONENT_TYPES.StepSequencer.exportValues.map((spec) => spec.field);
+  assert.deepEqual(fields, ['bpm', 'running']);
+});
+
+// --- the tab container ---------------------------------------------------------------------------------
+
+test('a tab container always has at least one page', () => {
+  // Rendering no pages would make its children unreachable with no way back.
+  const empty = control('TabContainer', 'TabContainer', { pages: [] });
+  assert.equal(tabPages(empty).length, 1);
+});
+
+test('a child with no page recorded belongs to the first one', () => {
+  // "Invisible on every page" is not a state a user can get out of.
+  const tabs = control('TabContainer', 'TabContainer');
+  const orphan = { _children: { Core: { id: 'x' } } };
+  assert.equal(childPageId(orphan, tabs), 'p0');
+  assert.equal(isChildOnActivePage(orphan, tabs), true);
+});
+
+test('a child on a deleted page comes back rather than vanishing', () => {
+  const tabs = control('TabContainer', 'TabContainer');
+  const stranded = { _children: { Core: { id: 'x', tabPageId: 'p9' } } };
+  assert.equal(childPageId(stranded, tabs), 'p0');
+});
+
+test('the page index is clamped to the pages that exist', () => {
+  assert.equal(activePageIndex(control('TabContainer', 'TabContainer', { pageIndex: 7 })), 1);
+  assert.equal(activePageIndex(control('TabContainer', 'TabContainer', { pageIndex: -3 })), 0);
+});
+
+test('the strip takes space from the page area, on whichever edge it is on', () => {
+  for (const edge of ['top', 'bottom', 'left', 'right']) {
+    const tabs = control('TabContainer', 'TabContainer', { edge, stripSize: 20 });
+    const geom = tabGeometry(200, 100, tabs);
+    assert.ok(geom.page.w > 0 && geom.page.h > 0, edge);
+    assert.equal(geom.page.w * geom.page.h, geom.vertical ? (200 - 20) * 100 : 200 * (100 - 20), edge);
+  }
+  const hidden = control('TabContainer', 'TabContainer', { showStrip: false });
+  assert.equal(tabGeometry(200, 100, hidden).page.h, 100);
+});
+
+test('a click lands on the tab under it', () => {
+  const tabs = control('TabContainer', 'TabContainer');
+  const geom = tabGeometry(200, 100, tabs);
+  const rect = tabRect(geom, 1, 2);
+  assert.equal(tabAtPoint(geom, rect.x + rect.w / 2, rect.y + rect.h / 2, 2), 1);
+  assert.equal(tabAtPoint(geom, 100, 80, 2), null, 'the page area is not the strip');
+});
+
+test('the page is a bindable port AND a choice-typed host parameter with real labels', () => {
+  // A footswitch changing the page is a real performance gesture. Exported as an anonymous float it
+  // would reach a DAW as "0.37", which is not a page.
+  assert.deepEqual(getComponentPorts('TabContainer').map((port) => port.id), ['pageIndex']);
+  const panel = { controls: [control('TabContainer', 'TabContainer')] };
+  const [parameter] = deriveExportParameters(panel);
+  assert.equal(parameter.valueKind, 'choice');
+  assert.deepEqual(parameter.choiceLabels, ['Page 1', 'Page 2']);
+  assert.equal(parameter.max, 1, 'the range is however many pages there are');
+});
+
+// --- the scroll area -----------------------------------------------------------------------------------
+
+test('the extent is measured from the children, never set by the author', () => {
+  // An author-set extent goes stale the moment a control moves: the scrollbar then stops short of a
+  // control that is really there, or scrolls past the end into nothing.
+  const area = {
+    ...control('ScrollArea', 'ScrollArea'),
+    children: [
+      { _children: { Transform: { x: 0, y: 0, width: 100, height: 40 } } },
+      { _children: { Transform: { x: 0, y: 300, width: 100, height: 40 } } },
+    ],
+  };
+  const extent = contentExtent(area);
+  assert.equal(extent.height, 340);
+  assert.equal(maxScroll(200, 100, area).y, 340 - 100);
+});
+
+test('a child dragged above the top is reachable rather than stranded', () => {
+  const area = {
+    ...control('ScrollArea', 'ScrollArea'),
+    children: [{ _children: { Transform: { x: 0, y: -50, width: 100, height: 40 } } }],
+  };
+  assert.equal(contentExtent(area).minY, -50);
+});
+
+test('content that fits does not scroll', () => {
+  const area = { ...control('ScrollArea', 'ScrollArea'), children: [{ _children: { Transform: { x: 0, y: 0, width: 10, height: 10 } } }] };
+  assert.deepEqual(maxScroll(200, 200, area), { x: 0, y: 0 });
+  assert.deepEqual(clampScroll({ x: 50, y: 50 }, 200, 200, area), { x: 0, y: 0 });
+});
+
+test('a wheel notch is a stated distance in line mode and the raw delta in smooth', () => {
+  const tall = [{ _children: { Transform: { x: 0, y: 0, width: 50, height: 900 } } }];
+  const line = { ...control('ScrollArea', 'ScrollArea', { lineHeight: 24 }), children: tall };
+  assert.equal(scrollByWheel({ x: 0, y: 0 }, { y: 3 }, 200, 100, line).y, 24);
+
+  const smooth = { ...control('ScrollArea', 'ScrollArea', { scrollMode: 'smooth' }), children: tall };
+  assert.equal(scrollByWheel({ x: 0, y: 0 }, { y: 37 }, 200, 100, smooth).y, 37);
+});
+
+test('a scroll position past the end is clamped, not honoured', () => {
+  const area = { ...control('ScrollArea', 'ScrollArea'), children: [{ _children: { Transform: { x: 0, y: 0, width: 50, height: 300 } } }] };
+  assert.equal(scrollByWheel({ x: 0, y: 9999 }, { y: 1 }, 200, 100, area).y, 200);
+});
+
+test('the thumb has a minimum length, or it cannot be grabbed', () => {
+  // A thumb proportional to very long content is a few pixels tall, at which point the scrollbar is
+  // decoration.
+  const area = { ...control('ScrollArea', 'ScrollArea'), children: [{ _children: { Transform: { x: 0, y: 0, width: 50, height: 20000 } } }] };
+  const thumb = thumbRect('y', { y: 0 }, 200, 100, area);
+  assert.ok(thumb.h >= 24, `thumb was ${thumb.h}px`);
+  assert.equal(thumbRect('y', { y: 0 }, 200, 30000, area), null, 'content that fits has no thumb');
+});
+
+test('a child scrolled out of view is known to be out of view', () => {
+  const child = { _children: { Transform: { x: 0, y: 0, width: 50, height: 40 } } };
+  assert.equal(isChildVisible(child, { x: 0, y: 0 }, 200, 100), true);
+  assert.equal(isChildVisible(child, { x: 0, y: 200 }, 200, 100), false);
+});
+
+test('a scroll position is not a host parameter', () => {
+  // Where somebody is LOOKING is not a parameter of the instrument, and a DAW writing it would move
+  // the view under the player's hands.
+  assert.deepEqual(COMPONENT_TYPES.ScrollArea.exportValues, []);
+});

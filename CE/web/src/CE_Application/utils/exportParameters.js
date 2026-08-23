@@ -357,8 +357,23 @@ function paramFromTypeSpec(name, spec, sections) {
   // a `bipolar` flag that only changes the readout (RibbonRenderer does `value * 2 - 1` for it), so
   // exporting -1..1 would hand the host a range the control does not actually hold.
   const min = spec.minField ? num(section[spec.minField], 0) : num(spec.min, 0);
-  const max = spec.maxField ? num(section[spec.maxField], 1) : num(spec.max, 1);
+  // A fourth way, for a choice whose options are a LIST on the section: the Tab Container's pages
+  // are authored, so its range is however many there are and its labels are their names. Without
+  // this a page selector reaches a DAW as an anonymous 0..1 float, which is the thing `choice`
+  // exists to prevent.
+  const listed = spec.listField && Array.isArray(section[spec.listField]) ? section[spec.listField] : null;
+  const max = listed
+    ? Math.max(0, listed.length - 1)
+    : (spec.maxField ? num(section[spec.maxField], 1) : num(spec.max, 1));
   const suffix = spec.suffix ?? 'value';
+
+  // Labels come from the list where there is one. A choice with fewer than two labels is not a
+  // choice — one page is a constant, and exporting it as a selector with a single option would put
+  // a dead control in the host.
+  const listedLabels = listed
+    ? listed.map((entry, index) => String(entry?.[spec.labelKey ?? 'label'] ?? `${index + 1}`))
+    : null;
+  const usableChoice = spec.kind === 'choice' && Array.isArray(listedLabels) && listedLabels.length > 1;
 
   return {
     id: `${name}.${suffix}`,
@@ -370,7 +385,8 @@ function paramFromTypeSpec(name, spec, sections) {
     defaultValue: clampNum(num(section[spec.field], min), min, max === min ? min + 1 : max),
     unit: String(spec.unit ?? '').trim(),
     midiCC: null,
-    valueKind: spec.kind === 'bool' || spec.kind === 'choice' ? spec.kind : 'float',
+    valueKind: spec.kind === 'bool' ? 'bool' : (usableChoice ? 'choice' : 'float'),
+    ...(usableChoice ? { choiceLabels: listedLabels, choiceValues: listedLabels, choiceMode: 'index' } : {}),
     // WHERE the value lives, carried through to the player. Without these the parameter reaches the
     // host and moves nothing: `valueOverride` is for a Behavior value and `customValues` is for a
     // CustomComponent channel, and a field on a component's own section is neither. See

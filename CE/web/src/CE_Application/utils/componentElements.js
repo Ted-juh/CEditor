@@ -43,6 +43,20 @@ export function uniqueElementId(prefix, list) {
  * need something outside their own list — a Timbre anchor carries a value per morph target.
  */
 export const COMPONENT_ELEMENT_TEMPLATES = {
+  'StepSequencer.tracks': (list) => ({
+    id: uniqueElementId('t', list),
+    label: `Track ${list.length + 1}`,
+    // Walks up the General MIDI drum map from the kick, so a second and third track land on a
+    // snare and a hat rather than three notes of the same pitch.
+    note: 36 + list.length,
+    channel: 10,
+    colour: ['FF5B9BD5', 'FFF2C94C', 'FF39D98A', 'FF9B8AFF', 'FFF2994A'][list.length % 5],
+    muted: false,
+  }),
+  'TabContainer.pages': (list) => ({
+    id: uniqueElementId('p', list),
+    label: `Page ${list.length + 1}`,
+  }),
   'Macro.slots': (list) => ({
     id: uniqueElementId('m', list), label: `Dest ${list.length + 1}`,
     depth: 1, curve: 'linear', min: 0, max: 1, enabled: true,

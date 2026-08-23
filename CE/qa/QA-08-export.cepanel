@@ -15,12 +15,12 @@
   "scriptId": "qa_08_export",
   "author": "",
   "version": "1.0.0",
-  "description": "QA-08 — the exported plugin's parameter list, 24 exporting types and 15 branch recipes",
+  "description": "QA-08 — the exported plugin's parameter list, 26 exporting types and 15 branch recipes",
   "enabled": true,
   "locked": false,
   "filePath": null,
   "width": 1600,
-  "height": 4710,
+  "height": 4993,
   "resizable": false,
   "panicShortcut": "Escape",
   "minWidth": 0,
@@ -747,6 +747,63 @@
       "deviceParameterId": ""
     },
     {
+      "id": "qa08_StepSequencer.bpm",
+      "label": "qa08_StepSequencer Tempo",
+      "controlName": "qa08_StepSequencer",
+      "path": "qa08_StepSequencer.bpm",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "StepSequencer",
+      "field": "bpm",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_StepSequencer.run",
+      "label": "qa08_StepSequencer Run",
+      "controlName": "qa08_StepSequencer",
+      "path": "qa08_StepSequencer.run",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "section": "StepSequencer",
+      "field": "running",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_TabContainer.page",
+      "label": "qa08_TabContainer Page",
+      "controlName": "qa08_TabContainer",
+      "path": "qa08_TabContainer.page",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Page 1",
+        "Page 2"
+      ],
+      "choiceValues": [
+        "Page 1",
+        "Page 2"
+      ],
+      "choiceMode": "index",
+      "section": "TabContainer",
+      "field": "pageIndex",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
       "id": "Cutoff.value",
       "label": "Cutoff",
       "controlName": "Cutoff",
@@ -1023,7 +1080,7 @@
     {
       "_children": {
         "Core": {
-          "name": "group_Exports_a_parameter_at_defaults_24_of_50_types",
+          "name": "group_Exports_a_parameter_at_defaults_26_of_54_types",
           "id": "qa_group_0",
           "controlType": "Label"
         },
@@ -1048,7 +1105,7 @@
           }
         },
         "Text": {
-          "content": "Exports a parameter at defaults — 24 of 50 types",
+          "content": "Exports a parameter at defaults — 26 of 54 types",
           "_children": {
             "Font": {
               "size": 13,
@@ -4285,13 +4342,281 @@
     {
       "_children": {
         "Core": {
-          "name": "group_Exports_nothing_and_the_type_says_so_26_types",
+          "name": "caption_qa_cap_48",
+          "id": "qa_cap_48",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1120,
+          "y": 2404,
+          "width": 420,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "StepSequencer",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_StepSequencer",
+          "id": "qa08_StepSequencer",
+          "controlType": "StepSequencer"
+        },
+        "Transform": {
+          "x": 1120,
+          "y": 2426
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_49",
+          "id": "qa_cap_49",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2614,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "2 parameters",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_StepSequencer",
+          "id": "qa08_p_StepSequencer",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2636,
+          "width": 430,
+          "height": 102
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_StepSequencer.bpm  [0 … 1]  default 1\n  AudioParameterFloat\nqa08_StepSequencer.run  [0 … 1]  default 0\n  AudioParameterBool",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_50",
+          "id": "qa_cap_50",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 2614,
+          "width": 320,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "TabContainer",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_TabContainer",
+          "id": "qa08_TabContainer",
+          "controlType": "TabContainer"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 2636
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_51",
+          "id": "qa_cap_51",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 826,
+          "y": 2614,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_TabContainer",
+          "id": "qa08_p_TabContainer",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 826,
+          "y": 2636,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_TabContainer.page  [0 … 1]  default 0\n  AudioParameterChoice\n  menu: Page 1 / Page 2",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Exports_nothing_and_the_type_says_so_28_types",
           "id": "qa_group_1",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 2620,
+          "y": 2890,
           "width": 1544,
           "height": 26
         },
@@ -4310,7 +4635,7 @@
           }
         },
         "Text": {
-          "content": "Exports nothing, and the type says so — 26 types",
+          "content": "Exports nothing, and the type says so — 28 types",
           "_children": {
             "Font": {
               "size": 13,
@@ -4331,13 +4656,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_48",
-          "id": "qa_cap_48",
+          "name": "caption_qa_cap_52",
+          "id": "qa_cap_52",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 2656,
+          "y": 2926,
           "width": 1544,
           "height": 18
         },
@@ -4375,9 +4700,9 @@
         },
         "Transform": {
           "x": 28,
-          "y": 2678,
+          "y": 2948,
           "width": 1544,
-          "height": 131
+          "height": 144
         },
         "Background": {
           "_children": {
@@ -4394,7 +4719,7 @@
           }
         },
         "Text": {
-          "content": "Background       exportValues: [] — ruled, not overlooked   Image            exportValues: [] — ruled, not overlooked   Recorder         exportValues: [] — ruled, not overlooked\nLabel            exportValues: [] — ruled, not overlooked   LcdDisplay       exportValues: [] — ruled, not overlooked   SplitZone        exportValues: [] — ruled, not overlooked\nButton           family=trigger valueType=none              PixelDisplay     exportValues: [] — ruled, not overlooked   Panic            exportValues: [] — ruled, not overlooked\nMomentaryButton  family=trigger valueType=none              Router           exportValues: [] — ruled, not overlooked   Constraint       exportValues: [] — ruled, not overlooked\nTextInput        family=text valueType=text                 Looper           exportValues: [] — ruled, not overlooked   Matrix           exportValues: [] — ruled, not overlooked\nTimedButton      family=trigger valueType=none              ChordPad         exportValues: [] — ruled, not overlooked   Envelope         exportValues: [] — ruled, not overlooked\nOneShotButton    family=trigger valueType=none              NoteRibbon       exportValues: [] — ruled, not overlooked   Meter            exportValues: [] — ruled, not overlooked\nContainer        exportValues: [] — ruled, not overlooked   DrumPads         exportValues: [] — ruled, not overlooked   TestBox          exportValues: [] — ruled, not overlooked\nGroup            exportValues: [] — ruled, not overlooked   Harmoniser       exportValues: [] — ruled, not overlooked",
+          "content": "Background       exportValues: [] — ruled, not overlooked   LcdDisplay       exportValues: [] — ruled, not overlooked   Panic            exportValues: [] — ruled, not overlooked\nLabel            exportValues: [] — ruled, not overlooked   PixelDisplay     exportValues: [] — ruled, not overlooked   Constraint       exportValues: [] — ruled, not overlooked\nButton           family=trigger valueType=none              Router           exportValues: [] — ruled, not overlooked   Matrix           exportValues: [] — ruled, not overlooked\nMomentaryButton  family=trigger valueType=none              Looper           exportValues: [] — ruled, not overlooked   Envelope         exportValues: [] — ruled, not overlooked\nTextInput        family=text valueType=text                 ChordPad         exportValues: [] — ruled, not overlooked   Keyboard         exportValues: [] — ruled, not overlooked\nTimedButton      family=trigger valueType=none              NoteRibbon       exportValues: [] — ruled, not overlooked   ScrollArea       exportValues: [] — ruled, not overlooked\nOneShotButton    family=trigger valueType=none              DrumPads         exportValues: [] — ruled, not overlooked   Meter            exportValues: [] — ruled, not overlooked\nContainer        exportValues: [] — ruled, not overlooked   Harmoniser       exportValues: [] — ruled, not overlooked   TestBox          exportValues: [] — ruled, not overlooked\nGroup            exportValues: [] — ruled, not overlooked   Recorder         exportValues: [] — ruled, not overlooked\nImage            exportValues: [] — ruled, not overlooked   SplitZone        exportValues: [] — ruled, not overlooked",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -4419,7 +4744,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 2843,
+          "y": 3126,
           "width": 1544,
           "height": 26
         },
@@ -4459,13 +4784,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_49",
-          "id": "qa_cap_49",
+          "name": "caption_qa_cap_53",
+          "id": "qa_cap_53",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 2879,
+          "y": 3162,
           "width": 1544,
           "height": 18
         },
@@ -4503,7 +4828,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 2901,
+          "y": 3184,
           "width": 1544,
           "height": 54
         },
@@ -4547,7 +4872,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 2989,
+          "y": 3272,
           "width": 1544,
           "height": 26
         },
@@ -4587,13 +4912,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_50",
-          "id": "qa_cap_50",
+          "name": "caption_qa_cap_54",
+          "id": "qa_cap_54",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 3025,
+          "y": 3308,
           "width": 1544,
           "height": 18
         },
@@ -4631,7 +4956,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 3047,
+          "y": 3330,
           "width": 1544,
           "height": 54
         },
@@ -4675,7 +5000,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 3135,
+          "y": 3418,
           "width": 1544,
           "height": 26
         },
@@ -4715,13 +5040,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_51",
-          "id": "qa_cap_51",
+          "name": "caption_qa_cap_55",
+          "id": "qa_cap_55",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 3171,
+          "y": 3454,
           "width": 132,
           "height": 18
         },
@@ -4759,7 +5084,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 3193
+          "y": 3476
         },
         "Behavior": {
           "min": 20,
@@ -4773,13 +5098,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_52",
-          "id": "qa_cap_52",
+          "name": "caption_qa_cap_56",
+          "id": "qa_cap_56",
           "controlType": "Label"
         },
         "Transform": {
           "x": 184,
-          "y": 3171,
+          "y": 3454,
           "width": 470,
           "height": 18
         },
@@ -4817,7 +5142,7 @@
         },
         "Transform": {
           "x": 184,
-          "y": 3193,
+          "y": 3476,
           "width": 470,
           "height": 118
         },
@@ -4855,13 +5180,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_53",
-          "id": "qa_cap_53",
+          "name": "caption_qa_cap_57",
+          "id": "qa_cap_57",
           "controlType": "Label"
         },
         "Transform": {
           "x": 678,
-          "y": 3171,
+          "y": 3454,
           "width": 132,
           "height": 18
         },
@@ -4899,7 +5224,7 @@
         },
         "Transform": {
           "x": 678,
-          "y": 3193
+          "y": 3476
         },
         "Behavior": {
           "min": 64,
@@ -4912,13 +5237,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_54",
-          "id": "qa_cap_54",
+          "name": "caption_qa_cap_58",
+          "id": "qa_cap_58",
           "controlType": "Label"
         },
         "Transform": {
           "x": 834,
-          "y": 3171,
+          "y": 3454,
           "width": 470,
           "height": 18
         },
@@ -4956,7 +5281,7 @@
         },
         "Transform": {
           "x": 834,
-          "y": 3193,
+          "y": 3476,
           "width": 470,
           "height": 118
         },
@@ -4994,13 +5319,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_55",
-          "id": "qa_cap_55",
+          "name": "caption_qa_cap_59",
+          "id": "qa_cap_59",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1328,
-          "y": 3171,
+          "y": 3454,
           "width": 136,
           "height": 18
         },
@@ -5038,7 +5363,7 @@
         },
         "Transform": {
           "x": 1328,
-          "y": 3193
+          "y": 3476
         },
         "Behavior": {
           "defaultValue": true
@@ -5049,13 +5374,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_56",
-          "id": "qa_cap_56",
+          "name": "caption_qa_cap_60",
+          "id": "qa_cap_60",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 3339,
+          "y": 3622,
           "width": 470,
           "height": 18
         },
@@ -5093,7 +5418,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 3361,
+          "y": 3644,
           "width": 470,
           "height": 118
         },
@@ -5131,13 +5456,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_57",
-          "id": "qa_cap_57",
+          "name": "caption_qa_cap_61",
+          "id": "qa_cap_61",
           "controlType": "Label"
         },
         "Transform": {
           "x": 522,
-          "y": 3339,
+          "y": 3622,
           "width": 160,
           "height": 18
         },
@@ -5175,7 +5500,7 @@
         },
         "Transform": {
           "x": 522,
-          "y": 3361
+          "y": 3644
         },
         "Value": {
           "rows": [
@@ -5232,13 +5557,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_58",
-          "id": "qa_cap_58",
+          "name": "caption_qa_cap_62",
+          "id": "qa_cap_62",
           "controlType": "Label"
         },
         "Transform": {
           "x": 706,
-          "y": 3339,
+          "y": 3622,
           "width": 470,
           "height": 18
         },
@@ -5276,7 +5601,7 @@
         },
         "Transform": {
           "x": 706,
-          "y": 3361,
+          "y": 3644,
           "width": 470,
           "height": 157
         },
@@ -5314,13 +5639,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_59",
-          "id": "qa_cap_59",
+          "name": "caption_qa_cap_63",
+          "id": "qa_cap_63",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1200,
-          "y": 3339,
+          "y": 3622,
           "width": 160,
           "height": 18
         },
@@ -5358,7 +5683,7 @@
         },
         "Transform": {
           "x": 1200,
-          "y": 3361
+          "y": 3644
         },
         "Value": {
           "rows": [
@@ -5398,13 +5723,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_60",
-          "id": "qa_cap_60",
+          "name": "caption_qa_cap_64",
+          "id": "qa_cap_64",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 3546,
+          "y": 3829,
           "width": 470,
           "height": 18
         },
@@ -5442,7 +5767,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 3568,
+          "y": 3851,
           "width": 470,
           "height": 144
         },
@@ -5480,13 +5805,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_61",
-          "id": "qa_cap_61",
+          "name": "caption_qa_cap_65",
+          "id": "qa_cap_65",
           "controlType": "Label"
         },
         "Transform": {
           "x": 522,
-          "y": 3546,
+          "y": 3829,
           "width": 160,
           "height": 18
         },
@@ -5524,7 +5849,7 @@
         },
         "Transform": {
           "x": 522,
-          "y": 3568
+          "y": 3851
         },
         "Value": {
           "rows": [
@@ -5570,13 +5895,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_62",
-          "id": "qa_cap_62",
+          "name": "caption_qa_cap_66",
+          "id": "qa_cap_66",
           "controlType": "Label"
         },
         "Transform": {
           "x": 706,
-          "y": 3546,
+          "y": 3829,
           "width": 470,
           "height": 18
         },
@@ -5614,7 +5939,7 @@
         },
         "Transform": {
           "x": 706,
-          "y": 3568,
+          "y": 3851,
           "width": 470,
           "height": 144
         },
@@ -5652,13 +5977,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_63",
-          "id": "qa_cap_63",
+          "name": "caption_qa_cap_67",
+          "id": "qa_cap_67",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1200,
-          "y": 3546,
+          "y": 3829,
           "width": 132,
           "height": 18
         },
@@ -5696,7 +6021,7 @@
         },
         "Transform": {
           "x": 1200,
-          "y": 3568
+          "y": 3851
         }
       },
       "_type": "Control"
@@ -5704,13 +6029,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_64",
-          "id": "qa_cap_64",
+          "name": "caption_qa_cap_68",
+          "id": "qa_cap_68",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 3740,
+          "y": 4023,
           "width": 470,
           "height": 18
         },
@@ -5748,7 +6073,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 3762,
+          "y": 4045,
           "width": 470,
           "height": 144
         },
@@ -5786,13 +6111,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_65",
-          "id": "qa_cap_65",
+          "name": "caption_qa_cap_69",
+          "id": "qa_cap_69",
           "controlType": "Label"
         },
         "Transform": {
           "x": 522,
-          "y": 3740,
+          "y": 4023,
           "width": 220,
           "height": 18
         },
@@ -5830,7 +6155,7 @@
         },
         "Transform": {
           "x": 522,
-          "y": 3762
+          "y": 4045
         },
         "Behavior": {
           "max": 127,
@@ -5851,13 +6176,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_66",
-          "id": "qa_cap_66",
+          "name": "caption_qa_cap_70",
+          "id": "qa_cap_70",
           "controlType": "Label"
         },
         "Transform": {
           "x": 766,
-          "y": 3740,
+          "y": 4023,
           "width": 470,
           "height": 18
         },
@@ -5895,7 +6220,7 @@
         },
         "Transform": {
           "x": 766,
-          "y": 3762,
+          "y": 4045,
           "width": 470,
           "height": 144
         },
@@ -5933,13 +6258,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_67",
-          "id": "qa_cap_67",
+          "name": "caption_qa_cap_71",
+          "id": "qa_cap_71",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1260,
-          "y": 3740,
+          "y": 4023,
           "width": 220,
           "height": 18
         },
@@ -5977,7 +6302,7 @@
         },
         "Transform": {
           "x": 1260,
-          "y": 3762
+          "y": 4045
         },
         "Behavior": {
           "max": 127,
@@ -5999,13 +6324,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_68",
-          "id": "qa_cap_68",
+          "name": "caption_qa_cap_72",
+          "id": "qa_cap_72",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 3934,
+          "y": 4217,
           "width": 470,
           "height": 18
         },
@@ -6043,7 +6368,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 3956,
+          "y": 4239,
           "width": 470,
           "height": 144
         },
@@ -6081,13 +6406,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_69",
-          "id": "qa_cap_69",
+          "name": "caption_qa_cap_73",
+          "id": "qa_cap_73",
           "controlType": "Label"
         },
         "Transform": {
           "x": 522,
-          "y": 3934,
+          "y": 4217,
           "width": 132,
           "height": 18
         },
@@ -6125,7 +6450,7 @@
         },
         "Transform": {
           "x": 522,
-          "y": 3956
+          "y": 4239
         },
         "Behavior": {
           "max": 16383,
@@ -6149,13 +6474,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_70",
-          "id": "qa_cap_70",
+          "name": "caption_qa_cap_74",
+          "id": "qa_cap_74",
           "controlType": "Label"
         },
         "Transform": {
           "x": 678,
-          "y": 3934,
+          "y": 4217,
           "width": 470,
           "height": 18
         },
@@ -6193,7 +6518,7 @@
         },
         "Transform": {
           "x": 678,
-          "y": 3956,
+          "y": 4239,
           "width": 470,
           "height": 131
         },
@@ -6231,13 +6556,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_71",
-          "id": "qa_cap_71",
+          "name": "caption_qa_cap_75",
+          "id": "qa_cap_75",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1172,
-          "y": 3934,
+          "y": 4217,
           "width": 132,
           "height": 18
         },
@@ -6275,7 +6600,7 @@
         },
         "Transform": {
           "x": 1172,
-          "y": 3956
+          "y": 4239
         },
         "Behavior": {
           "max": 127,
@@ -6296,13 +6621,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_72",
-          "id": "qa_cap_72",
+          "name": "caption_qa_cap_76",
+          "id": "qa_cap_76",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 4128,
+          "y": 4411,
           "width": 470,
           "height": 18
         },
@@ -6340,7 +6665,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 4150,
+          "y": 4433,
           "width": 470,
           "height": 144
         },
@@ -6378,13 +6703,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_73",
-          "id": "qa_cap_73",
+          "name": "caption_qa_cap_77",
+          "id": "qa_cap_77",
           "controlType": "Label"
         },
         "Transform": {
           "x": 522,
-          "y": 4128,
+          "y": 4411,
           "width": 220,
           "height": 18
         },
@@ -6422,7 +6747,7 @@
         },
         "Transform": {
           "x": 522,
-          "y": 4150
+          "y": 4433
         },
         "Behavior": {
           "max": 127,
@@ -6444,13 +6769,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_74",
-          "id": "qa_cap_74",
+          "name": "caption_qa_cap_78",
+          "id": "qa_cap_78",
           "controlType": "Label"
         },
         "Transform": {
           "x": 766,
-          "y": 4128,
+          "y": 4411,
           "width": 470,
           "height": 18
         },
@@ -6488,7 +6813,7 @@
         },
         "Transform": {
           "x": 766,
-          "y": 4150,
+          "y": 4433,
           "width": 470,
           "height": 118
         },
@@ -6526,13 +6851,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_75",
-          "id": "qa_cap_75",
+          "name": "caption_qa_cap_79",
+          "id": "qa_cap_79",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1260,
-          "y": 4128,
+          "y": 4411,
           "width": 150,
           "height": 18
         },
@@ -6570,7 +6895,7 @@
         },
         "Transform": {
           "x": 1260,
-          "y": 4150,
+          "y": 4433,
           "width": 150,
           "height": 100
         },
@@ -6597,13 +6922,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_76",
-          "id": "qa_cap_76",
+          "name": "caption_qa_cap_80",
+          "id": "qa_cap_80",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 4322,
+          "y": 4605,
           "width": 470,
           "height": 18
         },
@@ -6641,7 +6966,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 4344,
+          "y": 4627,
           "width": 470,
           "height": 118
         },
@@ -6679,13 +7004,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_77",
-          "id": "qa_cap_77",
+          "name": "caption_qa_cap_81",
+          "id": "qa_cap_81",
           "controlType": "Label"
         },
         "Transform": {
           "x": 522,
-          "y": 4322,
+          "y": 4605,
           "width": 150,
           "height": 18
         },
@@ -6723,7 +7048,7 @@
         },
         "Transform": {
           "x": 522,
-          "y": 4344,
+          "y": 4627,
           "width": 150,
           "height": 100
         },
@@ -6768,13 +7093,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_78",
-          "id": "qa_cap_78",
+          "name": "caption_qa_cap_82",
+          "id": "qa_cap_82",
           "controlType": "Label"
         },
         "Transform": {
           "x": 696,
-          "y": 4322,
+          "y": 4605,
           "width": 470,
           "height": 18
         },
@@ -6812,7 +7137,7 @@
         },
         "Transform": {
           "x": 696,
-          "y": 4344,
+          "y": 4627,
           "width": 470,
           "height": 157
         },
@@ -6850,13 +7175,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_79",
-          "id": "qa_cap_79",
+          "name": "caption_qa_cap_83",
+          "id": "qa_cap_83",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1190,
-          "y": 4322,
+          "y": 4605,
           "width": 132,
           "height": 18
         },
@@ -6894,7 +7219,7 @@
         },
         "Transform": {
           "x": 1190,
-          "y": 4344
+          "y": 4627
         },
         "Behavior": {
           "min": 20,
@@ -6907,13 +7232,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_80",
-          "id": "qa_cap_80",
+          "name": "caption_qa_cap_84",
+          "id": "qa_cap_84",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 4529,
+          "y": 4812,
           "width": 470,
           "height": 18
         },
@@ -6951,7 +7276,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 4551,
+          "y": 4834,
           "width": 470,
           "height": 131
         },

@@ -29,8 +29,11 @@
 
   let query = $state('');
 
-  const TYPE_LABELS = new Map(
-    INSERT_CATEGORIES.flatMap((category) => category.items.map((item) => [item.type, item.label]))
+  // Keyed by the item's `id` where it has one, so a preset and its plain type are two entries
+  // rather than one overwriting the other.
+  const ITEM_KEY = (item) => String(item.id ?? item.type);
+  const CATALOG_ITEMS = new Map(
+    INSERT_CATEGORIES.flatMap((category) => category.items.map((item) => [ITEM_KEY(item), item]))
   );
 
   let filteredCategories = $derived.by(() => {
@@ -51,8 +54,8 @@
 
   let recentItems = $derived(
     $insertRecents
-      .filter((type) => TYPE_LABELS.has(type))
-      .map((type) => ({ type, label: TYPE_LABELS.get(type) }))
+      .filter((key) => CATALOG_ITEMS.has(key))
+      .map((key) => CATALOG_ITEMS.get(key))
       .slice(0, 6)
   );
 
@@ -63,9 +66,11 @@
     return entries.filter((entry) => String(entry.name ?? '').toLowerCase().includes(q)).slice(0, 12);
   });
 
-  function insertType(type) {
+  function insertItem(item) {
     if (!hasActivePanel) return;
-    addControl(type);
+    // A catalog item is either a bare type or a preset of one; both go through the same path,
+    // because a preset is section defaults and nothing more.
+    addControl(item.type, item.overrides ?? {});
   }
 
   function insertPackage(entry) {
@@ -76,10 +81,12 @@
 
   // Drag-to-place: the canvas reads this payload on drop and inserts at the
   // drop point (EditorCanvas → addControl(..., { at })).
-  function handleTypeDragStart(type, e) {
+  function handleTypeDragStart(item, e) {
     if (!hasActivePanel) { e.preventDefault(); return; }
     e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('application/x-ceditor-insert', JSON.stringify({ kind: 'type', type }));
+    e.dataTransfer.setData('application/x-ceditor-insert', JSON.stringify({
+      kind: 'type', type: item.type, overrides: item.overrides ?? null,
+    }));
   }
 
   function handlePackageDragStart(entry, e) {
@@ -112,15 +119,15 @@
     {#if recentItems.length && !query.trim()}
       <div class="section-title">Recent</div>
       <div class="recent-row">
-        {#each recentItems as item (item.type)}
+        {#each recentItems as item (ITEM_KEY(item))}
           {@const Icon = TYPE_ICONS[item.type] ?? FALLBACK_TYPE_ICON}
           <button
             class="recent-chip"
             title={`Insert ${item.label}`}
             disabled={!hasActivePanel}
             draggable={hasActivePanel}
-            ondragstart={(e) => handleTypeDragStart(item.type, e)}
-            onclick={() => insertType(item.type)}
+            ondragstart={(e) => handleTypeDragStart(item, e)}
+            onclick={() => insertItem(item)}
           >
             <Icon size={13} strokeWidth={1.6} />
             <span>{item.label}</span>
@@ -134,15 +141,15 @@
         <category.icon size={12} strokeWidth={1.6} />
         <span>{category.label}</span>
       </div>
-      {#each category.items as item (item.type)}
+      {#each category.items as item (ITEM_KEY(item))}
         {@const Icon = TYPE_ICONS[item.type] ?? FALLBACK_TYPE_ICON}
         <button
           class="insert-item"
           title={hasActivePanel ? `Insert ${item.label} — or drag it onto the panel` : `${item.label} (open a panel first)`}
           disabled={!hasActivePanel}
           draggable={hasActivePanel}
-          ondragstart={(e) => handleTypeDragStart(item.type, e)}
-          onclick={() => insertType(item.type)}
+          ondragstart={(e) => handleTypeDragStart(item, e)}
+          onclick={() => insertItem(item)}
         >
           <span class="item-icon"><Icon size={15} strokeWidth={1.5} /></span>
           <span class="item-label">{item.label}</span>

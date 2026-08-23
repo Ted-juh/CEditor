@@ -1240,6 +1240,90 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Keyboard: {
+    sections: ['Background', 'Keyboard', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. A keyboard emits NOTES, not a parameter value — a DAW automating "note" on a
+    // keyboard would be a DAW playing it, which is what its own MIDI track is for. Declared empty
+    // rather than left absent, so QA-08 files it as a decision instead of an oversight.
+    exportValues: [],
+    ports: getComponentPorts('Keyboard'),
+    defaultOverrides: {
+      // Two octaves at a playable key width by default.
+      Transform: { width: 320, height: 90 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF15151A' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 4 },
+        },
+      },
+    },
+  },
+
+  StepSequencer: {
+    sections: ['Background', 'StepSequencer', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. Tempo and run state, which are the two things a DAW plausibly drives. The
+    // pattern is not automatable: it is a document, and a host parameter per cell would be a
+    // thousand lanes.
+    exportValues: [
+      { field: 'bpm', section: 'StepSequencer', kind: 'float', suffix: 'bpm', label: 'Tempo' },
+      { field: 'running', section: 'StepSequencer', kind: 'bool', suffix: 'run', label: 'Run' },
+    ],
+    ports: getComponentPorts('StepSequencer'),
+    defaultOverrides: {
+      Transform: { width: 420, height: 130 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF15151A' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 6 },
+        },
+      },
+    },
+  },
+
+  TabContainer: {
+    sections: ['Background', 'TabContainer', 'Effects', 'Grid', 'Children'],
+    // HOST AUTOMATION. The page, as a choice — switching pages from a DAW is a real thing to want,
+    // and `valueKind: 'choice'` is what makes it arrive as named pages rather than as a float.
+    exportValues: [{
+      field: 'pageIndex', section: 'TabContainer', kind: 'choice', suffix: 'page', label: 'Page',
+      // The range and the labels both come from the authored page list — see paramFromTypeSpec.
+      listField: 'pages', labelKey: 'label',
+    }],
+    ports: getComponentPorts('TabContainer'),
+    defaultOverrides: {
+      Transform: { width: 320, height: 220 },
+      Grid: { enabled: true, snap: true, size: 10 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF1A1A20' },
+          Border: { enabled: true, thickness: 1, colour: 'FF2E2E36' },
+          Corners: { radius: 6 },
+        },
+      },
+    },
+  },
+
+  ScrollArea: {
+    sections: ['Background', 'ScrollArea', 'Effects', 'Grid', 'Children'],
+    // HOST AUTOMATION: none. A scroll position is where somebody is LOOKING, not a parameter of the
+    // instrument, and a DAW writing it would move the view under the player's hands.
+    exportValues: [],
+    ports: getComponentPorts('ScrollArea'),
+    defaultOverrides: {
+      Transform: { width: 280, height: 200 },
+      Grid: { enabled: true, snap: true, size: 10 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF1A1A20' },
+          Border: { enabled: true, thickness: 1, colour: 'FF2E2E36' },
+          Corners: { radius: 6 },
+        },
+      },
+    },
+  },
+
   Meter: {
     sections: ['Background', 'Meter', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     // HOST AUTOMATION: none, deliberately. A meter DISPLAYS a level that arrives from somewhere

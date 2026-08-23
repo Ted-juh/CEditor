@@ -6,6 +6,10 @@ import { routerPorts } from '../utils/routerLayout.js';
 import { timbrePorts } from '../utils/timbreLayout.js';
 import { constellationPorts } from '../utils/constellationLayout.js';
 import { constraintPorts } from '../utils/constraintLayout.js';
+import { keyboardPorts } from '../utils/keyboardLayout.js';
+import { sequencerPorts } from '../utils/stepSequencerLayout.js';
+import { tabPorts } from '../utils/tabContainerLayout.js';
+import { scrollPorts } from '../utils/scrollAreaLayout.js';
 
 export const PARAMETER_TYPES = {
   INTEGER: 'integer',
@@ -371,6 +375,15 @@ export function getComponentPorts(componentOrType) {
   if (componentType === 'Constraint' && typeof componentOrType === 'object') {
     return constraintPorts(componentOrType, PARAMETER_TYPES);
   }
+  // The four components added with the last of the backlog's mini-specs. Their ports are fixed
+  // rather than derived from the control, so they could equally have gone in the table above —
+  // they live with their own layout modules instead, so a component's ports and its geometry are
+  // never in two files that can disagree.
+  if (componentType === 'Keyboard') return keyboardPorts(componentOrType, PARAMETER_TYPES);
+  if (componentType === 'StepSequencer') return sequencerPorts(componentOrType, PARAMETER_TYPES);
+  if (componentType === 'TabContainer') return tabPorts(componentOrType, PARAMETER_TYPES);
+  if (componentType === 'ScrollArea') return scrollPorts(componentOrType, PARAMETER_TYPES);
+
   return DEFAULT_COMPONENT_PORTS[componentType] ?? [];
 }
 

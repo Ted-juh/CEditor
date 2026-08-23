@@ -15,6 +15,10 @@
   import PixelDisplayRenderer from './PixelDisplayRenderer.svelte';
   import ScriptDrawOverlay from './ScriptDrawOverlay.svelte';
   import MeterRenderer from './MeterRenderer.svelte';
+  import KeyboardRenderer from './KeyboardRenderer.svelte';
+  import StepSequencerRenderer from './StepSequencerRenderer.svelte';
+  import TabContainerRenderer from './TabContainerRenderer.svelte';
+  import ScrollAreaRenderer from './ScrollAreaRenderer.svelte';
   import EnvelopeRenderer from './EnvelopeRenderer.svelte';
   import MatrixRenderer from './MatrixRenderer.svelte';
   import JoystickRenderer from './JoystickRenderer.svelte';
@@ -236,6 +240,10 @@
   let isLcdDisplay = $derived(String(core?.controlType ?? '') === 'LcdDisplay');
   let isPixelDisplay = $derived(String(core?.controlType ?? '') === 'PixelDisplay');
   let isMeter = $derived(String(core?.controlType ?? '') === 'Meter');
+  let isKeyboard = $derived(String(core?.controlType ?? '') === 'Keyboard');
+  let isStepSequencer = $derived(String(core?.controlType ?? '') === 'StepSequencer');
+  let isTabContainer = $derived(String(core?.controlType ?? '') === 'TabContainer');
+  let isScrollArea = $derived(String(core?.controlType ?? '') === 'ScrollArea');
   let isEnvelope = $derived(String(core?.controlType ?? '') === 'Envelope');
   let isMatrix = $derived(String(core?.controlType ?? '') === 'Matrix');
   let isJoystick = $derived(String(core?.controlType ?? '') === 'VectorJoystick');
@@ -1849,7 +1857,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isNumpad && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !isTimbre && !isTuring && !isKinetic && !isConstellation && !isConstraint && !isChordPad && !isArp && !isNoteRibbon && !isDrumPads && !isPanic && !isTransport && !isSplitZone && !isPhrase && !isRecorder && !isHarmoniser && !isSetlist && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isKeyboard && !isStepSequencer && !isTabContainer && !isScrollArea && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isNumpad && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !isTimbre && !isTuring && !isKinetic && !isConstellation && !isConstraint && !isChordPad && !isArp && !isNoteRibbon && !isDrumPads && !isPanic && !isTransport && !isSplitZone && !isPhrase && !isRecorder && !isHarmoniser && !isSetlist && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -3173,6 +3181,32 @@
 
     {#if isMeter}
       <MeterRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isKeyboard}
+      <KeyboardRenderer
+        control={renderControl}
+        width={displayW}
+        height={displayH}
+        held={previewSession?.keyboardHeld ?? []}
+      />
+    {/if}
+
+    {#if isStepSequencer}
+      <StepSequencerRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isTabContainer}
+      <TabContainerRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isScrollArea}
+      <ScrollAreaRenderer
+        control={renderControl}
+        width={displayW}
+        height={displayH}
+        offset={previewSession?.scrollOffset ?? null}
+      />
     {/if}
 
     {#if isEnvelope}

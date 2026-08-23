@@ -245,7 +245,8 @@
       ...category.items.map((item) => ({
         label: item.label,
         enabled: hasPanel,
-        action: () => addControl(item.type),
+        // `overrides` is how a catalog preset differs from a bare type — see insertCatalog.js.
+        action: () => addControl(item.type, item.overrides ?? {}),
       })),
     ]),
     Build: [
