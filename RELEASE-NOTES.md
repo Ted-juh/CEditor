@@ -42,6 +42,11 @@ move between the two freely.
   component types are not yet ruled on and also export nothing — mostly structural ones where that
   is obviously right, but if you expect to automate something and cannot, that is worth reporting.
 - **No update channel.** There is no in-app update check. Watch the repository.
+- **No current editor manual.** Help → Documentation carries the scripting manual, cookbook,
+  getting-started, these notes and the known-issues list, all searchable. What it does not carry is
+  a manual for the editor itself: the one in the repository describes an editor two refactors ago,
+  so shipping it would be worse than the gap. Help → Keyboard Shortcuts and the hint on every
+  property are what the editor documents about itself today.
 - **Panel sharing is new and has never run on Windows.** A bare `.cepanel` references images by
   absolute path, so sending one to someone else loses its pictures — the file looks perfect on the
   machine that made it, which is why this went unnoticed. **File → Share Panel...** writes a

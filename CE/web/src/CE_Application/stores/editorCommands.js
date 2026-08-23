@@ -33,3 +33,10 @@ export const aboutSignal = writable(0);
 export function requestAbout() {
   aboutSignal.update((n) => n + 1);
 }
+
+/** Incremented to open the documentation viewer. Same ownership story as `aboutSignal`. */
+export const documentationSignal = writable(0);
+
+export function requestDocumentation() {
+  documentationSignal.update((n) => n + 1);
+}

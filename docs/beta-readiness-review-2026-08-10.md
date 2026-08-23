@@ -317,7 +317,9 @@ Everything above is small. These are not, and they are what a beta decision actu
    (custom components have one; panels do not)~~ *(fixed — File → Share Panel... writes a
    `.cepanelpkg` with every image embedded, File → Open Shared Panel... reads one back; the
    author's file path and bound MIDI ports are stripped on the way out)*, no Ctrlr
-   `.panel`/`.bpanelz` importer, no update channel.
+   `.panel`/`.bpanelz` importer, no update channel. The documentation half is closed: Help →
+   Documentation carries the scripting manual, cookbook, getting-started, release notes and known
+   issues, searchable and baked into the bundle.
 6. **Export polish**: pipeline **D1** (GUID registry / "update vs new copy") unbuilt, so two panels
    can collide FUIDs; **E1–E5** unbuilt, so there is no build log surface, export history or
    "Reveal in folder"; ~~every parameter maps to `AudioParameterFloat`~~ *(fixed)* — the editor now emits a

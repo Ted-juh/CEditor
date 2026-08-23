@@ -31,7 +31,7 @@
     showTreePanel, togglePanelVisibility,
   } from '../stores/panelVisibility.js';
   import { GLOBAL_SHORTCUTS } from '../utils/globalShortcuts.js';
-  import { requestAbout } from '../stores/editorCommands.js';
+  import { requestAbout, requestDocumentation } from '../stores/editorCommands.js';
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
   import { openSharedPanelFromFile, sharePanelToFile } from '../stores/panelSharingActions.js';
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
@@ -271,6 +271,9 @@
       { label: 'Close Tab', shortcut: 'Ctrl+W', action: () => closeActiveEditorTab() },
     ],
     Help: [
+      // Nineteen thousand words of manual shipped in a repository the user does not have. This is
+      // the first Help row for a reason: the shortcut list was the only help in the program.
+      { label: 'Documentation', action: () => requestDocumentation() },
       { label: 'Keyboard Shortcuts', shortcut: 'F1', action: () => {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1', bubbles: true }));
       }},

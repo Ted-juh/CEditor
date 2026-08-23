@@ -1,0 +1,145 @@
+// generate-help-bundle.mjs — bake the user-facing documentation into the app.
+//
+// THE PROBLEM, quoted from the completeness review: "The 60 design docs in `CE_Application/docs/`
+// and the scripting manual/cookbook/getting-started are invisible from inside the app." A program
+// with four designers in it shipped with an F1 shortcut list and a glossary as its only help.
+//
+// WHY A GENERATED MODULE rather than reading the files at runtime. The docs live at the repository
+// root, outside `CE/web`, and the app runs from a `file://` bundle inside WebView2 with no
+// filesystem of its own — so they have to be in the bundle either way. Baking them through a
+// script is the pattern this repo already uses for exactly this (`generated/dpdProfileMap.json`,
+// `generate-scripting-manual.mjs`), and it keeps the vite config free of an `fs.allow` escape
+// hatch for a directory two levels above the project root.
+//
+// The cost of a generated file is staleness, and that is what `test/helpDocs.test.js` is for: it
+// regenerates in memory and fails if the committed module differs. Same contract as the scripting
+// manual's freshness test.
+//
+//   Regenerate: npm run docs:help
+//   Output:     src/CE_Application/generated/helpDocs.js
+
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = resolve(HERE, '../../..');
+
+export const OUT = resolve(HERE, '../src/CE_Application/generated/helpDocs.js');
+
+/**
+ * What ships, and — as importantly — what does not.
+ *
+ * The rule is that a document in here is one a USER needs and that is CURRENT. Two of the obvious
+ * candidates fail the second half and are deliberately absent:
+ *
+ *   docs/editor-manual-2026-08-10.md   its own first line calls it a historical snapshot; its
+ *                                      generator is not in the tree and the editor has since
+ *                                      replaced two of the files it read. Shipping it as the
+ *                                      manual would be shipping a document that is wrong about
+ *                                      the program it is inside.
+ *   docs/property-hints.md             a writing-style rule for contributors, not for users.
+ *
+ * That leaves a real gap — there is no current editor manual — and the viewer says so rather than
+ * letting the absence pass for completeness.
+ */
+export const HELP_DOCUMENTS = [
+  {
+    id: 'release-notes',
+    file: 'RELEASE-NOTES.md',
+    section: 'Start here',
+    title: 'Release notes',
+    blurb: 'What this build is, what it cannot do yet, and how to report something.',
+  },
+  {
+    id: 'scripting-getting-started',
+    file: 'docs/scripting-getting-started.md',
+    section: 'Start here',
+    title: 'Scripting: getting started',
+    blurb: 'The first script, in the language of your choice.',
+  },
+  {
+    id: 'scripting-manual',
+    file: 'docs/scripting-manual.md',
+    section: 'Scripting',
+    title: 'Scripting manual',
+    blurb: 'The complete panel API. Generated from the same table the editor validates against.',
+  },
+  {
+    id: 'scripting-cookbook',
+    file: 'docs/scripting-cookbook.md',
+    section: 'Scripting',
+    title: 'Scripting cookbook',
+    blurb: 'Worked recipes for the things people actually ask for.',
+  },
+  {
+    id: 'known-issues',
+    file: 'docs/known-issues.md',
+    section: 'Reference',
+    title: 'Known issues',
+    blurb: 'Found, not fixed, and written down so it is not rediscovered.',
+  },
+];
+
+/** The gap the list above leaves, said out loud in the viewer rather than left to be noticed. */
+export const HELP_GAPS = [
+  'There is no current editor manual. The 2026-08-10 snapshot in the repository describes an '
+  + 'editor two refactors ago and is not shipped for that reason. Until one exists, Help → '
+  + 'Keyboard Shortcuts and the hint text on every property are what the editor documents about '
+  + 'itself.',
+];
+
+const firstParagraph = (text) => {
+  for (const block of String(text).split(/\n\s*\n/)) {
+    const line = block.trim();
+    if (!line || line.startsWith('#') || line.startsWith('>') || line.startsWith('```')) continue;
+    return line.replace(/\s+/g, ' ');
+  }
+  return '';
+};
+
+export function buildHelpBundle(readFile = (rel) => readFileSync(join(REPO, rel), 'utf8')) {
+  return HELP_DOCUMENTS.map((doc) => {
+    const text = readFile(doc.file).replace(/\r\n?/g, '\n');
+    return {
+      id: doc.id,
+      title: doc.title,
+      section: doc.section,
+      blurb: doc.blurb,
+      source: doc.file,
+      /** For the index, so a reader can judge length before opening a 89 KB manual. */
+      words: text.split(/\s+/).filter(Boolean).length,
+      opening: firstParagraph(text),
+      text,
+    };
+  });
+}
+
+export function renderModule(bundle, gaps = HELP_GAPS) {
+  return `// GENERATED by scripts/generate-help-bundle.mjs — do not edit.
+//
+// The user-facing documentation, baked into the bundle because the app runs from a file:// entry
+// point in WebView2 and the sources live outside CE/web. Regenerate with \`npm run docs:help\`;
+// test/helpDocs.test.js fails when this is stale.
+
+/** Documented gaps — absences the index states rather than letting them pass for completeness. */
+export const HELP_GAPS = ${JSON.stringify(gaps, null, 2)};
+
+export const HELP_DOCS = ${JSON.stringify(bundle, null, 2)};
+
+/** The sections in the order the index shows them: what to read first, then the rest. */
+export const HELP_SECTIONS = ${JSON.stringify([...new Set(bundle.map((d) => d.section))], null, 2)};
+
+export function helpDocById(id) {
+  return HELP_DOCS.find((doc) => doc.id === id) ?? null;
+}
+`;
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const module = renderModule(buildHelpBundle());
+  mkdirSync(dirname(OUT), { recursive: true });
+  writeFileSync(OUT, module, 'utf8');
+  const kb = (module.length / 1024).toFixed(0);
+  console.log(`help bundle: ${HELP_DOCUMENTS.length} documents, ${kb} KB -> ${OUT}`);
+}

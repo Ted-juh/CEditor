@@ -108,8 +108,12 @@ identity self-check is genuinely good) and the shipping half is scaffolding.
   panels, no welcome screen, no first-run experience, no tour** — the only in-app help is the F1
   shortcut list, the `?` glossary, and hover hints. The program now contains *four* designers
   (panel canvas, custom-component surface with 22 draw tools, Behavior Designer, DPD Designer V2)
-  and nothing that introduces any of them. The 60 design docs in `CE_Application/docs/` and the
-  scripting manual/cookbook/getting-started are invisible from inside the app. Meanwhile the
+  and nothing that introduces any of them. ~~The 60 design docs in `CE_Application/docs/` and the
+  scripting manual/cookbook/getting-started are invisible from inside the app.~~ *(half fixed —
+  Help → Documentation now carries the scripting manual, cookbook, getting-started, release notes
+  and known issues, searchable, baked into the bundle. The 60 design docs are deliberately still
+  out: they are for whoever works on the program, not for whoever uses it. There is still no
+  current editor manual, and the viewer says so.)* Meanwhile the
   ~~**Auto-Panel generator** (DPD → complete working panel in one step) — which would *be* the
   onboarding for the core use case — is designed and sits in Phase 5, unbuilt.~~ *(built — File →
   New Panel from Device Profile; [auto-panel.md](../CE/web/src/CE_Application/docs/auto-panel.md).
