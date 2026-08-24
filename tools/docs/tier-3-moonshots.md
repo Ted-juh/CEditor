@@ -222,8 +222,8 @@ their defaults.* Same shape as the Ctrlr import report and the Auto-Panel regene
 same reason.
 
 **What it reuses:** the interpolation and blending mathematics already written for
-[Timbre Space](../../CE/web/src/CE_Application/docs/timbre-space.md) and
-[Preset Constellation](../../CE/web/src/CE_Application/docs/preset-constellation.md) — which already
+Timbre Space and
+Preset Constellation — which already
 weight and blend whole patches across DPD ranges, stepping enums and skipping the
 non-interpolatable. Translation is that machinery pointed at two devices instead of two patches.
 
@@ -234,7 +234,7 @@ canonical vocabulary to exist first, which makes it genuinely late-order work.
 
 ## 3. Modulation node-graph — already designed
 
-Design record: [`node-graph.md`](../../CE/web/src/CE_Application/docs/node-graph.md).
+Design record: `node-graph.md`.
 
 A patch-cord canvas: sources wired to destinations with depth and curve. The record's own key
 decision is the right one — **a cable *is* a route**, sharing the existing route model with the
@@ -248,7 +248,7 @@ program needs a magazine cover.
 
 ## 4. Snapshot Morph — half shipped
 
-Design record: [`macro-and-morph.md`](../../CE/web/src/CE_Application/docs/macro-and-morph.md).
+Design record: `macro-and-morph.md`.
 
 The **Macro** half is shipped: one knob to many destinations, each with depth, curve and range,
 through the fan-out mechanism, with a pure engine and tests. What remains is the **snapshot morph** —

@@ -112,18 +112,23 @@ export function generateManual() {
     })
     .join('\n\n');
 
-  // One line of context for the component-command categories: what the component is,
-  // and where its full story lives. `target` semantics are shared by all of them.
-  const COMPONENT_DOCS = '../CE/web/src/CE_Application/docs';
+  // One line of context for the component-command categories: what the component is. `target`
+  // semantics are shared by all of them.
+  //
+  // THESE USED TO LINK to a design doc per component, under `CE/web/src/CE_Application/docs/`. That
+  // tree is gone — the whole design-note folder was deleted deliberately — and this manual is
+  // compiled into the app's help bundle, so a link to a file that no longer exists is a dead link
+  // inside the shipped editor rather than a dead link in a repo somebody can grep. The sentence
+  // each link carried is kept; only the href went.
   const CATEGORY_NOTES = {
-    'Zone Splitter': `Drive the [Zone Splitter](${COMPONENT_DOCS}/zone-splitter.md) — keyboard zones with per-zone routing. \`target\` is the component's control name.`,
-    'Phrase Sequencer': `Drive the [Phrase Sequencer](${COMPONENT_DOCS}/phrase-sequencer.md) — a step grid whose rows are scale degrees. \`target\` is the component's control name.`,
-    'Phrase Recorder': `Drive the [Phrase Recorder](${COMPONENT_DOCS}/phrase-recorder.md) — the note looper. \`target\` is the component's control name.`,
-    'Harmoniser': `Drive the [Harmoniser](${COMPONENT_DOCS}/harmoniser.md) — one finger in, a full chord out. \`target\` is the component's control name.`,
-    'Setlist': `Drive the [Setlist](${COMPONENT_DOCS}/setlist.md) — scenes on a footswitch. \`target\` is the component's control name.`,
-    'Arpeggiator': `Drive the [Arpeggiator](${COMPONENT_DOCS}/arpeggiator.md) — held notes walked as a pattern. \`target\` is the component's control name.`,
-    'Turing Modulator': `Drive the [Turing Modulator](${COMPONENT_DOCS}/turing-modulator.md) — the locking random looper. \`target\` is the component's control name.`,
-    'Gesture Looper': `Drive the [Gesture Looper](${COMPONENT_DOCS}/gesture-looper.md) — recorded control motion on a loop. \`target\` is the component's control name.`,
+    'Zone Splitter': `Keyboard zones with per-zone routing. \`target\` is the component's control name.`,
+    'Phrase Sequencer': `A step grid whose rows are scale degrees. \`target\` is the component's control name.`,
+    'Phrase Recorder': `The note looper. \`target\` is the component's control name.`,
+    'Harmoniser': `One finger in, a full chord out. \`target\` is the component's control name.`,
+    'Setlist': `Scenes on a footswitch. \`target\` is the component's control name.`,
+    'Arpeggiator': `Held notes walked as a pattern. \`target\` is the component's control name.`,
+    'Turing Modulator': `The locking random looper. \`target\` is the component's control name.`,
+    'Gesture Looper': `Recorded control motion on a loop. \`target\` is the component's control name.`,
   };
 
   const commandsByCategory = new Map();

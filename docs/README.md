@@ -11,11 +11,10 @@
 | 5 | [Panel API spec](../tools/docs/panel-api-spec.md) | The design decisions (Q1–Q11) behind the API — the contract and its *why*. |
 | 6 | [Scripting redesign plan](../tools/docs/scripting-redesign-plan.md) | Why scripting works this way: lifecycle spine, scope layers, the many-real-languages model, Model 2 runtime. |
 | 7 | [Language options & shippable export](scripting-language-options-and-shippable-export.md) | Per-language toolchains, installer options, exporting from an installed app. |
-| — | [Scripting modules design](scripting-modules-design.md) | The design record for the `ce.*` module system: why it is shaped this way, and an *as built* section per phase as each one landed. |
 | — | [Scripting architecture plan](../tools/docs/scripting-architecture-plan.md) | ⚠️ **Historical.** The retired command-graph model; superseded by 5 and 6. |
 
-Working notes: [runtime gaps](../CE/web/src/CE_Application/docs/scripting-runtime-gaps.md) (what the
-API advertises vs what the C++ runtime backs) and [timer system](../CE/web/src/CE_Application/docs/timer-system.md).
+Working notes on what the API advertises versus what the C++ runtime backs, and on the timer
+system, lived in `CE/web/src/CE_Application/docs/` and were deleted with the rest of that tree.
 
 ## Other documents here
 
@@ -36,5 +35,7 @@ API advertises vs what the C++ runtime backs) and [timer system](../CE/web/src/C
   Its generator needed two files the editor has since replaced, so it is kept as a dated record and
   as the specification for whoever ports it. The scripting manual above is the current one.
 
-Component and panel-part design docs live in `CE/web/src/CE_Application/docs/`; editor and tooling
-design records have their own index at [tools/docs](../tools/docs/README.md).
+Editor and tooling design records have their own index at [tools/docs](../tools/docs/README.md).
+The component and panel-part design notes that used to sit in `CE/web/src/CE_Application/docs/` were
+deleted deliberately — the code and its tests are the record now. Git history has them if the
+reasoning behind a component is ever wanted again.

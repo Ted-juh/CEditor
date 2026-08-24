@@ -42,7 +42,7 @@ mention.
 ### The panel is a performance instrument, not a remote control
 
 Every competing editor stops at "move a control, send a message." CEditor ships, per
-[`groundbreaking-components.md`](../CE/web/src/CE_Application/docs/groundbreaking-components.md):
+`groundbreaking-components.md`:
 
 | Family | Shipped | What it means to a musician |
 |---|---|---|
@@ -181,7 +181,7 @@ Staged, with the ordering rules and the failure modes to test:
 ### 3. Auto-Panel — profile in, working editor out
 
 **Built** — File → New Panel from Device Profile; see
-[`auto-panel.md`](../CE/web/src/CE_Application/docs/auto-panel.md). It is three things at once and
+`auto-panel.md`. It is three things at once and
 each alone would justify it:
 
 - **The adoption unlock.** Hours of layout become seconds.
@@ -193,7 +193,7 @@ each alone would justify it:
 
 The three questions that kept it unbuilt — mapping policy, layout strategy, and
 **regenerate-versus-merge** — are answered in the *Resolved design* section now appended to
-[`auto-panel.md`](../CE/web/src/CE_Application/docs/auto-panel.md): a complete `valueType` → control
+`auto-panel.md`: a complete `valueType` → control
 table, sectioned-by-group layout with one page per scope instance, and a three-way merge over
 provenance-tagged controls so a regenerate never discards the user's styling. That last one is the
 difference between a party trick and a tool — and it is what stops the Capture Session and the
@@ -270,7 +270,7 @@ It also converts the MIDI 2.0 story from aspiration to fact, which matters for p
 
 ### 7. Patch Diff / Compare
 
-Designed in [`patch-diff.md`](../CE/web/src/CE_Application/docs/patch-diff.md); cheap on top of
+Designed in `patch-diff.md`; cheap on top of
 snapshots + DPD. Two audiences at once: sound designers get the hardware **Compare** button they
 have missed since 1990 (A/B against the stored patch), and profile authors get the byte-level
 pairing that makes reverse-engineering legible. It is the natural companion to the Capture Session
@@ -303,9 +303,9 @@ whether they compound or merely impress. Summary:
   to the Blofeld"* is expressible: match on parameter meaning, rescale through both ranges, report
   what had no counterpart. Imperfect by nature, unforgettable as a demo, and impossible for anyone
   whose device layer is a SysEx template.
-- **Modulation node-graph** ([`node-graph.md`](../CE/web/src/CE_Application/docs/node-graph.md)) —
+- **Modulation node-graph** (`node-graph.md`) —
   the flashiest unbuilt item, and the single best screenshot the program could have.
-- **Snapshot Morph** ([`macro-and-morph.md`](../CE/web/src/CE_Application/docs/macro-and-morph.md))
+- **Snapshot Morph** (`macro-and-morph.md`)
   — the piece that finishes the turn from editor to instrument.
 
 ---
