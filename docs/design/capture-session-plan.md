@@ -3,9 +3,9 @@
 > Status: **S1–S4 built, 2026-08-23.** The inference engine, the session state machine and the
 > guided screen exist; see "What was built" at the foot of this file. Originally written as design,
 > 2026-08-11. Tier 1 #1 in
-> [`docs/beta-differentiation.md`](../../docs/beta-differentiation.md), and the proposed headline
+> [`docs/beta-differentiation.md`](../beta-differentiation.md), and the proposed headline
 > for the first beta. Companion to
-> [`device-profile-engine-mvp-plan.md`](device-profile-engine-mvp-plan.md) (the engine this writes
+> `device-profile-engine-mvp-plan.md` (the engine this writes
 > into) and [`midi2-integration-plan.md`](midi2-integration-plan.md) (the other road to the same
 > destination).
 

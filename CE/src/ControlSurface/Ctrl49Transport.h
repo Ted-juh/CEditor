@@ -1,7 +1,7 @@
 // Transport interfaces for the CTRL49 control surface. The session and page logic depend
 // only on these; the Win32 backends (WinMM output, KSPROPERTY private input) live behind
 // them so a future Advance or Windows MIDI Services backend can slot in without touching
-// session code. Design record: tools/docs/screen-builder-design.md.
+// session code. Design record: docs/design/screen-builder-design.md.
 
 #pragma once
 

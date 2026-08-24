@@ -7,7 +7,7 @@
 // a script is "source-based" when it has a `source` string + `language`. New scripts use
 // this shape; old documents keep working until they are migrated/retired.
 //
-// Spec: tools/docs/panel-api-spec.md. Runtime: Model 2 (C++ host).
+// Spec: docs/design/panel-api-spec.md. Runtime: Model 2 (C++ host).
 
 import {
   SCRIPT_LANGUAGES,

@@ -4,7 +4,7 @@
 
 // RestorePolicy.h — when an exported plugin is allowed to push a restored patch at the hardware.
 //
-// THE GAP THIS CLOSES, from tools/docs/total-recall-plan.md §1: `setStateInformation` restores every
+// THE GAP THIS CLOSES, from docs/design/total-recall-plan.md §1: `setStateInformation` restores every
 // value and reconnects the ports, and then stops. The APVTS holds the patch; the synth holds
 // whatever it was left on. The state is *known* and *not transmitted*, which from the user's chair
 // is indistinguishable from not having been saved.

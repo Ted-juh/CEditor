@@ -40,7 +40,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 ; (Settings -> Scripting Toolchains) or fetched automatically on first export of a panel that uses them.
 ; NOTE: a full VST3 export needs the C++ build environment (source + CMake + a compiler); these
 ; components install the per-language toolchains for that build, they do not by themselves make a
-; GUI-only install able to export. See tools/docs/windows-installer.md.
+; GUI-only install able to export. See docs/design/windows-installer.md.
 [Types]
 Name: "standard"; Description: "Standard (Lua, JavaScript, TypeScript)"
 Name: "full";     Description: "Full (adds Python, C++, C#, Java scripting)"

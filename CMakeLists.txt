@@ -414,7 +414,7 @@ if(CEDITOR_BUILD_APP)
         PlayerWebData
     )
 
-    # --- CLAP format (via vendored clap-juce-extensions, ThirdParty/clap-juce-extensions) --------
+    # --- CLAP format (via vendored clap-juce-extensions, CE/thirdparty/clap-juce-extensions) --------
     # JUCE has no native CLAP support, so the .clap comes from the free-audio wrapper: it creates a
     # CEditorPlayerVST_CLAP target reusing the same PlayerHost/plugin code. The CLAP id is a
     # freeform reverse-DNS string, so per-panel uniqueness needs no 4-char-code hashing — the
@@ -428,7 +428,7 @@ if(CEDITOR_BUILD_APP)
     set(CE_CLAP_ID "com.tedjuh.ceditor.default" CACHE STRING "Per-panel CLAP id (the export pipeline passes the real one)")
 
     if (CEDITOR_CLAP)
-        add_subdirectory(ThirdParty/clap-juce-extensions clap-juce-extensions EXCLUDE_FROM_ALL)
+        add_subdirectory(CE/thirdparty/clap-juce-extensions clap-juce-extensions EXCLUDE_FROM_ALL)
         clap_juce_extensions_plugin(TARGET CEditorPlayerVST
             CLAP_ID "${CE_CLAP_ID}"
             # A MIDI controller surface, not an audio processor: "utility" is the honest category
@@ -631,7 +631,7 @@ ce_configure_test(CEditorUpdateCheckTests)
 
 # --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
 # Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.
-# Design record: tools/docs/screen-builder-design.md.
+# Design record: docs/design/screen-builder-design.md.
 add_executable(CEditorCtrl49ProtocolTests
     "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
     "${CE_ROOT}/tests/Ctrl49ProtocolTests.cpp"

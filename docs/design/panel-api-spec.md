@@ -5,7 +5,7 @@ The shared API that every scripting language calls. It must behave **identically
 Decisions are recorded here as we settle them, question by question. A question marked LOCKED
 records what was decided then, not necessarily the whole surface now — hooks and commands added by
 later design rounds are not backfilled here. For the API as it currently stands, read the
-[scripting manual](../../docs/scripting-manual.md) or open `docs/api-explorer.html`.
+[scripting manual](../scripting-manual.md) or open `docs/api-explorer.html`.
 
 ---
 

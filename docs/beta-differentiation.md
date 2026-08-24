@@ -2,7 +2,7 @@
 
 > Status: **product strategy, 2026-08-11.** Written against the code and the design records as
 > they stand at `e007732`. Companion to the
-> [program completeness review](program-completeness-review-2026-08-03.md) — that document asked
+> program completeness review (`program-completeness-review-2026-08-03.md`) — that document asked
 > *what is missing*; this one asks *what is unmatched*, and what it would take to make the
 > difference visible to somebody who has never opened the program.
 
@@ -68,7 +68,7 @@ it reads as a footnote.
 ### The device layer is an intent compiler, not a SysEx generator
 
 The architectural decision in
-[`device-profile-engine-mvp-plan.md`](../tools/docs/device-profile-engine-mvp-plan.md) — a panel
+`device-profile-engine-mvp-plan.md` — a panel
 emits *"set mainSynth.filter.cutoff to 64"* and the device layer decides whether that becomes CC,
 NRPN, RPN, SysEx, a multi-message transaction, or a no-op — is why half the list above is even
 possible. Morphing a whole patch, diffing two patches semantically, randomizing within musical
@@ -126,7 +126,7 @@ mission statement in `midi2-integration-plan.md` — "control and automate almos
 — made literal.
 
 The three capture modes, the byte-diff inference table, the confidence model, the staging and the
-simulated-synth test strategy are in [**capture-session-plan.md**](../tools/docs/capture-session-plan.md).
+simulated-synth test strategy are in [**capture-session-plan.md**](design/capture-session-plan.md).
 One detail from it worth repeating here: the DPD schema already defines `provenance.source` as
 `official | community | imported | **learn**`. The place to put a learned parameter was reserved
 before anyone proposed learning one.
@@ -176,7 +176,7 @@ back too.* All four stages are done. Nothing here has yet been run against real 
 session-recallable, automatable, stage-ready instrument.
 
 Staged, with the ordering rules and the failure modes to test:
-[**total-recall-plan.md**](../tools/docs/total-recall-plan.md).
+[**total-recall-plan.md**](design/total-recall-plan.md).
 
 ### 3. Auto-Panel — profile in, working editor out
 
@@ -227,7 +227,7 @@ profile, then let **Auto-Panel** rebuild the interface natively. One evening of 
 devices instead of one week per device.
 
 This deserved its own record — the difficulty analysis, the stage plan, and the mapping tables are
-in [**ctrlr-import-plan.md**](../tools/docs/ctrlr-import-plan.md). Short version: the geometry and
+in [**ctrlr-import-plan.md**](design/ctrlr-import-plan.md). Short version: the geometry and
 the MIDI map are a data-mapping problem and genuinely easy; the Lua is hard and should be
 quarantined rather than translated; nothing about it requires porting JUCE.
 
@@ -258,7 +258,7 @@ for the argument it makes about *why* discovery is worth having, which is unchan
 
 ~~`juce_midi_ci` is vendored and compiled in but unwired.~~ `CE/dpd/tools/import-midici.mjs` already
 converts Property Exchange JSON into a partial profile, offline, today. M1 of
-[`midi2-integration-plan.md`](../tools/docs/midi2-integration-plan.md) connects the two.
+[`midi2-integration-plan.md`](design/midi2-integration-plan.md) connects the two.
 
 The honest limit is already documented in the importer: Property Exchange describes controllers,
 programs and identity — never SysEx addresses, bit-packing or dump layouts. So CI gives you the CC
@@ -292,7 +292,7 @@ not currently surface at export time at all.
 
 ## Tier 3 — after the beta
 
-Designed in [**tier-3-moonshots.md**](../tools/docs/tier-3-moonshots.md), which ranks them by
+Designed in [**tier-3-moonshots.md**](design/tier-3-moonshots.md), which ranks them by
 whether they compound or merely impress. Summary:
 
 - **Manual → profile.** Feed the synth's MIDI implementation chart PDF; get a draft DPD; verify it

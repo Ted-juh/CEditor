@@ -2369,5 +2369,5 @@ means in practice:
 
 - [Getting started](scripting-getting-started.md) — your first script, step by step.
 - [Scripting cookbook](scripting-cookbook.md) — task-based recipes.
-- [Panel API spec](../tools/docs/panel-api-spec.md) — the design decisions behind this API.
+- [Panel API spec](design/panel-api-spec.md) — the design decisions behind this API.
 - [Docs index](README.md) — reading order for all scripting docs.

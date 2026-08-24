@@ -2,7 +2,7 @@
 // runnable source in its own language.
 //
 // CEditor stores and runs scripts AS-IS: no transpilation, no projection through an
-// intermediate model (CLAUDE.md, tools/docs/panel-api-spec.md). So this harness takes the
+// intermediate model (CLAUDE.md, docs/design/panel-api-spec.md). So this harness takes the
 // canonical script source for each language (script-export-corpus.mjs), hands it to that
 // language's REAL toolchain, and asserts it produces the canonical effects against a stubbed
 // panel API. If a language's toolchain is absent the target is skipped, never silently passed.

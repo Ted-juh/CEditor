@@ -11,7 +11,7 @@
 //   • (later) the Sol3 (Lua) + juce_javascript (JS) host bindings.
 //
 // It is DATA, not behaviour — the runtime lives in the C++ host (Model 2).
-// Spec: tools/docs/panel-api-spec.md (decisions Q1–Q11). Naming rule throughout:
+// Spec: docs/design/panel-api-spec.md (decisions Q1–Q11). Naming rule throughout:
 // self-evident, distinct words, established conventions.
 //
 // PARITY IS ENFORCED. Five runtimes implement this contract — the WebView runtime

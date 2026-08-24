@@ -4,7 +4,7 @@ This document defines the implementation plan for converting a CEditor panel int
 **unique, self-contained JUCE artifact** (VST3 plugin and/or standalone application),
 built fresh per panel.
 
-It is the companion to [device-profile-engine-mvp-plan.md](device-profile-engine-mvp-plan.md).
+It is the companion to `device-profile-engine-mvp-plan.md`.
 That plan covers the *authoring* loop (design → preview → adjust). This plan covers the
 *delivery* loop (panel document → compiled binary → runs in a DAW against real hardware).
 

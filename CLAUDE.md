@@ -298,7 +298,7 @@ CE/src/      C++ backend (JUCE) — bridge, DeviceProfile, Player, Scripting, Ex
 CE/web/      Svelte frontend — CE_Application (editor), CE_Panel (renderers), Player
 CE/tests/    C++ test sources; targets and add_test() live in the root CMakeLists.txt
 tools/       Export, packaging, toolchain provisioning and QA scripts
-docs/        Scripting manual, cookbook, design and review notes
+docs/        User-facing docs; docs/design/ holds the design records
 ```
 
 `CMakeLists.txt` is heavily commented and those comments are load-bearing history — several of them

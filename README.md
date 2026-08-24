@@ -120,6 +120,7 @@ CEditor/
   CE/
     thirdparty/
       webview2/              WebView2 SDK (pre-installed)
+      clap-juce-extensions/  Vendored CLAP wrapper (the .clap build of the player)
     src/                     C++ backend source (see the tree above)
     dpd/                     Device profile schema, codecs and profile tooling
     include/                 Native app assets
@@ -130,12 +131,11 @@ CEditor/
       test/                  Node test suite (npm test)
       package.json           Node dependencies
       vite.config.js         Vite configuration
-  docs/                      User-facing docs: scripting manual, cookbook, API explorer
-                             — start at docs/README.md
+  docs/                      User-facing docs — start at docs/README.md
+    design/                  Design records for the editor and its tooling
   CMakeLists.txt             CMake build configuration
   build/                     Build output (gitignored)
   tools/
-    docs/                    Design records for the editor and its tooling (tools/docs/README.md)
     installer/               Inno Setup script and installer assets
     scripts/                 Build, packaging, export and doc-generation helpers
       build-native.ps1       Windows-native build helper (loads vcvars + builds preset)

@@ -6,10 +6,8 @@
 /CE/web/node_modules/.vite/
 /CE/web/node_modules/.vite-temp/
 /CE/web/node_modules/.package-lock.json
-/Ctrlr/
 # JUCE is vendored with this repository and should be tracked.
-/Docs/
-/out/
+
 # Scratch: QA screenshots, harness scripts, logs, mockups.
 /tmp/
 # Per-panel export output (generated VST3s).
@@ -22,6 +20,11 @@
 # baked in as data URIs. docs/api-explorer.html is the checked-in page; this one is ~1.9MB of the
 # same content and is regenerated whenever it is hosted.
 /docs/api-explorer.standalone.html
+
+# CAREFUL with case here. core.ignorecase is true on Windows, which makes these patterns
+# case-INSENSITIVE: a rule reading `/Docs/` silently ignored everything new under the tracked
+# `docs/` tree, and `/Claude.md` did the same to `CLAUDE.md`. Both were relics of an older layout
+# and both are gone. Match the real casing of a real path, or leave the rule out.
 
 /.claude/
 *.cache
@@ -38,9 +41,5 @@
 *.suo
 *.vs
 .vscode
-.windsurf
 .DS_Store
-.windsurfrules
-MoveAllFiles.bat
-/Claude.md
 build-installer.log

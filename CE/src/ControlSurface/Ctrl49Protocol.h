@@ -2,7 +2,7 @@
 //
 // Byte-level ground truth is the external reverse-engineering handoff
 // (CTRL49_CEditor_Complete_Engineering_Handoff.md); design record is
-// tools/docs/screen-builder-design.md. Every builder here has a golden-byte test in
+// docs/design/screen-builder-design.md. Every builder here has a golden-byte test in
 // CE/tests/Ctrl49ProtocolTests.cpp reproducing frames proven live on hardware.
 //
 // Frame shape:  F0 00 01 05 31 08  TT CC  L0 L1  [payload]  F7

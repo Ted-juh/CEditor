@@ -750,4 +750,4 @@ function main() {
   console.log(`  common ${PATCH_COMMON.length - 11}, tone 3 x ${PATCH_TONE.length}, effects ${PATCH_DISTORTION.length + PATCH_FLANGER.length + PATCH_DELAY.length + PATCH_REVERB.length}, arpeggio ${PATCH_ARPEGGIO_COMMON.length}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

@@ -113,4 +113,4 @@ function main() {
   console.log('Export it, route the plugin MIDI out to a monitor, load it — each working language sends its CC (20..26).');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

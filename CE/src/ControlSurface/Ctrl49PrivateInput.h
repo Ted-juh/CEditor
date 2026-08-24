@@ -17,7 +17,7 @@
 //
 // The private capture behaves as a single logical consumer: exactly one process (and in
 // it, one instance) may own it. Open failure here is the backstop that keeps a bridge
-// from starting a talk-only session (design record: tools/docs/screen-builder-design.md).
+// from starting a talk-only session (design record: docs/design/screen-builder-design.md).
 // Windows-only.
 
 #pragma once

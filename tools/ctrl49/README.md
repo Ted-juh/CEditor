@@ -1,7 +1,7 @@
 # CTRL49 control-surface tools
 
 Probe tooling and assets for the CTRL49 screen integration. Design record:
-[`tools/docs/screen-builder-design.md`](../docs/screen-builder-design.md). Byte-level
+[`docs/design/screen-builder-design.md`](../../docs/design/screen-builder-design.md). Byte-level
 protocol ground truth is the external reverse-engineering handoff.
 
 ## The product exe: Ctrl49Bridge (start here)

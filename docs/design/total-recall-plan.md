@@ -1,7 +1,7 @@
 # Total Recall — hardware that behaves like a plugin
 
 > Status: **design, 2026-08-11.** Tier 1 #2 in
-> [`docs/beta-differentiation.md`](../../docs/beta-differentiation.md). Companion to
+> [`docs/beta-differentiation.md`](../beta-differentiation.md). Companion to
 > [`panel-export-pipeline-plan.md`](panel-export-pipeline-plan.md). Smaller and better-defined than
 > the other two Tier-1 items — most of this is finishing things that are already three-quarters
 > written.

@@ -4,7 +4,7 @@
 
 // ProgramBank.h — the exported plugin's program list, read off the baked panel.
 //
-// THE GAP, from tools/docs/total-recall-plan.md §3: the plugin reported one program and named it
+// THE GAP, from docs/design/total-recall-plan.md §3: the plugin reported one program and named it
 // nothing, so a DAW's program menu was empty and there was no host-automatable way to change patch.
 // Meanwhile `stores/presetLibrarian.js` has had persisted banks, captured patch data, ROM-write
 // blocking and recall for a long time — in the editor's web layer, where the plugin never sees it.

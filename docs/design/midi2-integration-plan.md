@@ -1,7 +1,7 @@
 # MIDI 2.0 Integration Plan — MIDI-CI first, UMP second
 
 This document is the deferred plan for bringing MIDI 2.0 to CEditor. It is the companion to
-[device-profile-engine-mvp-plan.md](device-profile-engine-mvp-plan.md) (the authoring/runtime engine)
+`device-profile-engine-mvp-plan.md` (the authoring/runtime engine)
 and builds on the universal Device Profile Designer (DPD) and its dump pipeline.
 
 > The point of CEditor is to control and automate **almost any** hardware synth. MIDI 2.0 matters here

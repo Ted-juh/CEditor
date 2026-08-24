@@ -11,7 +11,7 @@
 > CEditor is Svelte."*
 >
 > The short answer is that the difficulty is real but it is **not** where the objection puts it.
-> Ranked in [`docs/beta-differentiation.md`](../../docs/beta-differentiation.md) as Tier 2 #4.
+> Ranked in [`docs/beta-differentiation.md`](../beta-differentiation.md) as Tier 2 #4.
 
 ## The objection, and why it points the wrong way
 

@@ -14,7 +14,7 @@
 //   • ScriptRuntime  — owns the engines + the script set; routes lifecycle hooks and events to the
 //                      right scripts; tracks inbound origin for transmit-by-default (Q2); logs errors.
 //
-// Spec: tools/docs/panel-api-spec.md (Q1–Q11). The JS side of the API surface lives in
+// Spec: docs/design/panel-api-spec.md (Q1–Q11). The JS side of the API surface lives in
 // CE/web/src/CE_Application/scripting/panelApi.js — keep the two in sync.
 //
 // THREADING: every public method here must be called on the JUCE message thread. The audio thread

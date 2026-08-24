@@ -1,7 +1,7 @@
 // RestorePolicyTests — when an exported plugin may push a restored patch at the hardware.
 //
 // This is the one part of Total Recall S2 that is all ordering and timing, and the plan
-// (tools/docs/total-recall-plan.md §1) warns about exactly that: "the failure modes here are all
+// (docs/design/total-recall-plan.md §1) warns about exactly that: "the failure modes here are all
 // timing and ordering, so test those rather than the happy path."
 //
 // It is also the only part testable off Windows. The rest lives in PluginProcessor.h, which needs

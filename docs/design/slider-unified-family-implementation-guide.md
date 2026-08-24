@@ -18,8 +18,8 @@ thinking. The slider system should be designed correctly from the start:
 
 Related references:
 
-- `tools/docs/interactive-components-implementation-spec.md`
-- `tools/docs/button-system-redesign-spec.md`
+- `docs/design/interactive-components-implementation-spec.md` — deleted; in git history.
+- `docs/design/button-system-redesign-spec.md` — deleted; in git history.
 
 ## Core Product Position
 

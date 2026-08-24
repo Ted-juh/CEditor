@@ -17,7 +17,7 @@ The existing interactive architecture already supports this direction through
 
 Related reference:
 
-- `tools/docs/interactive-components-implementation-spec.md`
+- `docs/design/interactive-components-implementation-spec.md` — deleted; in git history.
 
 ## Direct Answers
 

@@ -2,7 +2,7 @@
 
 The exported player ships as a `.clap` alongside the `.vst3` (and the standalone). JUCE has no
 native CLAP support, so the format is produced by the vendored
-[clap-juce-extensions](../ThirdParty/clap-juce-extensions/VENDORED.md) wrapper around the same
+[clap-juce-extensions](../CE/thirdparty/clap-juce-extensions/VENDORED.md) wrapper around the same
 `CEditorPlayerVST` target — same PlayerHost, same panel, same WebView UI; only the host-facing
 shell differs.
 

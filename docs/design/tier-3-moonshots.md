@@ -1,7 +1,7 @@
 # Tier 3 — the post-beta bets
 
 > Status: **design, 2026-08-11.** Tier 3 of
-> [`docs/beta-differentiation.md`](../../docs/beta-differentiation.md): four things that are too big
+> [`docs/beta-differentiation.md`](../beta-differentiation.md): four things that are too big
 > or too speculative for a first beta and would each be a reason to write about the program.
 >
 > Two of them are genuinely new and are designed here. Two already have design records and are

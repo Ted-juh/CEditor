@@ -1,5 +1,17 @@
 # Vendored third-party SDKs
 
+## clap-juce-extensions
+
+The CLAP wrapper for the player plugin, vendored so the build works offline. The root
+`CMakeLists.txt` pulls it in with `add_subdirectory(CE/thirdparty/clap-juce-extensions ...)` when
+`CEDITOR_CLAP` is ON, which is inside the `CEDITOR_BUILD_APP` guard — it attaches itself to the
+`CEditorPlayerVST` target, so there is nothing for it to attach to off Windows.
+
+Version, upstream and the pinned commits are in
+[`clap-juce-extensions/VENDORED.md`](clap-juce-extensions/VENDORED.md), which is also where the
+update procedure lives. It used to sit in a `ThirdParty/` folder of its own at the repo root;
+vendored code has one home now, and this is it.
+
 ## WebView2
 
 **`webview2/` is what the build uses.** `CMakeLists.txt` points `WEBVIEW2_DIR` at

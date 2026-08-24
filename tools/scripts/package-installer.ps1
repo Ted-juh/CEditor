@@ -219,7 +219,7 @@ function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     # are downloaded on demand). This makes Settings -> Scripting Toolchains work in the installed app and
     # gives the installer's language components something to provision into. NOTE: a full VST3 export also
     # needs the C++ build environment (source + CMake + a compiler); that is a separate "developer install"
-    # and is not staged here — see tools/docs/windows-installer.md.
+    # and is not staged here — see docs/design/windows-installer.md.
     $toolsSrc = Join-Path $RepoRoot "tools"
     $toolsDst = Join-Path $StageDir "tools"
 

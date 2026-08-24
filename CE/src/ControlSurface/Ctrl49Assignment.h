@@ -1,6 +1,6 @@
 // Assignment model for the CTRL49 control surface: pages of encoder-slot -> device
 // parameter bindings. This is the "assignments, not layouts" core of the Screen Builder
-// (design record: tools/docs/screen-builder-design.md) in its first, file-loaded form —
+// (design record: docs/design/screen-builder-design.md) in its first, file-loaded form —
 // the seed of the Screen document that the editor UI will later produce.
 //
 // Uses juce::var for JSON, so it is host-side glue: only the synth hosts and its test

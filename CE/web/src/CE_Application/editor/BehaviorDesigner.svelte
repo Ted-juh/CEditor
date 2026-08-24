@@ -1,7 +1,7 @@
 <script>
   // BehaviorDesigner — the stable single-frame scripting editor (replaces the 10-mode
   // ScriptWorkspace). Cloned from the DPD shell: fixed frame, nav-rail by lifecycle,
-  // screens via display:none/.active, list -> detail. Spec: tools/docs/panel-api-spec.md.
+  // screens via display:none/.active, list -> detail. Spec: docs/design/panel-api-spec.md.
   import './behaviorDesigner.css';
   import { onMount, untrack } from 'svelte';
   import ScriptPicker from './ScriptPicker.svelte';

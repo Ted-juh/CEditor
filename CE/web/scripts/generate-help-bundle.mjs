@@ -136,7 +136,7 @@ export function helpDocById(id) {
 `;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const module = renderModule(buildHelpBundle());
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, module, 'utf8');
