@@ -1,12 +1,15 @@
 {
-  "panelGuid": "14fa3c6c-4d64-4c9c-b1a1-c871ba7bcb46",
+  "panelGuid": "5e1f7e57-c0de-4000-8000-000000000001",
   "exportSettings": {
     "pluginName": "",
     "vendor": "Tedjuh",
     "manufacturerCode": "Tdjh",
     "version": "1.0.0",
     "embedPython": "on",
-    "compileNativeHandlers": "on"
+    "compileNativeHandlers": "on",
+    "exportClap": true,
+    "exportLv2": true,
+    "restoreHardware": "ask"
   },
   "name": "CEditor Self-Test",
   "scriptId": "panel_1",
@@ -19,6 +22,7 @@
   "width": 600,
   "height": 400,
   "resizable": false,
+  "panicShortcut": "Escape",
   "minWidth": 0,
   "minHeight": 0,
   "maxWidth": 0,
@@ -101,6 +105,10 @@
   "gridOriginX": 0,
   "gridOriginY": 0,
   "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
   "notepad": {
     "notes": [
       {
@@ -208,5 +216,14 @@
     "runInPreview": true,
     "runOnExport": true
   },
-  "controls": []
+  "controls": [],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ]
 }

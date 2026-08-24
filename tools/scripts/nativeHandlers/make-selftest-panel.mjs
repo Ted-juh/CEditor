@@ -6,8 +6,21 @@
 //   CC 20 lua · 21 javascript · 22 typescript · 23 python · 24 cpp · 25 csharp · 26 java   (all value 127)
 //
 // Export it with compileNativeHandlers='auto'/'on' (C++/C#/Java) + embedPython='on' (Python) to exercise
-// every engine. Run:  node tools/scripts/nativeHandlers/make-selftest-panel.mjs [outFile]
-import { writeFileSync } from 'node:fs';
+// every engine. Run:
+//   node tools/scripts/nativeHandlers/make-selftest-panel.mjs [outFile]
+//   node tools/scripts/nativeHandlers/make-selftest-panel.mjs --check   (fail if the committed copy is stale)
+//
+// THE COMMITTED COPY DRIFTED, and the reason it could is worth writing down. `createPanel` mints a
+// random `panelGuid` on every call, so a freshness test comparing the file to a fresh build would
+// have failed on every run — nobody wrote one, and the file quietly fell behind the model by several
+// fields (exportClap, exportLv2, restoreHardware, panicShortcut, guides, layers).
+//
+// So the GUID is pinned below, which is not a testing hack: a fixture that mints a NEW plugin
+// identity every time it is regenerated is wrong on its own terms. Re-exporting the self-test should
+// update the same plugin, not spawn another one in the DAW and leave the old one orphaned — that is
+// what the identity registry (utils/guidRegistry.js) exists to prevent, and this file was the one
+// place deliberately violating it.
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
@@ -54,16 +67,50 @@ end`],
 }`],
 };
 
+/**
+ * The self-test's plugin identity, fixed.
+ *
+ * Reads as "selftest" in hex, which is the point: an obviously synthetic id nobody will mistake for
+ * one the registry minted. Never change it — a new value orphans every copy of this plugin already
+ * installed in somebody's DAW.
+ */
+const SELFTEST_GUID = '5e1f7e57-c0de-4000-8000-000000000001';
+
 const panel = createPanel('CEditor Self-Test');
+panel.panelGuid = SELFTEST_GUID;
 panel.scripts = Object.entries(LANGS).map(([lang, [, source]]) =>
   createScript({ id: `st_${lang}`, name: `selftest ${lang}`, language: lang, source, event: 'onPanelReady', scope: 'panel', target: '*' }));
 // Make the export exercise every engine.
 panel.exportSettings = { ...panel.exportSettings, compileNativeHandlers: 'on', embedPython: 'on' };
 panel.scripting = { enabled: true, runInPreview: true, runOnExport: true };
 
-const out = process.argv[2] || path.join(REPO, 'tools/scripts/nativeHandlers/selftest.cepanel');
-const json = serializePanel(panel);
-writeFileSync(out, typeof json === 'string' ? json : JSON.stringify(json, null, 2));
-console.log(`Wrote ${out}`);
-console.log('Languages:', Object.keys(LANGS).join(', '));
-console.log('Export it, route the plugin MIDI out to a monitor, load it — each working language sends its CC (20..26).');
+/** What the committed file should contain. Exported so a test can compare without shelling out. */
+export function serializeSelftestPanel() {
+  const json = serializePanel(panel);
+  return typeof json === 'string' ? json : JSON.stringify(json, null, 2);
+}
+
+export const SELFTEST_PATH = path.join(REPO, 'tools/scripts/nativeHandlers/selftest.cepanel');
+export const SELFTEST_LANGUAGES = Object.keys(LANGS);
+
+function main() {
+  const args = process.argv.slice(2);
+  const json = serializeSelftestPanel();
+  const out = path.resolve(REPO, args.find((a) => !a.startsWith('--')) ?? SELFTEST_PATH);
+
+  if (args.includes('--check')) {
+    let current = null;
+    try { current = readFileSync(out, 'utf8'); } catch { /* missing counts as stale */ }
+    if (current === json) { console.log('selftest.cepanel is up to date.'); return; }
+    console.error(`Stale: ${path.relative(REPO, out)} — run: node tools/scripts/nativeHandlers/make-selftest-panel.mjs`);
+    process.exitCode = 1;
+    return;
+  }
+
+  writeFileSync(out, json);
+  console.log(`Wrote ${out}`);
+  console.log('Languages:', SELFTEST_LANGUAGES.join(', '));
+  console.log('Export it, route the plugin MIDI out to a monitor, load it — each working language sends its CC (20..26).');
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) main();
