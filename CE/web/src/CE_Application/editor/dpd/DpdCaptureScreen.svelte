@@ -23,7 +23,7 @@
   import {
     CAPTURE_MODE, CAPTURE_STATE, SENDS_DURING_CAPTURE, acceptHypothesis, addBaseline, beginCapture,
     chooseMode, discardHypothesis, newSession, readyToCapture, recordDump, sessionHarvest,
-    sessionSummary, toConfirm, undoLast, BASELINE_COUNT,
+    sessionSummary, toConfirm, undoLast, BASELINE_COUNT, ECHO_WINDOW_MS,
   } from '../../utils/captureSession.js';
   import { CONFIDENCE } from '../../utils/captureInference.js';
   import { cinfo, cwarn } from '../../stores/console.js';
@@ -110,9 +110,20 @@
         <span>{modeChoice.why}</span>
       </div>
 
-      <p class="note">While a capture is running this panel sends <b>nothing</b> except explicit dump
-        requests{SENDS_DURING_CAPTURE ? '' : ''}. Otherwise the device echoes what we sent and the
-        session learns its own transmission, which looks exactly like success.</p>
+      <!-- The sentence reads the constant rather than restating it. It used to say "nothing" and
+           then evaluate `SENDS_DURING_CAPTURE ? '' : ''`, which renders the same either way — a
+           reference that looks like a check and is not one, so flipping the rule would have left
+           this screen confidently describing the opposite behaviour. That is precisely the failure
+           the constant was made a constant to prevent. -->
+      {#if SENDS_DURING_CAPTURE}
+        <p class="note">While a capture is running this panel <b>does</b> send. Anything inbound
+          within {ECHO_WINDOW_MS}ms of one of our own messages is treated as its echo and dropped —
+          without that the session learns its own transmission, which looks exactly like success.</p>
+      {:else}
+        <p class="note">While a capture is running this panel sends <b>nothing</b> except explicit
+          dump requests. Otherwise the device echoes what we sent and the session learns its own
+          transmission, which looks exactly like success.</p>
+      {/if}
 
       <button class="btn primary" disabled={modeChoice.mode === CAPTURE_MODE.none} onclick={start}>
         <Radio size={12} /> Start a session

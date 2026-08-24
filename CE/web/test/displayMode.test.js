@@ -20,7 +20,7 @@ import {
 } from '../src/CE_Application/utils/displayMaps.js';
 import { acceptsPointerFor, isFocusableFor, resolveTabIndexFor } from '../src/CE_Application/utils/mouseBehavior.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
-import { deriveExportParameters } from '../src/CE_Application/utils/exportParameters.js';
+import { collectExportParameters, deriveExportParameters } from '../src/CE_Application/utils/exportParameters.js';
 
 // --- the flag ---------------------------------------------------------------------------------
 
@@ -136,6 +136,38 @@ test('a display exports no host parameter', () => {
   };
   const names = deriveExportParameters(panel).map((p) => p.controlName);
   assert.deepEqual(names, ['Cutoff'], 'the display exported something');
+
+  // AND THROUGH THE OTHER DOOR. An explicit `panel.exportParameters` wins over the derived list and
+  // used to walk straight past this gate — the same dead lane, reached a different way. It is the
+  // author's list, so a bad entry is dropped rather than refused: an export parameter list is
+  // generated machinery, and an entry that cannot function is not a decision anybody made.
+  const explicit = collectExportParameters({
+    ...panel,
+    exportParameters: [
+      { id: 'Cutoff.value', path: 'Cutoff.value', controlName: 'Cutoff', min: 0, max: 127 },
+      { id: 'Level.value', path: 'Level.value', controlName: 'Level', min: 0, max: 127 },
+    ],
+  });
+  assert.deepEqual(explicit.map((p) => p.controlName), ['Cutoff']);
+});
+
+test('a display nested in a group is still not exported', () => {
+  // The lookup walks the tree rather than the top level: a meter inside a group is still a meter,
+  // and an explicit list can name one.
+  const panel = {
+    controls: [{
+      _children: {
+        Core: { id: 'g', name: 'Group' },
+        Children: {
+          _children: {
+            b: { _children: { Core: { id: 'b', name: 'Level' }, Behavior: { family: 'range', role: 'slider', valueType: 'float', min: 0, max: 127, valueFlow: 'display' } } },
+          },
+        },
+      },
+    }],
+    exportParameters: [{ id: 'Level.value', path: 'Level.value', controlName: 'Level', min: 0, max: 127 }],
+  };
+  assert.deepEqual(collectExportParameters(panel), []);
 });
 
 // --- the maps ---------------------------------------------------------------------------------

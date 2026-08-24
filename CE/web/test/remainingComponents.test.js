@@ -52,6 +52,26 @@ function control(type, section, patch = {}) {
   };
 }
 
+/**
+ * A container with children, in the shape the model actually uses.
+ *
+ * `_children.Children._children`, keyed by id, and every child carries a `Core` — `getChildControls`
+ * filters on it. Worth a helper rather than a literal per test, because the previous fixtures
+ * invented a `children: []` array that no control has ever had, and everything built on them tested
+ * the fixture instead of the component.
+ */
+function withChildren(container, transforms) {
+  const kids = {};
+  transforms.forEach((transform, index) => {
+    const id = `k${index}`;
+    kids[id] = { _children: { Core: { id, name: id, controlType: 'Label' }, Transform: transform } };
+  });
+  return {
+    ...container,
+    _children: { ...container._children, Children: { _children: kids } },
+  };
+}
+
 // --- the three promoted from presets to their own types ---------------------------------------
 
 test('ProgressBar is its own type over the Meter engine, not a second Meter', () => {
@@ -416,50 +436,53 @@ test('the page is a bindable port AND a choice-typed host parameter with real la
 test('the extent is measured from the children, never set by the author', () => {
   // An author-set extent goes stale the moment a control moves: the scrollbar then stops short of a
   // control that is really there, or scrolls past the end into nothing.
-  const area = {
-    ...control('ScrollArea', 'ScrollArea'),
-    children: [
-      { _children: { Transform: { x: 0, y: 0, width: 100, height: 40 } } },
-      { _children: { Transform: { x: 0, y: 300, width: 100, height: 40 } } },
-    ],
-  };
+  const area = withChildren(control('ScrollArea', 'ScrollArea'), [
+    { x: 0, y: 0, width: 100, height: 40 },
+    { x: 0, y: 300, width: 100, height: 40 },
+  ]);
   const extent = contentExtent(area);
   assert.equal(extent.height, 340);
   assert.equal(maxScroll(200, 100, area).y, 340 - 100);
+
+  // And it reads the children the MODEL has, not a `children` array invented by a fixture. That
+  // array is what the extent used to look for, so every real scroll area measured zero and never
+  // grew a scrollbar — the extent was wrong and nothing looked wrong, which is the failure the
+  // whole component is written around.
+  const fake = { ...control('ScrollArea', 'ScrollArea'), children: [
+    { _children: { Transform: { x: 0, y: 0, width: 100, height: 900 } } },
+  ] };
+  assert.equal(contentExtent(fake).height, 0, 'a `children` array is not where children live');
 });
 
 test('a child dragged above the top is reachable rather than stranded', () => {
-  const area = {
-    ...control('ScrollArea', 'ScrollArea'),
-    children: [{ _children: { Transform: { x: 0, y: -50, width: 100, height: 40 } } }],
-  };
+  const area = withChildren(control('ScrollArea', 'ScrollArea'), [{ x: 0, y: -50, width: 100, height: 40 }]);
   assert.equal(contentExtent(area).minY, -50);
 });
 
 test('content that fits does not scroll', () => {
-  const area = { ...control('ScrollArea', 'ScrollArea'), children: [{ _children: { Transform: { x: 0, y: 0, width: 10, height: 10 } } }] };
+  const area = withChildren(control('ScrollArea', 'ScrollArea'), [{ x: 0, y: 0, width: 10, height: 10 }]);
   assert.deepEqual(maxScroll(200, 200, area), { x: 0, y: 0 });
   assert.deepEqual(clampScroll({ x: 50, y: 50 }, 200, 200, area), { x: 0, y: 0 });
 });
 
 test('a wheel notch is a stated distance in line mode and the raw delta in smooth', () => {
-  const tall = [{ _children: { Transform: { x: 0, y: 0, width: 50, height: 900 } } }];
-  const line = { ...control('ScrollArea', 'ScrollArea', { lineHeight: 24 }), children: tall };
+  const tall = [{ x: 0, y: 0, width: 50, height: 900 }];
+  const line = withChildren(control('ScrollArea', 'ScrollArea', { lineHeight: 24 }), tall);
   assert.equal(scrollByWheel({ x: 0, y: 0 }, { y: 3 }, 200, 100, line).y, 24);
 
-  const smooth = { ...control('ScrollArea', 'ScrollArea', { scrollMode: 'smooth' }), children: tall };
+  const smooth = withChildren(control('ScrollArea', 'ScrollArea', { scrollMode: 'smooth' }), tall);
   assert.equal(scrollByWheel({ x: 0, y: 0 }, { y: 37 }, 200, 100, smooth).y, 37);
 });
 
 test('a scroll position past the end is clamped, not honoured', () => {
-  const area = { ...control('ScrollArea', 'ScrollArea'), children: [{ _children: { Transform: { x: 0, y: 0, width: 50, height: 300 } } }] };
+  const area = withChildren(control('ScrollArea', 'ScrollArea'), [{ x: 0, y: 0, width: 50, height: 300 }]);
   assert.equal(scrollByWheel({ x: 0, y: 9999 }, { y: 1 }, 200, 100, area).y, 200);
 });
 
 test('the thumb has a minimum length, or it cannot be grabbed', () => {
   // A thumb proportional to very long content is a few pixels tall, at which point the scrollbar is
   // decoration.
-  const area = { ...control('ScrollArea', 'ScrollArea'), children: [{ _children: { Transform: { x: 0, y: 0, width: 50, height: 20000 } } }] };
+  const area = withChildren(control('ScrollArea', 'ScrollArea'), [{ x: 0, y: 0, width: 50, height: 20000 }]);
   const thumb = thumbRect('y', { y: 0 }, 200, 100, area);
   assert.ok(thumb.h >= 24, `thumb was ${thumb.h}px`);
   assert.equal(thumbRect('y', { y: 0 }, 200, 30000, area), null, 'content that fits has no thumb');

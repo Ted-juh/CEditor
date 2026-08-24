@@ -1,4 +1,5 @@
 import { COMPONENT_TYPES } from '../models/componentTypes.js';
+import { flatControls } from './containment.js';
 import { isDisplayOnly } from './displayMode.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { canSendMidiControl, isMidiControlBinding, midiControlResolution } from './midiControlBindings.js';
@@ -396,9 +397,43 @@ function paramFromTypeSpec(name, spec, sections) {
   };
 }
 
-/** The panel's host-automatable parameters: explicit author list if present, else derived. */
+/**
+ * The names of every control on the panel that shows a value and does not accept input.
+ *
+ * Walked with `flatControls` rather than over the top level, because a meter inside a group is
+ * still a meter and an explicit list can name it.
+ */
+function displayOnlyControlNames(panel) {
+  const names = new Set();
+  for (const control of flatControls(Array.isArray(panel?.controls) ? panel.controls : [])) {
+    if (!isDisplayOnly(control?._children?.Behavior)) continue;
+    const core = control?._children?.Core;
+    const name = core?.name ?? core?.id;
+    if (name) names.add(String(name));
+  }
+  return names;
+}
+
+/**
+ * The panel's host-automatable parameters: explicit author list if present, else derived.
+ *
+ * THE DISPLAY GATE APPLIES TO BOTH LISTS. `deriveExportParameters` has skipped read-only controls
+ * since the capability landed, and an explicit `panel.exportParameters` went straight past it —
+ * which is the same silent failure the gate exists to stop, reached through the other door. A host
+ * parameter for a display gives the DAW an automation lane whose every value is overwritten by the
+ * next feedback frame: it appears to work, it records fine, and it moves nothing.
+ *
+ * Dropped rather than refused, and this is the one place in this pass where losing the entry is
+ * right: an export parameter list is generated machinery, not an author's sentence, and an entry
+ * that cannot function is not a decision anybody made. A panel that has since made one of its
+ * controls a display should export the rest and not fail.
+ */
 export function collectExportParameters(panel) {
   const explicit = Array.isArray(panel?.exportParameters) ? panel.exportParameters : [];
-  if (explicit.length) return explicit.map(normalizeExportParameter).filter(Boolean);
-  return deriveExportParameters(panel);
+  if (!explicit.length) return deriveExportParameters(panel);
+
+  const displays = displayOnlyControlNames(panel);
+  return explicit
+    .map(normalizeExportParameter)
+    .filter((parameter) => parameter && !displays.has(parameter.controlName));
 }

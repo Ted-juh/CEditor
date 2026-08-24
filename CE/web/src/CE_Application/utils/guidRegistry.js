@@ -71,14 +71,34 @@ export function identityDecision({ panel = null, registry = [] } = {}) {
     return { action: 'update', guid, owner, reason: 'a new build of this panel\'s own plugin' };
   }
 
+  // WHY IT COULD NOT MATCH, and the honest answer is not always "you copied this".
+  //
+  // `panelId` is a session counter — `deserializePanel` hands out a fresh one on every load — so
+  // after a restart the only evidence left is the file path. Three shapes reach here and they are
+  // genuinely different situations, even though `ask` is the right answer to all three: the
+  // registry cannot tell a MOVED original from a COPY, and guessing either way is wrong in a way
+  // somebody only finds out when their plugin is replaced.
+  //
+  // So it asks in all three cases and says which one it is looking at. "Almost certainly copied"
+  // told to somebody who has simply renamed their file is a wrong explanation of a right question,
+  // and it sends them hunting for a duplicate that does not exist.
+  const owned = owner.productName || owner.panelPath || owner.panelId;
+  const here = String(panel?.filePath ?? '');
+  const why = !owner.panelPath
+    ? 'that claim was recorded before the panel had been saved anywhere, so there is no path to '
+      + 'compare — this may well be the same panel'
+    : !here
+      ? 'this panel has not been saved yet, so there is no path to compare it against'
+      : 'almost certainly the panel this one was copied from — or this one, moved or renamed since '
+        + 'it was last exported';
+
   return {
     action: 'ask',
     guid,
     owner,
     // Named, because "there is a conflict" sends somebody looking through every panel they have
     // open, and the answer is nearly always "the file you copied this from".
-    reason: `this identity already belongs to ${owner.productName || owner.panelPath || owner.panelId}`
-      + ' — almost certainly the panel this one was copied from',
+    reason: `this identity already belongs to ${owned} — ${why}`,
   };
 }
 

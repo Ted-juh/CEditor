@@ -20,6 +20,7 @@
   import KeyboardRenderer from './KeyboardRenderer.svelte';
   import StepSequencerRenderer from './StepSequencerRenderer.svelte';
   import TabContainerRenderer from './TabContainerRenderer.svelte';
+  import { isChildOnActivePage } from '../utils/tabContainerLayout.js';
   import ScrollAreaRenderer from './ScrollAreaRenderer.svelte';
   import EnvelopeRenderer from './EnvelopeRenderer.svelte';
   import MatrixRenderer from './MatrixRenderer.svelte';
@@ -589,7 +590,16 @@
   // control with no Children section renders exactly as before. ---
   let childrenSection = $derived(getSection(control, 'Children'));
   let isContainer = $derived(!!childrenSection);
-  let childControls = $derived(isContainer ? sortControlsForRender(getChildControls(control)) : []);
+  // A TAB CONTAINER SHOWS ONE PAGE. `isChildOnActivePage` was written with the component and then
+  // nothing called it, so every page's children were drawn at once and the inspector's "Show this
+  // page" button set a number that changed nothing on screen — a control with pages that are not
+  // pages. Nothing becomes unreachable by hiding them: `childPageId` puts a child with no page, or
+  // one whose page was deleted, back on page one, and the author switches pages from the same
+  // button that was already there.
+  let childControls = $derived(isContainer
+    ? sortControlsForRender(getChildControls(control))
+      .filter((child) => !isTabContainer || isChildOnActivePage(child, control))
+    : []);
   // WHERE A CHILD'S 0,0 IS. Everything else in the app answers this with containment.contentOrigin
   // — hit-testing, controlPanelRect, the fit measurement, the scenery compiler — and that function
   // prefers paddingLeft/paddingTop over the shared `padding`. This component used the shared number

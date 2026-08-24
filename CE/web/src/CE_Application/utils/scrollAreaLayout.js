@@ -10,6 +10,8 @@
 //
 // PURE. The renderer applies the offset and the clip; this decides how far there is to go.
 
+import { getChildControls } from './containment.js';
+
 const num = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, num(value, lo)));
 
@@ -26,7 +28,16 @@ export function scrollConfig(control) {
  * would strand it.
  */
 export function contentExtent(control) {
-  const children = Array.isArray(control?.children) ? control.children : [];
+  // `getChildControls`, not `control.children`. A container's children live in the model at
+  // `_children.Children._children`, as a MAP keyed by id — there is no `children` array on a
+  // control and never was. Reading one returned an empty list for every real scroll area, so the
+  // extent was always zero, `scrollGeometry` never saw anything past the edge, and the scrollbar
+  // never appeared. Which is the exact failure this file's header warns about, arrived at from the
+  // other side: the extent was wrong and nothing looked wrong.
+  //
+  // It passed its tests because they built `{ children: [...] }` by hand. A fixture that invents a
+  // shape the model does not use tests the fixture.
+  const children = getChildControls(control);
   if (children.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
 
   let minX = Infinity;

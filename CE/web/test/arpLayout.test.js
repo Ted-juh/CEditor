@@ -193,3 +193,13 @@ test('two synced arps on different divisions stay in a fixed ratio', () => {
     assert.equal(b, a * 2 + (Math.floor(beats * 4) % 2));      // exactly twice as fast, always
   }
 });
+
+test('a full gate stops a hair short, so a repeated note retriggers', () => {
+  // Gate 1 reads as legato and is, for a step that moves to a different note. For a REPEAT the
+  // note-off for step N and the note-on for step N+1 land on the same millisecond from two separate
+  // timers and whichever fires second wins — half the time the arp drops the note, which looks like
+  // a missed step rather than a gate setting. Same cap and same reason as the step sequencer's.
+  const step = 0.5;
+  assert.ok(gateSeconds(ap({ gate: 1 }), step) < step, 'a full gate must not fill the whole step');
+  assert.ok(gateSeconds(ap({ gate: 1 }), step) > step * 0.9, 'and must still sound legato');
+});

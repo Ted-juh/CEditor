@@ -62,6 +62,33 @@ test('A COPIED PANEL IS ASKED ABOUT — the whole point of the registry', () => 
   assert.match(decision.reason, /copied from/);
 });
 
+test('and it says which of the three shapes it is looking at, not always "copied"', () => {
+  // `panelId` is a session counter — a reopened panel gets a fresh one — so after a restart the
+  // only evidence is the file path. Three situations reach `ask` and the registry cannot tell a
+  // MOVED original from a COPY, so it asks in all three. What it can do is stop asserting the
+  // wrong one: "almost certainly copied", told to somebody who renamed their file, is a wrong
+  // explanation of a right question and sends them hunting for a duplicate that does not exist.
+  const copied = identityDecision({
+    panel: panel({ id: 'p2', filePath: '/panels/bass-variant.cepanel' }), registry: REGISTRY,
+  });
+  assert.match(copied.reason, /copied from/);
+  assert.match(copied.reason, /moved or renamed/);
+
+  // Claimed before the panel had ever been saved: there is no path on the claim to compare.
+  const pathless = identityDecision({
+    panel: panel({ id: 'p2' }),
+    registry: [registryEntry({ guid: GUID, panelId: 'p1', panelPath: '', productName: 'Bass Station' })],
+  });
+  assert.equal(pathless.action, 'ask');
+  assert.match(pathless.reason, /before the panel had been saved/);
+  assert.doesNotMatch(pathless.reason, /copied from/);
+
+  // This panel is the unsaved one.
+  const unsaved = identityDecision({ panel: panel({ id: 'p2', filePath: '' }), registry: REGISTRY });
+  assert.equal(unsaved.action, 'ask');
+  assert.match(unsaved.reason, /has not been saved yet/);
+});
+
 test('an identity the registry has never seen is adopted, not questioned', () => {
   // A panel from somebody else, or a cleared registry. There is no local plugin to collide with,
   // so there is nothing to decide.
