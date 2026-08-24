@@ -263,6 +263,21 @@ Juno.
 `test/captureInference.test.js` (the answer key). S1, S2, S3 and S4; S5's ergonomics are partly
 there — undo-last and a session summary — and save/resume and the manual-name paste are not.
 
+**S5, revisited 2026-08-24.** The manual-name paste and the session report are built;
+`save/resume` is still not, and that is now a decision rather than an omission — it needs a place to
+put an in-progress session, and the obvious one (the panel document, beside `deviceSession`) means a
+half-finished capture travels inside a file somebody might share.
+
+`namesFromPaste` is POSITIONAL and shows the pairing before it lands. Matching by similarity would
+pair "Cutoff" with "Cutoff Env Amount" on a page that has both, and a paste starting one line too
+high would rename everything below it silently — so it reports too-few and too-many names in both
+directions and the author sees old → new before applying.
+
+`sessionReport` groups by how much a row is worth trusting, hardest evidence first, and carries each
+row's evidence with it. A report in capture order buries the four rows that need attention under the
+thirty that do not, and six months later "u7 at offset 44, values 0-127" is the difference between
+trusting a row and re-capturing it.
+
 **The simulated synth is the feature, not the test scaffolding.** This plan said "hardware is not
 reproducible and a nightly cannot own a Juno", and that turned out to shape everything: the fake
 device carries a plain u7, a 14-bit value, a nibble field, **two parameters sharing one byte**, a

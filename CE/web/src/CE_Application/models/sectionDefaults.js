@@ -1968,6 +1968,9 @@ export const SECTION_DEFAULTS = {
     division: '1/16',             // 1/4 | 1/8 | 1/8T | 1/16 | 1/16T | 1/32
     direction: 'forward',         // forward | reverse | pingpong | random
     gate: 60,                     // % of a step the note is held; capped under 100 so repeats retrigger
+    // Off, so nothing that already exists changes speed. On, the step boundaries come from the
+    // shared transport instead of `bpm` — the same field the Arp and the Phrase already carry.
+    syncToTransport: false,
     running: false,
     position: 0,
     channel: 10,

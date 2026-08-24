@@ -2,8 +2,13 @@
   // Step Sequencer — steps, tempo, direction, and the track list.
   //
   // The tempo note is load-bearing and is written into the UI rather than left in a design doc:
-  // this clock is WALL-CLOCK, so a sequence at 120 BPM runs at 120 BPM on its own and drifts
-  // against a DAW's transport. Somebody will otherwise discover it during a take.
+  // free-running, this clock is WALL-CLOCK, so a sequence at 120 BPM runs at 120 BPM on its own and
+  // drifts against a DAW's transport. Somebody will otherwise discover it during a take.
+  //
+  // It is now a caveat about a SETTING rather than about the component, and it appears only when
+  // that setting is off. It used to say tempo-sync "needs MIDI clock in, which does not exist yet",
+  // which stopped being true when the shared transport landed — and a warning that names a missing
+  // feature the app has since grown is worse than no warning, because the reader believes it.
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { componentListWithElement } from '../utils/componentElements.js';
   import { STEP_DIRECTION, STEP_DIVISIONS } from '../utils/stepSequencerLayout.js';
@@ -43,7 +48,12 @@
 {#if q}
   <PropertySection title="Sequence" icon={Grid3x3}>
     <NumberCell label="Steps" min={1} max={64} step={1} value={q.steps ?? 16} onchange={(v) => set('steps', v)} />
-    <NumberCell label="Tempo (BPM)" min={20} max={300} step={1} value={q.bpm ?? 120} onchange={(v) => set('bpm', v)} />
+    <PropertyCell label="Follow transport" span={2} hint="Take the tempo and the step boundaries from the panel's shared transport, the way the Arp and the Phrase do. Off, this sequence runs on its own BPM below.">
+      <PropertyToggle value={q.syncToTransport === true} onchange={(next) => set('syncToTransport', next)} />
+    </PropertyCell>
+    {#if q.syncToTransport !== true}
+      <NumberCell label="Tempo (BPM)" min={20} max={300} step={1} value={q.bpm ?? 120} onchange={(v) => set('bpm', v)} />
+    {/if}
     <PropertyCell label="Division" span={2} hint="How many steps fill a beat.">
       <select class="val" value={q.division ?? '1/16'} onchange={(event) => set('division', event.target.value)}>
         {#each Object.keys(STEP_DIVISIONS) as division}<option value={division}>{division}</option>{/each}
@@ -59,10 +69,13 @@
     <PropertyCell label="Running" span={2} hint="Starts the playhead in preview and in the exported plugin.">
       <PropertyToggle value={q.running === true} onchange={(next) => set('running', next)} />
     </PropertyCell>
-    <PropertyCell label="" span={4} compact>
-      <p class="tempo-note">The clock is wall-clock. This sequence runs at its own tempo and will
-        drift against a DAW's transport — tempo-sync needs MIDI clock in, which does not exist yet.</p>
-    </PropertyCell>
+    {#if q.syncToTransport !== true}
+      <PropertyCell label="" span={4} compact>
+        <p class="tempo-note">The clock is wall-clock. This sequence runs at its own tempo and will
+          drift against a DAW's transport. Turn on <b>Follow transport</b> to lock it to the panel's
+          shared clock instead.</p>
+      </PropertyCell>
+    {/if}
   </PropertySection>
 
   <PropertySection title="Tracks" icon={Rows3}>

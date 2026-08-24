@@ -276,6 +276,101 @@ export function sessionHarvest(session) {
 }
 
 /**
+ * Match a list of names pasted out of a manual against what the session has learned.
+ *
+ * S5 asks for this and the plan says why in one line: the manual is still useful — as NAMES, which
+ * it gets right, and not as BYTES, which is where it lies. Nobody wants to type "Filter Envelope
+ * Attack" thirty times when the page they are reading already has all thirty in order.
+ *
+ * POSITIONAL, and it says so rather than trying to be clever. The nth non-empty line names the nth
+ * parameter learned, because that is the order somebody sweeps a panel in and any attempt to match
+ * by similarity would silently pair "Cutoff" with "Cutoff Env Amount" on a page that has both. What
+ * it does instead is report the mismatch: more names than parameters, or fewer, is something the
+ * author has to look at, and a paste that is off by one at the top would otherwise rename
+ * everything below it.
+ *
+ * `id` is derived from the label rather than taken from a second column. A manual page is one
+ * column of names, and asking somebody to build a two-column paste is asking them to do the typing
+ * this exists to avoid.
+ */
+export function namesFromPaste(text, session) {
+  const learned = session?.learned ?? [];
+  const lines = String(text ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*[-*\u2022]?\s*/, '').trim())
+    .filter(Boolean);
+
+  const pairs = lines.slice(0, learned.length).map((label, index) => ({
+    index,
+    label,
+    id: label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || `learned_${index}`,
+    was: String(learned[index]?.label ?? ''),
+  }));
+
+  return {
+    pairs,
+    // Both directions are worth reporting. Too few names leaves parameters unnamed at the bottom;
+    // too many means the paste includes rows the session never captured, which usually means it
+    // started one line too high.
+    unnamed: Math.max(0, learned.length - lines.length),
+    extra: Math.max(0, lines.length - learned.length),
+  };
+}
+
+/** Apply a `namesFromPaste` result. Separate, so the screen can show the pairing before it lands. */
+export function applyPastedNames(session, pairs) {
+  const learned = [...(session?.learned ?? [])];
+  for (const pair of pairs ?? []) {
+    const entry = learned[pair.index];
+    if (!entry) continue;
+    learned[pair.index] = { ...entry, id: String(pair.id), label: String(pair.label) };
+  }
+  return { ...session, learned };
+}
+
+/**
+ * The session report S5 asks for.
+ *
+ * The summary line says how many; this says WHICH, and carries each parameter's evidence with it.
+ * That is the part worth keeping after the session is closed: six months later "u7 at offset 0x2C,
+ * values 0-127, checksum moved with it" is the difference between trusting a row and re-capturing
+ * it.
+ *
+ * Grouped by how much the row is worth trusting, hardest first, because a report that lists thirty
+ * parameters in capture order buries the four that need attention. Plain text rather than a
+ * structure: it goes in a bug report, an email to somebody with the same synth, or a comment in a
+ * profile, and all three take text.
+ */
+export function sessionReport(session) {
+  const harvest = sessionHarvest(session);
+  const lines = [`Capture session ${session?.id ?? ''}`.trim(), sessionSummary(session), ''];
+
+  const section = (title, rows, note) => {
+    if (!rows.length) return;
+    lines.push(`## ${title} (${rows.length})`);
+    if (note) lines.push(note);
+    for (const row of rows) {
+      lines.push(`- ${row.label || row.id || 'Unnamed'} — ${row.kind}`
+        + `${row.offsets?.length ? ` at ${row.offsets.join(', ')}` : ''}`);
+      const why = row.provenance?.evidence;
+      if (why) lines.push(`    ${why}`);
+    }
+    lines.push('');
+  };
+
+  section('Verified on the synth', harvest.verified,
+    'Somebody moved the control and confirmed the device did what it should.');
+  section('Probable', harvest.unverified,
+    'The bytes look right and nobody checked. These export as parameters anyway.');
+  section('Still a guess', harvest.candidates,
+    'Not enough evidence to call. These export as candidates, not parameters.');
+  section('In conflict', harvest.conflicts,
+    'Two readings that disagree. A question rather than a write.');
+
+  return lines.join('\n').trim();
+}
+
+/**
  * A one-line summary of the session, for the report S5 asks for.
  *
  * Says what was NOT settled as prominently as what was: a session that learned thirty parameters

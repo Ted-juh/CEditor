@@ -24,6 +24,7 @@
     CAPTURE_MODE, CAPTURE_STATE, SENDS_DURING_CAPTURE, acceptHypothesis, addBaseline, beginCapture,
     chooseMode, discardHypothesis, newSession, readyToCapture, recordDump, sessionHarvest,
     sessionSummary, toConfirm, undoLast, BASELINE_COUNT, ECHO_WINDOW_MS,
+    applyPastedNames, namesFromPaste, sessionReport,
   } from '../../utils/captureSession.js';
   import { CONFIDENCE } from '../../utils/captureInference.js';
   import { cinfo, cwarn } from '../../stores/console.js';
@@ -42,6 +43,33 @@
   }));
 
   let harvest = $derived(session ? sessionHarvest(session) : null);
+
+  // Bulk naming and the report — the two pieces of S5 that are pure functions over what the session
+  // already holds. Save/resume is the third and is not built; it needs somewhere to put a session.
+  let pasting = $state(false);
+  let pasteText = $state('');
+  let reportCopied = $state(false);
+  let pastePlan = $derived(session && pasteText.trim() ? namesFromPaste(pasteText, session) : null);
+
+  function applyPaste() {
+    if (!pastePlan) return;
+    session = applyPastedNames(session, pastePlan.pairs);
+    pasteText = '';
+    pasting = false;
+  }
+  async function copyReport() {
+    if (!session) return;
+    const text = sessionReport(session);
+    try {
+      await navigator.clipboard?.writeText(text);
+      reportCopied = true;
+      setTimeout(() => { reportCopied = false; }, 1500);
+    } catch {
+      // No clipboard (a locked-down webview, a denied permission). The report is still worth
+      // producing, so it goes to the console rather than nowhere.
+      cinfo(text);
+    }
+  }
 
   /**
    * A dump, from the device or — with no device attached — refused rather than faked.
@@ -221,6 +249,8 @@
         <h3>Learned</h3>
         <span class="pill">{sessionSummary(session)}</span>
         <button class="btn small" onclick={() => (session = undoLast(session))}><Undo2 size={11} /> Undo last</button>
+        <button class="btn small" onclick={() => (pasting = !pasting)}>Name from a list</button>
+        <button class="btn small" onclick={copyReport}>{reportCopied ? 'Copied' : 'Copy report'}</button>
       </div>
       <ul class="learned">
         {#each session.learned as entry, index (entry.id + index)}
@@ -232,6 +262,36 @@
           </li>
         {/each}
       </ul>
+      {#if pasting}
+        <!-- POSITIONAL, and it says so before it lands. The manual is right about names and wrong
+             about bytes, so this takes the names — but matching them by similarity would pair
+             "Cutoff" with "Cutoff Env Amount" on a page that has both, and a paste that starts one
+             line too high would rename everything below it. So the pairing is shown first. -->
+        <div class="paste">
+          <p class="note">One name per line, in the order you captured them. The manual's parameter
+            list pastes straight in — it is reliable about names, which is all this uses.</p>
+          <textarea rows="5" bind:value={pasteText} placeholder={'Filter Cutoff\nFilter Resonance\n…'}></textarea>
+          {#if pastePlan}
+            <ul class="pairs">
+              {#each pastePlan.pairs as pair (pair.index)}
+                <li><span class="was">{pair.was || 'Unnamed'}</span> → <b>{pair.label}</b></li>
+              {/each}
+            </ul>
+            {#if pastePlan.unnamed}
+              <p class="note warn"><TriangleAlert size={11} />
+                {pastePlan.unnamed} captured parameter{pastePlan.unnamed === 1 ? '' : 's'} past the
+                end of the list would keep their current names.</p>
+            {/if}
+            {#if pastePlan.extra}
+              <p class="note warn"><TriangleAlert size={11} />
+                {pastePlan.extra} more name{pastePlan.extra === 1 ? '' : 's'} than parameters — the
+                list usually starts a line too high when that happens, which would shift every name
+                below it.</p>
+            {/if}
+            <button class="btn small primary" onclick={applyPaste}>Apply {pastePlan.pairs.length} name{pastePlan.pairs.length === 1 ? '' : 's'}</button>
+          {/if}
+        </div>
+      {/if}
       {#if harvest.candidates.length}
         <p class="note warn"><TriangleAlert size={11} />
           {harvest.candidates.length} of these are still guesses. They land as draft rows, not as
@@ -244,6 +304,11 @@
 
 <style>
   .dpd-screen { padding: 16px 18px; overflow-y: auto; height: 100%; }
+  .paste { margin-top: 8px; display: grid; gap: 6px; }
+  .paste textarea { width: 100%; resize: vertical; font: inherit; font-size: 11px;
+    background: #1A1A1A; color: #C8C8C8; border: 1px solid #2E2E2E; border-radius: 4px; padding: 6px; }
+  .pairs { list-style: none; margin: 0; padding: 0; font-size: 11px; display: grid; gap: 2px; }
+  .pairs .was { color: #777; }
   h2 { font-size: 15px; margin: 0 0 14px; font-weight: 600; }
   h3 { font-size: 12px; margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 

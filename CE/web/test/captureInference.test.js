@@ -18,6 +18,7 @@ import {
 } from '../src/CE_Application/utils/captureInference.js';
 import {
   BASELINE_COUNT, CAPTURE_MODE, ECHO_WINDOW_MS, SENDS_DURING_CAPTURE, acceptHypothesis, addBaseline,
+  applyPastedNames, namesFromPaste, sessionReport,
   beginCapture, chooseMode, newSession, readyToCapture, recordDump, recordMessages, sessionHarvest,
   sessionSummary, toConfirm, undoLast,
 } from '../src/CE_Application/utils/captureSession.js';
@@ -541,6 +542,53 @@ test('the summary says what is unsettled as loudly as what is settled', () => {
   assert.match(summary, /2 parameters/);
   assert.match(summary, /1 still a guess/);
   assert.match(summary, /sharing a byte/);
+});
+
+test('names pasted out of a manual land positionally, and say when they do not fit', () => {
+  // The manual is still useful — as NAMES, which it gets right, not as BYTES, which is where it
+  // lies. Positional on purpose: matching by similarity would silently pair "Cutoff" with "Cutoff
+  // Env Amount" on a page that has both, and a paste off by one at the top would rename everything
+  // below it without saying so.
+  const session = { learned: [
+    { id: 'learned_0', label: 'Unnamed', confidence: CONFIDENCE.probable, kind: 'u7' },
+    { id: 'learned_1', label: 'Unnamed', confidence: CONFIDENCE.probable, kind: 'u7' },
+  ] };
+
+  const fit = namesFromPaste('  Filter Cutoff \n- Filter Resonance\n\n', session);
+  assert.equal(fit.unnamed, 0);
+  assert.equal(fit.extra, 0);
+  assert.deepEqual(fit.pairs.map((p) => p.id), ['filter_cutoff', 'filter_resonance']);
+  assert.deepEqual(fit.pairs.map((p) => p.was), ['Unnamed', 'Unnamed']);
+
+  const applied = applyPastedNames(session, fit.pairs);
+  assert.deepEqual(applied.learned.map((entry) => entry.label), ['Filter Cutoff', 'Filter Resonance']);
+
+  // Both directions reported. Too few leaves rows unnamed; too many usually means the paste started
+  // a line too high, which is the case that would otherwise rename everything.
+  assert.equal(namesFromPaste('Only One', session).unnamed, 1);
+  assert.equal(namesFromPaste('A\nB\nC\nD', session).extra, 2);
+});
+
+test('the report says which parameters, with the evidence, hardest first', () => {
+  // The summary says how many. Six months later "u7 at offset 44, values 0-127" is the difference
+  // between trusting a row and re-capturing it, and a report in capture order buries the four that
+  // need attention under the thirty that do not.
+  const report = sessionReport({ id: 'sess1', learned: [
+    { label: 'Cutoff', kind: 'u7', offsets: [44], confidence: CONFIDENCE.probable,
+      provenance: { evidence: 'one byte at offset 44, values 0-127' } },
+    { label: 'Wave', kind: 'bitslice', offsets: [12], confidence: CONFIDENCE.confirmed,
+      provenance: { evidence: 'only bits 0,1,2 of offset 12 moved' } },
+    { label: 'Mystery', kind: 'scattered', offsets: [8, 40], confidence: CONFIDENCE.candidate,
+      provenance: { evidence: 'two offsets that are not adjacent' } },
+  ] });
+
+  assert.match(report, /Verified on the synth \(1\)/);
+  assert.match(report, /Probable \(1\)/);
+  assert.match(report, /Still a guess \(1\)/);
+  assert.ok(report.indexOf('Verified') < report.indexOf('Probable'), 'hardest evidence first');
+  assert.ok(report.indexOf('Probable') < report.indexOf('Still a guess'));
+  assert.match(report, /one byte at offset 44/, 'the evidence travels with the row');
+  assert.doesNotMatch(report, /In conflict/, 'an empty section is not printed');
 });
 
 test('and it separates what a person checked from what only looked right', () => {

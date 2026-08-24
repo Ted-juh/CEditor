@@ -4,17 +4,31 @@
 // grid — the generator grid draws that already — but the TRANSPORT: a playhead, a pattern that
 // advances, and the fact that time here is wall-clock rather than tempo-locked.
 //
-// THE TEMPO CAVEAT IS LOAD-BEARING and the backlog flagged it: the Timer is wall-clock, so a
-// sequence set to 120 BPM runs at 120 BPM on its own and drifts against a DAW's transport. Rather
-// than pretend otherwise, the step time is derived from a BPM the component owns and the component
-// says so; a Transport component on the panel can drive it, which is what tempo-sync means here
-// until MIDI clock in exists.
+// THE TEMPO CAVEAT WAS LOAD-BEARING and is now a choice. Free-running, the clock is wall-clock: a
+// sequence set to 120 BPM runs at 120 BPM on its own and drifts against a DAW's transport, and the
+// inspector says so rather than pretending otherwise. That was the whole story while the note in
+// the inspector claimed tempo-sync "needs MIDI clock in, which does not exist yet" — which stopped
+// being true when the shared transport landed. The Arp and the Phrase both follow it; this was the
+// one clocked component that could not, for no reason anybody chose.
+//
+// So `syncToTransport` is here too, off by default, and a synced sequencer takes its step boundaries
+// from the transport's POSITION rather than from a rate of its own.
+//
+// Synced stepping ACCUMULATES rather than deriving the index from the position, which is where this
+// differs from the Arp. The Arp can say "beats ÷ division, modulo length" because it only ever
+// walks forward. A sequencer has reverse, ping-pong and random, and none of those is a function of
+// the position — ping-pong's answer depends on which way it was already going, and random's has no
+// answer at all. So the transport says HOW MANY step boundaries were crossed and `advanceStep`
+// still decides where each one lands. One implementation of "where next", and the direction modes
+// keep working when synced instead of quietly becoming forward.
 //
 // SEPARATE FROM THE PAD GRID, deliberately, and from the mod matrix. All three are steps × tracks
 // grids and they are three different questions: a pad grid triggers, a matrix routes, a sequencer
 // PLAYS — it owns a position in time and nothing else here does.
 //
 // PURE. The Timer drives `advance` and the preview surface emits what `stepNotes` returns.
+
+import { beatsPerStep, crossedSteps } from './transportLayout.js';
 
 const num = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 const clampInt = (value, lo, hi) => Math.min(hi, Math.max(lo, Math.round(num(value, lo))));
@@ -29,6 +43,15 @@ export const STEP_DIRECTION = {
 };
 
 /** How many steps a bar of each division holds, for the readout. */
+/**
+ * The step lengths this component offers, as steps per beat.
+ *
+ * The reciprocal of `transportLayout.DIVISIONS`, which is in beats per step. Two tables for one
+ * fact, and they agree — pinned by a test, because the moment they do not a synced sequencer and a
+ * free-running one at the same setting play at different speeds and the setting is the only thing
+ * that looks the same. Kept as its own list rather than the transport's full one because a
+ * sequencer grid with a whole-note step is a grid with nothing in it.
+ */
 export const STEP_DIVISIONS = {
   '1/4': 1, '1/8': 2, '1/8T': 3, '1/16': 4, '1/16T': 6, '1/32': 8,
 };
@@ -87,18 +110,55 @@ export function setCellVelocity(pattern, trackId, step, velocity) {
   return { ...pattern, [key]: { ...pattern[key], velocity: clampInt(velocity, 1, 127) } };
 }
 
+/** The walk mode, validated. An unknown one is forward rather than a stopped sequencer. */
+export function sequencerDirection(control) {
+  const d = String(sequencerConfig(control).direction ?? STEP_DIRECTION.forward);
+  return Object.values(STEP_DIRECTION).includes(d) ? d : STEP_DIRECTION.forward;
+}
+
+/** Following the shared transport, rather than running on a BPM of its own. */
+export function sequencerSynced(control) {
+  return sequencerConfig(control).syncToTransport === true;
+}
+
+/** The step length, validated. The six the editor offers are all in the transport's own table. */
+export function sequencerDivision(control) {
+  const d = String(sequencerConfig(control).division ?? '1/16');
+  return Object.hasOwn(STEP_DIVISIONS, d) ? d : '1/16';
+}
+
+/** Beats per step — what the transport measures its position in. */
+export function sequencerBeatsPerStep(control) {
+  return beatsPerStep(sequencerDivision(control));
+}
+
 /**
  * How long one step lasts, in milliseconds.
  *
- * Wall-clock, from the component's own BPM. Named `stepMs` rather than anything suggesting a
- * musical grid, because that is exactly what it is not: two sequencers at the same BPM started a
- * second apart stay a second apart.
+ * Free-running that is wall-clock, from the component's own BPM: two sequencers at the same BPM
+ * started a second apart stay a second apart, which is what the inspector warns about. Synced, the
+ * tempo comes from the transport instead, so the same setting follows a DAW.
+ *
+ * `bpm` is passed in rather than read, because this file does not import a store and should not:
+ * everything here stays a function of its arguments so the tests can run without a transport.
  */
-export function stepMs(control) {
-  const config = sequencerConfig(control);
-  const bpm = Math.max(20, Math.min(300, num(config.bpm, 120)));
-  const perBeat = STEP_DIVISIONS[String(config.division ?? '1/16')] ?? 4;
-  return 60000 / bpm / perBeat;
+export function stepMs(control, bpm = null) {
+  const own = Math.max(20, Math.min(300, num(sequencerConfig(control).bpm, 120)));
+  const tempo = sequencerSynced(control) && bpm !== null
+    ? Math.max(20, Math.min(300, num(bpm, own)))
+    : own;
+  return 60000 / tempo / (1 / sequencerBeatsPerStep(control));
+}
+
+/**
+ * How many step boundaries the transport crossed between two positions.
+ *
+ * A count, not an index — see the note at the top of the file for why a sequencer cannot derive its
+ * position from the transport's the way the Arp does. `maxSteps` caps a catch-up after a stall: a
+ * frame that arrives half a second late should resume, not replay half a second of notes.
+ */
+export function syncedStepsBetween(prevBeats, nextBeats, control, maxSteps = 16) {
+  return crossedSteps(prevBeats, nextBeats, sequencerDivision(control), maxSteps).steps.length;
 }
 
 /**
@@ -177,9 +237,11 @@ export function stepNotes(control, step) {
  * two notes rather than one long one — a sequencer whose repeated notes merge is a sequencer that
  * cannot play a repeated note.
  */
-export function gateMs(control) {
+export function gateMs(control, bpm = null) {
   const gate = Math.max(1, Math.min(99, num(sequencerConfig(control).gate, 60)));
-  return (stepMs(control) * gate) / 100;
+  // The same `bpm` `stepMs` takes, so a synced sequencer's gate follows the transport rather than
+  // staying sized to a BPM the component is no longer using.
+  return (stepMs(control, bpm) * gate) / 100;
 }
 
 /** Grid geometry: a row per track, a column per step, with a lane for the track headers. */

@@ -112,6 +112,10 @@
     arpGeometry, arpCellAt, toggleMute, arpPhase,
     arpSynced, arpDivision, syncedPhaseAt,
   } from '../utils/arpLayout.js';
+  import {
+    advanceStep, gateMs, sequencerConfig, sequencerDirection, sequencerSteps, sequencerSynced,
+    stepMs, stepNotes, syncedStepsBetween,
+  } from '../utils/stepSequencerLayout.js';
   // The touch-strip Ribbon (a parameter control) already owns the plain
   // ribbonConfig/ribbonGeometry names, so the note ribbon's come in aliased.
   import {
@@ -422,6 +426,13 @@
    *  whether to re-baseline. */
   function raiseComponentCycle(control, phase, previous) {
     if (!(phase < previous)) return;
+    raiseComponentCycleNow(control);
+  }
+
+  /** The same event for a component that knows it wrapped rather than inferring it from a phase.
+   *  The COUNT lives here either way — two counters for one component's laps would disagree the
+   *  first time one of them missed a frame, and `onCycle` promises a count. */
+  function raiseComponentCycleNow(control) {
     const id = getControlId(control);
     const count = (componentCycleCount[id] ?? 0) + 1;
     componentCycleCount[id] = count;
@@ -470,7 +481,7 @@
     // later would be visible to some of them and not others. See utils/sectionValueOverrides.js.
     const control = applySectionValues(rawControl, previewOverrides?.sectionValues);
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))))))))));
+    return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1628,6 +1639,9 @@
   const ORBIT_EMIT_MS = 25;
   const ORBIT_EMIT_EPS = 0.004;
   let orbitClock = $state(0);
+  // The sequencer's own frame stamp, so `applyStepSequencerValueSource` re-runs as the playhead
+  // walks. Separate from `orbitClock` because the two tickers self-stop independently.
+  let seqClock = $state(0);
   const orbitPhaseState = {};   // { [id]: phase 0..1 }
   const orbitLastSent = {};     // { [`${id}:${port}`]: { value, at } }
   let orbitTickerRunning = false;
@@ -2913,6 +2927,144 @@
     if (i < 0) return false;
     updateControlProperty(getControlId(control), 'Arp.mutes', toggleMute(control, i));
     return true;
+  }
+
+
+  // --- Step Sequencer: the thing that makes it a sequencer ---------------------
+  //
+  // The component had a grid, a playhead in the renderer and a "Running" toggle, and nothing ever
+  // drove any of it: `__position` was documented as "injected by the preview surface" and the
+  // preview surface had never heard of it. So the toggle set a flag, the playhead never appeared,
+  // and no note was ever sent. Built here on the Arp's pattern, because they are the same problem
+  // and two answers to it would drift.
+  //
+  // TWO CLOCKS, one loop. Free-running accumulates wall-clock milliseconds against `stepMs`, which
+  // is what the inspector's drift warning is about. Synced asks the transport how far it has moved
+  // and steps once per boundary crossed.
+  //
+  // Position ACCUMULATES in both, unlike the Arp's synced path which derives the index from the
+  // beat. The Arp can do that because it only walks forward; a sequencer has reverse, ping-pong and
+  // random, and ping-pong's next step is a function of which way it was already going rather than
+  // of the position. So the transport says how many boundaries were crossed and `advanceStep`
+  // decides where each lands — the direction modes keep working when synced instead of quietly
+  // becoming forward.
+  const seqTimers = {};         // id -> [timeoutId...]  (note-offs)
+  const seqSounding = {};       // id -> Set("ch:note") currently ringing
+  const seqPosition = {};       // id -> step index
+  const seqState = {};          // id -> { forward } for ping-pong
+  const seqAccMs = {};          // id -> ms accumulated toward the next step (free-running)
+  const seqBeats = {};          // id -> last transport reading (synced)
+  const seqJump = {};           // id -> transport jump counter seen
+  let seqTickerRunning = false;
+  let seqLastMs = 0;
+
+  function isStepSequencerControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'StepSequencer';
+  }
+  function stepSequencerControls() {
+    return (orderedControls ?? []).filter((c) => isStepSequencerControl(c));
+  }
+  function seqAllOff(control) {
+    const id = getControlId(control);
+    for (const t of seqTimers[id] ?? []) clearTimeout(t);
+    seqTimers[id] = [];
+    for (const key of seqSounding[id] ?? []) {
+      const [ch, note] = String(key).split(':').map(Number);
+      sendNoteBytes(noteOffBytes(ch, note), `seq_off_${note}`);
+    }
+    seqSounding[id] = new Set();
+  }
+  function seqFireStep(control, step, bpm) {
+    const id = getControlId(control);
+    const notes = stepNotes(control, step);
+    if (!notes.length) return;
+    const held = gateMs(control, bpm);
+    for (const entry of notes) {
+      const key = `${entry.channel}:${entry.note}`;
+      sendNoteBytes(noteOnBytes(entry.channel, entry.note, entry.velocity), `seq_on_${entry.note}`);
+      (seqSounding[id] ??= new Set()).add(key);
+      (seqTimers[id] ??= []).push(setTimeout(() => {
+        sendNoteBytes(noteOffBytes(entry.channel, entry.note), `seq_off_${entry.note}`);
+        seqSounding[id]?.delete(key);
+      }, held));
+    }
+    raiseComponent(control, 'onStep', {
+      index: step + 1,
+      of: sequencerSteps(control),
+      notes: notes.map((entry) => entry.note),
+    });
+  }
+  function seqStepOnce(control, id, bpm) {
+    const steps = sequencerSteps(control);
+    const next = advanceStep(seqPosition[id] ?? -1, steps, sequencerDirection(control), seqState[id] ?? {});
+    seqPosition[id] = next.position;
+    seqState[id] = { forward: next.forward };
+    if (next.wrapped) raiseComponentCycleNow(control);
+    seqFireStep(control, next.position, bpm);
+  }
+  function ensureSeqTicker() {
+    if (seqTickerRunning) return;
+    seqTickerRunning = true;
+    seqLastMs = Date.now();
+    const loop = () => {
+      const running = stepSequencerControls().filter((c) => sequencerConfig(c).running === true);
+      if (!running.length) { seqTickerRunning = false; return; }   // self-stop, like the Arp's
+      const now = Date.now();
+      // Capped, so a backgrounded tab that wakes after ten seconds resumes rather than firing ten
+      // seconds of notes at once.
+      const dt = Math.min(250, Math.max(0, now - seqLastMs));
+      seqLastMs = now;
+
+      for (const control of running) {
+        const id = getControlId(control);
+        if (sequencerSynced(control)) {
+          const beats = transportBeatsNow();
+          const prev = seqBeats[id];
+          seqBeats[id] = beats;
+          // A locate, a loop wrap or a rewind is a discontinuity rather than playing on. Catching up
+          // through one fires every step the locator skipped, which is a burst nobody asked for.
+          const jump = transportJumpSeq();
+          if (seqJump[id] !== jump) { seqJump[id] = jump; continue; }
+          if (!isTransportRunning() || prev === undefined || beats <= prev) continue;
+          const bpm = transportBpmNow();
+          const crossed = syncedStepsBetween(prev, beats, control);
+          for (let i = 0; i < crossed; i += 1) seqStepOnce(control, id, bpm);
+          continue;
+        }
+
+        // Free-running. Accumulated rather than derived from a phase, so changing the BPM mid-run
+        // moves the NEXT boundary and does not retime the step already in progress.
+        delete seqBeats[id];
+        const per = stepMs(control);
+        seqAccMs[id] = (seqAccMs[id] ?? per) + dt;
+        let guard = 0;
+        while (seqAccMs[id] >= per && guard < 16) {
+          seqAccMs[id] -= per;
+          seqStepOnce(control, id, null);
+          guard += 1;
+        }
+        if (guard >= 16) seqAccMs[id] = 0;   // gave up catching up; resume from now
+      }
+      seqClock = now;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+  // Inject the live playhead so the renderer draws the real walk. A stopped sequencer injects
+  // nothing, and the renderer draws no playhead rather than one parked at step zero.
+  function applyStepSequencerValueSource(control, resolved) {
+    if (!isStepSequencerControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const section = base?._children?.StepSequencer;
+    if (!section) return resolved;
+    const id = getControlId(control);
+    if (section.running === true) { ensureSeqTicker(); void seqClock; }
+    else if (seqSounding[id]?.size) { seqAllOff(control); seqPosition[id] = -1; seqAccMs[id] = undefined; }
+    const next = { ...section };
+    if (section.running === true && seqPosition[id] !== undefined && seqPosition[id] >= 0) {
+      next.__position = seqPosition[id];
+    }
+    return { ...resolved, control: { ...base, _children: { ...base._children, StepSequencer: next } } };
   }
 
   // --- Ribbon Keyboard: slide along the strip to play pitch --------------------

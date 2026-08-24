@@ -31,7 +31,8 @@ import {
   keyboardGlide, keyboardHold, keyboardKeys, keyboardNoteAt, keyboardPress, keyboardRange,
 } from '../src/CE_Application/utils/keyboardLayout.js';
 import {
-  STEP_DIRECTION, advanceStep, beatLines, cellAtPoint, gateMs, sequencerGeometry, stepMs,
+  STEP_DIRECTION, STEP_DIVISIONS, advanceStep, beatLines, cellAtPoint, gateMs, sequencerBeatsPerStep,
+  sequencerGeometry, sequencerSynced, stepMs, syncedStepsBetween,
   stepNotes, toggleCell,
 } from '../src/CE_Application/utils/stepSequencerLayout.js';
 import {
@@ -339,6 +340,55 @@ test('the gate follows the tempo, and never merges two repeated notes', () => {
 
   const long = control('StepSequencer', 'StepSequencer', { gate: 500 });
   assert.ok(gateMs(long) < stepMs(long), 'and an over-100 gate is clamped rather than obeyed');
+});
+
+test('the sequencer can follow the transport, like the other two clocked components', () => {
+  // It was the only one that could not, for no reason anybody chose, while the inspector explained
+  // the gap by naming a missing feature — "tempo-sync needs MIDI clock in" — that the app had since
+  // grown. A warning that cites something untrue is worse than no warning, because it is believed.
+  const free = control('StepSequencer', 'StepSequencer', { bpm: 120, division: '1/16' });
+  const synced = control('StepSequencer', 'StepSequencer', {
+    bpm: 120, division: '1/16', syncToTransport: true,
+  });
+
+  assert.equal(sequencerSynced(free), false, 'off by default, so nothing existing changes speed');
+  assert.equal(sequencerSynced(synced), true);
+
+  // Free-running ignores the transport's tempo entirely — that is what the drift warning is about.
+  assert.equal(stepMs(free, 240), stepMs(free, null));
+  // Synced takes it, and the gate follows so it stays sized to the step actually being played.
+  assert.ok(stepMs(synced, 240) < stepMs(synced, null));
+  assert.ok(gateMs(synced, 240) < stepMs(synced, 240));
+});
+
+test('the two division tables are reciprocals, and a test says so', () => {
+  // The component offers steps-per-beat; the transport measures beats-per-step. Two tables for one
+  // fact. The moment they disagree, a synced sequencer and a free-running one at the same setting
+  // play at different speeds and the setting is the only thing that looks the same.
+  for (const [division, perBeat] of Object.entries(STEP_DIVISIONS)) {
+    const sequencer = control('StepSequencer', 'StepSequencer', { division });
+    assert.ok(
+      Math.abs(sequencerBeatsPerStep(sequencer) - 1 / perBeat) < 1e-9,
+      `${division}: ${sequencerBeatsPerStep(sequencer)} beats/step vs ${perBeat} steps/beat`,
+    );
+  }
+});
+
+test('a synced sequencer counts boundaries and still walks its own direction', () => {
+  // Where this differs from the Arp on purpose. The Arp derives its index from the beat, which it
+  // can because it only goes forward. Ping-pong's next step is a function of which way it was
+  // already going and random's is not a function of anything, so the transport says HOW MANY
+  // boundaries were crossed and `advanceStep` decides where each one lands.
+  const sequencer = control('StepSequencer', 'StepSequencer', {
+    division: '1/16', syncToTransport: true, steps: 4, direction: STEP_DIRECTION.pingpong,
+  });
+  // A 1/16 step is a quarter of a beat, so one beat is four boundaries.
+  assert.equal(syncedStepsBetween(0, 1, sequencer), 4);
+  assert.equal(syncedStepsBetween(0, 0.2, sequencer), 0, 'less than a step is not a step');
+  assert.equal(syncedStepsBetween(1, 0.5, sequencer), 0, 'going backwards fires nothing');
+
+  // And a long stall resumes rather than replaying: catching up to now beats replaying where it was.
+  assert.ok(syncedStepsBetween(0, 100, sequencer) <= 16);
 });
 
 test('a step fires only the tracks that are on and not muted', () => {
