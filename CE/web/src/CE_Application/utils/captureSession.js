@@ -97,6 +97,84 @@ export function newSession({ mode = CAPTURE_MODE.dump, profileId = '', now = nul
   };
 }
 
+/**
+ * Coerce whatever a panel file carried into a usable session, or null.
+ *
+ * S5's save/resume, and the panel document is where it lives — beside `deviceSession`, so a session
+ * survives whatever the panel survives and moves between machines with the file.
+ *
+ * DEFENSIVE, because this reads a document. A .cepanel can be hand-edited, written by an older
+ * build, or produced by a converter, and everything downstream indexes into `baselines` and
+ * `observations` as arrays of byte arrays. One string where an array belongs and the diff engine
+ * produces confident nonsense, which is the failure this whole subsystem is written around.
+ *
+ * A session with nothing learned and no baselines is dropped rather than restored: an empty session
+ * is indistinguishable from a fresh one and restoring it means the screen opens mid-conversation
+ * with nothing to show for it.
+ */
+export function normalizeCaptureSession(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+
+  const bytes = (list) => (Array.isArray(list) ? list : [])
+    .filter((entry) => Array.isArray(entry))
+    .map((entry) => entry.map((b) => Math.max(0, Math.min(255, Math.round(Number(b) || 0)))));
+
+  const learned = (Array.isArray(raw.learned) ? raw.learned : [])
+    .filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry))
+    .map((entry) => ({
+      ...entry,
+      id: String(entry.id ?? ''),
+      label: String(entry.label ?? entry.id ?? 'Unnamed'),
+      offsets: (Array.isArray(entry.offsets) ? entry.offsets : []).map((o) => Math.round(Number(o) || 0)),
+    }));
+
+  const baselines = bytes(raw.baselines);
+  if (!learned.length && !baselines.length) return null;
+
+  return {
+    ...newSession({ mode: raw.mode, profileId: raw.profileId }),
+    ...raw,
+    id: String(raw.id ?? ''),
+    mode: Object.values(CAPTURE_MODE).includes(raw.mode) ? raw.mode : CAPTURE_MODE.dump,
+    state: Object.values(CAPTURE_STATE).includes(raw.state) ? raw.state : CAPTURE_STATE.setup,
+    baselines,
+    mask: (Array.isArray(raw.mask) ? raw.mask : []).map((o) => Math.round(Number(o) || 0)),
+    // The observations of a control half-way through being learned. Dropped on the way in: they are
+    // scratch for one hypothesis, they are the largest thing in the session, and a hypothesis
+    // resumed without the prompt that produced it is a question nobody remembers being asked.
+    observations: [],
+    messages: [],
+    hypothesis: null,
+    learned,
+    touchedAt: String(raw.touchedAt ?? raw.startedAt ?? ''),
+  };
+}
+
+/** Stamp a session as of now. Called at the persistence boundary so the mutators stay pure. */
+export function touchCaptureSession(session, now) {
+  return session ? { ...session, touchedAt: String(now ?? '') } : session;
+}
+
+/**
+ * How stale a resumed session's baseline is, in whole hours, or null when it cannot be told.
+ *
+ * The baseline is the perishable half. `recordDump` diffs every new dump against
+ * `baselines.at(-1)` through the stored `mask`, so a session resumed after the synth was
+ * power-cycled, a different patch was loaded, or a different unit was plugged into the same port is
+ * measuring against a description of the device that no longer holds.
+ *
+ * When the state has moved a lot that surfaces honestly, as `packed` or `inconsistent`. The case
+ * worth the warning is when it has moved a LITTLE: a handful of offsets differ, the diff looks like
+ * a parameter, and it is wrong. Restoring the baselines is the owner's call; the age is what makes
+ * the banner something to act on rather than something to dismiss.
+ */
+export function baselineAgeHours(session, now) {
+  const then = Date.parse(String(session?.touchedAt ?? ''));
+  const at = Date.parse(String(now ?? ''));
+  if (!Number.isFinite(then) || !Number.isFinite(at) || at < then) return null;
+  return Math.floor((at - then) / 3600000);
+}
+
 /** Add a setup baseline. Once there are enough, the volatile mask falls out. */
 export function addBaseline(session, payload) {
   const baselines = [...(session.baselines ?? []), payload];

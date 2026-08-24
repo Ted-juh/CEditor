@@ -1,6 +1,7 @@
 import { get } from 'svelte/store';
 import { defaultGridSize, defaultSnapToGrid } from './runtimePreferences.js';
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
+import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
 import { expandControl, shrinkControl } from './documentShape.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
@@ -315,6 +316,20 @@ export function serializePanel(panel, options = {}) {
   if (deviceSession) data.deviceSession = normalizeProjectDeviceSession(deviceSession);
   else delete data.deviceSession;
 
+  // An in-progress capture, on the same "right or absent" rule. It lives on the panel so a session
+  // survives whatever the panel survives and travels between machines with the file — the owner's
+  // call, made knowing a shared .cepanel then carries a half-finished capture and the raw dumps it
+  // took off somebody's synth.
+  //
+  // NOT in the build payload: `serializePanelForExport` passes `captureSession: null`. The exported
+  // plugin's C++ reads Core, Behavior and Scripts and has no idea what a capture is, so including
+  // one would compile a few tens of KB of somebody's SysEx into a binary for nothing.
+  const captureSession = options.captureSession === null
+    ? null
+    : (options.captureSession ?? data.captureSession);
+  if (captureSession) data.captureSession = captureSession;
+  else delete data.captureSession;
+
   // Card presets, on the same "right or absent" rule as `name` and `deviceSession` above: a panel
   // that defines none writes no key, so a document saved before presets travelled round-trips
   // byte-identical and the committed .cepanel fixtures do not all grow an empty array. The key
@@ -367,6 +382,14 @@ export function deserializePanel(json, filePath, name) {
   const id = nextId++;
   if (data.deviceSession) {
     data.deviceSession = normalizeProjectDeviceSession(data.deviceSession);
+  }
+  // Coerced rather than trusted: everything downstream indexes into `baselines` as arrays of byte
+  // arrays, and a document can be hand-edited. `normalizeCaptureSession` returns null for anything
+  // it cannot make sense of, and for an empty session, which then reads as no session at all.
+  if (data.captureSession) {
+    const session = normalizeCaptureSession(data.captureSession);
+    if (session) data.captureSession = session;
+    else delete data.captureSession;
   }
 
   // The document stores each control as a diff against its type's defaults; the editor's model

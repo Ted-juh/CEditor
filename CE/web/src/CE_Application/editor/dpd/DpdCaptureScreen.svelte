@@ -25,13 +25,68 @@
     chooseMode, discardHypothesis, newSession, readyToCapture, recordDump, sessionHarvest,
     sessionSummary, toConfirm, undoLast, BASELINE_COUNT, ECHO_WINDOW_MS,
     applyPastedNames, namesFromPaste, sessionReport,
+    baselineAgeHours, normalizeCaptureSession, touchCaptureSession,
   } from '../../utils/captureSession.js';
+  import { activePanel, updatePanel } from '../../stores/panels.js';
   import { CONFIDENCE } from '../../utils/captureInference.js';
   import { cinfo, cwarn } from '../../stores/console.js';
 
   let { model, profileId = '', requestDump = null, deviceTransmits = false, deviceDumps = true } = $props();
 
+  // SAVE AND RESUME (S5), and the panel document is where a session lives — beside `deviceSession`,
+  // so it survives whatever the panel survives and travels between machines with the file.
+  //
+  // Adopted once per panel rather than on every change to `$activePanel`: the panel object is
+  // rewritten every time this screen writes back, and re-adopting from it would fight whatever the
+  // author is doing right now.
   let session = $state(null);
+  let adoptedFrom = $state(null);
+  // Set when this session came off disk rather than being started here. Drives the banner, and
+  // cleared the moment the baselines are retaken.
+  let resumed = $state(false);
+
+  $effect(() => {
+    const panel = $activePanel;
+    if (!panel || adoptedFrom === panel.id) return;
+    adoptedFrom = panel.id;
+    const stored = normalizeCaptureSession(panel.captureSession);
+    session = stored;
+    resumed = !!stored;
+  });
+
+  /** Write the session back to the panel. Stamped here so the state machine stays pure. */
+  function persist(next) {
+    session = next;
+    const panel = $activePanel;
+    if (!panel) return;
+    updatePanel(panel.id, {
+      captureSession: next ? touchCaptureSession(next, new Date().toISOString()) : null,
+    });
+  }
+
+  /**
+   * Throw away the restored baselines and take three fresh ones.
+   *
+   * What the banner is FOR. `recordDump` diffs every dump against `baselines.at(-1)` through the
+   * stored `mask`, so a session resumed after a power-cycle, a patch change, or a different unit on
+   * the same port is measuring against a description of the device that no longer holds. A big
+   * change surfaces honestly as `packed` or `inconsistent`; a small one looks like a parameter and
+   * is wrong. What is learned is kept — it is the hour of work — and only the perishable half goes.
+   */
+  function retakeBaselines() {
+    resumed = false;
+    persist({
+      ...session,
+      state: CAPTURE_STATE.setup,
+      baselines: [],
+      mask: [],
+      checksum: null,
+      observations: [],
+      messages: [],
+      hypothesis: null,
+    });
+  }
+
   let name = $state('');
   let group = $state('');
   let verified = $state(false);
@@ -43,6 +98,13 @@
   }));
 
   let harvest = $derived(session ? sessionHarvest(session) : null);
+  let baselineAge = $derived(session ? baselineAgeHours(session, new Date().toISOString()) : null);
+  let baselineAgeLabel = $derived(
+    baselineAge === null ? ''
+      : baselineAge < 1 ? 'less than an hour ago'
+        : baselineAge < 24 ? `${baselineAge} hour${baselineAge === 1 ? '' : 's'} ago`
+          : `${Math.floor(baselineAge / 24)} day${Math.floor(baselineAge / 24) === 1 ? '' : 's'} ago`,
+  );
 
   // Bulk naming and the report — the two pieces of S5 that are pure functions over what the session
   // already holds. Save/resume is the third and is not built; it needs somewhere to put a session.
@@ -53,7 +115,7 @@
 
   function applyPaste() {
     if (!pastePlan) return;
-    session = applyPastedNames(session, pastePlan.pairs);
+    persist(applyPastedNames(session, pastePlan.pairs));
     pasteText = '';
     pasting = false;
   }
@@ -91,17 +153,18 @@
   }
 
   function start() {
-    session = newSession({ mode: modeChoice.mode, profileId, now: new Date().toISOString() });
+    resumed = false;
+    persist(newSession({ mode: modeChoice.mode, profileId, now: new Date().toISOString() }));
     cinfo(`[capture] ${modeChoice.why}`);
   }
 
   async function baseline() {
     const payload = await takeDump();
-    if (payload) session = addBaseline(session, payload);
+    if (payload) persist(addBaseline(session, payload));
   }
 
   function go() {
-    session = beginCapture(session);
+    persist(beginCapture(session));
   }
 
   async function captured() {
@@ -110,7 +173,7 @@
   }
 
   function keep() {
-    session = acceptHypothesis(session, { id: name.trim(), label: name.trim(), group: group.trim(), verified, now: new Date().toISOString() });
+    persist(acceptHypothesis(session, { id: name.trim(), label: name.trim(), group: group.trim(), verified, now: new Date().toISOString() }));
     name = '';
     group = '';
     verified = false;
@@ -126,6 +189,24 @@
 
 <div class="dpd-screen">
   <h2>Capture</h2>
+
+  <!-- RESUMED, with the age of the baseline in it. The baselines were restored along with
+       everything else, which is the fast path and the one where a stale baseline can still produce
+       a plausible wrong parameter — so the banner has to be actionable rather than decorative. The
+       age is what makes it so: "four minutes ago" is fine, "nine days ago" is a different synth. -->
+  {#if session && resumed}
+    <div class="notice resumed">
+      <TriangleAlert size={12} />
+      <div>
+        <b>Resumed from this panel</b> — {session.learned?.length ?? 0} parameter{(session.learned?.length ?? 0) === 1 ? '' : 's'} already learned{#if baselineAge !== null}, baseline taken <b>{baselineAgeLabel}</b>{/if}.
+        <p>Every new dump is measured against that baseline. If the synth has been power-cycled,
+          had a different patch loaded, or is a different unit on the same port, the comparison is
+          against a device that no longer exists — and a small difference reads as a parameter
+          rather than as a mismatch.</p>
+      </div>
+      <button class="btn small" onclick={retakeBaselines}>Retake baselines</button>
+    </div>
+  {/if}
 
   {#if !session}
     <section class="card">
@@ -248,7 +329,7 @@
       <div class="card-head">
         <h3>Learned</h3>
         <span class="pill">{sessionSummary(session)}</span>
-        <button class="btn small" onclick={() => (session = undoLast(session))}><Undo2 size={11} /> Undo last</button>
+        <button class="btn small" onclick={() => persist(undoLast(session))}><Undo2 size={11} /> Undo last</button>
         <button class="btn small" onclick={() => (pasting = !pasting)}>Name from a list</button>
         <button class="btn small" onclick={copyReport}>{reportCopied ? 'Copied' : 'Copy report'}</button>
       </div>
@@ -304,6 +385,11 @@
 
 <style>
   .dpd-screen { padding: 16px 18px; overflow-y: auto; height: 100%; }
+  .notice.resumed { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px;
+    padding: 8px 10px; border: 1px solid #4A3F1E; background: rgba(242, 201, 76, 0.08);
+    border-radius: 5px; font-size: 11px; line-height: 1.45; }
+  .notice.resumed > div { flex: 1; min-width: 0; }
+  .notice.resumed p { margin: 3px 0 0; color: #9A9A9A; }
   .paste { margin-top: 8px; display: grid; gap: 6px; }
   .paste textarea { width: 100%; resize: vertical; font: inherit; font-size: 11px;
     background: #1A1A1A; color: #C8C8C8; border: 1px solid #2E2E2E; border-radius: 4px; padding: 6px; }

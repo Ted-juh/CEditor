@@ -197,6 +197,10 @@ function serializePanelDocument(panel) {
 function serializePanelForExport(panel) {
   return serializePanel(panel, {
     deviceSession: getProjectDeviceSessionSnapshot(),
+    // An in-progress capture is saved in the .cepanel and has no business in a plugin binary: the
+    // player's C++ reads Core, Behavior and Scripts and has never heard of a capture session, so
+    // carrying one would compile tens of KB of somebody's SysEx dumps into the build for nothing.
+    captureSession: null,
     elide: false,
   });
 }

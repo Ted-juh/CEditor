@@ -19,10 +19,12 @@ import {
 import {
   BASELINE_COUNT, CAPTURE_MODE, ECHO_WINDOW_MS, SENDS_DURING_CAPTURE, acceptHypothesis, addBaseline,
   applyPastedNames, namesFromPaste, sessionReport,
+  baselineAgeHours, normalizeCaptureSession, touchCaptureSession,
   beginCapture, chooseMode, newSession, readyToCapture, recordDump, recordMessages, sessionHarvest,
   sessionSummary, toConfirm, undoLast,
 } from '../src/CE_Application/utils/captureSession.js';
 import { createFakeSynth, FAKE_MAP } from './support/fakeSynth.js';
+import { createPanel, deserializePanel, serializePanel } from '../src/CE_Application/stores/panelModel.js';
 
 /** Capture n moves of one control, the way a session would. */
 function observe(synth, id, values, mask) {
@@ -542,6 +544,68 @@ test('the summary says what is unsettled as loudly as what is settled', () => {
   assert.match(summary, /2 parameters/);
   assert.match(summary, /1 still a guess/);
   assert.match(summary, /sharing a byte/);
+});
+
+test('a session survives a round trip through a panel document', () => {
+  // S5's save/resume. The session lives on the panel, beside `deviceSession`, so it survives
+  // whatever the panel survives — and a shared .cepanel carries it, which is the accepted cost.
+  const synth = createFakeSynth();
+  let session = newSession({ profileId: 'juno', now: '2026-08-24T09:00:00Z' });
+  // Kept, rather than re-dumped in the assertion: the fake synth's volatile counter ticks on every
+  // dump, which is the whole reason the baseline step exists.
+  const taken = Array.from({ length: BASELINE_COUNT }, () => synth.dump());
+  for (const payload of taken) session = addBaseline(session, payload);
+  session = { ...session, learned: [
+    { id: 'cutoff', label: 'Cutoff', kind: 'u7', offsets: [44], confidence: CONFIDENCE.confirmed },
+  ] };
+
+  const panel = { ...createPanel(), captureSession: touchCaptureSession(session, '2026-08-24T09:30:00Z') };
+  const reopened = deserializePanel(serializePanel(panel), '', 'x');
+  const back = reopened.captureSession;
+
+  assert.equal(back.learned.length, 1, 'the hour of work is what has to survive');
+  assert.equal(back.learned[0].label, 'Cutoff');
+  assert.equal(back.baselines.length, BASELINE_COUNT, 'the baselines came back too — the owner\'s call');
+  assert.deepEqual(back.baselines[0], taken[0]);
+  assert.ok(back.mask.length, 'and the volatile mask derived from them');
+  assert.equal(back.touchedAt, '2026-08-24T09:30:00Z');
+});
+
+test('a hand-edited session is coerced rather than trusted, and an empty one is no session', () => {
+  // This reads a document. Everything downstream indexes into `baselines` as arrays of bytes, and
+  // one string where an array belongs makes the diff engine produce confident nonsense — which is
+  // the failure the whole subsystem is written around.
+  const mangled = normalizeCaptureSession({
+    id: 7, mode: 'nonsense', state: 'elsewhere',
+    baselines: ['not an array', [1, 2, 999, -5]],
+    mask: ['3', 4.7],
+    learned: [null, 'nope', { id: 'a' }],
+    observations: [{ changed: [], payload: [1] }],
+  });
+  assert.equal(mangled.id, '7');
+  assert.equal(mangled.mode, CAPTURE_MODE.dump, 'an unknown mode falls back rather than sticking');
+  assert.deepEqual(mangled.baselines, [[1, 2, 255, 0]], 'the string is dropped, the bytes clamped');
+  assert.deepEqual(mangled.mask, [3, 5]);
+  assert.equal(mangled.learned.length, 1, 'a null and a string are not learned parameters');
+  assert.equal(mangled.learned[0].label, 'a', 'and one with no label falls back to its id');
+  assert.deepEqual(mangled.observations, [], 'mid-hypothesis scratch does not resume');
+
+  // Nothing learned and no baselines is indistinguishable from a fresh session, so it is not one.
+  assert.equal(normalizeCaptureSession({ learned: [], baselines: [] }), null);
+  assert.equal(normalizeCaptureSession(null), null);
+  assert.equal(normalizeCaptureSession('a session'), null);
+});
+
+test('the baseline age is what makes the resume warning actionable', () => {
+  // Restoring the baselines is the fast path and the one where a stale baseline can still produce a
+  // plausible wrong parameter. "Four minutes ago" is fine; "nine days ago" is a different synth.
+  const session = touchCaptureSession({ learned: [] }, '2026-08-24T09:00:00Z');
+  assert.equal(baselineAgeHours(session, '2026-08-24T09:40:00Z'), 0);
+  assert.equal(baselineAgeHours(session, '2026-08-24T14:00:00Z'), 5);
+  assert.equal(baselineAgeHours(session, '2026-09-02T09:00:00Z'), 216);   // nine days
+  assert.equal(baselineAgeHours(session, 'not a date'), null);
+  assert.equal(baselineAgeHours({}, '2026-08-24T09:00:00Z'), null, 'no stamp, no claim');
+  assert.equal(baselineAgeHours(session, '2026-08-24T08:00:00Z'), null, 'a clock that went backwards says nothing');
 });
 
 test('names pasted out of a manual land positionally, and say when they do not fit', () => {

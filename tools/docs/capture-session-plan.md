@@ -263,10 +263,35 @@ Juno.
 `test/captureInference.test.js` (the answer key). S1, S2, S3 and S4; S5's ergonomics are partly
 there — undo-last and a session summary — and save/resume and the manual-name paste are not.
 
-**S5, revisited 2026-08-24.** The manual-name paste and the session report are built;
-`save/resume` is still not, and that is now a decision rather than an omission — it needs a place to
-put an in-progress session, and the obvious one (the panel document, beside `deviceSession`) means a
-half-finished capture travels inside a file somebody might share.
+**S5, revisited 2026-08-24. All of it is built.** The manual-name paste, the session report and
+save/resume.
+
+**The session lives on the panel**, beside `deviceSession`, so it survives whatever the panel
+survives and moves between machines with the file. The cost was named before the choice was made and
+is accepted: a shared `.cepanel` carries a half-finished capture and the raw dumps it took off
+somebody's synth. It is NOT in the build payload — `serializePanelForExport` passes
+`captureSession: null`, because the player's C++ reads Core, Behavior and Scripts and has never
+heard of a capture, so carrying one would compile tens of KB of SysEx into a binary for nothing.
+
+**`normalizeCaptureSession` coerces rather than trusts**, because this reads a document.
+Everything downstream indexes into `baselines` as arrays of bytes and one string where an array
+belongs makes the diff engine produce confident nonsense. A session with nothing learned and no
+baselines returns null: it is indistinguishable from a fresh one, and restoring it opens the screen
+mid-conversation with nothing to show. Mid-hypothesis `observations` are dropped — scratch for one
+prompt, the largest thing in the session, and a hypothesis resumed without the question that
+produced it is one nobody remembers being asked.
+
+**Resume restores the baselines too**, which is the fast path and the one with the sharp edge.
+`recordDump` diffs every dump against `baselines.at(-1)` through the stored `mask`, so a session
+resumed after a power-cycle, a patch change, or a different unit on the same port is measuring
+against a device that no longer exists. A large difference surfaces honestly as `packed` or
+`inconsistent`; a small one reads as a parameter and is wrong.
+
+That is a warning rather than a refusal, by decision. What makes it act like one is `baselineAgeHours`:
+the banner says how old the baseline is, because "less than an hour ago" and "nine days ago" call
+for different answers, and it carries a **Retake baselines** button that clears the perishable half
+and keeps what was learned. The split is the whole reason this stayed small — `learned` is an hour
+of work and cannot be rebuilt; baselines, mask and checksum are three dumps.
 
 `namesFromPaste` is POSITIONAL and shows the pairing before it lands. Matching by similarity would
 pair "Cutoff" with "Cutoff Env Amount" on a page that has both, and a paste starting one line too
