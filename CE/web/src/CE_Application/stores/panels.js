@@ -17,6 +17,9 @@ import {
 } from '../bridge/bridge.js';
 import { clog, cinfo, cwarn, cerror } from './console.js';
 import {
+  appendRunLine, beginRun, claimIdentity, finishRun, identityFor, newCopyPatch,
+} from './exportRuns.js';
+import {
   reopenLastSession,
   autosaveEnabled,
   autosaveIntervalSeconds,
@@ -26,6 +29,7 @@ import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 import { fileDataByteSize, fileDataText } from '../utils/fileDataPayload.js';
 import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
 import { runWhenIdle } from '../utils/runWhenIdle.js';
+import { rememberRecentFile } from './recentFiles.js';
 import { equalityWritable } from '../utils/equalityStore.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { createPanel, deserializePanel, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
@@ -193,6 +197,10 @@ function serializePanelDocument(panel) {
 function serializePanelForExport(panel) {
   return serializePanel(panel, {
     deviceSession: getProjectDeviceSessionSnapshot(),
+    // An in-progress capture is saved in the .cepanel and has no business in a plugin binary: the
+    // player's C++ reads Core, Behavior and Scripts and has never heard of a capture session, so
+    // carrying one would compile tens of KB of somebody's SysEx dumps into the build for nothing.
+    captureSession: null,
     elide: false,
   });
 }
@@ -1008,12 +1016,21 @@ function ensureBuildListeners() {
   buildListenersReady = true;
   onBuildProgress((p) => {
     const line = p?.line;
-    if (line != null && String(line).length) clog('[vst3]', String(line));
+    if (line == null || !String(line).length) return;
+    clog('[vst3]', String(line));
+    // Also captured per run. The console is where every subsystem's chatter goes, and a build's
+    // output interleaved with MIDI traffic is not a build log — see stores/exportRuns.js.
+    appendRunLine(String(line));
   });
   onBuildComplete((r) => {
     buildInFlight = false;
     if (r?.ok) cinfo('[vst3] ✓ Build complete →', r.path ?? '(see export-out/)');
     else cerror('[vst3] ✗ Build failed:', r?.message ?? `exit ${r?.code ?? '?'}`);
+    finishRun({
+      ok: r?.ok === true,
+      path: r?.path ?? '',
+      message: r?.message ?? (r?.ok ? '' : `exit ${r?.code ?? '?'}`),
+    });
   });
 }
 
@@ -1022,24 +1039,56 @@ function ensureBuildListeners() {
  * backend (no-op in plain-browser dev). Reuses the panel's stable GUID, minting + persisting one
  * the first time so re-exports keep the same plugin identity.
  */
-export function buildActivePanelVst3() {
+export function buildActivePanelVst3({ identityChoice = null } = {}) {
   const panel = get(activePanel);
   if (!panel) { cwarn('[vst3] No active panel to build.'); return false; }
   if (buildInFlight) { cwarn('[vst3] A build is already running.'); return false; }
 
   ensureBuildListeners();
 
+  // The identity fork (export plan D1). The collision that matters is not two panels picking the
+  // same random GUID — it is a .cepanel being COPIED: export the copy and it takes over the
+  // original plugin's identity, silently replacing it in every project that loaded it. `ask` is
+  // returned only for that case, so the ordinary re-export still runs without a question.
+  const decision = identityFor(panel);
+  if (decision.action === 'ask' && identityChoice === null) {
+    cwarn(`[vst3] ${decision.reason}. Choose Update or New copy on the Export tab.`);
+    return { needsChoice: true, decision };
+  }
+
   let guid = panel.panelGuid;
-  if (!guid) {
+  if (identityChoice === 'new') {
+    const patch = newCopyPatch(panel, makeGuid);
+    guid = patch.panelGuid;
+    updatePanel(panel.id, patch);
+    cinfo(`[vst3] New independent plugin identity — exporting as "${patch.exportSettings.pluginName}".`);
+  } else if (!guid) {
     guid = makeGuid();
     updatePanel(panel.id, { panelGuid: guid }); // persist identity into the document
   }
+
+  // Claimed BEFORE the build, not after: a failed first export would otherwise leave the panel
+  // holding a GUID nothing has claimed, and the next export of a copy of it would read as "adopt"
+  // rather than "ask" — which is exactly the collision this is here to catch.
+  claimIdentity({
+    guid,
+    panelId: String(panel.id),
+    panelPath: panel.filePath ?? '',
+    productName: panel.exportSettings?.pluginName?.trim() || String(panel.name ?? ''),
+  });
 
   // Match the exporter's choice (Export settings pluginName overrides the panel name) so the
   // streamed "Build complete → path" reflects the real output file.
   const pluginName = panel.exportSettings?.pluginName?.trim();
   const productName = pluginName || String(panel.name || 'CEditor Panel').trim() || 'CEditor Panel';
   buildInFlight = true;
+  beginRun({
+    panelId: String(panel.id),
+    panelName: String(panel.name ?? ''),
+    productName,
+    guid,
+    format: 'VST3',
+  });
   cinfo(`[vst3] Building "${productName}" — runs npm + cmake, may take a minute…`);
   // Serialize with the GUID merged in so the temp .cepanel carries it too (harmless if unused).
   bridgeBuildVst3(String(panel.id), serializePanelForExport({ ...panel, panelGuid: guid }), guid, productName);
@@ -1127,6 +1176,14 @@ export function initPanelBridge() {
       list.map(p => p.id === panelId ? { ...p, ...updates } : p)
     );
 
+    // No markContextSaved() call here on purpose: history.js imports this module, so importing it
+    // back would close a cycle for something it does not need. Its noteCleanState() adopts this
+    // state as the saved marker the moment the cleared `modified` flag reaches its subscription,
+    // which is this same tick — so undo back to here clears the dirty dot either way.
+    if (updates.filePath) {
+      rememberRecentFile({ kind: 'panel', path: updates.filePath, name: updates.name });
+    }
+
     // Persist open panel paths now that this panel has a file
     schedulePanelOpenHousekeeping(label);
   });
@@ -1198,6 +1255,7 @@ export function initPanelBridge() {
 
     const activateTimer = createPerfDebugTimer(`panel activate ${label}`);
     addPanel(panel);
+    if (filePath) rememberRecentFile({ kind: 'panel', path: filePath, name: panel?.name });
     activateTimer(`controls=${controlCount}`);
 
     requestAnimationFrame(() => {

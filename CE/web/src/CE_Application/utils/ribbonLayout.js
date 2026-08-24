@@ -49,32 +49,10 @@ export function ribbonValueFromPx(px, py, geom, vertical) {
 // Where a ribbon springs back to on release. Exported as a table because the script verb
 // ce.components.ribbon.returnMode has to offer exactly these and no others — a verb that accepts a
 // mode the switch below has no case for writes a setting that silently does nothing.
-export const RIBBON_RETURN_MODES = ['none', 'center', 'min', 'max', 'rest'];
-
-// The rest value the ribbon returns to on release, or null when it latches.
-export function ribbonReturnTarget(control) {
-  const cfg = ribbonConfig(control);
-  switch (String(cfg.returnMode ?? 'none')) {
-    case 'center': return 0.5;
-    case 'min': return 0;
-    case 'max': return 1;
-    case 'rest': return clamp01(num(cfg.returnValue, 0.5));
-    default: return null; // none → latch/hold
-  }
-}
-
-// One return glide step toward `target` at `rate` (units/sec) over `dtSec`;
-// never overshoots. `rate` ≤ 0 snaps instantly. Returns { value, settled }.
-export function ribbonGlide(value, target, rate, dtSec) {
-  const from = clamp01(num(value, 0));
-  const to = clamp01(num(target, 0.5));
-  const r = num(rate, 8);
-  if (r <= 0) return { value: to, settled: true };
-  const step = r * Math.max(0, num(dtSec, 0));
-  const d = to - from;
-  if (Math.abs(d) <= step) return { value: to, settled: true };
-  return { value: from + Math.sign(d) * step, settled: false };
-}
+// The ribbon, the joystick and the crossfader share one spring, so they share its vocabulary.
+// Re-exported under the old name because the picker imports it that way, and because a second
+// list of the same five strings is a second list that can drift.
+export { RETURN_MODES as RIBBON_RETURN_MODES } from './returnToRest.js';
 
 // Realistic-wheel grip ridges: positions (0..1 along the visible face, 0 = top)
 // of the grip lines on a cylinder rotated by `value`. Projected so ridges bunch

@@ -15,6 +15,13 @@
   import PixelDisplayRenderer from './PixelDisplayRenderer.svelte';
   import ScriptDrawOverlay from './ScriptDrawOverlay.svelte';
   import MeterRenderer from './MeterRenderer.svelte';
+  import ShapeRenderer from './ShapeRenderer.svelte';
+  import { isMeterFamily, isRibbonFamily } from '../models/componentFamilies.js';
+  import KeyboardRenderer from './KeyboardRenderer.svelte';
+  import StepSequencerRenderer from './StepSequencerRenderer.svelte';
+  import TabContainerRenderer from './TabContainerRenderer.svelte';
+  import { isChildOnActivePage } from '../utils/tabContainerLayout.js';
+  import ScrollAreaRenderer from './ScrollAreaRenderer.svelte';
   import EnvelopeRenderer from './EnvelopeRenderer.svelte';
   import MatrixRenderer from './MatrixRenderer.svelte';
   import JoystickRenderer from './JoystickRenderer.svelte';
@@ -55,6 +62,7 @@
   import { guides, selectedGuide } from '../stores/guides.js';
   import { fileCache, loadFile } from '../stores/fileCache.js';
   import { findAlignmentSnap, computeDistances } from '../utils/canvasSnapping.js';
+  import { framedGuides, hasSelectedAncestor, multiDragPatches, toPanelDistances, toPanelGuides } from '../utils/canvasDragFrame.js';
   import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
@@ -63,11 +71,12 @@
     getMouseSection,
     resolveCursorCss,
     resolveHitTestClipPath,
+    resolveTabIndexFor,
     resolveTabIndex,
-    acceptsPointer,
     childrenAcceptPointer,
     showsFocusOutline,
-    isFocusable,
+    isFocusableFor,
+    acceptsPointerFor,
     raisesOnClick,
   } from '../utils/mouseBehavior.js';
   import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
@@ -176,6 +185,15 @@
     onpreviewlistboxfilter = null,
     // --- Nesting (all inert for un-nested/top-level controls) ---
     panelControls = [],
+    // The controls that share this one's COORDINATE FRAME, and the bounds of that frame. A
+    // container hands both to its children (its own child list, its own content box); a top-level
+    // control is handed neither and falls back to `allControls` and the panel, which is exactly
+    // what its frame is. See utils/canvasDragFrame.js for why this is a frame and not a
+    // conversion — `allControls` deliberately stays the panel's top-level list, because the LCD
+    // and pixel-display renderers use it to resolve a data source by name and that lookup is not
+    // a geometry question.
+    frameControls = null,
+    frameSize = null,
     parentOffset = { x: 0, y: 0 },
     parentChainIds = [],
     parentGrid = null,
@@ -224,13 +242,20 @@
   let isCustomComponent = $derived(String(core?.controlType ?? '') === 'CustomComponent');
   let isLcdDisplay = $derived(String(core?.controlType ?? '') === 'LcdDisplay');
   let isPixelDisplay = $derived(String(core?.controlType ?? '') === 'PixelDisplay');
-  let isMeter = $derived(String(core?.controlType ?? '') === 'Meter');
+  // Family, not name: a ProgressBar is drawn by the meter renderer and a wheel by the ribbon's.
+  // See METER_FAMILY / RIBBON_FAMILY in componentTypes.js — adding a member is one edit there.
+  let isMeter = $derived(isMeterFamily(core?.controlType));
+  let isKeyboard = $derived(String(core?.controlType ?? '') === 'Keyboard');
+  let isStepSequencer = $derived(String(core?.controlType ?? '') === 'StepSequencer');
+  let isTabContainer = $derived(String(core?.controlType ?? '') === 'TabContainer');
+  let isScrollArea = $derived(String(core?.controlType ?? '') === 'ScrollArea');
+  let isShape = $derived(String(core?.controlType ?? '') === 'Shape');
   let isEnvelope = $derived(String(core?.controlType ?? '') === 'Envelope');
   let isMatrix = $derived(String(core?.controlType ?? '') === 'Matrix');
   let isJoystick = $derived(String(core?.controlType ?? '') === 'VectorJoystick');
   let isCrossfader = $derived(String(core?.controlType ?? '') === 'Crossfader');
   let isNumpad = $derived(String(core?.controlType ?? '') === 'Numpad');
-  let isRibbon = $derived(String(core?.controlType ?? '') === 'Ribbon');
+  let isRibbon = $derived(isRibbonFamily(core?.controlType));
   let isMacro = $derived(String(core?.controlType ?? '') === 'Macro');
   let isOrbit = $derived(String(core?.controlType ?? '') === 'Orbit');
   let isLooper = $derived(String(core?.controlType ?? '') === 'Looper');
@@ -423,10 +448,16 @@
   // makes something focusable should take effect while that state is active.
   let mouseSection = $derived(getMouseSection(renderControl ?? control));
   let mouseAppliesToSurface = $derived(editorInteractionEnabled === false);
-  let mouseFocusable = $derived(mouseAppliesToSurface && isFocusable(mouseSection));
+  // Behavior rides alongside for the value-flow question: a display is not a tab stop, whatever
+  // the Mouse tab says, because focusing something that cannot be operated swallows the Tab press
+  // that was heading for the next real control.
+  let flowBehavior = $derived((renderControl ?? control)?._children?.Behavior ?? null);
+  let mouseFocusable = $derived(mouseAppliesToSurface && isFocusableFor(mouseSection, flowBehavior));
   let mouseCursorCSS = $derived(mouseAppliesToSurface ? resolveCursorCss(mouseSection) : '');
   let mouseClipCSS = $derived(mouseAppliesToSurface ? resolveHitTestClipPath(mouseSection) : '');
-  let mouseBlocksPointer = $derived(mouseAppliesToSurface && !acceptsPointer(mouseSection));
+  // A display is transparent to the pointer, whatever the Mouse tab says — clicks pass through to
+  // whatever sits behind it, and it has no hover. See utils/displayMode.js for the trade.
+  let mouseBlocksPointer = $derived(mouseAppliesToSurface && !acceptsPointerFor(mouseSection, flowBehavior));
   let mouseChildrenTakePointer = $derived(mouseAppliesToSurface && childrenAcceptPointer(mouseSection));
   let mouseFocusOutline = $derived(mouseAppliesToSurface && showsFocusOutline(mouseSection));
   let mouseRaisesOnClick = $derived(mouseAppliesToSurface && raisesOnClick(mouseSection));
@@ -477,7 +508,11 @@
   // The surface's own tab index wins when it set one — it knows about roles and
   // handle counts. The Mouse section fills in for everything else.
   let effectiveTabIndex = $derived(
-    previewTabIndex !== undefined ? previewTabIndex : resolveTabIndex(mouseSection)
+    // ...except for a display, where the surface does not know it is one. -1 wins over the
+    // surface's own index there, because a read-only control is never in the tab order.
+    mouseAppliesToSurface && resolveTabIndexFor(mouseSection, flowBehavior) === -1
+      ? -1
+      : (previewTabIndex !== undefined ? previewTabIndex : resolveTabIndex(mouseSection))
   );
 
   // --- Drag state (internal $state per feedback) ---
@@ -511,9 +546,22 @@
   let transientW = $state(null);
   let transientH = $state(null);
 
+  // CARRIED, not moved. Ctrl+A selects containers together with everything inside them, so a
+  // nested child is routinely selected at the same time as the container it lives in. The
+  // container translates and the DOM nesting takes the child with it — applying the broadcast
+  // delta here as well moved the child TWICE, sliding it out of its own container by exactly the
+  // distance the container travelled. The commit had the same double (handleDragEnd), so letting
+  // go did not put it back.
+  let carriedByAncestor = $derived(isSelected && hasSelectedAncestor(parentChainIds, $selectedComponentIds));
+
   // During multi-drag, non-dragged selected components offset by the shared delta
-  let multiDragOffsetX = $derived(!isDragging && isSelected && $multiDragDelta.active ? $multiDragDelta.x : 0);
-  let multiDragOffsetY = $derived(!isDragging && isSelected && $multiDragDelta.active ? $multiDragDelta.y : 0);
+  let multiDragOffsetX = $derived(!isDragging && isSelected && !carriedByAncestor && $multiDragDelta.active ? $multiDragDelta.x : 0);
+  let multiDragOffsetY = $derived(!isDragging && isSelected && !carriedByAncestor && $multiDragDelta.active ? $multiDragDelta.y : 0);
+  // ...and when the pointer has hold of the carried child itself, its own transient position is
+  // the same double from the other end: the ancestor is already moving it. Falling back to the
+  // stored Transform lets the container's translation be the only thing that moves it on screen,
+  // which is what the commit will write.
+  let dragMovesSelf = $derived(!(carriedByAncestor && $multiDragDelta.active));
   let deviceDropCompatibility = $derived($deviceParameterDrag?.parameter
     ? getBindingCompatibility(sourceControl, $deviceParameterDrag.parameter)
     : null
@@ -528,8 +576,8 @@
           : 'incompatible'
   );
 
-  let displayX = $derived(layoutPosition ? layoutPosition.x : (transientX ?? transform?.x ?? 0) + multiDragOffsetX);
-  let displayY = $derived(layoutPosition ? layoutPosition.y : (transientY ?? transform?.y ?? 0) + multiDragOffsetY);
+  let displayX = $derived(layoutPosition ? layoutPosition.x : (dragMovesSelf ? (transientX ?? transform?.x ?? 0) : (transform?.x ?? 0)) + multiDragOffsetX);
+  let displayY = $derived(layoutPosition ? layoutPosition.y : (dragMovesSelf ? (transientY ?? transform?.y ?? 0) : (transform?.y ?? 0)) + multiDragOffsetY);
   // A section whose size comes from its contents (utils/containerFit.js). Deep, because a section
   // holding another fitted section cannot know its own size until the inner one does. The derived
   // size wins over the stored Transform on a fitted axis; a transient drag still wins over both, so
@@ -542,7 +590,16 @@
   // control with no Children section renders exactly as before. ---
   let childrenSection = $derived(getSection(control, 'Children'));
   let isContainer = $derived(!!childrenSection);
-  let childControls = $derived(isContainer ? sortControlsForRender(getChildControls(control)) : []);
+  // A TAB CONTAINER SHOWS ONE PAGE. `isChildOnActivePage` was written with the component and then
+  // nothing called it, so every page's children were drawn at once and the inspector's "Show this
+  // page" button set a number that changed nothing on screen — a control with pages that are not
+  // pages. Nothing becomes unreachable by hiding them: `childPageId` puts a child with no page, or
+  // one whose page was deleted, back on page one, and the author switches pages from the same
+  // button that was already there.
+  let childControls = $derived(isContainer
+    ? sortControlsForRender(getChildControls(control))
+      .filter((child) => !isTabContainer || isChildOnActivePage(child, control))
+    : []);
   // WHERE A CHILD'S 0,0 IS. Everything else in the app answers this with containment.contentOrigin
   // — hit-testing, controlPanelRect, the fit measurement, the scenery compiler — and that function
   // prefers paddingLeft/paddingTop over the shared `padding`. This component used the shared number
@@ -587,6 +644,13 @@
     y: parentOffset.y + displayY + childrenPad.top,
   });
   let childParentChainIds = $derived([...parentChainIds, core?.id].filter(Boolean));
+  // The frame this container's children live in: their (0,0) is its content origin, so the bounds
+  // they snap and measure against are the CONTENT box, not the container's border box. Handed down
+  // as `frameSize` — the same role the panel's own size plays for a top-level control.
+  let childFrameSize = $derived({
+    width: Math.max(0, displayW - childrenPad.left - childrenPad.right),
+    height: Math.max(0, displayH - childrenPad.top - childrenPad.bottom),
+  });
   let myGridSection = $derived(getSection(control, 'Grid') ?? null);
   // This container is highlighted as the live drop target during a canvas drag.
   let isDropTargetHighlighted = $derived(editorInteractionEnabled && core?.id != null && $containerDropTargetId === core.id);
@@ -601,20 +665,45 @@
   let snapGuides = $state.raw([]);
   let distanceLabels = $state.raw([]); // { axis, dist, x, y, length }
 
+  // MY COORDINATE FRAME. Everything below this line does rect math in the space this control's
+  // own x/y is expressed in — its siblings and the box they sit in — never in panel space. For a
+  // top-level control the two are the same thing and none of this changes anything; for a nested
+  // one they differ by `parentOffset`, and mixing them is what made snapping inside a container
+  // snap to nowhere and its distance labels read as fiction. utils/canvasDragFrame.js carries the
+  // reasoning; the short version is that a frame is cheaper and less error-prone than converting
+  // every sibling into panel space sixty times a second.
+  let mySiblings = $derived(frameControls ?? allControls);
+  let myFrameSize = $derived(frameSize ?? { width: panelWidth, height: panelHeight });
+  // Ruler guides are stored in panel space because that is where the rulers draw them, so they are
+  // the one input that has to be brought INTO the frame rather than being there already.
+  let myFrameGuides = $derived(framedGuides($guides, parentOffset));
+  // The tree the drag commit resolves selection roots and sibling transforms against.
+  // `panelControls` is the real thing; the fallback is for the handful of callers that render a
+  // CanvasControl with a flat list and no tree (a flat list IS a tree with no children, so the
+  // answers are identical for them).
+  let dragTree = $derived(panelControls?.length ? panelControls : allControls);
+  // THE LAST id in the chain, not the first. `parentChainIds` is built outermost-first
+  // (`[...parentChainIds, core.id]`), so index 0 is the TOP of the chain — at depth 1 that happens
+  // to be the immediate parent, which is why reading [0] survived until containers could hold
+  // containers. At depth 2 it named the grandparent, and a drag that never left its own container
+  // looked to the drop logic like a reparent out of the one above it.
+  let myParentId = $derived(parentChainIds.length ? parentChainIds[parentChainIds.length - 1] : null);
+
   // Thin wrappers around the pure snap utils so the drag/resize handlers
-  // stay readable. findAlignmentSnap uses allControls + ruler guides;
+  // stay readable. findAlignmentSnap uses my frame's controls + ruler guides;
   // computeDistances additionally filters out co-selected siblings and
   // only runs for the dragged (key-object) component.
   function alignSnap(x, y, w, h) {
     const align = findAlignmentSnap(
-      { x, y, w, h }, core?.id, allControls, $guides, getSection,
-      { width: panelWidth, height: panelHeight },
+      { x, y, w, h }, core?.id, mySiblings, myFrameGuides, getSection,
+      myFrameSize,
       // 5 screen px of stickiness at every zoom level.
       5 / (scale || 1),
     );
     // Publish the live guides so the panel rulers can mirror them (parity with
-    // the component editor). Cleared on drag/resize end.
-    setActivePanelSnapGuides(align.guides);
+    // the component editor). Cleared on drag/resize end. The rulers are panel-space,
+    // so this is the boundary where the frame is left behind.
+    setActivePanelSnapGuides(toPanelGuides(align.guides, parentOffset));
     return align;
   }
 
@@ -626,10 +715,17 @@
       { x, y, w, h },
       core?.id,
       ids,
-      allControls,
-      { width: panelWidth, height: panelHeight },
+      mySiblings,
+      myFrameSize,
       getSection,
     );
+  }
+
+  // The selection overlay positions guides and labels by subtracting a PANEL-space offset
+  // (`overlayOffsetX`), so both cross back out of the frame on the way to it. A no-op at top level.
+  function publishMeasurements(align, labels) {
+    snapGuides = toPanelGuides(align.guides, parentOffset);
+    distanceLabels = toPanelDistances(labels, parentOffset);
   }
 
   // --- Double-click: drill into containers, edit text in place ---
@@ -1000,8 +1096,7 @@
     if (snapSuspended) setActivePanelSnapGuides([]);
     transientX = Math.round(align.x);
     transientY = Math.round(align.y);
-    snapGuides = align.guides;
-    distanceLabels = $showDistances ? distancesFor(transientX, transientY, displayW, displayH) : [];
+    publishMeasurements(align, $showDistances ? distancesFor(transientX, transientY, displayW, displayH) : []);
 
     // Broadcast delta for other selected components to follow
     const ids = get(selectedComponentIds);
@@ -1010,10 +1105,12 @@
     }
 
     // Highlight the container under the pointer as the drop target
-    // (holding Space keeps the current parent).
-    const currentParentId = parentChainIds[0] ?? null;
+    // (holding Space keeps the current parent). A control being CARRIED by a selected ancestor is
+    // not the thing that moved and cannot reparent itself — see the same guard in handleDragEnd.
+    const currentParentId = myParentId;
     const surfacePoint = surfacePointFromClient(e.clientX, e.clientY);
-    const target = (!dragSpaceHeld && surfacePoint) ? dropCandidateAt(surfacePoint.x, surfacePoint.y) : currentParentId;
+    const canReparent = !dragSpaceHeld && !(ids.size > 1 && hasSelectedAncestor(parentChainIds, ids));
+    const target = (canReparent && surfacePoint) ? dropCandidateAt(surfacePoint.x, surfacePoint.y) : currentParentId;
     containerDropTargetId.set(target !== currentParentId ? target : null);
   }
 
@@ -1039,9 +1136,15 @@
     }
 
     // Where did the drag end — over which container (or top level)?
-    const currentParentId = parentChainIds[0] ?? null;
+    //
+    // Not asked at all when a selected ancestor is carrying this control. The moving root is the
+    // ancestor, the pointer is inside it, and buildDropCandidates excludes a moving root's whole
+    // subtree — so the answer would be "somewhere outside the container you are still inside", and
+    // a Ctrl+A drag of one nested child would tear its container out of its parent.
+    const carriedNow = isMultiDrag && hasSelectedAncestor(parentChainIds, ids);
+    const currentParentId = myParentId;
     let targetParentId = currentParentId;
-    if (moved && !dragSpaceHeld) {
+    if (moved && !dragSpaceHeld && !carriedNow) {
       const surfacePoint = surfacePointFromClient(e?.clientX, e?.clientY);
       if (surfacePoint) targetParentId = dropCandidateAt(surfacePoint.x, surfacePoint.y);
     }
@@ -1068,29 +1171,25 @@
       }
       if (entries.length) reparentControls(entries, targetParentId);
     } else if (moved) {
-      const patches = new Map();
-      if (isMultiDrag) {
-        // Multi-drag: apply delta to all selected components
-        for (const other of allControls) {
-          const otherId = getSection(other, 'Core')?.id;
-          if (!otherId || otherId === core.id || !ids.has(otherId)) continue;
-          const ot = getSection(other, 'Transform');
-          if (ot) {
-            patches.set(otherId, {
-              'Transform.x': ot.x + dx,
-              'Transform.y': ot.y + dy,
-            });
-          }
-        }
-      }
-      // Always update the dragged component itself
-      if (core?.id) {
-        patches.set(core.id, {
-          ...(patches.get(core.id) ?? {}),
-          'Transform.x': transientX,
-          'Transform.y': transientY,
-        });
-      }
+      // What moves, and by how much. This used to walk `allControls` — the panel's TOP-LEVEL list
+      // — which got two different things wrong at once: a co-selected sibling nested in a
+      // container was never in that list, so it followed the drag on screen and snapped back the
+      // instant you let go; and a child selected alongside its container (Ctrl+A does exactly
+      // that) WAS in the list at top level and got the delta a second time on top of the
+      // translation its container had already given it. multiDragPatches answers both from the
+      // selection ROOTS over the whole tree — see utils/canvasDragFrame.js.
+      const patches = multiDragPatches({
+        tree: dragTree,
+        selectedIds: ids,
+        draggedId: core?.id ?? null,
+        draggedAncestorIds: parentChainIds,
+        dx,
+        dy,
+        draggedX: transientX,
+        draggedY: transientY,
+        multi: isMultiDrag,
+        getSection,
+      });
 
       if (patches.size > 0) {
         applyControlPatchesById(patches);
@@ -1153,7 +1252,13 @@
     const dy = (e.clientY - resizeStartMouse.y) / scale;
 
     const rotation = Number(transform?.rotation ?? 0) % 360;
+    // Alt resizes about the control's own centre instead of pinning the opposite edge — the
+    // convention every design tool shares, and the same option the group box passes. Note Alt is
+    // read for drag-duplicate too (handleDragEnd), but the two gestures are exclusive: you are
+    // either on a handle or on the body.
+    const fromCenter = e.altKey === true;
     const resizeOpts = {
+      fromCenter,
       aspectLock: e.shiftKey || (transform?.aspectLock === true),
       aspectRatio: resizeStartRect.w / resizeStartRect.h,
       minW: Math.max(MIN_SIZE, transform?.minWidth || 0),
@@ -1181,8 +1286,11 @@
     // Resize geometry (deltas + aspect lock + min/max clamping)
     let rect = computeResizedRect(resizeStartRect, resizeHandle, dx, dy, resizeOpts);
 
-    // Holding Ctrl/Cmd suspends snapping during resize, matching drag.
-    const snapSuspended = e.ctrlKey || e.metaKey;
+    // Holding Ctrl/Cmd suspends snapping during resize, matching drag. Alt suspends it too, and
+    // not as a convenience: a positional snap moves x/y, which under from-centre resizing walks
+    // the centre off the point the gesture is supposed to be pinning. The rotated branch above
+    // already skips snapping for the same class of reason.
+    const snapSuspended = e.ctrlKey || e.metaKey || fromCenter;
 
     // Grid snap
     if (!snapSuspended && snapToGrid) rect = snapRectToGrid(rect, gridSize, snapToGridX, snapToGridY);
@@ -1194,8 +1302,7 @@
     transientY = Math.round(align.y);
     transientW = Math.round(rect.w);
     transientH = Math.round(rect.h);
-    snapGuides = align.guides;
-    distanceLabels = $showDistances ? distancesFor(transientX, transientY, transientW, transientH) : [];
+    publishMeasurements(align, $showDistances ? distancesFor(transientX, transientY, transientW, transientH) : []);
   }
 
   function handleResizeEnd() {
@@ -1767,7 +1874,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isNumpad && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !isTimbre && !isTuring && !isKinetic && !isConstellation && !isConstraint && !isChordPad && !isArp && !isNoteRibbon && !isDrumPads && !isPanic && !isTransport && !isSplitZone && !isPhrase && !isRecorder && !isHarmoniser && !isSetlist && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isKeyboard && !isStepSequencer && !isTabContainer && !isScrollArea && !isShape && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isNumpad && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !isTimbre && !isTuring && !isKinetic && !isConstellation && !isConstraint && !isChordPad && !isArp && !isNoteRibbon && !isDrumPads && !isPanic && !isTransport && !isSplitZone && !isPhrase && !isRecorder && !isHarmoniser && !isSetlist && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -3039,6 +3146,9 @@
   class:key-object={editorInteractionEnabled && isKeyObject && !panelLocked}
   class:hidden-component={!isVisible}
   class:locked={editorInteractionEnabled && isEditorLocked}
+  class:lock-click-through={editorInteractionEnabled && isLocked}
+  class:editor-draggable={editorInteractionEnabled && !isEditorLocked && !inlineTextEditing}
+  class:dragging={isDragging && dragEngaged}
   class:custom-component-hint={editorInteractionEnabled && isCustomComponent && !panelLocked}
   class:preview-surface={!editorInteractionEnabled}
   class:drop-target={isDropTargetHighlighted}
@@ -3088,6 +3198,36 @@
 
     {#if isMeter}
       <MeterRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isShape}
+      <ShapeRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isKeyboard}
+      <KeyboardRenderer
+        control={renderControl}
+        width={displayW}
+        height={displayH}
+        held={previewSession?.keyboardHeld ?? []}
+      />
+    {/if}
+
+    {#if isStepSequencer}
+      <StepSequencerRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isTabContainer}
+      <TabContainerRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isScrollArea}
+      <ScrollAreaRenderer
+        control={renderControl}
+        width={displayW}
+        height={displayH}
+        offset={previewSession?.scrollOffset ?? null}
+      />
     {/if}
 
     {#if isEnvelope}
@@ -3799,7 +3939,13 @@
   {#if childControls.length}
     <!-- Nested children: DOM nesting makes their Transform.x/y parent-relative
          for free. The clip/origin layers carry no pointer events; children
-         re-enable their own. -->
+         re-enable their own.
+
+         Parent-relative is also why each child is handed its own COORDINATE FRAME here —
+         `frameControls` (its siblings) and `frameSize` (this container's content box). Everything
+         a child snaps to, measures against or multi-drags with lives in that frame. `allControls`
+         still goes down unchanged and still means the panel's top-level list: the LCD and pixel
+         displays resolve a data source out of it by name, which is a lookup, not geometry. -->
     <div class="children-clip" class:clipped={childrenClip} class:children-interactive={mouseChildrenTakePointer}
       style={childrenClip && childrenClipRadius ? `border-radius:${childrenClipRadius}px;` : ''}>
       <div class="children-origin" style="left:{childrenPad.left}px; top:{childrenPad.top}px;">
@@ -3814,6 +3960,8 @@
             {gridOriginY}
             {panelLocked}
             {allControls}
+            frameControls={childControls}
+            frameSize={childFrameSize}
             {panelWidth}
             {panelHeight}
             {onDragStart}
@@ -3866,6 +4014,23 @@
     position: absolute;
     box-sizing: border-box;
     cursor: default;
+  }
+
+  /* THE DRAG AFFORDANCE. The canvas had exactly two cursors — the resize handles' arrows and this
+     `default` — so nothing on the surface ever said a control could be dragged; you found out by
+     trying it. `move` rather than `grab`: the gesture is a direct positional move, and the eight
+     handles ringing a selected control are already pointing at the resize story.
+
+     It reflects state on both sides. Locked is excluded by the class condition rather than by a
+     later override, so there is no moment where a not-allowed control claims to be draggable; and
+     `dragging` waits for dragEngaged, not for the mousedown, because the first four screen pixels
+     of a press are still a click and swapping the cursor there makes an ordinary selection twitch. */
+  .canvas-control.editor-draggable {
+    cursor: move;
+  }
+
+  .canvas-control.editor-draggable.dragging {
+    cursor: grabbing;
   }
 
   /* --- Mouse section, preview/runtime only (see mouseAppliesToSurface) --- */
@@ -4355,6 +4520,45 @@
     outline: calc(1px * var(--inv-scale, 1)) dashed #666;
   }
 
+  /* A HIDDEN CONTROL STOPS TAKING THE POINTER. `opacity: 0.25` alone left it fully interactive, so
+     something you had deliberately made invisible still ate the click meant for what sits under it
+     and still swallowed a marquee begun on top of it — the eye said "not there", the mouse said
+     "very much there".
+
+     pointer-events INHERITS. That is the trap already recorded on the .children-origin rules above
+     (a blanket `none` once made every nested control unreachable in preview), and here it is the
+     wanted behaviour rather than an accident: hiding a container dims its whole subtree, because
+     the opacity applies to the subtree, and a child you cannot see must not be clickable either.
+     Which means the two deliberate re-enables — .preview-interactive and .selected — would punch
+     straight back through it, and a selected child inside a hidden container would be the one
+     clickable thing in an invisible group. `!important` on the descendant selector shuts both off
+     inside a hidden subtree, and on the host selector too, so a hidden control that is itself a
+     selected nested child does not re-enable itself.
+     To work on a hidden control, unhide it. */
+  .canvas-control.hidden-component,
+  .canvas-control.hidden-component :global(.canvas-control) {
+    pointer-events: none !important;
+  }
+
+  /* A LOCKED CONTROL IS CLICK-THROUGH. It used to intercept the press and then refuse to do
+     anything with it (handleMouseDown returns early on isEditorLocked), which is the worst of both:
+     the click is spent, whatever is underneath never sees it, and a marquee cannot even be started
+     on top of a locked backdrop — the single most common thing to lock. Locked means "not a target",
+     the way it does in every other design tool, and selecting one is the component tree's job.
+
+     Scoped to the control's OWN lock, not `isEditorLocked`: when the whole PANEL is locked every
+     control would go inert at once and the canvas would stop responding entirely, so panel-lock
+     keeps the old swallow-and-refuse path (and the not-allowed cursor below, which is the only
+     place that cursor can still be seen).
+
+     Inheriting into the subtree is correct here too — locking a container locks what is inside it,
+     which is already how buildDropCandidates treats one — and the same two re-enables have to be
+     shut off for the same reason as above. */
+  .canvas-control.lock-click-through,
+  .canvas-control.lock-click-through :global(.canvas-control) {
+    pointer-events: none !important;
+  }
+
   /* A custom component with no visible background renders transparent, so in
      edit mode it would be invisible until hovered/selected. This faint,
      edit-only dashed box + corner tag shows where it is. Suppressed once the
@@ -4389,6 +4593,9 @@
     z-index: 1;
   }
 
+  /* Only reachable when the whole PANEL is locked: a control locked on its own is click-through
+     (see .lock-click-through), so its cursor is whatever lies underneath, which is the honest
+     answer for something that is not a target. */
   .canvas-control.locked {
     cursor: not-allowed;
   }

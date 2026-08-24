@@ -126,6 +126,11 @@ JUCE_BEGIN_NO_SANITIZE ("vptr")
  DEF_CLASS_IID (ARA::IMainFactory)
 #endif
 
+#if CEDITOR_SIDECAR_IDENTITY
+ // CEDITOR PATCH -- runtime plugin identity for the prebuilt template player.
+ #include "Export/Vst3SidecarIdentity.h"
+#endif
+
 namespace juce
 {
 
@@ -151,6 +156,21 @@ static VST3InterfaceId getInterfaceId (VST3InterfaceType interfaceType)
    #if JUCE_VST3_CAN_REPLACE_VST2
     if (interfaceType == VST3InterfaceType::controller || interfaceType == VST3InterfaceType::component)
         return VST3ClientExtensions::convertVST2PluginId (JucePlugin_VSTUniqueID, JucePlugin_Name, interfaceType);
+   #endif
+
+   #if CEDITOR_SIDECAR_IDENTITY
+    // CEDITOR PATCH -- see CE/src/Export/Vst3SidecarIdentity.h for the whole rationale.
+    //
+    // A prebuilt player binary takes its identity from the panel document sitting beside it, so one
+    // signed binary can be copied per panel instead of the user needing a C++ toolchain to relink
+    // one. The codes are the same four-character strings the compiling exporter would have passed
+    // to CMake, so the id this returns is byte-identical to the compiled one -- asserted directly
+    // against this very function in CE/tests/PanelIdentitySidecarTests.cpp.
+    //
+    // Falls through to the defines when there is no panel beside the module, which is every
+    // development build, so a source build is unaffected.
+    if (const auto codes = ceditor::vst3SidecarPluginCodes())
+        return VST3ClientExtensions::convertJucePluginId (codes->first, codes->second, interfaceType);
    #endif
 
     return VST3ClientExtensions::convertJucePluginId (JucePlugin_ManufacturerCode, JucePlugin_PluginCode, interfaceType);

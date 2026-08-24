@@ -58,14 +58,14 @@
       <PropertyToggle value={cs.showBadge !== false} onchange={() => set('showBadge', !(cs.showBadge !== false))} />
     </PropertyCell>
     {#if String(cs.mode ?? 'sum') === 'order'}
-      <PropertyCell label="Min gap" span={2} compact hint="Minimum spacing kept between adjacent members (e.g. keep resonance a little below cutoff).">
+      <PropertyCell label="Min gap" span={1} compact hint="Minimum spacing kept between adjacent members (e.g. keep resonance a little below cutoff).">
         <NumberCell label="Gap" min={0} max={0.9} step={0.02} value={cs.minGap ?? 0} defaultValue={0} onchange={(v) => set('minGap', clamp01(v))} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Values" span={1} hint="Show live per-member values.">
       <PropertyToggle value={cs.showValues !== false} onchange={() => set('showValues', !(cs.showValues !== false))} />
     </PropertyCell>
-    <PropertyCell label="" span={3} hint="Bind each member's port in Device Bindings to drive a real parameter.">
+    <PropertyCell label="" span={3} hint="Bind each member's port in Device Bindings to drive a real parameter." compact>
       <div class="rule">{constraintModeLabel(cs.mode ?? 'sum')} · {members.length} members</div>
     </PropertyCell>
   </PropertySection>
@@ -85,7 +85,7 @@
     {#snippet tools()}
       <button type="button" class="header-add-btn" title="Add member" onclick={addMember}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="The linked parameters, moving together to satisfy the rule. Bind each 'Member' port in Device Bindings.">
+    <PropertyCell label="" span={4} hint="The linked parameters, moving together to satisfy the rule. Bind each 'Member' port in Device Bindings." compact>
       <div class="rows">
         {#if members.length === 0}<div class="empty">No members yet. Add one, then bind its port.</div>{/if}
         {#each members as m, i (m.id ?? i)}
@@ -112,8 +112,8 @@
 {/if}
 
 <style>
-  .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .rule { font-size: 11px; color: #8a8a94; }
   .rows { display: flex; flex-direction: column; gap: 8px; }
   .member { border: 1px solid #303030; border-radius: 6px; background: #171717; padding: 8px; }

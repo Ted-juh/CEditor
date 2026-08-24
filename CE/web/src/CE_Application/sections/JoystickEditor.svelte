@@ -29,42 +29,51 @@
 
 {#if j}
   <PropertySection title="Joystick" icon={Gamepad2}>
-    <PropertyCell label="Bipolar" span={2} hint="X/Y ports emit −1..1 (vs 0..1). Corner blends are always 0..1.">
+    <PropertyCell label="Bipolar" span={1} hint="X/Y ports emit −1..1 (vs 0..1). Corner blends are always 0..1.">
       <PropertyToggle value={j.bipolar !== false} onchange={() => set('bipolar', !(j.bipolar !== false))} />
     </PropertyCell>
-    <PropertyCell label="Editable" span={2} hint="Drag the puck in preview.">
+    <PropertyCell label="Editable" span={1} hint="Drag the puck in preview.">
       <PropertyToggle value={j.editable !== false} onchange={() => set('editable', !(j.editable !== false))} />
     </PropertyCell>
-    <PropertyCell label="Rest X" span={2} compact hint="Resting puck X (0–1).">
+    <PropertyCell label="Rest X" span={1} compact hint="Resting puck X (0–1).">
       <NumberCell label="X" value={j.x ?? 0.5} min={0} max={1} step={0.01} defaultValue={0.5} onchange={(v) => set('x', Math.max(0, Math.min(1, num(v, 0.5))))} />
     </PropertyCell>
-    <PropertyCell label="Rest Y" span={2} compact hint="Resting puck Y (0–1, bottom = 0).">
+    <PropertyCell label="Rest Y" span={1} compact hint="Resting puck Y (0–1, bottom = 0).">
       <NumberCell label="Y" value={j.y ?? 0.5} min={0} max={1} step={0.01} defaultValue={0.5} onchange={(v) => set('y', Math.max(0, Math.min(1, num(v, 0.5))))} />
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Return to rest" icon={IterationCcw}>
-    {#snippet tools()}
-      <HeaderPill value={j.returnToCenter === true}
-                  title="Glide the puck back to centre when released (pitch/mod-wheel feel)"
-                  onchange={() => toggle('returnToCenter')} />
-    {/snippet}
-    {#if j.returnToCenter === true}
-      <PropertyCell label="Axes" span={2} hint="Which axes spring back.">
+    <PropertyCell label="On release" span={2} hint="Where the puck goes when you let go. Shared with the ribbon and the crossfader, so a corner is reachable now and not only the centre.">
+        <select class="val" value={j.returnMode ?? 'none'} onchange={(e) => set('returnMode', e.target.value)}>
+          <option value="none">Latch (stay put)</option>
+          <option value="center">Centre</option>
+          <option value="min">Minimum</option>
+          <option value="max">Maximum</option>
+          <option value="rest">A set value</option>
+        </select>
+    </PropertyCell>
+    {#if String(j.returnMode ?? 'none') !== 'none'}
+      <PropertyCell label="Axes" span={2} hint="Which axes spring back. Both travel on ONE progress, so the puck moves in a straight line — per-axis timing would make it curve.">
         <select class="val" value={j.returnAxes ?? 'both'} onchange={(e) => set('returnAxes', e.target.value)}>
           <option value="both">Both</option>
           <option value="x">X only</option>
           <option value="y">Y only</option>
         </select>
       </PropertyCell>
-      <PropertyCell label="Speed" span={2} compact hint="Glide speed (units/sec).">
-        <NumberCell label="Spd" value={j.returnRate ?? 4} min={0.5} step={0.5} defaultValue={4} onchange={(v) => set('returnRate', Math.max(0.1, num(v, 4)))} />
+      <NumberCell label="Time (ms)" min={0} max={5000} step={10} value={j.returnTime ?? 250} onchange={(v) => set('returnTime', Math.max(0, num(v, 250)))} />
+      <PropertyCell label="Curve" span={2} hint="Linear is the constant-speed walk these controls always had. Exp covers most of the distance early, which is what a real spring does.">
+        <select class="val" value={j.returnCurve ?? 'linear'} onchange={(e) => set('returnCurve', e.target.value)}>
+          <option value="linear">Linear</option>
+          <option value="exp">Spring (exp)</option>
+          <option value="ease">Ease</option>
+        </select>
       </PropertyCell>
     {/if}
   </PropertySection>
 
   <PropertySection title="Corners" icon={SquareDashedBottomCode}>
-    <PropertyCell label="Show" span={2} hint="Draw corner markers + labels.">
+    <PropertyCell label="Show" span={1} hint="Draw corner markers + labels.">
       <PropertyToggle value={j.showCorners !== false} onchange={() => set('showCorners', !(j.showCorners !== false))} />
     </PropertyCell>
     <PropertyCell label="↖ Top-left" span={2}>
@@ -94,11 +103,11 @@
     <PropertyCell label="Puck size" span={1} compact hint="Puck radius (px).">
       <NumberCell label="Puck" value={j.puckRadius ?? 9} min={3} step={1} defaultValue={9} onchange={(v) => set('puckRadius', Math.max(3, num(v, 9)))} />
     </PropertyCell>
-    <PropertyCell label="Trail" span={2} hint="Fading motion trail behind the puck.">
+    <PropertyCell label="Trail" span={1} hint="Fading motion trail behind the puck.">
       <PropertyToggle value={j.showTrail === true} onchange={() => toggle('showTrail')} />
     </PropertyCell>
     {#if j.showTrail === true}
-      <PropertyCell label="Trail length" span={2} compact hint="Number of trail points.">
+      <PropertyCell label="Trail length" span={1} compact hint="Number of trail points.">
         <NumberCell label="Len" value={j.trailLength ?? 24} min={2} max={200} step={1} defaultValue={24} onchange={(v) => set('trailLength', Math.max(2, Math.round(num(v, 24))))} />
       </PropertyCell>
     {/if}
@@ -114,9 +123,6 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
-    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
 </style>

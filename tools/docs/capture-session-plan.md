@@ -1,6 +1,8 @@
 # Capture Session — learning a synth from the synth
 
-> Status: **design, 2026-08-11.** Nothing built. Tier 1 #1 in
+> Status: **S1–S4 built, 2026-08-23.** The inference engine, the session state machine and the
+> guided screen exist; see "What was built" at the foot of this file. Originally written as design,
+> 2026-08-11. Tier 1 #1 in
 > [`docs/beta-differentiation.md`](../../docs/beta-differentiation.md), and the proposed headline
 > for the first beta. Companion to
 > [`device-profile-engine-mvp-plan.md`](device-profile-engine-mvp-plan.md) (the engine this writes
@@ -251,3 +253,92 @@ Juno.
   of the human time once the bytes are solved.
 - For Mode A, how long a sweep is enough to call a range confidently — and should the session ask
   for the extremes explicitly rather than infer them from whatever the user happened to do?
+
+---
+
+## What was built, 2026-08-23
+
+`utils/captureInference.js` (the engine), `utils/captureSession.js` (the state machine),
+`editor/dpd/DpdCaptureScreen.svelte` (the conversation), and `test/support/fakeSynth.js` plus
+`test/captureInference.test.js` (the answer key). S1, S2, S3 and S4; S5's ergonomics are partly
+there — undo-last and a session summary — and save/resume and the manual-name paste are not.
+
+**S5, revisited 2026-08-24. All of it is built.** The manual-name paste, the session report and
+save/resume.
+
+**The session lives on the panel**, beside `deviceSession`, so it survives whatever the panel
+survives and moves between machines with the file. The cost was named before the choice was made and
+is accepted: a shared `.cepanel` carries a half-finished capture and the raw dumps it took off
+somebody's synth. It is NOT in the build payload — `serializePanelForExport` passes
+`captureSession: null`, because the player's C++ reads Core, Behavior and Scripts and has never
+heard of a capture, so carrying one would compile tens of KB of SysEx into a binary for nothing.
+
+**`normalizeCaptureSession` coerces rather than trusts**, because this reads a document.
+Everything downstream indexes into `baselines` as arrays of bytes and one string where an array
+belongs makes the diff engine produce confident nonsense. A session with nothing learned and no
+baselines returns null: it is indistinguishable from a fresh one, and restoring it opens the screen
+mid-conversation with nothing to show. Mid-hypothesis `observations` are dropped — scratch for one
+prompt, the largest thing in the session, and a hypothesis resumed without the question that
+produced it is one nobody remembers being asked.
+
+**Resume restores the baselines too**, which is the fast path and the one with the sharp edge.
+`recordDump` diffs every dump against `baselines.at(-1)` through the stored `mask`, so a session
+resumed after a power-cycle, a patch change, or a different unit on the same port is measuring
+against a device that no longer exists. A large difference surfaces honestly as `packed` or
+`inconsistent`; a small one reads as a parameter and is wrong.
+
+That is a warning rather than a refusal, by decision. What makes it act like one is `baselineAgeHours`:
+the banner says how old the baseline is, because "less than an hour ago" and "nine days ago" call
+for different answers, and it carries a **Retake baselines** button that clears the perishable half
+and keeps what was learned. The split is the whole reason this stayed small — `learned` is an hour
+of work and cannot be rebuilt; baselines, mask and checksum are three dumps.
+
+`namesFromPaste` is POSITIONAL and shows the pairing before it lands. Matching by similarity would
+pair "Cutoff" with "Cutoff Env Amount" on a page that has both, and a paste starting one line too
+high would rename everything below it silently — so it reports too-few and too-many names in both
+directions and the author sees old → new before applying.
+
+`sessionReport` groups by how much a row is worth trusting, hardest evidence first, and carries each
+row's evidence with it. A report in capture order buries the four rows that need attention under the
+thirty that do not, and six months later "u7 at offset 44, values 0-127" is the difference between
+trusting a row and re-capturing it.
+
+**The simulated synth is the feature, not the test scaffolding.** This plan said "hardware is not
+reproducible and a nightly cannot own a Juno", and that turned out to shape everything: the fake
+device carries a plain u7, a 14-bit value, a nibble field, **two parameters sharing one byte**, a
+volatile counter that ticks on every dump, idle CC chatter on the live stream, and a Roland-style
+checksum **over a range that excludes the header**. The engine recovers the whole map from dumps
+alone, and every awkward case in that list caught a real defect on the way.
+
+**Four rulings the plan did not have to make, and the engine did.**
+
+*A shared byte needs three conditions, not one.* "Some bits did not move" is not evidence of a
+bit-field. Bits `{0,1,2,3,5,6}` moving is a plain byte whose bit 4 happened not to flip across three
+samples, which is common — so a bit-field now requires the moved bits to be **contiguous** (a real
+field is a mask and a shift), at most **five wide** (a six-bit "field" in a seven-bit byte is a u7
+that never reached its top), and some bit outside the run to be **actually used** in some
+observation. Without that last one the engine invents a bit-field wherever a value stayed small.
+
+*A wide parameter can leave a byte unchanged.* `0x0064 → 0x1234` moves three of four nibbles,
+because the last one is 4 either way. Demanding identical diff signatures across observations would
+call that "two controls were moved". So nested signatures over a contiguous run take the union, and
+only genuinely disjoint ones are reported as inconsistent.
+
+*The tightest checksum range wins.* A leading byte that is zero in every payload contributes nothing
+to a sum, so "covers it" and "does not" fit equally. The start offset is scanned descending and the
+wider fits are reported alongside, because the difference matters the first time a device sends a
+non-zero header.
+
+*A partial sweep is not a selector.* Five readings at 0, 20, 40, 80, 127 are somebody sweeping a
+knob. "Few distinct values" alone calls that a five-way enum every time; **evenly spaced** distinct
+values is the discriminator, and it is the only one available from a single pass.
+
+**Echo is a constant, not an absence.** `SENDS_DURING_CAPTURE = false` is a value that can be
+asserted rather than a gap in the code, and inbound messages inside the echo window are discarded
+without being counted. The plan is right that this is the likeliest way to ship something that demos
+beautifully and is wrong, and a rule that exists only as missing code is a rule somebody adds code
+past.
+
+**The human's answer is the only thing that confirms anything.** A hypothesis reaches `probable` on
+three consistent observations and no further. The Confirm step's checkbox — "I wrote the value back
+and the synth did the thing" — is what makes it `confirmed`, and the provenance block records which.

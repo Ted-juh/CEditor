@@ -11,10 +11,18 @@
   import Triangle from 'lucide-svelte/icons/triangle';
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
+  import ExternalLink from 'lucide-svelte/icons/external-link';
+  import Crosshair from 'lucide-svelte/icons/crosshair';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { addStopInLargestGap, updateStopAt, deleteStopAt } from '../utils/gradientStops.js';
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
+  import { deriveProxyGeometry, proxyShapeKind } from '../utils/gradientProxyGeometry.js';
+  import { gradientShapeOverride, setGradientShapeOverride, clearGradientShapeOverride } from '../stores/gradientProxyShape.js';
+  import { gradientTarget } from '../stores/gradientTarget.js';
+  import { activePanel } from '../stores/panels.js';
   import NumberCell from '../properties/NumberCell.svelte';
+  import StopColourPopover from './StopColourPopover.svelte';
+  import { beginStopEdit, previewStopColour, commitStopEdit, cancelStopEdit } from '../utils/stopColourEdit.js';
 
   const SECTION_ORDER_STORAGE_KEY = 'ce.gradientSettings.sectionOrder.v1';
   const DEFAULT_SECTION_ORDER = ['type', 'geometry', 'shape', 'edge', 'stops', 'presets'];
@@ -22,7 +30,30 @@
   let props = $props();
   let gradient = $derived(props.gradient);
   let selectedStop = $derived(props.selectedStop ?? 0);
-  let shape = $derived(props.shape ?? 'rectangle');
+
+  // --- Proxy shape (B7) ---------------------------------------------------
+  // The shape of the preview is the shape of the TARGET, unless the user has
+  // deliberately overridden it. `props.shape` is still accepted and still
+  // reported back through `onShapeChange`, but it is no longer what decides:
+  // its default is the string 'rectangle', so a prop could never distinguish
+  // "the user chose a rectangle" from "nobody has chosen anything", which is
+  // exactly how the preview ended up permanently rectangular.
+  let proxyGeometry = $derived(deriveProxyGeometry($gradientTarget, $activePanel));
+  let autoShape = $derived($gradientShapeOverride == null);
+  let shape = $derived($gradientShapeOverride ?? proxyShapeKind(proxyGeometry));
+
+  function chooseShape(next) {
+    setGradientShapeOverride(next);
+    onShapeChange?.(next);
+  }
+
+  function chooseAutoShape() {
+    clearGradientShapeOverride();
+    // The parent still keeps a `shape` string for the previews that have not
+    // been taught about the override store (the Colors tab's stop mini-preview
+    // is one), so hand it the closest name for the geometry we just derived.
+    onShapeChange?.(proxyShapeKind(proxyGeometry));
+  }
   let onchange = $derived(props.onchange);
   let onSelectStop = $derived(props.onSelectStop);
   let onEditStopColor = $derived(props.onEditStopColor);
@@ -54,6 +85,45 @@
     const result = addStopInLargestGap(gradient.stops);
     onchange({ ...gradient, stops: result.stops });
     onSelectStop?.(result.newIndex);
+  }
+
+  // --- In-place stop colour editing (B5) ---------------------------------
+  // The chip used to hand the whole dock over to the Colors tab and back —
+  // two full-panel transitions to change one stop. It now opens the chooser
+  // under the row instead, inside the scrolling sidebar so nothing can clip
+  // it, and the gradient stays on screen the whole time. The old cross-tab
+  // flow is still one click away on the ↗ button, because the Colors tab has
+  // room for the full chooser and this row does not.
+  //
+  // Unlike the editor's popover, edits here are emitted as they happen: this
+  // component holds no live copy of the stops, so the preview next to it can
+  // only follow if the change goes out. Abandonment still commits, which is
+  // the same rule from the outside.
+  // `stopEdit` is the record from utils/stopColourEdit.js: { index, original }.
+  let stopEdit = $state(null);
+  let editingStopIndex = $derived(stopEdit ? stopEdit.index : null);
+
+  function openStopEditor(index) {
+    const edit = beginStopEdit(gradient.stops, index);
+    if (!edit) return;
+    onSelectStop?.(index);
+    stopEdit = edit;
+  }
+
+  function handleStopColourInput(colour) {
+    onchange({ ...gradient, stops: previewStopColour(gradient.stops, stopEdit, colour) });
+  }
+
+  function handleStopColourCommit(colour) {
+    const result = commitStopEdit(gradient.stops, stopEdit, colour);
+    onchange({ ...gradient, stops: result.stops });
+    stopEdit = result.edit;
+  }
+
+  function handleStopColourCancel() {
+    const result = cancelStopEdit(gradient.stops, stopEdit);
+    onchange({ ...gradient, stops: result.stops });
+    stopEdit = result.edit;
   }
 
   // Contextual controls based on gradient type
@@ -180,20 +250,32 @@
             <button class="section-order-btn" disabled={!canMoveSection(sectionId, 1)} onclick={() => moveSection(sectionId, 1)} title="Move Shape down"><ChevronDown size={12} strokeWidth={2} /></button>
           </div>
         </div>
+        <button
+          class="auto-shape-btn"
+          class:active={autoShape}
+          onclick={chooseAutoShape}
+          title="Preview the gradient on the target's real width, height and corners"
+        >
+          <Crosshair size={12} strokeWidth={1.6} />
+          <span class="auto-shape-text">
+            <span class="auto-shape-title">Auto — from target</span>
+            <span class="auto-shape-sub">{proxyGeometry.label}</span>
+          </span>
+        </button>
         <div class="toggle-row">
-          <button class="toggle-btn" class:active={shape === 'circle'} onclick={() => onShapeChange && onShapeChange('circle')} title="Circle">
+          <button class="toggle-btn" class:active={!autoShape && shape === 'circle'} onclick={() => chooseShape('circle')} title="Override: circle">
             <Circle size={13} strokeWidth={1.5} />
           </button>
-          <button class="toggle-btn" class:active={shape === 'ellipse'} onclick={() => onShapeChange && onShapeChange('ellipse')} title="Ellipse">
+          <button class="toggle-btn" class:active={!autoShape && shape === 'ellipse'} onclick={() => chooseShape('ellipse')} title="Override: ellipse">
             <Circle size={13} strokeWidth={1.5} style="transform: scaleX(1.4)" />
           </button>
-          <button class="toggle-btn" class:active={shape === 'square'} onclick={() => onShapeChange && onShapeChange('square')} title="Square">
+          <button class="toggle-btn" class:active={!autoShape && shape === 'square'} onclick={() => chooseShape('square')} title="Override: square">
             <Square size={13} strokeWidth={1.5} />
           </button>
-          <button class="toggle-btn" class:active={shape === 'rectangle'} onclick={() => onShapeChange && onShapeChange('rectangle')} title="Rectangle">
+          <button class="toggle-btn" class:active={!autoShape && shape === 'rectangle'} onclick={() => chooseShape('rectangle')} title="Override: rectangle">
             <RectangleHorizontal size={13} strokeWidth={1.5} />
           </button>
-          <button class="toggle-btn" class:active={shape === 'triangle'} onclick={() => onShapeChange && onShapeChange('triangle')} title="Triangle">
+          <button class="toggle-btn" class:active={!autoShape && shape === 'triangle'} onclick={() => chooseShape('triangle')} title="Override: triangle">
             <Triangle size={13} strokeWidth={1.5} />
           </button>
         </div>
@@ -226,21 +308,41 @@
             <div class="stop-row" class:selected={stop.origIdx === selectedStop}>
               <button
                 class="stop-color"
+                class:editing={editingStopIndex === stop.origIdx}
                 style="background: #{stop.color}"
-                onclick={() => { if (onSelectStop) onSelectStop(stop.origIdx); if (onEditStopColor) onEditStopColor(stop.origIdx); }}
-                title="Click to edit colour"
+                onclick={() => openStopEditor(stop.origIdx)}
+                title="Edit this colour here"
               ></button>
               <span class="stop-hex">#{stop.color}</span>
               <span class="stop-pos nc-wrap">
                 <NumberCell min={0} max={100} value={stop.position} onchange={(v) => updateStop(stop.origIdx, { position: parseInt(v) || 0 })} />
               </span>
               <span class="stop-pct">%</span>
+              <button
+                class="stop-popout"
+                onclick={() => { onSelectStop?.(stop.origIdx); onEditStopColor?.(stop.origIdx); }}
+                title="Open this stop in the Colors tab"
+                aria-label="Open stop {stop.origIdx + 1} in the Colors tab"
+              >
+                <ExternalLink size={10} strokeWidth={2} />
+              </button>
               {#if gradient.stops.length > 2}
                 <button class="stop-delete" onclick={() => deleteStop(stop.origIdx)} title="Delete stop">
                   <X size={10} strokeWidth={2} />
                 </button>
               {/if}
             </div>
+            {#if editingStopIndex === stop.origIdx}
+              <div class="stop-inline-editor">
+                <StopColourPopover
+                  color={stop.color}
+                  label="Stop {stop.origIdx + 1}"
+                  oninput={handleStopColourInput}
+                  oncommit={handleStopColourCommit}
+                  oncancel={handleStopColourCancel}
+                />
+              </div>
+            {/if}
           {/each}
         </div>
         <button class="add-stop-btn" onclick={addStop}>
@@ -408,6 +510,53 @@
     flex-shrink: 0;
   }
 
+  /* Auto (derived) proxy shape — the default; the toggles below it override. */
+  .auto-shape-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    margin-bottom: 4px;
+    padding: 4px 6px;
+    background: #1A1A1A;
+    border: 1px solid #333;
+    border-radius: 3px;
+    color: #888;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+
+  .auto-shape-btn:hover {
+    color: #DDD;
+    border-color: #5B9BD5;
+  }
+
+  .auto-shape-btn.active {
+    background: #094771;
+    border-color: #5B9BD5;
+    color: #DDD;
+  }
+
+  .auto-shape-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .auto-shape-title {
+    font-size: 10px;
+  }
+
+  .auto-shape-sub {
+    font-size: 9px;
+    color: #8FA8BE;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* Toggle buttons */
   .toggle-row {
     display: flex;
@@ -478,6 +627,36 @@
 
   .stop-color:hover {
     border-color: #5B9BD5;
+  }
+
+  .stop-color.editing {
+    border-color: #F2B04A;
+    box-shadow: 0 0 4px rgba(242, 176, 74, 0.6);
+  }
+
+  /* The inline chooser sits INSIDE the scrolling sidebar rather than floating
+     over it: the sidebar is narrow and scrolls, and a floating popover in a
+     scroll container is a clipped popover. */
+  .stop-inline-editor {
+    --stop-popover-width: 100%;
+    margin: 3px 0 5px;
+  }
+
+  .stop-popout {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    border-radius: 2px;
+    transition: all 0.1s;
+  }
+
+  .stop-popout:hover {
+    color: #5B9BD5;
+    background: rgba(91, 155, 213, 0.12);
   }
 
   .stop-hex {

@@ -15,6 +15,7 @@
     validateCustomComponentPackage,
   } from '../utils/customComponentPackage.js';
   import { deepClone } from '../utils/deepClone.js';
+  import LibraryBig from 'lucide-svelte/icons/library-big';
 
   let { control = null } = $props();
 
@@ -493,7 +494,7 @@
 </script>
 
 {#if designer}
-  <PropertySection title="Library">
+  <PropertySection title="Library" icon={LibraryBig}>
     {#if $creatorMode === 'advanced' && currentSourcePackage}
       <PropertyCell label="Source" span={4} hint="Package provenance kept when this component was inserted or loaded from a reusable package.">
         <div class="source-package" class:changed={!currentPackageMatchesSource}>
@@ -747,7 +748,7 @@
     <PropertyCell label="Import" span={3} hint="Paste one package JSON, a package array, or a ceditor-component-library bundle.">
       <textarea class="val package-text" rows="4" bind:value={importText} placeholder="paste package or library JSON"></textarea>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Validate and import pasted package JSON.">
+    <PropertyCell label="" span={1} hint="Validate and import pasted package JSON." compact>
       <div class="import-actions">
         <label class="library-btn file-btn">
           File
@@ -841,22 +842,20 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%;
-    min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+
+  /* A textarea wears `.val` too, and the shared skin is sized for a single-line field. Rows
+     decide its height; the token is only a floor. */
+  textarea.val {
+    height: auto;
+    min-height: var(--pp-field-height, 26px);
     padding: 4px 6px;
-    font-family: inherit;
-    outline: none;
-    box-sizing: border-box;
+    line-height: 1.4;
+    resize: vertical;
   }
 
   .val:focus {
-    border-color: #5B9BD5;
+    border-color: var(--pp-field-focus, #5B9BD5);
   }
 
   .metric {

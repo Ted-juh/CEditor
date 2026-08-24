@@ -1,5 +1,26 @@
 # Program completeness review — 2026-08-03
 
+> ⚠️ **SUPERSEDED IN PART.** Kept because its framing — three end-to-end journeys, none of which
+> closes — is still the clearest account of what "feels complete but isn't" meant, and one of the
+> three loops is still open. But it was written against a README and a codebase that have both moved,
+> and reading it cold will mislead you. What has changed since:
+>
+> | Its claim | Today |
+> |---|---|
+> | The goal is "a visual editor for designing and building audio plugin UIs" | The README no longer says that. It leads on hardware-synth editors that are instruments in their own right — a change this document's own §3 argued for, by way of `beta-differentiation.md`. |
+> | "45 component types" | 50. |
+> | **The sound loop**: no preset model, no banks, no factory-vs-user slots | Built. `stores/presetLibrarian.js` has banks, named entries, scan capture and attached dump data. The DPD Presets screen is no longer a "not built yet" placeholder. |
+> | **The delivery loop**: VST3-only, source-checkout-only, unsigned | CLAP and LV2 ship beside VST3. Source-checkout-only is gone — a template player exports with no compiler (`docs/scripting-language-options-and-shippable-export.md` §3a). Unsigned is unchanged and is now a named v1 blocker in the 08-10 review. |
+> | Five menu stubs (Panel Properties…, Export Settings…, Build Standalone, Build Settings…) | Gone; none of those strings is in the tree. |
+> | "Undo is 50 whole-panel JSON snapshots — a perf ceiling on large panels" | Fixed. `stores/history.js` keeps a shallow copy sharing the control objects; the GAIA panel's snapshot went from 21 MB and ~190 ms to a few kilobytes. |
+>
+> **What survives, and it is the reason this file is not retired: the people loop.** No templates,
+> no example panels, no first run, no panel package format, no importer. Every word of §3 on that
+> still holds, and it is item 5 in `beta-readiness-review-2026-08-10.md` §3.
+>
+> For current status read the [08-10 beta readiness review](beta-readiness-review-2026-08-10.md) and
+> [known-issues.md](known-issues.md). This is a record of a diagnosis, not a to-do list.
+
 **The question asked:** "The program feels complete, but it's missing something I can't point my
 finger at. Given the program's goal, what is it missing?"
 
@@ -87,16 +108,21 @@ identity self-check is genuinely good) and the shipping half is scaffolding.
   panels, no welcome screen, no first-run experience, no tour** — the only in-app help is the F1
   shortcut list, the `?` glossary, and hover hints. The program now contains *four* designers
   (panel canvas, custom-component surface with 22 draw tools, Behavior Designer, DPD Designer V2)
-  and nothing that introduces any of them. The 60 design docs in `CE_Application/docs/` and the
-  scripting manual/cookbook/getting-started are invisible from inside the app. Meanwhile the
-  **Auto-Panel generator** (DPD → complete working panel in one step) — which would *be* the
-  onboarding for the core use case — is designed ([auto-panel.md](../CE/web/src/CE_Application/docs/auto-panel.md))
-  and sits in Phase 5, unbuilt.
+  and nothing that introduces any of them. ~~The 60 design docs in `CE_Application/docs/` and the
+  scripting manual/cookbook/getting-started are invisible from inside the app.~~ *(half fixed —
+  Help → Documentation now carries the scripting manual, cookbook, getting-started, release notes
+  and known issues, searchable, baked into the bundle. The 60 design docs are deliberately still
+  out: they are for whoever works on the program, not for whoever uses it. There is still no
+  current editor manual, and the viewer says so.)* Meanwhile the
+  ~~**Auto-Panel generator** (DPD → complete working panel in one step) — which would *be* the
+  onboarding for the core use case — is designed and sits in Phase 5, unbuilt.~~ *(built — File →
+  New Panel from Device Profile; [auto-panel.md](../CE/web/src/CE_Application/docs/auto-panel.md).
+  The blank canvas is still what New Panel gives you, so the rest of this bullet stands.)*
 - **No way out (sharing):** Ctrlr's actual moat was never the editor — it was the community
   ecosystem of panels. CEditor has no panel-sharing/import/export story: no package format for
   *panels* (custom components have one, with metadata, versioning, and a library — the panel level
   has nothing), no Ctrlr `.panel`/`.bpanelz` importer to bootstrap the existing community's work,
-  and the DPD "Share & impact" screen is another "not built yet" stub. The
+  and the DPD "Share & impact" screen is another "not built yet" stub *(built 2026-08-23)*. The
   identity-registry/"update vs new copy" policy from the export plan (D1) is also unbuilt, which is
   the piece sharing would need to not collide FUIDs.
 - **End-user docs exist only for scripting.** The 2026-08-02 review fixed that for the scripting
@@ -132,7 +158,7 @@ identity self-check is genuinely good) and the shipping half is scaffolding.
 |---|------|----------------|
 | 1 | **Build-verify Phase 0** (inbound MIDI + TimerManager) on hardware | Everything two-way sits on it; currently paper-done |
 | 2 | **Preset model + Workbench librarian** (slot map in `dpd.schema.json`, factory/user ranges, recall action, persisted user banks; un-stub `buildDump`; host programs via `getNumPrograms`) | Closes the sound loop — the core user promise |
-| 3 | **Auto-Panel generator** (even a crude first cut: DPD → bound controls in a grid) | Turns the deepest asset (DPD) into the onboarding; kills the blank-canvas problem |
+| 3 | ~~**Auto-Panel generator** (even a crude first cut: DPD → bound controls in a grid)~~ *(built — File → New Panel from Device Profile, and not crude: every control is bound and adopts the profile's range, choices and label)* | Turns the deepest asset (DPD) into the onboarding; kills the blank-canvas problem |
 | 4 | **Ship the Standalone export path** + wire the stubbed Build menu items; typed parameters (`AudioParameterChoice`/`Bool`) | Cheapest honest step toward the README's promise; standalone also dodges the FUID/compiler constraint per §3a |
 | 5 | **Panel package/share format** + identity registry (D1) + surface the AGPL implication at export | Closes the people loop outward |
 | 6 | **Editor user manual + 2–3 example panels** shipped in-app | The scripting docs proved the pattern; repeat it for the editor |

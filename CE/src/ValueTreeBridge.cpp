@@ -215,6 +215,13 @@ namespace
 #endif
 }
 
+// Cleared here, not merely destroyed: the update-check thread holds a copy of the shared_ptr and
+// reads the flag after its socket returns. Setting it false is what makes that read say "gone".
+ValueTreeBridge::~ValueTreeBridge()
+{
+    if (alive != nullptr) alive->store (false);
+}
+
 ValueTreeBridge::ValueTreeBridge()
 {
     // Create a sample tree to test with

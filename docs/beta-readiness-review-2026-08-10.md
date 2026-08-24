@@ -175,9 +175,13 @@ the download, not about a panel.
 - **Four DPD Designer screens are placeholders** — Packing Studio, Share & impact, Import result,
   Assignable list (`DeviceProfileDesignerV2.svelte:129, 209-214`). They sit in the navigation, so
   every DPD user finds them. Either build or hide.
-- **Two DPD Parameters buttons ship disabled** with `title="Coming soon"` — Import CSV, MIDI learn
-  (`DpdParametersScreen.svelte:80-81`).
-- **Display panel Effects tab** is a placeholder: "full editing coming soon" (`DisplayPanel.svelte:517`).
+  *(Share & impact built 2026-08-23 — `DpdShareImpactScreen.svelte` over `utils/profileImpact.js`.
+  Three remain badged and dimmed.)*
+- ~~**Two DPD Parameters buttons ship disabled** with `title="Coming soon"`~~ *(fixed 2026-08-23)* —
+  both removed. Neither feature is built; both are recorded in `known-issues.md`, along with why
+  MIDI learn here is not the same thing as `MidiLearnChips.svelte`.
+- ~~**Display panel Effects tab** is a placeholder: "full editing coming soon"~~ *(fixed)* — the tab
+  is real; `DisplayPanel.svelte:43` now carries only a comment recording that it used to say so.
 - **`.gitignore` is 1925 lines / 140 KB**, most of it a dead `Source/CPanel_Build/modules/juce_*`
   list from a tree that no longer exists.
 
@@ -281,28 +285,73 @@ Everything above is small. These are not, and they are what a beta decision actu
    because "this one needs a person" was the reason it stayed open for four days. What remains is
    a **re-test of 009 and 010**, whose root cause was fixed in `4f02a12` and which nobody has
    confirmed against a build containing the fix. That is confirmation of a fix, not an open defect.
-3. **Which install do beta testers get?** A GUI install cannot export, by design. That is a fine
-   answer if the beta is "design panels, report bugs" and a fatal one if it is "ship a plugin."
-   Decide, then say so in the release notes.
-4. **The QA sheet suite is 3 of 8.** Built: QA-01 (every component at authored default), QA-02
-   (properties driven hard), QA-06 (162 GAIA-bound controls). Unbuilt: **QA-03 states/interaction,
-   QA-04 scripting, QA-05 component verbs, QA-07 custom-component packages, QA-08 export** — which
-   is exactly where the 08-06 pass found its bugs. CI also does not run the export smoke test or
-   the installer packaging, by `ci.yml`'s own header.
+3. ~~**Which install do beta testers get?** A GUI install cannot export, by design.~~ *(decided —
+   there is no cut-down beta build: the installer is the whole program and it exports, because the
+   template exporter ships prebuilt player templates and needs no Visual Studio, CMake or source
+   checkout. The release notes say so under "One install, and it can export".)*
+4. **The QA sheet suite is 8 of 8.** *(closed)* QA-03 (15 stateful types × 7 states), QA-04
+   (7 languages × 37 events), QA-05 (23 verb families / 426 verbs beside the components they
+   drive), QA-07 (all 14 custom-component starters, built through the designer's own patch and
+   printing their readiness verdicts) and QA-08 (the export parameter list) now sit alongside the
+   original three. Each carries a coverage ratchet in `qaPanels.test.js` that reads its list from
+   the model, so the suite cannot fall behind it.
+
+   Two things the new sheets surfaced while being built, neither of them a sheet problem:
+
+   - ~~**Forty of the fifty component types export no host parameter**, and not all of that is
+     deliberate.~~ *(fixed — every type now says something: 24 export and 26 decline with a stated
+     reason. `Crossfader`, `Ribbon`, `VectorJoystick`, `Macro` and `Numpad` all export; `Meter`,
+     `Envelope` and `Matrix` decline, for reasons in `docs/known-issues.md`. The route was a
+     type-level `exportValues` declaration rather than a `Behavior` section, because
+     `PropertiesPanel.svelte:223` mounts a Behavior tab off the section's mere presence and a
+     crossfader would have grown a tab full of `fireOn` and `buttonType`.)*
+   - ~~**`Numpad` carries a `Value` section and no `Behavior`**, which is the same gap with a
+     sharper edge: it stores a value and still exports nothing.~~ *(fixed with the above.)*
+   - **The judgement this asked for turned up a defect underneath it.** The `exportValues` door led
+     nowhere: a parameter naming a field on the component's own section reached the host,
+     automated, saved with the session, and moved nothing, because the player writes
+     `valueOverride` or `customValues` and a section field is neither.
+     `utils/sectionValueOverrides.js` closes it.
+
+   CI also does not run the export smoke test or the installer packaging, by `ci.yml`'s own
+   header. That is unchanged.
 5. **No way in, no way out.** New Panel is a blank canvas across four designers; no templates, no
-   example panels, no first run. The Auto-Panel generator (DPD → a bound working panel) is still
-   unbuilt and would *be* the onboarding for the core use case. Outward: no panel package format
-   (custom components have one; panels do not), no Ctrlr `.panel`/`.bpanelz` importer, no update
-   channel.
+   example panels, no first run. ~~The Auto-Panel generator (DPD → a bound working panel) is still
+   unbuilt and would *be* the onboarding for the core use case.~~ *(fixed — File → New Panel from
+   Device Profile turns a profile into a bound, adopted panel: 793 GAIA parameters become 1624
+   controls, each with its real range, choices and label. See
+   `CE/web/src/CE_Application/docs/auto-panel.md`.)* Outward: ~~no panel package format
+   (custom components have one; panels do not)~~ *(fixed — File → Share Panel... writes a
+   `.cepanelpkg` with every image embedded, File → Open Shared Panel... reads one back; the
+   author's file path and bound MIDI ports are stripped on the way out)*, no Ctrlr
+   ~~`.panel`/`.bpanelz` importer~~ *(built — `node tools/scripts/ctrlr-import.mjs`, all four
+   stages, never run on a real community panel)*. ~~no update channel~~ *(fixed — Help → Check for Updates, off by
+   default because the request tells GitHub the machine's IP.)* The documentation half is closed: Help →
+   Documentation carries the scripting manual, cookbook, getting-started, release notes and known
+   issues, searchable and baked into the bundle.
 6. **Export polish**: pipeline **D1** (GUID registry / "update vs new copy") unbuilt, so two panels
    can collide FUIDs; **E1–E5** unbuilt, so there is no build log surface, export history or
-   "Reveal in folder"; every parameter maps to `AudioParameterFloat` (`PanelParameters.h`), so
-   comboboxes and toggles read in the host as anonymous 0–1 floats; `getNumPrograms()` returns 1
+   "Reveal in folder" *(all built 2026-08-23 — see the export plan's D1 and E1–E5)*; ~~every parameter maps to `AudioParameterFloat`~~ *(fixed)* — the editor now emits a
+   `valueKind` and `PanelParameters.h` branches on it, so a selector arrives as an
+   `AudioParameterChoice` with its real option names and a toggle as an `AudioParameterBool`. The
+   two shipped hardware panels gained 32 (GAIA) and 58 (AN1x) named menus that were anonymous
+   numbers before; `getNumPrograms()` returns 1
    (`PluginProcessor.h:213`), so there are no host-visible programs; `buildDump` still returns an
    empty var (`:809`).
 
 7. **Formats beyond VST3, LV2 and Standalone** — see §4. AU is blocked behind the macOS port; CLAP
    needs a third-party wrapper. LV2 shipped.
+
+8. **Code signing — decided: unsigned for the beta, a certificate before v1.** §2.6 already covers
+   the beta half, and it is covered properly: About states the unsigned build and the Export tab
+   carries it as a "Before you share" note, so nobody meets SmartScreen without warning. What is
+   recorded here is the other half, which was previously only a line in `known-issues.md` and would
+   have retired with it. **An Authenticode certificate is a v1 blocker, not a beta one.** Unsigned
+   is defensible while testers are people who chose to install a beta; it is not defensible for a
+   download aimed at strangers, where a SmartScreen wall is indistinguishable from malware to the
+   person reading it. The cert has to be in hand *before* the v1 packaging run, and OV validation
+   takes days, so it is a lead-time item rather than a build item — which is exactly the kind that
+   gets discovered on the day it blocks the release.
 
 ---
 

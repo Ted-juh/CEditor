@@ -161,7 +161,7 @@
     <PropertyCell label="Add" span={3} hint="Create an interaction area independent from visible layers.">
       <input class="val" type="text" bind:value={newName} placeholder="hitZoneName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Add a new hit zone.">
+    <PropertyCell label="" span={1} hint="Add a new hit zone." compact>
       <button class="action-btn" type="button" onclick={addZone}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose which hit zone to edit.">
@@ -172,7 +172,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected hit zone.">
+    <PropertyCell label="" span={1} hint="Remove the selected hit zone." compact>
       <button class="action-btn danger" type="button" onclick={removeZone} disabled={!selectedName}>Remove</button>
     </PropertyCell>
   </PropertySection>
@@ -328,20 +328,8 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%;
-    min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
-    padding: 4px 6px;
-    font-family: inherit;
-    outline: none;
-    box-sizing: border-box;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .zone-map {
     width: 100%;
     min-height: 154px;

@@ -115,17 +115,84 @@ argument for the beta, not against it. And `PanelParameter` is parsed from the b
 
 ## Stages
 
-**S1 — Typed parameters.** Choice/Bool/Float from the metadata that already crosses. Self-contained,
-visible in every DAW screenshot, and best done before anyone has automation to break.
+**S1 — Typed parameters.** ✅ **Done, 2026-08-23.** Every derived parameter now carries an explicit
+`valueKind` (`float` / `bool` / `choice`) and `choiceLabels` ride on every selector, not only the
+store-by-name ones; `PanelParameters.h` branches on it into `AudioParameterChoice` /
+`AudioParameterBool` / `AudioParameterFloat`. The explicit kind was unavoidable: a toggle and a plain
+0..1 knob have identical ranges, so nothing could be inferred. The two shipped hardware panels gained
+32 (GAIA) and 58 (AN1x) named menus that had been anonymous numbers. Migration holds — a panel baked
+before the field reads as `float`, which is exactly what it had — and `PanelParametersTests` asserts
+the concrete `juce::AudioParameter*` class the layout produces, not just that a string parsed.
 
-**S2 — Restore push.** Pending-restore flag, fire on device-ready, Ask/Always/Never policy. This is
-the one that delivers the headline, and it is small.
+**S2 — Restore push.** ✅ **Done, 2026-08-23.** `setStateInformation` arms a pending flag and sends
+nothing — that call can arrive before the ports are open, before `prepareToPlay`, and on a thread
+with no business emitting SysEx. The message-thread timer then asks `ce::decideRestore` on every
+tick until the question is settled.
+
+The rules live in their own header (`CE/src/Player/RestorePolicy.h`) as a pure function, because
+they are all ordering and timing and `PluginProcessor.h` needs WebView2 and does not build off
+Windows. `RestorePolicyTests` drives every ordering this section warns about on any machine —
+including the two that are easy to get backwards: a remembered *never* outranks a panel that says
+*always* (the author states a default, the person at the desk states a decision about the hardware
+actually plugged in), and an unanswered question is **not** timed out, because a restore waiting on
+a person is not a stalled one and dropping it would silently lose the patch.
+
+Ask/Always/Never is authored in the Export tab (`exportSettings.restoreHardware`) and defaults to
+Ask, which is also what a panel exported before the key existed reads as — strictly more than the
+nothing it used to do. The answer is saved with the project rather than globally: the decision was
+made about this session's patch and this session's synth.
+
+The question is a bar in the Player, not a modal — the panel behind it is what the question is
+about, and a modal over a plugin window in a DAW is a good way to lose a take. "Not now" sends
+nothing and leaves the restore pending, so it is offered again next time.
+
+Every path that does not push logs why. A restore that silently did not happen is the failure this
+whole feature exists to prevent.
 
 **S3 — `buildDump`.** Full-patch capture into session state; restore sends dump then values.
+*Codec done, 2026-08-23* on both sides — C++ (`DeviceProfileEngine::buildDumpMessage`) and the
+editor preview (`localBuildDumpMessage`, declared layouts). What S3 still wants is the session-state
+half. Previously: the codec exists — `DeviceProfileEngine::buildDumpMessage`, round-trip
+tested against the GAIA profile, and wired to `ce.device.buildDump` in the Player. What S3 still
+wants is the session-state half: capturing the built dump into `getStateInformation` and sending it
+before the values on restore.
 
-**S4 — Programs.** Bake the librarian bank into the export; wire the three overrides.
+**S4 — Programs.** ✅ **Done, 2026-08-23.** The Export tab offers the preset librarian's banks for
+whichever profile the panel requires; choosing one bakes `panel.programBank` into the document, and
+`CE/src/Player/ProgramBank.h` reads it back in the plugin. `getNumPrograms` returns the bank size,
+`getProgramName` the stored slot name, `setCurrentProgram` queues the recall.
 
-S1 and S2 together are already a shippable claim. S3 and S4 make it complete.
+Baking is not only plumbing around browser storage. A plugin should not scan an instrument's memory
+on every project load, so the alternative to baking is worse — and the honest limit follows and is
+stated in the Export tab: a *panel-authored* bank is a list somebody curated, not a live view of
+what is in the synth now.
+
+Three things the reading had to get right, all of them invisible in a build:
+
+- **Never zero programs.** Some hosts refuse to instantiate a plugin that claims none, and JUCE
+  assumes at least one. A panel with no bank reports the single unnamed program it always did.
+- **Out-of-range names answer rather than assert.** Hosts do ask past the count they were given,
+  usually while rebuilding a menu.
+- **`setCurrentProgram` sends nothing.** A host may call it from the audio thread — VST3 maps a
+  program change onto a parameter — and the send path runs a script's `interceptMidiOut` filter,
+  which is message-thread work. It sets an atomic flag; the timer performs the recall, the same
+  discipline S2 follows.
+
+Recall has two kinds, and the difference is the librarian's own: an entry that captured the patch
+sends THAT, so the synth ends up on the sound somebody saved; a name-only entry sends the profile's
+recall action for the slot, which is weaker and honest — it tells the synth which of its own
+patches to load, and what is in that slot today is the synth's business.
+
+Restoring a saved program index deliberately does NOT fire a change: the restore push is about to
+put the whole patch back, and a program change on top of it recalls a slot over the patch that was
+just restored.
+
+**All four stages are done.** A reopened project puts the whole patch back on the synth, the DAW
+sees named programs it can automate between, and every parameter arrives as the right kind of host
+parameter rather than an anonymous float.
+
+What has NOT happened is a test against hardware. Everything here is reasoned from the profile and
+driven by unit tests; no restore in this build has reached a synth.
 
 ## Verification
 

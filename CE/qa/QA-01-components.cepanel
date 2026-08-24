@@ -8,7 +8,8 @@
     "embedPython": "auto",
     "compileNativeHandlers": "auto",
     "exportClap": true,
-    "exportLv2": true
+    "exportLv2": true,
+    "restoreHardware": "ask"
   },
   "name": "QA-01 Components",
   "scriptId": "qa_01_components",
@@ -19,7 +20,7 @@
   "locked": false,
   "filePath": null,
   "width": 1600,
-  "height": 3036,
+  "height": 3444,
   "resizable": false,
   "panicShortcut": "Escape",
   "minWidth": 0,
@@ -125,6 +126,31 @@
   "parameterSnapshots": {},
   "exportParameters": [
     {
+      "id": "qa01_TabContainer.page",
+      "label": "qa01_TabContainer Page",
+      "controlName": "qa01_TabContainer",
+      "path": "qa01_TabContainer.page",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Page 1",
+        "Page 2"
+      ],
+      "choiceValues": [
+        "Page 1",
+        "Page 2"
+      ],
+      "choiceMode": "index",
+      "section": "TabContainer",
+      "field": "pageIndex",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
       "id": "qa01_Number.value",
       "label": "qa01_Number",
       "controlName": "qa01_Number",
@@ -134,6 +160,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -147,6 +174,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -160,6 +188,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -173,6 +202,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -186,6 +221,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -199,6 +239,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -212,6 +258,28 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Numpad.value",
+      "label": "qa01_Numpad",
+      "controlName": "qa01_Numpad",
+      "path": "qa01_Numpad.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Numpad",
+      "field": "value",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -225,6 +293,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -238,6 +307,503 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Crossfader.value",
+      "label": "qa01_Crossfader",
+      "controlName": "qa01_Crossfader",
+      "path": "qa01_Crossfader.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Crossfader",
+      "field": "mix",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Ribbon.value",
+      "label": "qa01_Ribbon",
+      "controlName": "qa01_Ribbon",
+      "path": "qa01_Ribbon.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Ribbon",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_PitchWheel.value",
+      "label": "qa01_PitchWheel",
+      "controlName": "qa01_PitchWheel",
+      "path": "qa01_PitchWheel.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Ribbon",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_ModWheel.value",
+      "label": "qa01_ModWheel",
+      "controlName": "qa01_ModWheel",
+      "path": "qa01_ModWheel.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Ribbon",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_VectorJoystick.x",
+      "label": "qa01_VectorJoystick X",
+      "controlName": "qa01_VectorJoystick",
+      "path": "qa01_VectorJoystick.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "x",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_VectorJoystick.y",
+      "label": "qa01_VectorJoystick Y",
+      "controlName": "qa01_VectorJoystick",
+      "path": "qa01_VectorJoystick.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "y",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Macro.value",
+      "label": "qa01_Macro",
+      "controlName": "qa01_Macro",
+      "path": "qa01_Macro.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.28,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Macro",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Constellation.x",
+      "label": "qa01_Constellation X",
+      "controlName": "qa01_Constellation",
+      "path": "qa01_Constellation.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Constellation",
+      "field": "probeX",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Constellation.y",
+      "label": "qa01_Constellation Y",
+      "controlName": "qa01_Constellation",
+      "path": "qa01_Constellation.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Constellation",
+      "field": "probeY",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Timbre.x",
+      "label": "qa01_Timbre X",
+      "controlName": "qa01_Timbre",
+      "path": "qa01_Timbre.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Timbre",
+      "field": "x",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Timbre.y",
+      "label": "qa01_Timbre Y",
+      "controlName": "qa01_Timbre",
+      "path": "qa01_Timbre.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Timbre",
+      "field": "y",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Turing.rate",
+      "label": "qa01_Turing Rate",
+      "controlName": "qa01_Turing",
+      "path": "qa01_Turing.rate",
+      "min": 0.1,
+      "max": 32,
+      "defaultValue": 2,
+      "unit": "st/s",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Turing",
+      "field": "rate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Turing.randomness",
+      "label": "qa01_Turing Randomness",
+      "controlName": "qa01_Turing",
+      "path": "qa01_Turing.randomness",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.25,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Turing",
+      "field": "randomness",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Turing.gateThreshold",
+      "label": "qa01_Turing Gate threshold",
+      "controlName": "qa01_Turing",
+      "path": "qa01_Turing.gateThreshold",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Turing",
+      "field": "gateThreshold",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Turing.length",
+      "label": "qa01_Turing Length",
+      "controlName": "qa01_Turing",
+      "path": "qa01_Turing.length",
+      "min": 1,
+      "max": 64,
+      "defaultValue": 8,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Turing",
+      "field": "length",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Kinetic.gravity",
+      "label": "qa01_Kinetic Gravity",
+      "controlName": "qa01_Kinetic",
+      "path": "qa01_Kinetic.gravity",
+      "min": -1,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Kinetic",
+      "field": "gravity",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Kinetic.restitution",
+      "label": "qa01_Kinetic Restitution",
+      "controlName": "qa01_Kinetic",
+      "path": "qa01_Kinetic.restitution",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.92,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Kinetic",
+      "field": "restitution",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Kinetic.friction",
+      "label": "qa01_Kinetic Friction",
+      "controlName": "qa01_Kinetic",
+      "path": "qa01_Kinetic.friction",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.04,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Kinetic",
+      "field": "friction",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Orbit.rate",
+      "label": "qa01_Orbit Rate",
+      "controlName": "qa01_Orbit",
+      "path": "qa01_Orbit.rate",
+      "min": 0.01,
+      "max": 8,
+      "defaultValue": 0.25,
+      "unit": "Hz",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Orbit",
+      "field": "rate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_StepSequencer.bpm",
+      "label": "qa01_StepSequencer Tempo",
+      "controlName": "qa01_StepSequencer",
+      "path": "qa01_StepSequencer.bpm",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "StepSequencer",
+      "field": "bpm",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_StepSequencer.run",
+      "label": "qa01_StepSequencer Run",
+      "controlName": "qa01_StepSequencer",
+      "path": "qa01_StepSequencer.run",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "section": "StepSequencer",
+      "field": "running",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Arp.rate",
+      "label": "qa01_Arp Rate",
+      "controlName": "qa01_Arp",
+      "path": "qa01_Arp.rate",
+      "min": 0.1,
+      "max": 32,
+      "defaultValue": 6,
+      "unit": "st/s",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Arp",
+      "field": "rate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Arp.gate",
+      "label": "qa01_Arp Gate",
+      "controlName": "qa01_Arp",
+      "path": "qa01_Arp.gate",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.6,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Arp",
+      "field": "gate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Arp.swing",
+      "label": "qa01_Arp Swing",
+      "controlName": "qa01_Arp",
+      "path": "qa01_Arp.swing",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Arp",
+      "field": "swing",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Arp.octaves",
+      "label": "qa01_Arp Octaves",
+      "controlName": "qa01_Arp",
+      "path": "qa01_Arp.octaves",
+      "min": 1,
+      "max": 4,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Arp",
+      "field": "octaves",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Phrase.transpose",
+      "label": "qa01_Phrase Transpose",
+      "controlName": "qa01_Phrase",
+      "path": "qa01_Phrase.transpose",
+      "min": -24,
+      "max": 24,
+      "defaultValue": 0,
+      "unit": "st",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Phrase",
+      "field": "transpose",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Phrase.swing",
+      "label": "qa01_Phrase Swing",
+      "controlName": "qa01_Phrase",
+      "path": "qa01_Phrase.swing",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Phrase",
+      "field": "swing",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Phrase.gate",
+      "label": "qa01_Phrase Gate",
+      "controlName": "qa01_Phrase",
+      "path": "qa01_Phrase.gate",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.8,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Phrase",
+      "field": "gate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Phrase.rate",
+      "label": "qa01_Phrase Rate",
+      "controlName": "qa01_Phrase",
+      "path": "qa01_Phrase.rate",
+      "min": 0.1,
+      "max": 32,
+      "defaultValue": 8,
+      "unit": "st/s",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Phrase",
+      "field": "rate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Setlist.index",
+      "label": "qa01_Setlist Scene",
+      "controlName": "qa01_Setlist",
+      "path": "qa01_Setlist.index",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Setlist",
+      "field": "index",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_Transport.swing",
+      "label": "qa01_Transport Swing",
+      "controlName": "qa01_Transport",
+      "path": "qa01_Transport.swing",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Transport",
+      "field": "swing",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -251,6 +817,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -264,6 +831,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     }
@@ -487,6 +1055,110 @@
         "Transform": {
           "x": 792,
           "y": 64,
+          "width": 320,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "TabContainer",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_TabContainer",
+          "id": "qa01_TabContainer",
+          "controlType": "TabContainer"
+        },
+        "Transform": {
+          "x": 792,
+          "y": 86
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_4",
+          "id": "qa_cap_4",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1136,
+          "y": 64,
+          "width": 280,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "ScrollArea",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_ScrollArea",
+          "id": "qa01_ScrollArea",
+          "controlType": "ScrollArea"
+        },
+        "Transform": {
+          "x": 1136,
+          "y": 86
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_5",
+          "id": "qa_cap_5",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 334,
           "width": 160,
           "height": 18
         },
@@ -523,8 +1195,8 @@
           "controlType": "Image"
         },
         "Transform": {
-          "x": 792,
-          "y": 86
+          "x": 28,
+          "y": 356
         }
       },
       "_type": "Control"
@@ -532,13 +1204,65 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_4",
-          "id": "qa_cap_4",
+          "name": "caption_qa_cap_6",
+          "id": "qa_cap_6",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 976,
-          "y": 64,
+          "x": 212,
+          "y": 334,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Shape",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_Shape",
+          "id": "qa01_Shape",
+          "controlType": "Shape"
+        },
+        "Transform": {
+          "x": 212,
+          "y": 356
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_7",
+          "id": "qa_cap_7",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 368,
+          "y": 334,
           "width": 132,
           "height": 18
         },
@@ -575,8 +1299,8 @@
           "controlType": "TestBox"
         },
         "Transform": {
-          "x": 976,
-          "y": 86
+          "x": 368,
+          "y": 356
         }
       },
       "_type": "Control"
@@ -590,7 +1314,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 320,
+          "y": 510,
           "width": 1544,
           "height": 26
         },
@@ -630,13 +1354,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_5",
-          "id": "qa_cap_5",
+          "name": "caption_qa_cap_8",
+          "id": "qa_cap_8",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 356,
+          "y": 546,
           "width": 132,
           "height": 18
         },
@@ -673,7 +1397,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 378
+          "y": 568
         }
       },
       "_type": "Control"
@@ -681,13 +1405,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_6",
-          "id": "qa_cap_6",
+          "name": "caption_qa_cap_9",
+          "id": "qa_cap_9",
           "controlType": "Label"
         },
         "Transform": {
           "x": 184,
-          "y": 356,
+          "y": 546,
           "width": 160,
           "height": 18
         },
@@ -725,7 +1449,7 @@
         },
         "Transform": {
           "x": 184,
-          "y": 378
+          "y": 568
         }
       },
       "_type": "Control"
@@ -733,13 +1457,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_7",
-          "id": "qa_cap_7",
+          "name": "caption_qa_cap_10",
+          "id": "qa_cap_10",
           "controlType": "Label"
         },
         "Transform": {
           "x": 368,
-          "y": 356,
+          "y": 546,
           "width": 132,
           "height": 18
         },
@@ -777,7 +1501,7 @@
         },
         "Transform": {
           "x": 368,
-          "y": 378
+          "y": 568
         }
       },
       "_type": "Control"
@@ -785,13 +1509,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_8",
-          "id": "qa_cap_8",
+          "name": "caption_qa_cap_11",
+          "id": "qa_cap_11",
           "controlType": "Label"
         },
         "Transform": {
           "x": 524,
-          "y": 356,
+          "y": 546,
           "width": 200,
           "height": 18
         },
@@ -829,7 +1553,7 @@
         },
         "Transform": {
           "x": 524,
-          "y": 378
+          "y": 568
         }
       },
       "_type": "Control"
@@ -843,7 +1567,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 452,
+          "y": 642,
           "width": 1544,
           "height": 26
         },
@@ -883,13 +1607,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_9",
-          "id": "qa_cap_9",
+          "name": "caption_qa_cap_12",
+          "id": "qa_cap_12",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 488,
+          "y": 678,
           "width": 132,
           "height": 18
         },
@@ -927,7 +1651,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 510
+          "y": 700
         }
       },
       "_type": "Control"
@@ -935,13 +1659,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_10",
-          "id": "qa_cap_10",
+          "name": "caption_qa_cap_13",
+          "id": "qa_cap_13",
           "controlType": "Label"
         },
         "Transform": {
           "x": 184,
-          "y": 488,
+          "y": 678,
           "width": 132,
           "height": 18
         },
@@ -979,7 +1703,7 @@
         },
         "Transform": {
           "x": 184,
-          "y": 510
+          "y": 700
         }
       },
       "_type": "Control"
@@ -987,13 +1711,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_11",
-          "id": "qa_cap_11",
+          "name": "caption_qa_cap_14",
+          "id": "qa_cap_14",
           "controlType": "Label"
         },
         "Transform": {
           "x": 340,
-          "y": 488,
+          "y": 678,
           "width": 136,
           "height": 18
         },
@@ -1031,7 +1755,7 @@
         },
         "Transform": {
           "x": 340,
-          "y": 510
+          "y": 700
         }
       },
       "_type": "Control"
@@ -1039,13 +1763,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_12",
-          "id": "qa_cap_12",
+          "name": "caption_qa_cap_15",
+          "id": "qa_cap_15",
           "controlType": "Label"
         },
         "Transform": {
           "x": 500,
-          "y": 488,
+          "y": 678,
           "width": 148,
           "height": 18
         },
@@ -1083,7 +1807,7 @@
         },
         "Transform": {
           "x": 500,
-          "y": 510
+          "y": 700
         }
       },
       "_type": "Control"
@@ -1091,13 +1815,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_13",
-          "id": "qa_cap_13",
+          "name": "caption_qa_cap_16",
+          "id": "qa_cap_16",
           "controlType": "Label"
         },
         "Transform": {
           "x": 672,
-          "y": 488,
+          "y": 678,
           "width": 148,
           "height": 18
         },
@@ -1135,7 +1859,7 @@
         },
         "Transform": {
           "x": 672,
-          "y": 510
+          "y": 700
         }
       },
       "_type": "Control"
@@ -1143,13 +1867,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_14",
-          "id": "qa_cap_14",
+          "name": "caption_qa_cap_17",
+          "id": "qa_cap_17",
           "controlType": "Label"
         },
         "Transform": {
           "x": 844,
-          "y": 488,
+          "y": 678,
           "width": 136,
           "height": 18
         },
@@ -1187,7 +1911,7 @@
         },
         "Transform": {
           "x": 844,
-          "y": 510
+          "y": 700
         }
       },
       "_type": "Control"
@@ -1195,13 +1919,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_15",
-          "id": "qa_cap_15",
+          "name": "caption_qa_cap_18",
+          "id": "qa_cap_18",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1004,
-          "y": 488,
+          "y": 678,
           "width": 240,
           "height": 18
         },
@@ -1239,7 +1963,7 @@
         },
         "Transform": {
           "x": 1004,
-          "y": 510
+          "y": 700
         }
       },
       "_type": "Control"
@@ -1253,7 +1977,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 588,
+          "y": 778,
           "width": 1544,
           "height": 26
         },
@@ -1293,13 +2017,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_16",
-          "id": "qa_cap_16",
+          "name": "caption_qa_cap_19",
+          "id": "qa_cap_19",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 624,
+          "y": 814,
           "width": 160,
           "height": 18
         },
@@ -1337,7 +2061,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 646
+          "y": 836
         }
       },
       "_type": "Control"
@@ -1345,13 +2069,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_17",
-          "id": "qa_cap_17",
+          "name": "caption_qa_cap_20",
+          "id": "qa_cap_20",
           "controlType": "Label"
         },
         "Transform": {
           "x": 212,
-          "y": 624,
+          "y": 814,
           "width": 160,
           "height": 18
         },
@@ -1389,7 +2113,7 @@
         },
         "Transform": {
           "x": 212,
-          "y": 646
+          "y": 836
         }
       },
       "_type": "Control"
@@ -1397,13 +2121,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_18",
-          "id": "qa_cap_18",
+          "name": "caption_qa_cap_21",
+          "id": "qa_cap_21",
           "controlType": "Label"
         },
         "Transform": {
           "x": 396,
-          "y": 624,
+          "y": 814,
           "width": 168,
           "height": 18
         },
@@ -1441,7 +2165,7 @@
         },
         "Transform": {
           "x": 396,
-          "y": 646
+          "y": 836
         }
       },
       "_type": "Control"
@@ -1455,7 +2179,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 912,
+          "y": 1102,
           "width": 1544,
           "height": 26
         },
@@ -1495,13 +2219,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_19",
-          "id": "qa_cap_19",
+          "name": "caption_qa_cap_22",
+          "id": "qa_cap_22",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 948,
+          "y": 1138,
           "width": 220,
           "height": 18
         },
@@ -1539,7 +2263,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 970
+          "y": 1160
         }
       },
       "_type": "Control"
@@ -1547,13 +2271,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_20",
-          "id": "qa_cap_20",
+          "name": "caption_qa_cap_23",
+          "id": "qa_cap_23",
           "controlType": "Label"
         },
         "Transform": {
           "x": 272,
-          "y": 948,
+          "y": 1138,
           "width": 132,
           "height": 18
         },
@@ -1591,7 +2315,7 @@
         },
         "Transform": {
           "x": 272,
-          "y": 970
+          "y": 1160
         }
       },
       "_type": "Control"
@@ -1599,13 +2323,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_21",
-          "id": "qa_cap_21",
+          "name": "caption_qa_cap_24",
+          "id": "qa_cap_24",
           "controlType": "Label"
         },
         "Transform": {
           "x": 428,
-          "y": 948,
+          "y": 1138,
           "width": 200,
           "height": 18
         },
@@ -1643,7 +2367,7 @@
         },
         "Transform": {
           "x": 428,
-          "y": 970
+          "y": 1160
         }
       },
       "_type": "Control"
@@ -1651,13 +2375,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_22",
-          "id": "qa_cap_22",
+          "name": "caption_qa_cap_25",
+          "id": "qa_cap_25",
           "controlType": "Label"
         },
         "Transform": {
           "x": 652,
-          "y": 948,
+          "y": 1138,
           "width": 132,
           "height": 18
         },
@@ -1695,7 +2419,7 @@
         },
         "Transform": {
           "x": 652,
-          "y": 970
+          "y": 1160
         }
       },
       "_type": "Control"
@@ -1703,13 +2427,117 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_23",
-          "id": "qa_cap_23",
+          "name": "caption_qa_cap_26",
+          "id": "qa_cap_26",
           "controlType": "Label"
         },
         "Transform": {
           "x": 808,
-          "y": 948,
+          "y": 1138,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "PitchWheel",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_PitchWheel",
+          "id": "qa01_PitchWheel",
+          "controlType": "PitchWheel"
+        },
+        "Transform": {
+          "x": 808,
+          "y": 1160
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_27",
+          "id": "qa_cap_27",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 964,
+          "y": 1138,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "ModWheel",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_ModWheel",
+          "id": "qa01_ModWheel",
+          "controlType": "ModWheel"
+        },
+        "Transform": {
+          "x": 964,
+          "y": 1160
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_28",
+          "id": "qa_cap_28",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1120,
+          "y": 1138,
           "width": 160,
           "height": 18
         },
@@ -1746,8 +2574,8 @@
           "controlType": "VectorJoystick"
         },
         "Transform": {
-          "x": 808,
-          "y": 970
+          "x": 1120,
+          "y": 1160
         }
       },
       "_type": "Control"
@@ -1761,7 +2589,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 1164,
+          "y": 1354,
           "width": 1544,
           "height": 26
         },
@@ -1801,13 +2629,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_24",
-          "id": "qa_cap_24",
+          "name": "caption_qa_cap_29",
+          "id": "qa_cap_29",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 1200,
+          "y": 1390,
           "width": 260,
           "height": 18
         },
@@ -1845,7 +2673,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 1222
+          "y": 1412
         }
       },
       "_type": "Control"
@@ -1853,13 +2681,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_25",
-          "id": "qa_cap_25",
+          "name": "caption_qa_cap_30",
+          "id": "qa_cap_30",
           "controlType": "Label"
         },
         "Transform": {
           "x": 312,
-          "y": 1200,
+          "y": 1390,
           "width": 260,
           "height": 18
         },
@@ -1897,7 +2725,7 @@
         },
         "Transform": {
           "x": 312,
-          "y": 1222
+          "y": 1412
         }
       },
       "_type": "Control"
@@ -1905,13 +2733,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_26",
-          "id": "qa_cap_26",
+          "name": "caption_qa_cap_31",
+          "id": "qa_cap_31",
           "controlType": "Label"
         },
         "Transform": {
           "x": 596,
-          "y": 1200,
+          "y": 1390,
           "width": 220,
           "height": 18
         },
@@ -1949,7 +2777,59 @@
         },
         "Transform": {
           "x": 596,
-          "y": 1222
+          "y": 1412
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_32",
+          "id": "qa_cap_32",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 840,
+          "y": 1390,
+          "width": 220,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "ProgressBar",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_ProgressBar",
+          "id": "qa01_ProgressBar",
+          "controlType": "ProgressBar"
+        },
+        "Transform": {
+          "x": 840,
+          "y": 1412
         }
       },
       "_type": "Control"
@@ -1963,7 +2843,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 1396,
+          "y": 1586,
           "width": 1544,
           "height": 26
         },
@@ -2003,13 +2883,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_27",
-          "id": "qa_cap_27",
+          "name": "caption_qa_cap_33",
+          "id": "qa_cap_33",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 1432,
+          "y": 1622,
           "width": 320,
           "height": 18
         },
@@ -2047,7 +2927,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 1454
+          "y": 1644
         }
       },
       "_type": "Control"
@@ -2055,13 +2935,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_28",
-          "id": "qa_cap_28",
+          "name": "caption_qa_cap_34",
+          "id": "qa_cap_34",
           "controlType": "Label"
         },
         "Transform": {
           "x": 372,
-          "y": 1432,
+          "y": 1622,
           "width": 260,
           "height": 18
         },
@@ -2099,7 +2979,7 @@
         },
         "Transform": {
           "x": 372,
-          "y": 1454
+          "y": 1644
         }
       },
       "_type": "Control"
@@ -2107,13 +2987,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_29",
-          "id": "qa_cap_29",
+          "name": "caption_qa_cap_35",
+          "id": "qa_cap_35",
           "controlType": "Label"
         },
         "Transform": {
           "x": 656,
-          "y": 1432,
+          "y": 1622,
           "width": 220,
           "height": 18
         },
@@ -2151,7 +3031,7 @@
         },
         "Transform": {
           "x": 656,
-          "y": 1454
+          "y": 1644
         }
       },
       "_type": "Control"
@@ -2159,13 +3039,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_30",
-          "id": "qa_cap_30",
+          "name": "caption_qa_cap_36",
+          "id": "qa_cap_36",
           "controlType": "Label"
         },
         "Transform": {
           "x": 900,
-          "y": 1432,
+          "y": 1622,
           "width": 320,
           "height": 18
         },
@@ -2203,7 +3083,7 @@
         },
         "Transform": {
           "x": 900,
-          "y": 1454
+          "y": 1644
         }
       },
       "_type": "Control"
@@ -2211,13 +3091,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_31",
-          "id": "qa_cap_31",
+          "name": "caption_qa_cap_37",
+          "id": "qa_cap_37",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1244,
-          "y": 1432,
+          "y": 1622,
           "width": 260,
           "height": 18
         },
@@ -2255,7 +3135,7 @@
         },
         "Transform": {
           "x": 1244,
-          "y": 1454
+          "y": 1644
         }
       },
       "_type": "Control"
@@ -2263,13 +3143,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_32",
-          "id": "qa_cap_32",
+          "name": "caption_qa_cap_38",
+          "id": "qa_cap_38",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 1702,
+          "y": 1892,
           "width": 180,
           "height": 18
         },
@@ -2307,7 +3187,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 1724
+          "y": 1914
         }
       },
       "_type": "Control"
@@ -2315,13 +3195,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_33",
-          "id": "qa_cap_33",
+          "name": "caption_qa_cap_39",
+          "id": "qa_cap_39",
           "controlType": "Label"
         },
         "Transform": {
           "x": 232,
-          "y": 1702,
+          "y": 1892,
           "width": 200,
           "height": 18
         },
@@ -2359,7 +3239,7 @@
         },
         "Transform": {
           "x": 232,
-          "y": 1724
+          "y": 1914
         }
       },
       "_type": "Control"
@@ -2367,13 +3247,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_34",
-          "id": "qa_cap_34",
+          "name": "caption_qa_cap_40",
+          "id": "qa_cap_40",
           "controlType": "Label"
         },
         "Transform": {
           "x": 456,
-          "y": 1702,
+          "y": 1892,
           "width": 280,
           "height": 18
         },
@@ -2411,7 +3291,7 @@
         },
         "Transform": {
           "x": 456,
-          "y": 1724
+          "y": 1914
         }
       },
       "_type": "Control"
@@ -2419,13 +3299,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_35",
-          "id": "qa_cap_35",
+          "name": "caption_qa_cap_41",
+          "id": "qa_cap_41",
           "controlType": "Label"
         },
         "Transform": {
           "x": 760,
-          "y": 1702,
+          "y": 1892,
           "width": 260,
           "height": 18
         },
@@ -2463,7 +3343,7 @@
         },
         "Transform": {
           "x": 760,
-          "y": 1724
+          "y": 1914
         }
       },
       "_type": "Control"
@@ -2471,13 +3351,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_36",
-          "id": "qa_cap_36",
+          "name": "caption_qa_cap_42",
+          "id": "qa_cap_42",
           "controlType": "Label"
         },
         "Transform": {
           "x": 1044,
-          "y": 1702,
+          "y": 1892,
           "width": 200,
           "height": 18
         },
@@ -2515,7 +3395,7 @@
         },
         "Transform": {
           "x": 1044,
-          "y": 1724
+          "y": 1914
         }
       },
       "_type": "Control"
@@ -2529,7 +3409,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 1958,
+          "y": 2148,
           "width": 1544,
           "height": 26
         },
@@ -2569,13 +3449,117 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_37",
-          "id": "qa_cap_37",
+          "name": "caption_qa_cap_43",
+          "id": "qa_cap_43",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 1994,
+          "y": 2184,
+          "width": 320,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Keyboard",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_Keyboard",
+          "id": "qa01_Keyboard",
+          "controlType": "Keyboard"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2206
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_44",
+          "id": "qa_cap_44",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 372,
+          "y": 2184,
+          "width": 420,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "StepSequencer",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_StepSequencer",
+          "id": "qa01_StepSequencer",
+          "controlType": "StepSequencer"
+        },
+        "Transform": {
+          "x": 372,
+          "y": 2206
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_45",
+          "id": "qa_cap_45",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 816,
+          "y": 2184,
           "width": 260,
           "height": 18
         },
@@ -2612,8 +3596,8 @@
           "controlType": "ChordPad"
         },
         "Transform": {
-          "x": 28,
-          "y": 2016
+          "x": 816,
+          "y": 2206
         }
       },
       "_type": "Control"
@@ -2621,13 +3605,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_38",
-          "id": "qa_cap_38",
+          "name": "caption_qa_cap_46",
+          "id": "qa_cap_46",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 312,
-          "y": 1994,
+          "x": 1100,
+          "y": 2184,
           "width": 320,
           "height": 18
         },
@@ -2664,8 +3648,8 @@
           "controlType": "Arp"
         },
         "Transform": {
-          "x": 312,
-          "y": 2016
+          "x": 1100,
+          "y": 2206
         }
       },
       "_type": "Control"
@@ -2673,13 +3657,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_39",
-          "id": "qa_cap_39",
+          "name": "caption_qa_cap_47",
+          "id": "qa_cap_47",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 656,
-          "y": 1994,
+          "x": 28,
+          "y": 2514,
           "width": 360,
           "height": 18
         },
@@ -2716,8 +3700,8 @@
           "controlType": "NoteRibbon"
         },
         "Transform": {
-          "x": 656,
-          "y": 2016
+          "x": 28,
+          "y": 2536
         }
       },
       "_type": "Control"
@@ -2725,13 +3709,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_40",
-          "id": "qa_cap_40",
+          "name": "caption_qa_cap_48",
+          "id": "qa_cap_48",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1040,
-          "y": 1994,
+          "x": 412,
+          "y": 2514,
           "width": 260,
           "height": 18
         },
@@ -2768,8 +3752,8 @@
           "controlType": "DrumPads"
         },
         "Transform": {
-          "x": 1040,
-          "y": 2016
+          "x": 412,
+          "y": 2536
         }
       },
       "_type": "Control"
@@ -2777,13 +3761,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_41",
-          "id": "qa_cap_41",
+          "name": "caption_qa_cap_49",
+          "id": "qa_cap_49",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 2324,
+          "x": 696,
+          "y": 2514,
           "width": 460,
           "height": 18
         },
@@ -2820,8 +3804,8 @@
           "controlType": "Phrase"
         },
         "Transform": {
-          "x": 28,
-          "y": 2346
+          "x": 696,
+          "y": 2536
         }
       },
       "_type": "Control"
@@ -2829,13 +3813,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_42",
-          "id": "qa_cap_42",
+          "name": "caption_qa_cap_50",
+          "id": "qa_cap_50",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 512,
-          "y": 2324,
+          "x": 1180,
+          "y": 2514,
           "width": 300,
           "height": 18
         },
@@ -2872,8 +3856,8 @@
           "controlType": "Looper"
         },
         "Transform": {
-          "x": 512,
-          "y": 2346
+          "x": 1180,
+          "y": 2536
         }
       },
       "_type": "Control"
@@ -2881,13 +3865,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_43",
-          "id": "qa_cap_43",
+          "name": "caption_qa_cap_51",
+          "id": "qa_cap_51",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 836,
-          "y": 2324,
+          "x": 28,
+          "y": 2844,
           "width": 260,
           "height": 18
         },
@@ -2924,8 +3908,8 @@
           "controlType": "Setlist"
         },
         "Transform": {
-          "x": 836,
-          "y": 2346
+          "x": 28,
+          "y": 2866
         }
       },
       "_type": "Control"
@@ -2933,13 +3917,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_44",
-          "id": "qa_cap_44",
+          "name": "caption_qa_cap_52",
+          "id": "qa_cap_52",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1120,
-          "y": 2324,
+          "x": 312,
+          "y": 2844,
           "width": 340,
           "height": 18
         },
@@ -2976,8 +3960,8 @@
           "controlType": "Harmoniser"
         },
         "Transform": {
-          "x": 1120,
-          "y": 2346
+          "x": 312,
+          "y": 2866
         }
       },
       "_type": "Control"
@@ -2985,13 +3969,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_45",
-          "id": "qa_cap_45",
+          "name": "caption_qa_cap_53",
+          "id": "qa_cap_53",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
-          "y": 2544,
+          "x": 676,
+          "y": 2844,
           "width": 420,
           "height": 18
         },
@@ -3028,8 +4012,8 @@
           "controlType": "Recorder"
         },
         "Transform": {
-          "x": 28,
-          "y": 2566
+          "x": 676,
+          "y": 2866
         }
       },
       "_type": "Control"
@@ -3037,13 +4021,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_46",
-          "id": "qa_cap_46",
+          "name": "caption_qa_cap_54",
+          "id": "qa_cap_54",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 472,
-          "y": 2544,
+          "x": 1120,
+          "y": 2844,
           "width": 420,
           "height": 18
         },
@@ -3080,8 +4064,8 @@
           "controlType": "SplitZone"
         },
         "Transform": {
-          "x": 472,
-          "y": 2566
+          "x": 1120,
+          "y": 2866
         }
       },
       "_type": "Control"
@@ -3089,13 +4073,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_47",
-          "id": "qa_cap_47",
+          "name": "caption_qa_cap_55",
+          "id": "qa_cap_55",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 916,
-          "y": 2544,
+          "x": 28,
+          "y": 3044,
           "width": 132,
           "height": 18
         },
@@ -3132,8 +4116,8 @@
           "controlType": "Panic"
         },
         "Transform": {
-          "x": 916,
-          "y": 2566
+          "x": 28,
+          "y": 3066
         }
       },
       "_type": "Control"
@@ -3141,13 +4125,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_48",
-          "id": "qa_cap_48",
+          "name": "caption_qa_cap_56",
+          "id": "qa_cap_56",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
-          "y": 2544,
+          "x": 184,
+          "y": 3044,
           "width": 230,
           "height": 18
         },
@@ -3184,8 +4168,8 @@
           "controlType": "Transport"
         },
         "Transform": {
-          "x": 1072,
-          "y": 2566
+          "x": 184,
+          "y": 3066
         }
       },
       "_type": "Control"
@@ -3199,7 +4183,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 2750,
+          "y": 3158,
           "width": 1544,
           "height": 26
         },
@@ -3239,13 +4223,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_49",
-          "id": "qa_cap_49",
+          "name": "caption_qa_cap_57",
+          "id": "qa_cap_57",
           "controlType": "Label"
         },
         "Transform": {
           "x": 28,
-          "y": 2786,
+          "y": 3194,
           "width": 200,
           "height": 18
         },
@@ -3283,7 +4267,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 2808
+          "y": 3216
         }
       },
       "_type": "Control"

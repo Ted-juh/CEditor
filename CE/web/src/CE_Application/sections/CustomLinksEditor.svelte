@@ -332,7 +332,7 @@
     <PropertyCell label="Add" span={3} hint="Create a link between internal values, behaviors, visual properties, or external component API values.">
       <input class="val" type="text" bind:value={newName} placeholder="linkName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Add a logic link.">
+    <PropertyCell label="" span={1} hint="Add a logic link." compact>
       <button class="action-btn" type="button" onclick={addLink}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose which link to edit.">
@@ -342,7 +342,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected link.">
+    <PropertyCell label="" span={1} hint="Remove the selected link." compact>
       <button class="action-btn danger" type="button" onclick={removeLink} disabled={!selectedName}>Remove</button>
     </PropertyCell>
   </PropertySection>
@@ -551,14 +551,14 @@
             />
           </PropertyCell>
         {:else if selected.type === 'offset'}
-          <PropertyCell label="Amount" span={2} compact hint="Amount added to the source before writing the target.">
+          <PropertyCell label="Amount" span={1} compact hint="Amount added to the source before writing the target.">
             <NumberCell label="Amt" value={selected.amount ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('amount', value)} />
           </PropertyCell>
         {:else if selected.type === 'clamp'}
-          <PropertyCell label="Min" span={2} compact hint="Lowest allowed routed value.">
+          <PropertyCell label="Min" span={1} compact hint="Lowest allowed routed value.">
             <NumberCell label="Min" value={selected.min ?? 0} step={0.01} defaultValue={0} onchange={(value) => set('min', value)} />
           </PropertyCell>
-          <PropertyCell label="Max" span={2} compact hint="Highest allowed routed value.">
+          <PropertyCell label="Max" span={1} compact hint="Highest allowed routed value.">
             <NumberCell label="Max" value={selected.max ?? 1} step={0.01} defaultValue={1} onchange={(value) => set('max', value)} />
           </PropertyCell>
         {:else if selected.type === 'condition'}
@@ -582,7 +582,7 @@
             }}></textarea>
           </PropertyCell>
         {:else}
-          <PropertyCell label="Invert" span={2} hint="Invert the boolean source before writing the target.">
+          <PropertyCell label="Invert" span={1} hint="Invert the boolean source before writing the target.">
             <PropertyToggle value={selected.invert === true} onchange={() => set('invert', !(selected.invert === true))} />
           </PropertyCell>
         {/if}
@@ -598,9 +598,19 @@
 {/if}
 
 <style>
-  .val { width: 100%; min-width: 0; background: #1A1A1A; border: 1px solid #333; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 6px; font-family: inherit; outline: none; box-sizing: border-box; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+
+  /* A textarea wears `.val` too, and the shared skin is sized for a single-line field. Rows
+     decide its height; the token is only a floor. */
+  textarea.val {
+    height: auto;
+    min-height: var(--pp-field-height, 26px);
+    padding: 4px 6px;
+    line-height: 1.4;
+    resize: vertical;
+  }
   .val.code { font-family: Consolas, 'Courier New', monospace; line-height: 1.4; }
-  .val:focus { border-color: #5B9BD5; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .action-btn { width: 100%; background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 8px; cursor: pointer; font-family: inherit; }
   .action-btn:hover:not(:disabled) { border-color: #5B9BD5; color: #FFF; }
   .action-btn.danger:hover:not(:disabled) { border-color: #D56B6B; }

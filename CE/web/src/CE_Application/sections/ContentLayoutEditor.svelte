@@ -46,7 +46,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Gap" span={2} compact hint="Space between text and icon when both are visible.">
+    <PropertyCell label="Gap" span={1} compact hint="Space between text and icon when both are visible.">
       <NumberCell label="Gap" value={layout.gap ?? 8} step={1} min={0} defaultValue={8} onchange={(value) => set('gap', value)} />
     </PropertyCell>
     <PropertyCell label="H Align" span={2} hint="Horizontal alignment for the composed content block.">
@@ -96,30 +96,19 @@
   </PropertySection>
 
   <PropertySection title="Overlay" icon={Layers}>
-    <PropertyCell label="Text Z" span={2} compact hint="Text should usually stay above the icon in overlay mode.">
+    <PropertyCell label="Text Z" span={1} compact hint="Text should usually stay above the icon in overlay mode.">
       <NumberCell label="Text Z" value={layout.textZIndex ?? 2} step={1} defaultValue={2} onchange={(value) => set('textZIndex', value)} />
     </PropertyCell>
-    <PropertyCell label="Icon Z" span={2} compact hint="Icon draw order inside overlay mode.">
+    <PropertyCell label="Icon Z" span={1} compact hint="Icon draw order inside overlay mode.">
       <NumberCell label="Icon Z" value={layout.iconZIndex ?? 1} step={1} defaultValue={1} onchange={(value) => set('iconZIndex', value)} />
     </PropertyCell>
   </PropertySection>
 {/if}
 
 <style>
-  .val {
-    width: 100%;
-    min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
-    padding: 4px 6px;
-    font-family: inherit;
-    outline: none;
-  }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
 
   .val:focus {
-    border-color: #5B9BD5;
+    border-color: var(--pp-field-focus, #5B9BD5);
   }
 </style>

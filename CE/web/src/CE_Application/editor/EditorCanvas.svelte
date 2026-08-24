@@ -7,7 +7,11 @@
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../utils/backgroundCSS.js';
   import { computeGridOrigin, buildGridStyle } from '../utils/gridCSS.js';
   import { handleEditorShortcut } from '../utils/editorShortcuts.js';
-  import { findControlsInRect, findControlAtPoint } from '../utils/canvasSelection.js';
+  import { findControlsInRect, findControlAtPoint, marqueeScopeId } from '../utils/canvasSelection.js';
+  import { controlPanelOffset, controlPanelRect, findParentOfControl, getChildControls } from '../utils/containment.js';
+  import { gestureHudParts, gestureTargetFor, readGestureGeometry, rewindGesture } from '../utils/canvasGesture.js';
+  import { measureBetweenRects } from '../utils/canvasMeasure.js';
+  import { detectEqualSpacing } from '../utils/equalSpacing.js';
   import { normalizePanelLayers } from '../utils/panelLayers.js';
   import { createPanController, createMarqueeController } from '../utils/canvasInteractions.js';
   import { DragScrub, presets } from '../scrub/dragScrub';
@@ -36,7 +40,10 @@
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
   import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
-  import { undo, redo, undoAvailable, redoAvailable } from '../stores/history.js';
+  import { undo, redo, undoAvailable, redoAvailable, flushHistory } from '../stores/history.js';
+
+  // The four keys whose autorepeat is one undo step (see handleEditorKeyUp).
+  const ARROW_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
   import Undo2 from 'lucide-svelte/icons/undo-2';
   import Redo2 from 'lucide-svelte/icons/redo-2';
   import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
@@ -111,6 +118,15 @@
       destroy() {
         if (viewportEl === node) viewportEl = null;
       },
+    };
+  }
+
+  // Capture-phase mousedown on the viewport — see captureCanvasPress for why
+  // it cannot be an ordinary onmousedown.
+  function bindCanvasCapture(node) {
+    node.addEventListener('mousedown', captureCanvasPress, true);
+    return {
+      destroy() { node.removeEventListener('mousedown', captureCanvasPress, true); },
     };
   }
 
@@ -277,12 +293,13 @@
     });
   });
 
-  // --- Pan (space+drag, middle mouse, right mouse) ---
-  // `pan` state is mutated by the controller; reactivity lives here.
+  // --- Pan (space+drag, middle mouse) ---
+  // `pan` state is mutated by the controller; reactivity lives here. The right
+  // button no longer pans — it opens the context menu, from the browser's own
+  // contextmenu event; see createPanController for the whole story.
   let pan = $state({ isPanning: false, spaceHeld: false });
   const panCtrl = createPanController(pan, {
     getViewport: () => viewportEl,
-    onRightClick: (x, y) => showContextMenuAt(x, y),
   });
 
   // --- Marquee selection ---
@@ -291,26 +308,199 @@
     getSurface: () => panelSurfaceEl,
     getScale: () => scale,
     isBlocked: () => pan.spaceHeld,
-    onSelect: (rect, e) => {
+    alsoStartsOn: (target) => isDrilledScopeBody(target),
+    onSelect: (rect, e, info) => {
       // Only select if the marquee has a meaningful size (not just a click).
       // rect is in panel units — compare against SCREEN pixels so a click
       // doesn't count as a marquee at 25% zoom, nor a real 10px drag at 400%.
       const clickSize = 3 / (scale || 1);
       if (rect.w < clickSize && rect.h < clickSize) {
-        if (!e?.shiftKey) clearSelection();
+        // A click that landed on a locked control has already selected
+        // something (the control's own mousedown ran too), and clearing it
+        // here would make locked controls unselectable on the canvas.
+        if (!e?.shiftKey && !info?.onLocked) clearSelection();
         return;
       }
-      const ids = canvasPanel ? findControlsInRect(canvasPanel.controls, rect, getSection) : new Set();
+      // The marquee reaches inside the container the user has drilled into,
+      // and only the top level when they have not — marqueeScopeId derives
+      // which from the selection. Read BEFORE the selection is replaced.
+      const scopeId = canvasPanel ? marqueeScopeId(canvasPanel.controls, $selectedComponentIds) : null;
+      const ids = canvasPanel ? findControlsInRect(canvasPanel.controls, rect, getSection, scopeId) : new Set();
       // Shift extends: a selection can be built out of several passes.
       if (e?.shiftKey) {
         selectedComponentIds.update((current) => new Set([...current, ...ids]));
-      } else {
-        selectedComponentIds.set(ids);
+        return;
       }
+      // An empty sweep INSIDE a container is left alone: clearing would step
+      // back out of the drill-down the next marquee depends on, silently.
+      // Missing everything is not a request to leave; Escape is.
+      if (ids.size === 0 && scopeId) return;
+      selectedComponentIds.set(ids);
     },
   });
 
   let marqueeRect = $derived(marqueeCtrl.getRect());
+
+  /**
+   * Is this press on the BODY of the container the user has drilled into?
+   *
+   * A container fills the space its children sit in, so without this the only
+   * place a scoped marquee could begin was the bare panel around it — and a
+   * container that fills the panel left nowhere at all. Inside a group, a drag
+   * over its empty space is a rubber band over its children, exactly as it is
+   * on the panel one level up; a press on a CHILD is still that child's drag,
+   * because `closest` returns the innermost control.
+   */
+  function isDrilledScopeBody(target) {
+    if (!canvasPanel) return false;
+    const scopeId = marqueeScopeId(canvasPanel.controls, $selectedComponentIds);
+    if (!scopeId) return false;
+    return target?.closest?.('.canvas-control')?.dataset?.controlId === scopeId;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Geometry feedback: the live readout, Alt-hover measuring, Escape-to-cancel
+  // ---------------------------------------------------------------------------
+  // Three of the review's A13 complaints are one subject — what the canvas
+  // tells you about geometry while your hand is on the mouse — so they share
+  // the pointer bookkeeping here rather than each growing their own.
+  //
+  // The press is watched in the CAPTURE phase, on the viewport, because a
+  // control's own mousedown calls stopPropagation and would otherwise be the
+  // end of it. That same capture is what lets a marquee START on top of a
+  // locked control (A10): locked means "not a target", so the press belongs to
+  // the rubber band, and the marquee controller decides — see startsMarquee.
+  const GESTURE_ENGAGE_PX = 4;   // matches CanvasControl's DRAG_ENGAGE_SCREEN_PX
+
+  let gesture = $state(null);    // { kind, id, geometry } while a drag/resize is live
+  let gestureStart = null;       // the press that began it, for the Escape rewind
+  let gestureFrame = null;
+
+  function captureCanvasPress(e) {
+    if ($previewModeEnabled || e.button !== 0 || pan.spaceHeld) return;
+
+    const onScopeBody = isDrilledScopeBody(e.target);
+    const wasActive = marquee.isActive;
+    marqueeCtrl.handleMouseDown(e);
+    if (marquee.isActive && !wasActive) {
+      // The container's own mousedown would otherwise select it and start
+      // dragging it under the rubber band. Stopping here is the whole point:
+      // inside a group the press belongs to the marquee.
+      if (onScopeBody) e.stopPropagation();
+      gestureStart = null;
+      return;
+    }
+
+    // Nothing on a locked panel moves, so there is no geometry to report and
+    // nothing for Escape to cancel — the press is only ever a selection.
+    if (panelLocked) { gestureStart = null; return; }
+
+    // A rotate has its own angle HUD already; the readout is about the box.
+    const found = gestureTargetFor(e.target);
+    if (!found || found.kind === 'rotate') { gestureStart = null; return; }
+
+    gestureStart = { ...found, id: found.element.dataset?.controlId ?? null, x: e.clientX, y: e.clientY };
+    window.addEventListener('mousemove', trackGesture);
+    window.addEventListener('mouseup', endGesture);
+    window.addEventListener('keydown', gestureKey, true);
+  }
+
+  function trackGesture(e) {
+    if (!gestureStart) return;
+    if (!gesture && Math.hypot(e.clientX - gestureStart.x, e.clientY - gestureStart.y) < GESTURE_ENGAGE_PX) return;
+    if (gestureFrame !== null) return;
+    // One read per frame: the control re-renders on every mousemove and
+    // getBoundingClientRect forces layout, so reading on each one would make
+    // the drag pay for the readout.
+    gestureFrame = requestAnimationFrame(() => {
+      gestureFrame = null;
+      if (!gestureStart) return;
+      const geometry = readGestureGeometry(gestureStart.element, panelSurfaceEl, scale);
+      if (geometry) gesture = { kind: gestureStart.kind, id: gestureStart.id, geometry };
+    });
+  }
+
+  function endGesture() {
+    window.removeEventListener('mousemove', trackGesture);
+    window.removeEventListener('mouseup', endGesture);
+    window.removeEventListener('keydown', gestureKey, true);
+    if (gestureFrame !== null) { cancelAnimationFrame(gestureFrame); gestureFrame = null; }
+    gestureStart = null;
+    gesture = null;
+  }
+
+  /**
+   * Escape abandons the drag or resize in flight — see rewindGesture for how
+   * a cancel is expressed to a control that has no cancel entry point.
+   *
+   * The listener is on window, in capture, and only for the length of the
+   * gesture: the editor wrapper's keydown needs focus it may not have while
+   * dragging, and Escape must not ALSO run the deselect branch in
+   * editorShortcuts.js — cancelling a move and losing your selection are two
+   * different requests, and the one you asked for is the move.
+   */
+  function gestureKey(e) {
+    if (e.key !== 'Escape' || !gestureStart || !gesture) return;
+    e.preventDefault();
+    e.stopPropagation();
+    rewindGesture(window, gestureStart);
+    endGesture();
+  }
+
+  // The sibling rects of a control, in the frame its own x/y is measured in —
+  // panel space at the top level, the container's content space inside one.
+  // Equal spacing is only meaningful between things in one frame.
+  function frameSiblingRects(id) {
+    if (!canvasPanel || id == null) return [];
+    const parent = findParentOfControl(canvasPanel.controls, id);
+    const list = parent ? getChildControls(parent) : canvasPanel.controls;
+    return list
+      .map((c) => ({ control: c, t: c?._children?.Transform }))
+      .filter((entry) => entry.t)
+      .map(({ control, t }) => ({
+        id: control._children.Core.id,
+        x: t.x ?? 0, y: t.y ?? 0, w: t.width ?? 0, h: t.height ?? 0,
+      }));
+  }
+
+  // Equal-gap indicators for the control being moved. Figma shows these while
+  // you drag, which is when they can still change the outcome.
+  let gestureSpacing = $derived.by(() => {
+    if (!gesture?.id || !canvasPanel || $previewModeEnabled) return null;
+    const g = gesture.geometry;
+    const target = { id: gesture.id, x: g.x, y: g.y, w: g.w, h: g.h };
+    const groups = detectEqualSpacing(target, frameSiblingRects(gesture.id).filter((r) => r.id !== gesture.id));
+    if (!groups.length) return null;
+    return { groups, offset: controlPanelOffset(canvasPanel.controls, gesture.id) };
+  });
+
+  // --- Alt-hover measuring ---
+  // Hold Alt with one control selected and point at another: the distances
+  // between them are drawn without moving anything. The only altKey the canvas
+  // read before this was drag-duplicate, so the measuring modifier every other
+  // tool has was simply missing.
+  let measure = $state(null);   // { segments } in panel units
+
+  function handleCanvasMouseMove(e) {
+    if ($previewModeEnabled || gesture || !e.altKey || !canvasPanel || !panelSurfaceEl || $selectedComponentIds.size !== 1) {
+      if (measure) measure = null;
+      return;
+    }
+    const surface = panelSurfaceEl.getBoundingClientRect();
+    const px = (e.clientX - surface.left) / scale;
+    const py = (e.clientY - surface.top) / scale;
+    const hovered = findControlAtPoint(canvasPanel.controls, px, py,
+      normalizePanelLayers(canvasPanel.layers, canvasPanel.controls));
+    const hoveredId = hovered?._children?.Core?.id;
+    const selectedId = [...$selectedComponentIds][0];
+    if (!hoveredId || hoveredId === selectedId) { measure = null; return; }
+    const from = controlPanelRect(canvasPanel.controls, selectedId);
+    const to = controlPanelRect(canvasPanel.controls, hoveredId);
+    if (!from || !to) { measure = null; return; }
+    measure = { segments: measureBetweenRects(from, to) };
+  }
+
+  function clearMeasure() { if (measure) measure = null; }
 
   // --- Zoom controller (wheel, fit-to-window, zoom-to-selection) ---
   const zoomCtrl = createZoomController({
@@ -414,6 +604,15 @@
   function handleEditorKeyUp(e) {
     if (componentSurfaceWorkspaceActive) return;
     if ($previewModeEnabled) return;
+    // Letting go of Alt puts the measuring away, even if the pointer never
+    // moves again.
+    if (!e.altKey) clearMeasure();
+    // A held arrow key is one undo step, and the debounce is what makes it one — but the debounce
+    // only commits 400 ms after the LAST repeat, so the tail of the run sat uncommitted until
+    // something unrelated happened to push it. Releasing the key is the real end of the gesture,
+    // so close the step here. Cheap and safe on every keyup: flushHistory is a no-op when the
+    // debounce holds nothing.
+    if (ARROW_KEYS.has(e.key)) flushHistory();
     panCtrl.handleKeyUp(e);
   }
 
@@ -432,8 +631,17 @@
   // CanvasContextMenu mutates this back to null via bind:target.
   let ctxMenu = $state(null);
 
-  // Always suppress the native context menu — our custom one is shown from handlePanEnd
-  function handleContextMenu(e) { e.preventDefault(); }
+  // The native menu is replaced by ours, opened HERE rather than from the end
+  // of a right-button pan. The old route had to guess whether a right press
+  // was a click or a drag, and more than two pixels of tremor meant "drag" and
+  // no menu at all — from either source, since the native one was already
+  // suppressed. `contextmenu` fires whether or not the pointer moved, which is
+  // the whole point of using it.
+  function handleContextMenu(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    showContextMenuAt(e.clientX, e.clientY);
+  }
 
   function showContextMenuAt(screenX, screenY) {
     if ($previewModeEnabled) { ctxMenu = null; return; }
@@ -570,6 +778,79 @@
 
 </script>
 
+<!-- The canvas annotation layer: everything the editor DRAWS OVER the panel
+     without being part of it. Lives in the zoom container rather than inside
+     PanelSurface, so nothing here can reach a preview render or an export —
+     both build their own surface, and neither renders this component's
+     chrome. Inert by construction (`pointer-events: none`), because an
+     overlay that eats a click on the thing it is annotating is worse than no
+     overlay. Sizes are multiplied by `scale` here instead of riding the
+     surface's CSS transform, which is what keeps the hairlines one screen
+     pixel at every zoom. -->
+{#snippet canvasAnnotations()}
+  {#if !$previewModeEnabled}
+    <div class="canvas-annotations">
+      {#if (canvasPanel?.controls?.length ?? 0) === 0}
+        <!-- A NEW PANEL IS NOT A BROKEN ONE, but it looked identical to one:
+             a bare grey rectangle with nothing anywhere saying where controls
+             come from. The no-document state next door has always pointed at
+             what to do next; this is the same courtesy one step later. It
+             disappears the moment the panel has a single control, so it can
+             never print over real content. -->
+        <div class="empty-panel-hint">
+          <strong>This panel is empty</strong>
+          <span>Open <b>Insert</b> with the <b>+</b> at the top of the left rail, then click a component to place it at the centre — or drag one onto the canvas.</span>
+        </div>
+      {/if}
+
+      {#if gestureSpacing}
+        {#each gestureSpacing.groups as group}
+          {#each group.segments as segment}
+            <div
+              class="eq-bar"
+              class:eq-y={group.axis === 'y'}
+              style={group.axis === 'x'
+                ? `left:${(gestureSpacing.offset.x + segment.x) * scale}px; top:${(gestureSpacing.offset.y + segment.y) * scale}px; width:${segment.length * scale}px;`
+                : `left:${(gestureSpacing.offset.x + segment.x) * scale}px; top:${(gestureSpacing.offset.y + segment.y) * scale}px; height:${segment.length * scale}px;`}
+            ></div>
+          {/each}
+          <div
+            class="eq-label"
+            style="left:{(gestureSpacing.offset.x + group.segments[0].x + (group.axis === 'x' ? group.segments[0].length / 2 : 0)) * scale}px; top:{(gestureSpacing.offset.y + group.segments[0].y + (group.axis === 'y' ? group.segments[0].length / 2 : 0)) * scale}px;"
+          >{group.gap}</div>
+        {/each}
+      {/if}
+
+      {#if measure}
+        {#each measure.segments as segment}
+          <div
+            class="measure-line"
+            class:measure-y={segment.axis === 'y'}
+            style={segment.axis === 'x'
+              ? `left:${Math.min(segment.x1, segment.x2) * scale}px; top:${segment.y1 * scale}px; width:${Math.abs(segment.x2 - segment.x1) * scale}px;`
+              : `left:${segment.x1 * scale}px; top:${Math.min(segment.y1, segment.y2) * scale}px; height:${Math.abs(segment.y2 - segment.y1) * scale}px;`}
+          ></div>
+          <div
+            class="measure-label"
+            style="left:{((segment.x1 + segment.x2) / 2) * scale}px; top:{((segment.y1 + segment.y2) / 2) * scale}px;"
+          >{segment.dist}</div>
+        {/each}
+      {/if}
+
+      {#if gesture}
+        <div
+          class="gesture-hud"
+          style="left:{gesture.geometry.panelX * scale}px; top:{(gesture.geometry.panelY + gesture.geometry.panelH) * scale + 8}px;"
+        >
+          {#each gestureHudParts(gesture.geometry) as part}
+            <span><b>{part.label}</b>{part.value}</span>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
+{/snippet}
+
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="editor-wrapper" onkeydown={handleEditorKeyDown} onkeyup={handleEditorKeyUp} tabindex="-1" class:panning={pan.isPanning || pan.spaceHeld}>
   <div class="tab-bar-area">
@@ -668,7 +949,8 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div class="canvas-viewport designer-split-viewport" class:with-rulers={$showRulers} use:bindViewport class:panel-active={canvasPanel}
                  onclick={handleCanvasClick} oncontextmenu={handleContextMenu}
-                 onmousedown={panCtrl.handleMouseDown} use:nonPassiveWheel={zoomCtrl.handleWheel}>
+                 onmousemove={handleCanvasMouseMove} onmouseleave={clearMeasure}
+                 onmousedown={panCtrl.handleMouseDown} use:bindCanvasCapture use:nonPassiveWheel={zoomCtrl.handleWheel}>
               <div class="canvas-stage">
                 <div
                   class="zoom-container"
@@ -709,6 +991,7 @@
                   {:else if editorStateBadge}
                     <div class="editor-state-badge">{editorStateBadge}</div>
                   {/if}
+                  {@render canvasAnnotations()}
                 </div>
               </div>
             </div>
@@ -766,7 +1049,8 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="canvas-viewport" class:with-rulers={$showRulers} use:bindViewport class:panel-active={canvasPanel}
              onclick={handleCanvasClick} oncontextmenu={handleContextMenu}
-             onmousedown={panCtrl.handleMouseDown} use:nonPassiveWheel={zoomCtrl.handleWheel}>
+             onmousemove={handleCanvasMouseMove} onmouseleave={clearMeasure}
+             onmousedown={panCtrl.handleMouseDown} use:bindCanvasCapture use:nonPassiveWheel={zoomCtrl.handleWheel}>
           <div class="canvas-stage">
             <div
               class="zoom-container"
@@ -807,6 +1091,7 @@
               {:else if editorStateBadge}
                 <div class="editor-state-badge">{editorStateBadge}</div>
               {/if}
+              {@render canvasAnnotations()}
             </div>
           </div>
         </div>
@@ -1167,6 +1452,119 @@
     position: relative;
     outline: 1px solid rgba(91, 155, 213, 0.35);
     outline-offset: 2px;
+  }
+
+  /* --- Canvas annotation layer (live readout, measuring, equal spacing, the
+         empty-panel hint). Editor-only; see the snippet's comment. --- */
+  .canvas-annotations {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 15;
+  }
+
+  .empty-panel-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 32px;
+    text-align: center;
+    color: #7C8B99;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .empty-panel-hint strong {
+    color: #9FB4C6;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .empty-panel-hint span {
+    max-width: 320px;
+  }
+
+  .empty-panel-hint b {
+    color: #BBD3E6;
+    font-weight: 600;
+  }
+
+  /* Equal-gap indicators. Pink because that is what every user of a modern
+     design tool already reads as "these spaces match" — the alignment guides
+     are blue and the distance labels amber, so a third meaning needed a third
+     colour rather than another shade of the first two. */
+  .eq-bar {
+    position: absolute;
+    height: 1px;
+    background: #F2589B;
+    box-shadow: 0 0 0 0.5px rgba(242, 88, 155, 0.35);
+  }
+
+  .eq-bar.eq-y {
+    width: 1px;
+    height: auto;
+  }
+
+  .eq-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: #F2589B;
+    color: #FFF;
+    font-size: 10px;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  .measure-line {
+    position: absolute;
+    height: 1px;
+    background: #E8B04B;
+  }
+
+  .measure-line.measure-y {
+    width: 1px;
+    height: auto;
+  }
+
+  .measure-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: #E8B04B;
+    color: #1A1A1A;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  /* The live X/Y/W/H. Sits just below the box being moved so it never covers
+     the thing whose numbers it is reporting. */
+  .gesture-hud {
+    position: absolute;
+    display: flex;
+    gap: 10px;
+    padding: 3px 7px;
+    border-radius: 3px;
+    background: rgba(18, 18, 18, 0.92);
+    border: 1px solid rgba(91, 155, 213, 0.45);
+    color: #D7ECFF;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .gesture-hud b {
+    color: #7FA8CC;
+    font-weight: 600;
+    margin-right: 3px;
   }
 
   .editor-state-badge {

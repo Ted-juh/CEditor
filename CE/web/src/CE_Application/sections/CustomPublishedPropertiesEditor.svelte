@@ -566,10 +566,10 @@
     <PropertyCell label="Add" span={2} hint="Add a public input by name.">
       <input class="val" type="text" bind:value={newInputName} placeholder="inputName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create a new published input.">
+    <PropertyCell label="" span={1} hint="Create a new published input." compact>
       <button class="action-btn" type="button" onclick={addInput}>Add</button>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Publish all value channels marked as public inputs/outputs.">
+    <PropertyCell label="" span={1} hint="Publish all value channels marked as public inputs/outputs." compact>
       <button class="action-btn" type="button" onclick={syncChannels}>Sync</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose a published input to edit.">
@@ -579,7 +579,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected published input.">
+    <PropertyCell label="" span={1} hint="Remove the selected published input." compact>
       <button class="action-btn danger" type="button" onclick={removeInput} disabled={!selectedInput}>Remove</button>
     </PropertyCell>
     {#if selectedInputEntry}
@@ -645,7 +645,7 @@
     <PropertyCell label="Add" span={3} hint="Add a public output by name.">
       <input class="val" type="text" bind:value={newOutputName} placeholder="outputName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create a new published output.">
+    <PropertyCell label="" span={1} hint="Create a new published output." compact>
       <button class="action-btn" type="button" onclick={addOutput}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose a published output to edit.">
@@ -655,7 +655,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected published output.">
+    <PropertyCell label="" span={1} hint="Remove the selected published output." compact>
       <button class="action-btn danger" type="button" onclick={removeOutput} disabled={!selectedOutput}>Remove</button>
     </PropertyCell>
     {#if selectedOutputEntry}
@@ -721,7 +721,7 @@
     <PropertyCell label="Add" span={3} hint="Add a friendly editable property by name.">
       <input class="val" type="text" bind:value={newPropertyName} placeholder="propertyName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create a new editable property.">
+    <PropertyCell label="" span={1} hint="Create a new editable property." compact>
       <button class="action-btn" type="button" onclick={addProperty}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose an editable property to edit.">
@@ -731,7 +731,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected editable property.">
+    <PropertyCell label="" span={1} hint="Remove the selected editable property." compact>
       <button class="action-btn danger" type="button" onclick={removeProperty} disabled={!selectedProperty}>Remove</button>
     </PropertyCell>
     {#if selectedPropertyEntry}
@@ -803,8 +803,8 @@
 {/if}
 
 <style>
-  .val { width: 100%; min-width: 0; background: #1A1A1A; border: 1px solid #333; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 6px; font-family: inherit; outline: none; box-sizing: border-box; }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .action-btn { width: 100%; background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 8px; cursor: pointer; font-family: inherit; }
   .action-btn:hover:not(:disabled) { border-color: #5B9BD5; color: #FFF; }
   .action-btn.danger:hover:not(:disabled) { border-color: #D56B6B; }

@@ -77,7 +77,7 @@
   </PropertySection>
 
   <PropertySection title="Outputs" icon={LogOut}>
-    <PropertyCell label="" span={4} hint="Ports: X, Y, Speed, and a Bounce gate that pulses on each wall hit. Bind them in Device Bindings.">
+    <PropertyCell label="" span={4} hint="Ports: X, Y, Speed, and a Bounce gate that pulses on each wall hit. Bind them in Device Bindings." compact>
       <div class="ports">
         <span class="chip"><i style="background:#39D98A"></i>X</span>
         <span class="chip"><i style="background:#5B9BD5"></i>Y</span>

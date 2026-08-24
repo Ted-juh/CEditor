@@ -1,4 +1,4 @@
-import { DEFAULT_GENERAL_SETTINGS } from './runtimePreferences.js';
+import { DEFAULT_GENERAL_SETTINGS, normalizeManufacturerCode } from './runtimePreferences.js';
 import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
 
 const BUILTIN_FONTS = [
@@ -314,6 +314,10 @@ export function normalizeGeneralSettings(general) {
       600
     ),
     restoreUnsavedWork: general?.restoreUnsavedWork !== false,
+    // `=== true`, not `!== false`: an absent setting must read as OFF. Every other flag here
+    // defaults on and uses the opposite test, which is exactly why this one is spelled out — the
+    // idiom next to it would silently opt every existing installation into a network call.
+    checkForUpdatesOnStartup: general?.checkForUpdatesOnStartup === true,
     defaultSnapToGrid: general?.defaultSnapToGrid !== false,
     defaultGridSize: clampInteger(
       general?.defaultGridSize,
@@ -340,6 +344,15 @@ export function normalizeGeneralSettings(general) {
       1,
       400
     ),
+    // Export defaults (plan E5). Empty strings survive as empty: an invented vendor name baked
+    // into somebody's plugin is worse than a blank field, because nobody notices the first one.
+    exportVendor: String(general?.exportVendor ?? '').slice(0, 120),
+    exportManufacturerCode: normalizeManufacturerCode(general?.exportManufacturerCode),
+    exportOutputDir: String(general?.exportOutputDir ?? ''),
+    exportDefaultFormat: ['vst3', 'standalone', 'both'].includes(String(general?.exportDefaultFormat))
+      ? String(general.exportDefaultFormat) : 'vst3',
+    exportBackend: ['auto', 'fast', 'recompile'].includes(String(general?.exportBackend))
+      ? String(general.exportBackend) : 'auto',
   };
 }
 

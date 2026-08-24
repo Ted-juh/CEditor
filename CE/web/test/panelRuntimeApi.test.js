@@ -184,9 +184,26 @@ test('midiValue reports that it needs the device host instead of returning undef
 });
 
 test('buildDump says why it produced nothing rather than returning a quiet null', () => {
-  const build = runtimeSource.slice(runtimeSource.indexOf('buildDump: (kind)'));
-  assert.match(build.slice(0, 600), /addScriptTrace\(\s*'error'/,
-    'buildDump should report at error level when the device host is absent');
+  // Anchored on `buildDump: (` rather than the full parameter list: the signature gained a `values`
+  // argument when the declared-layout path landed, and the old anchor `buildDump: (kind)` silently
+  // stopped matching — indexOf returned -1, slice(-1) took one character, and the assertion passed
+  // over nothing until it happened to fail. An anchor that can miss is worse than a looser one.
+  const at = runtimeSource.indexOf('buildDump: (');
+  assert.ok(at > 0, 'the runtime no longer defines buildDump');
+  const build = runtimeSource.slice(at, at + 1600);
+  assert.match(build, /addScriptTrace\(\s*'error'/,
+    'buildDump should report at error level when it cannot produce bytes');
+});
+
+test('buildDump builds a script-declared layout locally, and only defers profile dumps', () => {
+  // The two cases, which are the whole shape of this API in the preview: a layout the script
+  // declared with defineDump is one the runtime owns, so it builds here; a PROFILE dump's codec is
+  // in the C++ engine and the preview cannot reach it synchronously. Collapsing the two back into
+  // one "needs the device host" branch would silently un-fix the declared case.
+  const at = runtimeSource.indexOf('buildDump: (');
+  const build = runtimeSource.slice(at, at + 1600);
+  assert.match(build, /buildRuntimeDump\(/, 'the declared-layout path must go through the local builder');
+  assert.match(build, /=== null/, 'a null from the builder means "no declared dumps", not "failed"');
 });
 
 /* --------------------------------------------------------------------- set()\'s opts.transmit */

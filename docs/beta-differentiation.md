@@ -19,11 +19,12 @@ not a component at all — it is everything that happens *before* a panel exists
 
 Three findings, in order of how much money is on the table:
 
-1. **You are shipping a live instrument and describing it as a UI builder.** The README's first
-   line sells "a visual editor for designing and building audio plugin UIs" — the one thing in this
-   space with real competition. Meanwhile `groundbreaking-components.md` lists nineteen components
-   marked 🟢 shipped that no competing editor has in any form. That gap is a positioning problem,
-   and positioning is free.
+1. ~~**You are shipping a live instrument and describing it as a UI builder.**~~ ***(done)*** The
+   README's first line used to sell "a visual editor for designing and building audio plugin UIs" —
+   the one thing in this space with real competition — while `groundbreaking-components.md` listed
+   nineteen 🟢 shipped components no competing editor has in any form. It now leads on the
+   instrument layer: the note players, the four modulation sources, the live rig, the patch-space
+   navigation. This finding is the one that cost nothing and it was taken.
 2. **The category's true bottleneck is profile acquisition, and nobody has automated it.** Every
    editor ever written — including Ctrlr — begins with a human transcribing a MIDI implementation
    chart out of a manual. Automating that is the one advantage a competitor cannot copy by adding
@@ -148,26 +149,30 @@ precisely what an exported CEditor panel is positioned to fix and currently does
 **One finding first, because it changes the shape of the work.** The session already remembers more
 than the completeness review implied: `getStateInformation` (`PluginProcessor.h:222`) saves the APVTS
 values, the device role→port mapping, script state and `ce.storage` panel settings, and
-`setStateInformation` restores all four. What it never does is **tell the hardware** — the values are
-restored and the ports reconnected, and nothing is transmitted. The state is known and not sent,
-which from the user's chair is indistinguishable from not being saved at all. That restore push, with
-an Ask / Always / Never policy so the plugin isn't blasting SysEx at whatever is plugged in, is the
+`setStateInformation` restores all four. ~~What it never does is **tell the hardware** — the values
+are restored and the ports reconnected, and nothing is transmitted. The state is known and not sent,
+which from the user's chair is indistinguishable from not being saved at all.~~ *(fixed, S2 —
+`setStateInformation` now arms a pending restore and the message-thread timer pushes it once the
+device reports ready, under an Ask / Always / Never policy authored in the Export tab. The rules are
+a pure function in `CE/src/Player/RestorePolicy.h` with their own test, because they are all
+ordering and timing and `PluginProcessor.h` does not build off Windows.)* That restore push, with
+an Ask / Always / Never policy so the plugin isn't blasting SysEx at whatever is plugged in, was the
 smallest change here and the one that delivers the headline.
 
 **The stubs**, found by the completeness review and all still present at `e007732`:
 
 | Location | Current | Needed |
 |---|---|---|
-| `CE/src/Player/PluginProcessor.h:213` | `getNumPrograms() { return 1; }` | Host-visible programs backed by the preset librarian |
-| `CE/src/Player/PluginProcessor.h:215` | `setCurrentProgram (int) {}` | Recall the bank slot, send it to the device |
-| `CE/src/Player/PluginProcessor.h:809` | `cb.buildDump = [] (const juce::String&) { return juce::var(); }` | Capture live panel state as a dump — window closed |
-| `CE/src/Player/PanelParameters.h:71-84` | every parameter → `AudioParameterFloat` | `AudioParameterChoice` / `AudioParameterBool` where the JS side already carries `choiceMode` / `choiceValues` |
+| ~~`CE/src/Player/PluginProcessor.h:213`~~ | ~~`getNumPrograms() { return 1; }`~~ | *(done, S4 — the bank size, off a librarian bank baked into the panel)* |
+| ~~`CE/src/Player/PluginProcessor.h:215`~~ | ~~`setCurrentProgram (int) {}`~~ | *(done, S4 — queues the recall; the timer sends it, because a host may call this from the audio thread)* |
+| ~~`CE/src/Player/PluginProcessor.h:809`~~ | ~~`cb.buildDump = [] (const juce::String&) { return juce::var(); }`~~ | *(done, S3 — the codec, plus `<DeviceDumps>` in the saved state and a dump-before-values restore)* |
+| ~~`CE/src/Player/PanelParameters.h:71-84`~~ | ~~every parameter → `AudioParameterFloat`~~ | *(done, S1 — `AudioParameterChoice` / `AudioParameterBool` / `AudioParameterFloat` off an explicit `valueKind`)* |
 
 The last one is cosmetic but it is the one a reviewer screenshots: a combobox that reads
 `0.4700` in the automation lane instead of `Saw` makes the whole export look like a debug build.
 
 **The claim it earns:** *save the session, close the lid, come back next year — the synth comes
-back too.* Pair it with Panic and the Setlist and the story is complete: your hardware is a
+back too.* All four stages are done. Nothing here has yet been run against real hardware. Pair it with Panic and the Setlist and the story is complete: your hardware is a
 session-recallable, automatable, stage-ready instrument.
 
 Staged, with the ordering rules and the failure modes to test:
@@ -175,8 +180,9 @@ Staged, with the ordering rules and the failure modes to test:
 
 ### 3. Auto-Panel — profile in, working editor out
 
-Designed in [`auto-panel.md`](../CE/web/src/CE_Application/docs/auto-panel.md), unbuilt, sitting in
-roadmap Phase 5. It is three things at once and each alone would justify it:
+**Built** — File → New Panel from Device Profile; see
+[`auto-panel.md`](../CE/web/src/CE_Application/docs/auto-panel.md). It is three things at once and
+each alone would justify it:
 
 - **The adoption unlock.** Hours of layout become seconds.
 - **The onboarding fix.** New Panel is a blank canvas in a program with four designers behind it,
@@ -243,9 +249,14 @@ So the rigour exists and **the user cannot see any of it**: the DPD Designer's S
 engine. In a category whose folklore is *"that panel works except for the filter section,"* showing
 whether a profile is verified — and how — is worth more than most features.
 
-### 6. MIDI-CI discovery (M1)
+### 6. MIDI-CI discovery (M1) — ***wired since this was written***
 
-`juce_midi_ci` is vendored and compiled in but unwired. `CE/dpd/tools/import-midici.mjs` already
+`CE/src/DeviceProfile/MidiCiSession.cpp` calls `startDiscovery()`, `DeviceProfileServiceMidiCi.cpp`
+emits `midiCiDiscoveryComplete`, and `DeviceRuntimeBridge.cpp:153` exposes
+`startMidiCiDiscovery` to the panel. The paragraph below describes the state before that and is kept
+for the argument it makes about *why* discovery is worth having, which is unchanged.
+
+~~`juce_midi_ci` is vendored and compiled in but unwired.~~ `CE/dpd/tools/import-midici.mjs` already
 converts Property Exchange JSON into a partial profile, offline, today. M1 of
 [`midi2-integration-plan.md`](../tools/docs/midi2-integration-plan.md) connects the two.
 
@@ -305,9 +316,9 @@ whether they compound or merely impress. Summary:
 |---|---|---|---|---|
 | 0 | Reposition around the instrument layer | Already earned | ~zero | **Beta** |
 | 1 | Capture-and-infer profiling | **Highest — structurally uncopyable** | Medium | Beta headline |
-| 2 | Total Recall (3 stubs + parameter types) | High — the #1 user pain | Low–medium | Beta if the schedule allows |
-| 3 | Auto-Panel | High — adoption + onboarding | Medium | Beta+1 |
-| 4 | Ctrlr harvest → profiles | High — network effect, migration | Low (staged) | Beta+1 |
+| 2 | Total Recall (**all four stages done**) | High — the #1 user pain | Low–medium | **Beta** |
+| 3 | ~~Auto-Panel~~ **built** | High — adoption + onboarding | Medium | **Beta** |
+| 4 | ~~Ctrlr harvest → profiles~~ **built** (never run on a real panel) | High — network effect, migration | Low (staged) | **Beta** |
 | 5 | Verified-profile badge | Medium — trust | **Very low** | Beta |
 | 6 | MIDI-CI discovery | Medium — first mover, press | Low (code exists) | Beta+1 |
 | 7 | Patch Diff / Compare | Medium — daily driver | Low | Beta+1 |
@@ -315,19 +326,27 @@ whether they compound or merely impress. Summary:
 
 ## What to do for this beta
 
-[`BETA_SMOKE_TEST_2026-08-06.md`](../BETA_SMOKE_TEST_2026-08-06.md) says do not ship — **but that
-verdict is stale, and this document repeated it for several rounds before anyone checked.** The pass
-ran against a build from 2026-08-04; all three High-severity findings were fixed on 2026-08-06, most
-within hours of the report, and the report was committed afterwards without a status. Verified on
-2026-08-11: the regression test asserts the original crash still reproduces without the fix, and the
-full suite is 2197/2197. See the status block at the top of that file.
+The 2026-08-06 first-beta smoke pass said do not ship — **but that verdict was stale before it was
+written down, and this document repeated it for several rounds before anyone checked.** The pass ran
+against a build from 2026-08-04; all three High-severity findings were fixed on 2026-08-06, most
+within hours of the report, and the report was committed afterwards without a status.
+
+That report has since been retired: all twelve of its findings were verified closed in the code, and
+the ones worth pinning are pinned by tests that name them — `deepCloneProxySafety.test.js` for the
+three High findings (one `structuredClone` root cause behind all of them, plus a sweep that fails on
+a new unguarded call anywhere in `src`), `comboboxDefaults.test.js`, `sliderDefaultCurrent.test.js`,
+`packageReadinessDetail.test.js` and `panelIdentityAndVersion.test.js` for the rest.
 
 The lesson is worth more than the fix: **a QA report is a snapshot, and an undated verdict outlives
 the build it describes.** Every finding table in this repository should carry a status column from
 the day it is written.
 
-What remains is four open Medium/Low workflow defects (004, 008, 009, 010) and half of 007 — no
-crashes among them. Given that, the recommendation is deliberately narrow:
+~~What remains is four open Medium/Low workflow defects (004, 008, 009, 010) and half of 007~~ —
+**all twelve are now closed in code.** 004 and 007b landed after this was written; 009 and 010 never
+needed a patch, sharing the `DataCloneError` root cause fixed in `4f02a12`. What is left of them is a
+**re-test** of 009/010 against a build containing the fix, which is confirmation rather than work,
+and is tracked in `beta-readiness-review-2026-08-10.md` §3. Given that, the recommendation is
+deliberately narrow:
 
 1. **Run a fresh QA pass against a current build.** Not a code change — the open findings are
    workflow bugs that can only be judged in the running application, and the last pass tested a

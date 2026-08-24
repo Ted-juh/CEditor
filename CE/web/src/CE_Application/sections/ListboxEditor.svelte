@@ -43,7 +43,7 @@
 
 {#if lb}
   <PropertySection title="Rows" icon={List}>
-    <PropertyCell label="Row height" span={2} compact hint="Fixed row height in px (0 = auto from font size).">
+    <PropertyCell label="Row height" span={1} compact hint="Fixed row height in px (0 = auto from font size).">
       <NumberCell label="Height" value={lb.rowHeight ?? 0} step={1} min={0} max={80} defaultValue={0} onchange={(v) => set('rowHeight', Math.max(0, Math.round(v)))} />
     </PropertyCell>
     <PropertyCell label="Density" span={2} hint="Comfortable or compact auto row height.">
@@ -104,10 +104,10 @@
         { key: 'accentColour', label: 'Accent', value: lb.accentColour || 'FF89C2FF', target: { type: 'control', controlId: core?.id, path: 'Listbox.accentColour' } },
       ]} />
     </PropertyCell>
-    <PropertyCell label="Animate" span={2} hint="Slide/fade the selection indicator between rows.">
+    <PropertyCell label="Animate" span={1} hint="Slide/fade the selection indicator between rows.">
       <PropertyToggle value={lb.selectionAnim === true} onchange={() => toggle('selectionAnim', false)} />
     </PropertyCell>
-    <PropertyCell label="Multi-select" span={2} hint="Checkbox / ctrl-click multi-selection.">
+    <PropertyCell label="Multi-select" span={1} hint="Checkbox / ctrl-click multi-selection.">
       <PropertyToggle value={lb.multiSelect === true} onchange={() => toggle('multiSelect', false)} />
     </PropertyCell>
   </PropertySection>
@@ -212,16 +212,7 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%;
-    box-sizing: border-box;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    color: #DDD;
-    border-radius: 4px;
-    padding: 3px 6px;
-    font-size: 12px;
-  }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
 
   .hint-note {
     display: block;

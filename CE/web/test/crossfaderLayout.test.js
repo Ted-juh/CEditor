@@ -2,10 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   crossfaderGains, crossfaderDetent, crossfaderGeometry, crossfaderHandlePos,
-  crossfaderMixFromPx, crossfaderPortValues, crossfaderGlide,
+  crossfaderMixFromPx, crossfaderPortValues,
 } from '../src/CE_Application/utils/crossfaderLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
+
+import {
+  normalizeReturnBehavior, restValueFor, returnStep, returnStep2DAxes,
+} from '../src/CE_Application/utils/returnToRest.js';
 
 test('gain laws: linear / equal-power / sharp', () => {
   // Ends are always full A / full B.
@@ -50,9 +54,20 @@ test('portValues expose gains + mix (bipolar option)', () => {
   assert.ok(near(crossfaderPortValues(bip).mix, 0.5)); // 0.75 → +0.5 bipolar
 });
 
-test('return glide moves toward the target, clamps, settles', () => {
-  let s = crossfaderGlide(0, 0.5, 4, 0.1);   // step 0.4
-  assert.ok(near(s.mix, 0.4) && s.settled === false);
-  s = crossfaderGlide(0.45, 0.5, 100, 1);    // lands exactly, settles
-  assert.ok(near(s.mix, 0.5) && s.settled === true);
+// `crossfaderGlide` is gone — the three private springs are now one. Same assertions, shared path.
+test('the fader returns to centre, lands exactly, and settles', () => {
+  const spec = normalizeReturnBehavior({ returnToCenter: true, returnRate: 4 });
+  assert.equal(spec.returnTime, 250, 'rate 4 across 0..1 was 250ms, and still is');
+
+  let s = returnStep(0, 0.5, 100, spec);
+  assert.ok(near(s.value, 0.2) && s.done === false);
+  s = returnStep(0.45, 0.5, 250, spec);
+  assert.ok(near(s.value, 0.5) && s.done === true);
+});
+
+test('a crossfader can now return somewhere other than the middle', () => {
+  // It gained the whole vocabulary by joining the shared spring: `returnToCenter` was a boolean and
+  // `returnMode` is a choice, so springing to an end is expressible where it was not before.
+  assert.equal(restValueFor(normalizeReturnBehavior({ returnMode: 'max' })), 1);
+  assert.equal(restValueFor(normalizeReturnBehavior({ returnMode: 'none' })), null);
 });

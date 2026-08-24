@@ -86,7 +86,7 @@
     <PropertyCell label="Channel" span={1} compact hint="MIDI channel (10 is the GM percussion channel).">
       <NumberCell label="Ch" value={num(d.channel, 10)} step={1} min={1} max={16} defaultValue={10} onchange={(v) => set('channel', clampInt(v, 1, 16, 10))} />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="What the grid covers.">
+    <PropertyCell label="" span={1} hint="What the grid covers." compact>
       <div class="note">{count} pads · {drumNoteLabel(num(d.baseNote, 36), true)}…</div>
     </PropertyCell>
   </PropertySection>
@@ -98,7 +98,7 @@
       </select>
     </PropertyCell>
     {#if isOneShot}
-      <PropertyCell label="Gate" span={2} compact hint="Milliseconds the one-shot note is held before note-off.">
+      <PropertyCell label="Gate" span={1} compact hint="Milliseconds the one-shot note is held before note-off.">
         <NumberCell label="Gate" value={num(d.gateMs, 60)} step={5} min={5} max={2000} defaultValue={60} onchange={(v) => set('gateMs', clampInt(v, 5, 2000, 60))} />
       </PropertyCell>
     {/if}
@@ -127,7 +127,7 @@
         ]} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="" span={4} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth.">
+    <PropertyCell label="" span={4} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth." compact>
       <div class="note">Plays MIDI notes · ch {num(d.channel, 10)}</div>
     </PropertyCell>
   </PropertySection>
@@ -139,7 +139,7 @@
                   onchange={() => set('zones', !(d.zones === true))} />
     {/snippet}
     {#if d.zones === true}
-      <PropertyCell label="Corner size" span={2} compact hint="How much of each pad a corner claims, measured in from both edges. The rest of the pad is the face and always plays a plain hit.">
+      <PropertyCell label="Corner size" span={1} compact hint="How much of each pad a corner claims, measured in from both edges. The rest of the pad is the face and always plays a plain hit.">
         <NumberCell label="Size" value={num(d.cornerSize, 0.28)} step={0.01} min={0.05} max={0.45} defaultValue={0.28}
                     onchange={(v) => set('cornerSize', Math.min(0.45, Math.max(0.05, num(v, 0.28))))} />
       </PropertyCell>
@@ -162,7 +162,7 @@
   </PropertySection>
 
   <PropertySection title="Pads" icon={Table}>
-    <PropertyCell label="" span={4} hint="Each row overrides one pad — blank fields use the generated map. Pads sharing a choke number cut each other.">
+    <PropertyCell label="" span={4} hint="Each row overrides one pad — blank fields use the generated map. Pads sharing a choke number cut each other." compact>
       <div class="table" role="table" aria-label="Pad overrides">
         <div class="thead" role="row">
           <span role="columnheader">#</span>
@@ -186,8 +186,9 @@
               <NumberCell value={p.choke} step={1} min={0} max={8}
                           onchange={(v) => setPad(p.index, 'choke', clampInt(v, 0, 8, 0))} />
             </span>
-            <input class="chk" role="cell" type="checkbox" checked={p.roll} aria-label={`Pad ${p.index + 1} roll`}
-                   onchange={(e) => setPad(p.index, 'roll', e.target.checked)} />
+            <span role="cell"><PropertyToggle compact label="Roll" value={p.roll === true}
+                   ariaLabel={`Pad ${p.index + 1} roll`}
+                   onchange={(next) => setPad(p.index, 'roll', next)} /></span>
             <span role="cell">
               <SwatchCluster swatches={[
                 { key: `pad-${p.id}`, label: `P${p.index + 1}`, value: p.colour ?? d.accentColour ?? 'FF5B9BD5', target: { type: 'callback', apply: (hex) => setPad(p.index, 'colour', hex) } },
@@ -213,7 +214,7 @@
           <NumberCell label="Hz" value={num(d.rollHz, 8)} step={0.5} min={0.5} max={50} defaultValue={8} onchange={(v) => set('rollHz', Math.min(50, Math.max(0.5, num(v, 8))))} />
         </PropertyCell>
       {:else}
-        <PropertyCell label="" span={1} hint="At the panel's current tempo.">
+        <PropertyCell label="" span={1} hint="At the panel's current tempo." compact>
           <div class="note">≈ {rollIntervalMs(d, 120)} ms at 120 bpm</div>
         </PropertyCell>
       {/if}
@@ -224,13 +225,13 @@
         <NumberCell label="Vel" value={num(d.rollVelocity, 0.75)} step={0.05} min={0} max={1} defaultValue={0.75} onchange={(v) => set('rollVelocity', Math.min(1, Math.max(0, num(v, 0.75))))} />
       </PropertyCell>
       {#if !rollUsable}
-        <PropertyCell label="" span={4} hint="A roll runs for as long as the pad is on. A one-shot releases itself after its gate, so there is no 'while held' for it to fill.">
+        <PropertyCell label="" span={4} hint="A roll runs for as long as the pad is on. A one-shot releases itself after its gate, so there is no 'while held' for it to fill." compact>
           <div class="note warn">The grid is a one-shot, so rolls are ignored — a one-shot releases itself and has no 'while held'.</div>
         </PropertyCell>
       {/if}
     {/if}
     {#if overridden}
-      <PropertyCell label="" span={4} hint="Drop every override and go back to the generated map.">
+      <PropertyCell label="" span={4} hint="Drop every override and go back to the generated map." compact>
         <button class="btn" type="button" onclick={() => set('pads', [])}>Reset all {overridden} customised pad{overridden === 1 ? '' : 's'}</button>
       </PropertyCell>
     {/if}
@@ -260,10 +261,9 @@
 {/if}
 
 <style>
-  .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .note.warn { color: #E0A030; }
-  .chk { justify-self: center; width: 14px; height: 14px; accent-color: var(--accent, #5B9BD5); cursor: pointer; }
   .note { font-size: 11px; color: #8a8a94; }
   .table { display: flex; flex-direction: column; gap: 3px; }
   .thead, .trow { display: grid; grid-template-columns: 20px 1fr 52px 44px 30px 34px 24px; gap: 4px; align-items: center; }

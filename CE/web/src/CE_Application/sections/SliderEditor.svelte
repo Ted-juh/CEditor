@@ -236,19 +236,19 @@
           <option value="ccw">ccw</option>
         </select>
       </PropertyCell>
-      <PropertyCell label="Wrap" span={2} hint="Allow circular range/band spans to cross the seam.">
+      <PropertyCell label="Wrap" span={1} hint="Allow circular range/band spans to cross the seam.">
         <PropertyToggle value={behavior.allowWrapAround === true} onchange={() => set('Behavior.allowWrapAround', !(behavior.allowWrapAround === true))} />
       </PropertyCell>
-      <PropertyCell label="Start Angle" span={2} compact hint="Angle where the circular slider begins.">
+      <PropertyCell label="Start Angle" span={1} compact hint="Angle where the circular slider begins.">
         <NumberCell label="Start" value={behavior.startAngle ?? 135} defaultValue={135} step={1} min={-720} max={720} onchange={(value) => set('Behavior.startAngle', value)} />
       </PropertyCell>
-      <PropertyCell label="End Angle" span={2} compact hint="Angle where the circular slider ends; changing it updates the sweep.">
+      <PropertyCell label="End Angle" span={1} compact hint="Angle where the circular slider ends; changing it updates the sweep.">
         <NumberCell label="End" value={circularEndAngle()} step={1} min={-720} max={720} onchange={setCircularEndAngle} />
       </PropertyCell>
       <PropertyCell label="Sweep" span={2} hint="How much of the circle is active.">
         <PropertyScrub value={behavior.sweepAngle ?? 270} step={1} min={1} max={360} defaultValue={270} onchange={(value) => set('Behavior.sweepAngle', clampSweep(value))} />
       </PropertyCell>
-      <PropertyCell label="Diameter" span={2} compact hint="Circular track diameter in pixels. Set to 0 for automatic fitting.">
+      <PropertyCell label="Diameter" span={1} compact hint="Circular track diameter in pixels. Set to 0 for automatic fitting.">
         <NumberCell label="Diam" value={behavior.circularDiameter ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('Behavior.circularDiameter', Math.max(0, value))} />
       </PropertyCell>
       <PropertyCell label="Drag" span={2} hint="absolute jumps to the clicked angle; knob is the plugin-standard vertical drag from the current value; rotary follows actual rotation about the dial.">
@@ -290,7 +290,7 @@
     </PropertyCell>
 
     {#if valueMode !== 'single'}
-      <PropertyCell label="Default Start" span={2} compact hint="Authored default for the start handle.">
+      <PropertyCell label="Default Start" span={1} compact hint="Authored default for the start handle.">
         <NumberCell label="Start" value={behavior.defaultStartValue ?? behavior.min ?? 0} defaultValue={behavior.min ?? 0} step={numberOr(behavior.step, 0.01)} onchange={(value) => set('Behavior.defaultStartValue', value)} />
       </PropertyCell>
     {/if}
@@ -450,12 +450,12 @@
     <!-- The readout's own range, when it differs from the wire's. A synth parameter stored 61..67
          and printed -3..+3 is the case this exists for; typing into the readout maps back, so the
          two directions agree. Both blank means no mapping at all. -->
-    <PropertyCell label="Reads as" span={2} disabled={displayScaleOff}
+    <PropertyCell label="Reads as" span={1} disabled={displayScaleOff}
                   hint="Low end of the range shown to the user, when it differs from the value range.">
       <NumberCell value={behavior.displayMin ?? behavior.min ?? 0} step={1}
                    onchange={(value) => set('Behavior.displayMin', value)} />
     </PropertyCell>
-    <PropertyCell label="…to" span={2} disabled={displayScaleOff}
+    <PropertyCell label="…to" span={1} disabled={displayScaleOff}
                   hint="High end of the range shown to the user.">
       <NumberCell value={behavior.displayMax ?? behavior.max ?? 1} step={1}
                    onchange={(value) => set('Behavior.displayMax', value)} />
@@ -496,7 +496,7 @@
       })} />
     </PropertyCell>
 
-    <PropertyCell label="Pointer Size" span={2} compact hint="Primary current-handle size.">
+    <PropertyCell label="Pointer Size" span={1} compact hint="Primary current-handle size.">
       <NumberCell label="Ptr" value={parts?._children?.pointerCurrent?._children?.Layout?.width ?? 20} defaultValue={20} step={1} min={8} onchange={(value) => setPatch({
         'Parts.pointerStart.Layout.width': value,
         'Parts.pointerStart.Layout.height': value,
@@ -528,22 +528,10 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%;
-    min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
-    padding: 4px 6px;
-    font-family: inherit;
-    outline: none;
-    box-sizing: border-box;
-  }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
 
   .val:focus {
-    border-color: #5B9BD5;
+    border-color: var(--pp-field-focus, #5B9BD5);
   }
 
   .preset-grid {

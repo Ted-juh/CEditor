@@ -159,9 +159,20 @@ export function swingDelay(stepIndex, swing, stepSeconds) {
   const odd = Math.abs(Math.round(num(stepIndex, 0))) % 2 === 1;
   return odd ? s * 0.5 * Math.max(0, num(stepSeconds, 0)) : 0;
 }
-// How long a note sounds: a fraction of the step (gate 1 = legato, tied).
+/**
+ * How long a note sounds: a fraction of the step.
+ *
+ * Gate 1 reads as "legato, tied", and it is — for a step that moves to a DIFFERENT note. For a
+ * repeat it is a race: the note-off for step N and the note-on for step N+1 land on the same
+ * millisecond from two separate timers, and whichever fires second wins. Half the time the arp
+ * drops the repeated note entirely, which looks like a missed step rather than like a gate setting.
+ *
+ * So it stops a hair short, the same way `stepSequencerLayout.gateMs` caps at 99% and for the same
+ * stated reason: a sequencer whose repeated notes merge is one that cannot play a repeated note.
+ * 99% of a step still sounds legato and no longer depends on timer ordering.
+ */
 export function gateSeconds(control, stepSeconds) {
-  const g = clamp01(num(arpConfig(control).gate, 0.6));
+  const g = Math.min(0.99, clamp01(num(arpConfig(control).gate, 0.6)));
   return Math.max(0.01, g * Math.max(0.01, num(stepSeconds, 0.1)));
 }
 // How long one step lasts. Free-running that's just 1/rate; synced it's the

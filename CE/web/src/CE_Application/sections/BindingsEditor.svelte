@@ -121,7 +121,7 @@
     <PropertyCell label="Add" span={3} hint="Create a new named binding.">
       <input class="val" type="text" bind:value={newBindingName} placeholder="Binding name" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create the binding with a neutral default shape.">
+    <PropertyCell label="" span={1} hint="Create the binding with a neutral default shape." compact>
       <button class="action-btn" onclick={addBinding}>Add</button>
     </PropertyCell>
     <PropertyCell label="Bindings" span={3} hint="Select the binding to edit.">
@@ -131,7 +131,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected binding.">
+    <PropertyCell label="" span={1} hint="Remove the selected binding." compact>
       <button class="action-btn danger" onclick={removeBinding} disabled={!selectedBindingName}>Remove</button>
     </PropertyCell>
   </PropertySection>
@@ -194,16 +194,16 @@
         <PropertyCell label="Invert" span={1} hint="Invert the input range before output mapping.">
           <PropertyToggle value={selectedBinding.invert === true} onchange={() => setBindingProp('invert', !(selectedBinding.invert === true))} />
         </PropertyCell>
-        <PropertyCell label="" span={1} hint="Send the selected binding payload to the Debug panel.">
+        <PropertyCell label="" span={1} hint="Send the selected binding payload to the Debug panel." compact>
           <button class="action-btn" onclick={dumpBindingDebug}>Debug</button>
         </PropertyCell>
       </PropertySection>
     {:else if selectedBinding.mapMode === 'boolean'}
       <PropertySection title="Boolean Map" icon={ArrowRightLeft}>
-        <PropertyCell label="False" span={2} compact hint="Output used when the source resolves to false.">
+        <PropertyCell label="False" span={1} compact hint="Output used when the source resolves to false.">
           <NumberCell label="False" value={selectedBinding.falseValue ?? 0} step={0.01} defaultValue={0} onchange={(value) => setBindingProp('falseValue', value)} />
         </PropertyCell>
-        <PropertyCell label="True" span={2} compact hint="Output used when the source resolves to true.">
+        <PropertyCell label="True" span={1} compact hint="Output used when the source resolves to true.">
           <NumberCell label="True" value={selectedBinding.trueValue ?? 100} step={0.01} defaultValue={100} onchange={(value) => setBindingProp('trueValue', value)} />
         </PropertyCell>
       </PropertySection>
@@ -212,7 +212,7 @@
         <PropertyCell label="Map" span={4} hint="JSON object mapping enum names to output values.">
           <textarea class="val code" rows="10" bind:value={enumMapDraft} onblur={commitEnumMap}></textarea>
         </PropertyCell>
-        <PropertyCell label="" span={4} hint="Parse status for the enum map JSON.">
+        <PropertyCell label="" span={4} hint="Parse status for the enum map JSON." compact>
           <div class="patch-footer">
             <span class="error">{parseError}</span>
             <button class="action-btn" onclick={dumpBindingDebug}>Debug</button>
@@ -241,17 +241,16 @@
     font-size: 11px;
   }
 
-  .val {
-    width: 100%;
-    min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+
+  /* A textarea wears `.val` too, and the shared skin is sized for a single-line field. Rows
+     decide its height; the token is only a floor. */
+  textarea.val {
+    height: auto;
+    min-height: var(--pp-field-height, 26px);
     padding: 4px 6px;
-    font-family: inherit;
-    outline: none;
+    line-height: 1.4;
+    resize: vertical;
   }
 
   .val.code {
@@ -260,7 +259,7 @@
   }
 
   .val:focus {
-    border-color: #5B9BD5;
+    border-color: var(--pp-field-focus, #5B9BD5);
   }
 
   .action-btn {

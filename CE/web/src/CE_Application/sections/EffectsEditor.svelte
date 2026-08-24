@@ -4,12 +4,12 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import PropertyButton from '../properties/PropertyButton.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
   import Copy from 'lucide-svelte/icons/copy';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Haze from 'lucide-svelte/icons/haze';
-  import WandSparkles from 'lucide-svelte/icons/wand-sparkles';
   import Box from 'lucide-svelte/icons/box';
   import Type from 'lucide-svelte/icons/type';
   import ImageIcon from 'lucide-svelte/icons/image';
@@ -41,21 +41,32 @@
   }
 </script>
 
-{#if effects}
-  <PropertySection title="Effects Target" icon={WandSparkles}>
-    <PropertyCell label="Target" span={4} hint="Centralized effects editing for component, text, and icon.">
-      <div class="target-row">
-        {#each TARGETS as target}
-          <button class="target-btn" class:active={selectedTarget === target} onclick={() => selectedTarget = target}>
-            {target}
-          </button>
-        {/each}
-      </div>
-    </PropertyCell>
-  </PropertySection>
+<!--
+  The target picker rides in the section header rather than in a section of its own.
 
+  It used to be an entire PropertySection — 38px of header chrome plus a full-width cell — around
+  three buttons, and the 2026-08-14 review named it as the canonical near-empty section: 78px to
+  host a 3-button switch. PropertySection's `tools` slot exists for exactly this, "a section whose
+  only decision lives in its header needs no body rows", and the picker is now beside the title of
+  the effects it switches instead of above it in a box of its own.
+-->
+{#snippet targetPicker()}
+  <div class="target-row">
+    {#each TARGETS as target}
+      <PropertyButton
+        compact
+        label={target}
+        active={selectedTarget === target}
+        title={`Edit ${target} effects`}
+        onclick={() => selectedTarget = target}
+      />
+    {/each}
+  </div>
+{/snippet}
+
+{#if effects}
   {#if selectedTarget === 'component'}
-    <PropertySection title="Component Effects" icon={Box}>
+    <PropertySection title="Component Effects" icon={Box} tools={targetPicker}>
       <PropertyCell label="Shadow" span={1} hint="Enable the first component drop shadow.">
         <PropertyToggle
           value={effects?._children?.Shadows?.items?.[0]?.enabled === true}
@@ -77,7 +88,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if selectedTarget === 'text' && textEffects}
-    <PropertySection title="Text Effects" icon={Type}>
+    <PropertySection title="Text Effects" icon={Type} tools={targetPicker}>
       <PropertyCell label="Enable" span={2} hint="Text shadow, glow, blur. Hover a chip for its name.">
         <FlagStrip
           flags={[
@@ -97,7 +108,7 @@
       <PropertyCell label="Shadow Y" span={1} compact hint="Text shadow vertical offset.">
         <NumberCell label="Y" value={textEffects.shadowOffsetY ?? 1} step={1} defaultValue={1} onchange={(value) => set('Text.Effects.shadowOffsetY', value)} />
       </PropertyCell>
-      <PropertyCell label="Glow Size" span={2} compact hint="Text glow size.">
+      <PropertyCell label="Glow Size" span={1} compact hint="Text glow size.">
         <NumberCell label="Size" value={textEffects.glowSize ?? 4} step={0.5} min={0} defaultValue={4} onchange={(value) => set('Text.Effects.glowSize', value)} />
       </PropertyCell>
       <PropertyCell label="Outline" span={1} hint="Enable text outline.">
@@ -105,7 +116,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if selectedTarget === 'icon' && iconEffects}
-    <PropertySection title="Icon Effects" icon={ImageIcon}>
+    <PropertySection title="Icon Effects" icon={ImageIcon} tools={targetPicker}>
       <PropertyCell label="Enable" span={2} hint="Icon shadow, glow, blur. Hover a chip for its name.">
         <FlagStrip
           flags={[
@@ -125,7 +136,7 @@
       <PropertyCell label="Shadow Y" span={1} compact hint="Icon shadow vertical offset.">
         <NumberCell label="Y" value={iconEffects.shadowOffsetY ?? 2} step={1} defaultValue={2} onchange={(value) => set('Icon.Effects.shadowOffsetY', value)} />
       </PropertyCell>
-      <PropertyCell label="Glow Size" span={2} compact hint="Icon glow size.">
+      <PropertyCell label="Glow Size" span={1} compact hint="Icon glow size.">
         <NumberCell label="Size" value={iconEffects.glowSize ?? 4} step={0.5} min={0} defaultValue={4} onchange={(value) => set('Icon.Effects.glowSize', value)} />
       </PropertyCell>
       <PropertyCell label="Tint" span={1} hint="Primary icon tint still lives in Icon.">
@@ -138,39 +149,10 @@
 <style>
   .target-row {
     display: flex;
-    gap: 6px;
-    width: 100%;
+    gap: 4px;
   }
 
-  .target-btn {
-    flex: 1;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    color: #AAA;
-    border-radius: 3px;
-    height: 28px;
-    cursor: pointer;
-    font-size: 11px;
-    font-family: inherit;
-    text-transform: capitalize;
-  }
 
-  .target-btn.active {
-    background: #094771;
-    border-color: #0B6EB5;
-    color: #FFF;
-  }
 
-  .val {
-    width: 100%;
-    min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
-    padding: 4px 6px;
-    font-family: inherit;
-    outline: none;
-  }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
 </style>

@@ -44,10 +44,12 @@
   import Grid2x2Check from 'lucide-svelte/icons/grid-2x2-check';
   import Disc3 from 'lucide-svelte/icons/disc-3';
   import Layers from 'lucide-svelte/icons/layers';
+  import ScrollText from 'lucide-svelte/icons/scroll-text';
+  import Pentagon from 'lucide-svelte/icons/pentagon';
   import ListOrdered from 'lucide-svelte/icons/list-ordered';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
-  import { propertyFilter, clearPropertyFilter } from '../stores/propertyFilter.js';
+  import { clearPropertyFilter } from '../stores/propertyFilter.js';
   import { creatorMode, CREATOR_SIMPLE_HIDDEN_TABS } from '../stores/creatorMode.js';
   import { selectedControl, hasSection, getSection, updateControlProperty } from '../stores/controls.js';
   import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
@@ -188,6 +190,11 @@
     { id: 'pixel',      icon: Grid3x3,       label: 'Pixels',     section: 'Pixel' },
     { id: 'listbox',    icon: Rows3,         label: 'Listbox',    section: 'Listbox' },
     { id: 'meter',      icon: Gauge,         label: 'Meter',      section: 'Meter' },
+    { id: 'keyboard',   icon: Piano,         label: 'Keyboard',   section: 'Keyboard' },
+    { id: 'shape',      icon: Pentagon,      label: 'Shape',      section: 'Shape' },
+    { id: 'stepsequencer', icon: Grid3x3,    label: 'Sequencer',  section: 'StepSequencer' },
+    { id: 'tabcontainer', icon: Layers,      label: 'Pages',      section: 'TabContainer' },
+    { id: 'scrollarea', icon: ScrollText,    label: 'Scroll',     section: 'ScrollArea' },
     { id: 'envelope',   icon: Spline,        label: 'Envelope',   section: 'Envelope' },
     { id: 'matrix',     icon: Grid2x2,       label: 'Matrix',     section: 'Matrix' },
     { id: 'joystick',   icon: Crosshair,     label: 'Joystick',   section: 'Joystick' },
@@ -302,6 +309,14 @@
       ? componentTabs.filter(t => t.id === activeSingleTab)
       : componentTabs.filter(t => activeMultiTabs.has(t.id))
   );
+
+  // The collapse scopes currently rendered, in SectionRenderer's `contextMode:tabId` form, so the
+  // toolbar's collapse-all acts on exactly the sections that are on screen — including both halves
+  // of the pinned-split view, where a panel tab and a component tab render together.
+  let collapseScopes = $derived([
+    ...visibleTabs.map((tab) => `${contextMode}:${tab.id}`),
+    ...(showPinnedPanel ? visiblePinnedPanelTabs.map((tab) => `panel:${tab.id}`) : []),
+  ]);
 
   let visiblePinnedPanelTabs = $derived(
     viewMode === 'single'
@@ -459,6 +474,7 @@
     <!-- Toolbar area — aligns with editor tab bar (34px) -->
     <PropertiesToolbar
       panel={$activePanel}
+      {collapseScopes}
       {pinPanelProps}
       {viewMode}
       previewMode={$previewModeEnabled}
@@ -581,18 +597,8 @@
            designer launch, docked at the bottom of the panel (was at the top). -->
       <div class="component-footer">
         <div class="component-footer-row">
-          <div class="property-search">
-            <input
-              type="text"
-              placeholder="Search properties…"
-              value={$propertyFilter}
-              oninput={(event) => propertyFilter.set(event.currentTarget.value)}
-              aria-label="Search properties"
-            />
-            {#if $propertyFilter}
-              <button type="button" class="property-search-clear" aria-label="Clear search" onclick={clearPropertyFilter}>&times;</button>
-            {/if}
-          </div>
+          <!-- The search box that used to sit here is in the toolbar now, where every context can
+               reach it. The filter itself was never custom-component-specific; only its input was. -->
           <div class="creator-mode-toggle" role="radiogroup" aria-label="Creator mode">
             <button
               type="button"
@@ -626,6 +632,36 @@
 </div>
 
 <style>
+  /* --------------------------------------------------------------------------------------
+     Field metrics for the whole properties panel, in one place.
+
+     Before this, every editor pasted its own `.val` rule and the copies drifted: 19 distinct
+     bodies across 114 declarations, settling into two skins that disagree on all three metrics
+     that decide how a row looks — 12px/3px 6px/4px in 28 of them, 11px/4px 6px/3px in 26 — plus
+     one set that hardcodes 26px. Two of those sit side by side in the same grid row with
+     misaligned baselines, and it reads as a rendering bug rather than a stylesheet.
+
+     Declared on the panel root, so custom properties cascade into every editor's scoped styles
+     without any of them importing anything. A density setting is now a matter of rewriting these
+     five values on one element, which is what S6 of the 2026-08-14 review asked for and could not
+     have while the numbers were 114 hardcoded literals.
+
+     26px is PropertyToggle's height and it wins because it is the tallest thing already in the
+     grid; matching it is what makes a toggle and a text field on the same row line up.
+     -------------------------------------------------------------------------------------- */
+  .properties-panel {
+    --pp-field-height: 26px;
+    --pp-field-font: 11px;
+    --pp-field-padding: 0 6px;
+    --pp-field-radius: 3px;
+    --pp-field-bg: #1A1A1A;
+    --pp-field-border: #333;
+    --pp-field-fg: #DDD;
+    --pp-field-fg-muted: #888;
+    --pp-field-focus: #5B9BD5;
+    --pp-field-disabled-fg: #555;
+  }
+
   .properties-panel {
     display: flex;
     flex-direction: column;
@@ -652,10 +688,6 @@
     align-items: stretch;
   }
 
-  .component-footer-row .property-search {
-    flex: 1;
-    margin: 0;
-  }
 
   .component-footer-row .creator-mode-toggle {
     margin: 0;
@@ -711,46 +743,10 @@
     color: #C6CDD4;
   }
 
-  .property-search {
-    flex: 0 0 auto;
-    position: relative;
-    margin: 6px 8px 0 8px;
-  }
 
-  .property-search input {
-    width: 100%;
-    box-sizing: border-box;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 4px;
-    color: #DDD;
-    font-size: 11px;
-    font-family: inherit;
-    padding: 5px 22px 5px 8px;
-    outline: none;
-  }
 
-  .property-search input:focus {
-    border-color: #5B9BD5;
-  }
 
-  .property-search-clear {
-    position: absolute;
-    right: 4px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: #999;
-    font-size: 15px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0 4px;
-  }
 
-  .property-search-clear:hover {
-    color: #FFF;
-  }
 
   /* --- Normal view: icon bar + content side by side --- */
 

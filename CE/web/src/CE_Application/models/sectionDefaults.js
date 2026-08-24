@@ -795,6 +795,25 @@ export const SECTION_DEFAULTS = {
     dragEnabled: false,
     wheelEnabled: false,
     reverseMouseDirection: false,
+    // --- Value flow (the feedback/input direction) ---
+    // `twoWay` is what every control has always been: the device's value moves it, and moving it
+    // sends. `display` is the read-only half the output components need — a meter, an LCD bound
+    // field, a pad-grid LED — and `input` is the opposite, a control that sends and is not moved by
+    // feedback. See utils/displayMode.js; `readOnly: true` is accepted as the older spelling.
+    valueFlow: 'twoWay',     // twoWay | display | input
+
+    // --- Return-to-rest (spring-back) ---
+    // One capability, many components: a pitch or mod wheel springing to centre, a ribbon returning
+    // to rest, a joystick recentring, a spring fader. Each was about to reinvent it.
+    //
+    // `none` by default so nothing existing starts springing, and because most controls are
+    // set-and-hold. See utils/returnToRest.js — and note that the glide EMITS: a spring-back that
+    // moves the control and tells the device nothing leaves the synth bent.
+    returnMode: 'none',      // none | center | min | max | rest
+    returnValue: 0,          // the rest value when returnMode is 'rest'
+    returnTime: 120,         // ms; 0 = snap, and exactly 0 emits no intermediate value
+    returnCurve: 'exp',      // linear | exp | ease
+
     snapToStep: true,
     snapToTicks: false,
     emitValueCommit: false,
@@ -1142,6 +1161,12 @@ export const SECTION_DEFAULTS = {
     mode: 'chords',               // chords | notes
     key: 0,                       // tonic pitch class (0 = C)
     scale: 'major',               // see SCALES in chordPadLayout.js
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     chordType: 'triad',           // triad | seventh
     voicing: 'close',             // close | spread | drop2
     inversion: 0,
@@ -1190,6 +1215,12 @@ export const SECTION_DEFAULTS = {
     // Its own chord (source = 'chord').
     key: 0,                       // tonic pitch class (0 = C)
     scale: 'minor',
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     degree: 0,                    // scale degree the chord is built on
     chordType: 'triad',           // triad | seventh
     baseOctave: 3,
@@ -1222,6 +1253,12 @@ export const SECTION_DEFAULTS = {
     orientation: 'horizontal',    // horizontal | vertical
     key: 0,                       // tonic pitch class (0 = C)
     scale: 'major',
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     baseNote: 48,                 // lowest note on the strip (C3)
     octaves: 2,                   // how far the strip reaches
     bendRange: 2,                 // glide: semitones, MUST match the synth's setting
@@ -1320,6 +1357,12 @@ export const SECTION_DEFAULTS = {
     mode: 'degree',
     key: 0,                      // tonic pitch class (0 = C)
     scale: 'minor',
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     baseOctave: 3,               // row 0 = the tonic at this octave
     transpose: 0,                // semitones, applied after the row → pitch map
     steps: 16,
@@ -1401,6 +1444,12 @@ export const SECTION_DEFAULTS = {
     mode: 'diatonic',            // diatonic (in key) | memory (fixed shape)
     key: 0,
     scale: 'major',
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     size: 3,                     // notes in the diatonic stack (3 = triad)
     shape: [0, 4, 7],            // memory mode: semitones from the played note
     voicing: 'close',            // close | open | drop2
@@ -1456,6 +1505,12 @@ export const SECTION_DEFAULTS = {
     quantizeLength: false,
     key: 0,
     scale: 'minor',
+    // Follow the panel's key instead of this one. Off by default so nothing existing starts
+    // re-harmonising; turning it on lets one control change the whole panel's key at once.
+    // A BROADCAST, not an indirection: the panel key is written into `key`/`scale` above,
+    // so every renderer, editor and export keeps reading exactly what it always did.
+    // See utils/panelKey.js.
+    followPanelKey: false,
     snapToScale: false,          // pitch-correct the take into the key
     take: { events: [], pending: {} },
     editable: true,              // click the roll to arm/record in preview
@@ -1644,7 +1699,13 @@ export const SECTION_DEFAULTS = {
     editable: true,
     returnMode: 'none',           // none | center | min | max | rest
     returnValue: 0.5,             // rest value when returnMode = rest
-    returnRate: 8,                // glide speed (units/sec; 0 = instant snap)
+    // The shared spring's vocabulary. `returnRate` (units/sec) and `returnToCenter` (a boolean)
+    // were this component's own words for it before the three private springs were unified;
+    // both are still READ by normalizeReturnBehavior, so an old panel keeps its feel exactly —
+    // rate 4 was 250ms of constant-speed walk, which is what it converts to. New panels get
+    // these. See utils/returnToRest.js.
+    returnTime: 125,         // ms for the whole travel; 0 = instant snap
+    returnCurve: 'linear',   // linear | exp | ease
     snap: 0,                      // value snap step (0 = continuous)
     showGlow: true,               // touch glow while held
     showValue: false,
@@ -1717,8 +1778,15 @@ export const SECTION_DEFAULTS = {
     orientation: 'horizontal',    // horizontal | vertical
     editable: true,
     detent: 0.03,                 // centre detent snap threshold (0 = off)
-    returnToCenter: false,        // spring back to centre on release
-    returnRate: 4,                // glide speed (units/sec)
+    // The shared spring's vocabulary. `returnRate` (units/sec) and `returnToCenter` (a boolean)
+    // were this component's own words for it before the three private springs were unified;
+    // both are still READ by normalizeReturnBehavior, so an old panel keeps its feel exactly —
+    // rate 4 was 250ms of constant-speed walk, which is what it converts to. New panels get
+    // these. See utils/returnToRest.js.
+    returnMode: 'none',      // none | center | min | max | rest — an end is now reachable
+    returnValue: 0.5,
+    returnTime: 250,
+    returnCurve: 'linear',
     labelA: 'A',
     labelB: 'B',
     showLabels: true,
@@ -1741,9 +1809,16 @@ export const SECTION_DEFAULTS = {
     bipolar: true,                // X/Y ports emit −1..1 (vs 0..1)
     editable: true,
     // Spring return-to-rest on release.
-    returnToCenter: false,
-    returnAxes: 'both',           // both | x | y
-    returnRate: 4,                // normalized units/sec glide speed
+    // The shared spring's vocabulary. `returnRate` (units/sec) and `returnToCenter` (a boolean)
+    // were this component's own words for it before the three private springs were unified;
+    // both are still READ by normalizeReturnBehavior, so an old panel keeps its feel exactly —
+    // rate 4 was 250ms of constant-speed walk, which is what it converts to. New panels get
+    // these. See utils/returnToRest.js.
+    returnMode: 'none',      // none | center | min | max | rest — a corner is now reachable
+    returnValue: 0.5,
+    returnAxes: 'both',      // both | x | y — the one genuinely 2-D question, kept
+    returnTime: 250,
+    returnCurve: 'linear',
     // Display.
     showGrid: true,
     gridDiv: 4,
@@ -1837,6 +1912,159 @@ export const SECTION_DEFAULTS = {
   Parts: {
     _type: 'Parts',
     _children: {},
+  },
+
+  /**
+   * Keyboard — a piano keyboard that sends notes on click or touch.
+   *
+   * The key geometry is `splitZoneLayout.js`'s, unchanged: the Zone Splitter's keyboard strip
+   * already knew where every white and black key goes, and a second implementation would put two
+   * keyboards on one panel that disagree about where middle C is. What is here is what a splitter
+   * never needed — latch, scale lock, and the octave/transpose a player reaches for.
+   */
+  Keyboard: {
+    _type: 'Keyboard',
+    lowNote: 48,                  // C3
+    highNote: 72,                 // C5
+    channel: 1,
+    velocity: 100,
+    octave: 0,                    // whole octaves added to every note sent
+    transpose: 0,                 // semitones, on top of the octave
+    // Latch is what makes a keyboard playable with ONE pointer: without it a chord is impossible,
+    // and a chord is most of the point of having a keyboard rather than a note ribbon.
+    latch: false,
+    // How a note outside the panel's key is treated. `off` plays it; `quantize` moves it to the
+    // nearest in-key note; `refuse` sends nothing. Out-of-key keys are shaded either way, so the
+    // player can see the rule before they meet it.
+    scaleLock: 'off',             // off | quantize | refuse
+    followPanelKey: false,
+    key: 0,
+    scale: 'major',
+    showLabels: true,             // C3, C4… on the C keys
+    padding: 6,
+    // Colours.
+    whiteColour: 'FFE8E8E8',
+    blackColour: 'FF1A1A1A',
+    heldColour: 'FF5B9BD5',
+    outOfKeyColour: 'FF9A9A9A',
+    labelColour: 'FF555555',
+  },
+
+  /**
+   * StepSequencer — steps across, tracks down, a playhead walking left to right.
+   *
+   * SEPARATE from the Drum Pads and the Mod Matrix on purpose. All three are steps × tracks grids
+   * and they answer three different questions: pads trigger, a matrix routes, and a sequencer
+   * PLAYS — it owns a position in time, and nothing else here does.
+   *
+   * The clock is WALL-CLOCK. A sequence at 120 BPM runs at 120 BPM on its own and drifts against a
+   * DAW's transport; tempo-sync needs MIDI clock in, which does not exist yet. Said here rather
+   * than discovered later.
+   */
+  StepSequencer: {
+    _type: 'StepSequencer',
+    steps: 16,
+    bpm: 120,
+    division: '1/16',             // 1/4 | 1/8 | 1/8T | 1/16 | 1/16T | 1/32
+    direction: 'forward',         // forward | reverse | pingpong | random
+    gate: 60,                     // % of a step the note is held; capped under 100 so repeats retrigger
+    // Off, so nothing that already exists changes speed. On, the step boundaries come from the
+    // shared transport instead of `bpm` — the same field the Arp and the Phrase already carry.
+    syncToTransport: false,
+    running: false,
+    position: 0,
+    channel: 10,
+    beatEvery: 4,                 // heavier grid line every N steps — 16 identical boxes are unreadable
+    trackHeaderWidth: 64,
+    padding: 6,
+    tracks: [
+      { id: 't0', label: 'Kick', note: 36, channel: 10, colour: 'FF5B9BD5', muted: false },
+      { id: 't1', label: 'Snare', note: 38, channel: 10, colour: 'FFF2C94C', muted: false },
+      { id: 't2', label: 'Hat', note: 42, channel: 10, colour: 'FF39D98A', muted: false },
+    ],
+    // Sparse: a cell is `{ on, velocity }` keyed "trackId:step", and an absent one is off. A dense
+    // 64 × 16 grid would put a thousand `false`s in every panel file that carried a sequencer.
+    pattern: {},
+    // Colours.
+    cellColour: 'FF1E1E24',
+    cellOnColour: 'FF5B9BD5',
+    playheadColour: '885B9BD5',
+    gridColour: 'FF2E2E36',
+    labelColour: 'FFB9B9B9',
+  },
+
+  /**
+   * TabContainer — a container with pages and a strip to switch between them.
+   *
+   * `pageIndex` is a BINDABLE PORT, which is the reason this is a component rather than a Group
+   * with some visibility toggles: a footswitch changing the page is a real performance gesture and
+   * it needs somewhere to send its value.
+   */
+  TabContainer: {
+    _type: 'TabContainer',
+    pageIndex: 0,
+    edge: 'top',                  // top | bottom | left | right
+    stripSize: 26,
+    showStrip: true,
+    pages: [
+      { id: 'p0', label: 'Page 1' },
+      { id: 'p1', label: 'Page 2' },
+    ],
+    // Colours.
+    stripColour: 'FF1B1B20',
+    tabColour: 'FF26262E',
+    activeTabColour: 'FF3A5A80',
+    labelColour: 'FFB9B9B9',
+    activeLabelColour: 'FFFFFFFF',
+  },
+
+  /**
+   * ScrollArea — a clipping container with a scrollbar for oversized content.
+   *
+   * The scroll extent is measured from the CHILDREN, never set by the author. An author-set extent
+   * goes stale the moment a control moves, and then the scrollbar either stops short of a control
+   * that is really there or scrolls past the end into nothing — both of which look like the scroll
+   * area is broken rather than like the number is.
+   */
+  ScrollArea: {
+    _type: 'ScrollArea',
+    direction: 'vertical',        // vertical | horizontal | both
+    scrollMode: 'line',           // line (a notch is a stated distance) | smooth (raw delta)
+    lineHeight: 24,
+    scrollbarSize: 10,
+    scrollX: 0,
+    scrollY: 0,
+    // Colours.
+    trackColour: 'FF1A1A1A',
+    thumbColour: 'FF454550',
+  },
+
+  /**
+   * Shape — a vector primitive drawn as a real path.
+   *
+   * The Background section can already be a rectangle, and with a big enough corner radius a
+   * stadium. What it cannot be is an ellipse at an arbitrary aspect ratio, a line at an angle, or a
+   * polygon — and those are the shapes somebody wants when they say "shape". Hence a path, hence a
+   * renderer, hence this section.
+   */
+  Shape: {
+    _type: 'Shape',
+    // rectangle | ellipse | line, plus every polygon in shapeGeometry.js — triangle, diamond,
+    // pentagon, hexagon, star, chevron, arrow, plus and the rest. Read from there rather than
+    // listed again here, so the placeable Shape and the designer's draw tools cannot drift.
+    kind: 'rectangle',
+    cornerRadius: 0,         // rectangle only
+    // A line runs corner to corner of the box by default, so dragging the box IS drawing the line —
+    // an angle field on top of that would give two ways to say the same thing and let them disagree.
+    lineCap: 'butt',         // butt | round | square
+    rotation: 0,
+    fillEnabled: true,
+    fillColour: 'FF2A2A32',
+    strokeEnabled: true,
+    strokeColour: 'FF3A3A44',
+    strokeWidth: 1,
+    strokeStyle: 'solid',    // solid | dashed | dotted
+    strokeDash: 6,
   },
 
   /** Bindings — value-driven mappings into root or part properties. */

@@ -99,7 +99,7 @@
       {/each}
     </select>
 
-    <input aria-label="Search" placeholder="Filter by parameter, hex, anything" bind:value={search} />
+    <input type="text" aria-label="Search" placeholder="Filter by parameter, hex, anything" bind:value={search} />
 
     <label class="check"><input type="checkbox" bind:checked={failuresOnly} /> Failures only</label>
 
@@ -189,8 +189,7 @@
   }
 
   .toolbar select,
-  .toolbar input[type='text'],
-  .toolbar input:not([type]) {
+  .toolbar input[type='text'] {
     height: 24px;
     padding: 0 6px;
     border: 1px solid #3A3A3A;
@@ -201,7 +200,7 @@
     font-size: 11px;
   }
 
-  .toolbar input:not([type]) { flex: 1 1 180px; min-width: 140px; }
+  .toolbar input[type='text'] { flex: 1 1 180px; min-width: 140px; }
   .spacer { flex: 1 1 auto; }
 
   .check { display: flex; align-items: center; gap: 5px; color: #9A9A9A; white-space: nowrap; }

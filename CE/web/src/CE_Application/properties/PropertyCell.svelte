@@ -33,6 +33,7 @@
   class="property-cell"
   class:span-1={span === 1}
   class:span-2={span === 2}
+  class:span-3={span === 3}
   class:span-4={span === 4}
   class:disabled
   class:compact
@@ -57,8 +58,13 @@
     min-width: 0;
   }
 
+  /* span-3 was missing and 44 cells ask for it. With no matching class the cell fell back to
+     the grid default of one track, so a three-wide field silently rendered one-wide and the row
+     it was supposed to fill kept a ragged hole on the right. Nothing errored, which is why it
+     survived: `span={3}` reads as honoured at every call site. */
   .property-cell.span-1 { grid-column: span 1; }
   .property-cell.span-2 { grid-column: span 2; }
+  .property-cell.span-3 { grid-column: span 3; }
   .property-cell.span-4 { grid-column: span 4; }
 
   .property-cell.filtered-out { display: none; }

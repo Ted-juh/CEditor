@@ -5,24 +5,67 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CE_ROOT "${CMAKE_SOURCE_DIR}/CE")
 
+# Refuse MinGW here, where the reason still fits on a screen.
+#
+# JUCE does not support it and says so, but it says so from inside a header — juce_core's
+# juce_TargetPlatform.h has a bare `#error "MinGW is not supported."` — which means you find out
+# several hundred lines into a build, underneath the wreckage that follows from it: a
+# `static_assert (sizeof (pointer_sized_int) == sizeof (void*))` reduced to `(4 == 8)` because the
+# platform block that defines those types was never entered, a CRITICAL_SECTION sized `40 <= 24`,
+# memset/strlen/strcmp/stricmp and __cpuid all undeclared, and a sol2 template error on top. None
+# of that is a defect in this repo and none of it is worth reading.
+#
+# It is easy to hit by accident and the accident leaves no trace: on Windows the `native` preset
+# asks for Ninja, Ninja asks CMake for a C++ compiler, and CMake takes the first one on PATH. In a
+# plain PowerShell that is whatever MinGW you have installed for something else; `cl.exe` is only
+# on PATH inside a Developer shell. The configure then succeeds, so the mistake surfaces as a
+# compile failure in JUCE rather than as a wrong compiler.
+if(MINGW)
+    message(FATAL_ERROR
+        "MinGW cannot build this project — JUCE rejects it outright (juce_TargetPlatform.h).\n"
+        "CMake picked ${CMAKE_CXX_COMPILER}, which is the first compiler on PATH.\n"
+        "\n"
+        "Build with MSVC instead. Delete the cache first, because it has the compiler pinned:\n"
+        "    Remove-Item -Recurse -Force build/native\n"
+        "then EITHER open 'x64 Native Tools Command Prompt for VS 2022' (or run\n"
+        "Launch-VsDevShell.ps1 -Arch amd64) and re-run the configure there, so cl.exe is found:\n"
+        "    cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF\n"
+        "OR stay in a plain shell and let CMake find MSVC itself:\n"
+        "    cmake -S . -B build/native -G \"Visual Studio 17 2022\" -A x64 -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF")
+endif()
+
 # Register the test executables below with CTest so `ctest --test-dir <build> -C <config>` (and CI)
 # discovers and runs them all; each exe returns non-zero on failure.
 enable_testing()
 option(CEDITOR_DEV_MODE "Load the frontend from the Vite dev server" ON)
 
-# The GUI app, the standalone player and the VST are Windows-only in fact rather
-# than by policy: they embed the WebView2 SDK (CE/thirdparty/webview2, a Windows
-# NuGet package) and they need a native juceaide to bake BinaryData. The TESTS
-# need neither, so they are always configured and the app is not.
+# The GUI app, the standalone player and the VST default to Windows-only, but the reason is
+# narrower than it looks and it is worth knowing exactly where the wall is, because "it needs
+# Windows" was used for a long time to avoid checking anything at all off it.
 #
-# Turn it on elsewhere and you will get the missing-helper error below, which is
-# then telling you something true. `cmake -B build -DCEDITOR_BUILD_APP=ON`.
+# What is actually Windows-only is the LINK, and one library of it: `dwmapi`. Everything else
+# builds here. All thirty translation units of the CEditor target compile on Linux — Main.cpp
+# included — with the real app defines (JUCE_WEB_BROWSER=1, JUCE_USE_WIN_WEBVIEW2=1), and even
+# WebView2LoaderStatic.lib goes through the linker without complaint. juceaide is not a wall
+# either: the vendored .exe runs under Wine and bakes BinaryData correctly, which is what
+# CEDITOR_JUCE_HELPER_DIR below is for. See CLAUDE.md, "Local verification", for the recipe.
+#
+# So the honest split is:
+#   compiles anywhere   — every CE/src file, every JUCE module, the generated binary data
+#   needs Windows       — the final link (dwmapi), and MSVC's opinion of the source
+#
+# That second one is not a formality: the commit before this comment was written fixed a
+# C3861 that GCC and Clang both accept, caused by a function sitting behind the wrong #if. A
+# clean Linux compile is a strong check and not a substitute for the CI run.
+#
+# The TESTS need none of it, so they are always configured and the app is not.
+# `cmake -B build -DCEDITOR_BUILD_APP=ON` turns the app on wherever you are.
 if(WIN32)
     set(CEDITOR_BUILD_APP_DEFAULT ON)
 else()
     set(CEDITOR_BUILD_APP_DEFAULT OFF)
 endif()
-option(CEDITOR_BUILD_APP "Build the GUI app, the standalone player and the VST (needs Windows: WebView2 + a native juceaide)" ${CEDITOR_BUILD_APP_DEFAULT})
+option(CEDITOR_BUILD_APP "Build the GUI app, the standalone player and the VST (links against Windows dwmapi; compiles anywhere)" ${CEDITOR_BUILD_APP_DEFAULT})
 
 # JUCE 8.0.7 from local install
 #
@@ -39,16 +82,26 @@ option(CEDITOR_BUILD_APP "Build the GUI app, the standalone player and the VST (
 # source), so the fix is always to copy them in from a JUCE 8.0.7 install.
 set(JUCE_VENDORED_BIN "${CMAKE_SOURCE_DIR}/JUCE/bin/JUCE-8.0.7")
 set(JUCE_REQUIRED_HELPERS juceaide juce_lv2_helper juce_vst3_helper)
-if(WIN32)
-    set(JUCE_HELPER_SUFFIX ".exe")
-else()
-    set(JUCE_HELPER_SUFFIX "")
-endif()
+
+# Where to find the helpers, overridable so the vendored .exe files are not the only answer:
+#   -DCEDITOR_JUCE_HELPER_DIR=/path/to/dir
+# holding `juceaide.exe`, `juce_lv2_helper.exe`, `juce_vst3_helper.exe`. Those names keep the
+# .exe suffix whatever the platform, because JUCEConfig.cmake hardcodes it (JUCE/lib/cmake/
+# JUCE-8.0.7/JUCEConfig.cmake:71) — but nothing requires them to BE Windows binaries. A shell
+# script that execs `wine juceaide.exe` works, and is how the app target is built off Windows.
+#
+# This used to compute a platform suffix and check for `juceaide` with no extension on Linux
+# while the import below went on pointing at `juceaide.exe`. The two never agreed: dropping
+# genuine native helpers in would satisfy the check and then fail at build time on a path that
+# does not exist, and the vendored .exe files failed the check while being perfectly usable.
+# One name, checked and imported in the same place, is the fix.
+set(CEDITOR_JUCE_HELPER_DIR "${JUCE_VENDORED_BIN}" CACHE PATH
+    "Directory holding juceaide.exe and the plugin format helpers (may be Wine wrappers)")
 
 set(JUCE_MISSING_HELPERS "")
 foreach(helper IN LISTS JUCE_REQUIRED_HELPERS)
-    if(NOT EXISTS "${JUCE_VENDORED_BIN}/${helper}${JUCE_HELPER_SUFFIX}")
-        list(APPEND JUCE_MISSING_HELPERS "  JUCE/bin/JUCE-8.0.7/${helper}${JUCE_HELPER_SUFFIX}")
+    if(NOT EXISTS "${CEDITOR_JUCE_HELPER_DIR}/${helper}.exe")
+        list(APPEND JUCE_MISSING_HELPERS "  ${CEDITOR_JUCE_HELPER_DIR}/${helper}.exe")
     endif()
 endforeach()
 
@@ -71,11 +124,28 @@ if(JUCE_MISSING_HELPERS AND CEDITOR_BUILD_APP)
         "format helpers.\n\n"
         "Copy them from a JUCE 8.0.7 install (they sit in bin/JUCE-8.0.7 "
         "there too) and commit them. .gitignore has an exception for this "
-        "directory; without it the blanket *.exe rule drops them again.")
+        "directory; without it the blanket *.exe rule drops them again.\n\n"
+        "Off Windows you do not need native ones: point "
+        "-DCEDITOR_JUCE_HELPER_DIR at a directory of wrappers that exec them "
+        "under Wine. See CLAUDE.md, \"Local verification\".")
 endif()
 
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/JUCE/lib/cmake/JUCE-8.0.7")
 find_package(JUCE CONFIG REQUIRED)
+
+# JUCEConfig.cmake hardcodes each helper's IMPORTED_LOCATION to the vendored path, so honouring
+# CEDITOR_JUCE_HELPER_DIR means re-pointing the imported targets after the fact. Only when it has
+# been moved: the default path is what find_package already set, and rewriting it to the same
+# value would be noise.
+if(NOT CEDITOR_JUCE_HELPER_DIR STREQUAL JUCE_VENDORED_BIN)
+    foreach(helper IN LISTS JUCE_REQUIRED_HELPERS)
+        if(TARGET juce::${helper})
+            set_target_properties(juce::${helper} PROPERTIES
+                IMPORTED_LOCATION "${CEDITOR_JUCE_HELPER_DIR}/${helper}.exe")
+        endif()
+    endforeach()
+    message(STATUS "CEditor: JUCE helpers from ${CEDITOR_JUCE_HELPER_DIR}")
+endif()
 
 # ------------------------------------------------------------------ the app, the player, the VST
 # Everything from here to the tests needs WebView2 and a native juceaide. See CEDITOR_BUILD_APP.
@@ -227,8 +297,29 @@ if(CEDITOR_BUILD_APP)
     # meant to be panel-less", and gets a status line instead. A hand build still gets the warning.
     set(CE_VST_PANEL_PATH   ""                   CACHE STRING "Panel document the plugin loads")
     option(CE_VST_GENERIC_PLAYER "Building the panel-less player deliberately (suppresses the no-panel warning)" OFF)
+
+    # The compiler-free export path.
+    #
+    # Normally each exported panel is its own relink, because the VST3 FUID is derived from
+    # PLUGIN_CODE + MANUFACTURER_CODE and those are #defines. That is what made a C++ toolchain a
+    # requirement on the USER's machine, and it is the reason "export runs from a source checkout"
+    # was a product limitation rather than a preference.
+    #
+    # A template build drops that. The binary takes both its identity and its panel from the single
+    # .cepanel sitting beside it, so exporting becomes "copy a prebuilt (and signable, once)
+    # binary, write the panel next to it" with no compiler anywhere. The ids it reports are
+    # byte-identical to the ones the relinking path produced -- CE/tests/PanelIdentitySidecarTests
+    # asserts that against JUCE's own convertJucePluginId -- so a session saved against a
+    # compile-per-panel export keeps finding its plugin.
+    #
+    # It needs a one-line patch in vendored JUCE (JUCE/VENDORED.md; guarded by the define below and
+    # pinned by CE/web/test/vendoredJucePatches.test.js). OFF by default: the per-panel build is
+    # still what a developer wants, and it is the path with the mileage on it.
+    option(CEDITOR_TEMPLATE_PLAYER "Build a panel-agnostic player that reads its identity and panel from a .cepanel beside the binary" OFF)
     if (CE_VST_PANEL_PATH STREQUAL "")
-        if (CE_VST_GENERIC_PLAYER)
+        if (CEDITOR_TEMPLATE_PLAYER)
+            message(STATUS "CEditorPlayerVST: TEMPLATE build -- identity and panel come from the .cepanel beside the binary.")
+        elseif (CE_VST_GENERIC_PLAYER)
             message(STATUS "CEditorPlayerVST: generic player build, no panel baked in (as intended).")
         else()
             message(WARNING "CE_VST_PANEL_PATH is not set — CEditorPlayerVST will build but load no panel. "
@@ -291,12 +382,21 @@ if(CEDITOR_BUILD_APP)
         CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
         CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
         CEDITOR_PLAYER_PANEL_PATH="${CE_VST_PANEL_PATH}"
+        CEDITOR_SIDECAR_IDENTITY=$<IF:$<BOOL:${CEDITOR_TEMPLATE_PLAYER}>,1,0>
     )
 
+    # PUBLIC for CE_ROOT/src, not PRIVATE, and the reason is easy to trip over: juce_add_plugin puts
+    # the format wrappers in their own targets that LINK this one, so a PRIVATE include never
+    # reaches the translation unit that compiles juce_audio_plugin_client_VST3.cpp -- which is
+    # exactly the file that needs Export/Vst3SidecarIdentity.h. The compile definitions above are
+    # PUBLIC for the same reason.
     target_include_directories(CEditorPlayerVST PRIVATE
         "${WEBVIEW2_INCLUDE}"
-        "${CE_ROOT}/src"
         "${CMAKE_BINARY_DIR}/PlayerWebData"
+    )
+
+    target_include_directories(CEditorPlayerVST PUBLIC
+        "${CE_ROOT}/src"
     )
 
     target_link_libraries(CEditorPlayerVST PRIVATE
@@ -406,6 +506,29 @@ target_link_libraries(CEditorExportIdentityTests PRIVATE
 add_test(NAME PanelExportIdentity COMMAND CEditorExportIdentityTests)
 ce_configure_test(CEditorExportIdentityTests)
 
+# --- Export pipeline: compiler-free identity (the template player) ---
+#
+# The one that decides whether a prebuilt binary can carry a per-panel identity. It links
+# juce_audio_processors rather than juce_core alone, because the assertion that matters is against
+# JUCE's OWN VST3ClientExtensions::convertJucePluginId -- comparing our runtime derivation to a
+# reimplementation of it here would prove only that two copies of our arithmetic agree.
+add_executable(CEditorIdentitySidecarTests
+    "${CE_ROOT}/tests/PanelIdentitySidecarTests.cpp"
+)
+
+target_compile_features(CEditorIdentitySidecarTests PRIVATE cxx_std_23)
+
+target_include_directories(CEditorIdentitySidecarTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorIdentitySidecarTests PRIVATE
+    juce::juce_audio_processors
+)
+
+add_test(NAME PanelIdentitySidecar COMMAND CEditorIdentitySidecarTests)
+ce_configure_test(CEditorIdentitySidecarTests)
+
 # --- Window-closed script runtime (M2): C++ panel value model (full mirror) ---
 # Pure juce_core; verifies PanelValueModel.h resolves get/set paths identically to the WebView JS
 # runtime. Build + run: cmake --build build/native --target CEditorPanelValueTests && run the exe.
@@ -447,6 +570,64 @@ target_link_libraries(CEditorPanelParametersTests PRIVATE
 
 add_test(NAME PanelParameters COMMAND CEditorPanelParametersTests)
 ce_configure_test(CEditorPanelParametersTests)
+
+# --- Total Recall S2: when a restored patch may be pushed at the hardware ---
+# All ordering and timing, which is the class of rule that is easy to get subtly wrong and
+# impossible to test through PluginProcessor.h — that file needs WebView2 and does not build off
+# Windows. RestorePolicy.h is a pure function of the situation for exactly that reason, so every
+# ordering the plan warns about is driven here on any machine. juce_core only.
+add_executable(CEditorRestorePolicyTests
+    "${CE_ROOT}/tests/RestorePolicyTests.cpp"
+)
+
+target_include_directories(CEditorRestorePolicyTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorRestorePolicyTests PRIVATE
+    juce::juce_core
+)
+
+add_test(NAME RestorePolicy COMMAND CEditorRestorePolicyTests)
+ce_configure_test(CEditorRestorePolicyTests)
+
+# --- Total Recall S4: the exported plugin's program list ---
+# Same reasoning as RestorePolicy above — the rules are a pure function of the baked document so
+# they can be driven off Windows, and the failures they guard (a host caching getNumPrograms, asking
+# for names it was never promised, refusing a plugin that claims zero programs) show up in no build.
+add_executable(CEditorProgramBankTests
+    "${CE_ROOT}/tests/ProgramBankTests.cpp"
+)
+
+target_include_directories(CEditorProgramBankTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorProgramBankTests PRIVATE
+    juce::juce_core
+)
+
+add_test(NAME ProgramBank COMMAND CEditorProgramBankTests)
+ce_configure_test(CEditorProgramBankTests)
+
+# --- Update check: is there a newer CEditor than this one? ---
+# The feature is one HTTP GET and a version comparison. The GET needs Windows and a network; the
+# comparison is the half that can be wrong in a way nobody notices — a build that quietly believes
+# it is up to date — so it is a pure function with its own test.
+add_executable(CEditorUpdateCheckTests
+    "${CE_ROOT}/tests/UpdateCheckTests.cpp"
+)
+
+target_include_directories(CEditorUpdateCheckTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorUpdateCheckTests PRIVATE
+    juce::juce_core
+)
+
+add_test(NAME UpdateCheck COMMAND CEditorUpdateCheckTests)
+ce_configure_test(CEditorUpdateCheckTests)
 
 # --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
 # Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.

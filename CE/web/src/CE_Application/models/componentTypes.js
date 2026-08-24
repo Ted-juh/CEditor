@@ -1,4 +1,8 @@
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
+export {
+  METER_FAMILY, RIBBON_FAMILY, isMeterFamily, isRibbonFamily,
+} from './componentFamilies.js';
+import { deepClone } from '../utils/deepClone.js';
 import { createDefaultInteractiveSections } from './interactionDefaults.js';
 import { getComponentPorts } from './componentPorts.js';
 import {
@@ -175,11 +179,17 @@ function createButtonType({
 export const COMPONENT_TYPES = {
   Background: {
     sections: ['Background', 'Effects'],
+    // HOST AUTOMATION.
+    // Nothing to automate: this type holds no value, only appearance and layout.
+    exportValues: [],
     defaultOverrides: {},
   },
 
   Label: {
     sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout'],
+    // HOST AUTOMATION.
+    // Nothing to automate: this type holds no value, only appearance and layout.
+    exportValues: [],
     defaultOverrides: {
       Transform: { width: 120, height: 32 },
       Text: { content: 'Label' },
@@ -536,6 +546,9 @@ export const COMPONENT_TYPES = {
 
   Container: {
     sections: ['Background', 'Effects', 'Grid', 'Children'],
+    // HOST AUTOMATION.
+    // Nothing to automate: this type holds no value, only appearance and layout.
+    exportValues: [],
     defaultOverrides: {
       Transform: { width: 300, height: 200 },
       Grid: { enabled: true, snap: true, size: 10 },
@@ -544,6 +557,9 @@ export const COMPONENT_TYPES = {
 
   Group: {
     sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Grid', 'Children'],
+    // HOST AUTOMATION.
+    // Nothing to automate: this type holds no value, only appearance and layout.
+    exportValues: [],
     defaultOverrides: {
       Transform: { width: 260, height: 180 },
       Background: {
@@ -569,6 +585,9 @@ export const COMPONENT_TYPES = {
 
   Image: {
     sections: ['Background', 'Effects'],
+    // HOST AUTOMATION.
+    // Nothing to automate: this type holds no value, only appearance and layout.
+    exportValues: [],
     defaultOverrides: {
       Transform: { width: 160, height: 120 },
       Background: {
@@ -582,6 +601,10 @@ export const COMPONENT_TYPES = {
 
   LcdDisplay: {
     sections: ['Background', 'Display', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION.
+    // An OUTPUT. Its content arrives from a binding or a script; a host parameter would let a DAW write
+    // what the display is supposed to be reporting. Same ruling as Meter.
+    exportValues: [],
     ports: getComponentPorts('LcdDisplay'),
     defaultOverrides: {
       // A 16x2 character LCD in a dark bezel by default.
@@ -598,6 +621,10 @@ export const COMPONENT_TYPES = {
 
   PixelDisplay: {
     sections: ['Background', 'Pixel', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION.
+    // An OUTPUT. Its content arrives from a binding or a script; a host parameter would let a DAW write
+    // what the display is supposed to be reporting. Same ruling as Meter.
+    exportValues: [],
     ports: getComponentPorts('PixelDisplay'),
     defaultOverrides: {
       // A 128x64 OLED-style pixel surface in a dark bezel by default.
@@ -614,6 +641,9 @@ export const COMPONENT_TYPES = {
 
   Macro: {
     sections: ['Background', 'Macro', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. The macro's own position, 0..1. `slots` is where it is routed, which is
+    // panel wiring rather than something a host moves.
+    exportValues: [{ field: 'value', section: 'Macro', kind: 'float' }],
     ports: getComponentPorts('Macro'),
     defaultOverrides: {
       // A macro knob + assignment lanes in a dark panel by default.
@@ -630,6 +660,11 @@ export const COMPONENT_TYPES = {
 
   Constellation: {
     sections: ['Background', 'Constellation', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION.
+    exportValues: [
+      { field: 'probeX', section: 'Constellation', kind: 'float', suffix: 'x', label: 'X' },
+      { field: 'probeY', section: 'Constellation', kind: 'float', suffix: 'y', label: 'Y' },
+    ],
     ports: getComponentPorts('Constellation'),
     defaultOverrides: {
       // A wide preset-map field on a dark panel by default.
@@ -646,6 +681,11 @@ export const COMPONENT_TYPES = {
 
   Timbre: {
     sections: ['Background', 'Timbre', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION.
+    exportValues: [
+      { field: 'x', section: 'Timbre', kind: 'float', suffix: 'x', label: 'X' },
+      { field: 'y', section: 'Timbre', kind: 'float', suffix: 'y', label: 'Y' },
+    ],
     ports: getComponentPorts('Timbre'),
     defaultOverrides: {
       // A square perceptual sound-map on a dark panel by default.
@@ -662,6 +702,9 @@ export const COMPONENT_TYPES = {
 
   Router: {
     sections: ['Background', 'Router', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION.
+    // Routing configuration -- which source drives what, through which curve. Config, not performance.
+    exportValues: [],
     ports: getComponentPorts('Router'),
     defaultOverrides: {
       // A transfer-curve panel with a source chip + destination lanes by default.
@@ -678,6 +721,19 @@ export const COMPONENT_TYPES = {
 
   Turing: {
     sections: ['Background', 'Turing', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. Decided 2026-08-23: the four knobs the front panel of a real Turing machine
+    // has. `length` is included deliberately — shortening the loop live is the instrument's defining
+    // gesture, not a configuration step.
+    //
+    // `phase` stays out permanently: generated output, and a host parameter would let a DAW write
+    // what the component reports. `quantizeLevels` stays out too — it changes what the values MEAN
+    // rather than what they are, so sweeping it is a patch edit, not a performance.
+    exportValues: [
+      { field: 'rate', section: 'Turing', kind: 'float', suffix: 'rate', min: 0.1, max: 32, label: 'Rate', unit: 'st/s' },
+      { field: 'randomness', section: 'Turing', kind: 'float', suffix: 'randomness', label: 'Randomness' },
+      { field: 'gateThreshold', section: 'Turing', kind: 'float', suffix: 'gateThreshold', label: 'Gate threshold' },
+      { field: 'length', section: 'Turing', kind: 'float', suffix: 'length', min: 1, max: 64, label: 'Length' },
+    ],
     ports: getComponentPorts('Turing'),
     defaultOverrides: {
       // A wide step-sequence field on a dark panel by default.
@@ -694,6 +750,14 @@ export const COMPONENT_TYPES = {
 
   Looper: {
     sections: ['Background', 'Looper', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. Decided 2026-08-23: NOTHING, and the deferral was right to suspect it.
+    //
+    // `phase` is the playhead — generated output, so a host writing it would be a DAW driving the
+    // component's own report. `loopSeconds` and `loopBars` are the loop's LENGTH, and changing that
+    // while lanes are playing is a structural edit rather than a sweep: every recorded gesture is
+    // stored against the loop it was drawn in, so a host automating the length would be scrubbing
+    // the material rather than performing it. There is no scalar here worth a permanent parameter.
+    exportValues: [],
     ports: getComponentPorts('Looper'),
     defaultOverrides: {
       // A wide multi-lane gesture recorder on a dark panel by default.
@@ -712,6 +776,10 @@ export const COMPONENT_TYPES = {
     // Note-playing control: it emits MIDI notes rather than driving a device
     // parameter, so it carries no DeviceBindings section.
     sections: ['Background', 'ChordPad', 'Text', 'Effects', 'Scripts'],
+    // HOST AUTOMATION.
+    // A note EMITTER. It sends notes; it holds no scalar a host would sweep. Its fields are musical
+    // configuration (key, scale, voicing).
+    exportValues: [],
     ports: getComponentPorts('ChordPad'),
     defaultOverrides: {
       // A square chord wheel on a dark panel by default.
@@ -730,6 +798,20 @@ export const COMPONENT_TYPES = {
     // Like the ChordPad it plays notes rather than driving a parameter, so it
     // carries no DeviceBindings section either.
     sections: ['Background', 'Arp', 'Text', 'Effects', 'Scripts'],
+    // HOST AUTOMATION. Decided 2026-08-23: all four candidates export, because all four are
+    // things a player sweeps mid-performance rather than settings they configure once. Picking a
+    // subset would have been the arbitrary choice.
+    //
+    // `phase` is deliberately absent and always will be: it is the arpeggiator's own position,
+    // GENERATED output, and a host parameter would let a DAW write what the component is reporting.
+    // `octaves` is stepped and rides as a float — arpLayout's `clampInt(octaves, 1, 4)` rounds it,
+    // so a host sweeping between values lands on whole octaves.
+    exportValues: [
+      { field: 'rate', section: 'Arp', kind: 'float', suffix: 'rate', min: 0.1, max: 32, label: 'Rate', unit: 'st/s' },
+      { field: 'gate', section: 'Arp', kind: 'float', suffix: 'gate', label: 'Gate' },
+      { field: 'swing', section: 'Arp', kind: 'float', suffix: 'swing', label: 'Swing' },
+      { field: 'octaves', section: 'Arp', kind: 'float', suffix: 'octaves', min: 1, max: 4, label: 'Octaves' },
+    ],
     ports: getComponentPorts('Arp'),
     defaultOverrides: {
       // A wide, short step lane.
@@ -748,6 +830,9 @@ export const COMPONENT_TYPES = {
     // Plays notes rather than driving a parameter — no DeviceBindings, same as
     // the ChordPad and the Arp.
     sections: ['Background', 'NoteRibbon', 'Text', 'Effects', 'Scripts'],
+    // HOST AUTOMATION.
+    // A note emitter, as ChordPad. Keyboard configuration, not a value.
+    exportValues: [],
     ports: getComponentPorts('NoteRibbon'),
     defaultOverrides: {
       // A wide playing strip.
@@ -766,6 +851,9 @@ export const COMPONENT_TYPES = {
     // Emits notes rather than driving a parameter — no DeviceBindings, same as
     // the ChordPad, the Arp and the NoteRibbon.
     sections: ['Background', 'DrumPads', 'Text', 'Effects', 'Scripts'],
+    // HOST AUTOMATION.
+    // A note emitter, as ChordPad. Grid and mapping configuration, not a value.
+    exportValues: [],
     ports: getComponentPorts('DrumPads'),
     defaultOverrides: {
       // A square 4x4 grid.
@@ -784,6 +872,19 @@ export const COMPONENT_TYPES = {
     // Sequences PITCH — the gap between the Turing (values) and the Arp (notes
     // you're already holding). Emits MIDI, so no DeviceBindings.
     sections: ['Background', 'Phrase', 'Text', 'Effects', 'Scripts'],
+    // HOST AUTOMATION. Decided 2026-08-23: the four continuous performance controls, matching the
+    // Arp's ruling because they are the same four gestures over a different pattern source.
+    //
+    // `steps` stays out permanently — it is a pattern with the Matrix's variable-cardinality
+    // problem, and an exported list has to be fixed. `velocity` stays out too, but for a softer
+    // reason: it is the default a cell uses when it carries none, so automating it moves only the
+    // cells that declined to say, which is a surprising thing for a host parameter to do.
+    exportValues: [
+      { field: 'transpose', section: 'Phrase', kind: 'float', suffix: 'transpose', min: -24, max: 24, label: 'Transpose', unit: 'st' },
+      { field: 'swing', section: 'Phrase', kind: 'float', suffix: 'swing', label: 'Swing' },
+      { field: 'gate', section: 'Phrase', kind: 'float', suffix: 'gate', label: 'Gate' },
+      { field: 'rate', section: 'Phrase', kind: 'float', suffix: 'rate', min: 0.1, max: 32, label: 'Rate', unit: 'st/s' },
+    ],
     ports: getComponentPorts('Phrase'),
     defaultOverrides: {
       Transform: { width: 460, height: 170 },
@@ -801,6 +902,20 @@ export const COMPONENT_TYPES = {
     // An ordered list of panel states you advance with a footswitch. Sends
     // program change and writes panel values, so no DeviceBindings of its own.
     sections: ['Background', 'Setlist', 'Text', 'Effects', 'Scripts'],
+    // HOST AUTOMATION. Decided 2026-08-23: `index` exports, with a FIXED 0..127 range rather than
+    // the scene count.
+    //
+    // The trap was real — the number of scenes is per-panel and an exported parameter's range is
+    // permanent once a session references it, so a range that tracked the scene list would silently
+    // change meaning the moment somebody added a song. Pinning it at 0..127 is the same answer MIDI
+    // itself gives for program change: the host sees a fixed set of slots and the component clamps
+    // to the scenes that exist. Adding a song then widens what is reachable instead of rewriting
+    // what every saved automation lane means.
+    //
+    // `crossfadeMs` stays out: it is how a scene change behaves, not a thing to perform.
+    exportValues: [
+      { field: 'index', section: 'Setlist', kind: 'float', suffix: 'index', min: 0, max: 127, label: 'Scene' },
+    ],
     ports: getComponentPorts('Setlist'),
     defaultOverrides: {
       Transform: { width: 260, height: 150 },
@@ -818,6 +933,10 @@ export const COMPONENT_TYPES = {
     // One finger in, a chord out. Reads the MIDI input and emits notes, so no
     // DeviceBindings.
     sections: ['Background', 'Harmoniser', 'Text', 'Effects', 'Scripts'],
+    // HOST AUTOMATION.
+    // Harmony configuration (key, scale, voicing, voice leading). No single scalar, and each field
+    // changes what the notes MEAN rather than how much of something there is.
+    exportValues: [],
     ports: getComponentPorts('Harmoniser'),
     defaultOverrides: {
       Transform: { width: 340, height: 110 },
@@ -835,6 +954,10 @@ export const COMPONENT_TYPES = {
     // The note twin of the Gesture Looper: records what you play (on the panel
     // or on the MIDI input) and loops it. Emits MIDI, so no DeviceBindings.
     sections: ['Background', 'Recorder', 'Text', 'Effects', 'Scripts'],
+    // HOST AUTOMATION.
+    // A transport state machine (`state`, `playing`, `slot`). A host writing 'recording' into it is not
+    // automation.
+    exportValues: [],
     ports: getComponentPorts('Recorder'),
     defaultOverrides: {
       Transform: { width: 420, height: 150 },
@@ -853,6 +976,10 @@ export const COMPONENT_TYPES = {
     // path. Like the other note controls it emits MIDI rather than parameter
     // values, so there is no DeviceBindings section.
     sections: ['Background', 'SplitZone', 'Text', 'Effects', 'Scripts'],
+    // HOST AUTOMATION.
+    // Zone configuration: note ranges and channels. Changing it mid-performance is a setup change, not
+    // automation.
+    exportValues: [],
     ports: getComponentPorts('SplitZone'),
     defaultOverrides: {
       Transform: { width: 420, height: 110 },
@@ -869,6 +996,9 @@ export const COMPONENT_TYPES = {
   Panic: {
     // Emits MIDI directly, like the note-playing controls — no DeviceBindings.
     sections: ['Background', 'Panic', 'Text', 'Effects', 'Scripts'],
+    // HOST AUTOMATION.
+    // A trigger, not a value. Same family as Button, which declines for the same reason.
+    exportValues: [],
     ports: getComponentPorts('Panic'),
     defaultOverrides: {
       Transform: { width: 132, height: 48 },
@@ -885,6 +1015,20 @@ export const COMPONENT_TYPES = {
   Transport: {
     // Emits MIDI clock directly rather than driving a parameter.
     sections: ['Background', 'Transport', 'Text', 'Effects', 'Scripts'],
+    // HOST AUTOMATION. Decided 2026-08-23: `swing` exports, `bpm` does not — and the split is the
+    // resolution of the snag rather than a compromise around it.
+    //
+    // `bpm` genuinely fights its own source. A Transport set to follow the host takes tempo FROM the
+    // DAW, so a host parameter writing tempo INTO it would be the DAW arguing with itself, and which
+    // side wins depends on a setting the automation lane cannot see. A parameter that is ignored
+    // half the time is worse than no parameter, because the lane looks like it is doing something.
+    //
+    // `swing` has no such conflict. It is CEditor's own, applied to every synced step follower, and
+    // no host has an opinion about it — so it behaves identically whichever source the Transport is
+    // on, which is exactly the property `bpm` lacks.
+    exportValues: [
+      { field: 'swing', section: 'Transport', kind: 'float', suffix: 'swing', label: 'Swing' },
+    ],
     ports: getComponentPorts('Transport'),
     defaultOverrides: {
       Transform: { width: 230, height: 58 },
@@ -900,6 +1044,9 @@ export const COMPONENT_TYPES = {
 
   Constraint: {
     sections: ['Background', 'Constraint', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION.
+    // A rule applied to other controls. The automatable values are the members', not this one's.
+    exportValues: [],
     ports: getComponentPorts('Constraint'),
     defaultOverrides: {
       // A row of linked value bars on a dark panel by default.
@@ -916,6 +1063,17 @@ export const COMPONENT_TYPES = {
 
   Kinetic: {
     sections: ['Background', 'Kinetic', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. Decided 2026-08-23: all three, which is the non-arbitrary answer to "picking
+    // one would be arbitrary" — the same reasoning that gave VectorJoystick two rather than one.
+    //
+    // They are the physics a player performs with: gravity swings the field, restitution decides how
+    // long it rings, friction decides how fast it dies. Each is a plain scalar with a stable range
+    // and none of them is generated output.
+    exportValues: [
+      { field: 'gravity', section: 'Kinetic', kind: 'float', suffix: 'gravity', min: -1, max: 1, label: 'Gravity' },
+      { field: 'restitution', section: 'Kinetic', kind: 'float', suffix: 'restitution', label: 'Restitution' },
+      { field: 'friction', section: 'Kinetic', kind: 'float', suffix: 'friction', label: 'Friction' },
+    ],
     ports: getComponentPorts('Kinetic'),
     defaultOverrides: {
       // A square physics box on a dark panel by default.
@@ -932,6 +1090,20 @@ export const COMPONENT_TYPES = {
 
   Orbit: {
     sections: ['Background', 'Orbit', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. Decided 2026-08-23: `rate` exports and `nodes` does not, which turns out not
+    // to be a compromise — they are different kinds of thing.
+    //
+    // `rate` is the global speed of the whole field: one scalar, stable range, exactly what a host
+    // parameter is for. `nodes` is a LIST whose length the author chooses, which is the Matrix and
+    // Envelope problem — an exported parameter list has to be fixed, and a panel that gains a node
+    // must not silently change what every saved automation lane addresses. The per-node values stay
+    // reachable through the component's own ports and through scripting, where cardinality can
+    // change without breaking anything already written down.
+    //
+    // `cycleBars` stays out: it is which division to sync to, a setting rather than a sweep.
+    exportValues: [
+      { field: 'rate', section: 'Orbit', kind: 'float', suffix: 'rate', min: 0.01, max: 8, label: 'Rate', unit: 'Hz' },
+    ],
     ports: getComponentPorts('Orbit'),
     defaultOverrides: {
       // A square circular modulation field on a dark panel by default.
@@ -948,6 +1120,8 @@ export const COMPONENT_TYPES = {
 
   Ribbon: {
     sections: ['Background', 'Ribbon', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. Same shape as the crossfader — one scalar stored 0..1.
+    exportValues: [{ field: 'value', section: 'Ribbon', kind: 'float' }],
     ports: getComponentPorts('Ribbon'),
     defaultOverrides: {
       // A tall vertical touch strip / wheel by default.
@@ -966,6 +1140,11 @@ export const COMPONENT_TYPES = {
     // Value + DeviceBindings, so a typed number binds like any other value — to a device parameter,
     // or through a script to a preset recall. Nothing about Program Change lives in the component.
     sections: ['Background', 'Numpad', 'Value', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. A keypad is one number, and it already declares its own range. It carries a
+    // Value section and no Behavior, which is why deriveExportParameters could not see it: that
+    // function's only door for a standard control was `Behavior`, so the one component here that
+    // visibly stores a number exported nothing at all.
+    exportValues: [{ field: 'value', section: 'Numpad', kind: 'float', minField: 'min', maxField: 'max' }],
     ports: getComponentPorts('Numpad'),
     defaultOverrides: {
       // Three columns of keys plus a readout: taller than it is wide, like the thing it imitates.
@@ -982,6 +1161,10 @@ export const COMPONENT_TYPES = {
 
   Crossfader: {
     sections: ['Background', 'Crossfader', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. `mix` is the whole value, stored 0..1 with 0.5 as centre. `bipolar` is a
+    // DISPLAY flag — RibbonRenderer's readout does `value * 2 - 1` for it — so the exported range
+    // is the stored domain, not the displayed one.
+    exportValues: [{ field: 'mix', section: 'Crossfader', kind: 'float' }],
     ports: getComponentPorts('Crossfader'),
     defaultOverrides: {
       // A wide horizontal A/B fader by default.
@@ -998,6 +1181,13 @@ export const COMPONENT_TYPES = {
 
   VectorJoystick: {
     sections: ['Background', 'Joystick', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. Two parameters, not one. Every host models an XY pad as two automation
+    // lanes, and flattening them to a single scalar would lose the axis a user was drawing. Both
+    // are stored 0..1 with 0.5 as centre, whatever `bipolar` shows.
+    exportValues: [
+      { field: 'x', section: 'Joystick', kind: 'float', suffix: 'x', label: 'X' },
+      { field: 'y', section: 'Joystick', kind: 'float', suffix: 'y', label: 'Y' },
+    ],
     ports: getComponentPorts('VectorJoystick'),
     defaultOverrides: {
       // A square XY pad in a dark panel by default.
@@ -1014,6 +1204,11 @@ export const COMPONENT_TYPES = {
 
   Matrix: {
     sections: ['Background', 'Matrix', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION: none, deliberately. Two reasons, either sufficient. A parameter per cell is
+    // rows x cols parameters and both are per-panel, but the exported list has to be FIXED — a
+    // panel whose parameter count changes when someone adds a row is a panel that breaks every
+    // saved session. And a modulation matrix is routing configuration, not a performance control.
+    exportValues: [],
     ports: getComponentPorts('Matrix'),
     defaultOverrides: {
       // A 4×4 routing grid in a dark panel by default.
@@ -1030,6 +1225,10 @@ export const COMPONENT_TYPES = {
 
   Envelope: {
     sections: ['Background', 'Envelope', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION: none, deliberately. An envelope is a shape with a variable number of
+    // points, so it has the same fixed-list problem as the matrix; and the thing that does move
+    // continuously, `phase`, is driven by `phaseSourceId` — an output, like the meter's.
+    exportValues: [],
     ports: getComponentPorts('Envelope'),
     defaultOverrides: {
       // A wide ADSR editing area in a dark panel by default.
@@ -1044,8 +1243,206 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Keyboard: {
+    sections: ['Background', 'Keyboard', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. A keyboard emits NOTES, not a parameter value — a DAW automating "note" on a
+    // keyboard would be a DAW playing it, which is what its own MIDI track is for. Declared empty
+    // rather than left absent, so QA-08 files it as a decision instead of an oversight.
+    exportValues: [],
+    ports: getComponentPorts('Keyboard'),
+    defaultOverrides: {
+      // Two octaves at a playable key width by default.
+      Transform: { width: 320, height: 90 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF15151A' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 4 },
+        },
+      },
+    },
+  },
+
+  StepSequencer: {
+    sections: ['Background', 'StepSequencer', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. Tempo and run state, which are the two things a DAW plausibly drives. The
+    // pattern is not automatable: it is a document, and a host parameter per cell would be a
+    // thousand lanes.
+    exportValues: [
+      { field: 'bpm', section: 'StepSequencer', kind: 'float', suffix: 'bpm', label: 'Tempo' },
+      { field: 'running', section: 'StepSequencer', kind: 'bool', suffix: 'run', label: 'Run' },
+    ],
+    ports: getComponentPorts('StepSequencer'),
+    defaultOverrides: {
+      Transform: { width: 420, height: 130 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF15151A' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 6 },
+        },
+      },
+    },
+  },
+
+  TabContainer: {
+    sections: ['Background', 'TabContainer', 'Effects', 'Grid', 'Children'],
+    // HOST AUTOMATION. The page, as a choice — switching pages from a DAW is a real thing to want,
+    // and `valueKind: 'choice'` is what makes it arrive as named pages rather than as a float.
+    exportValues: [{
+      field: 'pageIndex', section: 'TabContainer', kind: 'choice', suffix: 'page', label: 'Page',
+      // The range and the labels both come from the authored page list — see paramFromTypeSpec.
+      listField: 'pages', labelKey: 'label',
+    }],
+    ports: getComponentPorts('TabContainer'),
+    defaultOverrides: {
+      Transform: { width: 320, height: 220 },
+      Grid: { enabled: true, snap: true, size: 10 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF1A1A20' },
+          Border: { enabled: true, thickness: 1, colour: 'FF2E2E36' },
+          Corners: { radius: 6 },
+        },
+      },
+    },
+  },
+
+  ScrollArea: {
+    sections: ['Background', 'ScrollArea', 'Effects', 'Grid', 'Children'],
+    // HOST AUTOMATION: none. A scroll position is where somebody is LOOKING, not a parameter of the
+    // instrument, and a DAW writing it would move the view under the player's hands.
+    exportValues: [],
+    ports: getComponentPorts('ScrollArea'),
+    defaultOverrides: {
+      Transform: { width: 280, height: 200 },
+      Grid: { enabled: true, snap: true, size: 10 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF1A1A20' },
+          Border: { enabled: true, thickness: 1, colour: 'FF2E2E36' },
+          Corners: { radius: 6 },
+        },
+      },
+    },
+  },
+
+  /**
+   * ProgressBar — a meter reading a KNOWN quantity rather than a live level.
+   *
+   * Its own controlType over the Meter engine and the Meter section, the way Knob is its own type
+   * over the slider family. It shipped first as a catalog preset; the difference a real type makes
+   * is that a progress bar stays a progress bar — in the inspector, in the saved file, and to
+   * anything that walks a panel asking what is on it. A preset is a starting position and forgets
+   * itself the moment it is inserted.
+   *
+   * No new section: a determinate bar and a level meter differ in their SETTINGS, not in what they
+   * need to store, and a second twenty-field section would be a copy that drifts.
+   */
+  ProgressBar: {
+    sections: ['Background', 'Meter', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION: none, for the Meter's reason. It reports; a host writing the reading would
+    // be arguing with whatever is doing the work.
+    exportValues: [],
+    ports: getComponentPorts('Meter'),
+    defaultOverrides: {
+      Transform: { width: 220, height: 20 },
+      Meter: {
+        // No peak to hold and no threshold zones: 40% of a file copied is not "amber", it is 40%.
+        peakHold: false,
+        segments: 0,
+        gradient: false,
+        zones: [{ from: 0, colour: 'FF5B9BD5' }],
+        fillColour: 'FF5B9BD5',
+        valueMin: 0,
+        valueMax: 1,
+        value: 0.35,
+        showReadout: true,
+      },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 4 },
+        },
+      },
+    },
+  },
+
+  /**
+   * PitchWheel — bipolar, sprung to centre.
+   *
+   * Over the Ribbon engine and section. The two wheels are separate types rather than one with a
+   * flag because THE SPRING IS THE DIFFERENCE: a pitch wheel that stayed where you left it is a
+   * broken pitch wheel, and a mod wheel that sprang back is a broken mod wheel. Two names for two
+   * instruments beats one name and a setting nobody can get wrong twice.
+   */
+  PitchWheel: {
+    sections: ['Background', 'Ribbon', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. One scalar stored 0..1, same as the Ribbon — the bipolar flag changes the
+    // readout, not the stored domain, so exporting -1..1 would hand the host a range it does not hold.
+    exportValues: [{ field: 'value', section: 'Ribbon', kind: 'float' }],
+    ports: getComponentPorts('Ribbon'),
+    defaultOverrides: {
+      Transform: { width: 44, height: 150 },
+      // 83ms is `returnRate: 12` in the shared spring's vocabulary — the exact conversion,
+      // 1000/12. The normaliser would still accept the rate; the default should not teach it.
+      Ribbon: { style: 'wheel', bipolar: true, returnMode: 'center', returnValue: 0.5, returnTime: 83, value: 0.5 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  /** ModWheel — unipolar, and it LATCHES. See PitchWheel for why these are two types. */
+  ModWheel: {
+    sections: ['Background', 'Ribbon', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    exportValues: [{ field: 'value', section: 'Ribbon', kind: 'float' }],
+    ports: getComponentPorts('Ribbon'),
+    defaultOverrides: {
+      Transform: { width: 44, height: 150 },
+      Ribbon: { style: 'wheel', bipolar: false, returnMode: 'none', value: 0 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  /**
+   * Shape — a real vector primitive, not a Background wearing a corner radius.
+   *
+   * This is the one of the four where a type buys more than identity. A Background can be a
+   * rectangle and, with a radius past half its width, a stadium; it cannot be an ELLIPSE at an
+   * arbitrary aspect ratio, a line at an angle, or a polygon at all. Those need a path, so they
+   * need a renderer, so they need a type.
+   */
+  Shape: {
+    sections: ['Background', 'Shape', 'Effects'],
+    // HOST AUTOMATION: none. Decoration holds no value.
+    exportValues: [],
+    defaultOverrides: {
+      Transform: { width: 120, height: 90 },
+      // The Background is off by default: the Shape section paints, and two fills stacked would
+      // make every shape a rectangle with a shape drawn inside it.
+      Background: { _children: { Fill: { solidEnabled: false }, Border: { enabled: false } } },
+    },
+  },
+
   Meter: {
     sections: ['Background', 'Meter', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION: none, deliberately. A meter DISPLAYS a level that arrives from somewhere
+    // else — `valueSourceId` names where — so a host parameter would let a DAW write a reading the
+    // component is supposed to be reporting. An output is not an automation target. Declared
+    // empty rather than left absent, so QA-08 files it as a decision instead of an oversight.
+    exportValues: [],
     ports: getComponentPorts('Meter'),
     defaultOverrides: {
       // A horizontal level meter in a dark inset by default.
@@ -1062,6 +1459,9 @@ export const COMPONENT_TYPES = {
 
   TestBox: {
     sections: ['Background', 'Effects'],
+    // HOST AUTOMATION.
+    // Nothing to automate: this type holds no value, only appearance and layout.
+    exportValues: [],
     defaultOverrides: {
       Transform: { width: 80, height: 80 },
       Background: { _children: { Fill: { colour: 'FF5B9BD5' } } },
@@ -1072,11 +1472,6 @@ export const COMPONENT_TYPES = {
 // --- Internal helpers ---
 
 let nextControlId = Date.now();
-
-/** Deep-clone a plain object. */
-function deepClone(obj) {
-  return JSON.parse(JSON.stringify(obj));
-}
 
 /** Deep-merge overrides into a section clone, including _children. */
 function applyOverrides(section, overrides) {

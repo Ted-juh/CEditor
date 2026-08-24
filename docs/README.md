@@ -15,8 +15,7 @@
 | — | [Scripting architecture plan](../tools/docs/scripting-architecture-plan.md) | ⚠️ **Historical.** The retired command-graph model; superseded by 5 and 6. |
 
 Working notes: [runtime gaps](../CE/web/src/CE_Application/docs/scripting-runtime-gaps.md) (what the
-API advertises vs what the C++ runtime backs), [timer system](../CE/web/src/CE_Application/docs/timer-system.md),
-and the [manual review of 2026-08-02](scripting-manual-review-2026-08-02.md) that produced this index.
+API advertises vs what the C++ runtime backs) and [timer system](../CE/web/src/CE_Application/docs/timer-system.md).
 
 ## Other documents here
 
@@ -27,8 +26,10 @@ and the [manual review of 2026-08-02](scripting-manual-review-2026-08-02.md) tha
 - [Beta readiness review 2026-08-10](beta-readiness-review-2026-08-10.md)
 - [Beta differentiation](beta-differentiation.md) — what actually sets CEditor apart, and the
   three bets that would define the product.
-- [Project review 2026-07-02](project-review-2026-07-02.md)
 - [License decision](license-decision.md)
+- [Known issues](known-issues.md) — found, not fixed, not forgotten.
+- [Release notes](../RELEASE-NOTES.md) — what a beta tester is told before installing: Windows only,
+  unsigned, and what this build can and cannot do.
 - [Verify end-to-end](verify-end-to-end.md)
 - [Editor manual — snapshot of 2026-08-10](editor-manual-2026-08-10.md) — ⚠️ **not generated, not
   tested.** The user-facing manual for everything *before* scripting: components, bindings, export.

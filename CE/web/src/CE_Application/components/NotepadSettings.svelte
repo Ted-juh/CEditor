@@ -13,7 +13,12 @@
   import { availableFonts, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import NumberCell from '../properties/NumberCell.svelte';
 
-  let { getEditorElement, onPickColor } = $props();
+  // `format` is the notepad editor's single formatting entry point. The sidebar used to take
+  // `getEditorElement` and run `document.execCommand` on the element directly, which is finding
+  // B10's last clause and was worse than deprecated: the keyboard half had already moved to the
+  // Range-based ops, so the B button and Ctrl+B emitted different markup into the same note and
+  // then disagreed about whether it was bold. One entry point, one implementation, no drift.
+  let { format, onPickColor } = $props();
 
   let fontFamily = $state('Consolas');
   let fontSize = $state(12);
@@ -30,35 +35,19 @@
 
   const fontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48];
 
-  // Map px sizes to execCommand's 1-7 scale (approximate)
-  const sizeMap = { 8: 1, 9: 1, 10: 2, 11: 2, 12: 3, 14: 3, 16: 4, 18: 4, 20: 5, 24: 5, 28: 6, 32: 6, 36: 7, 48: 7 };
+  // No px-to-1-7 size map any more: execCommand's `fontSize` took the legacy HTML scale and
+  // emitted `<font size="4">`, so this file mapped px onto that scale, applied it, then went
+  // hunting for the `<font>` elements it had just caused and rewrote them to the px it wanted in
+  // the first place. Two of those three steps existed only to undo the first.
 
-  function focusEditor() {
-    const el = getEditorElement?.();
-    if (el) el.focus();
-  }
-
-  function exec(command, value = null) {
-    focusEditor();
-    document.execCommand(command, false, value);
-  }
+  const run = (command, value = null) => format?.(command, value);
 
   function applyFont() {
-    exec('fontName', fontFamily);
+    run('fontFamily', fontFamily);
   }
 
   function applyFontSize() {
-    const scale = sizeMap[fontSize] ?? 3;
-    exec('fontSize', String(scale));
-    // Replace generated <font size="X"> with inline style for exact px
-    const el = getEditorElement?.();
-    if (el) {
-      const fontEls = el.querySelectorAll(`font[size="${scale}"]`);
-      for (const f of fontEls) {
-        f.removeAttribute('size');
-        f.style.fontSize = `${fontSize}px`;
-      }
-    }
+    run('fontSize', fontSize);
   }
 
 </script>
@@ -93,19 +82,19 @@
   <div class="section">
     <div class="section-label">Format</div>
     <div class="toolbar-row">
-      <button class="tool-btn" onclick={() => exec('bold')} title="Bold (Ctrl+B)">
+      <button class="tool-btn" onclick={() => run('bold')} title="Bold (Ctrl+B)">
         <Bold size={13} />
       </button>
-      <button class="tool-btn" onclick={() => exec('italic')} title="Italic (Ctrl+I)">
+      <button class="tool-btn" onclick={() => run('italic')} title="Italic (Ctrl+I)">
         <Italic size={13} />
       </button>
-      <button class="tool-btn" onclick={() => exec('underline')} title="Underline (Ctrl+U)">
+      <button class="tool-btn" onclick={() => run('underline')} title="Underline (Ctrl+U)">
         <Underline size={13} />
       </button>
-      <button class="tool-btn" onclick={() => exec('strikeThrough')} title="Strikethrough">
+      <button class="tool-btn" onclick={() => run('strikethrough')} title="Strikethrough">
         <Strikethrough size={13} />
       </button>
-      <button class="tool-btn" onclick={() => exec('removeFormat')} title="Clear formatting">
+      <button class="tool-btn" onclick={() => run('clearFormatting')} title="Clear formatting">
         <RemoveFormatting size={13} />
       </button>
     </div>
@@ -115,13 +104,13 @@
   <div class="section">
     <div class="section-label">Align</div>
     <div class="toolbar-row">
-      <button class="tool-btn" onclick={() => exec('justifyLeft')} title="Align left">
+      <button class="tool-btn" onclick={() => run('alignLeft')} title="Align left">
         <AlignLeft size={13} />
       </button>
-      <button class="tool-btn" onclick={() => exec('justifyCenter')} title="Align center">
+      <button class="tool-btn" onclick={() => run('alignCenter')} title="Align center">
         <AlignCenter size={13} />
       </button>
-      <button class="tool-btn" onclick={() => exec('justifyRight')} title="Align right">
+      <button class="tool-btn" onclick={() => run('alignRight')} title="Align right">
         <AlignRight size={13} />
       </button>
     </div>
@@ -131,10 +120,10 @@
   <div class="section">
     <div class="section-label">Lists</div>
     <div class="toolbar-row">
-      <button class="tool-btn" onclick={() => exec('insertUnorderedList')} title="Bullet list">
+      <button class="tool-btn" onclick={() => run('bulletList')} title="Bullet list">
         <List size={13} />
       </button>
-      <button class="tool-btn" onclick={() => exec('insertOrderedList')} title="Numbered list">
+      <button class="tool-btn" onclick={() => run('numberedList')} title="Numbered list">
         <ListOrdered size={13} />
       </button>
     </div>

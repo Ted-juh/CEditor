@@ -8,6 +8,11 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import Repeat from 'lucide-svelte/icons/repeat';
+  import EyeIcon from 'lucide-svelte/icons/eye';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import Frame from 'lucide-svelte/icons/frame';
+  import GitBranch from 'lucide-svelte/icons/git-branch';
   import NumberCell from '../properties/NumberCell.svelte';
 
   let { control = null } = $props();
@@ -181,11 +186,11 @@
 </script>
 
 {#if generators}
-  <PropertySection title="Generators">
+  <PropertySection title="Generators" icon={Repeat}>
     <PropertyCell label="Add" span={3} hint="Create rule-driven layers such as ticks, grids, piano keys, repeated LEDs, or segmented rings.">
       <input class="val" type="text" bind:value={newName} placeholder="generatorName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Add a generator.">
+    <PropertyCell label="" span={1} hint="Add a generator." compact>
       <button class="action-btn" type="button" onclick={addGenerator}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose which generator to edit.">
@@ -195,13 +200,13 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected generator.">
+    <PropertyCell label="" span={1} hint="Remove the selected generator." compact>
       <button class="action-btn danger" type="button" onclick={removeGenerator} disabled={!selectedName}>Remove</button>
     </PropertyCell>
   </PropertySection>
 
   {#if selected}
-    <PropertySection title="Generator Preview">
+    <PropertySection title="Generator Preview" icon={EyeIcon}>
       <PropertyCell label="Preview" span={2} hint="Visual sketch of the selected generator family.">
         <div class={`generator-preview ${previewClass}`} class:disabled={selected?.enabled === false} style={`--preview-rows:${gridPreviewRows}; --preview-columns:${gridPreviewColumns};`}>
           <span class="preview-stage">
@@ -250,7 +255,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Definition">
+    <PropertySection title="Definition" icon={SlidersHorizontal}>
       <PropertyCell label="Enabled" span={1} hint="Enable this generator.">
         <PropertyToggle value={selected.enabled !== false} onchange={() => set('enabled', !(selected.enabled !== false))} />
       </PropertyCell>
@@ -300,7 +305,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Bounds">
+    <PropertySection title="Bounds" icon={Frame}>
       <PropertyCell label="Mode" span={2} hint="Most generators can be scoped to a rectangular percentage area inside the component.">
         <select class="val" value={selected.bounds?.unit ?? 'percent'} onchange={(event) => set('bounds.unit', event.target.value)}>
           <option value="percent">percent</option>
@@ -327,7 +332,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Rules">
+    <PropertySection title="Rules" icon={GitBranch}>
       <PropertyCell label="Count" span={1} compact hint="Primary generated item count.">
         <NumberCell label="Count" value={selected.count ?? 11} step={1} min={0} defaultValue={11} onchange={(value) => set('count', Math.max(0, Math.round(value)))} />
       </PropertyCell>
@@ -367,10 +372,10 @@
           <option value="single">single</option>
         </select>
       </PropertyCell>
-      <PropertyCell label="Hit Zones" span={2} hint="Generate matching hit zones where useful.">
+      <PropertyCell label="Hit Zones" span={1} hint="Generate matching hit zones where useful.">
         <PropertyToggle value={selected.generatedHitZones === true} onchange={() => set('generatedHitZones', !(selected.generatedHitZones === true))} />
       </PropertyCell>
-      <PropertyCell label="Detach" span={2} hint="Allow future detach-to-layers conversion.">
+      <PropertyCell label="Detach" span={1} hint="Allow future detach-to-layers conversion.">
         <PropertyToggle value={selected.detachable !== false} onchange={() => set('detachable', !(selected.detachable !== false))} />
       </PropertyCell>
       <PropertyCell label="Commit" span={2} hint="Convert generated output into normal editable layers and disable this generator.">
@@ -381,8 +386,8 @@
 {/if}
 
 <style>
-  .val { width: 100%; min-width: 0; background: #1A1A1A; border: 1px solid #333; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 6px; font-family: inherit; outline: none; box-sizing: border-box; }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .bounds-presets {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

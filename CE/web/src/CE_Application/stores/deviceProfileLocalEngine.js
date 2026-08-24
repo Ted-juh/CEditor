@@ -748,6 +748,123 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
   };
 }
 
+/**
+ * Build a dump message from parameter values — the encode direction, mirroring
+ * `DeviceProfileEngine::buildDumpMessage` on the C++ side.
+ *
+ * TWO IMPLEMENTATIONS, ON PURPOSE, and it is worth saying why rather than leaving it to be
+ * discovered. The Player has a real DeviceProfileEngine in-process; the editor preview does not, and
+ * a script running in the preview would otherwise get null where the exported plugin gives bytes.
+ * That asymmetry is exactly what `scripting-runtime-gaps.md` exists to record, and this closes the
+ * preview half of it.
+ *
+ * The two are kept honest the same way the parsers are: they share the profile shape, they share the
+ * checksum table (`utils/checksums.js`, the same vocabulary `ce.midi.checksum` answers from), and
+ * each is round-trip tested against ITS OWN parser. A builder that agrees with its parser and a
+ * parser that agrees across languages is enough — that is the property the existing local/native
+ * parse tests already establish.
+ *
+ * Framing, in the order that matters: prefix, payload at its declared offset, room reserved for the
+ * checksum field, then the suffix. The reservation is not fussiness — in the Roland shape the
+ * checksum sits BETWEEN the last data byte and F7, so appending the suffix first writes the checksum
+ * on top of F7 and produces a message that neither ends correctly nor verifies.
+ */
+export function localBuildDumpMessage(profile, dumpId = '', values = {}) {
+  const fail = (error) => ({ ok: false, error, dumpId: String(dumpId), hex: '', bytes: [] });
+
+  const dumps = Array.isArray(profile?.dumpDefinitions) ? profile.dumpDefinitions : [];
+  if (dumps.length === 0) return fail('Profile has no dump definitions');
+
+  // By id, then by name — a script author reaches for whichever the DPD shows them.
+  const key = String(dumpId);
+  const dump = dumps.find((d) => String(d?.id ?? '') === key)
+    ?? dumps.find((d) => String(d?.name ?? '') === key);
+  if (!dump) return fail(`No dump definition named: ${key}`);
+
+  const variables = profile?.variables ?? {};
+  const prefix = localPatternBytes(dump?.matcher?.prefix, variables);
+  const suffix = localPatternBytes(dump?.matcher?.suffix, variables);
+  const payloadOffset = Number(dump?.payload?.offset ?? prefix.length);
+  const payloadSize = Number(dump?.payload?.size ?? 0);
+  if (!(payloadSize > 0)) return fail(`Dump definition has no payload size: ${dump.id ?? key}`);
+
+  const mappings = Array.isArray(dump?.mappings) ? dump.mappings : [];
+  if (mappings.length === 0) return fail(`Dump definition has no mappings: ${dump.id ?? key}`);
+
+  const defaultByte = Number(dump?.payload?.defaultByte ?? 0) & 0x7f;
+  const body = new Array(payloadSize).fill(defaultByte);
+
+  const parameters = Array.isArray(profile?.parameters) ? profile.parameters : [];
+  const unmapped = [];
+  const consumed = new Set();
+
+  for (const mapping of mappings) {
+    const parameterId = String(mapping?.parameter ?? '');
+    const parameter = parameters.find((entry) => String(entry?.id ?? '') === parameterId);
+    if (!parameter) return fail(`Dump mapping references unknown parameter: ${parameterId}`);
+
+    // A value the caller did not supply leaves the definition's default bytes in place. The normal
+    // case for a panel that covers part of a dump, so it is reported rather than refused.
+    if (!Object.prototype.hasOwnProperty.call(values ?? {}, parameterId)) {
+      unmapped.push(parameterId);
+      continue;
+    }
+    consumed.add(parameterId);
+
+    const encoded = encodeParameterValue(parameter, values[parameterId]);
+    if (encoded?.error) return fail(`Cannot encode ${parameterId}: ${encoded.error}`);
+
+    const offset = Number(mapping?.offset ?? 0);
+    if (offset < 0 || offset + encoded.bytes.length > body.length) {
+      return fail(`Mapping for ${parameterId} writes outside the payload `
+        + `(offset ${offset}, ${encoded.bytes.length} byte(s), payload ${payloadSize})`);
+    }
+    for (let i = 0; i < encoded.bytes.length; i += 1) body[offset + i] = encoded.bytes[i] & 0x7f;
+  }
+
+  const unknown = Object.keys(values ?? {}).filter((id) => !consumed.has(id) && !unmapped.includes(id));
+
+  const bytes = [...prefix];
+  while (bytes.length < payloadOffset) bytes.push(0);
+  bytes.push(...body);
+
+  const checksum = dump?.checksum;
+  if (checksum) {
+    const reserveAt = Number(checksum.byteOffset ?? bytes.length);
+    const reserveCount = Math.max(1, Number(checksum.byteCount ?? 1));
+    while (bytes.length < reserveAt + reserveCount) bytes.push(0);
+  }
+  bytes.push(...suffix);
+
+  let checksumStatus = 'none';
+  if (checksum) {
+    const fromOffset = Number(checksum.fromOffset ?? 0);
+    const toOffset = Number(checksum.toOffset ?? bytes.length - 2);
+    const byteOffset = Number(checksum.byteOffset ?? bytes.length - 2);
+    if (fromOffset < 0 || toOffset >= bytes.length || fromOffset > toOffset || byteOffset < 0) {
+      return fail('Dump checksum range is outside the built message');
+    }
+    const computed = checksumBytes(String(checksum.type ?? ''), bytes.slice(fromOffset, toOffset + 1),
+      { offset: checksum.offset });
+    if (!computed?.length) return fail(`Unsupported dump checksum type: ${checksum.type}`);
+    const count = Math.max(1, Number(checksum.byteCount ?? computed.length));
+    if (byteOffset + count > bytes.length) return fail('Dump checksum does not fit in the built message');
+    for (let i = 0; i < count && i < computed.length; i += 1) bytes[byteOffset + i] = computed[i];
+    checksumStatus = 'ok';
+  }
+
+  return {
+    ok: true,
+    dumpId: String(dump.id ?? key),
+    dumpName: String(dump.name ?? ''),
+    bytes,
+    hex: bytesToHex(bytes),
+    checksumStatus,
+    unmapped,
+    unknown,
+  };
+}
+
 export function localParseDumpMessage(profile, inputHex = '') {
   const parsed = parseRawMidiHexText(inputHex);
   if (!parsed.ok) {

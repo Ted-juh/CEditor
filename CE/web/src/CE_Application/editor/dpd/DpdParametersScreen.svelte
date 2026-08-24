@@ -77,8 +77,6 @@
 
 <div class="toolbar">
   <button class="btn primary" onclick={() => addParam()}>+ Add parameter</button>
-  <button class="btn" disabled title="Coming soon">⇪ Import CSV</button>
-  <button class="btn" disabled title="Coming soon">◉ MIDI learn</button>
   <div class="spacer"></div>
   <div class={['status-pill', !allClean && 'warn']}>
     <span class={['chk', allClean ? 'ok' : 'warn']}>{allClean ? '✓' : '!'}</span>

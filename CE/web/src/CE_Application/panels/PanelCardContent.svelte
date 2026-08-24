@@ -1,6 +1,6 @@
 <script>
   import { panels, activePanel, updatePanel, buildActivePanelVst3 } from '../stores/panels.js';
-  import { makeGuid } from '../stores/panelModel.js';
+  import { createPanel, makeGuid } from '../stores/panelModel.js';
   import { shortcutFromEvent, panicShortcutWarnings } from '../utils/panicLayout.js';
   import { deriveIdentity } from '../utils/exportIdentity.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
@@ -33,10 +33,18 @@
   import Puzzle from 'lucide-svelte/icons/puzzle';
   import Cpu from 'lucide-svelte/icons/cpu';
   import Hammer from 'lucide-svelte/icons/hammer';
+  import Scale from 'lucide-svelte/icons/scale';
+  import ListMusic from 'lucide-svelte/icons/list-music';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';
   import { collectPanelExportScripts } from '../scripting/scriptPanelExport.js';
+  import { activeRun, buildRunning, clearHistory, clearRun, exportHistory, identityFor }
+    from '../stores/exportRuns.js';
+  import { canRevealFiles, revealFile } from '../bridge/revealFile.js';
+  import { LICENCE_NOTICE, SIGNING_NOTICE } from '../utils/legalNotices.js';
+  import { presetLibrary } from '../stores/presetLibrarian.js';
+  import { bakeProgramBank, bakeReport, MAX_PROGRAMS } from '../utils/programBank.js';
   import { panelModules, panelModuleCost, allModules, isExtensionModule } from '../scripting/panelApi.js';
   import { missingExtensionsFor } from '../scripting/extensionModules.js';
   import {
@@ -45,6 +53,14 @@
   } from '../stores/scriptModules.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
+  import {
+    backgroundLayerClipboard,
+    canPastePanelBackgroundLayer,
+    copyPanelBackgroundLayer,
+    getBackgroundLayerClipboard,
+    panelBackgroundLayerPatch,
+    panelBackgroundLayerPayload,
+  } from '../stores/backgroundLayerClipboard.js';
 
   let { tabId = '' } = $props();
 
@@ -82,6 +98,29 @@
   let exportSettings = $derived(panel?.exportSettings ?? {});
   // The host-visible plugin name: explicit override, else the panel name.
   let effectivePluginName = $derived((exportSettings.pluginName?.trim()) || panel?.name || 'CEditor Panel');
+  // 'ask' | 'always' | 'never'. A panel saved before the key existed reads as 'ask', matching
+  // Player/RestorePolicy.h's parse so the editor and the plugin cannot disagree about the default.
+  let restoreHardwareMode = $derived(['ask', 'always', 'never'].includes(exportSettings.restoreHardware)
+    ? exportSettings.restoreHardware : 'ask');
+
+  // --- Total Recall S4: the program list the exported plugin shows a DAW ---
+  // Banks come from the preset librarian, keyed by the profile this panel requires. A panel bound
+  // to no profile has no banks to offer, which is the honest state rather than an empty dropdown.
+  let requiredProfileId = $derived(String(panel?.requiredProfiles?.[0]?.profileId ?? ''));
+  let availableBanks = $derived(requiredProfileId ? ($presetLibrary?.[requiredProfileId]?.banks ?? []) : []);
+  let bakedBank = $derived(panel?.programBank ?? null);
+  let bakedCount = $derived(bakedBank?.programs?.length ?? 0);
+
+  function bakeBank(bankId) {
+    const bank = availableBanks.find((candidate) => candidate.id === bankId);
+    const report = bakeReport(bank);
+    if (!report.ok) return;
+    updatePanel(panel.id, { programBank: report.bank });
+  }
+
+  function clearBank() {
+    updatePanel(panel.id, { programBank: null });
+  }
   // Live preview of the derived codes — identical to what the exporter stamps into the build.
   let identity = $derived(
     deriveIdentity(
@@ -167,6 +206,16 @@
     ['.vst3', ...(exportClap ? ['.clap'] : []), ...(exportLv2 ? ['.lv2'] : [])].join(' + ')
   );
 
+  // The identity fork, asked only when it is a real question. `identityFor` returns 'ask' solely
+  // for a GUID that belongs to a DIFFERENT panel — the copied-.cepanel case — so a normal
+  // re-export never sees this and never learns to click through it.
+  let identityAsk = $state(null);
+
+  function runExport(choice = null) {
+    const result = buildActivePanelVst3(choice === null ? {} : { identityChoice: choice });
+    identityAsk = result && result.needsChoice ? result.decision : null;
+  }
+
   function setExportSetting(key, value) {
     if (!panel) return;
     updatePanel(panel.id, { exportSettings: { ...(panel.exportSettings ?? {}), [key]: value } });
@@ -248,6 +297,53 @@
     if (layerId === 'image') return panel.bgImageEnabled === true;
     if (layerId === 'texture') return panel.bgTextureEnabled === true;
     return false;
+  }
+
+  // --- Background layer copy / paste / reset ---
+  // The panel background had none of these. The control background editor has had a layer
+  // clipboard for a while, but it was its own private store, so a gradient could travel from one
+  // control to another and never to the panel behind them — the two editors are separate
+  // implementations over separate field names and there was no route between them.
+  //
+  // They share the clipboard now. stores/backgroundLayerClipboard.js owns the translation
+  // (the panel's "texture" is the control's "overlay"; `bgImageTint` is `imageTint`), so copying
+  // a control's Image layer and pasting it onto the panel — or the reverse — is one click each
+  // way, and the R/C/P buttons the Image and Texture sections have always drawn finally do
+  // something.
+  function copyBgLayer(layerId) {
+    if (panel) copyPanelBackgroundLayer(panel, layerId);
+  }
+
+  function canPasteBgLayer(layerId) {
+    return canPastePanelBackgroundLayer($backgroundLayerClipboard, layerId);
+  }
+
+  function pasteBgLayer(layerId) {
+    if (!panel) return;
+    const patch = panelBackgroundLayerPatch(getBackgroundLayerClipboard(), layerId);
+    if (patch) updatePanel(panel.id, patch);
+  }
+
+  // A pristine panel, made once and only if someone actually presses Reset. It burns one
+  // in-memory panel id, which is why it is not built at module load — those ids are session-local
+  // (see panelModel.makeGuid's note) but there is no reason to spend one on nobody's behalf.
+  let pristinePanel = null;
+  function panelDefaults() {
+    if (!pristinePanel) pristinePanel = createPanel();
+    return pristinePanel;
+  }
+
+  function resetBgLayer(layerId) {
+    if (!panel) return;
+    const defaults = panelDefaults();
+    const patch = panelBackgroundLayerPatch(panelBackgroundLayerPayload(defaults, layerId), layerId);
+    if (!patch) return;
+    // Reset restores the defaults but must not switch a layer the author had turned off back on.
+    delete patch.bgSolid;
+    delete patch.bgGradientEnabled;
+    delete patch.bgImageEnabled;
+    delete patch.bgTextureEnabled;
+    updatePanel(panel.id, patch);
   }
 
   // --- Panic shortcut capture ---------------------------------------------------
@@ -512,6 +608,11 @@
     {#each [...layerOrder()].reverse() as layerId (layerId)}
       {#if layerId === 'solid' && panel.bgSolid !== false}
         <PropertySection title="Solid" icon={PaintBucket}>
+          {#snippet tools()}
+            <button class="layer-tool-btn" title="Reset layer" onclick={() => resetBgLayer('solid')}>R</button>
+            <button class="layer-tool-btn" title="Copy layer settings" onclick={() => copyBgLayer('solid')}>C</button>
+            <button class="layer-tool-btn" disabled={!canPasteBgLayer('solid')} title="Paste layer settings" onclick={() => pasteBgLayer('solid')}>P</button>
+          {/snippet}
           <PropertyCell label="" span={2} hint="Background fill colour — click swatch to open colour picker">
             <button class="bg-swatch"
                     style="background:#{String(panel.bgColour ?? '333333').slice(-6)}"
@@ -531,6 +632,11 @@
       {/if}
       {#if layerId === 'gradient' && panel.bgGradientEnabled === true}
         <PropertySection title="Gradient" icon={Blend}>
+          {#snippet tools()}
+            <button class="layer-tool-btn" title="Reset layer" onclick={() => resetBgLayer('gradient')}>R</button>
+            <button class="layer-tool-btn" title="Copy layer settings" onclick={() => copyBgLayer('gradient')}>C</button>
+            <button class="layer-tool-btn" disabled={!canPasteBgLayer('gradient')} title="Paste layer settings" onclick={() => pasteBgLayer('gradient')}>P</button>
+          {/snippet}
           <PropertyCell label="" span={2} hint="Gradient preview — click to edit">
             <button class="bg-swatch"
                     style="background:{gradientToCSS(panel.bgGradient)}"
@@ -560,10 +666,14 @@
           defaultFit="fill"
           placeholder="No image selected"
           collapsed={imageCollapsed}
+          canPaste={canPasteBgLayer('image')}
           onupdate={(patch) => updatePanel(panel.id, patch)}
           onbrowse={handleBrowseImage}
           oncollapsetoggle={(v) => setCollapsed('bg-image', v)}
           onswatchclick={handleSwatchClick}
+          onreset={() => resetBgLayer('image')}
+          oncopy={() => copyBgLayer('image')}
+          onpaste={() => pasteBgLayer('image')}
         />
       {/if}
       {#if layerId === 'texture' && panel.bgTextureEnabled === true}
@@ -574,10 +684,14 @@
           defaultFit="tile"
           placeholder="No texture selected"
           collapsed={textureCollapsed}
+          canPaste={canPasteBgLayer('texture')}
           onupdate={(patch) => updatePanel(panel.id, patch)}
           onbrowse={handleBrowseTexture}
           oncollapsetoggle={(v) => setCollapsed('bg-texture', v)}
           onswatchclick={handleSwatchClick}
+          onreset={() => resetBgLayer('texture')}
+          oncopy={() => copyBgLayer('texture')}
+          onpaste={() => pasteBgLayer('texture')}
         />
       {/if}
     {/each}
@@ -791,6 +905,37 @@
       </PropertyCell>
     </PropertySection>
 
+    <!-- Total Recall S2. The plugin restores every value when a project reopens and — until this
+         existed — told the hardware nothing, so the synth sat on whatever patch it was left on.
+         The setting is here rather than buried because it decides whether an exported plugin sends
+         SysEx unprompted, which is the panel author's call to make on their users' behalf. -->
+    <PropertySection title="Hardware Restore" icon={Scale}>
+      <PropertyCell label="On project reopen" span={4}
+                    hint="Whether the exported plugin sends the restored session values to the synth. Ask = ask once per project and remember. Always = send without asking. Never = restore the panel only and leave the hardware alone.">
+        <div class="export-row">
+          <div class="seg">
+            {#each [['ask', 'Ask'], ['always', 'Always'], ['never', 'Never']] as [mode, label] (mode)}
+              <button class={['seg-btn', restoreHardwareMode === mode && 'seg-active']}
+                      onclick={() => setExportSetting('restoreHardware', mode)}>{label}</button>
+            {/each}
+          </div>
+        </div>
+      </PropertyCell>
+      <PropertyCell label="" span={4}>
+        <span class="export-build-note">
+          {#if restoreHardwareMode === 'always'}
+            The plugin will push this panel's values to the synth as soon as the device is ready —
+            with no prompt, including mid-session.
+          {:else if restoreHardwareMode === 'never'}
+            The panel restores; the synth is left on whatever patch it is on.
+          {:else}
+            The plugin asks once per project, with the device name in the question, and remembers
+            the answer.
+          {/if}
+        </span>
+      </PropertyCell>
+    </PropertySection>
+
     <PropertySection title="Scripting Runtime" icon={Cpu}>
       <PropertyCell label="Python" span={4}
                     hint="Embed the CPython runtime so Python scripts run window-closed and offline. Auto = only when this panel uses Python.">
@@ -841,13 +986,136 @@
       </PropertyCell>
     </PropertySection>
 
+    <!-- Two things a person needs to know BEFORE they press Export, which is why this sits above
+         the button rather than in a menu they would have to think to open. Both sentences come
+         from utils/legalNotices.js, the same module the About dialog reads, because the release
+         notes promise the program says them in both places. -->
+    <!-- Total Recall S4. The plugin reported one nameless program, so a DAW's program menu was
+         empty and there was no host-automatable way to change patch — while the librarian had
+         banks, captured patches and recall sitting in the editor where the plugin never saw them.
+         The bank is baked at export because a plugin should not scan an instrument's memory on
+         every project load; the note below says which it is. -->
+    <PropertySection title="Programs" icon={ListMusic}>
+      {#if !requiredProfileId}
+        <PropertyCell label="Bank" span={4}
+                      hint="Programs come from a preset librarian bank for the device profile this panel requires. Bind a control to a profile parameter first.">
+          <span class="export-build-note">This panel requires no device profile, so there are no banks to offer.</span>
+        </PropertyCell>
+      {:else if availableBanks.length === 0}
+        <PropertyCell label="Bank" span={4}
+                      hint="Capture or create a bank in the MIDI Workbench's preset librarian, then choose it here.">
+          <span class="export-build-note">No librarian banks for {requiredProfileId} yet.</span>
+        </PropertyCell>
+      {:else}
+        <PropertyCell label="Bank" span={4}
+                      hint="Bakes this bank into the exported plugin as its host program list. Entries with captured patch data send that patch; name-only entries send the profile's recall action for the slot.">
+          <div class="export-row">
+            <select class="shortcut" style="width: auto"
+                    onchange={(e) => (e.currentTarget.value ? bakeBank(e.currentTarget.value) : clearBank())}>
+              <option value="">— none —</option>
+              {#each availableBanks as bank (bank.id)}
+                <option value={bank.id} selected={bakedBank?.label === bank.label}>
+                  {bank.label} ({bank.entries.length})
+                </option>
+              {/each}
+            </select>
+            {#if bakedCount > 0}
+              <span class="export-build-note">{bakedCount} program{bakedCount === 1 ? '' : 's'} baked</span>
+            {/if}
+          </div>
+        </PropertyCell>
+      {/if}
+      <PropertyCell label="" span={4}>
+        <span class="export-build-note">
+          {#if bakedCount > 0}
+            A panel-authored list, not a live view of the synth's memory — the DAW shows these names
+            and can automate program changes between them. Re-bake after changing the bank.
+            {#if bakedCount >= MAX_PROGRAMS}Capped at {MAX_PROGRAMS}.{/if}
+          {:else}
+            No bank baked: the plugin reports one unnamed program, as it always did.
+          {/if}
+        </span>
+      </PropertyCell>
+    </PropertySection>
+
+    <PropertySection title="Licence &amp; signing" icon={Scale}>
+      <PropertyCell label={LICENCE_NOTICE.title} span={4} hint={LICENCE_NOTICE.detail}>
+        <span class="export-build-note">{LICENCE_NOTICE.short}</span>
+      </PropertyCell>
+      <PropertyCell label={SIGNING_NOTICE.title} span={4} hint={SIGNING_NOTICE.detail}>
+        <span class="export-build-note">{SIGNING_NOTICE.short}</span>
+      </PropertyCell>
+    </PropertySection>
+
     <PropertySection title="Build" icon={Hammer}>
-      <PropertyCell label="Output" span={4} hint="Builds every enabled format (see Formats above) from this panel into export-out/. Progress streams into the Console panel.">
+      <PropertyCell label="Output" span={4} hint="Builds every enabled format (see Formats above) from this panel into export-out/. The log below is this run only; the Console panel keeps the interleaved copy.">
         <div class="export-row">
-          <button class="export-action" onclick={() => buildActivePanelVst3()}>Export Plugin</button>
+          <button class="export-action" disabled={$buildRunning} onclick={() => runExport()}>
+            {$buildRunning ? 'Building…' : 'Export Plugin'}
+          </button>
           <span class="export-build-note">→ export-out/{effectivePluginName}{exportFormatSuffix}{pythonWillEmbed ? ` (+~${PYTHON_RUNTIME_MB} MB Python)` : ''}</span>
         </div>
       </PropertyCell>
+
+      <!-- The identity fork (export plan D1). Shown only when it is a real question: a normal
+           re-export of a panel's own plugin must not ask, or it becomes a dialog people click
+           through without reading. -->
+      {#if identityAsk}
+        <PropertyCell label="Plugin identity" span={4} hint="This panel's plugin GUID already belongs to another panel — almost always the file this one was copied from. Updating replaces that plugin everywhere it is loaded; a new copy gets its own identity and can sit beside it in a DAW.">
+          <div class="identity-fork">
+            <p class="identity-why">{identityAsk.reason}.</p>
+            <div class="export-row">
+              <button class="export-action" onclick={() => runExport('update')}>Update that plugin</button>
+              <button class="export-action primary" onclick={() => runExport('new')}>Export as a new plugin</button>
+            </div>
+          </div>
+        </PropertyCell>
+      {/if}
+
+      {#if $activeRun}
+        <PropertyCell label={$activeRun.status === 'running' ? 'Build log' : ($activeRun.status === 'ok' ? 'Built' : 'Failed')} span={4} hint="The head and tail of this run. The middle is dropped when a build is long — a configure error is in the first lines and a compile error in the last, so both ends are kept and the gap is counted rather than hidden.">
+          <div class="build-log" class:ok={$activeRun.status === 'ok'} class:failed={$activeRun.status === 'failed'}>
+            {#if $activeRun.status === 'ok'}
+              <div class="build-result">
+                <b>{$activeRun.productName}</b> → <code>{$activeRun.path || 'export-out/'}</code>
+                {#if canRevealFiles() && $activeRun.path}
+                  <button class="link" onclick={() => revealFile($activeRun.path)}>Reveal in folder</button>
+                {/if}
+                <button class="link" onclick={() => clearRun()}>Dismiss</button>
+              </div>
+            {:else if $activeRun.status === 'failed'}
+              <div class="build-result bad">
+                {$activeRun.message || 'Build failed'}
+                <button class="link" onclick={() => clearRun()}>Dismiss</button>
+              </div>
+            {/if}
+            <pre class="log-lines">{$activeRun.head.join('\n')}{$activeRun.elided ? `\n… ${$activeRun.elided} lines not shown …\n` : '\n'}{$activeRun.tail.join('\n')}</pre>
+          </div>
+        </PropertyCell>
+      {/if}
+
+      {#if $exportHistory.length}
+        <PropertyCell label="History" span={4} hint="What this project has exported and where it went. Failed runs are kept too — the one you want to look at again is usually the one that did not work.">
+          <ul class="export-history">
+            {#each $exportHistory.slice(0, 12) as run (run.guid + run.at)}
+              <li class:bad={!run.ok}>
+                <span class="hist-mark">{run.ok ? '✓' : '✗'}</span>
+                <span class="hist-name">{run.productName || run.panelName}</span>
+                <span class="hist-fmt">{run.format}</span>
+                {#if run.ok && run.path}
+                  <code class="hist-path" title={run.path}>{run.path}</code>
+                  {#if canRevealFiles()}
+                    <button class="link" onclick={() => revealFile(run.path)}>Reveal</button>
+                  {/if}
+                {:else}
+                  <span class="hist-path bad" title={run.message}>{run.message || 'failed'}</span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+          <button class="link" onclick={() => clearHistory()}>Clear history</button>
+        </PropertyCell>
+      {/if}
     </PropertySection>
 
   {:else}
@@ -856,6 +1124,41 @@
 {/if}
 
 <style>
+  .identity-fork { display: flex; flex-direction: column; gap: 6px; }
+  .identity-why { color: #F2C94C; font-size: 11px; line-height: 1.45; margin: 0; }
+  .export-action.primary { background: #3A5A80; border-color: #4A72A0; color: #FFF; }
+  .export-action:disabled { opacity: 0.5; cursor: default; }
+
+  .build-log { display: flex; flex-direction: column; gap: 5px; }
+  .build-result { display: flex; align-items: center; gap: 8px; font-size: 11px; flex-wrap: wrap; }
+  .build-result.bad { color: #E57373; }
+  .build-result code { color: #AAA; font-size: 10.5px; }
+  .log-lines {
+    margin: 0; max-height: 220px; overflow: auto; background: #141414; border: 1px solid #2E2E2E;
+    border-radius: 4px; padding: 6px 8px; color: #9A9A9A; font-size: 10.5px; line-height: 1.5;
+    font-family: ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word;
+  }
+  .build-log.failed .log-lines { border-color: #4A2A2A; }
+  .build-log.ok .log-lines { border-color: #2A4A38; }
+
+  .export-history { list-style: none; margin: 0 0 6px; padding: 0; font-size: 11px; }
+  .export-history li { display: flex; align-items: center; gap: 6px; padding: 2px 0; min-width: 0; }
+  .export-history li.bad { color: #C08080; }
+  .hist-mark { color: #39D98A; width: 10px; }
+  .export-history li.bad .hist-mark { color: #E57373; }
+  .hist-name { flex: 0 0 auto; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-fmt { color: #777; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .hist-path {
+    flex: 1; min-width: 0; color: #777; font-size: 10px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left;
+  }
+  .hist-path.bad { color: #C08080; direction: ltr; }
+  .link {
+    background: none; border: none; color: #5B9BD5; font-family: inherit; font-size: 10.5px;
+    padding: 0; cursor: pointer; white-space: nowrap;
+  }
+  .link:hover { color: #7BB3E5; text-decoration: underline; }
+
   .shortcut {
     width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; cursor: pointer;
@@ -1137,5 +1440,32 @@
     padding: 20px;
     color: #444;
     font-size: 11px;
+  }
+
+  /* Same R/C/P chips LayerEffectsSection draws for the Image and Texture layers, so the Solid and
+     Gradient sections' tools do not look like a different control. */
+  .layer-tool-btn {
+    width: 18px;
+    height: 16px;
+    background: #1A1A1A;
+    border: 1px solid #333;
+    border-radius: 3px;
+    color: #777;
+    font-size: 9px;
+    font-family: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .layer-tool-btn:hover {
+    border-color: #5B9BD5;
+    color: #DDD;
+  }
+
+  .layer-tool-btn:disabled {
+    opacity: 0.3;
+    pointer-events: none;
   }
 </style>

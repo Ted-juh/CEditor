@@ -98,7 +98,7 @@
     <PropertyCell label="Y axis" span={2} hint="Name the vertical musical direction (e.g. soft → aggressive).">
       <input class="val" type="text" value={tb.axisY ?? ''} onchange={(e) => set('axisY', e.target.value)} />
     </PropertyCell>
-    <PropertyCell label="Blend" span={2} compact hint="Sharpness of the blend — higher makes the nearest anchor dominate sooner.">
+    <PropertyCell label="Blend" span={1} compact hint="Sharpness of the blend — higher makes the nearest anchor dominate sooner.">
       <NumberCell label="Blend" min={1} max={6} step={0.5} value={tb.power ?? 2} defaultValue={2} onchange={(v) => set('power', Math.max(1, Math.min(6, v)))} />
     </PropertyCell>
     <PropertyCell label="Editable" span={1} hint="Drag the puck / anchors in preview.">
@@ -107,11 +107,11 @@
     <PropertyCell label="Field" span={1} hint="Show the colour heat field.">
       <PropertyToggle value={tb.showField !== false} onchange={() => set('showField', !(tb.showField !== false))} />
     </PropertyCell>
-    <PropertyCell label="Readout" span={2} hint="Show how many targets are actually MIDI-addressable (bound to a device parameter).">
+    <PropertyCell label="Readout" span={1} hint="Show how many targets are actually MIDI-addressable (bound to a device parameter).">
       <PropertyToggle value={tb.showReadout !== false} onchange={() => set('showReadout', !(tb.showReadout !== false))} />
     </PropertyCell>
     {#if targets.length}
-      <PropertyCell label="" span={2} hint="Bind each target's port in Device Bindings to make it drive a real parameter.">
+      <PropertyCell label="" span={2} hint="Bind each target's port in Device Bindings to make it drive a real parameter." compact>
         <div class="note" class:warn={addr.addressable < addr.total}>{addr.addressable} of {addr.total} targets are MIDI-addressable</div>
       </PropertyCell>
     {/if}
@@ -131,7 +131,7 @@
     {#snippet tools()}
       <button type="button" class="hdr-btn" title="Add target" onclick={addTarget}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Each target is one parameter the anchors morph. Bind its 'Target' port in Device Bindings.">
+    <PropertyCell label="" span={4} hint="Each target is one parameter the anchors morph. Bind its 'Target' port in Device Bindings." compact>
       <div class="rows">
         {#if targets.length === 0}<div class="empty">No targets yet. Add one, then bind its port.</div>{/if}
         {#each targets as t, i (t.id ?? i)}
@@ -151,7 +151,7 @@
     {#snippet tools()}
       <button type="button" class="hdr-btn" title="Add anchor" onclick={addAnchor}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Each anchor is a named patch at X/Y (0–1) storing a value per target. Capture stamps the panel's current values.">
+    <PropertyCell label="" span={4} hint="Each anchor is a named patch at X/Y (0–1) storing a value per target. Capture stamps the panel's current values." compact>
       <div class="rows">
         {#if anchors.length === 0}<div class="empty">No anchors yet. Add one and set its per-target values.</div>{/if}
         {#each anchors as a, i (a.id ?? i)}
@@ -185,11 +185,8 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
-    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .rows { display: flex; flex-direction: column; gap: 8px; }
   .trow { display: flex; align-items: center; gap: 8px; }
   .trow .name { flex: 1 1 auto; }

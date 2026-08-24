@@ -1,6 +1,7 @@
 #include "ValueTreeBridge.h"
 #include "AppSettings.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
+#include "UpdateCheck.h"
 
 #include <cstdlib>
 
@@ -579,6 +580,178 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                                + " emitCall=" + juce::String (juce::Time::getMillisecondCounterHiRes() - emitStartMs, 1) + "ms");
             });
         })
+        // --- Panel packages (.cepanelpkg) ------------------------------------------------------
+        // A .cepanel references its images by absolute path, so sending one to another person
+        // sends a panel with no pictures. utils/panelPackage.js embeds them instead; these two
+        // listeners are the only native support that format needs — a save dialog and an open
+        // dialog. Reading is deliberately not here: the chooser emits a path and the web side
+        // reads it back through requestFileData, which already base64-encodes for the reason
+        // documented on that listener, and a package full of embedded images is exactly the
+        // payload that makes the difference.
+        .withEventListener ("savePanelPackageAs", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                auto suggestedName = payloadObj->getProperty ("suggestedName").toString();
+                auto jsonData = payloadObj->getProperty ("data").toString();
+
+                auto startIn = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+                if (suggestedName.isNotEmpty())
+                    startIn = startIn.getChildFile (suggestedName);
+
+                fileChooser = std::make_unique<juce::FileChooser> (
+                    "Share Panel As",
+                    startIn,
+                    "*.cepanelpkg");
+
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                    [this, jsonData] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+
+                        if (result == juce::File())
+                            return;
+
+                        auto file = result.withFileExtension ("cepanelpkg");
+
+                        auto* obj = new juce::DynamicObject();
+                        obj->setProperty ("filePath", file.getFullPathName());
+                        obj->setProperty ("name", file.getFileNameWithoutExtension());
+                        // replaceWithText's return value is reported rather than dropped: a
+                        // package is the thing you are about to send somebody, so "saved" has to
+                        // mean it. A full disk or a read-only folder should say so here, not when
+                        // the recipient opens nothing.
+                        obj->setProperty ("ok", file.replaceWithText (jsonData));
+
+                        browser->emitEventIfBrowserIsVisible ("panelPackageSaved", juce::var (obj));
+                    });
+            });
+        })
+        .withEventListener ("openPanelPackage", [this] (const juce::var&)
+        {
+            juce::MessageManager::callAsync ([this]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                fileChooser = std::make_unique<juce::FileChooser> (
+                    "Open Shared Panel",
+                    juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                    "*.cepanelpkg");
+
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                    [this] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+
+                        if (result == juce::File() || ! result.existsAsFile())
+                            return;
+
+                        auto* obj = new juce::DynamicObject();
+                        obj->setProperty ("filePath", result.getFullPathName());
+                        obj->setProperty ("name", result.getFileNameWithoutExtension());
+                        obj->setProperty ("byteSize", (juce::int64) result.getSize());
+
+                        browser->emitEventIfBrowserIsVisible ("panelPackageOpened", juce::var (obj));
+                    });
+            });
+        })
+        // --- Update check ------------------------------------------------------------------------
+        //
+        // One HTTP GET, on a background thread, reported back as an event. The RULES — which
+        // version is newer, what counts as a readable reply, and when a check is allowed at all —
+        // are in CE/src/UpdateCheck.h with their own test; this is only the fetch.
+        //
+        // OFF BY DEFAULT, and the web side enforces that before it ever gets here. A check sends
+        // this machine's IP address to GitHub: unremarkable, and still not something the program
+        // should do on its own the first time somebody starts it. Help -> Check for Updates is the
+        // always-available path, because choosing it IS the consent.
+        .withEventListener ("checkForUpdates", [this] (const juce::var&)
+        {
+            // Not on the message thread: this blocks on a socket, and a five-second DNS timeout
+            // with the UI frozen behind it is a worse experience than no update check at all.
+            juce::Thread::launch ([this, stillAlive = alive]()
+            {
+                juce::String body, error;
+                juce::URL url (ce::latestReleaseEndpoint());
+                int status = 0;
+
+                // GitHub requires a User-Agent and rejects requests without one. Asking for the
+                // documented media type pins the reply shape this parses.
+                auto options = juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+                                   .withExtraHeaders ("Accept: application/vnd.github+json\r\n"
+                                                      "User-Agent: CEditor\r\n")
+                                   .withConnectionTimeoutMs (8000)
+                                   .withStatusCode (&status);
+
+                if (auto stream = url.createInputStream (options))
+                    body = stream->readEntireStreamAsString();
+
+                if (body.isEmpty())
+                    error = status > 0 ? "The update service answered " + juce::String (status) + "."
+                                       : "Could not reach the update service. Check your connection.";
+
+                const auto reply = error.isEmpty() ? juce::JSON::parse (body) : juce::var();
+
+                juce::MessageManager::callAsync ([this, stillAlive, reply, error]()
+                {
+                    // Eight seconds is long enough to close a window in. Without this the callback
+                    // would dereference a destroyed bridge — the one place here where a background
+                    // thread can genuinely outlive the object that started it.
+                    if (! stillAlive->load() || browser == nullptr)
+                        return;
+
+                    auto* obj = new juce::DynamicObject();
+                    if (error.isNotEmpty())
+                    {
+                        obj->setProperty ("ok", false);
+                        obj->setProperty ("error", error);
+                    }
+                    else
+                    {
+                        // The comparison happens on the web side, which knows the running version
+                        // from the build stamp. Here we only forward what was published — one
+                        // place decides "is this newer", and it is the one with the test.
+                        obj->setProperty ("ok", true);
+                        obj->setProperty ("release", reply);
+                    }
+                    browser->emitEventIfBrowserIsVisible ("updateCheckResult", juce::var (obj));
+                });
+            });
+        })
+        .withEventListener ("revealFile", [] (const juce::var& payload)
+        {
+            // "Show me where this actually is" — the tab strip's context menu (review finding D8).
+            // No browser round-trip and no reply: the OS file manager is the whole answer, so
+            // there is nothing for the web side to wait on. It still hops to the message thread,
+            // because revealToUser() opens a shell window and the bridge callback is not the
+            // place to do that.
+            juce::MessageManager::callAsync ([payload]()
+            {
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                juce::File file (payloadObj->getProperty ("filePath").toString());
+
+                // A path that no longer exists reveals nothing; fall back to the containing
+                // folder so a moved-or-deleted file still gets the user somewhere useful rather
+                // than opening a window on nothing.
+                if (file.exists())
+                    file.revealToUser();
+                else if (file.getParentDirectory().isDirectory())
+                    file.getParentDirectory().revealToUser();
+            });
+        })
         .withEventListener ("saveScriptWorkspaceAs", [this] (const juce::var& payload)
         {
             juce::MessageManager::callAsync ([this, payload]()
@@ -768,7 +941,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 else if (ext == ".woff") mimeType = "font/woff";
                 else if (ext == ".woff2") mimeType = "font/woff2";
                 else if (ext == ".svg") mimeType = "image/svg+xml";
-                else if (ext == ".json" || ext == ".cepanel") mimeType = "application/json";
+                else if (ext == ".json" || ext == ".cepanel" || ext == ".cepanelpkg") mimeType = "application/json";
 
                 auto* obj = new juce::DynamicObject();
                 obj->setProperty ("requestId", requestId);
@@ -1279,27 +1452,43 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
 
                 const auto sourceRoot = ceditorSourceRoot();   // dev checkout OR installed tools/ beside the exe
 
-                const auto script = sourceRoot.getChildFile ("tools")
-                                              .getChildFile ("scripts")
-                                              .getChildFile ("export-panel-vst3.mjs");
-                if (! script.existsAsFile())
-                {
-                    emitFail ("Exporter not found: " + script.getFullPathName());
-                    return;
-                }
-
-                // A full VST3 export AOT-compiles a unique-identity plugin, which needs the C++ build
-                // environment (player source + CMake + a compiler). A GUI-only install ships the exporter
-                // script + toolchains but not the source tree, so fail with a clear message instead of the
-                // raw node module-resolution error from the exporter's source-tree imports.
+                // TWO EXPORT PATHS, and which one runs depends on what this install actually has.
+                //
+                // The compiling path relinks the player per panel and needs the C++ build environment.
+                // The template path copies a prebuilt player and writes the panel inside it -- no
+                // compiler, no CMake, no source tree -- and produces byte-identical plugin ids, so a
+                // session saved against either keeps working. See CE/src/Export/PanelIdentitySidecar.h.
+                //
+                // The compiling path is preferred WHERE IT IS AVAILABLE, because it is the one with the
+                // mileage on it and a source checkout is by definition a developer machine. An install
+                // that ships templates and no source tree takes the other, which is what turns "export
+                // runs from a source checkout" from a limitation into a preference.
                 const bool hasBuildEnv = sourceRoot.getChildFile ("CMakeLists.txt").existsAsFile()
                                        && sourceRoot.getChildFile ("CE").getChildFile ("web")
                                                     .getChildFile ("src").isDirectory();
-                if (! hasBuildEnv)
+
+                const auto templatesDir = sourceRoot.getChildFile ("templates");
+                const bool hasTemplates = templatesDir.isDirectory()
+                                       && ! templatesDir.findChildFiles (juce::File::findFilesAndDirectories, false,
+                                                                         "*.vst3").isEmpty();
+
+                const auto scriptName = hasBuildEnv ? "export-panel-vst3.mjs" : "export-panel-template.mjs";
+                const auto script = sourceRoot.getChildFile ("tools")
+                                              .getChildFile ("scripts")
+                                              .getChildFile (scriptName);
+
+                if (! hasBuildEnv && ! hasTemplates)
                 {
-                    emitFail ("Full VST3 export needs the C++ build environment (the player source, CMake "
-                              "and a compiler), which isn't part of this install. Run exports from a source "
-                              "checkout. This install can still design panels and manage scripting toolchains.");
+                    emitFail ("This install can't export yet: it has neither the C++ build environment "
+                              "(player source, CMake and a compiler) nor a prebuilt player template in "
+                              "templates/. Reinstall including the plugin templates, or run exports from a "
+                              "source checkout. Designing panels and managing scripting toolchains still work.");
+                    return;
+                }
+
+                if (! script.existsAsFile())
+                {
+                    emitFail ("Exporter not found: " + script.getFullPathName());
                     return;
                 }
 
@@ -1322,11 +1511,17 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 const auto exportPath = sourceRoot.getChildFile ("export-out")
                                                   .getChildFile (productName + ".vst3").getFullPathName();
 
-                const juce::StringArray command { node.getFullPathName(),
-                                                  script.getFullPathName(),
-                                                  tempPanel.getFullPathName(),
-                                                  guid,
-                                                  productName };
+                // The two exporters take the same first two arguments deliberately. The third differs:
+                // the compiling one accepts a product-name override on the command line, the template
+                // one takes the directory to copy from.
+                juce::StringArray command { node.getFullPathName(),
+                                            script.getFullPathName(),
+                                            tempPanel.getFullPathName(),
+                                            guid };
+                if (hasBuildEnv)
+                    command.add (productName);
+                else
+                    command.addArray ({ "--templates", templatesDir.getFullPathName() });
 
                 buildJob = std::make_unique<VstBuildJob> (browser, command, exportPath);
             });

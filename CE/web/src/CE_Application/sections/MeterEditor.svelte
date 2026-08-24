@@ -63,10 +63,10 @@
       </select>
     </PropertyCell>
     {#if String(m.scale) === 'db'}
-      <PropertyCell label="dB floor" span={2} compact hint="Decibels at the bottom of the meter.">
+      <PropertyCell label="dB floor" span={1} compact hint="Decibels at the bottom of the meter.">
         <NumberCell label="Floor" value={m.dbFloor ?? -60} defaultValue={-60} onchange={(v) => set('dbFloor', v)} />
       </PropertyCell>
-      <PropertyCell label="dB ceil" span={2} compact hint="Decibels at the top of the meter.">
+      <PropertyCell label="dB ceil" span={1} compact hint="Decibels at the top of the meter.">
         <NumberCell label="Ceil" value={m.dbCeil ?? 6} defaultValue={6} onchange={(v) => set('dbCeil', v)} />
       </PropertyCell>
     {/if}
@@ -82,7 +82,7 @@
       </select>
     </PropertyCell>
     {#if !m.valueSourceId}
-      <PropertyCell label="Value" span={2} compact hint="Static/test value shown when nothing drives the meter.">
+      <PropertyCell label="Value" span={1} compact hint="Static/test value shown when nothing drives the meter.">
         <NumberCell label="Val" value={m.value ?? 0} defaultValue={0} onchange={(v) => set('value', v)} />
       </PropertyCell>
     {/if}
@@ -95,7 +95,7 @@
   </PropertySection>
 
   <PropertySection title="Fill" icon={PaintBucket}>
-    <PropertyCell label="Segments" span={2} compact hint="0 = smooth continuous fill; N = N discrete LED segments.">
+    <PropertyCell label="Segments" span={1} compact hint="0 = smooth continuous fill; N = N discrete LED segments.">
       <NumberCell label="Seg" min={0} max={64} value={m.segments ?? 0} defaultValue={0} onchange={(v) => set('segments', Math.max(0, Math.round(v)))} />
     </PropertyCell>
     <PropertyCell label="Gradient" span={1} hint="Blend zone colours smoothly vs hard steps.">
@@ -104,7 +104,7 @@
     <PropertyCell label="Rounded" span={1} compact hint="Fill corner radius (px).">
       <NumberCell label="Rad" min={0} value={m.rounded ?? 3} defaultValue={3} onchange={(v) => set('rounded', Math.max(0, v))} />
     </PropertyCell>
-    <PropertyCell label="Thickness" span={2} compact hint="Bar/arc thickness in px (0 = fill the box).">
+    <PropertyCell label="Thickness" span={1} compact hint="Bar/arc thickness in px (0 = fill the box).">
       <NumberCell label="Thick" min={0} value={m.thickness ?? 0} defaultValue={0} onchange={(v) => set('thickness', Math.max(0, v))} />
     </PropertyCell>
     <PropertyCell label="Track" span={2} hint="Unlit background colour. Click the swatch to edit it in the Colors tab.">
@@ -118,7 +118,7 @@
     {#snippet tools()}
       <button type="button" class="hdr-btn" title="Add zone" onclick={addZone}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Each zone lights the fill from its position (0–1) upward; leave one at 0 for the base colour.">
+    <PropertyCell label="" span={4} hint="Each zone lights the fill from its position (0–1) upward; leave one at 0 for the base colour." compact>
       <div class="zones">
         {#if zones.length === 0}
           <div class="empty">No zones — the fill uses one colour. Add a zone to colour by level.</div>
@@ -160,15 +160,15 @@
   </PropertySection>
 
   <PropertySection title="Scale & readout" icon={Ruler}>
-    <PropertyCell label="Ticks" span={2} hint="Draw scale tick marks along the meter.">
+    <PropertyCell label="Ticks" span={1} hint="Draw scale tick marks along the meter.">
       <PropertyToggle value={m.showTicks === true} onchange={() => toggle('showTicks')} />
     </PropertyCell>
     {#if m.showTicks === true}
-      <PropertyCell label="Tick count" span={2} compact hint="Number of divisions (marks = count + 1).">
+      <PropertyCell label="Tick count" span={1} compact hint="Number of divisions (marks = count + 1).">
         <NumberCell label="Ticks" min={1} max={20} value={m.tickCount ?? 4} defaultValue={4} onchange={(v) => set('tickCount', Math.max(1, Math.round(v)))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Readout" span={2} hint="Show the numeric value overlaid on the meter.">
+    <PropertyCell label="Readout" span={1} hint="Show the numeric value overlaid on the meter.">
       <PropertyToggle value={m.showValue === true} onchange={() => toggle('showValue')} />
     </PropertyCell>
     {#if m.showValue === true}
@@ -193,10 +193,10 @@
 
   {#if String(m.orientation) === 'arc'}
     <PropertySection title="Arc" icon={Radius}>
-      <PropertyCell label="Start°" span={2} compact hint="Arc start angle (clockwise from 3 o'clock).">
+      <PropertyCell label="Start°" span={1} compact hint="Arc start angle (clockwise from 3 o'clock).">
         <NumberCell label="Start" value={m.arcStart ?? 135} defaultValue={135} onchange={(v) => set('arcStart', v)} />
       </PropertyCell>
-      <PropertyCell label="Sweep°" span={2} compact hint="Degrees the arc sweeps.">
+      <PropertyCell label="Sweep°" span={1} compact hint="Degrees the arc sweeps.">
         <NumberCell label="Sweep" value={m.arcSweep ?? 270} defaultValue={270} onchange={(v) => set('arcSweep', v)} />
       </PropertyCell>
     </PropertySection>
@@ -204,11 +204,8 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
-    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .zones { display: flex; flex-direction: column; gap: 6px; }
   .zrow { display: flex; align-items: center; gap: 6px; }
   .zrow .zfrom { flex: 0 0 70px; }

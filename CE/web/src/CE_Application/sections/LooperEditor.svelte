@@ -48,13 +48,13 @@
       hint="Loop over a number of bars instead of seconds, so the loop point is the bar line."
     >
       {#snippet children()}
-        <PropertyCell label="Loop (bars)" span={2} compact hint="Loop length in bars. 0.25 = one beat in 4/4.">
+        <PropertyCell label="Loop (bars)" span={1} compact hint="Loop length in bars. 0.25 = one beat in 4/4.">
           <NumberCell label="Bars" value={lp.loopBars ?? 2} step={0.25} min={MIN_BARS} max={MAX_BARS} defaultValue={2} onchange={(v) => set('loopBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(v, 2))))} />
         </PropertyCell>
       {/snippet}
     </TransportSyncCells>
     {#if lp.syncToTransport !== true}
-      <PropertyCell label="Loop (s)" span={2} compact hint="Loop length in seconds — how long one pass around takes.">
+      <PropertyCell label="Loop (s)" span={1} compact hint="Loop length in seconds — how long one pass around takes.">
         <NumberCell label="Sec" value={lp.loopSeconds ?? 4} step={0.1} min={0.1} max={60} defaultValue={4} onchange={(v) => set('loopSeconds', Math.max(0.1, num(v, 4)))} />
       </PropertyCell>
     {/if}
@@ -95,7 +95,7 @@
     {#snippet tools()}
       <button type="button" class="header-add-btn" title="Add lane" onclick={addLane}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Each lane records a value-over-loop gesture. Bind its 'Lane' port in Device Bindings.">
+    <PropertyCell label="" span={4} hint="Each lane records a value-over-loop gesture. Bind its 'Lane' port in Device Bindings." compact>
       <div class="lanes">
         {#if lanes.length === 0}
           <div class="empty">No lanes yet. Add one, then bind its port in Device Bindings.</div>
@@ -108,7 +108,7 @@
                 { key: `lane-${i}`, label: 'Colour', value: l.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateLane(i, 'colour', hex) } },
               ]} />
               <span class="pts">{pointCount(l) ? `${pointCount(l)} pts` : 'empty'}</span>
-              <label class="flag"><input type="checkbox" checked={l.enabled !== false} onchange={(e) => updateLane(i, 'enabled', e.currentTarget.checked)} /><span>On</span></label>
+              <PropertyToggle compact label="On" value={l.enabled !== false} onchange={(next) => updateLane(i, 'enabled', next)} ariaLabel={`Lane ${i + 1} enabled`} />
               <button type="button" class="action-btn" onclick={() => clearLane(i)} title="Clear recording">Clear</button>
               <button type="button" class="action-btn danger" onclick={() => removeLane(i)} title="Remove">✕</button>
             </div>
@@ -125,11 +125,8 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
-    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .lanes { display: flex; flex-direction: column; gap: 8px; }
   .lane { border: 1px solid #303030; border-radius: 6px; background: #171717; padding: 8px; display: flex; flex-direction: column; gap: 7px; }
   .lane.off { opacity: 0.55; }
@@ -140,7 +137,6 @@
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #8a8a8a; }
   .nc-wrap { display: flex; }
-  .flag { display: inline-flex; align-items: center; gap: 5px; color: #B9B9B9; font-size: 11px; white-space: nowrap; }
   .empty { border: 1px dashed #3A3A3A; border-radius: 4px; color: #8A8A8A; font-size: 11px; padding: 8px; }
   .action-btn {
     background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD;

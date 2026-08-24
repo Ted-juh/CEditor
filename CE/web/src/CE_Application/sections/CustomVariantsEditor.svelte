@@ -4,6 +4,9 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import Shuffle from 'lucide-svelte/icons/shuffle';
+  import EyeIcon from 'lucide-svelte/icons/eye';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
 
   // showActivePicker=false hides the instance-facing "Active" cell — inside
   // the Publish tab only the definitions are edited (the picker lives on the
@@ -259,7 +262,7 @@
 </script>
 
 {#if variants}
-  <PropertySection title="Variants">
+  <PropertySection title="Variants" icon={Shuffle}>
     {#if showActivePicker}
       <PropertyCell label="Active" span={2} hint="Variant used by preview and normal panel properties.">
         <select class="val" value={variants.active ?? 'default'} onchange={(event) => {
@@ -282,12 +285,12 @@
     <PropertyCell label="Add" span={3} hint="Add a named component variant such as compact, vertical, dark, or detailed.">
       <input class="val" type="text" bind:value={newName} placeholder="variantName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create variant.">
+    <PropertyCell label="" span={1} hint="Create variant." compact>
       <button class="action-btn" type="button" onclick={addVariant}>Add</button>
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Variant Preview">
+  <PropertySection title="Variant Preview" icon={EyeIcon}>
     <PropertyCell label="Summary" span={2} hint="Variant count and active state.">
       <div class="variant-summary">
         <strong>{variants.active ?? 'default'}</strong>
@@ -316,7 +319,7 @@
   </PropertySection>
 
   {#if selected}
-    <PropertySection title="Variant Definition">
+    <PropertySection title="Variant Definition" icon={SlidersHorizontal}>
       <PropertyCell label="Enabled" span={1} hint="Enable this variant.">
         <PropertyToggle value={selected.enabled !== false} onchange={() => set('enabled', !(selected.enabled !== false))} />
       </PropertyCell>
@@ -357,7 +360,7 @@
           </datalist>
         </div>
       </PropertyCell>
-      <PropertyCell label="" span={4} hint="Raw JSON patch map — an escape hatch for cases the visual editor doesn't cover yet.">
+      <PropertyCell label="" span={4} hint="Raw JSON patch map — an escape hatch for cases the visual editor doesn't cover yet." compact>
         <div class="advanced-block">
           <button class="cond-mini" type="button" onclick={() => showAdvanced = !showAdvanced}>{showAdvanced ? 'Hide raw JSON' : 'Advanced: raw JSON'}</button>
           {#if showAdvanced}
@@ -365,7 +368,7 @@
           {/if}
         </div>
       </PropertyCell>
-      <PropertyCell label="" span={4} hint="Remove this variant. Default cannot be removed.">
+      <PropertyCell label="" span={4} hint="Remove this variant. Default cannot be removed." compact>
         <div class="footer-row">
           <span>{parseError}</span>
           <button class="action-btn danger compact" type="button" onclick={removeVariant} disabled={selectedName === 'default'}>Remove variant</button>
@@ -376,9 +379,19 @@
 {/if}
 
 <style>
-  .val { width: 100%; min-width: 0; background: #1A1A1A; border: 1px solid #333; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 6px; font-family: inherit; outline: none; box-sizing: border-box; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+
+  /* A textarea wears `.val` too, and the shared skin is sized for a single-line field. Rows
+     decide its height; the token is only a floor. */
+  textarea.val {
+    height: auto;
+    min-height: var(--pp-field-height, 26px);
+    padding: 4px 6px;
+    line-height: 1.4;
+    resize: vertical;
+  }
   .val.code { font-family: Consolas, 'Courier New', monospace; line-height: 1.4; }
-  .val:focus { border-color: #5B9BD5; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .action-btn { width: 100%; background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 8px; cursor: pointer; font-family: inherit; }
   .action-btn.compact { width: auto; }
   .action-btn:hover:not(:disabled) { border-color: #5B9BD5; color: #FFF; }

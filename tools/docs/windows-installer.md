@@ -194,18 +194,26 @@ Node; `resolveToolchain.mjs` checks the per-user dir first, then the bundled `{a
 installed either way resolve. (Removing an install-time-provisioned toolchain under Program Files needs
 elevation and is left in place by the in-app Remove.)
 
-### Important: export needs the C++ build environment
+### Export: no compiler needed, if the install ships templates
 
-The installed `CEditor.exe` is the **panel designer** + toolchain manager. A full **VST3 export** still
-requires the C++ build environment — the player source, JUCE, CMake, and a compiler — because each
-exported VST3 needs a **unique compile-time identity (FUID)**; a single prebuilt binary can't serve
-multiple panels without DAW session collisions (see
-`docs/scripting-language-options-and-shippable-export.md` §3a). So:
+This section used to say a full VST3 export required the C++ build environment, because each
+exported VST3 needs a unique **compile-time** identity (FUID). The premise was right about JUCE and
+wrong about VST3 — the class id is whatever the module's factory reports — and
+`docs/scripting-language-options-and-shippable-export.md` §3a now records both the mistake and the
+fix. So:
 
-- A GUI-only install can **manage/provision toolchains** but cannot by itself export a VST3.
-- Full VST3 export runs from a **source checkout** (or a future "developer install" that stages the
-  whole build tree).
-- A **compiler-free path exists only for standalone/CLAP** (no FUID contract) — future work.
+- An install that ships **prebuilt player templates** in `templates/` exports with **no compiler,
+  no CMake and no source tree**: the exporter copies a template and writes the panel inside it
+  (`tools/scripts/export-panel-template.mjs`). The plugin derives its identity from that panel at
+  load, and the ids are byte-identical to the ones a per-panel relink produced, so sessions saved
+  against an older export keep working.
+- An install with **neither** templates nor a source tree still cannot export, and says so.
+- A **source checkout** keeps the compiling path (`export-panel-vst3.mjs`) and prefers it — it has
+  the mileage, and a checkout is a developer machine.
+
+What this changes for packaging: the installer should stage `templates/` alongside `tools/`. One
+signed template binary per format serves every panel, which also makes code signing tractable —
+sign the template once rather than every export.
 
 The app locates the exporter via `ceditorSourceRoot()`, which checks the executable's directory (and its
 parent) and the working dir, so the same binary works from a source checkout or an install that staged

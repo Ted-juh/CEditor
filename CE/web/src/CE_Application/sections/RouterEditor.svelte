@@ -96,7 +96,7 @@
         </button>
       </PropertyCell>
       {#if String(r.source ?? '') === 'cc'}
-        <PropertyCell label="CC number" span={2} compact hint="Which controller number to follow (0–127).">
+        <PropertyCell label="CC number" span={1} compact hint="Which controller number to follow (0–127).">
           <NumberCell label="CC" value={num(r.ccNumber, 1)} step={1} min={0} max={127} onchange={(v) => set('ccNumber', Math.max(0, Math.min(127, Math.round(num(v, 1)))))} />
         </PropertyCell>
       {/if}
@@ -114,11 +114,11 @@
       <PropertyCell label="Test in" span={1} compact hint="Stand-in value (0–1) until that controller sends something. The header reads Live once real data arrives.">
         <NumberCell label="Test" value={r.testInput ?? 0.5} step={0.01} min={0} max={1} defaultValue={0.5} onchange={(v) => set('testInput', Math.max(0, Math.min(1, num(v, 0.5))))} />
       </PropertyCell>
-      <PropertyCell label="" span={4} hint="The controller is read from the hardware MIDI input on the device role.">
+      <PropertyCell label="" span={4} hint="The controller is read from the hardware MIDI input on the device role." compact>
         <div class="note">Reads {String(r.source ?? '') === 'cc' ? `CC ${num(r.ccNumber, 1)}` : routerSourceLabel(r.source ?? 'modwheel')} from the MIDI input{num(r.inputChannel, 0) > 0 ? ` · ch ${num(r.inputChannel, 0)}` : ' · omni'}{String(r.source ?? '') === 'polyAftertouch' ? ` · ${String(r.polyMode ?? 'highest') === 'last' ? 'most recent key' : 'hardest key'}` : ''}</div>
       </PropertyCell>
     {/if}
-    <PropertyCell label="Dead-zone" span={2} compact hint="Ignore the bottom of the input range; the rest rescales to fill 0–1 (0 = off).">
+    <PropertyCell label="Dead-zone" span={1} compact hint="Ignore the bottom of the input range; the rest rescales to fill 0–1 (0 = off).">
       <NumberCell label="Dz" value={r.deadzone ?? 0} step={0.02} min={0} max={0.9} defaultValue={0} onchange={(v) => set('deadzone', Math.max(0, Math.min(0.9, num(v, 0))))} />
     </PropertyCell>
     <PropertyCell label="Divisions" span={1} hint="Draw value-scale ticks along each destination meter, using the same major/minor tick generator as the sliders.">
@@ -150,7 +150,7 @@
     {#snippet tools()}
       <button type="button" class="hdr-btn" title="Add destination" onclick={addDest}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Each destination maps the curve to one bound parameter: depth (−100…+100%) and output range.">
+    <PropertyCell label="" span={4} hint="Each destination maps the curve to one bound parameter: depth (−100…+100%) and output range." compact>
       <div class="dests">
         {#if dests.length === 0}
           <div class="empty">No destinations yet. Add one, then bind its port in Device Bindings.</div>
@@ -162,7 +162,7 @@
               <span class="dcol"><SwatchCluster swatches={[
                 { key: 'colour', label: 'Colour', value: d.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateDest(i, 'colour', hex) } },
               ]} /></span>
-              <label class="flag"><input type="checkbox" checked={d.enabled !== false} onchange={(e) => updateDest(i, 'enabled', e.currentTarget.checked)} /><span>On</span></label>
+              <PropertyToggle compact label="On" value={d.enabled !== false} onchange={(next) => updateDest(i, 'enabled', next)} ariaLabel={`Destination ${i + 1} enabled`} />
               <button type="button" class="action-btn danger" onclick={() => removeDest(i)} title="Remove">✕</button>
             </div>
             <div class="drow2">
@@ -184,11 +184,8 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
-    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .note { font-size: 11px; color: #8a8a94; }
   .btn {
     width: 100%; background: #1A1A1A; border: 1px solid #333; color: #DDD;
@@ -205,7 +202,6 @@
   .drow2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #8a8a8a; }
-  .flag { display: inline-flex; align-items: center; gap: 5px; color: #B9B9B9; font-size: 11px; white-space: nowrap; }
   .empty { border: 1px dashed #3A3A3A; border-radius: 4px; color: #8A8A8A; font-size: 11px; padding: 8px; }
   .action-btn {
     background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD;

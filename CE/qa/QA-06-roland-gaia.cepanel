@@ -8,7 +8,8 @@
     "embedPython": "auto",
     "compileNativeHandlers": "auto",
     "exportClap": true,
-    "exportLv2": true
+    "exportLv2": true,
+    "restoreHardware": "ask"
   },
   "name": "QA-06 Roland GAIA SH-01",
   "scriptId": "qa_06_roland_gaia",
@@ -140,6 +141,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "common.patchLevel"
     },
@@ -153,6 +155,7 @@
       "defaultValue": 5,
       "unit": "BPM",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "common.patchTempo"
     },
@@ -166,6 +169,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.switch"
     },
@@ -179,6 +187,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.portamentoSwitch"
     },
@@ -192,6 +205,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "common.portamentoTime"
     },
@@ -205,6 +219,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.monoSwitch"
     },
@@ -218,6 +237,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "common.octaveShift"
     },
@@ -231,6 +251,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "common.pitchBendRangeUp"
     },
@@ -244,6 +265,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "common.pitchBendRangeDown"
     },
@@ -257,6 +279,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.tone1Switch"
     },
@@ -270,6 +297,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.tone1Select"
     },
@@ -283,6 +315,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.tone2Switch"
     },
@@ -296,6 +333,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.tone2Select"
     },
@@ -309,6 +351,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.tone3Switch"
     },
@@ -322,6 +369,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.tone3Select"
     },
@@ -335,6 +387,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "SYNC",
+        "RING"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.syncRingSelect"
     },
@@ -348,6 +406,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.effectsMasterSwitch"
     },
@@ -361,6 +424,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.tempoSyncSwitch"
     },
@@ -374,6 +442,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.lowBoostSwitch"
     },
@@ -387,6 +460,39 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "LFO-RATE",
+        "LFO-FADE-TIME",
+        "LFO-PITCH-MOD",
+        "LFO-FILTER-MOD",
+        "LFO-AMP-MOD",
+        "OSC-PITCH",
+        "OSC-DETUNE",
+        "OSC-PWM",
+        "OSC-PW",
+        "OSC-ENV-A",
+        "OSC-ENV-D",
+        "OSC-ENV-MOD",
+        "FILTER-CUTOFF",
+        "FILTER-RESONANCE",
+        "FILTER-ENV-A",
+        "FILTER-ENV-D",
+        "FILTER-ENV-S",
+        "FILTER-ENV-R",
+        "FILTER-ENV-MOD",
+        "AMP-LEVEL",
+        "AMP-ENV-A",
+        "AMP-ENV-D",
+        "AMP-ENV-S",
+        "AMP-ENV-R",
+        "EFX-CTRL",
+        "PORT-TIME",
+        "BENDER",
+        "MODULATION",
+        "FILTER-CUTOFF-KF",
+        "EFX-LEVEL"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.dBeamAssign"
     },
@@ -400,6 +506,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "NORMAL",
+        "REVERSE"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.dBeamPolarity"
     },
@@ -413,6 +524,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.effectsDistortionSelect"
     },
@@ -426,6 +542,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.effectsFlangerSelect"
     },
@@ -439,6 +560,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.effectsDelaySelect"
     },
@@ -452,6 +578,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "common.effectsReverbSelect"
     },
@@ -465,6 +596,7 @@
       "defaultValue": 100,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "master.volume"
     },
@@ -478,6 +610,16 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "SAW",
+        "SQR",
+        "PW-SQR",
+        "TRI",
+        "SINE",
+        "NOISE",
+        "SUPER-SAW"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone1.osc.wave"
     },
@@ -491,6 +633,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "A",
+        "B",
+        "C"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone1.osc.waveVariation"
     },
@@ -504,6 +652,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.osc.pitch"
     },
@@ -517,6 +666,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.osc.detune"
     },
@@ -530,6 +680,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.osc.pulseWidthModDepth"
     },
@@ -543,6 +694,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.osc.pulseWidth"
     },
@@ -556,6 +708,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.osc.pitchEnvAttackTime"
     },
@@ -569,6 +722,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.osc.pitchEnvDecay"
     },
@@ -582,6 +736,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.osc.pitchEnvDepth"
     },
@@ -595,6 +750,14 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "BYPASS",
+        "LPF",
+        "HPF",
+        "BPF",
+        "PKG"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone1.filter.mode"
     },
@@ -608,6 +771,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "-12 dB",
+        "-24 dB"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone1.filter.slope"
     },
@@ -621,6 +789,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.filter.cutoff"
     },
@@ -634,6 +803,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.filter.cutoffKeyfollow"
     },
@@ -647,6 +817,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.filter.envVelocitySens"
     },
@@ -660,6 +831,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.filter.resonance"
     },
@@ -673,6 +845,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.filter.envAttackTime"
     },
@@ -686,6 +859,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.filter.envDecayTime"
     },
@@ -699,6 +873,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.filter.envSustainLevel"
     },
@@ -712,6 +887,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.filter.envReleaseTime"
     },
@@ -725,6 +901,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.filter.envDepth"
     },
@@ -738,6 +915,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.amp.level"
     },
@@ -751,6 +929,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.amp.levelVelocitySens"
     },
@@ -764,6 +943,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.amp.envAttackTime"
     },
@@ -777,6 +957,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.amp.envDecayTime"
     },
@@ -790,6 +971,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.amp.envSustainLevel"
     },
@@ -803,6 +985,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.amp.envReleaseTime"
     },
@@ -816,6 +999,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.amp.pan"
     },
@@ -829,6 +1013,15 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "TRI",
+        "SIN",
+        "SAW",
+        "SQR",
+        "S&H",
+        "RND"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone1.lfo.shape"
     },
@@ -842,6 +1035,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.lfo.rate"
     },
@@ -855,6 +1049,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone1.lfo.tempoSyncSwitch"
     },
@@ -868,6 +1067,29 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "16",
+        "12",
+        "8",
+        "4",
+        "2",
+        "1",
+        "3/4",
+        "2/3",
+        "1/2",
+        "3/8",
+        "1/3",
+        "1/4",
+        "3/16",
+        "1/6",
+        "1/8",
+        "3/32",
+        "1/12",
+        "1/16",
+        "1/24",
+        "1/32"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone1.lfo.tempoSyncNote"
     },
@@ -881,6 +1103,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.lfo.fadeTime"
     },
@@ -894,6 +1117,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone1.lfo.keyTrigger"
     },
@@ -907,6 +1135,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.lfo.pitchDepth"
     },
@@ -920,6 +1149,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.lfo.filterDepth"
     },
@@ -933,6 +1163,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.lfo.ampDepth"
     },
@@ -946,6 +1177,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.lfo.panDepth"
     },
@@ -959,6 +1191,15 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "TRI",
+        "SIN",
+        "SAW",
+        "SQR",
+        "S&H",
+        "RND"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone1.modLfo.shape"
     },
@@ -972,6 +1213,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.modLfo.rate"
     },
@@ -985,6 +1227,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone1.modLfo.tempoSyncSwitch"
     },
@@ -998,6 +1245,29 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "16",
+        "12",
+        "8",
+        "4",
+        "2",
+        "1",
+        "3/4",
+        "2/3",
+        "1/2",
+        "3/8",
+        "1/3",
+        "1/4",
+        "3/16",
+        "1/6",
+        "1/8",
+        "3/32",
+        "1/12",
+        "1/16",
+        "1/24",
+        "1/32"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone1.modLfo.tempoSyncNote"
     },
@@ -1011,6 +1281,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.modLfo.pitchDepth"
     },
@@ -1024,6 +1295,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.modLfo.filterDepth"
     },
@@ -1037,6 +1309,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.modLfo.ampDepth"
     },
@@ -1050,6 +1323,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone1.modLfo.panDepth"
     },
@@ -1063,6 +1337,16 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "SAW",
+        "SQR",
+        "PW-SQR",
+        "TRI",
+        "SINE",
+        "NOISE",
+        "SUPER-SAW"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone2.osc.wave"
     },
@@ -1076,6 +1360,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "A",
+        "B",
+        "C"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone2.osc.waveVariation"
     },
@@ -1089,6 +1379,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.osc.pitch"
     },
@@ -1102,6 +1393,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.osc.detune"
     },
@@ -1115,6 +1407,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.osc.pulseWidthModDepth"
     },
@@ -1128,6 +1421,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.osc.pulseWidth"
     },
@@ -1141,6 +1435,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.osc.pitchEnvAttackTime"
     },
@@ -1154,6 +1449,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.osc.pitchEnvDecay"
     },
@@ -1167,6 +1463,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.osc.pitchEnvDepth"
     },
@@ -1180,6 +1477,14 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "BYPASS",
+        "LPF",
+        "HPF",
+        "BPF",
+        "PKG"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone2.filter.mode"
     },
@@ -1193,6 +1498,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "-12 dB",
+        "-24 dB"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone2.filter.slope"
     },
@@ -1206,6 +1516,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.filter.cutoff"
     },
@@ -1219,6 +1530,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.filter.cutoffKeyfollow"
     },
@@ -1232,6 +1544,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.filter.envVelocitySens"
     },
@@ -1245,6 +1558,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.filter.resonance"
     },
@@ -1258,6 +1572,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.filter.envAttackTime"
     },
@@ -1271,6 +1586,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.filter.envDecayTime"
     },
@@ -1284,6 +1600,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.filter.envSustainLevel"
     },
@@ -1297,6 +1614,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.filter.envReleaseTime"
     },
@@ -1310,6 +1628,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.filter.envDepth"
     },
@@ -1323,6 +1642,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.amp.level"
     },
@@ -1336,6 +1656,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.amp.levelVelocitySens"
     },
@@ -1349,6 +1670,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.amp.envAttackTime"
     },
@@ -1362,6 +1684,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.amp.envDecayTime"
     },
@@ -1375,6 +1698,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.amp.envSustainLevel"
     },
@@ -1388,6 +1712,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.amp.envReleaseTime"
     },
@@ -1401,6 +1726,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.amp.pan"
     },
@@ -1414,6 +1740,15 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "TRI",
+        "SIN",
+        "SAW",
+        "SQR",
+        "S&H",
+        "RND"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone2.lfo.shape"
     },
@@ -1427,6 +1762,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.lfo.rate"
     },
@@ -1440,6 +1776,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone2.lfo.tempoSyncSwitch"
     },
@@ -1453,6 +1794,29 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "16",
+        "12",
+        "8",
+        "4",
+        "2",
+        "1",
+        "3/4",
+        "2/3",
+        "1/2",
+        "3/8",
+        "1/3",
+        "1/4",
+        "3/16",
+        "1/6",
+        "1/8",
+        "3/32",
+        "1/12",
+        "1/16",
+        "1/24",
+        "1/32"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone2.lfo.tempoSyncNote"
     },
@@ -1466,6 +1830,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.lfo.fadeTime"
     },
@@ -1479,6 +1844,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone2.lfo.keyTrigger"
     },
@@ -1492,6 +1862,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.lfo.pitchDepth"
     },
@@ -1505,6 +1876,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.lfo.filterDepth"
     },
@@ -1518,6 +1890,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.lfo.ampDepth"
     },
@@ -1531,6 +1904,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.lfo.panDepth"
     },
@@ -1544,6 +1918,15 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "TRI",
+        "SIN",
+        "SAW",
+        "SQR",
+        "S&H",
+        "RND"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone2.modLfo.shape"
     },
@@ -1557,6 +1940,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.modLfo.rate"
     },
@@ -1570,6 +1954,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone2.modLfo.tempoSyncSwitch"
     },
@@ -1583,6 +1972,29 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "16",
+        "12",
+        "8",
+        "4",
+        "2",
+        "1",
+        "3/4",
+        "2/3",
+        "1/2",
+        "3/8",
+        "1/3",
+        "1/4",
+        "3/16",
+        "1/6",
+        "1/8",
+        "3/32",
+        "1/12",
+        "1/16",
+        "1/24",
+        "1/32"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone2.modLfo.tempoSyncNote"
     },
@@ -1596,6 +2008,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.modLfo.pitchDepth"
     },
@@ -1609,6 +2022,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.modLfo.filterDepth"
     },
@@ -1622,6 +2036,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.modLfo.ampDepth"
     },
@@ -1635,6 +2050,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone2.modLfo.panDepth"
     },
@@ -1648,6 +2064,16 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "SAW",
+        "SQR",
+        "PW-SQR",
+        "TRI",
+        "SINE",
+        "NOISE",
+        "SUPER-SAW"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone3.osc.wave"
     },
@@ -1661,6 +2087,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "A",
+        "B",
+        "C"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone3.osc.waveVariation"
     },
@@ -1674,6 +2106,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.osc.pitch"
     },
@@ -1687,6 +2120,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.osc.detune"
     },
@@ -1700,6 +2134,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.osc.pulseWidthModDepth"
     },
@@ -1713,6 +2148,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.osc.pulseWidth"
     },
@@ -1726,6 +2162,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.osc.pitchEnvAttackTime"
     },
@@ -1739,6 +2176,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.osc.pitchEnvDecay"
     },
@@ -1752,6 +2190,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.osc.pitchEnvDepth"
     },
@@ -1765,6 +2204,14 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "BYPASS",
+        "LPF",
+        "HPF",
+        "BPF",
+        "PKG"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone3.filter.mode"
     },
@@ -1778,6 +2225,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "-12 dB",
+        "-24 dB"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone3.filter.slope"
     },
@@ -1791,6 +2243,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.filter.cutoff"
     },
@@ -1804,6 +2257,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.filter.cutoffKeyfollow"
     },
@@ -1817,6 +2271,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.filter.envVelocitySens"
     },
@@ -1830,6 +2285,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.filter.resonance"
     },
@@ -1843,6 +2299,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.filter.envAttackTime"
     },
@@ -1856,6 +2313,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.filter.envDecayTime"
     },
@@ -1869,6 +2327,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.filter.envSustainLevel"
     },
@@ -1882,6 +2341,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.filter.envReleaseTime"
     },
@@ -1895,6 +2355,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.filter.envDepth"
     },
@@ -1908,6 +2369,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.amp.level"
     },
@@ -1921,6 +2383,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.amp.levelVelocitySens"
     },
@@ -1934,6 +2397,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.amp.envAttackTime"
     },
@@ -1947,6 +2411,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.amp.envDecayTime"
     },
@@ -1960,6 +2425,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.amp.envSustainLevel"
     },
@@ -1973,6 +2439,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.amp.envReleaseTime"
     },
@@ -1986,6 +2453,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.amp.pan"
     },
@@ -1999,6 +2467,15 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "TRI",
+        "SIN",
+        "SAW",
+        "SQR",
+        "S&H",
+        "RND"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone3.lfo.shape"
     },
@@ -2012,6 +2489,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.lfo.rate"
     },
@@ -2025,6 +2503,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone3.lfo.tempoSyncSwitch"
     },
@@ -2038,6 +2521,29 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "16",
+        "12",
+        "8",
+        "4",
+        "2",
+        "1",
+        "3/4",
+        "2/3",
+        "1/2",
+        "3/8",
+        "1/3",
+        "1/4",
+        "3/16",
+        "1/6",
+        "1/8",
+        "3/32",
+        "1/12",
+        "1/16",
+        "1/24",
+        "1/32"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone3.lfo.tempoSyncNote"
     },
@@ -2051,6 +2557,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.lfo.fadeTime"
     },
@@ -2064,6 +2571,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone3.lfo.keyTrigger"
     },
@@ -2077,6 +2589,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.lfo.pitchDepth"
     },
@@ -2090,6 +2603,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.lfo.filterDepth"
     },
@@ -2103,6 +2617,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.lfo.ampDepth"
     },
@@ -2116,6 +2631,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.lfo.panDepth"
     },
@@ -2129,6 +2645,15 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "TRI",
+        "SIN",
+        "SAW",
+        "SQR",
+        "S&H",
+        "RND"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone3.modLfo.shape"
     },
@@ -2142,6 +2667,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.modLfo.rate"
     },
@@ -2155,6 +2681,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "ON"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone3.modLfo.tempoSyncSwitch"
     },
@@ -2168,6 +2699,29 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "16",
+        "12",
+        "8",
+        "4",
+        "2",
+        "1",
+        "3/4",
+        "2/3",
+        "1/2",
+        "3/8",
+        "1/3",
+        "1/4",
+        "3/16",
+        "1/6",
+        "1/8",
+        "3/32",
+        "1/12",
+        "1/16",
+        "1/24",
+        "1/32"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "tone3.modLfo.tempoSyncNote"
     },
@@ -2181,6 +2735,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.modLfo.pitchDepth"
     },
@@ -2194,6 +2749,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.modLfo.filterDepth"
     },
@@ -2207,6 +2763,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.modLfo.ampDepth"
     },
@@ -2220,6 +2777,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "tone3.modLfo.panDepth"
     },
@@ -2233,6 +2791,18 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "04_",
+        "08_",
+        "08L",
+        "08H",
+        "08t",
+        "16_",
+        "16L",
+        "16H",
+        "16t"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "arp.grid"
     },
@@ -2246,6 +2816,19 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "30",
+        "40",
+        "50",
+        "60",
+        "70",
+        "80",
+        "90",
+        "100",
+        "120",
+        "FUL"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "arp.duration"
     },
@@ -2259,6 +2842,21 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "UP/L",
+        "UP/L&H",
+        "UP/_",
+        "DOWN/L",
+        "DOWN/L&H",
+        "DOWN/_",
+        "UP&DOWN/L",
+        "UP&DOWN/L&H",
+        "UP&DOWN/_",
+        "RANDOM/L",
+        "RANDOM/_",
+        "PHRASE"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "arp.motif"
     },
@@ -2272,6 +2870,7 @@
       "defaultValue": 64,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arp.octaveRange"
     },
@@ -2285,6 +2884,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arp.accentRate"
     },
@@ -2298,6 +2898,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arp.velocity"
     },
@@ -2311,6 +2912,7 @@
       "defaultValue": 1,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arp.endStep"
     },
@@ -2324,6 +2926,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.originalNote"
     },
@@ -2337,6 +2940,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step1Data"
     },
@@ -2350,6 +2954,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step2Data"
     },
@@ -2363,6 +2968,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step3Data"
     },
@@ -2376,6 +2982,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step4Data"
     },
@@ -2389,6 +2996,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step5Data"
     },
@@ -2402,6 +3010,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step6Data"
     },
@@ -2415,6 +3024,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step7Data"
     },
@@ -2428,6 +3038,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step8Data"
     },
@@ -2441,6 +3052,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step9Data"
     },
@@ -2454,6 +3066,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step10Data"
     },
@@ -2467,6 +3080,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step11Data"
     },
@@ -2480,6 +3094,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step12Data"
     },
@@ -2493,6 +3108,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step13Data"
     },
@@ -2506,6 +3122,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step14Data"
     },
@@ -2519,6 +3136,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step15Data"
     },
@@ -2532,6 +3150,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step16Data"
     },
@@ -2545,6 +3164,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step17Data"
     },
@@ -2558,6 +3178,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step18Data"
     },
@@ -2571,6 +3192,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step19Data"
     },
@@ -2584,6 +3206,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step20Data"
     },
@@ -2597,6 +3220,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step21Data"
     },
@@ -2610,6 +3234,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step22Data"
     },
@@ -2623,6 +3248,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step23Data"
     },
@@ -2636,6 +3262,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step24Data"
     },
@@ -2649,6 +3276,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step25Data"
     },
@@ -2662,6 +3290,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step26Data"
     },
@@ -2675,6 +3304,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step27Data"
     },
@@ -2688,6 +3318,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step28Data"
     },
@@ -2701,6 +3332,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step29Data"
     },
@@ -2714,6 +3346,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step30Data"
     },
@@ -2727,6 +3360,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step31Data"
     },
@@ -2740,6 +3374,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note1.step32Data"
     },
@@ -2753,6 +3388,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.originalNote"
     },
@@ -2766,6 +3402,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step1Data"
     },
@@ -2779,6 +3416,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step2Data"
     },
@@ -2792,6 +3430,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step3Data"
     },
@@ -2805,6 +3444,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step4Data"
     },
@@ -2818,6 +3458,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step5Data"
     },
@@ -2831,6 +3472,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step6Data"
     },
@@ -2844,6 +3486,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step7Data"
     },
@@ -2857,6 +3500,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step8Data"
     },
@@ -2870,6 +3514,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step9Data"
     },
@@ -2883,6 +3528,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step10Data"
     },
@@ -2896,6 +3542,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step11Data"
     },
@@ -2909,6 +3556,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step12Data"
     },
@@ -2922,6 +3570,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step13Data"
     },
@@ -2935,6 +3584,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step14Data"
     },
@@ -2948,6 +3598,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step15Data"
     },
@@ -2961,6 +3612,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step16Data"
     },
@@ -2974,6 +3626,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step17Data"
     },
@@ -2987,6 +3640,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step18Data"
     },
@@ -3000,6 +3654,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step19Data"
     },
@@ -3013,6 +3668,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step20Data"
     },
@@ -3026,6 +3682,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step21Data"
     },
@@ -3039,6 +3696,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step22Data"
     },
@@ -3052,6 +3710,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step23Data"
     },
@@ -3065,6 +3724,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step24Data"
     },
@@ -3078,6 +3738,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step25Data"
     },
@@ -3091,6 +3752,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step26Data"
     },
@@ -3104,6 +3766,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step27Data"
     },
@@ -3117,6 +3780,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step28Data"
     },
@@ -3130,6 +3794,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step29Data"
     },
@@ -3143,6 +3808,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step30Data"
     },
@@ -3156,6 +3822,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step31Data"
     },
@@ -3169,6 +3836,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note10.step32Data"
     },
@@ -3182,6 +3850,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.originalNote"
     },
@@ -3195,6 +3864,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step1Data"
     },
@@ -3208,6 +3878,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step2Data"
     },
@@ -3221,6 +3892,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step3Data"
     },
@@ -3234,6 +3906,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step4Data"
     },
@@ -3247,6 +3920,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step5Data"
     },
@@ -3260,6 +3934,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step6Data"
     },
@@ -3273,6 +3948,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step7Data"
     },
@@ -3286,6 +3962,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step8Data"
     },
@@ -3299,6 +3976,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step9Data"
     },
@@ -3312,6 +3990,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step10Data"
     },
@@ -3325,6 +4004,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step11Data"
     },
@@ -3338,6 +4018,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step12Data"
     },
@@ -3351,6 +4032,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step13Data"
     },
@@ -3364,6 +4046,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step14Data"
     },
@@ -3377,6 +4060,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step15Data"
     },
@@ -3390,6 +4074,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step16Data"
     },
@@ -3403,6 +4088,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step17Data"
     },
@@ -3416,6 +4102,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step18Data"
     },
@@ -3429,6 +4116,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step19Data"
     },
@@ -3442,6 +4130,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step20Data"
     },
@@ -3455,6 +4144,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step21Data"
     },
@@ -3468,6 +4158,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step22Data"
     },
@@ -3481,6 +4172,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step23Data"
     },
@@ -3494,6 +4186,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step24Data"
     },
@@ -3507,6 +4200,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step25Data"
     },
@@ -3520,6 +4214,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step26Data"
     },
@@ -3533,6 +4228,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step27Data"
     },
@@ -3546,6 +4242,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step28Data"
     },
@@ -3559,6 +4256,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step29Data"
     },
@@ -3572,6 +4270,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step30Data"
     },
@@ -3585,6 +4284,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step31Data"
     },
@@ -3598,6 +4298,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note11.step32Data"
     },
@@ -3611,6 +4312,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.originalNote"
     },
@@ -3624,6 +4326,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step1Data"
     },
@@ -3637,6 +4340,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step2Data"
     },
@@ -3650,6 +4354,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step3Data"
     },
@@ -3663,6 +4368,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step4Data"
     },
@@ -3676,6 +4382,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step5Data"
     },
@@ -3689,6 +4396,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step6Data"
     },
@@ -3702,6 +4410,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step7Data"
     },
@@ -3715,6 +4424,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step8Data"
     },
@@ -3728,6 +4438,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step9Data"
     },
@@ -3741,6 +4452,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step10Data"
     },
@@ -3754,6 +4466,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step11Data"
     },
@@ -3767,6 +4480,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step12Data"
     },
@@ -3780,6 +4494,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step13Data"
     },
@@ -3793,6 +4508,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step14Data"
     },
@@ -3806,6 +4522,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step15Data"
     },
@@ -3819,6 +4536,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step16Data"
     },
@@ -3832,6 +4550,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step17Data"
     },
@@ -3845,6 +4564,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step18Data"
     },
@@ -3858,6 +4578,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step19Data"
     },
@@ -3871,6 +4592,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step20Data"
     },
@@ -3884,6 +4606,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step21Data"
     },
@@ -3897,6 +4620,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step22Data"
     },
@@ -3910,6 +4634,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step23Data"
     },
@@ -3923,6 +4648,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step24Data"
     },
@@ -3936,6 +4662,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step25Data"
     },
@@ -3949,6 +4676,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step26Data"
     },
@@ -3962,6 +4690,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step27Data"
     },
@@ -3975,6 +4704,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step28Data"
     },
@@ -3988,6 +4718,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step29Data"
     },
@@ -4001,6 +4732,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step30Data"
     },
@@ -4014,6 +4746,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step31Data"
     },
@@ -4027,6 +4760,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note12.step32Data"
     },
@@ -4040,6 +4774,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.originalNote"
     },
@@ -4053,6 +4788,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step1Data"
     },
@@ -4066,6 +4802,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step2Data"
     },
@@ -4079,6 +4816,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step3Data"
     },
@@ -4092,6 +4830,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step4Data"
     },
@@ -4105,6 +4844,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step5Data"
     },
@@ -4118,6 +4858,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step6Data"
     },
@@ -4131,6 +4872,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step7Data"
     },
@@ -4144,6 +4886,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step8Data"
     },
@@ -4157,6 +4900,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step9Data"
     },
@@ -4170,6 +4914,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step10Data"
     },
@@ -4183,6 +4928,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step11Data"
     },
@@ -4196,6 +4942,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step12Data"
     },
@@ -4209,6 +4956,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step13Data"
     },
@@ -4222,6 +4970,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step14Data"
     },
@@ -4235,6 +4984,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step15Data"
     },
@@ -4248,6 +4998,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step16Data"
     },
@@ -4261,6 +5012,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step17Data"
     },
@@ -4274,6 +5026,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step18Data"
     },
@@ -4287,6 +5040,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step19Data"
     },
@@ -4300,6 +5054,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step20Data"
     },
@@ -4313,6 +5068,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step21Data"
     },
@@ -4326,6 +5082,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step22Data"
     },
@@ -4339,6 +5096,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step23Data"
     },
@@ -4352,6 +5110,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step24Data"
     },
@@ -4365,6 +5124,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step25Data"
     },
@@ -4378,6 +5138,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step26Data"
     },
@@ -4391,6 +5152,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step27Data"
     },
@@ -4404,6 +5166,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step28Data"
     },
@@ -4417,6 +5180,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step29Data"
     },
@@ -4430,6 +5194,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step30Data"
     },
@@ -4443,6 +5208,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step31Data"
     },
@@ -4456,6 +5222,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note13.step32Data"
     },
@@ -4469,6 +5236,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.originalNote"
     },
@@ -4482,6 +5250,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step1Data"
     },
@@ -4495,6 +5264,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step2Data"
     },
@@ -4508,6 +5278,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step3Data"
     },
@@ -4521,6 +5292,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step4Data"
     },
@@ -4534,6 +5306,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step5Data"
     },
@@ -4547,6 +5320,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step6Data"
     },
@@ -4560,6 +5334,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step7Data"
     },
@@ -4573,6 +5348,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step8Data"
     },
@@ -4586,6 +5362,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step9Data"
     },
@@ -4599,6 +5376,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step10Data"
     },
@@ -4612,6 +5390,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step11Data"
     },
@@ -4625,6 +5404,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step12Data"
     },
@@ -4638,6 +5418,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step13Data"
     },
@@ -4651,6 +5432,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step14Data"
     },
@@ -4664,6 +5446,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step15Data"
     },
@@ -4677,6 +5460,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step16Data"
     },
@@ -4690,6 +5474,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step17Data"
     },
@@ -4703,6 +5488,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step18Data"
     },
@@ -4716,6 +5502,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step19Data"
     },
@@ -4729,6 +5516,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step20Data"
     },
@@ -4742,6 +5530,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step21Data"
     },
@@ -4755,6 +5544,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step22Data"
     },
@@ -4768,6 +5558,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step23Data"
     },
@@ -4781,6 +5572,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step24Data"
     },
@@ -4794,6 +5586,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step25Data"
     },
@@ -4807,6 +5600,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step26Data"
     },
@@ -4820,6 +5614,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step27Data"
     },
@@ -4833,6 +5628,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step28Data"
     },
@@ -4846,6 +5642,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step29Data"
     },
@@ -4859,6 +5656,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step30Data"
     },
@@ -4872,6 +5670,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step31Data"
     },
@@ -4885,6 +5684,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note14.step32Data"
     },
@@ -4898,6 +5698,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.originalNote"
     },
@@ -4911,6 +5712,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step1Data"
     },
@@ -4924,6 +5726,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step2Data"
     },
@@ -4937,6 +5740,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step3Data"
     },
@@ -4950,6 +5754,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step4Data"
     },
@@ -4963,6 +5768,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step5Data"
     },
@@ -4976,6 +5782,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step6Data"
     },
@@ -4989,6 +5796,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step7Data"
     },
@@ -5002,6 +5810,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step8Data"
     },
@@ -5015,6 +5824,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step9Data"
     },
@@ -5028,6 +5838,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step10Data"
     },
@@ -5041,6 +5852,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step11Data"
     },
@@ -5054,6 +5866,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step12Data"
     },
@@ -5067,6 +5880,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step13Data"
     },
@@ -5080,6 +5894,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step14Data"
     },
@@ -5093,6 +5908,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step15Data"
     },
@@ -5106,6 +5922,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step16Data"
     },
@@ -5119,6 +5936,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step17Data"
     },
@@ -5132,6 +5950,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step18Data"
     },
@@ -5145,6 +5964,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step19Data"
     },
@@ -5158,6 +5978,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step20Data"
     },
@@ -5171,6 +5992,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step21Data"
     },
@@ -5184,6 +6006,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step22Data"
     },
@@ -5197,6 +6020,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step23Data"
     },
@@ -5210,6 +6034,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step24Data"
     },
@@ -5223,6 +6048,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step25Data"
     },
@@ -5236,6 +6062,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step26Data"
     },
@@ -5249,6 +6076,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step27Data"
     },
@@ -5262,6 +6090,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step28Data"
     },
@@ -5275,6 +6104,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step29Data"
     },
@@ -5288,6 +6118,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step30Data"
     },
@@ -5301,6 +6132,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step31Data"
     },
@@ -5314,6 +6146,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note15.step32Data"
     },
@@ -5327,6 +6160,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.originalNote"
     },
@@ -5340,6 +6174,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step1Data"
     },
@@ -5353,6 +6188,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step2Data"
     },
@@ -5366,6 +6202,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step3Data"
     },
@@ -5379,6 +6216,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step4Data"
     },
@@ -5392,6 +6230,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step5Data"
     },
@@ -5405,6 +6244,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step6Data"
     },
@@ -5418,6 +6258,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step7Data"
     },
@@ -5431,6 +6272,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step8Data"
     },
@@ -5444,6 +6286,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step9Data"
     },
@@ -5457,6 +6300,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step10Data"
     },
@@ -5470,6 +6314,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step11Data"
     },
@@ -5483,6 +6328,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step12Data"
     },
@@ -5496,6 +6342,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step13Data"
     },
@@ -5509,6 +6356,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step14Data"
     },
@@ -5522,6 +6370,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step15Data"
     },
@@ -5535,6 +6384,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step16Data"
     },
@@ -5548,6 +6398,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step17Data"
     },
@@ -5561,6 +6412,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step18Data"
     },
@@ -5574,6 +6426,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step19Data"
     },
@@ -5587,6 +6440,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step20Data"
     },
@@ -5600,6 +6454,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step21Data"
     },
@@ -5613,6 +6468,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step22Data"
     },
@@ -5626,6 +6482,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step23Data"
     },
@@ -5639,6 +6496,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step24Data"
     },
@@ -5652,6 +6510,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step25Data"
     },
@@ -5665,6 +6524,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step26Data"
     },
@@ -5678,6 +6538,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step27Data"
     },
@@ -5691,6 +6552,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step28Data"
     },
@@ -5704,6 +6566,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step29Data"
     },
@@ -5717,6 +6580,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step30Data"
     },
@@ -5730,6 +6594,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step31Data"
     },
@@ -5743,6 +6608,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note16.step32Data"
     },
@@ -5756,6 +6622,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.originalNote"
     },
@@ -5769,6 +6636,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step1Data"
     },
@@ -5782,6 +6650,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step2Data"
     },
@@ -5795,6 +6664,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step3Data"
     },
@@ -5808,6 +6678,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step4Data"
     },
@@ -5821,6 +6692,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step5Data"
     },
@@ -5834,6 +6706,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step6Data"
     },
@@ -5847,6 +6720,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step7Data"
     },
@@ -5860,6 +6734,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step8Data"
     },
@@ -5873,6 +6748,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step9Data"
     },
@@ -5886,6 +6762,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step10Data"
     },
@@ -5899,6 +6776,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step11Data"
     },
@@ -5912,6 +6790,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step12Data"
     },
@@ -5925,6 +6804,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step13Data"
     },
@@ -5938,6 +6818,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step14Data"
     },
@@ -5951,6 +6832,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step15Data"
     },
@@ -5964,6 +6846,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step16Data"
     },
@@ -5977,6 +6860,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step17Data"
     },
@@ -5990,6 +6874,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step18Data"
     },
@@ -6003,6 +6888,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step19Data"
     },
@@ -6016,6 +6902,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step20Data"
     },
@@ -6029,6 +6916,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step21Data"
     },
@@ -6042,6 +6930,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step22Data"
     },
@@ -6055,6 +6944,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step23Data"
     },
@@ -6068,6 +6958,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step24Data"
     },
@@ -6081,6 +6972,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step25Data"
     },
@@ -6094,6 +6986,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step26Data"
     },
@@ -6107,6 +7000,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step27Data"
     },
@@ -6120,6 +7014,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step28Data"
     },
@@ -6133,6 +7028,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step29Data"
     },
@@ -6146,6 +7042,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step30Data"
     },
@@ -6159,6 +7056,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step31Data"
     },
@@ -6172,6 +7070,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note2.step32Data"
     },
@@ -6185,6 +7084,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.originalNote"
     },
@@ -6198,6 +7098,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step1Data"
     },
@@ -6211,6 +7112,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step2Data"
     },
@@ -6224,6 +7126,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step3Data"
     },
@@ -6237,6 +7140,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step4Data"
     },
@@ -6250,6 +7154,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step5Data"
     },
@@ -6263,6 +7168,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step6Data"
     },
@@ -6276,6 +7182,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step7Data"
     },
@@ -6289,6 +7196,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step8Data"
     },
@@ -6302,6 +7210,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step9Data"
     },
@@ -6315,6 +7224,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step10Data"
     },
@@ -6328,6 +7238,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step11Data"
     },
@@ -6341,6 +7252,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step12Data"
     },
@@ -6354,6 +7266,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step13Data"
     },
@@ -6367,6 +7280,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step14Data"
     },
@@ -6380,6 +7294,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step15Data"
     },
@@ -6393,6 +7308,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step16Data"
     },
@@ -6406,6 +7322,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step17Data"
     },
@@ -6419,6 +7336,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step18Data"
     },
@@ -6432,6 +7350,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step19Data"
     },
@@ -6445,6 +7364,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step20Data"
     },
@@ -6458,6 +7378,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step21Data"
     },
@@ -6471,6 +7392,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step22Data"
     },
@@ -6484,6 +7406,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step23Data"
     },
@@ -6497,6 +7420,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step24Data"
     },
@@ -6510,6 +7434,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step25Data"
     },
@@ -6523,6 +7448,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step26Data"
     },
@@ -6536,6 +7462,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step27Data"
     },
@@ -6549,6 +7476,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step28Data"
     },
@@ -6562,6 +7490,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step29Data"
     },
@@ -6575,6 +7504,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step30Data"
     },
@@ -6588,6 +7518,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step31Data"
     },
@@ -6601,6 +7532,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note3.step32Data"
     },
@@ -6614,6 +7546,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.originalNote"
     },
@@ -6627,6 +7560,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step1Data"
     },
@@ -6640,6 +7574,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step2Data"
     },
@@ -6653,6 +7588,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step3Data"
     },
@@ -6666,6 +7602,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step4Data"
     },
@@ -6679,6 +7616,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step5Data"
     },
@@ -6692,6 +7630,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step6Data"
     },
@@ -6705,6 +7644,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step7Data"
     },
@@ -6718,6 +7658,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step8Data"
     },
@@ -6731,6 +7672,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step9Data"
     },
@@ -6744,6 +7686,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step10Data"
     },
@@ -6757,6 +7700,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step11Data"
     },
@@ -6770,6 +7714,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step12Data"
     },
@@ -6783,6 +7728,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step13Data"
     },
@@ -6796,6 +7742,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step14Data"
     },
@@ -6809,6 +7756,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step15Data"
     },
@@ -6822,6 +7770,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step16Data"
     },
@@ -6835,6 +7784,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step17Data"
     },
@@ -6848,6 +7798,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step18Data"
     },
@@ -6861,6 +7812,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step19Data"
     },
@@ -6874,6 +7826,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step20Data"
     },
@@ -6887,6 +7840,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step21Data"
     },
@@ -6900,6 +7854,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step22Data"
     },
@@ -6913,6 +7868,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step23Data"
     },
@@ -6926,6 +7882,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step24Data"
     },
@@ -6939,6 +7896,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step25Data"
     },
@@ -6952,6 +7910,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step26Data"
     },
@@ -6965,6 +7924,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step27Data"
     },
@@ -6978,6 +7938,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step28Data"
     },
@@ -6991,6 +7952,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step29Data"
     },
@@ -7004,6 +7966,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step30Data"
     },
@@ -7017,6 +7980,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step31Data"
     },
@@ -7030,6 +7994,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note4.step32Data"
     },
@@ -7043,6 +8008,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.originalNote"
     },
@@ -7056,6 +8022,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step1Data"
     },
@@ -7069,6 +8036,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step2Data"
     },
@@ -7082,6 +8050,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step3Data"
     },
@@ -7095,6 +8064,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step4Data"
     },
@@ -7108,6 +8078,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step5Data"
     },
@@ -7121,6 +8092,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step6Data"
     },
@@ -7134,6 +8106,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step7Data"
     },
@@ -7147,6 +8120,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step8Data"
     },
@@ -7160,6 +8134,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step9Data"
     },
@@ -7173,6 +8148,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step10Data"
     },
@@ -7186,6 +8162,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step11Data"
     },
@@ -7199,6 +8176,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step12Data"
     },
@@ -7212,6 +8190,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step13Data"
     },
@@ -7225,6 +8204,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step14Data"
     },
@@ -7238,6 +8218,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step15Data"
     },
@@ -7251,6 +8232,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step16Data"
     },
@@ -7264,6 +8246,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step17Data"
     },
@@ -7277,6 +8260,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step18Data"
     },
@@ -7290,6 +8274,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step19Data"
     },
@@ -7303,6 +8288,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step20Data"
     },
@@ -7316,6 +8302,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step21Data"
     },
@@ -7329,6 +8316,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step22Data"
     },
@@ -7342,6 +8330,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step23Data"
     },
@@ -7355,6 +8344,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step24Data"
     },
@@ -7368,6 +8358,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step25Data"
     },
@@ -7381,6 +8372,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step26Data"
     },
@@ -7394,6 +8386,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step27Data"
     },
@@ -7407,6 +8400,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step28Data"
     },
@@ -7420,6 +8414,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step29Data"
     },
@@ -7433,6 +8428,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step30Data"
     },
@@ -7446,6 +8442,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step31Data"
     },
@@ -7459,6 +8456,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note5.step32Data"
     },
@@ -7472,6 +8470,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.originalNote"
     },
@@ -7485,6 +8484,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step1Data"
     },
@@ -7498,6 +8498,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step2Data"
     },
@@ -7511,6 +8512,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step3Data"
     },
@@ -7524,6 +8526,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step4Data"
     },
@@ -7537,6 +8540,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step5Data"
     },
@@ -7550,6 +8554,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step6Data"
     },
@@ -7563,6 +8568,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step7Data"
     },
@@ -7576,6 +8582,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step8Data"
     },
@@ -7589,6 +8596,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step9Data"
     },
@@ -7602,6 +8610,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step10Data"
     },
@@ -7615,6 +8624,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step11Data"
     },
@@ -7628,6 +8638,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step12Data"
     },
@@ -7641,6 +8652,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step13Data"
     },
@@ -7654,6 +8666,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step14Data"
     },
@@ -7667,6 +8680,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step15Data"
     },
@@ -7680,6 +8694,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step16Data"
     },
@@ -7693,6 +8708,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step17Data"
     },
@@ -7706,6 +8722,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step18Data"
     },
@@ -7719,6 +8736,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step19Data"
     },
@@ -7732,6 +8750,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step20Data"
     },
@@ -7745,6 +8764,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step21Data"
     },
@@ -7758,6 +8778,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step22Data"
     },
@@ -7771,6 +8792,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step23Data"
     },
@@ -7784,6 +8806,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step24Data"
     },
@@ -7797,6 +8820,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step25Data"
     },
@@ -7810,6 +8834,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step26Data"
     },
@@ -7823,6 +8848,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step27Data"
     },
@@ -7836,6 +8862,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step28Data"
     },
@@ -7849,6 +8876,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step29Data"
     },
@@ -7862,6 +8890,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step30Data"
     },
@@ -7875,6 +8904,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step31Data"
     },
@@ -7888,6 +8918,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note6.step32Data"
     },
@@ -7901,6 +8932,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.originalNote"
     },
@@ -7914,6 +8946,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step1Data"
     },
@@ -7927,6 +8960,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step2Data"
     },
@@ -7940,6 +8974,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step3Data"
     },
@@ -7953,6 +8988,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step4Data"
     },
@@ -7966,6 +9002,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step5Data"
     },
@@ -7979,6 +9016,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step6Data"
     },
@@ -7992,6 +9030,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step7Data"
     },
@@ -8005,6 +9044,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step8Data"
     },
@@ -8018,6 +9058,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step9Data"
     },
@@ -8031,6 +9072,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step10Data"
     },
@@ -8044,6 +9086,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step11Data"
     },
@@ -8057,6 +9100,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step12Data"
     },
@@ -8070,6 +9114,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step13Data"
     },
@@ -8083,6 +9128,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step14Data"
     },
@@ -8096,6 +9142,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step15Data"
     },
@@ -8109,6 +9156,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step16Data"
     },
@@ -8122,6 +9170,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step17Data"
     },
@@ -8135,6 +9184,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step18Data"
     },
@@ -8148,6 +9198,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step19Data"
     },
@@ -8161,6 +9212,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step20Data"
     },
@@ -8174,6 +9226,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step21Data"
     },
@@ -8187,6 +9240,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step22Data"
     },
@@ -8200,6 +9254,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step23Data"
     },
@@ -8213,6 +9268,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step24Data"
     },
@@ -8226,6 +9282,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step25Data"
     },
@@ -8239,6 +9296,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step26Data"
     },
@@ -8252,6 +9310,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step27Data"
     },
@@ -8265,6 +9324,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step28Data"
     },
@@ -8278,6 +9338,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step29Data"
     },
@@ -8291,6 +9352,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step30Data"
     },
@@ -8304,6 +9366,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step31Data"
     },
@@ -8317,6 +9380,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note7.step32Data"
     },
@@ -8330,6 +9394,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.originalNote"
     },
@@ -8343,6 +9408,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step1Data"
     },
@@ -8356,6 +9422,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step2Data"
     },
@@ -8369,6 +9436,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step3Data"
     },
@@ -8382,6 +9450,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step4Data"
     },
@@ -8395,6 +9464,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step5Data"
     },
@@ -8408,6 +9478,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step6Data"
     },
@@ -8421,6 +9492,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step7Data"
     },
@@ -8434,6 +9506,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step8Data"
     },
@@ -8447,6 +9520,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step9Data"
     },
@@ -8460,6 +9534,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step10Data"
     },
@@ -8473,6 +9548,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step11Data"
     },
@@ -8486,6 +9562,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step12Data"
     },
@@ -8499,6 +9576,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step13Data"
     },
@@ -8512,6 +9590,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step14Data"
     },
@@ -8525,6 +9604,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step15Data"
     },
@@ -8538,6 +9618,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step16Data"
     },
@@ -8551,6 +9632,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step17Data"
     },
@@ -8564,6 +9646,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step18Data"
     },
@@ -8577,6 +9660,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step19Data"
     },
@@ -8590,6 +9674,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step20Data"
     },
@@ -8603,6 +9688,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step21Data"
     },
@@ -8616,6 +9702,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step22Data"
     },
@@ -8629,6 +9716,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step23Data"
     },
@@ -8642,6 +9730,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step24Data"
     },
@@ -8655,6 +9744,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step25Data"
     },
@@ -8668,6 +9758,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step26Data"
     },
@@ -8681,6 +9772,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step27Data"
     },
@@ -8694,6 +9786,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step28Data"
     },
@@ -8707,6 +9800,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step29Data"
     },
@@ -8720,6 +9814,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step30Data"
     },
@@ -8733,6 +9828,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step31Data"
     },
@@ -8746,6 +9842,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note8.step32Data"
     },
@@ -8759,6 +9856,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.originalNote"
     },
@@ -8772,6 +9870,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step1Data"
     },
@@ -8785,6 +9884,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step2Data"
     },
@@ -8798,6 +9898,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step3Data"
     },
@@ -8811,6 +9912,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step4Data"
     },
@@ -8824,6 +9926,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step5Data"
     },
@@ -8837,6 +9940,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step6Data"
     },
@@ -8850,6 +9954,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step7Data"
     },
@@ -8863,6 +9968,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step8Data"
     },
@@ -8876,6 +9982,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step9Data"
     },
@@ -8889,6 +9996,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step10Data"
     },
@@ -8902,6 +10010,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step11Data"
     },
@@ -8915,6 +10024,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step12Data"
     },
@@ -8928,6 +10038,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step13Data"
     },
@@ -8941,6 +10052,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step14Data"
     },
@@ -8954,6 +10066,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step15Data"
     },
@@ -8967,6 +10080,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step16Data"
     },
@@ -8980,6 +10094,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step17Data"
     },
@@ -8993,6 +10108,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step18Data"
     },
@@ -9006,6 +10122,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step19Data"
     },
@@ -9019,6 +10136,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step20Data"
     },
@@ -9032,6 +10150,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step21Data"
     },
@@ -9045,6 +10164,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step22Data"
     },
@@ -9058,6 +10178,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step23Data"
     },
@@ -9071,6 +10192,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step24Data"
     },
@@ -9084,6 +10206,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step25Data"
     },
@@ -9097,6 +10220,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step26Data"
     },
@@ -9110,6 +10234,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step27Data"
     },
@@ -9123,6 +10248,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step28Data"
     },
@@ -9136,6 +10262,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step29Data"
     },
@@ -9149,6 +10276,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step30Data"
     },
@@ -9162,6 +10290,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step31Data"
     },
@@ -9175,6 +10304,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "arpPattern.note9.step32Data"
     },
@@ -9188,6 +10318,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "DELAY",
+        "PANNING DELAY"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "delay.type"
     },
@@ -9201,6 +10337,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter1"
     },
@@ -9214,6 +10351,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter2"
     },
@@ -9227,6 +10365,7 @@
       "defaultValue": 32750,
       "unit": "dB",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter3"
     },
@@ -9240,6 +10379,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter4"
     },
@@ -9253,6 +10393,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter5"
     },
@@ -9266,6 +10407,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter6"
     },
@@ -9279,6 +10421,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter7"
     },
@@ -9292,6 +10435,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter8"
     },
@@ -9305,6 +10449,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter9"
     },
@@ -9318,6 +10463,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter10"
     },
@@ -9331,6 +10477,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter11"
     },
@@ -9344,6 +10491,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter12"
     },
@@ -9357,6 +10505,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter13"
     },
@@ -9370,6 +10519,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter14"
     },
@@ -9383,6 +10533,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter15"
     },
@@ -9396,6 +10547,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter16"
     },
@@ -9409,6 +10561,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter17"
     },
@@ -9422,6 +10575,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter18"
     },
@@ -9435,6 +10589,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter19"
     },
@@ -9448,6 +10603,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "delay.parameter20"
     },
@@ -9461,6 +10617,13 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "DIST",
+        "FUZZ",
+        "BIT CRASH"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "distortion.type"
     },
@@ -9474,6 +10637,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter1"
     },
@@ -9487,6 +10651,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter2"
     },
@@ -9500,6 +10665,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter3"
     },
@@ -9513,6 +10679,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter4"
     },
@@ -9526,6 +10693,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter5"
     },
@@ -9539,6 +10707,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter6"
     },
@@ -9552,6 +10721,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter7"
     },
@@ -9565,6 +10735,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter8"
     },
@@ -9578,6 +10749,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter9"
     },
@@ -9591,6 +10763,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter10"
     },
@@ -9604,6 +10777,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter11"
     },
@@ -9617,6 +10791,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter12"
     },
@@ -9630,6 +10805,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter13"
     },
@@ -9643,6 +10819,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter14"
     },
@@ -9656,6 +10833,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter15"
     },
@@ -9669,6 +10847,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter16"
     },
@@ -9682,6 +10861,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter17"
     },
@@ -9695,6 +10875,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter18"
     },
@@ -9708,6 +10889,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter19"
     },
@@ -9721,6 +10903,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter20"
     },
@@ -9734,6 +10917,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter21"
     },
@@ -9747,6 +10931,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter22"
     },
@@ -9760,6 +10945,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter23"
     },
@@ -9773,6 +10959,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter24"
     },
@@ -9786,6 +10973,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter25"
     },
@@ -9799,6 +10987,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter26"
     },
@@ -9812,6 +11001,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter27"
     },
@@ -9825,6 +11015,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter28"
     },
@@ -9838,6 +11029,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter29"
     },
@@ -9851,6 +11043,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter30"
     },
@@ -9864,6 +11057,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter31"
     },
@@ -9877,6 +11071,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "distortion.parameter32"
     },
@@ -9890,6 +11085,13 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "FLANGER",
+        "PHASER",
+        "PITCH SHIFTER"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "flanger.type"
     },
@@ -9903,6 +11105,7 @@
       "defaultValue": 32826,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter1"
     },
@@ -9916,6 +11119,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter2"
     },
@@ -9929,6 +11133,7 @@
       "defaultValue": 32826,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter3"
     },
@@ -9942,6 +11147,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter4"
     },
@@ -9955,6 +11161,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter5"
     },
@@ -9968,6 +11175,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter6"
     },
@@ -9981,6 +11189,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter7"
     },
@@ -9994,6 +11203,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter8"
     },
@@ -10007,6 +11217,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter9"
     },
@@ -10020,6 +11231,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter10"
     },
@@ -10033,6 +11245,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter11"
     },
@@ -10046,6 +11259,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter12"
     },
@@ -10059,6 +11273,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter13"
     },
@@ -10072,6 +11287,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter14"
     },
@@ -10085,6 +11301,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter15"
     },
@@ -10098,6 +11315,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter16"
     },
@@ -10111,6 +11329,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter17"
     },
@@ -10124,6 +11343,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter18"
     },
@@ -10137,6 +11357,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter19"
     },
@@ -10150,6 +11371,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "flanger.parameter20"
     },
@@ -10163,6 +11385,11 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "OFF",
+        "REVERB"
+      ],
       "deviceRole": "primary",
       "deviceParameterId": "reverb.type"
     },
@@ -10176,6 +11403,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter1"
     },
@@ -10189,6 +11417,7 @@
       "defaultValue": 32769,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter2"
     },
@@ -10202,6 +11431,7 @@
       "defaultValue": 32819,
       "unit": "%",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter3"
     },
@@ -10215,6 +11445,7 @@
       "defaultValue": 32832,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter4"
     },
@@ -10228,6 +11459,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter5"
     },
@@ -10241,6 +11473,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter6"
     },
@@ -10254,6 +11487,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter7"
     },
@@ -10267,6 +11501,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter8"
     },
@@ -10280,6 +11515,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter9"
     },
@@ -10293,6 +11529,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter10"
     },
@@ -10306,6 +11543,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter11"
     },
@@ -10319,6 +11557,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter12"
     },
@@ -10332,6 +11571,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter13"
     },
@@ -10345,6 +11585,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter14"
     },
@@ -10358,6 +11599,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter15"
     },
@@ -10371,6 +11613,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter16"
     },
@@ -10384,6 +11627,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter17"
     },
@@ -10397,6 +11641,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter18"
     },
@@ -10410,6 +11655,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter19"
     },
@@ -10423,6 +11669,7 @@
       "defaultValue": 32768,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "reverb.parameter20"
     }

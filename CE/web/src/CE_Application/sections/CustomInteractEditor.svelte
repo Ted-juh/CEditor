@@ -14,6 +14,10 @@
   import CustomValueChannelsEditor from './CustomValueChannelsEditor.svelte';
   import CustomBehaviorsEditor from './CustomBehaviorsEditor.svelte';
   import CustomHitZonesEditor from './CustomHitZonesEditor.svelte';
+  import Unplug from 'lucide-svelte/icons/unplug';
+  import Waves from 'lucide-svelte/icons/waves';
+  import MousePointerClick from 'lucide-svelte/icons/mouse-pointer-click';
+  import SquareDashed from 'lucide-svelte/icons/square-dashed';
 
   let { control = null } = $props();
 
@@ -250,7 +254,7 @@
   {/each}
 
   {#if hasOrphans}
-    <PropertySection title="Not wired up">
+    <PropertySection title="Not wired up" icon={Unplug}>
       <div class="orphans">
         {#each orphans.channels as name (name)}
           <div class="orphan-row"><span class="tag">channel</span><strong>{name}</strong><em>no behavior drives it (fine for output-only values)</em></div>
@@ -268,13 +272,13 @@
   {#if $creatorMode === 'advanced'}
     <!-- Advanced escape hatch (C4): the original flat list editors, target
          dropdowns and all. Everything possible before stays possible. -->
-    <PropertySection title="Channels (flat list)">
+    <PropertySection title="Channels (flat list)" icon={Waves}>
       <div class="flat-embed"><CustomValueChannelsEditor {control} /></div>
     </PropertySection>
-    <PropertySection title="Behaviors (flat list)">
+    <PropertySection title="Behaviors (flat list)" icon={MousePointerClick}>
       <div class="flat-embed"><CustomBehaviorsEditor {control} /></div>
     </PropertySection>
-    <PropertySection title="Hit Zones (flat list)">
+    <PropertySection title="Hit Zones (flat list)" icon={SquareDashed}>
       <div class="flat-embed"><CustomHitZonesEditor {control} /></div>
     </PropertySection>
   {:else}

@@ -435,7 +435,7 @@ control does, so the list was withdrawn rather than enforced as written.
 |---|---|
 | `async` / `await` in a handler | The WebView awaits a returned promise; the C++ engines dispatch synchronously and drop it, so anything after the first `await` never runs in the export. `scriptValidate` warns. Use `onTimer` for work that has to wait. |
 | `onDawSaveState` / `onDawRestoreState` | Declared `runtime: 'player'`. The editor has no DAW to save a project, so they never fire in preview — test them in the exported plugin. |
-| the panel-component verbs | Declared `runtime: 'webview'`, stubbed with an explanation here. The stub lists are GENERATED into all three preludes — 248 names by hand in three files is 744 chances to mistype one, and a mistyped stub is an undefined global in exactly one engine. Run `node tools/scripts/gen-script-modules.mjs --write` after touching the contract. |
+| the panel-component verbs | Declared `runtime: 'webview'`, stubbed with an explanation here. The stub lists are GENERATED into all three preludes — 248 names by hand in three files is 744 chances to mistype one, and a mistyped stub is an undefined global in exactly one engine. Run `node --import ./CE/web/test/support/register-svelte.mjs tools/scripts/gen-script-modules.mjs --write` after touching the contract. |
 
 ### `onDawSaveState` returns; it does not mutate
 `store` arrives as a **copy** — each engine marshals it into the script's own language, so writing

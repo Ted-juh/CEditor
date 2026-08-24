@@ -94,3 +94,17 @@ export function readStoredNumber(key, fallback = 0) {
   const value = Number(readStoredJson(key, fallback));
   return Number.isFinite(value) ? value : fallback;
 }
+
+/**
+ * The write counterpart to readStoredNumber.
+ *
+ * There was a read helper and no write one, so callers reached for writeStoredJson and the pair at
+ * a call site read as mismatched — `readStoredNumber` in, `writeStoredJson` out, for the same key.
+ * A non-finite value is dropped rather than stored: reading it back would fall through to the
+ * caller's fallback anyway, and a stored `null` looks like a deliberate choice when it is not.
+ */
+export function writeStoredNumber(key, value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return;
+  writeStoredJson(key, n);
+}

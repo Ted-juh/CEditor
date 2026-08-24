@@ -25,7 +25,7 @@
   function applyPreset(name) {
     if (!core?.id) return;
     const fields = name === 'pitch'
-      ? { style: 'wheel3d', orientation: 'vertical', bipolar: true, value: 0.5, returnMode: 'center', returnRate: 12 }
+      ? { style: 'wheel3d', orientation: 'vertical', bipolar: true, value: 0.5, returnMode: 'center', returnTime: 85 }
       : name === 'mod'
         ? { style: 'wheel3d', orientation: 'vertical', bipolar: false, value: 0, returnMode: 'none' }
         : { style: 'ribbon', bipolar: false, returnMode: 'none' };
@@ -57,7 +57,7 @@
         <option value="horizontal">Horizontal</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Value" span={2} compact hint="Current / rest position (0–1).">
+    <PropertyCell label="Value" span={1} compact hint="Current / rest position (0–1).">
       <NumberCell label="Val" min={0} max={1} step={0.01} value={r.value ?? 0.5} defaultValue={0.5} onchange={(v) => set('value', Math.max(0, Math.min(1, v)))} />
     </PropertyCell>
     <PropertyCell label="Bipolar" span={1} hint="Value port emits −1..1 (pitch bend).">
@@ -84,20 +84,25 @@
       </PropertyCell>
     {/if}
     {#if String(r.returnMode ?? 'none') !== 'none'}
-      <PropertyCell label="Speed" span={1} compact hint="Glide speed (units/sec; 0 = instant snap).">
-        <NumberCell label="Spd" min={0} step={0.5} value={r.returnRate ?? 8} defaultValue={8} onchange={(v) => set('returnRate', Math.max(0, v))} />
+      <NumberCell label="Time (ms)" min={0} max={5000} step={10} value={r.returnTime ?? 125} onchange={(v) => set('returnTime', Math.max(0, v))} />
+      <PropertyCell label="Curve" span={2} hint="Linear is the constant-speed walk these controls always had. Exp covers most of the distance early, which is what a real spring does.">
+        <select class="val" value={r.returnCurve ?? 'linear'} onchange={(e) => set('returnCurve', e.target.value)}>
+          <option value="linear">Linear</option>
+          <option value="exp">Spring (exp)</option>
+          <option value="ease">Ease</option>
+        </select>
       </PropertyCell>
     {/if}
-    <PropertyCell label="Snap" span={2} compact hint="Value snap step (0 = continuous).">
+    <PropertyCell label="Snap" span={1} compact hint="Value snap step (0 = continuous).">
       <NumberCell label="Snap" min={0} max={1} step={0.01} value={r.snap ?? 0} defaultValue={0} onchange={(v) => set('snap', Math.max(0, Math.min(1, v)))} />
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Display" icon={Monitor}>
-    <PropertyCell label="Touch glow" span={2} hint="Glow while held.">
+    <PropertyCell label="Touch glow" span={1} hint="Glow while held.">
       <PropertyToggle value={r.showGlow !== false} onchange={() => set('showGlow', !(r.showGlow !== false))} />
     </PropertyCell>
-    <PropertyCell label="Readout" span={2} hint="Show the numeric value.">
+    <PropertyCell label="Readout" span={1} hint="Show the numeric value.">
       <PropertyToggle value={r.showValue === true} onchange={() => toggle('showValue')} />
     </PropertyCell>
     <PropertyCell label="Label" span={4} hint="Caption under the strip/wheel.">
@@ -115,11 +120,8 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
-    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .presets { display: flex; gap: 6px; flex-wrap: wrap; }
   .action-btn {
     background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD;

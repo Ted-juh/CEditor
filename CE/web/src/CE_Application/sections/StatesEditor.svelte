@@ -6,7 +6,14 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import ConditionBuilder from './ConditionBuilder.svelte';
   import { BASE_STATE_TARGET, buildStateTargetOptions, resolveSelectedStateName, summarizeStateOverrides } from '../utils/stateTargets.js';
+  import Layers from 'lucide-svelte/icons/layers';
+  import Target from 'lucide-svelte/icons/target';
+  import SquareCheck from 'lucide-svelte/icons/square-check';
+  import GitBranch from 'lucide-svelte/icons/git-branch';
+  import Replace from 'lucide-svelte/icons/replace';
+  import Wrench from 'lucide-svelte/icons/wrench';
 
   let { control = null } = $props();
 
@@ -23,6 +30,10 @@
   let core = $derived(getSection(control, 'Core'));
   let designer = $derived(getSection(control, 'Designer'));
   let states = $derived(getSection(control, 'States'));
+  // Channel names for the rule builder's operand list. A plain panel control has no
+  // ValueChannels section and the builder degrades to its free-text form, which is right:
+  // flags like `hover` are still legal operands there.
+  let channelNames = $derived(Object.keys(getSection(control, 'ValueChannels')?._children ?? {}));
   let multiEdit = $derived($selectedComponentIds.size > 1);
   let stateTargetOptions = $derived(buildStateTargetOptions(states));
   let selectedStateName = $state('');
@@ -176,7 +187,7 @@
 {#if multiEdit}
   <div class="placeholder">State editing is single-selection only.</div>
 {:else if states}
-  <PropertySection title="States">
+  <PropertySection title="States" icon={Layers}>
     <PropertyCell label="States" span={4} hint="Choose Base or a state you want to inspect and manage here.">
       <div class="state-strip">
         {#each stateTargetOptions as option}
@@ -198,13 +209,13 @@
     <PropertyCell label="New" span={3} hint="Create a new visual state for this control.">
       <input class="val" type="text" bind:value={newStateName} placeholder="State name" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create the state and make it the current visual target.">
+    <PropertyCell label="" span={1} hint="Create the state and make it the current visual target." compact>
       <button class="action-btn" onclick={addState}>Add</button>
     </PropertyCell>
   </PropertySection>
 
   {#if selectedStateName === BASE_STATE_TARGET}
-    <PropertySection title="Base Target">
+    <PropertySection title="Base Target" icon={Target}>
       <PropertyCell label="Mode" span={4} hint="Base is the unmodified control. Select a state chip to inspect that state directly.">
         <div class="target-banner">
           <div class="target-copy">
@@ -215,7 +226,7 @@
       </PropertyCell>
     </PropertySection>
   {:else if selectedState}
-    <PropertySection title="Selected State">
+    <PropertySection title="Selected State" icon={SquareCheck}>
       <PropertyCell label="Target" span={4} hint="Choose whether visual tabs should currently edit Base or this state.">
         <div class="target-banner">
           <div class="target-copy">
@@ -248,7 +259,24 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="When">
+    <PropertySection title="When" icon={GitBranch}>
+      <!--
+        The rule half of `evaluateState()` (utils/interactionRuntime.js): an optional compound
+        condition over channels and flags, ANDed with the toggles below. The runtime has honoured
+        it for as long as it has existed and the starter templates write one — the Tabbed Pages
+        container drives its page states with `tab == 'a'`, the Status LED with `active >= 1` —
+        but there was no field here, so a rule could be seen on the filmstrip badge and never
+        edited, and no user could write a new one. Same builder Links and Hit Zones use, on the
+        same condition language, so a rule learned in one place reads in all three.
+      -->
+      <PropertyCell label="Rule" span={4} hint="Compound condition over channels and flags. ANDed with the toggles below; leave empty to depend on the toggles alone.">
+        <ConditionBuilder
+          value={selectedState.rule ?? ''}
+          channels={channelNames}
+          onChange={(next) => setStateProp('rule', next)}
+          placeholder="no rule — flags only"
+        />
+      </PropertyCell>
       {#each COMMON_FLAGS as flag}
         <PropertyCell label={flag.label} span={1} hint={`Require ${flag.label.toLowerCase()} to activate this state.`}>
           <PropertyToggle
@@ -259,7 +287,7 @@
       {/each}
     </PropertySection>
 
-    <PropertySection title="Overrides">
+    <PropertySection title="Overrides" icon={Replace}>
       <PropertyCell label="Summary" span={4} hint="Visual tabs write overrides here when this state is targeted.">
         <div class="override-card">
           {#if overrideSummary.length}
@@ -286,7 +314,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Advanced">
+    <PropertySection title="Advanced" icon={Wrench}>
       <PropertyCell label="Raw Patches" span={4} hint="Optional JSON editing for advanced state patch work.">
         <div class="advanced-header">
           <span>Use this only when the visual tabs are not enough.</span>
@@ -302,7 +330,7 @@
         <PropertyCell label="Parts" span={2} hint="Per-part patch map keyed by part name.">
           <textarea class="val code" rows="12" bind:value={partsPatchDraft} onblur={() => commitPatchDraft('parts')}></textarea>
         </PropertyCell>
-        <PropertyCell label="" span={4} hint="Shows parse errors while editing the raw JSON.">
+        <PropertyCell label="" span={4} hint="Shows parse errors while editing the raw JSON." compact>
           <div class="patch-footer">
             <span class="error">{parseError}</span>
           </div>
@@ -319,17 +347,16 @@
     font-size: 11px;
   }
 
-  .val {
-    width: 100%;
-    min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+
+  /* A textarea wears `.val` too, and the shared skin is sized for a single-line field. Rows
+     decide its height; the token is only a floor. */
+  textarea.val {
+    height: auto;
+    min-height: var(--pp-field-height, 26px);
     padding: 4px 6px;
-    font-family: inherit;
-    outline: none;
+    line-height: 1.4;
+    resize: vertical;
   }
 
   .val.code {
@@ -342,7 +369,7 @@
   }
 
   .val:focus {
-    border-color: #5B9BD5;
+    border-color: var(--pp-field-focus, #5B9BD5);
   }
 
   .state-strip {

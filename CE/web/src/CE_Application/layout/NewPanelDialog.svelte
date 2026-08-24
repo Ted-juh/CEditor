@@ -8,10 +8,21 @@
   import { newPanelDialogOpen, closeNewPanelDialog } from '../stores/newPanelDialog.js';
   import { PANEL_SIZE_PRESETS, PANEL_TEMPLATES, buildPanelFromTemplate } from '../models/panelTemplates.js';
   import { addPanel } from '../stores/panels.js';
+  import { recentFiles, recentFileKey, recentFileLabel } from '../stores/recentFiles.js';
+  import { openRecentFile } from '../stores/recentFileActions.js';
   import NumberCell from '../properties/NumberCell.svelte';
 
   let name = $state('');
   let templateId = $state('blank');
+
+  // The four most recent panels, which is as many as fit on one row without the dialog growing
+  // a scrollbar for what is a shortcut, not a file browser. File > Open Recent has the full list.
+  let recentPanels = $derived($recentFiles.filter((entry) => entry.kind === 'panel').slice(0, 4));
+
+  function reopen(entry) {
+    closeNewPanelDialog();
+    openRecentFile(entry);
+  }
   let width = $state(600);
   let height = $state(400);
 
@@ -125,6 +136,23 @@
           <span class="unit">px</span>
         </div>
       </div>
+
+      {#if recentPanels.length}
+        <!-- "New panel" is very often the wrong answer to "I want to get back to what I was
+             doing" — the review's E6 asks for recent documents here for exactly that reason.
+             Panels only: this dialog makes panels, so offering a device profile alongside would
+             be a second, differently-shaped command hiding in a Create dialog. -->
+        <div class="field">
+          <span>Or reopen</span>
+          <div class="recent-row">
+            {#each recentPanels as entry (recentFileKey(entry))}
+              <button class="recent-chip" title={entry.path} onclick={() => reopen(entry)}>
+                {recentFileLabel(entry)}
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/if}
 
       <div class="dialog-actions">
         <button class="btn ghost" onclick={closeNewPanelDialog}>Cancel</button>
@@ -261,6 +289,20 @@
     gap: 6px;
   }
 
+  .recent-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .recent-chip {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .recent-chip,
   .size-chip {
     display: inline-flex;
     align-items: baseline;

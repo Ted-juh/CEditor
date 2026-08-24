@@ -1,3 +1,6 @@
+import { COMPONENT_TYPES } from '../models/componentTypes.js';
+import { flatControls } from './containment.js';
+import { isDisplayOnly } from './displayMode.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { canSendMidiControl, isMidiControlBinding, midiControlResolution } from './midiControlBindings.js';
 // exportParameters.js — the host-automatable parameter list a panel exposes (Milestone 2).
@@ -6,11 +9,28 @@ import { canSendMidiControl, isMidiControlBinding, midiControlResolution } from 
 // save/restore their values with the window closed. This module turns a panel into that list:
 //   - if the panel author defined `panel.exportParameters` explicitly, those win;
 //   - otherwise we derive one parameter per value-bearing control — its standard `Value.value`, or
-//     each public `ValueChannel` (the synth-facing controls). The same derivation runs in the editor
-//     (preview/automation UI) and is read by the C++ processor at export to build its APVTS.
+//     each public `ValueChannel` (the synth-facing controls), or what its type declares in
+//     `exportValues`. The same derivation runs in the editor (preview/automation UI) and is read by
+//     the C++ processor at export to build its APVTS.
+//
+// THE THIRD DOOR, and why it exists. For a long time there were only two: ValueChannels, and a
+// control's `Behavior`. Thirty-five of the fifty component types carry no Behavior section, so this
+// function never looked at them and they exported nothing — Crossfader, Ribbon, VectorJoystick,
+// Macro and Numpad among them, all things a user would expect to automate, and all bindable to a
+// synth parameter in the editor while giving a host no way to move them.
+//
+// The obvious fix — give those types a Behavior — is wrong: PropertiesPanel mounts a Behavior tab
+// off the section's presence, so a crossfader would grow a tab full of button fields. So the type
+// declares what it exports instead, in `exportValues`, next to its own section. A type that should
+// export NOTHING declares an empty list rather than staying silent, which is the difference between
+// a decision and an oversight — and QA-08 reports the two differently.
 //
 // A parameter entry:
-//   { id, label, controlName, path, min, max, defaultValue, unit, midiCC }
+//   { id, label, controlName, path, min, max, defaultValue, unit, midiCC, valueKind }
+// `valueKind` is 'float' | 'bool' | 'choice' and is what the C++ side branches on to pick an
+// AudioParameterFloat / Bool / Choice. It has to be explicit: a bool and a 0..1 knob are both
+// min 0 max 1, so the range cannot tell them apart, and for a long time everything exported as a
+// float — which is why a combobox read in the host as an anonymous number.
 // `path` is a script address (control name + leaf), so set()/get() and the bridge resolve it the
 // same way everywhere. `midiCC` is optional (window-closed CC send); null when unknown.
 
@@ -36,6 +56,7 @@ export function normalizeExportParameter(entry) {
     defaultValue: num(entry?.defaultValue, min),
     unit: String(entry?.unit ?? '').trim(),
     midiCC: entry?.midiCC == null ? null : num(entry.midiCC, 0),
+    valueKind: normalizeValueKind(entry),
     // Device wire — which synth parameter this drives (so the C++ processor can send MIDI for
     // automation window-closed). Empty when the control isn't bound to a device parameter.
     deviceRole: String(entry?.deviceRole ?? '').trim(),
@@ -48,19 +69,46 @@ export function normalizeExportParameter(entry) {
     // name (choiceValues[i]) rather than its index, so it round-trips even if the visible rows
     // change (cascading lists). 'index' (default) keeps the plain numeric index.
     ...choiceExportFields(entry),
+    // Where the value lives, for the parameters that drive a field on a component's own section
+    // (an Arp's rate, a joystick's x). Absent for the other two doors — a Behavior value and a
+    // CustomComponent channel both already have a place the player writes.
+    ...(entry?.section && entry?.field
+      ? { section: String(entry.section), field: String(entry.field) }
+      : {}),
   };
 }
 
-// Carry the named-choice metadata through unchanged when present.
+/**
+ * What kind of host parameter this is: 'float' | 'bool' | 'choice'.
+ *
+ * Explicit rather than inferred, because the range cannot carry it — a toggle and a 0..1 knob are
+ * both min 0 max 1. An author list that predates this field is read as a float, which is what those
+ * panels already got.
+ */
+const VALUE_KINDS = new Set(['float', 'bool', 'choice']);
+function normalizeValueKind(entry) {
+  const declared = String(entry?.valueKind ?? '').trim();
+  if (VALUE_KINDS.has(declared)) return declared;
+  // A list written before valueKind existed can still be recognised by what it carries.
+  if (Array.isArray(entry?.choiceLabels) && entry.choiceLabels.length > 1) return 'choice';
+  return 'float';
+}
+
+// Carry the choice metadata through. `choiceLabels` rides on EVERY selector, not just the
+// store-by-name ones: the labels are what the host shows in its parameter menu, and a selector
+// automated by index needs them just as much as one automated by name.
 function choiceExportFields(entry) {
-  if (String(entry?.choiceMode ?? 'index') !== 'value') return {};
+  const labels = Array.isArray(entry?.choiceLabels) ? entry.choiceLabels.map((v) => String(v ?? '')) : [];
   const values = Array.isArray(entry?.choiceValues) ? entry.choiceValues.map((v) => String(v ?? '')) : [];
-  if (!values.length) return {};
+  const byName = String(entry?.choiceMode ?? 'index') === 'value' && values.length > 0;
+  if (!labels.length && !byName) return {};
   return {
-    choiceMode: 'value',
-    choiceValues: values,
-    choiceLabels: Array.isArray(entry?.choiceLabels) ? entry.choiceLabels.map((v) => String(v ?? '')) : values,
-    defaultChoice: String(entry?.defaultChoice ?? values[0] ?? ''),
+    ...(labels.length ? { choiceLabels: labels } : { choiceLabels: values }),
+    ...(byName ? {
+      choiceMode: 'value',
+      choiceValues: values,
+      defaultChoice: String(entry?.defaultChoice ?? values[0] ?? ''),
+    } : {}),
   };
 }
 
@@ -173,6 +221,8 @@ function paramFromChannel(controlName, channelName, channel, single) {
     defaultValue: num(channel?.defaultValue ?? channel?.currentValue, min),
     unit: String(channel?.format?.suffix ?? channel?.format?.unit ?? '').trim(),
     midiCC: null,
+    // A value channel is a scalar by construction — there is no enum shape on this path.
+    valueKind: 'float',
   };
 }
 
@@ -190,6 +240,7 @@ function paramFromBehavior(name, behavior, valueSection = null) {
   let max;
   let defaultValue;
   let choiceFields = {};
+  let valueKind = 'float';
 
   if (family === 'range') {
     min = num(behavior?.min, 0);
@@ -197,20 +248,23 @@ function paramFromBehavior(name, behavior, valueSection = null) {
     defaultValue = num(behavior?.defaultCurrentValue ?? behavior?.defaultValue, min);
   } else if (valueType === 'bool') {
     min = 0; max = 1; defaultValue = behavior?.defaultValue === true ? 1 : 0;
+    valueKind = 'bool';
   } else if (valueType === 'enum' || family === 'select') {
     const choices = selectorChoices(valueSection);
     const count = choices.length || (Array.isArray(behavior?.enumValues) ? behavior.enumValues.length : 0);
     const defaultIndex = Math.max(0, choices.findIndex((c) => c.isDefault));
     min = 0; max = Math.max(1, count - 1); defaultValue = defaultIndex;
-    // Store-by-name: keep the numeric index for the APVTS contract, but attach the
-    // stable choice names so the persist/restore layer can round-trip by value.
+    // Two choices is the floor for a host menu; below that there is nothing to pick between and a
+    // plain float is the honest export.
+    if (choices.length > 1) valueKind = 'choice';
+    // The visible labels always ride along — they are what the host shows in its parameter menu.
+    if (choices.length) choiceFields.choiceLabels = choices.map((c) => c.label);
+    // Store-by-name additionally keeps the stable choice names, so the persist/restore layer can
+    // round-trip by value even when the visible rows change (cascading lists).
     if (valueSection?.storeByValue === true && choices.length) {
-      choiceFields = {
-        choiceMode: 'value',
-        choiceValues: choices.map((c) => c.value),
-        choiceLabels: choices.map((c) => c.label),
-        defaultChoice: choices[defaultIndex]?.value ?? choices[0]?.value ?? '',
-      };
+      choiceFields.choiceMode = 'value';
+      choiceFields.choiceValues = choices.map((c) => c.value);
+      choiceFields.defaultChoice = choices[defaultIndex]?.value ?? choices[0]?.value ?? '';
     }
   } else {
     return null; // trigger / none / decorative — not an automatable parameter
@@ -227,6 +281,7 @@ function paramFromBehavior(name, behavior, valueSection = null) {
     defaultValue: clampNum(defaultValue, min, max),
     unit: String(behavior?.unit ?? '').trim(),
     midiCC: null,
+    valueKind,
     ...choiceFields,
   };
 }
@@ -239,6 +294,13 @@ export function deriveExportParameters(panel) {
     const name = core?.name ?? core?.id;
     if (!name) continue;
     const kids = control._children;
+
+    // A DISPLAY EXPORTS NOTHING. A read-only control is not an input, and a host parameter for one
+    // would give the DAW an automation lane whose every value is overwritten by the next feedback
+    // frame — a lane that appears to work, records fine, and moves nothing. Gated here rather than
+    // per door, because all three doors below would otherwise need the same check.
+    if (isDisplayOnly(kids.Behavior)) continue;
+
     const wire = deviceWireFor(control); // which synth parameter this control drives
 
     // Custom-component value channels — one parameter per PUBLIC channel.
@@ -258,14 +320,120 @@ export function deriveExportParameters(panel) {
     if (kids.Behavior) {
       const param = paramFromBehavior(name, kids.Behavior, kids.Value);
       if (param) out.push({ ...param, ...wire });
+      continue;
+    }
+
+    // No Behavior: the type's own declaration, if it has one. An empty list is a type that has
+    // ruled it exports nothing, and is as final as a parameter.
+    for (const spec of COMPONENT_TYPES[core.controlType]?.exportValues ?? []) {
+      const param = paramFromTypeSpec(name, spec, kids);
+      if (param) out.push({ ...param, ...wire });
     }
   }
   return out;
 }
 
-/** The panel's host-automatable parameters: explicit author list if present, else derived. */
+/**
+ * A parameter from a component type's own `exportValues` declaration.
+ *
+ * The range comes from the component where the component names its own bounds (`Numpad.min`/`max`)
+ * and is 0..1 otherwise, which is what these components store. That is the whole vocabulary —
+ * anything more expressive belongs in a Behavior section, and a type that wants one should have one.
+ */
+function paramFromTypeSpec(name, spec, sections) {
+  const section = sections?.[spec.section];
+  if (!section) return null;
+
+  // Three ways a range is known, in order of who knows best.
+  //
+  //   minField/maxField  the COMPONENT names its own bounds (Numpad.min / .max) and the author may
+  //                      have changed them, so they win.
+  //   min/max            the TYPE states a fixed range, for a field that is not 0..1 and has no
+  //                      per-instance bounds to read — an Arp's steps-per-second, a Setlist index.
+  //                      Fixed on purpose: an exported parameter's range is permanent once a
+  //                      session references it, so it must not vary with what the author drew.
+  //   neither            0..1, which is what the normalized components store.
+  //
+  // The stored domain, not the displayed one. Several of these keep a normalized 0..1 position and
+  // a `bipolar` flag that only changes the readout (RibbonRenderer does `value * 2 - 1` for it), so
+  // exporting -1..1 would hand the host a range the control does not actually hold.
+  const min = spec.minField ? num(section[spec.minField], 0) : num(spec.min, 0);
+  // A fourth way, for a choice whose options are a LIST on the section: the Tab Container's pages
+  // are authored, so its range is however many there are and its labels are their names. Without
+  // this a page selector reaches a DAW as an anonymous 0..1 float, which is the thing `choice`
+  // exists to prevent.
+  const listed = spec.listField && Array.isArray(section[spec.listField]) ? section[spec.listField] : null;
+  const max = listed
+    ? Math.max(0, listed.length - 1)
+    : (spec.maxField ? num(section[spec.maxField], 1) : num(spec.max, 1));
+  const suffix = spec.suffix ?? 'value';
+
+  // Labels come from the list where there is one. A choice with fewer than two labels is not a
+  // choice — one page is a constant, and exporting it as a selector with a single option would put
+  // a dead control in the host.
+  const listedLabels = listed
+    ? listed.map((entry, index) => String(entry?.[spec.labelKey ?? 'label'] ?? `${index + 1}`))
+    : null;
+  const usableChoice = spec.kind === 'choice' && Array.isArray(listedLabels) && listedLabels.length > 1;
+
+  return {
+    id: `${name}.${suffix}`,
+    label: spec.label ? `${name} ${spec.label}` : name,
+    controlName: name,
+    path: `${name}.${suffix}`,
+    min,
+    max: max === min ? min + 1 : max,
+    defaultValue: clampNum(num(section[spec.field], min), min, max === min ? min + 1 : max),
+    unit: String(spec.unit ?? '').trim(),
+    midiCC: null,
+    valueKind: spec.kind === 'bool' ? 'bool' : (usableChoice ? 'choice' : 'float'),
+    ...(usableChoice ? { choiceLabels: listedLabels, choiceValues: listedLabels, choiceMode: 'index' } : {}),
+    // WHERE the value lives, carried through to the player. Without these the parameter reaches the
+    // host and moves nothing: `valueOverride` is for a Behavior value and `customValues` is for a
+    // CustomComponent channel, and a field on a component's own section is neither. See
+    // utils/sectionValueOverrides.js.
+    section: spec.section,
+    field: spec.field,
+  };
+}
+
+/**
+ * The names of every control on the panel that shows a value and does not accept input.
+ *
+ * Walked with `flatControls` rather than over the top level, because a meter inside a group is
+ * still a meter and an explicit list can name it.
+ */
+function displayOnlyControlNames(panel) {
+  const names = new Set();
+  for (const control of flatControls(Array.isArray(panel?.controls) ? panel.controls : [])) {
+    if (!isDisplayOnly(control?._children?.Behavior)) continue;
+    const core = control?._children?.Core;
+    const name = core?.name ?? core?.id;
+    if (name) names.add(String(name));
+  }
+  return names;
+}
+
+/**
+ * The panel's host-automatable parameters: explicit author list if present, else derived.
+ *
+ * THE DISPLAY GATE APPLIES TO BOTH LISTS. `deriveExportParameters` has skipped read-only controls
+ * since the capability landed, and an explicit `panel.exportParameters` went straight past it —
+ * which is the same silent failure the gate exists to stop, reached through the other door. A host
+ * parameter for a display gives the DAW an automation lane whose every value is overwritten by the
+ * next feedback frame: it appears to work, it records fine, and it moves nothing.
+ *
+ * Dropped rather than refused, and this is the one place in this pass where losing the entry is
+ * right: an export parameter list is generated machinery, not an author's sentence, and an entry
+ * that cannot function is not a decision anybody made. A panel that has since made one of its
+ * controls a display should export the rest and not fail.
+ */
 export function collectExportParameters(panel) {
   const explicit = Array.isArray(panel?.exportParameters) ? panel.exportParameters : [];
-  if (explicit.length) return explicit.map(normalizeExportParameter).filter(Boolean);
-  return deriveExportParameters(panel);
+  if (!explicit.length) return deriveExportParameters(panel);
+
+  const displays = displayOnlyControlNames(panel);
+  return explicit
+    .map(normalizeExportParameter)
+    .filter((parameter) => parameter && !displays.has(parameter.controlName));
 }

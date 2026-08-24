@@ -132,12 +132,16 @@
     position: relative;
     display: flex;
     align-items: stretch;
-    height: 24px;
+    /* On the panel token like every other field, so a stepper and a toggle in one grid row are
+       the same height. It was 24px against the toggle's 26 — two pixels, but visible as a wobble
+       down a column of paired rows. */
+    box-sizing: border-box;
+    height: var(--pp-field-height, 26px);
     flex: 1;
     min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
+    background: var(--pp-field-bg, #1A1A1A);
+    border: 1px solid var(--pp-field-border, #333);
+    border-radius: var(--pp-field-radius, 3px);
     overflow: hidden;
   }
 
@@ -146,7 +150,7 @@
   }
 
   .number-cell:focus-within {
-    border-color: #5B9BD5;
+    border-color: var(--pp-field-focus, #5B9BD5);
   }
 
   .number-cell.disabled {

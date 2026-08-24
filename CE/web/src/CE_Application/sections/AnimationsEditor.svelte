@@ -201,7 +201,7 @@
     <PropertyCell label="Add" span={3} hint="Create a new animation node.">
       <input class="val" type="text" bind:value={newAnimationName} placeholder="Animation name" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create the animation with a neutral transition shape.">
+    <PropertyCell label="" span={1} hint="Create the animation with a neutral transition shape." compact>
       <button class="action-btn" onclick={addAnimation}>Add</button>
     </PropertyCell>
     <PropertyCell label="Animations" span={3} hint="Select the animation to edit.">
@@ -211,7 +211,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected animation.">
+    <PropertyCell label="" span={1} hint="Remove the selected animation." compact>
       <button class="action-btn danger" onclick={removeAnimation} disabled={!selectedAnimationName}>Remove</button>
     </PropertyCell>
   </PropertySection>
@@ -307,7 +307,7 @@
       <PropertyCell label="Targets" span={4} hint="JSON array of target descriptors. Each item can provide a path and optional property hints.">
         <textarea class="val code" rows="12" bind:value={targetsDraft} onblur={commitTargets}></textarea>
       </PropertyCell>
-      <PropertyCell label="" span={4} hint="Send the selected animation payload to the Debug panel.">
+      <PropertyCell label="" span={4} hint="Send the selected animation payload to the Debug panel." compact>
         <div class="patch-footer">
           <span class="error">{parseError}</span>
           <button class="action-btn" onclick={dumpAnimationDebug}>Debug animation</button>
@@ -324,17 +324,16 @@
     font-size: 11px;
   }
 
-  .val {
-    width: 100%;
-    min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+
+  /* A textarea wears `.val` too, and the shared skin is sized for a single-line field. Rows
+     decide its height; the token is only a floor. */
+  textarea.val {
+    height: auto;
+    min-height: var(--pp-field-height, 26px);
     padding: 4px 6px;
-    font-family: inherit;
-    outline: none;
+    line-height: 1.4;
+    resize: vertical;
   }
 
   .val.code {
@@ -343,7 +342,7 @@
   }
 
   .val:focus {
-    border-color: #5B9BD5;
+    border-color: var(--pp-field-focus, #5B9BD5);
   }
 
   .action-btn {

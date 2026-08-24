@@ -208,7 +208,7 @@
     <PropertyCell label="Add" span={3} hint="Create a named value channel for sliders, grids, modes, note selections, scroll offsets, and external links.">
       <input class="val" type="text" bind:value={newName} placeholder="channelName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Add the channel with safe float defaults.">
+    <PropertyCell label="" span={1} hint="Add the channel with safe float defaults." compact>
       <button class="action-btn" type="button" onclick={addChannel}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose which channel to edit.">
@@ -218,7 +218,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected value channel.">
+    <PropertyCell label="" span={1} hint="Remove the selected value channel." compact>
       <button class="action-btn danger" type="button" onclick={removeChannel} disabled={!selectedName}>Remove</button>
     </PropertyCell>
   </PropertySection>
@@ -262,7 +262,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Definition" icon={Pencil}>
+    <PropertySection title="Definition" collapseKey="Channel Definition" icon={Pencil}>
       <PropertyCell label="Label" span={2} hint="Friendly label shown in the designer and public API.">
         <input class="val" type="text" value={selected.label ?? selectedName} onchange={(event) => set('label', event.target.value)} />
       </PropertyCell>
@@ -391,20 +391,8 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%;
-    min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
-    padding: 4px 6px;
-    font-family: inherit;
-    outline: none;
-    box-sizing: border-box;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .signal-card,
   .published-chip {
     display: flex;

@@ -30,6 +30,7 @@ class ValueTreeBridge : public juce::ValueTree::Listener
 {
 public:
     ValueTreeBridge();
+    ~ValueTreeBridge() override;
 
     /** Set the AppSettings reference for panel persistence */
     void setAppSettings (AppSettings* s) { appSettings = s; }
@@ -62,6 +63,15 @@ public:
                                 int indexFromWhichChildWasRemoved) override;
 
 private:
+    // Alive-flag for work that outlives the message thread's control.
+    //
+    // Almost everything here hops to the message thread and back and cannot outlive this object.
+    // The update check does: it blocks on a socket for up to eight seconds on a thread of its own,
+    // and the window can be closed in that time. The flag is shared with the thread and cleared in
+    // the destructor, so the completion callback can tell "still here" from "gone" instead of
+    // dereferencing a corpse.
+    std::shared_ptr<std::atomic<bool>> alive { std::make_shared<std::atomic<bool>> (true) };
+
     // Convert a ValueTree to a JSON-compatible juce::var (recursive)
     static juce::var treeToVar (const juce::ValueTree& t);
 

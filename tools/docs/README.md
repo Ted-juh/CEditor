@@ -46,14 +46,25 @@ with an *as built* section per phase.
 
 ## The Custom Component creator
 
-Read in this order; each one is a response to the one before it.
+| Document | What it is |
+|---|---|
+| [Creator redesign plan](custom-component-creator-redesign-plan.md) | What was wrong with the creator, the principles constraining the fix, and the phased plan: remove bookkeeping, never remove capability. **§1–§11 are all shipped.** It stays for §12, which is a live roadmap rather than a record — the array primitive and indexed repeats landed there, the arpeggiator write-side, responsive anchors, theme tokens and the sharing gallery have not. |
 
-| # | Document | What it is |
-|---|---|---|
-| 1 | [Creator redesign plan](custom-component-creator-redesign-plan.md) | What was wrong with the creator, the principles constraining the fix, and the phased plan: remove bookkeeping, never remove capability. |
-| 2 | [Properties panel review](cc-properties-panel-review.md) | The diagnosis its predecessor did not touch — the *taxonomy* of the properties panel. Its own phasing sketch (§6) is superseded by 3. |
-| 3 | [Properties panel restructure stages](cc-properties-panel-restructure-stages.md) | The implementation plan for 2: four independently shippable stages. Records all four as shipped on 2026-07-12. |
-| 4 | [Designer workspace review](cc-designer-workspace-review.md) | The other half of the editor — canvas, palette, bars, docks — audited against the code, and the regressions that audit found. |
+This used to be a four-document chain, read in order. The other three are retired, and what
+outlived them is here rather than in a document that reads as open:
+
+- **Properties panel review** — the taxonomy diagnosis. It produced the four-stage restructure,
+  all four of which shipped on 2026-07-12 and are verifiable in the code: the tabs are gated on
+  `componentWorkspaceMode`, `CustomDesignerEditor.svelte` is gone, `CustomInteractEditor` is the
+  cluster view, `CustomReactEditor` is the React group with its sub-nav. Its closing "what not to
+  do" was guidance, not work, and is now §2 of the redesign plan.
+- **Properties panel restructure stages** — the plan those four stages came from. Its one
+  remaining half, the W0 decomposition, was done on 2026-08-23.
+- **Designer workspace review** — closed out the same day: regressions restored, five bugs fixed
+  or verified, Tier 0 and Tier 1 complete, the feasible Tier 2 items done, the theming pass
+  applied, and the §5 decomposition finished at eight components. The decisions it raised that
+  nobody acted on are in [known-issues.md](../../docs/known-issues.md). Pinned by
+  `CE/web/test/surfaceDecomposition.test.js`.
 
 ## Post-beta bets
 
@@ -68,8 +79,3 @@ written to be argued with before anybody builds one. The overview is
 | [Total Recall](total-recall-plan.md) | Hardware that behaves like a plugin — the session restores the rig's state. |
 | [Ctrlr import](ctrlr-import-plan.md) | Reading the existing Ctrlr panel library, so a user's collection is not stranded. |
 
-## Snapshots
-
-- [Legacy controls snapshot](legacy-controls/README.md) — the pre-rewrite interactive control
-  system, kept as a parts bin rather than a base architecture. The code it describes is beside it
-  under `legacy-controls/reference/`, at its original source paths.

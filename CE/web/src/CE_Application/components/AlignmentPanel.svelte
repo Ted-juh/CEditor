@@ -377,13 +377,36 @@
 </div>
 
 <style>
+  /* Wraps rather than scrolls sideways (S3).
+     This was one non-wrapping row of `flex-shrink: 0` sections inside
+     `overflow-x: auto`, so below roughly 1100px the sections at the far end —
+     Order, Size, Layout — simply left the window. Nothing indicated they were
+     there: a horizontal scrollbar under a dock the user is already resizing
+     vertically is not a signal anyone reads, and this is the app's best
+     toolset to hide. Wrapping puts every section on screen at any width; the
+     dock scrolls vertically, which is the axis it already has a handle for. */
   .align-panel {
     display: flex;
     flex-direction: row;
-    gap: 0;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    column-gap: 0;
+    row-gap: 10px;
     padding: 8px 0;
     height: 100%;
-    overflow-x: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .align-panel::-webkit-scrollbar {
+    width: 6px;
+  }
+  .align-panel::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
+  }
+  .align-panel::-webkit-scrollbar-thumb:hover {
+    background: #5B9BD5;
   }
 
   .align-section {
@@ -394,8 +417,11 @@
     flex-shrink: 0;
   }
 
+  /* Auto height, not 100%: in a wrapping row a stretched divider would size
+     itself to the tallest line rather than to the line it sits on. */
   .section-divider {
     width: 1px;
+    align-self: stretch;
     background: #333;
     flex-shrink: 0;
   }

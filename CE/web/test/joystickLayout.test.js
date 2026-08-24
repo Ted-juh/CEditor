@@ -2,10 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   joystickGeometry, joyToPx, joyFromPx, joystickWeights, joystickAxis,
-  joystickPortValues, joystickGlide,
+  joystickPortValues,
 } from '../src/CE_Application/utils/joystickLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
+
+import {
+  normalizeReturnBehavior, restValueFor, returnStep, returnStep2DAxes,
+} from '../src/CE_Application/utils/returnToRest.js';
 
 test('px round-trip (y flipped: y=1 is the top)', () => {
   const g = joystickGeometry(120, 100, 10); // inner 100x80 at (10,10)
@@ -45,17 +49,29 @@ test('portValues exposes both axes + four corners', () => {
   assert.ok(near(v.cornerBR, w.br));
 });
 
-test('glide steps toward center, clamps, and settles', () => {
-  // rate 4/s, dt 0.1s → step 0.4 toward the target.
-  let s = joystickGlide({ x: 0, y: 1 }, { x: 0.5, y: 0.5 }, 4, 0.1, 'both');
-  assert.ok(near(s.pos.x, 0.4) && near(s.pos.y, 0.6));
-  assert.equal(s.settled, false);
-  // A big step lands exactly on target (no overshoot) + settles.
-  s = joystickGlide({ x: 0.45, y: 0.55 }, { x: 0.5, y: 0.5 }, 100, 1, 'both');
-  assert.ok(near(s.pos.x, 0.5) && near(s.pos.y, 0.5));
-  assert.equal(s.settled, true);
-  // Single-axis return leaves the other axis put.
-  s = joystickGlide({ x: 0.2, y: 0.9 }, { x: 0.5, y: 0.5 }, 100, 1, 'x');
-  assert.ok(near(s.pos.x, 0.5) && near(s.pos.y, 0.9));
-  assert.equal(s.settled, true);
+// `joystickGlide` is gone — the three private springs are now one. These are the same assertions
+// through the shared path, because the point of unifying is that the behaviour survived.
+test('the puck springs to centre, lands exactly, and settles', () => {
+  // returnToCenter + rate 4 normalises to 250ms linear; a quarter of the way in is a quarter there.
+  const spec = normalizeReturnBehavior({ returnToCenter: true, returnRate: 4 });
+  assert.equal(spec.returnMode, 'center');
+  assert.equal(spec.returnTime, 250);
+
+  const rest = { x: 0.5, y: 0.5 };
+  let s = returnStep2DAxes({ x: 0, y: 1 }, rest, 100, spec, 'both');
+  assert.ok(near(s.value.x, 0.2) && near(s.value.y, 0.8));
+  assert.equal(s.done, false);
+
+  s = returnStep2DAxes({ x: 0.45, y: 0.55 }, rest, 250, spec, 'both');
+  assert.ok(near(s.value.x, 0.5) && near(s.value.y, 0.5));
+  assert.equal(s.done, true);
+});
+
+test('a single-axis return leaves the other axis exactly where it was', () => {
+  // Both axes travel on ONE progress, so the puck moves in a straight line; an axis that is not
+  // returning holds its value and reports itself done, or the glide would never finish.
+  const spec = normalizeReturnBehavior({ returnToCenter: true, returnRate: 4, returnAxes: 'x' });
+  const s = returnStep2DAxes({ x: 0.2, y: 0.9 }, { x: 0.5, y: 0.5 }, 250, spec, spec.returnAxes);
+  assert.ok(near(s.value.x, 0.5) && near(s.value.y, 0.9));
+  assert.equal(s.done, true);
 });

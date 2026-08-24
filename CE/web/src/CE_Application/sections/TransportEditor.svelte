@@ -49,12 +49,12 @@
       </select>
     </PropertyCell>
     {#if isHost}
-      <PropertyCell label="" span={4} hint="">
+      <PropertyCell label="" span={4} hint="" compact>
         <div class="note">Only live in an exported plugin; elsewhere the face reads &ldquo;HOST · no DAW&rdquo;.</div>
       </PropertyCell>
     {/if}
 
-    <PropertyCell label="Tempo" span={2} compact hint="Beats per minute ({MIN_BPM}–{MAX_BPM}). Changing it never jumps the position — only the rate ahead of the current beat." disabled={external}>
+    <PropertyCell label="Tempo" span={1} compact hint="Beats per minute ({MIN_BPM}–{MAX_BPM}). Changing it never jumps the position — only the rate ahead of the current beat." disabled={external}>
       <NumberCell label="BPM" min={MIN_BPM} max={MAX_BPM} step={0.1} disabled={external}
              value={num(t.bpm, 120)} defaultValue={120} onchange={(v) => set('bpm', clampNum(v, MIN_BPM, MAX_BPM, 120))} />
     </PropertyCell>
@@ -81,7 +81,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="Every synced component follows this one clock.">
+    <PropertyCell label="" span={4} hint="Every synced component follows this one clock." compact>
       <div class="note">{isHost ? 'Following the DAW playhead' : external ? 'Following MIDI clock in' : 'Master clock'}{t.clockOut === true && !external ? ' · sending clock' : ''}</div>
       <!--
         Clock used to go to a hardcoded device name whatever the panel called its own, so a panel like
@@ -111,11 +111,11 @@
       <PropertyCell label="Length (bars)" span={1} compact hint="How long the loop is. 0.25 = one beat in 4/4.">
         <NumberCell label="Len" min={MIN_BARS} max={MAX_BARS} step={0.25} value={num(t.loopLengthBars, 4)} defaultValue={4} onchange={(v) => set('loopLengthBars', clampNum(v, MIN_BARS, MAX_BARS, 4))} />
       </PropertyCell>
-      <PropertyCell label="" span={2} hint="">
+      <PropertyCell label="" span={2} hint="" compact>
         <div class="note">bars {num(t.loopStartBar, 1)}–{num(t.loopStartBar, 1) + num(t.loopLengthBars, 4)}</div>
       </PropertyCell>
       {#if external}
-        <PropertyCell label="" span={4} hint="">
+        <PropertyCell label="" span={4} hint="" compact>
           <div class="note">Inactive while following {isHost ? 'the DAW' : 'MIDI clock in'} — the master owns the position, and folding it into a loop of ours would put the panel somewhere the master isn't. Use the host's own loop.</div>
         </PropertyCell>
       {/if}
@@ -147,8 +147,8 @@
 {/if}
 
 <style>
-  .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .val:disabled { opacity: 0.5; cursor: not-allowed; }
   .note { font-size: 11px; color: #8a8a94; }
   .note.warn { color: #d8a657; margin-top: 3px; }

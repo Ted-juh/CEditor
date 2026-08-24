@@ -10,6 +10,13 @@
   import ToolchainsSettings from '../settings/ToolchainsSettings.svelte';
   import MidiSettings from '../settings/MidiSettings.svelte';
 
+  // Only one of these pages is undoable, and the {#if} chain below is what
+  // enforces it: General registers itself as a history context while it is
+  // mounted, so switching sections hands Ctrl+Z back. The others are ACTIONS
+  // rather than editable values — Fonts and Icons import and delete files, MIDI
+  // opens devices, Toolchains provisions them — and writing an old snapshot back
+  // over any of those would be a side effect, not an undo. See
+  // settings/generalSettingsHistory.js.
   const sections = [
     { id: 'general', label: 'General', icon: Cog, available: true },
     { id: 'fonts', label: 'Fonts', icon: Type, available: true },

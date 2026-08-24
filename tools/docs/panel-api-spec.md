@@ -103,7 +103,10 @@ Rule: **named functions for "me reacting to me"; explicit `on(...)` for "me reac
 **Control events:** `valueChange` (live, while moving — for GUI/preview), `valueChanged` (settled/final — for transmit), `click`, `doubleClick`, `pointerDown`/`pointerMove`/`pointerUp`, `hoverStart`/`hoverEnd`, `wheel`, `stateChanged`.
 *(Value events: two, not three — `valueChanged` already means committed/final; the old `valueCommitted` was redundant.)*
 
-**Panel events:** lifecycle (Q5), `controlChanged`, `panelStateChanged`, `timer`, plus custom events via `emit`.
+**Panel events:** lifecycle (Q5), `controlChanged`, `timer`, plus custom events via `emit`.
+*(`panelStateChanged` was specified here and is not implemented. There is no panel-state feature
+in the model for it to observe, so no runtime could raise it; the declaration was removed from
+`panelApi.js`, which carries the same note. It comes back when panel states do.)*
 
 **Device events:** at **both** levels —
 - **Decoded (the DPD payoff, 90% of use):** `parameterReceived` (`parameter`, `value`), `dumpReceived` (`bytes`, `kind`).

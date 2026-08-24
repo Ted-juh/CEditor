@@ -1,0 +1,7624 @@
+{
+  "panelGuid": "55b8368f-5140-42bb-a4f8-4434614e9b51",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": true,
+    "exportLv2": true,
+    "restoreHardware": "ask"
+  },
+  "name": "QA-08 Export Parameters",
+  "scriptId": "qa_08_export",
+  "author": "",
+  "version": "1.0.0",
+  "description": "QA-08 — the exported plugin's parameter list, 28 exporting types and 15 branch recipes",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 1600,
+  "height": 5193,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF1C2024",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 20,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "activeNoteIndex": 0,
+    "notes": [
+      {
+        "name": "How to read this sheet",
+        "content": "WHAT THIS SHEET IS\n\ncollectExportParameters() turned into something you can look at. That function runs in the\neditor for the automation UI and is read by the C++ processor at export to build its APVTS,\nso what it returns IS the plugin's parameter list. There is no second opinion later.\n\nWHY IT MATTERS MORE THAN IT LOOKS\n\nEvery other sheet in this suite shows something that is wrong on screen. This one shows\nsomething that is wrong in three weeks, in a DAW, on somebody else's machine. A control that\nexports as no parameter, or with the wrong range, or with no wire to the synth, behaves\nperfectly while you are authoring. The panel looks finished.\n\nHOW TO RUN THE PASS\n\n  1. Read the third group first — the types the deriver never looks at. It is the only part\n     of this sheet that needs a judgement rather than a check. For each one, ask whether a\n     user would expect to automate it from a host. Anything that should be automatable and\n     is on that list is a finding, and it is invisible everywhere else.\n  2. Scan the first group for a range that looks wrong — a 0–1 where the control shows\n     0–127, a default outside its own range.\n  3. Read the recipe cards. Each names the branch it covers and re-checks it at generation\n     time; a red card means the branch stopped being exercised, which is a hole in the\n     coverage rather than a bug on its own.\n  4. Then export one. File → Export, open the plugin in a host, and check the parameter list\n     against the first group. This sheet proves what the editor believes; only a host proves\n     the two agree.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a value-bearing type in the \"never looks\" list       silently unautomatable\n  - a range of [0 … 1] on a control the user sees as 0–127\n  - a default outside the parameter's own min/max        the host clamps, the panel jumps\n  - a parameter with a deviceRole and no wire            moves in the DAW, sends nothing\n  - a wire on the velocity recipe                        automating an inbound-only message\n  - any red card                                          a recipe that stopped covering its branch\n\nWHAT IT CANNOT PROVE\n\nThat the host and the panel agree. Everything here is the editor's own derivation; the C++\nprocessor reads the same document and builds the APVTS from it, and the two have drifted\nbefore. Exporting one panel and opening it in a DAW is the check this sheet sets up and\ncannot perform.\n\nIt also proves nothing about VALUES — only about the parameter list. What a parameter does\nwhen a host moves it is the player, and the player is QA-04 and a real session."
+      }
+    ]
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "qa08_ToggleButton.value",
+      "label": "qa08_ToggleButton",
+      "controlName": "qa08_ToggleButton",
+      "path": "qa08_ToggleButton.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_RadioButtonGroup.value",
+      "label": "qa08_RadioButtonGroup",
+      "controlName": "qa08_RadioButtonGroup",
+      "path": "qa08_RadioButtonGroup.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_CyclicButton.value",
+      "label": "qa08_CyclicButton",
+      "controlName": "qa08_CyclicButton",
+      "path": "qa08_CyclicButton.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Combobox.value",
+      "label": "qa08_Combobox",
+      "controlName": "qa08_Combobox",
+      "path": "qa08_Combobox.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Listbox.value",
+      "label": "qa08_Listbox",
+      "controlName": "qa08_Listbox",
+      "path": "qa08_Listbox.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Range.value",
+      "label": "qa08_Range",
+      "controlName": "qa08_Range",
+      "path": "qa08_Range.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Number.value",
+      "label": "qa08_Number",
+      "controlName": "qa08_Number",
+      "path": "qa08_Number.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Slider.value",
+      "label": "qa08_Slider",
+      "controlName": "qa08_Slider",
+      "path": "qa08_Slider.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Knob.value",
+      "label": "qa08_Knob",
+      "controlName": "qa08_Knob",
+      "path": "qa08_Knob.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_CustomComponent.mainValue",
+      "label": "qa08_CustomComponent Main Value",
+      "controlName": "qa08_CustomComponent",
+      "path": "qa08_CustomComponent.mainValue",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_CustomComponent.mode",
+      "label": "qa08_CustomComponent Mode",
+      "controlName": "qa08_CustomComponent",
+      "path": "qa08_CustomComponent.mode",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Macro.value",
+      "label": "qa08_Macro",
+      "controlName": "qa08_Macro",
+      "path": "qa08_Macro.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.28,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Macro",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Constellation.x",
+      "label": "qa08_Constellation X",
+      "controlName": "qa08_Constellation",
+      "path": "qa08_Constellation.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Constellation",
+      "field": "probeX",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Constellation.y",
+      "label": "qa08_Constellation Y",
+      "controlName": "qa08_Constellation",
+      "path": "qa08_Constellation.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Constellation",
+      "field": "probeY",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Timbre.x",
+      "label": "qa08_Timbre X",
+      "controlName": "qa08_Timbre",
+      "path": "qa08_Timbre.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Timbre",
+      "field": "x",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Timbre.y",
+      "label": "qa08_Timbre Y",
+      "controlName": "qa08_Timbre",
+      "path": "qa08_Timbre.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Timbre",
+      "field": "y",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Turing.rate",
+      "label": "qa08_Turing Rate",
+      "controlName": "qa08_Turing",
+      "path": "qa08_Turing.rate",
+      "min": 0.1,
+      "max": 32,
+      "defaultValue": 2,
+      "unit": "st/s",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Turing",
+      "field": "rate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Turing.randomness",
+      "label": "qa08_Turing Randomness",
+      "controlName": "qa08_Turing",
+      "path": "qa08_Turing.randomness",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.25,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Turing",
+      "field": "randomness",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Turing.gateThreshold",
+      "label": "qa08_Turing Gate threshold",
+      "controlName": "qa08_Turing",
+      "path": "qa08_Turing.gateThreshold",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Turing",
+      "field": "gateThreshold",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Turing.length",
+      "label": "qa08_Turing Length",
+      "controlName": "qa08_Turing",
+      "path": "qa08_Turing.length",
+      "min": 1,
+      "max": 64,
+      "defaultValue": 8,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Turing",
+      "field": "length",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Arp.rate",
+      "label": "qa08_Arp Rate",
+      "controlName": "qa08_Arp",
+      "path": "qa08_Arp.rate",
+      "min": 0.1,
+      "max": 32,
+      "defaultValue": 6,
+      "unit": "st/s",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Arp",
+      "field": "rate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Arp.gate",
+      "label": "qa08_Arp Gate",
+      "controlName": "qa08_Arp",
+      "path": "qa08_Arp.gate",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.6,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Arp",
+      "field": "gate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Arp.swing",
+      "label": "qa08_Arp Swing",
+      "controlName": "qa08_Arp",
+      "path": "qa08_Arp.swing",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Arp",
+      "field": "swing",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Arp.octaves",
+      "label": "qa08_Arp Octaves",
+      "controlName": "qa08_Arp",
+      "path": "qa08_Arp.octaves",
+      "min": 1,
+      "max": 4,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Arp",
+      "field": "octaves",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Phrase.transpose",
+      "label": "qa08_Phrase Transpose",
+      "controlName": "qa08_Phrase",
+      "path": "qa08_Phrase.transpose",
+      "min": -24,
+      "max": 24,
+      "defaultValue": 0,
+      "unit": "st",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Phrase",
+      "field": "transpose",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Phrase.swing",
+      "label": "qa08_Phrase Swing",
+      "controlName": "qa08_Phrase",
+      "path": "qa08_Phrase.swing",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Phrase",
+      "field": "swing",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Phrase.gate",
+      "label": "qa08_Phrase Gate",
+      "controlName": "qa08_Phrase",
+      "path": "qa08_Phrase.gate",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.8,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Phrase",
+      "field": "gate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Phrase.rate",
+      "label": "qa08_Phrase Rate",
+      "controlName": "qa08_Phrase",
+      "path": "qa08_Phrase.rate",
+      "min": 0.1,
+      "max": 32,
+      "defaultValue": 8,
+      "unit": "st/s",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Phrase",
+      "field": "rate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Setlist.index",
+      "label": "qa08_Setlist Scene",
+      "controlName": "qa08_Setlist",
+      "path": "qa08_Setlist.index",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Setlist",
+      "field": "index",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Transport.swing",
+      "label": "qa08_Transport Swing",
+      "controlName": "qa08_Transport",
+      "path": "qa08_Transport.swing",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Transport",
+      "field": "swing",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Kinetic.gravity",
+      "label": "qa08_Kinetic Gravity",
+      "controlName": "qa08_Kinetic",
+      "path": "qa08_Kinetic.gravity",
+      "min": -1,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Kinetic",
+      "field": "gravity",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Kinetic.restitution",
+      "label": "qa08_Kinetic Restitution",
+      "controlName": "qa08_Kinetic",
+      "path": "qa08_Kinetic.restitution",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.92,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Kinetic",
+      "field": "restitution",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Kinetic.friction",
+      "label": "qa08_Kinetic Friction",
+      "controlName": "qa08_Kinetic",
+      "path": "qa08_Kinetic.friction",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.04,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Kinetic",
+      "field": "friction",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Orbit.rate",
+      "label": "qa08_Orbit Rate",
+      "controlName": "qa08_Orbit",
+      "path": "qa08_Orbit.rate",
+      "min": 0.01,
+      "max": 8,
+      "defaultValue": 0.25,
+      "unit": "Hz",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Orbit",
+      "field": "rate",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Ribbon.value",
+      "label": "qa08_Ribbon",
+      "controlName": "qa08_Ribbon",
+      "path": "qa08_Ribbon.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Ribbon",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Numpad.value",
+      "label": "qa08_Numpad",
+      "controlName": "qa08_Numpad",
+      "path": "qa08_Numpad.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Numpad",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_Crossfader.value",
+      "label": "qa08_Crossfader",
+      "controlName": "qa08_Crossfader",
+      "path": "qa08_Crossfader.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Crossfader",
+      "field": "mix",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_VectorJoystick.x",
+      "label": "qa08_VectorJoystick X",
+      "controlName": "qa08_VectorJoystick",
+      "path": "qa08_VectorJoystick.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "x",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_VectorJoystick.y",
+      "label": "qa08_VectorJoystick Y",
+      "controlName": "qa08_VectorJoystick",
+      "path": "qa08_VectorJoystick.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "y",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_StepSequencer.bpm",
+      "label": "qa08_StepSequencer Tempo",
+      "controlName": "qa08_StepSequencer",
+      "path": "qa08_StepSequencer.bpm",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "StepSequencer",
+      "field": "bpm",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_StepSequencer.run",
+      "label": "qa08_StepSequencer Run",
+      "controlName": "qa08_StepSequencer",
+      "path": "qa08_StepSequencer.run",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "section": "StepSequencer",
+      "field": "running",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_TabContainer.page",
+      "label": "qa08_TabContainer Page",
+      "controlName": "qa08_TabContainer",
+      "path": "qa08_TabContainer.page",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Page 1",
+        "Page 2"
+      ],
+      "choiceValues": [
+        "Page 1",
+        "Page 2"
+      ],
+      "choiceMode": "index",
+      "section": "TabContainer",
+      "field": "pageIndex",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_PitchWheel.value",
+      "label": "qa08_PitchWheel",
+      "controlName": "qa08_PitchWheel",
+      "path": "qa08_PitchWheel.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Ribbon",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa08_ModWheel.value",
+      "label": "qa08_ModWheel",
+      "controlName": "qa08_ModWheel",
+      "path": "qa08_ModWheel.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Ribbon",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Cutoff.value",
+      "label": "Cutoff",
+      "controlName": "Cutoff",
+      "path": "Cutoff.value",
+      "min": 20,
+      "max": 20000,
+      "defaultValue": 440,
+      "unit": "Hz",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Stuck.value",
+      "label": "Stuck",
+      "controlName": "Stuck",
+      "path": "Stuck.value",
+      "min": 64,
+      "max": 65,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Sync.value",
+      "label": "Sync",
+      "controlName": "Sync",
+      "path": "Sync.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Waveform.value",
+      "label": "Waveform",
+      "controlName": "Waveform",
+      "path": "Waveform.value",
+      "min": 0,
+      "max": 4,
+      "defaultValue": 2,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Saw",
+        "Square",
+        "Triangle",
+        "Sine",
+        "Noise"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Bank.value",
+      "label": "Bank",
+      "controlName": "Bank",
+      "path": "Bank.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Bank A",
+        "Bank B",
+        "Bank C"
+      ],
+      "choiceMode": "value",
+      "choiceValues": [
+        "bank_a",
+        "bank_b",
+        "bank_c"
+      ],
+      "defaultChoice": "bank_b",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Category.value",
+      "label": "Category",
+      "controlName": "Category",
+      "path": "Category.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Violin",
+        "Cello",
+        "Bass"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Level.value",
+      "label": "Level",
+      "controlName": "Level",
+      "path": "Level.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Resonance.value",
+      "label": "Resonance",
+      "controlName": "Resonance",
+      "path": "Resonance.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "primary",
+      "deviceParameterId": "osc1.resonance"
+    },
+    {
+      "id": "Expression.value",
+      "label": "Expression",
+      "controlName": "Expression",
+      "path": "Expression.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "mainSynth",
+      "deviceParameterId": "",
+      "midiControl": {
+        "kind": "cc",
+        "channel": 1,
+        "controller": 11,
+        "parameterMsb": 0,
+        "parameterLsb": 0,
+        "valueResolution": 7,
+        "nullAfterSend": false
+      }
+    },
+    {
+      "id": "Filter Track.value",
+      "label": "Filter Track",
+      "controlName": "Filter Track",
+      "path": "Filter Track.value",
+      "min": 0,
+      "max": 16383,
+      "defaultValue": 8192,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "mainSynth",
+      "deviceParameterId": "",
+      "midiControl": {
+        "kind": "nrpn",
+        "channel": 1,
+        "controller": 0,
+        "parameterMsb": 1,
+        "parameterLsb": 24,
+        "valueResolution": 14,
+        "nullAfterSend": false
+      }
+    },
+    {
+      "id": "Velocity Depth.value",
+      "label": "Velocity Depth",
+      "controlName": "Velocity Depth",
+      "path": "Velocity Depth.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 100,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Muted Send.value",
+      "label": "Muted Send",
+      "controlName": "Muted Send",
+      "path": "Muted Send.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Ring.value",
+      "label": "Ring",
+      "controlName": "Ring",
+      "path": "Ring.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.25,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "XY Pad.x",
+      "label": "XY Pad X",
+      "controlName": "XY Pad",
+      "path": "XY Pad.x",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "XY Pad.y",
+      "label": "XY Pad Y",
+      "controlName": "XY Pad",
+      "path": "XY Pad.y",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Cutoff.value",
+      "label": "Cutoff",
+      "controlName": "Cutoff",
+      "path": "Cutoff.value",
+      "min": 20,
+      "max": 20000,
+      "defaultValue": 440,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Exports_a_parameter_at_defaults_28_of_58_types",
+          "id": "qa_group_0",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 28,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Exports a parameter at defaults — 28 of 58 types",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_0",
+          "id": "qa_cap_0",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 64,
+          "width": 136,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "ToggleButton",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_ToggleButton",
+          "id": "qa08_ToggleButton",
+          "controlType": "ToggleButton"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 86
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_1",
+          "id": "qa_cap_1",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 188,
+          "y": 64,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_ToggleButton",
+          "id": "qa08_p_ToggleButton",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 188,
+          "y": 86,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_ToggleButton.value  [0 … 1]  default 0\n  AudioParameterBool",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_2",
+          "id": "qa_cap_2",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 642,
+          "y": 64,
+          "width": 240,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "RadioButtonGroup",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_RadioButtonGroup",
+          "id": "qa08_RadioButtonGroup",
+          "controlType": "RadioButtonGroup"
+        },
+        "Transform": {
+          "x": 642,
+          "y": 86
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_3",
+          "id": "qa_cap_3",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 906,
+          "y": 64,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_RadioButtonGroup",
+          "id": "qa08_p_RadioButtonGroup",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 906,
+          "y": 86,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_RadioButtonGroup.value  [0 … 1]  default 0\n  AudioParameterChoice\n  menu: Option 1 / Option 2",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_4",
+          "id": "qa_cap_4",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1360,
+          "y": 64,
+          "width": 136,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "CyclicButton",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_CyclicButton",
+          "id": "qa08_CyclicButton",
+          "controlType": "CyclicButton"
+        },
+        "Transform": {
+          "x": 1360,
+          "y": 86
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_5",
+          "id": "qa_cap_5",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 176,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_CyclicButton",
+          "id": "qa08_p_CyclicButton",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 198,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_CyclicButton.value  [0 … 2]  default 0\n  AudioParameterChoice\n  menu: State 1 / State 2 / State 3",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_6",
+          "id": "qa_cap_6",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 176,
+          "width": 160,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Combobox",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Combobox",
+          "id": "qa08_Combobox",
+          "controlType": "Combobox"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 198
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_7",
+          "id": "qa_cap_7",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 666,
+          "y": 176,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Combobox",
+          "id": "qa08_p_Combobox",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 666,
+          "y": 198,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Combobox.value  [0 … 2]  default 0\n  AudioParameterChoice\n  menu: Option 1 / Option 2 / Option 3",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_8",
+          "id": "qa_cap_8",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1120,
+          "y": 176,
+          "width": 160,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Listbox",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Listbox",
+          "id": "qa08_Listbox",
+          "controlType": "Listbox"
+        },
+        "Transform": {
+          "x": 1120,
+          "y": 198
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_9",
+          "id": "qa_cap_9",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 426,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Listbox",
+          "id": "qa08_p_Listbox",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 448,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Listbox.value  [0 … 2]  default 0\n  AudioParameterChoice\n  menu: Option 1 / Option 2 / Option 3",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_10",
+          "id": "qa_cap_10",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 426,
+          "width": 200,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Range",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Range",
+          "id": "qa08_Range",
+          "controlType": "Range"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 448
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_11",
+          "id": "qa_cap_11",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 706,
+          "y": 426,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Range",
+          "id": "qa08_p_Range",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 706,
+          "y": 448,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Range.value  [0 … 100]  default 0\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_12",
+          "id": "qa_cap_12",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1160,
+          "y": 426,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Number",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Number",
+          "id": "qa08_Number",
+          "controlType": "Number"
+        },
+        "Transform": {
+          "x": 1160,
+          "y": 448
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_13",
+          "id": "qa_cap_13",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 538,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Number",
+          "id": "qa08_p_Number",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 560,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Number.value  [0 … 100]  default 0\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_14",
+          "id": "qa_cap_14",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 538,
+          "width": 220,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Slider",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Slider",
+          "id": "qa08_Slider",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 560
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_15",
+          "id": "qa_cap_15",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 726,
+          "y": 538,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Slider",
+          "id": "qa08_p_Slider",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 726,
+          "y": 560,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Slider.value  [0 … 1]  default 0.5\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_16",
+          "id": "qa_cap_16",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1180,
+          "y": 538,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Knob",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Knob",
+          "id": "qa08_Knob",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 1180,
+          "y": 560
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_17",
+          "id": "qa_cap_17",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 688,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Knob",
+          "id": "qa08_p_Knob",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 710,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Knob.value  [0 … 1]  default 0.5\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_18",
+          "id": "qa_cap_18",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 688,
+          "width": 200,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "CustomComponent",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_CustomComponent",
+          "id": "qa08_CustomComponent",
+          "controlType": "CustomComponent"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 710
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_19",
+          "id": "qa_cap_19",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 706,
+          "y": 688,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "2 parameters",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_CustomComponent",
+          "id": "qa08_p_CustomComponent",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 706,
+          "y": 710,
+          "width": 430,
+          "height": 102
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_CustomComponent.mainValue  [0 … 1]  default 0.5\n  AudioParameterFloat\nqa08_CustomComponent.mode  [0 … 1]  default 0\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_20",
+          "id": "qa_cap_20",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1160,
+          "y": 688,
+          "width": 320,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Macro",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Macro",
+          "id": "qa08_Macro",
+          "controlType": "Macro"
+        },
+        "Transform": {
+          "x": 1160,
+          "y": 710
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_21",
+          "id": "qa_cap_21",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 938,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Macro",
+          "id": "qa08_p_Macro",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 960,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Macro.value  [0 … 1]  default 0.28\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_22",
+          "id": "qa_cap_22",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 938,
+          "width": 260,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Constellation",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Constellation",
+          "id": "qa08_Constellation",
+          "controlType": "Constellation"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 960
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_23",
+          "id": "qa_cap_23",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 766,
+          "y": 938,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "2 parameters",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Constellation",
+          "id": "qa08_p_Constellation",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 766,
+          "y": 960,
+          "width": 430,
+          "height": 102
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Constellation.x  [0 … 1]  default 0.5\n  AudioParameterFloat\nqa08_Constellation.y  [0 … 1]  default 0.5\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_24",
+          "id": "qa_cap_24",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1220,
+          "y": 938,
+          "width": 220,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Timbre",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Timbre",
+          "id": "qa08_Timbre",
+          "controlType": "Timbre"
+        },
+        "Transform": {
+          "x": 1220,
+          "y": 960
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_25",
+          "id": "qa_cap_25",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1208,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "2 parameters",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Timbre",
+          "id": "qa08_p_Timbre",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1230,
+          "width": 430,
+          "height": 102
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Timbre.x  [0 … 1]  default 0.5\n  AudioParameterFloat\nqa08_Timbre.y  [0 … 1]  default 0.5\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_26",
+          "id": "qa_cap_26",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 1208,
+          "width": 260,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Turing",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Turing",
+          "id": "qa08_Turing",
+          "controlType": "Turing"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 1230
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_27",
+          "id": "qa_cap_27",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 766,
+          "y": 1208,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "4 parameters",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Turing",
+          "id": "qa08_p_Turing",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 766,
+          "y": 1230,
+          "width": 430,
+          "height": 182
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Turing.rate  [0.1 … 32]  default 2  st/s\n  AudioParameterFloat\nqa08_Turing.randomness  [0 … 1]  default 0.25\n  AudioParameterFloat\nqa08_Turing.gateThreshold  [0 … 1]  default 0.5\n  AudioParameterFloat\nqa08_Turing.length  [1 … 64]  default 8\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_28",
+          "id": "qa_cap_28",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1220,
+          "y": 1208,
+          "width": 320,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Arp",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Arp",
+          "id": "qa08_Arp",
+          "controlType": "Arp"
+        },
+        "Transform": {
+          "x": 1220,
+          "y": 1230
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_29",
+          "id": "qa_cap_29",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1440,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "4 parameters",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Arp",
+          "id": "qa08_p_Arp",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1462,
+          "width": 430,
+          "height": 182
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Arp.rate  [0.1 … 32]  default 6  st/s\n  AudioParameterFloat\nqa08_Arp.gate  [0 … 1]  default 0.6\n  AudioParameterFloat\nqa08_Arp.swing  [0 … 1]  default 0\n  AudioParameterFloat\nqa08_Arp.octaves  [1 … 4]  default 1\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_30",
+          "id": "qa_cap_30",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 1440,
+          "width": 460,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Phrase",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Phrase",
+          "id": "qa08_Phrase",
+          "controlType": "Phrase"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 1462
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_31",
+          "id": "qa_cap_31",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 966,
+          "y": 1440,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "4 parameters",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Phrase",
+          "id": "qa08_p_Phrase",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 966,
+          "y": 1462,
+          "width": 430,
+          "height": 182
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Phrase.transpose  [-24 … 24]  default 0  st\n  AudioParameterFloat\nqa08_Phrase.swing  [0 … 1]  default 0\n  AudioParameterFloat\nqa08_Phrase.gate  [0 … 1]  default 0.8\n  AudioParameterFloat\nqa08_Phrase.rate  [0.1 … 32]  default 8  st/s\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_32",
+          "id": "qa_cap_32",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1672,
+          "width": 260,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Setlist",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Setlist",
+          "id": "qa08_Setlist",
+          "controlType": "Setlist"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1694
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_33",
+          "id": "qa_cap_33",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 1672,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Setlist",
+          "id": "qa08_p_Setlist",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 312,
+          "y": 1694,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Setlist.index  [0 … 127]  default 0\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_34",
+          "id": "qa_cap_34",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 766,
+          "y": 1672,
+          "width": 230,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Transport",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Transport",
+          "id": "qa08_Transport",
+          "controlType": "Transport"
+        },
+        "Transform": {
+          "x": 766,
+          "y": 1694
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_35",
+          "id": "qa_cap_35",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1020,
+          "y": 1672,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Transport",
+          "id": "qa08_p_Transport",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1020,
+          "y": 1694,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Transport.swing  [0 … 1]  default 0\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_36",
+          "id": "qa_cap_36",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1872,
+          "width": 180,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Kinetic",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Kinetic",
+          "id": "qa08_Kinetic",
+          "controlType": "Kinetic"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 1894
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_37",
+          "id": "qa_cap_37",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 232,
+          "y": 1872,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "3 parameters",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Kinetic",
+          "id": "qa08_p_Kinetic",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 232,
+          "y": 1894,
+          "width": 430,
+          "height": 142
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Kinetic.gravity  [-1 … 1]  default 0\n  AudioParameterFloat\nqa08_Kinetic.restitution  [0 … 1]  default 0.92\n  AudioParameterFloat\nqa08_Kinetic.friction  [0 … 1]  default 0.04\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_38",
+          "id": "qa_cap_38",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 686,
+          "y": 1872,
+          "width": 200,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Orbit",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Orbit",
+          "id": "qa08_Orbit",
+          "controlType": "Orbit"
+        },
+        "Transform": {
+          "x": 686,
+          "y": 1894
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_39",
+          "id": "qa_cap_39",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 910,
+          "y": 1872,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Orbit",
+          "id": "qa08_p_Orbit",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 910,
+          "y": 1894,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Orbit.rate  [0.01 … 8]  default 0.25  Hz\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_40",
+          "id": "qa_cap_40",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1364,
+          "y": 1872,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Ribbon",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Ribbon",
+          "id": "qa08_Ribbon",
+          "controlType": "Ribbon"
+        },
+        "Transform": {
+          "x": 1364,
+          "y": 1894
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_41",
+          "id": "qa_cap_41",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2122,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Ribbon",
+          "id": "qa08_p_Ribbon",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2144,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Ribbon.value  [0 … 1]  default 0.5\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_42",
+          "id": "qa_cap_42",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 2122,
+          "width": 168,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Numpad",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Numpad",
+          "id": "qa08_Numpad",
+          "controlType": "Numpad"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 2144
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_43",
+          "id": "qa_cap_43",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 674,
+          "y": 2122,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Numpad",
+          "id": "qa08_p_Numpad",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 674,
+          "y": 2144,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Numpad.value  [0 … 127]  default 0\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_44",
+          "id": "qa_cap_44",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1128,
+          "y": 2122,
+          "width": 200,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Crossfader",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_Crossfader",
+          "id": "qa08_Crossfader",
+          "controlType": "Crossfader"
+        },
+        "Transform": {
+          "x": 1128,
+          "y": 2144
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_45",
+          "id": "qa_cap_45",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2404,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_Crossfader",
+          "id": "qa08_p_Crossfader",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2426,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_Crossfader.value  [0 … 1]  default 0.5\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_46",
+          "id": "qa_cap_46",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 2404,
+          "width": 160,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "VectorJoystick",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_VectorJoystick",
+          "id": "qa08_VectorJoystick",
+          "controlType": "VectorJoystick"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 2426
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_47",
+          "id": "qa_cap_47",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 666,
+          "y": 2404,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "2 parameters",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_VectorJoystick",
+          "id": "qa08_p_VectorJoystick",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 666,
+          "y": 2426,
+          "width": 430,
+          "height": 102
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_VectorJoystick.x  [0 … 1]  default 0.5\n  AudioParameterFloat\nqa08_VectorJoystick.y  [0 … 1]  default 0.5\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_48",
+          "id": "qa_cap_48",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1120,
+          "y": 2404,
+          "width": 420,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "StepSequencer",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_StepSequencer",
+          "id": "qa08_StepSequencer",
+          "controlType": "StepSequencer"
+        },
+        "Transform": {
+          "x": 1120,
+          "y": 2426
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_49",
+          "id": "qa_cap_49",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2614,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "2 parameters",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_StepSequencer",
+          "id": "qa08_p_StepSequencer",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2636,
+          "width": 430,
+          "height": 102
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_StepSequencer.bpm  [0 … 1]  default 1\n  AudioParameterFloat\nqa08_StepSequencer.run  [0 … 1]  default 0\n  AudioParameterBool",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_50",
+          "id": "qa_cap_50",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 2614,
+          "width": 320,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "TabContainer",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_TabContainer",
+          "id": "qa08_TabContainer",
+          "controlType": "TabContainer"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 2636
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_51",
+          "id": "qa_cap_51",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 826,
+          "y": 2614,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_TabContainer",
+          "id": "qa08_p_TabContainer",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 826,
+          "y": 2636,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_TabContainer.page  [0 … 1]  default 0\n  AudioParameterChoice\n  menu: Page 1 / Page 2",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_52",
+          "id": "qa_cap_52",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1280,
+          "y": 2614,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "PitchWheel",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_PitchWheel",
+          "id": "qa08_PitchWheel",
+          "controlType": "PitchWheel"
+        },
+        "Transform": {
+          "x": 1280,
+          "y": 2636
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_53",
+          "id": "qa_cap_53",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2884,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_PitchWheel",
+          "id": "qa08_p_PitchWheel",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 2906,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_PitchWheel.value  [0 … 1]  default 0.5\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_54",
+          "id": "qa_cap_54",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 2884,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "ModWheel",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_ModWheel",
+          "id": "qa08_ModWheel",
+          "controlType": "ModWheel"
+        },
+        "Transform": {
+          "x": 482,
+          "y": 2906
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_55",
+          "id": "qa_cap_55",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 638,
+          "y": 2884,
+          "width": 430,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "1 parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_p_ModWheel",
+          "id": "qa08_p_ModWheel",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 638,
+          "y": 2906,
+          "width": 430,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "qa08_ModWheel.value  [0 … 1]  default 0\n  AudioParameterFloat",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Exports_nothing_and_the_type_says_so_30_types",
+          "id": "qa_group_1",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3090,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Exports nothing, and the type says so — 30 types",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_56",
+          "id": "qa_cap_56",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3126,
+          "width": 1544,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "Each of these has ruled. A Behavior that calls itself a trigger or a text field, or an explicit empty exportValues. Deliberate; nothing to check.",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_declined",
+          "id": "qa08_declined",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3148,
+          "width": 1544,
+          "height": 144
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Background       exportValues: [] — ruled, not overlooked   LcdDisplay       exportValues: [] — ruled, not overlooked   Panic            exportValues: [] — ruled, not overlooked\nLabel            exportValues: [] — ruled, not overlooked   PixelDisplay     exportValues: [] — ruled, not overlooked   Constraint       exportValues: [] — ruled, not overlooked\nButton           family=trigger valueType=none              Router           exportValues: [] — ruled, not overlooked   Matrix           exportValues: [] — ruled, not overlooked\nMomentaryButton  family=trigger valueType=none              Looper           exportValues: [] — ruled, not overlooked   Envelope         exportValues: [] — ruled, not overlooked\nTextInput        family=text valueType=text                 ChordPad         exportValues: [] — ruled, not overlooked   Keyboard         exportValues: [] — ruled, not overlooked\nTimedButton      family=trigger valueType=none              NoteRibbon       exportValues: [] — ruled, not overlooked   ScrollArea       exportValues: [] — ruled, not overlooked\nOneShotButton    family=trigger valueType=none              DrumPads         exportValues: [] — ruled, not overlooked   ProgressBar      exportValues: [] — ruled, not overlooked\nContainer        exportValues: [] — ruled, not overlooked   Harmoniser       exportValues: [] — ruled, not overlooked   Shape            exportValues: [] — ruled, not overlooked\nGroup            exportValues: [] — ruled, not overlooked   Recorder         exportValues: [] — ruled, not overlooked   Meter            exportValues: [] — ruled, not overlooked\nImage            exportValues: [] — ruled, not overlooked   SplitZone        exportValues: [] — ruled, not overlooked   TestBox          exportValues: [] — ruled, not overlooked",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Not_decided_yet_0_types",
+          "id": "qa_group_2",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3326,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Not decided yet — 0 types",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_57",
+          "id": "qa_cap_57",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3362,
+          "width": 1544,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "These have real candidates and no obvious single answer, and an exported parameter is permanent once a saved session references it. The reason is beside each declaration in componentTypes.js. This group should shrink to nothing; it is the work, not the answer.",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_deferred",
+          "id": "qa08_deferred",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3384,
+          "width": 1544,
+          "height": 54
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Exports_nothing_because_nothing_in_the_type_says_anything_0_types",
+          "id": "qa_group_3",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3472,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Exports nothing because nothing in the type says anything — 0 types",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_58",
+          "id": "qa_cap_58",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3508,
+          "width": 1544,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "No Behavior, no ValueChannels, no exportValues — so deriveExportParameters never looks. Read this list and ask of each: should a user be able to automate that from a DAW? If the answer is no, the type should SAY so with exportValues: [] and move to the group above.",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_unseen",
+          "id": "qa08_unseen",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3530,
+          "width": 1544,
+          "height": 54
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "group_Derivation_branches_a_default_panel_never_reaches_15_recipes",
+          "id": "qa_group_4",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3618,
+          "width": 1544,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF23282D"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Derivation branches a default panel never reaches — 15 recipes",
+          "_children": {
+            "Font": {
+              "size": 13,
+              "bold": true
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 10,
+          "paddingRight": 10,
+          "paddingTop": 3,
+          "paddingBottom": 3
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_59",
+          "id": "qa_cap_59",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3654,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "range family, real min/max/unit",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Cutoff",
+          "id": "qa08_range_real",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3676
+        },
+        "Behavior": {
+          "min": 20,
+          "max": 20000,
+          "defaultCurrentValue": 440,
+          "unit": "Hz"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_60",
+          "id": "qa_cap_60",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 184,
+          "y": 3654,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "range_real",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_range_real",
+          "id": "qa08_r_range_real",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 184,
+          "y": 3676,
+          "width": 470,
+          "height": 118
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "A knob authored 20 Hz–20 kHz. The DAW gets that range, not 0–1.\n\nCutoff.value  [20 … 20000]  default 440  Hz\n  AudioParameterFloat\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_61",
+          "id": "qa_cap_61",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 678,
+          "y": 3654,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "degenerate range — min equals max",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Stuck",
+          "id": "qa08_range_degenerate",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 678,
+          "y": 3676
+        },
+        "Behavior": {
+          "min": 64,
+          "max": 64,
+          "defaultCurrentValue": 64
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_62",
+          "id": "qa_cap_62",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 834,
+          "y": 3654,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "range_degenerate",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_range_degenerate",
+          "id": "qa08_r_range_degenerate",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 834,
+          "y": 3676,
+          "width": 470,
+          "height": 118
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "max is bumped to min+1. A zero-width parameter is one a host cannot represent.\n\nStuck.value  [64 … 65]  default 64\n  AudioParameterFloat\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_63",
+          "id": "qa_cap_63",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1328,
+          "y": 3654,
+          "width": 136,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "bool, authored ON",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Sync",
+          "id": "qa08_bool_on",
+          "controlType": "ToggleButton"
+        },
+        "Transform": {
+          "x": 1328,
+          "y": 3676
+        },
+        "Behavior": {
+          "defaultValue": true
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_64",
+          "id": "qa_cap_64",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3822,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "bool_default_on",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_bool_default_on",
+          "id": "qa08_r_bool_default_on",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 3844,
+          "width": 470,
+          "height": 118
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "defaultValue true → 1. A toggle that exports 0 comes up wrong in every saved session.\n\nSync.value  [0 … 1]  default 1\n  AudioParameterBool\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_65",
+          "id": "qa_cap_65",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 3822,
+          "width": 160,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "enum by index (the default mode)",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Waveform",
+          "id": "qa08_enum_index",
+          "controlType": "Combobox"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 3844
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "saw",
+              "displayText": "Saw",
+              "internalValue": "saw",
+              "sendValue": 0,
+              "selectedByDefault": false,
+              "enabled": true,
+              "isHeader": false
+            },
+            {
+              "id": "square",
+              "displayText": "Square",
+              "internalValue": "square",
+              "sendValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "isHeader": false
+            },
+            {
+              "id": "triangle",
+              "displayText": "Triangle",
+              "internalValue": "triangle",
+              "sendValue": 2,
+              "selectedByDefault": true,
+              "enabled": true,
+              "isHeader": false
+            },
+            {
+              "id": "sine",
+              "displayText": "Sine",
+              "internalValue": "sine",
+              "sendValue": 3,
+              "selectedByDefault": false,
+              "enabled": true,
+              "isHeader": false
+            },
+            {
+              "id": "noise",
+              "displayText": "Noise",
+              "internalValue": "noise",
+              "sendValue": 4,
+              "selectedByDefault": false,
+              "enabled": true,
+              "isHeader": false
+            }
+          ]
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_66",
+          "id": "qa_cap_66",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 706,
+          "y": 3822,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "enum_index",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_enum_index",
+          "id": "qa08_r_enum_index",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 706,
+          "y": 3844,
+          "width": 470,
+          "height": 157
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Five rows, third selected → [0..4] default 2. The host stores the position, and gets\nthe five names for its menu — an index-mode selector needs labels just as much as a\nstore-by-name one, which is why they ride on every selector now.\n\nWaveform.value  [0 … 4]  default 2\n  AudioParameterChoice\n  menu: Saw / Square / Triangle / Sine / Noise\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_67",
+          "id": "qa_cap_67",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1200,
+          "y": 3822,
+          "width": 160,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "enum by NAME — storeByValue",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Bank",
+          "id": "qa08_enum_value",
+          "controlType": "Combobox"
+        },
+        "Transform": {
+          "x": 1200,
+          "y": 3844
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "bank_a",
+              "displayText": "Bank A",
+              "internalValue": "bank_a",
+              "sendValue": 0,
+              "selectedByDefault": false,
+              "enabled": true,
+              "isHeader": false
+            },
+            {
+              "id": "bank_b",
+              "displayText": "Bank B",
+              "internalValue": "bank_b",
+              "sendValue": 1,
+              "selectedByDefault": true,
+              "enabled": true,
+              "isHeader": false
+            },
+            {
+              "id": "bank_c",
+              "displayText": "Bank C",
+              "internalValue": "bank_c",
+              "sendValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "isHeader": false
+            }
+          ],
+          "storeByValue": true
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_68",
+          "id": "qa_cap_68",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4029,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "enum_by_value",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_enum_by_value",
+          "id": "qa08_r_enum_by_value",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4051,
+          "width": 470,
+          "height": 144
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "The same list with storeByValue on. The host still automates an index, but the saved\nvalue is the choice name, so it survives the visible rows changing (cascading lists).\n\nBank.value  [0 … 2]  default 1\n  AudioParameterChoice\n  menu: Bank A / Bank B / Bank C  ·  stored by name: bank_a/bank_b/bank_c → default \"bank_b\"\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_69",
+          "id": "qa_cap_69",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 4029,
+          "width": 160,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "enum with a header row",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Category",
+          "id": "qa08_enum_header",
+          "controlType": "Combobox"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 4051
+        },
+        "Value": {
+          "rows": [
+            {
+              "id": "hdr",
+              "displayText": "— Strings —",
+              "internalValue": "hdr",
+              "isHeader": true,
+              "enabled": true
+            },
+            {
+              "id": "violin",
+              "displayText": "Violin",
+              "internalValue": "violin",
+              "sendValue": 0,
+              "selectedByDefault": true,
+              "enabled": true,
+              "isHeader": false
+            },
+            {
+              "id": "cello",
+              "displayText": "Cello",
+              "internalValue": "cello",
+              "sendValue": 1,
+              "selectedByDefault": false,
+              "enabled": true,
+              "isHeader": false
+            },
+            {
+              "id": "bass",
+              "displayText": "Bass",
+              "internalValue": "bass",
+              "sendValue": 2,
+              "selectedByDefault": false,
+              "enabled": true,
+              "isHeader": false
+            }
+          ]
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_70",
+          "id": "qa_cap_70",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 706,
+          "y": 4029,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "enum_header_row",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_enum_header_row",
+          "id": "qa08_r_enum_header_row",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 706,
+          "y": 4051,
+          "width": 470,
+          "height": 144
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Headers are not pickable and must not take an index. Four rows, one a header → [0..2],\nand the header must not reach the host menu either.\n\nCategory.value  [0 … 2]  default 0\n  AudioParameterChoice\n  menu: Violin / Cello / Bass\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_71",
+          "id": "qa_cap_71",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1200,
+          "y": 4029,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "a 0..1 knob — the reason valueKind is explicit",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Level",
+          "id": "qa08_unit_float",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 1200,
+          "y": 4051
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_72",
+          "id": "qa_cap_72",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4223,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "bool_vs_unit_float",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_bool_vs_unit_float",
+          "id": "qa08_r_bool_vs_unit_float",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4245,
+          "width": 470,
+          "height": 144
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Identical range to the toggle above: min 0, max 1. Nothing about the numbers says which\nis a switch and which is a continuous control, which is why every parameter used to\nexport as an anonymous float. The editor states the kind; the host branches on it.\n\nLevel.value  [0 … 1]  default 0.5\n  AudioParameterFloat\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_73",
+          "id": "qa_cap_73",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 4223,
+          "width": 220,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "bound to a device parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Resonance",
+          "id": "qa08_device_param",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 4245
+        },
+        "Behavior": {
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
+        "DeviceBindings": {
+          "bindings": [
+            {
+              "kind": "deviceParameter",
+              "parameterId": "osc1.resonance",
+              "deviceRole": "primary"
+            }
+          ]
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_74",
+          "id": "qa_cap_74",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 766,
+          "y": 4223,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "device_parameter",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_device_parameter",
+          "id": "qa08_r_device_parameter",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 766,
+          "y": 4245,
+          "width": 470,
+          "height": 144
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "The wire the plugin sends with its window closed. Without it the DAW moves a number\nand the synth hears nothing.\n\nResonance.value  [0 … 127]  default 0\n  AudioParameterFloat\n  device primary:osc1.resonance\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_75",
+          "id": "qa_cap_75",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1260,
+          "y": 4223,
+          "width": 220,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "bound to a raw CC",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Expression",
+          "id": "qa08_raw_cc",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 1260,
+          "y": 4245
+        },
+        "Behavior": {
+          "max": 127,
+          "defaultCurrentValue": 64
+        },
+        "DeviceBindings": {
+          "bindings": [
+            {
+              "kind": "midiControl",
+              "message": "cc",
+              "controller": 11,
+              "channel": 1
+            }
+          ]
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_76",
+          "id": "qa_cap_76",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4417,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "raw_cc",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_raw_cc",
+          "id": "qa08_r_raw_cc",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4439,
+          "width": 470,
+          "height": 144
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "No profile parameter, just three bytes. This used to export with an empty wire and\nsend nothing window-closed — indistinguishable from a bad MIDI cable.\n\nExpression.value  [0 … 127]  default 64\n  AudioParameterFloat\n  midi CC11 ch1 7-bit\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_77",
+          "id": "qa_cap_77",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 4417,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "raw NRPN, 14-bit",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Filter Track",
+          "id": "qa08_raw_nrpn",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 4439
+        },
+        "Behavior": {
+          "max": 16383,
+          "defaultCurrentValue": 8192
+        },
+        "DeviceBindings": {
+          "bindings": [
+            {
+              "kind": "midiControl",
+              "message": "nrpn",
+              "parameterMsb": 1,
+              "parameterLsb": 24,
+              "channel": 1,
+              "valueResolution": 14
+            }
+          ]
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_78",
+          "id": "qa_cap_78",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 678,
+          "y": 4417,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "raw_nrpn_14bit",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_raw_nrpn_14bit",
+          "id": "qa08_r_raw_nrpn_14bit",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 678,
+          "y": 4439,
+          "width": 470,
+          "height": 131
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Two 7-bit halves for the parameter number, and a resolution the send path has to honour.\n\nFilter Track.value  [0 … 16383]  default 8192\n  AudioParameterFloat\n  midi NRPN 1:24 ch1 14-bit\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_79",
+          "id": "qa_cap_79",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1172,
+          "y": 4417,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "bound to VELOCITY — inbound only, so NO wire",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Velocity Depth",
+          "id": "qa08_inbound_only",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 1172,
+          "y": 4439
+        },
+        "Behavior": {
+          "max": 127,
+          "defaultCurrentValue": 100
+        },
+        "DeviceBindings": {
+          "bindings": [
+            {
+              "kind": "midiControl",
+              "message": "velocity",
+              "channel": 1
+            }
+          ]
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_80",
+          "id": "qa_cap_80",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4611,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "inbound_only_no_wire",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_inbound_only_no_wire",
+          "id": "qa08_r_inbound_only_no_wire",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4633,
+          "width": 470,
+          "height": 144
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF2E2718"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "AAD8B45C"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Velocity, poly pressure and pitch bend arrive; they are not things a plugin sends.\nThe parameter is still exported. It must carry no midiControl — a wire here would be a\nDAW control that silently does nothing.\n\nVelocity Depth.value  [0 … 127]  default 100\n  AudioParameterFloat\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_81",
+          "id": "qa_cap_81",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 4611,
+          "width": 220,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "device bindings switched OFF",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Muted Send",
+          "id": "qa08_bindings_off",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 4633
+        },
+        "Behavior": {
+          "max": 127,
+          "defaultCurrentValue": 0
+        },
+        "DeviceBindings": {
+          "enabled": false,
+          "bindings": [
+            {
+              "kind": "deviceParameter",
+              "parameterId": "osc1.level",
+              "deviceRole": "primary"
+            }
+          ]
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_82",
+          "id": "qa_cap_82",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 766,
+          "y": 4611,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "bindings_disabled",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_bindings_disabled",
+          "id": "qa08_r_bindings_disabled",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 766,
+          "y": 4633,
+          "width": 470,
+          "height": 118
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "The binding is still authored. Disabled means disabled: no wire in the export.\n\nMuted Send.value  [0 … 127]  default 0\n  AudioParameterFloat\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_83",
+          "id": "qa_cap_83",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1260,
+          "y": 4611,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "custom component, ONE public channel",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Ring",
+          "id": "qa08_channels_single",
+          "controlType": "CustomComponent"
+        },
+        "Transform": {
+          "x": 1260,
+          "y": 4633,
+          "width": 150,
+          "height": 100
+        },
+        "ValueChannels": {
+          "_children": {
+            "value": {
+              "_type": "ValueChannel",
+              "publicInput": true,
+              "publicOutput": true,
+              "min": 0,
+              "max": 1,
+              "defaultValue": 0.25,
+              "label": "value"
+            },
+            "_removed": [
+              "mainValue",
+              "mode"
+            ]
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_84",
+          "id": "qa_cap_84",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4805,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "channels_single",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_channels_single",
+          "id": "qa08_r_channels_single",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 4827,
+          "width": 470,
+          "height": 118
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "A single channel is labelled with the control name alone — \"Ring\", not \"Ring value\".\n\nRing.value  [0 … 1]  default 0.25\n  AudioParameterFloat\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_85",
+          "id": "qa_cap_85",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 4805,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "custom component, THREE channels, one private",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "XY Pad",
+          "id": "qa08_channels_multi",
+          "controlType": "CustomComponent"
+        },
+        "Transform": {
+          "x": 522,
+          "y": 4827,
+          "width": 150,
+          "height": 100
+        },
+        "ValueChannels": {
+          "_children": {
+            "x": {
+              "_type": "ValueChannel",
+              "publicInput": true,
+              "publicOutput": true,
+              "min": 0,
+              "max": 127,
+              "defaultValue": 64,
+              "label": "X"
+            },
+            "y": {
+              "_type": "ValueChannel",
+              "publicInput": true,
+              "publicOutput": true,
+              "min": 0,
+              "max": 127,
+              "defaultValue": 64,
+              "label": "Y"
+            },
+            "scratch": {
+              "_type": "ValueChannel",
+              "publicInput": false,
+              "publicOutput": false,
+              "min": 0,
+              "max": 1,
+              "defaultValue": 0,
+              "label": "scratch"
+            },
+            "_removed": [
+              "mainValue",
+              "mode"
+            ]
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_86",
+          "id": "qa_cap_86",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 696,
+          "y": 4805,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "channels_multi",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_channels_multi",
+          "id": "qa08_r_channels_multi",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 696,
+          "y": 4827,
+          "width": 470,
+          "height": 157
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "One parameter per PUBLIC channel, each labelled. The private one must not appear —\nan internal channel exposed to a host is a parameter nobody can explain.\n\nXY Pad.x  [0 … 127]  default 64\n  AudioParameterFloat\nXY Pad.y  [0 … 127]  default 64\n  AudioParameterFloat\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_87",
+          "id": "qa_cap_87",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1190,
+          "y": 4805,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "an author's explicit list OVERRIDES derivation",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Cutoff",
+          "id": "qa08_explicit",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 1190,
+          "y": 4827
+        },
+        "Behavior": {
+          "min": 20,
+          "max": 20000,
+          "defaultCurrentValue": 440
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_88",
+          "id": "qa_cap_88",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5012,
+          "width": 470,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "explicit_wins",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa08_r_explicit_wins",
+          "id": "qa08_r_explicit_wins",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 5034,
+          "width": 470,
+          "height": 131
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF181D22"
+            },
+            "Border": {
+              "thickness": 1,
+              "colour": "3389C2FF"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "panel.exportParameters, when present, is the list. The knob beside this would derive\n\"Cutoff.value\"; the author said otherwise and the author wins.\n\nmacro1  →  Cutoff.value  [0 … 100]  default 50  %\n  AudioParameterFloat\n\n✓ branch still covered",
+          "_children": {
+            "Font": {
+              "family": "monospace",
+              "size": 10
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "verticalAlign": "top",
+          "paddingTop": 5
+        }
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ]
+}

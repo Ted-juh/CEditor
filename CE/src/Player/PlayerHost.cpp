@@ -180,6 +180,15 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         if (onResyncRequest != nullptr) onResyncRequest();
     });
 
+    // The answer to the restore question. Only "always" and "never" reach the processor; the
+    // panel's third button ("not now") simply dismisses the bar, because a restore the user
+    // deferred is still pending and should be offered again next time the project opens.
+    options = options.withEventListener ("restoreAnswer", [this] (const juce::var& payload)
+    {
+        if (onRestoreAnswer != nullptr)
+            onRestoreAnswer (payload.getProperty ("answer", "").toString());
+    });
+
    #if CEDITOR_DEV_MODE
     options = options.withResourceProvider ([] (const juce::String& path) { return providePlayerResource (path); },
                                             juce::String ("http://localhost:5173"));
@@ -216,6 +225,13 @@ PlayerHost::~PlayerHost()
 {
     // Stop the (possibly processor-owned, longer-lived) service from calling back into this host.
     service.setEventCallback (nullptr);
+}
+
+void PlayerHost::showRestorePrompt (const juce::String& deviceName)
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("deviceName", deviceName);
+    emitToWebView ("restorePrompt", juce::var (obj));
 }
 
 void PlayerHost::emitToWebView (const juce::String& eventName, const juce::var& payload)

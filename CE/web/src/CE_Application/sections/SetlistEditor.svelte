@@ -124,7 +124,7 @@
 
 {#if p}
   <PropertySection title="Setlist" icon={ListMusic}>
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="note">
         {setlistCount(control)} {setlistCount(control) === 1 ? 'scene' : 'scenes'}{index >= 0 ? ` · on ${index + 1}` : ''}.
         Advancing skips disabled scenes, and the end of the list stays put unless you turn loop on —
@@ -132,7 +132,7 @@
       </div>
     </PropertyCell>
 
-    <PropertyCell label="Loop" span={2} hint="Next at the end goes back to the first scene.">
+    <PropertyCell label="Loop" span={1} hint="Next at the end goes back to the first scene.">
       <PropertyToggle value={p.wrap === true} onchange={() => set('wrap', !(p.wrap === true))} />
     </PropertyCell>
     <PropertyCell label="Recall" span={2} hint="Send program, recall values, recall tempo. Hover a chip for its name.">
@@ -163,7 +163,7 @@
                   onchange={() => set('footEnabled', !(p.footEnabled !== false))} />
     {/snippet}
     {#if p.footEnabled !== false}
-      <PropertyCell label="" span={4} hint="">
+      <PropertyCell label="" span={4} hint="" compact>
         <div class="note">
           Steps on the <b>rising edge only</b>, so one press is one step.
         </div>
@@ -174,7 +174,7 @@
       <PropertyCell label="Channel" span={1} compact hint="0 listens on every channel.">
         <NumberCell label="Ch" value={num(p.footChannel, 0)} step={1} min={0} max={16} onchange={(value) => set('footChannel', clampInt(value, 0, 16, 0))} />
       </PropertyCell>
-      <PropertyCell label="Threshold" span={2} compact hint="Where 'pressed' starts. A sweeping expression pedal crosses it once on the way up, not thirty times.">
+      <PropertyCell label="Threshold" span={1} compact hint="Where 'pressed' starts. A sweeping expression pedal crosses it once on the way up, not thirty times.">
         <NumberCell label="Thr" value={num(p.footThreshold, 64)} step={1} min={1} max={127} onchange={(value) => set('footThreshold', clampInt(value, 1, 127, 64))} />
       </PropertyCell>
       <PropertyCell label="Does" span={2} hint="">
@@ -197,7 +197,7 @@
     {#snippet tools()}
       <button type="button" class="header-add-btn" onclick={addScene} disabled={scenes.length >= MAX_SCENES}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Capture stores an explicit list of paths, not 'everything'.">
+    <PropertyCell label="" span={4} hint="Capture stores an explicit list of paths, not 'everything'." compact>
       <div class="rowhead">
         <button type="button" class="btn" onclick={captureAllPathsFromPanel}>Capture every control</button>
         <span class="hintline">{capturePaths.length} path{capturePaths.length === 1 ? '' : 's'} per capture</span>
@@ -205,7 +205,7 @@
     </PropertyCell>
 
     {#each scenes as s, i (s.id)}
-      <PropertyCell label="" span={4} hint="">
+      <PropertyCell label="" span={4} hint="" compact>
         <div class="scene" class:current={i === index} class:off={s.enabled === false}>
           <div class="line">
             <span class="idx">{i + 1}</span>
@@ -241,7 +241,7 @@
       </PropertyCell>
     {/each}
     {#if !scenes.length}
-      <PropertyCell label="" span={4} hint=""><div class="note">No scenes yet.</div></PropertyCell>
+      <PropertyCell label="" span={4} hint="" compact><div class="note">No scenes yet.</div></PropertyCell>
     {/if}
   </PropertySection>
 
@@ -271,7 +271,7 @@
 {/if}
 
 <style>
-  .val { width: 100%; background: #141420; border: 1px solid #2a2a36; color: #E8E8EE; font-size: 12px; padding: 3px 6px; border-radius: 4px; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
   /* Fixed-width shell around a NumberCell in a scene row: the cell fills the
      span instead of flexing the row open. */
   .nc-wrap { display: flex; }

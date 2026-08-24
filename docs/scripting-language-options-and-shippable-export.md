@@ -28,14 +28,15 @@ These two are intertwined: language selection only matters once the installed ap
 | JavaScript | — | — | embedded (QuickJS) |
 | TypeScript | — | — | transpiled to JS at export |
 | Python | `python-embed` | ~11 MB | bundled INTO the plugin; no compiler |
-| **C++** | `llvm-mingw` (`+ninja`) | (shared w/ base) | **same compiler the base plugin build uses** — effectively free once you can build a plugin at all |
+| **C++** | `llvm-mingw` (`+ninja`) | ~178 MB | builds the ~100-line C shim, which contains no JUCE |
 | **C#** | `dotnet` SDK **+** `llvm-mingw` (shim) | ~230 MB | Roslyn + self-contained CoreCLR |
 | **Java** | `jdk` (javac/jlink) **+** `llvm-mingw` (shim) | ~195 MB | bytecode + jlink'd JRE |
-| *(base plugin build)* | Visual Studio **or** `llvm-mingw` + `ninja` + Node.js | (varies) | required to export ANY plugin |
+| *(base plugin build)* | **Visual Studio Build Tools** + Node.js — or **nothing at all**, with a prebuilt template | (varies) | see §3a: the compiler is no longer required to export |
 
 Two facts that shape everything below:
-1. **C++ is "free"** — its toolchain (`llvm-mingw`) is the same one that builds the plugin shell when
-   there's no Visual Studio. If you can export at all, you can export C++ handlers.
+1. **C++ handlers need `llvm-mingw`** for their C shim. It was long believed that the same toolchain
+   could build the plugin shell without Visual Studio; it cannot, and §3a explains why. The shim has
+   no JUCE in it and is unaffected.
 2. **C# and Java are the only heavy, optional downloads** (~230 / ~195 MB). These are the real "bloat"
    a user would want to opt out of. Python is tiny.
 
@@ -115,32 +116,61 @@ are thin front-ends over `provision.mjs`.
 Language options are moot until the installed app can export. Today export needs a full source/build
 tree. The fix has two independent wins; the first is large and unlocks the common case.
 
-### 3a. Reduce per-export cost — what's actually feasible (corrected after a code audit)
+### 3a. Reduce per-export cost — what's actually feasible (corrected twice)
 
 The original hope was "one prebuilt template binary, identity loaded from a sidecar, zero compiler."
-**A code audit of the player + JUCE killed the single-template-for-VST3 idea**, but found the per-panel
-build is already cheap and the real waste is elsewhere:
+A 2026-08 code audit **killed** that idea for VST3. A second look **revived it**, because the audit's
+premise was right and its conclusion was not. Both rounds are kept here, because the shape of the
+mistake is more useful than the answer.
+
+**What the first audit found, and it was correct:**
 
 - **VST3 FUID is compile-time.** JUCE derives the VST3 class id (FUID) from `PLUGIN_CODE` +
   `MANUFACTURER_CODE` (`#define`s baked at link time, `CMakeLists.txt` → `juce_add_plugin`; the FUID is a
   `const` in the VST3 wrapper). A single template binary would report the **same FUID for every panel**,
-  so a DAW would treat all exported panels as one plugin and **break session loading**. Each VST3 product
-  genuinely needs a **unique compile-time identity** → a per-panel link is unavoidable for VST3.
-- **But the per-panel build is already incremental.** Panel **data** is already runtime-loaded — the
+  so a DAW would treat all exported panels as one plugin and **break session loading**.
+- **The per-panel build is already incremental.** Panel **data** is already runtime-loaded — the
   player reads the `.cepanel` from a path at load (`CEDITOR_PLAYER_PANEL_PATH`) and the web UI is embedded
-  once. Only a handful of identity-dependent translation units change per panel, so CMake recompiles ~1–2
-  files and relinks (the real export log shows `[51/52] Linking` — i.e. just the relink). Minutes-long
-  exports were **not** the C++ build.
-- **The avoidable cost was the web bundle.** Every export ran an ~18 s `vite build` of a
-  **panel-independent** bundle. **Done:** the exporter now skips the Vite build when `CE/web/dist` is
-  newer than the web sources (`forceWebBuild`/`CE_FORCE_WEB=1` overrides). Re-exports drop to the relink.
+  once. Only a handful of identity-dependent translation units change per panel (`[51/52] Linking`).
+- **The avoidable cost was the web bundle.** **Done:** the exporter skips the Vite build when
+  `CE/web/dist` is newer than the web sources.
 
-So the realistic picture: **VST3 export needs the C++ build environment** (source + CMake + a compiler),
-because of the unique-FUID requirement — there is no compiler-free VST3 path. Two genuine future wins
-remain, both validated against the player build, not done here:
+**Where it went wrong.** From "JUCE derives the FUID from `#define`s" it concluded "each VST3 product
+genuinely needs a unique *compile-time* identity". That does not follow. **The VST3 class id is
+whatever the module's factory reports** — a `const` from `#define`s is JUCE's implementation choice,
+not a VST3 requirement. The audit even listed "sidecar FUID via a custom VST3 factory" as a future
+win two paragraphs later, without noticing it contradicted the conclusion above it.
+
+**Done, and it removes the compiler entirely.** `getInterfaceId()` in JUCE's VST3 wrapper now
+consults a runtime identity first (a four-line patch, `JUCE/VENDORED.md`), and
+`CEDITOR_TEMPLATE_PLAYER=ON` builds a panel-agnostic player that reads both its identity and its
+panel from the single `.cepanel` beside it. Exporting becomes a file copy:
+`tools/scripts/export-panel-template.mjs`.
+
+The ids it reports are **byte-identical** to the ones the relinking path produced, which is the part
+that matters — a host keys plugins by FUID, so a session saved against a compile-per-panel export
+must keep finding its plugin. `CE/tests/PanelIdentitySidecarTests.cpp` asserts that against JUCE's
+own `convertJucePluginId`, for every interface type. It holds because only the last eight bytes of
+the id carry identity, and they are literally the two four-character codes.
+
+One trap worth knowing about, because it would have made the whole thing quietly wrong: JUCE writes
+`Contents/Resources/moduleinfo.json` after linking, and that file **lists the class CIDs**. A copied
+template ships its own manifest, so a host trusting it would see every panel claiming one FUID — the
+exact collision this design prevents, reintroduced through a cache file. The template exporter
+regenerates it (still compiler-free: `juce_vst3_helper` is a prebuilt executable that asks the
+factory, which by then has the panel) or deletes it.
+
+**The compiling path stays and stays the default on a source checkout.** It has the mileage, and a
+checkout is a developer machine by definition. What has changed is that it is no longer the *only*
+path, so "export runs from a source checkout" is a preference rather than a limitation.
+
+Still true, and not fixed by any of this:
+
+- **`llvm-mingw` cannot build the plugin shell.** The old "no Visual Studio" story rested on it and
+  was never validated. JUCE `#error`s on `__MINGW32__` and `WebView2LoaderStatic.lib` is MSVC-mangled
+  — see `tools/toolchains/README.md`. Where a compiler IS wanted, it is MSVC (Build Tools suffice).
 - **Standalone / CLAP templating.** A *standalone* app has no FUID contract, so a single prebuilt
   standalone binary + a sidecar `.cepanel` + identity **is** viable — a compiler-free path for users who
-  only need the standalone. (CLAP ids are strings and could also be sidecar-loaded.)
 - **Sidecar FUID via a custom VST3 factory.** The VST3 class id is whatever the module's factory reports;
   JUCE hard-codes it, but a patched factory could read it from a sidecar at module load. This removes the
   per-panel link for VST3 too — but it means maintaining a fork of JUCE's VST3 client wrapper (fragile;
@@ -224,11 +254,12 @@ same `provision.mjs`. Either way, only **C#** (~230 MB) and **Java** (~195 MB) a
 | 1 | **On-demand provisioning** | ✅ `tools/toolchains/languages.mjs` (lang→toolchain map, status, preflight, ensure/remove) + the exporter installs only the toolchains a panel's languages need, when missing (`autoProvisionToolchains` opt-out). Node-side verified (status/preflight + freshness checks run). |
 | 1/3 | **Skip the panel-independent Vite build** | ✅ exporter rebuilds `dist` only when web sources changed (`webBundleFresh`); `forceWebBuild`/`CE_FORCE_WEB=1` overrides. Verified fresh↔stale flips. |
 | 2 | **In-app Scripting Toolchains panel** | ✅ Settings → Scripting Toolchains (Installed / Install / Remove per language). C++ bridge (`toolchainStatus`/`provisionToolchains`/`removeToolchains` via a `ToolchainJob` mirroring `VstBuildJob`) + `bridge.js` wrappers + `ToolchainsSettings.svelte`. Web bundle builds clean; C++ compiles with the app. |
-| 3 | **Template player** | ◑ Reframed (§3a): single-template VST3 is blocked by the compile-time FUID; the per-panel build is already an incremental relink and the avoidable cost (Vite) is removed. Standalone/CLAP templating + a sidecar-FUID JUCE-factory fork are the remaining wins (deferred — need the player build to validate). |
+| 3 | **Template player** | ● Done (§3a). The sidecar-FUID route works and produces byte-identical ids; `CEDITOR_TEMPLATE_PLAYER=ON` + `export-panel-template.mjs`. Unvalidated in a real host — that needs Windows and a DAW. |
 | 4 | **Installer language options + staging** | ✅ `CEditor.iss` `[Types]`/`[Components]` (Python/C++/C#/Java) with per-component `provision.cmd` `[Run]`; `package-installer.ps1` stages `tools/` (scripts only, binaries on demand); the app resolves the exporter from the install dir (`ceditorSourceRoot()` checks the exe dir). Inno/PowerShell not runnable in CI — needs a Windows packaging run to validate. |
 
 **Caveat carried by 3 + 4:** a GUI-only install can *manage toolchains* (Settings panel) and the
 installer can *provision* them, but a full **VST3 export still needs the C++ build environment** (source
-+ CMake + a compiler) because each panel needs a unique compile-time FUID. A compiler-free path exists
++ CMake + a compiler) on a source checkout; an install with a prebuilt template exports with no
+compiler at all (§3a). Historically a compiler-free path was thought to exist
 only for **standalone/CLAP** (future 3a work). This is a JUCE/VST3 ecosystem constraint, not a CEditor
 limitation.

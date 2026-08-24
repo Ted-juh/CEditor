@@ -2,24 +2,76 @@
   import Plus from 'lucide-svelte/icons/plus';
   import X from 'lucide-svelte/icons/x';
 
+  import {
+    applyBlockAlignment,
+    applyFontFamily,
+    applyFontSize,
+    applyInlineStyle,
+    applyList,
+    clearFormatting,
+    insertPlainText,
+    readCaretOffset,
+    resolveNotepadSync,
+    restoreCaretOffset,
+  } from '../utils/richTextEditing.js';
+
   let { notes = $bindable([]), activeNoteIndex = $bindable(0), onchange } = $props();
 
   let editorEl = $state(null);
-  let lastSyncedIndex = $state(-1);
 
-  // Load content into editor when switching notes
+  // Plain `let`, not `$state`: the sync effect both reads and writes these, and
+  // as reactive state that is a self-invalidating effect. Nothing in the markup
+  // reads them either.
+  let lastSyncedIndex = -1;
+  let lastSyncedHtml = null;
+  let composing = false;
+
+  /**
+   * Load the note into the contenteditable — on a note switch, and on an
+   * EXTERNAL content change.
+   *
+   * The external half is review finding D2. This effect used to fire only when
+   * the note INDEX changed, so an undo (menu, toolbar or Ctrl+Z) reverted the
+   * model while the DOM kept showing the old text — and because the very next
+   * keystroke saves `editorEl.innerHTML` back into the model, the stale DOM
+   * overwrote the restored content and the undo quietly vanished. Re-syncing
+   * naively instead would have been worse: the model is rewritten on every
+   * keystroke, so "content changed, reload the DOM" would rebuild the editor
+   * under the user's cursor as they typed. resolveNotepadSync draws that line;
+   * the caret is carried across by character offset, because after
+   * `innerHTML =` every node the old selection pointed at is gone.
+   */
   $effect(() => {
     const idx = activeNoteIndex;
-    if (editorEl && idx !== lastSyncedIndex) {
-      lastSyncedIndex = idx;
-      const note = notes[idx];
-      editorEl.innerHTML = note ? note.content : '';
-    }
+    const modelHtml = notes[idx]?.content ?? '';
+    if (!editorEl) return;
+
+    const decision = resolveNotepadSync({
+      index: idx,
+      lastIndex: lastSyncedIndex,
+      modelHtml,
+      domHtml: editorEl.innerHTML,
+      lastSyncedHtml,
+      composing,
+    });
+    if (!decision.sync) return;
+
+    const selection = typeof window === 'undefined' ? null : window.getSelection?.() ?? null;
+    const caret = decision.preserveCaret ? readCaretOffset(editorEl, selection) : null;
+
+    lastSyncedIndex = idx;
+    lastSyncedHtml = modelHtml;
+    editorEl.innerHTML = modelHtml;
+
+    if (caret != null && selection) restoreCaretOffset(editorEl, caret, selection, document);
   });
 
   function saveCurrentContent() {
     if (!editorEl || !notes[activeNoteIndex]) return;
     const html = editorEl.innerHTML;
+    // Recorded even when unchanged: this is the "the DOM and the model agree
+    // because of something WE did" marker the sync effect tests against.
+    lastSyncedHtml = html;
     if (notes[activeNoteIndex].content !== html) {
       notes[activeNoteIndex].content = html;
       if (onchange) onchange(notes);
@@ -28,6 +80,10 @@
 
   function handleInput() {
     saveCurrentContent();
+  }
+
+  function currentSelection() {
+    return typeof window === 'undefined' ? null : window.getSelection?.() ?? null;
   }
 
   function switchTab(index) {
@@ -76,34 +132,79 @@
     }
   }
 
-  // Keyboard shortcuts for formatting
+  // Keyboard shortcuts for formatting.
+  //
+  // These were `document.execCommand('bold' | 'italic' | 'underline')` and an
+  // `execCommand('insertText')` for Tab (B10). execCommand is deprecated, is
+  // specified nowhere, and emits different markup per engine — `<b>` here,
+  // `<span style>` there — into HTML we persist into the panel file. The
+  // Range-based replacements live in utils/richTextEditing.js and always emit
+  // the same thing. Programmatic edits raise no `input` event, so each one
+  // saves explicitly; forgetting that is how a formatted note loses its
+  // formatting on the next reload.
+  const FORMAT_KEYS = { b: 'bold', i: 'italic', u: 'underline' };
+
   function handleKeyDown(e) {
     if (e.ctrlKey || e.metaKey) {
-      switch (e.key.toLowerCase()) {
-        case 'b':
-          e.preventDefault();
-          document.execCommand('bold');
-          break;
-        case 'i':
-          e.preventDefault();
-          document.execCommand('italic');
-          break;
-        case 'u':
-          e.preventDefault();
-          document.execCommand('underline');
-          break;
+      const command = FORMAT_KEYS[String(e.key ?? '').toLowerCase()];
+      if (command) {
+        e.preventDefault();
+        applyInlineStyle(editorEl, currentSelection(), command, document);
+        saveCurrentContent();
+        return;
       }
     }
-    // Tab key inserts spaces
     if (e.key === 'Tab') {
       e.preventDefault();
-      document.execCommand('insertText', false, '    ');
+      insertPlainText(editorEl, currentSelection(), '    ', document);
+      saveCurrentContent();
     }
   }
 
   // Expose the editor element for settings panel to apply formatting
   export function getEditorElement() {
     return editorEl;
+  }
+
+  /**
+   * Every formatting operation the sidebar and the keyboard can ask for, in ONE place.
+   *
+   * The sidebar used to take `getEditorElement()` and run execCommand on it directly, so clicking
+   * **B** and pressing Ctrl+B wrote different markup into the same note — different enough to
+   * disagree about what "already bold" means, which is how a toggle stops toggling. Both callers
+   * come through here now, so they cannot drift again. The save afterwards is not optional and
+   * only this component can do it: a programmatic DOM edit raises no `input` event, so a
+   * formatting change that skipped the save was lost on the next reload.
+   */
+  const FORMAT_OPS = {
+    bold: (sel) => applyInlineStyle(editorEl, sel, 'bold', document),
+    italic: (sel) => applyInlineStyle(editorEl, sel, 'italic', document),
+    underline: (sel) => applyInlineStyle(editorEl, sel, 'underline', document),
+    strikethrough: (sel) => applyInlineStyle(editorEl, sel, 'strikethrough', document),
+    clearFormatting: (sel) => clearFormatting(editorEl, sel, document),
+    alignLeft: (sel) => applyBlockAlignment(editorEl, sel, 'left', document),
+    alignCenter: (sel) => applyBlockAlignment(editorEl, sel, 'center', document),
+    alignRight: (sel) => applyBlockAlignment(editorEl, sel, 'right', document),
+    bulletList: (sel) => applyList(editorEl, sel, false, document),
+    numberedList: (sel) => applyList(editorEl, sel, true, document),
+  };
+
+  export function formatSelection(command, value = null) {
+    if (!editorEl) return false;
+    const sel = currentSelection();
+    let applied = null;
+
+    if (command === 'fontFamily') applied = applyFontFamily(editorEl, sel, value, document);
+    else if (command === 'fontSize') applied = applyFontSize(editorEl, sel, value, document);
+    else applied = FORMAT_OPS[command]?.(sel) ?? null;
+
+    if (applied) saveCurrentContent();
+    return !!applied;
+  }
+
+  /** Commit whatever a caller has just done to the DOM into the model. */
+  export function commitDomEdit() {
+    saveCurrentContent();
   }
 </script>
 
@@ -142,6 +243,8 @@
     bind:this={editorEl}
     oninput={handleInput}
     onkeydown={handleKeyDown}
+    oncompositionstart={() => composing = true}
+    oncompositionend={() => { composing = false; saveCurrentContent(); }}
     spellcheck="false"
   ></div>
 </div>

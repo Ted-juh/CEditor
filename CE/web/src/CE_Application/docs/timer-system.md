@@ -155,7 +155,8 @@ A panel part you add and configure without scripting:
 
 - **LCD display** (`lcd-display-component.md`) — scroll / blink / cursor / page
   auto-advance / warm-up fade.
-- **Animations section** — could use the timer as its tick driver.
+- **Animations section** — could use the timer as its tick driver. *(Still open, re-checked
+  2026-08-23: nothing in the animation stores references `TimerManager` or a shared tick.)*
 - **Value commits** — debounce / throttle rapid changes.
 
 ## Decisions (resolved)
@@ -174,9 +175,14 @@ Remaining is implementation, not design — see below.
 
 ## Implementation TODO
 
-✅ **Live C++ backing implemented** (unverified by build — no toolchain in the
-authoring environment). `startTimer(id, ms)` / `stopTimer(id)` now run real timers
-and dispatch `onTimer({ id })`.
+✅ **Live C++ backing implemented.** `startTimer(id, ms)` / `stopTimer(id)` run real timers and
+dispatch `onTimer({ id })`.
+
+~~(unverified by build — no toolchain in the authoring environment)~~ — it compiles. `TimerManager.h`
+was syntax-checked directly on 2026-08-23, and CI builds it for real: the workflow configures
+`-DCEDITOR_SCRIPTING=ON` and the player target holds a `TimerManager` behind that guard
+(`PluginProcessor.h:54, :1451`). The caveat was written when nothing in this repo built off Windows,
+which stopped being true some time ago.
 
 - [x] **`TimerManager`** (`CE/src/Scripting/TimerManager.h`) — one `juce::Timer`
   multiplexing named timers on the message thread; repeating; fixed-rate with
@@ -195,7 +201,8 @@ and dispatch `onTimer({ id })`.
 - [ ] **Remaining additive commands** (`pauseTimer` / `resumeTimer` / `restartTimer` /
   `resetTimer` / `setTimerInterval`, queries, `onTimerDone`) — not yet.
 - [ ] **Serialize timer definitions** (declarative Timer section) — not yet.
-- [ ] **Python engine** registration — not yet.
+- [x] **Python engine** registration — **done**, `PythonScriptEngine.cpp:424` installs
+  `api_startTimer` / `api_stopTimer`.
 
 ## Add your ideas below
 <!-- New timer ideas go here; promote into the sections above once fleshed out. -->

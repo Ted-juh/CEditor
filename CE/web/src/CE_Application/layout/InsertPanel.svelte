@@ -29,8 +29,8 @@
 
   let query = $state('');
 
-  const TYPE_LABELS = new Map(
-    INSERT_CATEGORIES.flatMap((category) => category.items.map((item) => [item.type, item.label]))
+  const CATALOG_ITEMS = new Map(
+    INSERT_CATEGORIES.flatMap((category) => category.items.map((item) => [item.type, item]))
   );
 
   let filteredCategories = $derived.by(() => {
@@ -51,8 +51,8 @@
 
   let recentItems = $derived(
     $insertRecents
-      .filter((type) => TYPE_LABELS.has(type))
-      .map((type) => ({ type, label: TYPE_LABELS.get(type) }))
+      .filter((type) => CATALOG_ITEMS.has(type))
+      .map((type) => CATALOG_ITEMS.get(type))
       .slice(0, 6)
   );
 
@@ -63,9 +63,9 @@
     return entries.filter((entry) => String(entry.name ?? '').toLowerCase().includes(q)).slice(0, 12);
   });
 
-  function insertType(type) {
+  function insertItem(item) {
     if (!hasActivePanel) return;
-    addControl(type);
+    addControl(item.type);
   }
 
   function insertPackage(entry) {
@@ -76,10 +76,10 @@
 
   // Drag-to-place: the canvas reads this payload on drop and inserts at the
   // drop point (EditorCanvas → addControl(..., { at })).
-  function handleTypeDragStart(type, e) {
+  function handleTypeDragStart(item, e) {
     if (!hasActivePanel) { e.preventDefault(); return; }
     e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('application/x-ceditor-insert', JSON.stringify({ kind: 'type', type }));
+    e.dataTransfer.setData('application/x-ceditor-insert', JSON.stringify({ kind: 'type', type: item.type }));
   }
 
   function handlePackageDragStart(entry, e) {
@@ -119,8 +119,8 @@
             title={`Insert ${item.label}`}
             disabled={!hasActivePanel}
             draggable={hasActivePanel}
-            ondragstart={(e) => handleTypeDragStart(item.type, e)}
-            onclick={() => insertType(item.type)}
+            ondragstart={(e) => handleTypeDragStart(item, e)}
+            onclick={() => insertItem(item)}
           >
             <Icon size={13} strokeWidth={1.6} />
             <span>{item.label}</span>
@@ -141,8 +141,8 @@
           title={hasActivePanel ? `Insert ${item.label} — or drag it onto the panel` : `${item.label} (open a panel first)`}
           disabled={!hasActivePanel}
           draggable={hasActivePanel}
-          ondragstart={(e) => handleTypeDragStart(item.type, e)}
-          onclick={() => insertType(item.type)}
+          ondragstart={(e) => handleTypeDragStart(item, e)}
+          onclick={() => insertItem(item)}
         >
           <span class="item-icon"><Icon size={15} strokeWidth={1.5} /></span>
           <span class="item-label">{item.label}</span>

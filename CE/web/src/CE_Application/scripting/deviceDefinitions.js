@@ -25,7 +25,7 @@
 // is what makes the build idempotent (§13) — and it means a definition can never be half-saved
 // into the author's file.
 
-import { localParseDumpMessage } from '../stores/deviceProfileLocalEngine.js';
+import { localBuildDumpMessage, localParseDumpMessage } from '../stores/deviceProfileLocalEngine.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 /** role -> { parameters: Map<id, entry>, dumps: Map<kind, entry>, profile: object|null } */
@@ -409,6 +409,23 @@ export function decodeDump(role, hex) {
   const result = localParseDumpMessage(syntheticProfile(role), hex);
   if (!result?.ok) return { ok: false, error: result?.error ?? 'No declared layout matched.', matchStatus: result?.matchStatus ?? 'noMatch' };
   return { ok: true, kind: result.dumpId, name: result.dumpName, values: result.values ?? {} };
+}
+
+/**
+ * Build bytes for a DECLARED dump — the encode direction, and the counterpart to decodeDump.
+ *
+ * Only script-declared layouts, deliberately. A profile dump's codec lives in the C++ engine and the
+ * preview has no synchronous way to reach it; a layout the script declared with `defineDump` is one
+ * this runtime owns outright, so it can be built here with no host at all. That split is the same
+ * one `requestDump` already makes.
+ *
+ * Returns null when the role has no declared dumps, so a caller can tell "nothing declared" from
+ * "declared and failed" and give the right message for each.
+ */
+export function buildDump(role, kind, values = {}) {
+  const s = slot(role);
+  if (s.dumps.size === 0) return null;
+  return localBuildDumpMessage(syntheticProfile(role), kind, values);
 }
 
 /** Drop every definition. Called when the panel is rebuilt, for the reason onPanelBuild exists. */

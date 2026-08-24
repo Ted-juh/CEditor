@@ -2,6 +2,11 @@
   import { onDestroy, untrack } from 'svelte';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
+  import { isDisplayOnly } from '../utils/displayMode.js';
+  import { isMeterFamily, isRibbonFamily } from '../models/componentFamilies.js';
+  import {
+    RETURN_MODE, normalizeReturnBehavior, restValueFor, returnStep, returnStep2DAxes,
+  } from '../utils/returnToRest.js';
   import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout } from '../utils/lcdZones.js';
   import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
@@ -35,6 +40,7 @@
     listboxFilterHeight,
   } from '../utils/listboxLayout.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
+  import { applySectionValues } from '../utils/sectionValueOverrides.js';
   import { recallRowSlot } from '../stores/presetChoiceSync.js';
   import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
   import { meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
@@ -48,16 +54,16 @@
     matrixAmountAt, matrixAmountFromDrag, matrixSetAmount, matrixIndex, matrixCols,
   } from '../utils/matrixLayout.js';
   import {
-    joystickConfig, joystickPos, joystickGeometry, joyFromPx, joystickGlide,
+    joystickConfig, joystickPos, joystickGeometry, joyFromPx,
   } from '../utils/joystickLayout.js';
   import {
     crossfaderConfig, crossfaderMix, crossfaderGeometry, crossfaderMixFromPx,
-    crossfaderDetent, crossfaderGlide,
+    crossfaderDetent,
   } from '../utils/crossfaderLayout.js';
   import { numpadConfig, numpadDisplayText, numpadKeyAt, numpadPress } from '../utils/numpadLayout.js';
   import {
     ribbonConfig, ribbonValue, ribbonVertical, ribbonGeometry, ribbonValueFromPx,
-    ribbonSnap, ribbonReturnTarget, ribbonGlide,
+    ribbonSnap,
   } from '../utils/ribbonLayout.js';
   import { macroConfig, macroValue, macroGeometry, macroKnobHit } from '../utils/macroLayout.js';
   import {
@@ -106,6 +112,10 @@
     arpGeometry, arpCellAt, toggleMute, arpPhase,
     arpSynced, arpDivision, syncedPhaseAt,
   } from '../utils/arpLayout.js';
+  import {
+    advanceStep, gateMs, sequencerConfig, sequencerDirection, sequencerSteps, sequencerSynced,
+    stepMs, stepNotes, syncedStepsBetween,
+  } from '../utils/stepSequencerLayout.js';
   // The touch-strip Ribbon (a parameter control) already owns the plain
   // ribbonConfig/ribbonGeometry names, so the note ribbon's come in aliased.
   import {
@@ -416,6 +426,13 @@
    *  whether to re-baseline. */
   function raiseComponentCycle(control, phase, previous) {
     if (!(phase < previous)) return;
+    raiseComponentCycleNow(control);
+  }
+
+  /** The same event for a component that knows it wrapped rather than inferring it from a phase.
+   *  The COUNT lives here either way — two counters for one component's laps would disagree the
+   *  first time one of them missed a frame, and `onCycle` promises a count. */
+  function raiseComponentCycleNow(control) {
     const id = getControlId(control);
     const count = (componentCycleCount[id] ?? 0) + 1;
     componentCycleCount[id] = count;
@@ -454,11 +471,17 @@
     return $panelPreviewSessions?.[controlId] ?? createInteractionPreviewSession(control);
   }
 
-  function resolvedPreviewFor(control) {
-    const session = sessionFor(control);
+  function resolvedPreviewFor(rawControl) {
+    const session = sessionFor(rawControl);
     const previewOverrides = session?.enabled === false ? {} : session;
+    // Host automation of a field on the component's OWN section (an Arp's rate, a joystick's x)
+    // lands here first, so every apply*ValueSource below and the renderer itself read the section
+    // as they always do. It has to happen before the chain rather than inside it: several of those
+    // functions read the ORIGINAL `control` rather than the resolved one, so an overlay applied
+    // later would be visible to some of them and not others. See utils/sectionValueOverrides.js.
+    const control = applySectionValues(rawControl, previewOverrides?.sectionValues);
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))))))))));
+    return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1039,7 +1062,7 @@
     meterTickerRunning = true;
     const loop = () => {
       const anyPeak = (orderedControls ?? []).some((c) =>
-        String(c?._children?.Core?.controlType ?? '') === 'Meter' && c?._children?.Meter?.peakHold === true);
+        isMeterFamily(c?._children?.Core?.controlType) && c?._children?.Meter?.peakHold === true);
       if (!anyPeak) { meterTickerRunning = false; return; } // self-stop when none remain
       meterClock = Date.now();
       requestAnimationFrame(loop);
@@ -1052,7 +1075,7 @@
   // config; the peak decays via the ticker. The renderer reads Meter.__value /
   // Meter.__peak.
   function applyMeterValueSource(control, resolved) {
-    if (String(control?._children?.Core?.controlType ?? '') !== 'Meter') return resolved;
+    if (!isMeterFamily(control?._children?.Core?.controlType)) return resolved;
     const base = resolved?.control ?? control;
     const meter = base?._children?.Meter;
     if (!meter) return resolved;
@@ -1302,31 +1325,80 @@
     return true;
   }
   // Spring-return glide back to centre on release (rAF loop, emits fan-out).
+  // --- The spring-back, once ------------------------------------------------
+  //
+  // The joystick, the crossfader and the ribbon each shipped their own return glide before the
+  // capability existed, and all three were the same twenty lines: cancel if re-grabbed, step toward
+  // a target, write the session, fan out, and on arrival commit and raise onSettled. What differed
+  // was the glide maths (a constant-rate walk, per-axis on the joystick), the session keys, and one
+  // component's extras.
+  //
+  // So: one driver, `returnStep` for the maths, and the differences injected. Their three
+  // vocabularies (`returnToCenter` + `returnRate`, versus `returnMode` + `returnValue`) are
+  // normalised at READ time by `normalizeReturnBehavior` rather than migrated in the file — a
+  // migration has to be right first time on documents nobody can re-check, and a normaliser keeps
+  // working for a panel authored years ago that was never re-saved.
+  //
+  // The three gain something from this beyond tidiness: they had `returnToCenter` and now have the
+  // whole vocabulary, so a crossfader can spring to an end and a joystick to a corner.
+  function startComponentReturn({ id, section, control, read, write, commit, cancelled, settled2D = false, defaultRate = 4 }) {
+    const behavior = normalizeReturnBehavior(section, { defaultRate });
+    const restScalar = restValueFor(behavior);
+    // `null` is "this control does not return" — the latch case, which is not this function's job.
+    if (restScalar === null) return false;
+
+    cancelReturn(id);
+    const from = read();
+    const rest = settled2D ? { x: restScalar, y: restScalar } : restScalar;
+    const token = { cancelled: false };
+    activeReturns.set(id, token);
+
+    const startedAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const tick = () => {
+      if (token.cancelled) return;
+      // A new grab wins over the spring — the hand on the control beats the glide.
+      if (cancelled()) { activeReturns.delete(id); return; }
+
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const step = settled2D
+        ? returnStep2DAxes(from, rest, now - startedAt, behavior, behavior.returnAxes)
+        : returnStep(from, rest, now - startedAt, behavior);
+
+      write(step.value, step.done);
+      if (step.done) {
+        activeReturns.delete(id);
+        commit(step.value);
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    // Run the first frame now rather than waiting one: a zero return time means snap, and a snap
+    // that takes 16ms is not a snap.
+    tick();
+    return true;
+  }
+
   function startJoystickReturn(control) {
-    const cfg = joystickConfig(control);
-    if (cfg.returnToCenter !== true) return false;
     const id = getControlId(control);
-    const axes = String(cfg.returnAxes ?? 'both');
-    const rate = numberOr(cfg.returnRate, 4);
-    let lastT = Date.now();
-    const loop = () => {
-      if (joyDrag && joyDrag.id === id) return; // a new grab cancels the return
-      const now = Date.now();
-      const dt = Math.min(0.05, (now - lastT) / 1000);
-      lastT = now;
-      const { pos, settled } = joystickGlide(joyWorkingPos(control), { x: 0.5, y: 0.5 }, rate, dt, axes);
-      patchControlSession(id, { joyPos: pos, joyTrail: joyTrailNext(control, pos) });
-      emitControlPortFanout(joyControlWith(control, pos), settled ? 'commit' : 'continuous');
-      if (settled) {
+    return startComponentReturn({
+      id,
+      control,
+      section: joystickConfig(control),
+      settled2D: true,
+      read: () => joyWorkingPos(control),
+      // The trail is the joystick's own extra and stays with it: the driver knows about a value,
+      // not about the ribbon of past positions this component draws behind its puck.
+      write: (pos, done) => {
+        patchControlSession(id, { joyPos: pos, joyTrail: joyTrailNext(control, pos) });
+        emitControlPortFanout(joyControlWith(control, pos), done ? 'commit' : 'continuous');
+      },
+      commit: (pos) => {
         commitJoyPos(control, pos);
         patchControlSession(id, { joyPos: undefined });
         raiseComponent(control, 'onSettled', { value: pos.x, x: pos.x, y: pos.y });
-        return;
-      }
-      requestAnimationFrame(loop);
-    };
-    requestAnimationFrame(loop);
-    return true;
+      },
+      cancelled: () => !!joyDrag && joyDrag.id === id,
+    });
   }
 
   // --- Crossfader: 1-D A/B blend fader ------------------------------------
@@ -1368,29 +1440,23 @@
     return true;
   }
   function startCrossfaderReturn(control) {
-    const cfg = crossfaderConfig(control);
-    if (cfg.returnToCenter !== true) return false;
     const id = getControlId(control);
-    const rate = numberOr(cfg.returnRate, 4);
-    let lastT = Date.now();
-    const loop = () => {
-      if (xfadeDrag && xfadeDrag.id === id) return; // a new grab cancels the return
-      const now = Date.now();
-      const dt = Math.min(0.05, (now - lastT) / 1000);
-      lastT = now;
-      const { mix, settled } = crossfaderGlide(xfadeWorkingMix(control), 0.5, rate, dt);
-      patchControlSession(id, { xfadeMix: mix });
-      emitControlPortFanout(xfadeControlWith(control, mix), settled ? 'commit' : 'continuous');
-      if (settled) {
+    return startComponentReturn({
+      id,
+      control,
+      section: crossfaderConfig(control),
+      read: () => xfadeWorkingMix(control),
+      write: (mix, done) => {
+        patchControlSession(id, { xfadeMix: mix });
+        emitControlPortFanout(xfadeControlWith(control, mix), done ? 'commit' : 'continuous');
+      },
+      commit: (mix) => {
         commitXfadeMix(control, mix);
         patchControlSession(id, { xfadeMix: undefined });
         raiseComponent(control, 'onSettled', { value: mix });
-        return;
-      }
-      requestAnimationFrame(loop);
-    };
-    requestAnimationFrame(loop);
-    return true;
+      },
+      cancelled: () => !!xfadeDrag && xfadeDrag.id === id,
+    });
   }
 
   // --- Numpad: type a number, commit it -----------------------------------
@@ -1456,7 +1522,7 @@
   const RIB_PAD = 8;
   let ribbonDrag = null; // { id } while touching the strip
   function isRibbonControl(control) {
-    return String(control?._children?.Core?.controlType ?? '') === 'Ribbon';
+    return isRibbonFamily(control?._children?.Core?.controlType);
   }
   function ribGeomFor(control) {
     const t = control?._children?.Transform ?? {};
@@ -1496,33 +1562,33 @@
   // to the rest value (returnMode).
   function releaseRibbon(control) {
     const id = getControlId(control);
-    const target = ribbonReturnTarget(control);
-    if (target === null) { // latch / hold
-      const v = ribWorkingValue(control);
-      commitRibbonValue(control, v);
-      patchControlSession(id, { ribbonTouch: false, ribbonValue: undefined });
-      emitControlPortFanout(ribControlWith(control, v, false), 'commit');
-      return;
-    }
-    const rate = numberOr(ribbonConfig(control).returnRate, 8);
-    let lastT = Date.now();
-    const loop = () => {
-      if (ribbonDrag && ribbonDrag.id === id) return; // a new touch cancels the return
-      const now = Date.now();
-      const dt = Math.min(0.05, (now - lastT) / 1000);
-      lastT = now;
-      const { value, settled } = ribbonGlide(ribWorkingValue(control), target, rate, dt);
-      patchControlSession(id, { ribbonValue: value, ribbonTouch: false });
-      emitControlPortFanout(ribControlWith(control, value, false), settled ? 'commit' : 'continuous');
-      if (settled) {
+    // The touch gate is the ribbon's own extra: a released ribbon is untouched whether it springs
+    // back or latches, so it is cleared on both paths rather than inside the glide.
+    const started = startComponentReturn({
+      id,
+      control,
+      section: ribbonConfig(control),
+      defaultRate: 8,
+      read: () => ribWorkingValue(control),
+      write: (value, done) => {
+        patchControlSession(id, { ribbonValue: value, ribbonTouch: false });
+        emitControlPortFanout(ribControlWith(control, value, false), done ? 'commit' : 'continuous');
+      },
+      commit: (value) => {
         commitRibbonValue(control, value);
         patchControlSession(id, { ribbonValue: undefined });
         raiseComponent(control, 'onSettled', { value });
-        return;
-      }
-      requestAnimationFrame(loop);
-    };
-    requestAnimationFrame(loop);
+      },
+      cancelled: () => !!ribbonDrag && ribbonDrag.id === id,
+    });
+    if (started) return;
+
+    // Latch / hold: `restValueFor` said this control does not return, so the value it was left at
+    // IS the value. Committed here rather than glided to itself.
+    const value = ribWorkingValue(control);
+    commitRibbonValue(control, value);
+    patchControlSession(id, { ribbonTouch: false, ribbonValue: undefined });
+    emitControlPortFanout(ribControlWith(control, value, false), 'commit');
   }
 
   // --- Macro: one knob → many assignments (fan-out) -----------------------
@@ -1573,6 +1639,9 @@
   const ORBIT_EMIT_MS = 25;
   const ORBIT_EMIT_EPS = 0.004;
   let orbitClock = $state(0);
+  // The sequencer's own frame stamp, so `applyStepSequencerValueSource` re-runs as the playhead
+  // walks. Separate from `orbitClock` because the two tickers self-stop independently.
+  let seqClock = $state(0);
   const orbitPhaseState = {};   // { [id]: phase 0..1 }
   const orbitLastSent = {};     // { [`${id}:${port}`]: { value, at } }
   let orbitTickerRunning = false;
@@ -2858,6 +2927,144 @@
     if (i < 0) return false;
     updateControlProperty(getControlId(control), 'Arp.mutes', toggleMute(control, i));
     return true;
+  }
+
+
+  // --- Step Sequencer: the thing that makes it a sequencer ---------------------
+  //
+  // The component had a grid, a playhead in the renderer and a "Running" toggle, and nothing ever
+  // drove any of it: `__position` was documented as "injected by the preview surface" and the
+  // preview surface had never heard of it. So the toggle set a flag, the playhead never appeared,
+  // and no note was ever sent. Built here on the Arp's pattern, because they are the same problem
+  // and two answers to it would drift.
+  //
+  // TWO CLOCKS, one loop. Free-running accumulates wall-clock milliseconds against `stepMs`, which
+  // is what the inspector's drift warning is about. Synced asks the transport how far it has moved
+  // and steps once per boundary crossed.
+  //
+  // Position ACCUMULATES in both, unlike the Arp's synced path which derives the index from the
+  // beat. The Arp can do that because it only walks forward; a sequencer has reverse, ping-pong and
+  // random, and ping-pong's next step is a function of which way it was already going rather than
+  // of the position. So the transport says how many boundaries were crossed and `advanceStep`
+  // decides where each lands — the direction modes keep working when synced instead of quietly
+  // becoming forward.
+  const seqTimers = {};         // id -> [timeoutId...]  (note-offs)
+  const seqSounding = {};       // id -> Set("ch:note") currently ringing
+  const seqPosition = {};       // id -> step index
+  const seqState = {};          // id -> { forward } for ping-pong
+  const seqAccMs = {};          // id -> ms accumulated toward the next step (free-running)
+  const seqBeats = {};          // id -> last transport reading (synced)
+  const seqJump = {};           // id -> transport jump counter seen
+  let seqTickerRunning = false;
+  let seqLastMs = 0;
+
+  function isStepSequencerControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'StepSequencer';
+  }
+  function stepSequencerControls() {
+    return (orderedControls ?? []).filter((c) => isStepSequencerControl(c));
+  }
+  function seqAllOff(control) {
+    const id = getControlId(control);
+    for (const t of seqTimers[id] ?? []) clearTimeout(t);
+    seqTimers[id] = [];
+    for (const key of seqSounding[id] ?? []) {
+      const [ch, note] = String(key).split(':').map(Number);
+      sendNoteBytes(noteOffBytes(ch, note), `seq_off_${note}`);
+    }
+    seqSounding[id] = new Set();
+  }
+  function seqFireStep(control, step, bpm) {
+    const id = getControlId(control);
+    const notes = stepNotes(control, step);
+    if (!notes.length) return;
+    const held = gateMs(control, bpm);
+    for (const entry of notes) {
+      const key = `${entry.channel}:${entry.note}`;
+      sendNoteBytes(noteOnBytes(entry.channel, entry.note, entry.velocity), `seq_on_${entry.note}`);
+      (seqSounding[id] ??= new Set()).add(key);
+      (seqTimers[id] ??= []).push(setTimeout(() => {
+        sendNoteBytes(noteOffBytes(entry.channel, entry.note), `seq_off_${entry.note}`);
+        seqSounding[id]?.delete(key);
+      }, held));
+    }
+    raiseComponent(control, 'onStep', {
+      index: step + 1,
+      of: sequencerSteps(control),
+      notes: notes.map((entry) => entry.note),
+    });
+  }
+  function seqStepOnce(control, id, bpm) {
+    const steps = sequencerSteps(control);
+    const next = advanceStep(seqPosition[id] ?? -1, steps, sequencerDirection(control), seqState[id] ?? {});
+    seqPosition[id] = next.position;
+    seqState[id] = { forward: next.forward };
+    if (next.wrapped) raiseComponentCycleNow(control);
+    seqFireStep(control, next.position, bpm);
+  }
+  function ensureSeqTicker() {
+    if (seqTickerRunning) return;
+    seqTickerRunning = true;
+    seqLastMs = Date.now();
+    const loop = () => {
+      const running = stepSequencerControls().filter((c) => sequencerConfig(c).running === true);
+      if (!running.length) { seqTickerRunning = false; return; }   // self-stop, like the Arp's
+      const now = Date.now();
+      // Capped, so a backgrounded tab that wakes after ten seconds resumes rather than firing ten
+      // seconds of notes at once.
+      const dt = Math.min(250, Math.max(0, now - seqLastMs));
+      seqLastMs = now;
+
+      for (const control of running) {
+        const id = getControlId(control);
+        if (sequencerSynced(control)) {
+          const beats = transportBeatsNow();
+          const prev = seqBeats[id];
+          seqBeats[id] = beats;
+          // A locate, a loop wrap or a rewind is a discontinuity rather than playing on. Catching up
+          // through one fires every step the locator skipped, which is a burst nobody asked for.
+          const jump = transportJumpSeq();
+          if (seqJump[id] !== jump) { seqJump[id] = jump; continue; }
+          if (!isTransportRunning() || prev === undefined || beats <= prev) continue;
+          const bpm = transportBpmNow();
+          const crossed = syncedStepsBetween(prev, beats, control);
+          for (let i = 0; i < crossed; i += 1) seqStepOnce(control, id, bpm);
+          continue;
+        }
+
+        // Free-running. Accumulated rather than derived from a phase, so changing the BPM mid-run
+        // moves the NEXT boundary and does not retime the step already in progress.
+        delete seqBeats[id];
+        const per = stepMs(control);
+        seqAccMs[id] = (seqAccMs[id] ?? per) + dt;
+        let guard = 0;
+        while (seqAccMs[id] >= per && guard < 16) {
+          seqAccMs[id] -= per;
+          seqStepOnce(control, id, null);
+          guard += 1;
+        }
+        if (guard >= 16) seqAccMs[id] = 0;   // gave up catching up; resume from now
+      }
+      seqClock = now;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+  // Inject the live playhead so the renderer draws the real walk. A stopped sequencer injects
+  // nothing, and the renderer draws no playhead rather than one parked at step zero.
+  function applyStepSequencerValueSource(control, resolved) {
+    if (!isStepSequencerControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const section = base?._children?.StepSequencer;
+    if (!section) return resolved;
+    const id = getControlId(control);
+    if (section.running === true) { ensureSeqTicker(); void seqClock; }
+    else if (seqSounding[id]?.size) { seqAllOff(control); seqPosition[id] = -1; seqAccMs[id] = undefined; }
+    const next = { ...section };
+    if (section.running === true && seqPosition[id] !== undefined && seqPosition[id] >= 0) {
+      next.__position = seqPosition[id];
+    }
+    return { ...resolved, control: { ...base, _children: { ...base._children, StepSequencer: next } } };
   }
 
   // --- Ribbon Keyboard: slide along the strip to play pitch --------------------
@@ -4496,6 +4703,15 @@
       || control?._children?.Core?.enabled === false;
   }
 
+  /**
+   * A read-only control takes no input. Separate from `isDisabled` on purpose: a disabled control
+   * is greyed out and its `disabled` state fires, while a display is fully live — it just does not
+   * listen. Conflating them would make every meter look switched off.
+   */
+  function isReadOnly(control) {
+    return isDisplayOnly(getBehavior(control));
+  }
+
   function isRangeControl(control) {
     return isRangeBehavior(getBehavior(control));
   }
@@ -5585,6 +5801,61 @@
     });
   }
 
+  // --- Return to rest (the generic one) ------------------------------------
+  //
+  // A pitch or mod wheel springing back to centre, a spring-loaded fader, a ribbon returning. Three
+  // components already have their OWN spring — the joystick, the crossfader and the ribbon — and
+  // they keep it: each has extras this cannot know about (the joystick's trail, the ribbon's touch
+  // gate, per-axis return). This is the one for everything else, driven by the `returnMode` fields
+  // on Behavior, so a plain slider can spring without a fourth private implementation.
+  //
+  // THE GLIDE EMITS. A spring-back that moves the on-screen control to centre and tells the device
+  // nothing leaves the synth bent — which is the whole reason `returnToRest.js` produces a series of
+  // values rather than one. Each frame writes the session AND fans out; only the last one commits.
+  const activeReturns = new Map();   // controlId -> cancel token
+
+  function cancelReturn(controlId) {
+    const token = activeReturns.get(controlId);
+    if (token) { token.cancelled = true; activeReturns.delete(controlId); }
+  }
+
+  function startValueReturn(control) {
+    const behavior = getBehavior(control);
+    const rest = restValueFor(behavior);
+    // `null` is "this control does not return" and is not a rest value of zero — for a fader whose
+    // minimum is zero those are opposite behaviours.
+    if (rest === null || !isRangeControl(control)) return false;
+
+    const id = getControlId(control);
+    cancelReturn(id);                      // a new release restarts the glide rather than racing it
+
+    const from = currentRangeValue(control);
+    const token = { cancelled: false };
+    activeReturns.set(id, token);
+
+    const startedAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const tick = () => {
+      if (token.cancelled) return;
+      // A new grab cancels the return — the hand on the control wins over the spring.
+      if (pointerActiveControlId === id) { activeReturns.delete(id); return; }
+
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const step = returnStep(from, rest, now - startedAt, behavior);
+      setRangeValue(control, step.value);
+      emitControlPortFanout(control, step.done ? 'commit' : 'continuous');
+      if (step.done) {
+        activeReturns.delete(id);
+        raiseComponent(control, 'onSettled', { value: step.value });
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    // A zero return time snaps: run the first frame now rather than waiting one, so a control
+    // configured to snap does not visibly lag by 16ms.
+    tick();
+    return true;
+  }
+
   function setRangeValue(control, nextValue, extraPatch = {}) {
     if (!isRangeControl(control)) return;
     patchControlSession(getControlId(control), {
@@ -5828,6 +6099,9 @@
   }
 
   function handleRangeWheel(control, event) {
+    // A display does not scroll to a new value. The script dispatch below is skipped with it: a
+    // read-only control that still fired onWheel would let a script do what the wheel may not.
+    if (isReadOnly(control)) return;
     // Fire onWheel for ANY control (before the range-only built-in below returns), so a script can
     // react to the wheel even on non-range controls. delta = +1 up / -1 down; raw deltas included.
     dispatchInteraction(getControlId(control), 'onWheel', {
@@ -6183,6 +6457,8 @@
   function handlePointerDown(control, event) {
     if (event.button !== 0) return;
     if (isDisabled(control)) return;
+    // Before the double-tap bookkeeping, or a display would still register clicks it never acts on.
+    if (isReadOnly(control)) return;
 
     // Double-click: two presses on the same control within 350ms (CanvasControl has no native dblclick).
     const downId = getControlId(control);
@@ -6506,6 +6782,14 @@
       releaseRibbon(activeControl);
     }
 
+    // The generic spring-back, for the controls without one of their own. After the three
+    // specialised releases above, so a joystick or ribbon that already glided is not glided twice.
+    if (activeControl
+      && !joyDrag && !xfadeDrag && !ribbonDrag
+      && String(getBehavior(activeControl)?.returnMode ?? RETURN_MODE.none) !== RETURN_MODE.none) {
+      startValueReturn(activeControl);
+    }
+
     // Release a macro knob: commit the position, drop the session override.
     if (macroDrag && activeControl) {
       const value = macroWorkingValue(activeControl);
@@ -6712,6 +6996,7 @@
 
   function handleKeyDown(control, event) {
     if (isDisabled(control)) return;
+    if (isReadOnly(control)) return;
 
     const controlId = getControlId(control);
     lastInputMode = 'keyboard';

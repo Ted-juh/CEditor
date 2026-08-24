@@ -34,6 +34,21 @@ And a cluster of polish gaps: 9px uppercase labels in a wall of property cells; 
 
 > **5. Good defaults beat more knobs.** The finnicky-handle problem is solved by sane archetype defaults + drag behavior, not by asking the author to fix it.
 
+### Three more, from the properties-panel review
+
+That review (`cc-properties-panel-review.md`) is retired — its diagnosis produced the four-stage
+restructure, all of which shipped on 2026-07-12 — but its closing "what not to do" was guidance
+rather than work, and guidance outlives the document it arrived in:
+
+> **6. Don't merge for merging's sake.** Assets and Publish stay separate; they are genuinely
+> different tasks. Six author categories is the floor, not a challenge.
+
+> **7. Don't hide the graph.** Advanced mode keeps the flat Channels / Behaviors / Zones lists.
+> Exotic cross-wiring stays possible.
+
+> **8. Don't reach for the data model in a view pass.** The restructure was view-layer regrouping
+> throughout, which is why saved components and library entries opened unchanged.
+
 ---
 
 ## 3. The centerpiece — the interactivity model (fixes problem 1)
@@ -276,3 +291,35 @@ Branch-close review found Phase 1's "Pending user visual QA of 1E/1F" could neve
 - ✅ **1E context action**: a Make Interactive (⚡) button on the selected-layer quickbar scaffolds the active archetype onto an existing part.
 - ✅ **1F grab-area halo**: follow-mode zones now render at their **resolved** rect (`customHitZoneRect`: source part/face + inflate + minTouch) as a dashed teal halo, distinct from authored amber zones; move/resize disabled for follow zones (their rect derives from the source part). Previously the surface drew follow zones at their ignored authored bounds.
 - Verified live in the designer (Vite + browser): dial (face zone), slider (8px track → 44px minTouch halo), quickbar toggle-on-rectangle; behaviors/channels present; no console errors.
+
+### 12.14 Status update (2026-08-23, §12.5 and the chain's close)
+
+**§12.5 decomposition — the largest single pass yet.** The three monoliths this section named at
+7,809 / 3,468 / 2,415 lines now read:
+
+| File | Then | Now |
+|---|---|---|
+| `CustomDesignSurfaceEditor.svelte` | 7,809 | **~5,500**, across eight components — `SurfaceLookBar`, `SurfacePalette`, `SurfaceBottomBar`, `SurfaceToolStrip`, `SurfaceDockLayers`, `SurfaceDockInspector`, `SurfaceContextMenu`, `SurfaceHelpOverlay` |
+| `CustomDesignerEditor.svelte` | 3,468 | **gone** — dissolved by Stage B of the restructure |
+| `CustomTestBenchEditor.svelte` | 2,415 | ~1,540 |
+
+`test/surfaceDecomposition.test.js` ratchets the surface editor's line count so it cannot grow back,
+and checks that no extracted component carries its own copy of the shared glyph vocabulary.
+
+**The canvas viewport is deliberately left whole**, and the reasoning is in
+[known-issues.md](../../docs/known-issues.md) with the measurement: 116 props and 68 pieces of
+parent state its own handlers mutate. Extracting it produces the same coupling with a boundary
+drawn through the middle, not a smaller file.
+
+Also closed in the same pass, from elsewhere in this section: **§12.6's copy/paste** was already
+done; the **readiness auto-fix** and **glossary** were already done; and the surface gained marquee
+selection, a right-click context menu, multi-select-aware property editing, a layer filter, inline
+rename, an icon-strip palette collapse and a resizable display dock — the Tier 1 and Tier 2 lists of
+the now-retired workspace review.
+
+**Still open from §12**, unchanged by this pass: the arpeggiator pattern **write-side** precedence
+design (§12.12); **responsive anchors and theme tokens** (§12.6 — note that a persisted named
+palette library already exists in `stores/palettes.js`, so what theme tokens need is the
+*reference*, not the library); the **sharing gallery** (§12.7); **debugger native line-stepping**;
+and `TextEditor.svelte`, which is ~2,420 lines and the last of the monoliths without a plan.
+

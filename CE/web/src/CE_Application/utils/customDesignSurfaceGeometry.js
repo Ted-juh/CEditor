@@ -373,3 +373,118 @@ export function measurementLinesBetween(frameA, frameB) {
 
   return lines;
 }
+
+// --- Surface interaction quanta ----------------------------------------------------------------
+//
+// The last of the §5 extraction from the 2026-07-12 workspace review: the three numbers that
+// decide where a drag lands and how far a zoom goes. They lived as one-line closures over reactive
+// state inside CustomDesignSurfaceEditor, which meant the only way to check the zoom clamp or the
+// snap quantum was to open the app and try it. The review asks for exactly these as pure-logic
+// tests, on the grounds that a surface which cannot be tested is a surface that regresses quietly.
+
+/** Zoom bounds for the design surface. Below 0.25 parts are unhittable; above 5 a pixel is a tile. */
+export const SURFACE_ZOOM_MIN = 0.25;
+export const SURFACE_ZOOM_MAX = 5;
+
+/** Clamp a zoom factor into the usable range. Non-numeric input falls back to 1:1 rather than NaN. */
+export function clampSurfaceZoom(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(SURFACE_ZOOM_MIN, Math.min(SURFACE_ZOOM_MAX, n));
+}
+
+/** Clamp the zoom step (in percentage points) a +/- press or a wheel notch applies. */
+export function clampZoomIncrement(value) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n) || n <= 0) return null;   // null = leave the current increment alone
+  return Math.min(100, n);
+}
+
+/** Clamp the grid size. 1px is "off in all but name"; past 64 the grid is coarser than most parts. */
+export function clampSnapSize(value) {
+  const n = Number(value);
+  return Math.max(1, Math.min(64, Math.round(Number.isFinite(n) ? n : 10)));
+}
+
+/**
+ * Quantise one coordinate to the grid.
+ *
+ * `enabled` false and Alt-held both pass the value straight through — Alt is the documented
+ * bypass, and it has to be checked here rather than at the call sites, because there are a dozen
+ * of them and the one that forgets is the one that feels broken.
+ */
+export function snapToGrid(value, { enabled = true, size = 10, bypass = false } = {}) {
+  if (!enabled || bypass) return value;
+  const step = Math.max(1, Number(size) || 10);
+  return Math.round(value / step) * step;
+}
+
+/** Quantise a frame, keeping width and height at least one grid step so nothing snaps to nothing. */
+export function snapFrameToGrid(frame, opts = {}) {
+  if (!frame) return frame;
+  const { enabled = true, bypass = false } = opts;
+  if (!enabled || bypass) return frame;
+  return {
+    ...frame,
+    left: snapToGrid(frame.left, opts),
+    top: snapToGrid(frame.top, opts),
+    width: Math.max(1, snapToGrid(frame.width, opts)),
+    height: Math.max(1, snapToGrid(frame.height, opts)),
+  };
+}
+
+// --- Marquee selection ---------------------------------------------------------------------------
+//
+// Tier 1 of the 2026-07-12 workspace review: "Marquee selection (none exists — unlike the panel
+// editor)." The panel editor has `createMarqueeController`, but it is built around the panel's DOM
+// and zoom model; the design surface already has its own artboard-space point conversion, so what
+// was actually missing is the geometry, which is this.
+
+/** Normalise two artboard-space corners into a positive-area rect. */
+export function marqueeRect(start, end) {
+  const left = Math.min(start.x, end.x);
+  const top = Math.min(start.y, end.y);
+  return { left, top, width: Math.abs(end.x - start.x), height: Math.abs(end.y - start.y) };
+}
+
+/**
+ * A marquee smaller than this (in artboard units) is a click, not a drag.
+ *
+ * Without a threshold, every click on empty canvas is a zero-area rubber band that selects
+ * nothing and clears the selection — which is the wanted behaviour, but it has to be reached
+ * deliberately rather than as a side effect of the maths.
+ */
+export const MARQUEE_MIN_DRAG = 3;
+
+export function isMarqueeDrag(rect) {
+  return rect.width >= MARQUEE_MIN_DRAG || rect.height >= MARQUEE_MIN_DRAG;
+}
+
+/**
+ * The parts a marquee catches.
+ *
+ * Intersection, not containment: a rubber band that only takes parts it fully encloses cannot
+ * select a background plate that runs past the band on both sides, and reaching for one is the
+ * commonest use of the gesture. Locked and hidden parts are skipped — selecting something you
+ * cannot see or move is not a selection, it is a puzzle.
+ */
+export function partsInMarquee(entries, rect, frameOf) {
+  const x2 = rect.left + rect.width;
+  const y2 = rect.top + rect.height;
+  const hits = [];
+  for (const [name, part] of entries ?? []) {
+    if (part?.locked === true || part?.visible === false) continue;
+    const f = frameOf(part);
+    if (!f) continue;
+    if (f.left < x2 && f.left + f.width > rect.left && f.top < y2 && f.top + f.height > rect.top) {
+      hits.push(name);
+    }
+  }
+  return hits;
+}
+
+/** Shift-drag extends rather than replaces, matching the panel editor and every drawing tool. */
+export function mergeMarqueeSelection(existing, hits, additive) {
+  if (!additive) return hits;
+  return [...new Set([...(existing ?? []), ...hits])];
+}

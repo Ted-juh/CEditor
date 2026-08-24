@@ -8,7 +8,8 @@
     "embedPython": "auto",
     "compileNativeHandlers": "auto",
     "exportClap": true,
-    "exportLv2": true
+    "exportLv2": true,
+    "restoreHardware": "ask"
   },
   "name": "QA-02 Properties",
   "scriptId": "qa_02_properties",
@@ -134,6 +135,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -147,6 +149,12 @@
       "defaultValue": 1,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Saw",
+        "Super Saw",
+        "Noise"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -160,6 +168,12 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Init Patch",
+        "Hoover Lead",
+        "(empty)"
+      ],
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -173,6 +187,7 @@
       "defaultValue": 0,
       "unit": "",
       "midiCC": null,
+      "valueKind": "bool",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -186,6 +201,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "",
       "deviceParameterId": ""
     },
@@ -199,6 +215,7 @@
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
+      "valueKind": "float",
       "deviceRole": "primary",
       "deviceParameterId": "filter.cutoff"
     }

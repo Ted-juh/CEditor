@@ -16,6 +16,9 @@
     toggleSegmentEditScopeSegment,
   } from '../stores/segmentEditScope.js';
   import { deepClone } from '../utils/deepClone.js';
+  import Target from 'lucide-svelte/icons/target';
+  import SquareIcon from 'lucide-svelte/icons/square';
+  import StickyNote from 'lucide-svelte/icons/sticky-note';
   import {
     createEmptyRadioSegmentStyle,
     RADIO_INDICATOR_SHAPE_OPTIONS,
@@ -463,7 +466,7 @@
 {:else if rows.length === 0}
   <div class="placeholder">Add value rows first so the segment editor has segments to target.</div>
 {:else}
-  <PropertySection title="Scope">
+  <PropertySection title="Scope" icon={Target}>
     <PropertyCell label="Editing" span={4} hint="States and Segments in the top bar define which portion of the radio group these properties affect.">
       <div class="scope-stack">
         <div class="scope-banner">
@@ -565,7 +568,7 @@
   </PropertySection>
 
   {#if activePartId === 'whole'}
-    <PropertySection title="Shell Border">
+    <PropertySection title="Shell Border" icon={SquareIcon}>
       {#if wholeShellMixed}
         <PropertyCell label="Scope" span={4} hint="The selected segments have different border or corner settings. Editing below writes to all of them.">
           <div class="note-card mixed-note">
@@ -590,7 +593,7 @@
     </PropertySection>
   {/if}
 
-  <PropertySection title="Notes">
+  <PropertySection title="Notes" icon={StickyNote}>
     <PropertyCell label="Behavior" span={4} hint="How segment overrides stack and what happens with multi-select editing.">
       <div class="note-card">
         `All` edits the shared layer for the whole group. Selecting individual segment names edits only those segments, and `Mixed` means the selected segments currently differ.
@@ -718,6 +721,8 @@
 
   .val,
   .toggle-field {
+
+    box-sizing: border-box;
     flex: 1;
     min-width: 0;
     width: 100%;
@@ -733,7 +738,7 @@
   }
 
   .val:focus {
-    border-color: #5B9BD5;
+    border-color: var(--pp-field-focus, #5B9BD5);
   }
 
   .toggle-field {

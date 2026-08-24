@@ -86,20 +86,30 @@ export default defineConfig(({ command }) => ({
     // Three chunks sat above 1400 and none of them is a problem worth splitting:
     //   typescript (~3.6 MB)  third-party, dynamically imported by tsService.js — only when a
     //                         script editor opens, and its size is not ours to control
-    //   main       (~2.0 MB)  the editor entry; every section editor is already a lazy chunk
-    //   gaia.runtime (~1.7 MB) one device runtime, loaded per device
+    //   main       (~3.5 MB)  the editor entry; every section editor is already a lazy chunk
+    //   gaia.runtime (~1.8 MB) one device runtime, loaded per device
     //
     // So the limit is raised rather than the chunks split — splitting to satisfy a network
     // heuristic would add build time and complexity for no user-visible gain. It is set to catch
     // runaway growth, not to be met: if `main` ever approaches this, that IS worth investigating,
     // because parse time of the eager entry chunk is the one cost this delivery model still pays.
+    //
+    // It has already earned its keep once. A fourth chunk appeared above the line at 5.79 MB —
+    // MidiMonitorTab — and the growth was not the app's: 99.7% of that file was one lucide licence
+    // banner repeated 1702 times, wrapped around 27 kB of code, because a barrel import had crept
+    // into a component it renders (see `treeshake: false` below, which explains why a barrel import
+    // is not free here). test/bundleHygiene.test.js now fails on both halves of that: any
+    // `from 'lucide-svelte'` in src/, and any built chunk over this limit.
     chunkSizeWarningLimit: 4000,
     rollupOptions: {
       // Tree-shaking off: profiling showed Rollup's `include` pass (includeCallArguments alone
       // was ~49% of build time) accounted for 93% of a 4m22s build. Disabling it takes the build
       // to ~10s for +0.55 MB of assets — bytes that are read from local disk in WebView2 and
       // never cross a network. Relies on the per-icon lucide imports (`lucide-svelte/icons/x`):
-      // with the old barrel import this would pull in all ~1800 icons instead of the 152 used.
+      // with a barrel import this pulls in all ~1800 icons instead of the 236 used. That is not a
+      // hypothetical — one `import { Eraser, Radio } from 'lucide-svelte'` cost 3147 extra modules
+      // and 5.76 MB of duplicated licence text, and none of it changed how the app behaved, which
+      // is why test/bundleHygiene.test.js guards the rule rather than a reviewer's memory.
       treeshake: false,
       // Two entries: the editor (index.html) and the standalone player (player.html).
       input: {

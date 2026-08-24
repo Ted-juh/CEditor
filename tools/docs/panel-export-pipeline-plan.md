@@ -285,8 +285,14 @@ panel, still hand-built.
       through the plugin's own engine. (Also fixed `PlayerHost` dist lookup to walk up robustly —
       the Standalone wrapper exe nests one level deeper than the standalone app.)
       Plugin-opens-own-MIDI-port (decision #2) not yet wired (preview/dry-run only so far).
-- [ ] C3. `getStateInformation`/`setStateInformation` — currently stubbed; serialize selected
-      MIDI port + parameter values for DAW session restore. **Deferred.**
+      **Still true as of 2026-08-23**, and re-checked rather than assumed: the processor holds a
+      `DeviceProfileService` and calls `compileParameterMessage(payload, true)` on a parameter move,
+      but that second argument is `updateState`, not "transmit", and nothing in that call reaches a
+      `juce::MidiOutput`. Raw-wire moves go through `sendParamRawMidi`, which builds bytes. Whether
+      those bytes leave the machine is the one thing here that only a synth can answer.
+- [x] C3. `getStateInformation`/`setStateInformation` — **done**, and wider than this line asked
+      for: `PluginProcessor.h` defines both, saving APVTS state, the device role→port mapping
+      (`exportRoleMappings`/`importRoleMappings` at :255 and :286), script state and `ce.storage`.
 - [x] C4. **Serve WebView from embedded resources (BinaryData).** `juce_add_binary_data(PlayerWebData)`
       embeds the built web bundle into the player + plugin; `PlayerHost` serves `player.html` +
       assets from it by basename (filesystem dist kept as dev fallback). **Self-contained &
@@ -300,10 +306,19 @@ panel, still hand-built.
 **Exit proof:** ✅ **VST3 builds, loads in Reaper, and its panel UI PAINTS inside the host**
 (the WebView-in-plugin milestone — the riskiest part of the pipeline). The blank-panel blocker
 was a WebView2 user-data-folder conflict (fixed: unique folder per instance) + the embedded-bundle
-asset fix (C4). Remaining for a *functional* plugin: live MIDI to the synth via the plugin's own
-port (decision #2 — currently dry-run), hide JUCE's stock MIDI-CC params, C3 state save, C5
-two-instance test. **Housekeeping:** the unique-folder build is in `build/native`; swap into
-`export-out` (close the host first — it locks the DLL) to make it permanent.
+asset fix (C4).
+
+**Re-checked 2026-08-23.** Of the four things this paragraph listed as remaining, three are done and
+one is not:
+
+- ~~hide JUCE's stock MIDI-CC params~~ — done, `CMakeLists.txt:381` sets
+  `JUCE_VST3_EMULATE_MIDI_CC_WITH_PARAMETERS=0`.
+- ~~C3 state save~~ — done, see C3 above.
+- ~~the unique-folder build is in `build/native`; swap into `export-out`~~ — done, the exporter
+  writes to `export-out` (`export-panel-vst3.mjs:39`).
+- **Still open: live MIDI to the synth via the plugin's own port** (decision #2), and **C5**, the
+  two-instance test in a real DAW. Both need a Windows box, and the first needs a synth on the end
+  of it.
 
 ### Phase D — Build the exporter inside CEditor (the "Conversion" feature)
 
@@ -316,8 +331,24 @@ user toolchain by default**. Unique-binary-per-panel + the identity policy becom
         `auSubtype`, `clapId`, productName). Deterministic per GUID, unique across panels
         even with identical names, valid 4-char codes (JUCE-safe). Test:
         `CE/tests/PanelExportIdentityTests.cpp` (target `CEditorExportIdentityTests`, all pass).
-      - [ ] Mint a random GUID on first export, persist it in the `.cepanel`, keep a registry
-        of issued GUIDs, and wire the **Update vs New-copy** policy. *(needs generator + file I/O)*
+      - [x] **Done 2026-08-23.** A GUID is minted on first export and persisted in the `.cepanel`;
+        `stores/exportRuns.js` keeps the registry of issued GUIDs (browser storage, since it is a
+        fact about this machine's builds rather than about any panel) and `utils/guidRegistry.js`
+        decides Update vs New-copy.
+
+        The collision is **not** two panels drawing the same random GUID — that will not happen. It
+        is a `.cepanel` being **copied**: duplicate a panel to start a variant, export it, and it
+        takes over the original plugin's identity, silently replacing it in every project that
+        loaded it. So `identityDecision` returns `ask` for *exactly* that case — a GUID owned by a
+        different panel file — and stays silent for a normal re-export. An export that asks a
+        question every time is one people click through without reading, which would put the
+        collision straight back.
+
+        The identity is claimed **before** the build, not after: a failed first export would
+        otherwise leave the panel holding a GUID nothing has claimed, and the next export of a copy
+        would read as "adopt" rather than "ask". A New copy also renames the plugin, because two
+        independent plugins arriving in a DAW's list under one name defeat the point of the fresh
+        GUID.
 - [~] D2/D4. **Export contract + compile backend — PROVEN end-to-end.**
       `tools/scripts/export-panel-vst3.mjs`: given a panel + GUID, derives the identity
       (JS port of `PanelExportIdentity`, **self-checks `pluginCode`/`auSubtype` against the
@@ -355,13 +386,27 @@ non-colliding plugins (the "even if same panel" guarantee). Export a different p
 
 Implements the Hybrid (Candidate 3) UX above.
 
-- [ ] E1. Add the top-level **Export** menu header in `MenuBar.svelte` with quick items
-      (*Export VST3*, *Export Standalone*, *Export As…*, *Export Settings…*).
-- [ ] E2. Add the **Export tab** to `TabBar.svelte` (config + build log + history).
-- [ ] E3. Non-blocking progress: status-bar/toast chip for quick exports; full log in tab.
-- [ ] E4. Identity confirm modal (Update vs New copy); success card with "Reveal in folder."
-- [ ] E5. Export Defaults section in `appSettings` (vendor, manufacturer code, output dir,
-      default format, backend preference, signing).
+- [x] E1. `MenuBar.svelte` carries **Export Plugin**; one build produces every format the panel's
+      Export tab has enabled, which is why it is one item rather than four.
+- [x] E2. The Export tab holds config, and now the **build log** and **history** too
+      (`PanelCardContent.svelte` over `stores/exportRuns.js`). The log is per run and capped at a
+      head and a tail: a configure error is in the first lines and a compile error in the last, so
+      both ends are kept and the dropped middle is *counted* rather than silently swallowed. The
+      console keeps the interleaved copy; a build's output mixed with MIDI traffic is not a build
+      log, which is why the console alone was not enough.
+- [x] E3. The build never blocked the editor, and the tab now shows what it is doing: the button
+      reads *Building…* and is disabled, and the log streams in. Failed runs are kept in history
+      with their last lines — the run somebody wants to look at again is usually the one that did
+      not work.
+- [x] E4. Inline rather than a modal, and shown only when the identity is genuinely in question
+      (see D1). Success card with the output path and **Reveal in folder**, over the existing
+      `revealFile` bridge; every history row carries the same link.
+- [x] E5. **Export Defaults** in Settings → General: vendor, four-character manufacturer code,
+      output folder, default format, backend. They start **empty**, deliberately — a plausible
+      vendor name baked into somebody's plugin is worse than a blank field, because nobody notices
+      the first one. A manufacturer code is padded to four characters and the padded form is shown
+      back, so a three-character code cannot quietly become a plugin identifying as something else.
+      Signing is not here: there is nothing to sign with (see `legalNotices.js`).
 
 **Exit proof (the stated goal):** design a panel in CEditor → click Export → open the
 resulting VST3 in your DAW → it controls the GAIA. Loop closed.

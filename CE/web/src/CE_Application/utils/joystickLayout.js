@@ -10,7 +10,7 @@ function num(value, fallback = 0) {
 }
 function clamp01(n) { return n < 0 ? 0 : n > 1 ? 1 : n; }
 
-// Which axes spring back. joystickGlide reads exactly these, and so does the editor's picker.
+// Which axes spring back. `returnStep2DAxes` reads exactly these, and so does the editor's picker.
 export const JOYSTICK_RETURN_AXES = ['both', 'x', 'y'];
 
 export function joystickConfig(control) {
@@ -67,28 +67,6 @@ export function joystickPortValues(control) {
     y: joystickAxis(pos.y, bip),
     cornerTL: w.tl, cornerTR: w.tr, cornerBL: w.bl, cornerBR: w.br,
   };
-}
-
-// One spring-return glide step toward `target` at `rate` (normalized units/sec)
-// over `dtSec` seconds, on the configured axes. Never overshoots. Returns the
-// next {x,y} and whether it has settled (within epsilon of the target).
-export function joystickGlide(pos, target, rate, dtSec, axes = 'both') {
-  const step = Math.max(0, num(rate, 4)) * Math.max(0, num(dtSec, 0));
-  const move = (from, to, active) => {
-    if (!active) return from;
-    const d = to - from;
-    if (Math.abs(d) <= step) return to;
-    return from + Math.sign(d) * step;
-  };
-  const doX = axes === 'both' || axes === 'x';
-  const doY = axes === 'both' || axes === 'y';
-  const next = {
-    x: move(clamp01(num(pos?.x, 0)), clamp01(num(target?.x, 0.5)), doX),
-    y: move(clamp01(num(pos?.y, 0)), clamp01(num(target?.y, 0.5)), doY),
-  };
-  const settled = (!doX || Math.abs(next.x - clamp01(num(target?.x, 0.5))) < 1e-4)
-    && (!doY || Math.abs(next.y - clamp01(num(target?.y, 0.5))) < 1e-4);
-  return { pos: next, settled };
 }
 
 // The corner display labels [TL, TR, BL, BR] (defaults A/B/C/D).

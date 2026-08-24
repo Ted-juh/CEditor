@@ -24,7 +24,7 @@ import { flowGroups, styleSheet } from '../layout.mjs';
 export const GROUPS = [
   {
     title: 'Structure — the furniture a panel is built out of',
-    types: ['Background', 'Container', 'Group', 'Image', 'TestBox'],
+    types: ['Background', 'Container', 'Group', 'TabContainer', 'ScrollArea', 'Image', 'Shape', 'TestBox'],
   },
   {
     title: 'Text & numeric entry',
@@ -40,11 +40,11 @@ export const GROUPS = [
   },
   {
     title: 'Continuous controls',
-    types: ['Slider', 'Knob', 'Crossfader', 'Ribbon', 'VectorJoystick'],
+    types: ['Slider', 'Knob', 'Crossfader', 'Ribbon', 'PitchWheel', 'ModWheel', 'VectorJoystick'],
   },
   {
     title: 'Displays — the read-only half, where "value arrived" becomes visible',
-    types: ['LcdDisplay', 'PixelDisplay', 'Meter'],
+    types: ['LcdDisplay', 'PixelDisplay', 'Meter', 'ProgressBar'],
   },
   {
     title: 'Modulation & mapping',
@@ -52,7 +52,7 @@ export const GROUPS = [
   },
   {
     title: 'Performance & MIDI',
-    types: ['ChordPad', 'Arp', 'NoteRibbon', 'DrumPads', 'Phrase', 'Looper', 'Setlist', 'Harmoniser', 'Recorder', 'SplitZone', 'Panic', 'Transport'],
+    types: ['Keyboard', 'StepSequencer', 'ChordPad', 'Arp', 'NoteRibbon', 'DrumPads', 'Phrase', 'Looper', 'Setlist', 'Harmoniser', 'Recorder', 'SplitZone', 'Panic', 'Transport'],
   },
   {
     title: 'Custom components — the empty shell; QA-07 covers real packages',

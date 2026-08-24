@@ -2,6 +2,7 @@ import { get } from 'svelte/store';
 import { panels, resolvedActivePanelId } from '../stores/panels.js';
 import { panelPreviewSessions, updatePanelPreviewSession } from '../stores/interactionPreview.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
+import { shouldAcceptFeedback } from './displayMode.js';
 
 function getControlId(control) {
   return String(control?._children?.Core?.id ?? '');
@@ -101,7 +102,11 @@ export function syncDeviceParameterToPanelPreview(deviceRole, parameterId, value
     const controlId = getControlId(control);
     if (!controlId) continue;
     if (skipControlId && controlId === skipControlId) continue;
-    if (sessions?.[controlId]?.dragging === true) continue;
+    // The drag guard keeps the device's echo from fighting the hand on the knob — but it is only
+    // right for a two-way control. A display cannot be dragged, so a `dragging` flag left stale in
+    // its session could only freeze it; and an input-only control must not be moved by feedback at
+    // all. One question, asked with the flow in hand.
+    if (!shouldAcceptFeedback(getBehavior(control), sessions?.[controlId])) continue;
 
     const binding = activeDeviceBindings(control).find((entry) =>
       String(entry?.deviceRole ?? DEFAULT_DEVICE_ROLE) === role

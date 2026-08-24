@@ -4,6 +4,11 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import Package from 'lucide-svelte/icons/package';
+  import ImageIcon from 'lucide-svelte/icons/image';
+  import Film from 'lucide-svelte/icons/film';
+  import WandSparkles from 'lucide-svelte/icons/wand-sparkles';
+  import Settings2 from 'lucide-svelte/icons/settings-2';
   import { bakeCustomComponentFilmstrip, estimateFilmstripBake, normalizeFilmstripBakeOptions } from '../utils/customComponentFilmstripBaker.js';
 
   let { control = null } = $props();
@@ -335,11 +340,11 @@
 </script>
 
 {#if assets}
-  <PropertySection title="Packaging">
-    <PropertyCell label="Embed" span={2} hint="Package images and filmstrips with saved components.">
+  <PropertySection title="Packaging" icon={Package}>
+    <PropertyCell label="Embed" span={1} hint="Package images and filmstrips with saved components.">
       <PropertyToggle value={assets.packagePolicy?.embedAssets !== false} onchange={() => setAsset('packagePolicy.embedAssets', !(assets.packagePolicy?.embedAssets !== false))} />
     </PropertyCell>
-    <PropertyCell label="Fonts" span={2} hint="Warn when downloaded components reference missing fonts.">
+    <PropertyCell label="Fonts" span={1} hint="Warn when downloaded components reference missing fonts.">
       <PropertyToggle value={assets.packagePolicy?.warnMissingFonts !== false} onchange={() => setAsset('packagePolicy.warnMissingFonts', !(assets.packagePolicy?.warnMissingFonts !== false))} />
     </PropertyCell>
     <PropertyCell label="Images" span={2} hint="Image assets currently recorded in this component.">
@@ -350,11 +355,11 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Images">
+  <PropertySection title="Images" icon={ImageIcon}>
     <PropertyCell label="Add" span={3} hint="Create a reusable image asset slot for this component package.">
       <input class="val" type="text" bind:value={newImageName} placeholder="imageName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Add an image asset slot.">
+    <PropertyCell label="" span={1} hint="Add an image asset slot." compact>
       <button class="action-btn" type="button" onclick={addImageAsset}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={2} hint="Choose which image asset to inspect or replace.">
@@ -364,7 +369,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected image asset.">
+    <PropertyCell label="" span={1} hint="Remove the selected image asset." compact>
       <button class="action-btn danger" type="button" onclick={removeImageAsset} disabled={!selectedImage}>Remove</button>
     </PropertyCell>
     <PropertyCell label="Export" span={1} hint="Download the selected image asset.">
@@ -399,11 +404,11 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Filmstrips">
+  <PropertySection title="Filmstrips" icon={Film}>
     <PropertyCell label="Add" span={3} hint="Create a KnobMan-style filmstrip asset definition.">
       <input class="val" type="text" bind:value={newFilmstrip} placeholder="filmstripName" />
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Add a filmstrip asset.">
+    <PropertyCell label="" span={1} hint="Add a filmstrip asset." compact>
       <button class="action-btn" type="button" onclick={addFilmstrip}>Add</button>
     </PropertyCell>
     <PropertyCell label="Selected" span={3} hint="Choose which filmstrip to configure.">
@@ -413,7 +418,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected filmstrip.">
+    <PropertyCell label="" span={1} hint="Remove the selected filmstrip." compact>
       <button class="action-btn danger" type="button" onclick={removeFilmstrip} disabled={!selectedFilmstrip}>Remove</button>
     </PropertyCell>
     <PropertyCell label="Source" span={2} hint="Embedded filmstrip source size if this asset is baked or imported as a data URL.">
@@ -427,7 +432,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Generate Filmstrip">
+  <PropertySection title="Generate Filmstrip" icon={WandSparkles}>
     <PropertyCell label="Name" span={2} hint="Filmstrip asset name to create or replace.">
       <input class="val" type="text" bind:value={bakeName} placeholder="bakedFilmstrip" />
     </PropertyCell>
@@ -480,7 +485,7 @@
   </PropertySection>
 
   {#if filmstrip}
-    <PropertySection title="Filmstrip Setup">
+    <PropertySection title="Filmstrip Setup" icon={Settings2}>
       {#if filmstrip.source}
         <PropertyCell label="Preview" span={4} hint="Visual check of the selected filmstrip asset.">
           <div class="filmstrip-preview-wrap">
@@ -520,8 +525,8 @@
 {/if}
 
 <style>
-  .val { width: 100%; min-width: 0; background: #1A1A1A; border: 1px solid #333; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 6px; font-family: inherit; outline: none; box-sizing: border-box; }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .file-input { width: 100%; min-width: 0; min-height: 26px; background: #1A1A1A; border: 1px solid #333; border-radius: 3px; color: #DDD; font-size: 11px; padding: 3px 6px; font-family: inherit; box-sizing: border-box; }
   .file-input::file-selector-button { margin-right: 8px; background: #252525; border: 1px solid #3B3B3B; border-radius: 3px; color: #DDD; font-size: 11px; padding: 3px 8px; cursor: pointer; font-family: inherit; }
   .file-input::file-selector-button:hover { border-color: #5B9BD5; color: #FFF; }

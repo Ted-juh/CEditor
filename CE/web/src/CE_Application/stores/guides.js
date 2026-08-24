@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import { panels, resolvedActivePanelId, updatePanel } from './panels.js';
+import { panels, resolvedActivePanelId, selectedComponentIds, updatePanel } from './panels.js';
 
 /**
  * Ruler guides, backed by the PANEL DOCUMENT (panel.guides). Because they
@@ -94,3 +94,21 @@ export function deleteSelectedGuide() {
   selectedGuide.set(null);
   return true;
 }
+
+// A selected guide owns the Delete key: `deleteSelectedGuide()` runs ahead of the control-delete
+// branch in editorShortcuts, which is right while the guide is what the user last touched and
+// wrong the moment it is not. Clicking a control cleared it and clicking bare canvas cleared it,
+// but every OTHER route into a selection did not — Ctrl+A, Tab sibling-cycling, a marquee (whose
+// mouseup swallows the click that would have cleared it) and any click in the component tree.
+// So: select a guide, press Ctrl+A, press Delete, and the guide dies while all twenty selected
+// controls survive.
+//
+// Same shape of bug as the stale colour target, and the same answer — see stores/colorTarget.js,
+// which this deliberately mirrors: a selection change means the user has moved on, so the guide
+// stops being the thing Delete is aimed at. The first notification is the subscribe-time replay
+// and is skipped, or the guide would be cleared before anyone could select one.
+let guideSelectionSeen = false;
+selectedComponentIds.subscribe(() => {
+  if (!guideSelectionSeen) { guideSelectionSeen = true; return; }
+  if (get(selectedGuide)) selectedGuide.set(null);
+});

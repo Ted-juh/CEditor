@@ -10,6 +10,7 @@
   } from '../utils/noteRecorderLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
+  import PanelKeyCell from '../properties/PanelKeyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -77,7 +78,7 @@
 
 {#if p}
   <PropertySection title="Recorder" icon={CircleDot}>
-    <PropertyCell label="" span={4} hint="Arming waits for the top of the loop, so the take starts on the loop's downbeat.">
+    <PropertyCell label="" span={4} hint="Arming waits for the top of the loop, so the take starts on the loop's downbeat." compact>
       <div class="transport">
         <button type="button" class="btn rec" class:on={isRecordingState(state) || state === 'armed'}
                 onclick={() => set('state', toggleRecordState(state, !takeIsEmpty(take)))}>
@@ -89,7 +90,7 @@
         <button type="button" class="btn" disabled={!count} onclick={() => { set('take', clearTake()); set('state', 'idle'); }}>Clear</button>
       </div>
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="note">
         <b>{RECORDER_STATE_LABELS[state]}</b> · {count} {count === 1 ? 'note' : 'notes'}{passes > 1 ? ` in ${passes} passes` : ''} · {span}
         {#if count >= MAX_EVENTS}<br />Full — {MAX_EVENTS} notes is the cap.{/if}
@@ -137,7 +138,7 @@
   </PropertySection>
 
   <PropertySection title="Quantise" icon={Magnet}>
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="note">
         Strength pulls the timing toward the grid; full snap removes the feel.
       </div>
@@ -155,6 +156,7 @@
       <PropertyToggle value={p.snapToScale === true} onchange={() => set('snapToScale', !(p.snapToScale === true))} />
     </PropertyCell>
     {#if p.snapToScale === true}
+      <PanelKeyCell {control} section="Recorder" />
       <PropertyCell label="Key" span={1} hint="">
         <select class="val" value={num(p.key, 0)} onchange={(e) => set('key', clampInt(e.target.value, 0, 11, 0))}>
           {#each keyNames as nm, i (i)}<option value={i}>{nm}</option>{/each}
@@ -166,13 +168,13 @@
         </select>
       </PropertyCell>
     {/if}
-    <PropertyCell label="" span={4} hint="Rewrites the take. Not live — a live quantise would move notes under the playhead while they sound.">
+    <PropertyCell label="" span={4} hint="Rewrites the take. Not live — a live quantise would move notes under the playhead while they sound." compact>
       <button type="button" class="btn wide" disabled={!count} onclick={applyQuantize}>Apply to the take</button>
     </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Repair" icon={Wrench}>
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="note">
         Nudge the whole take, or fix a single note.
       </div>
@@ -186,10 +188,10 @@
       </div>
     </PropertyCell>
     {#if count}
-      <PropertyCell label="Note" span={2} compact hint="Which recorded note the fields below edit, in time order.">
+      <PropertyCell label="Note" span={1} compact hint="Which recorded note the fields below edit, in time order.">
         <NumberCell label="Note" min={1} max={count} step={1} value={selIdx + 1} onchange={(v) => { selNote = clampInt(v, 1, count, 1) - 1; }} />
       </PropertyCell>
-      <PropertyCell label="" span={2} hint="">
+      <PropertyCell label="" span={2} hint="" compact>
         <div class="note">{sel ? `${rowLabelFor(sel.note, recorderUseFlats(control))} at ${(sel.t * 100).toFixed(1)}%` : '—'}</div>
       </PropertyCell>
       {#if sel}
@@ -205,7 +207,7 @@
         <PropertyCell label="Length" span={1} compact hint="As a fraction of the loop.">
           <NumberCell label="Len" min={0.1} max={100} step={1} value={Number((sel.dur * 100).toFixed(1))} onchange={(v) => patchNote({ dur: clampNum(v, 0.1, 100, 10) / 100 })} />
         </PropertyCell>
-        <PropertyCell label="" span={4} hint="">
+        <PropertyCell label="" span={4} hint="" compact>
           <button type="button" class="btn" onclick={() => set('take', deleteNote(take, selIdx))}>Delete this note</button>
         </PropertyCell>
       {/if}
@@ -213,12 +215,12 @@
   </PropertySection>
 
   <PropertySection title="Takes" icon={Bookmark}>
-    <PropertyCell label="" span={4} hint="Storing and loading are copies in each direction.">
+    <PropertyCell label="" span={4} hint="Storing and loading are copies in each direction." compact>
       <div class="note">
         {slots.length ? `${slots.length} stored${liveSlot >= 0 ? ` · slot ${liveSlot + 1} was loaded last` : ''}.` : 'No stored takes yet.'}
       </div>
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="slots">
         {#each Array.from({ length: MAX_SLOTS }, (_, i) => i) as i (i)}
           {@const has = slots[i] && slots[i].events.length}
@@ -241,7 +243,7 @@
       ontoggle={(v) => set('chainOn', v)}
       onloop={(v) => set('chainLoop', v)}
     />
-    <PropertyCell label="" span={4} hint="">
+    <PropertyCell label="" span={4} hint="" compact>
       <div class="note">A chain never advances while recording.</div>
     </PropertyCell>
   </PropertySection>
@@ -275,7 +277,7 @@
 {/if}
 
 <style>
-  .val { width: 100%; background: #141420; border: 1px solid #2a2a36; color: #E8E8EE; font-size: 12px; padding: 3px 6px; border-radius: 4px; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
   .note { font-size: 11px; color: #9a9aa4; background: #141420; border: 1px solid #2a2a36; border-radius: 5px; padding: 5px 7px; line-height: 1.5; }
   .transport { display: flex; flex-wrap: wrap; gap: 5px; }
   .slots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }

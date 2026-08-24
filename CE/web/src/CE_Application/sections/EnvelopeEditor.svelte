@@ -72,7 +72,7 @@
         {#each points as _, i (i)}<option value={String(i)}>Node {i + 1}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Editable" span={2} hint="Allow dragging / adding nodes in preview.">
+    <PropertyCell label="Editable" span={1} hint="Allow dragging / adding nodes in preview.">
       <PropertyToggle value={e.editable !== false} onchange={() => set('editable', !(e.editable !== false))} />
     </PropertyCell>
   </PropertySection>
@@ -81,7 +81,7 @@
     {#snippet tools()}
       <button type="button" class="header-add-btn" title="Add node" onclick={addPoint}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Normalized position (0–1). Curve = the segment shape ending at that node.">
+    <PropertyCell label="" span={4} hint="Normalized position (0–1). Curve = the segment shape ending at that node." compact>
       <div class="nodes">
         {#each points as p, i (p.id ?? i)}
           <div class="nrow">
@@ -103,7 +103,7 @@
   </PropertySection>
 
   <PropertySection title="Loop & snap" icon={Repeat}>
-    <PropertyCell label="Loop" span={2} hint="Cycle a section (function-generator / looping envelope).">
+    <PropertyCell label="Loop" span={1} hint="Cycle a section (function-generator / looping envelope).">
       <PropertyToggle value={e.loopEnabled === true} onchange={() => toggle('loopEnabled')} />
     </PropertyCell>
     {#if e.loopEnabled === true}
@@ -114,10 +114,10 @@
         <NumberCell label="End" value={e.loopEnd ?? 0} min={0} defaultValue={0} onchange={(v) => set('loopEnd', Math.max(0, Math.round(num(v, 0))))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Snap X" span={2} compact hint="Grid snap for time when dragging (0 = free).">
+    <PropertyCell label="Snap X" span={1} compact hint="Grid snap for time when dragging (0 = free).">
       <NumberCell label="Snap X" value={e.snapX ?? 0} step={0.05} min={0} max={1} defaultValue={0} onchange={(v) => set('snapX', Math.max(0, Math.min(1, num(v, 0))))} />
     </PropertyCell>
-    <PropertyCell label="Snap Y" span={2} compact hint="Grid snap for level when dragging (0 = free).">
+    <PropertyCell label="Snap Y" span={1} compact hint="Grid snap for level when dragging (0 = free).">
       <NumberCell label="Snap Y" value={e.snapY ?? 0} step={0.05} min={0} max={1} defaultValue={0} onchange={(v) => set('snapY', Math.max(0, Math.min(1, num(v, 0))))} />
     </PropertyCell>
   </PropertySection>
@@ -168,11 +168,8 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
-    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .nodes { display: flex; flex-direction: column; gap: 5px; }
   .nrow { display: flex; align-items: center; gap: 5px; }
   .nrow .nlabel { flex: 0 0 16px; color: #888; font-size: 11px; text-align: right; }

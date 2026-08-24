@@ -253,7 +253,15 @@
   {#if componentDesignerActive}
     <div class="ctx-row"><span class="empty-state designer-state">Designer controls are active in the component workspace</span></div>
   {:else if !hasSelection}
-    <div class="ctx-row"><span class="empty-state">No selection</span></div>
+    <!-- NOT a second "No selection" (S5). The status bar already says that, and
+         it said it at the same time as this bar and the two it replaced — three
+         copies of the same two words on screen at once. The status bar keeps
+         the statement of fact; the bar that owns the selection tools says what
+         to do about it instead, which is the only thing an empty toolbar can
+         usefully contribute. -->
+    <div class="ctx-row">
+      <span class="empty-state">Select a component to edit it — or press <kbd>+</kbd> in the left rail to insert one.</span>
+    </div>
   {:else}
     <!-- Row 1 — what it is + which facet -->
     <div class="ctx-row">
@@ -717,6 +725,16 @@
   .empty-state {
     color: #777;
     font-size: 11px;
+  }
+
+  .empty-state kbd {
+    font-family: inherit;
+    font-size: 10px;
+    color: #AAB;
+    background: #2A2A2A;
+    border: 1px solid #3C3C3C;
+    border-radius: 3px;
+    padding: 0 4px;
   }
 
   .toolbar-slot {

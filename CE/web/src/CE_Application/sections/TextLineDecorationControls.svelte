@@ -62,7 +62,7 @@
     <button class="style-btn" class:active={layerValue === 'front'} onclick={() => onSetLayer('front')}>Front</button>
   </div>
 </PropertyCell>
-<PropertyCell label="Gap" span={2} compact hint={`Clearance around letters when the ${title.toLowerCase()} line overlaps the text.`}>
+<PropertyCell label="Gap" span={1} compact hint={`Clearance around letters when the ${title.toLowerCase()} line overlaps the text.`}>
   <NumberCell label="Gap" value={gap} min={0} step={0.5} onchange={onChangeGap} />
 </PropertyCell>
 

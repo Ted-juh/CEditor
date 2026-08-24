@@ -13,6 +13,7 @@
 // half into DragScrubOptions. Keeping the decisions in one pure module is what
 // lets both be tested without a browser.
 import { numberOr } from './primitives.js';
+import { isDisplayOnly } from './displayMode.js';
 
 /** Cursors offered in the Mouse tab. `default` means "inherit the surface's". */
 export const CURSOR_OPTIONS = [
@@ -110,6 +111,37 @@ export function resolveHitTestClipPath(mouse = null) {
 
 export function isFocusable(mouse = null) {
   return mouse?.focusable === true;
+}
+
+/**
+ * Focus and tab order with the control's value flow taken into account.
+ *
+ * A display is not a tab stop. Reaching it with the keyboard would put a focus ring on something
+ * that cannot be operated, and then swallow the Tab press that was heading for the next real
+ * control. The read-only answer WINS over an author's `focusable: true`, because the two settings
+ * are not equals — one says what kind of control this is, the other configures how it focuses.
+ */
+export function isFocusableFor(mouse = null, behavior = null) {
+  return isDisplayOnly(behavior) ? false : isFocusable(mouse);
+}
+
+export function resolveTabIndexFor(mouse = null, behavior = null) {
+  return isDisplayOnly(behavior) ? -1 : resolveTabIndex(mouse);
+}
+
+/**
+ * Whether the control takes the pointer, with the value flow taken into account.
+ *
+ * A DISPLAY IS TRANSPARENT TO THE POINTER, whatever the Mouse tab says. An author who ticked "take
+ * clicks" on a read-only control did not mean "and also be interactive", because it cannot be.
+ *
+ * What that costs is worth knowing where somebody reads it: a display has no hover, so it cannot
+ * carry a tooltip or a hover state, and a click passes through to whatever sits behind it — which
+ * makes overlap a layout decision rather than a cosmetic one. Sits here beside the other two
+ * flow-aware resolvers so a surface finds all three in one place.
+ */
+export function acceptsPointerFor(mouse = null, behavior = null) {
+  return isDisplayOnly(behavior) ? false : acceptsPointer(mouse);
 }
 
 export function showsFocusOutline(mouse = null) {

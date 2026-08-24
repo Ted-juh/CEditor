@@ -415,7 +415,7 @@
 
 {#if !surfaceCount}
   <PropertySection title="Nothing exposed" icon={CircleOff}>
-    <PropertyCell label="" span={4} hint="This component exposes no public inputs, outputs, or editable properties.">
+    <PropertyCell label="" span={4} hint="This component exposes no public inputs, outputs, or editable properties." compact>
       <div class="empty-state">No public controls exposed.</div>
     </PropertyCell>
   </PropertySection>
@@ -556,10 +556,7 @@
     box-shadow: 0 0 0 2px rgba(214, 179, 108, 0.12);
   }
 
-  .val {
-    width: 100%;
-    min-width: 0;
-  }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
 
   .file-input {
     max-width: 116px;

@@ -46,3 +46,18 @@ comes from snapshots + DPD + the analyzer.
 - Diff granularity (per-parameter; grouping; threshold for "changed").
 - Compare scope (whole patch vs section).
 - Three-way diff (factory vs stored vs live).
+
+---
+
+## Built, 2026-08-23
+
+`diffSnapshots` in `utils/snapshotModel.js`, surfaced as Compare A/B and Compare-with-live in the
+Snapshots tab.
+
+**Three buckets, not one list.** "Changed", "only in A" and "only in B" are different questions to a
+user: the first is an edit, the second is a parameter one side never captured. Collapsing them would
+make a partial snapshot look like a patch that zeroed half the synth.
+
+**Changes sort by normalised magnitude**, not raw delta — so a cutoff moving 40 of 127 and a
+resonance moving 0.3 of 1 sort against each other honestly. Sorting by raw delta would put every
+wide-range parameter on top of every list, every time.

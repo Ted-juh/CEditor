@@ -279,8 +279,14 @@ export function stepNotes(control, index) {
       })),
   };
 }
-// Gate length as a fraction of a step. 1 = legato into the next step.
-export function phraseGate(control) { return clamp01(num(phraseConfig(control).gate, 0.8)) || 0.01; }
+// Gate length as a fraction of a step. Stops a hair short of 1 rather than reaching it: at exactly
+// one step the note-off and the next note-on land on the same millisecond from two timers, so a
+// REPEATED note drops as often as it ties. Same cap and same reason as the step sequencer's, which
+// hit this first. A note that really should hold across steps says so with its own `length`, which
+// is a multiple of the step and is deliberately not capped — see `noteGateSeconds`.
+export function phraseGate(control) {
+  return Math.min(0.99, clamp01(num(phraseConfig(control).gate, 0.8))) || 0.01;
+}
 export function gateSeconds(control, stepSecs) {
   return Math.max(0.005, phraseGate(control) * Math.max(0.01, num(stepSecs, 0.1)));
 }

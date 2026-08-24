@@ -1,8 +1,13 @@
 # Text Input — Component Integration Spec
 
-> Status: **spec / ready to build (single-line MVP).** A new `controlType`: an
-> editable text field (e.g. patch-name entry). Part of the
-> [panel parts backlog](./README.md); see [component-gaps.md](./component-gaps.md).
+> Status: **shipped 🟢, with two named gaps.** `TextInput` is a component type, edited through
+> `TextEditor.svelte`, and on QA-01. Still open, both listed in the body below:
+> **multi-line** ("Later: multi-line variant") and **§8 device-binding emission for text** — sending
+> a patch name as SysEx on commit, which today's emit path does not do because it assumes a numeric
+> or enum value.
+>
+> It said "spec / ready to build" until 2026-08-23. Kept as the design record: the value-model
+> section is the only written account of why the text value is modelled the way it is.
 
 ## Decision
 

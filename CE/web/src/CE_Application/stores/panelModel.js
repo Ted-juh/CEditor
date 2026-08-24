@@ -1,6 +1,7 @@
 import { get } from 'svelte/store';
 import { defaultGridSize, defaultSnapToGrid } from './runtimePreferences.js';
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
+import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
 import { expandControl, shrinkControl } from './documentShape.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
@@ -53,6 +54,14 @@ export function createPanel(name = null) {
       // macOS build, so none of those are settings here.
       exportClap: true,
       exportLv2: true,
+      // Total Recall: may the exported plugin push a restored session's values back at the synth
+      // when a project reopens? 'ask' (the default) asks once and remembers; 'always' sends without
+      // asking; 'never' leaves the hardware alone. Ask is the conservative default because a plugin
+      // that blasts SysEx at whatever is plugged in whenever a project opens is a bad citizen —
+      // the device may be a different synth today, or the same synth mid-take. A panel exported
+      // before this key existed reads as 'ask' too (Player/RestorePolicy.h), which is strictly more
+      // than the nothing it used to do.
+      restoreHardware: 'ask',
     },
     name: name ?? `Untitled ${id}`,
     scriptId: `panel_${id}`,
@@ -154,6 +163,28 @@ export function createPanel(name = null) {
       activeImageIndex: 0,
     },
     requiredProfiles: [],
+    // Total Recall S4: the program list the exported plugin shows a DAW, baked from a preset
+    // librarian bank at author time. Absent means the plugin reports the one nameless program it
+    // always did. The librarian lives in browser storage, which neither the Node exporter nor the
+    // plugin can reach — and a plugin should not scan an instrument's memory on every project
+    // load, so baking is the right answer rather than a workaround. See utils/programBank.js.
+    programBank: null,
+    // Captured panel states: named value maps the panel can recall or blend between. Stored on the
+    // document so they travel with it — a shared panel carries the scenes somebody built, not just
+    // the controls. Distinct from `parameterSnapshots` below, which despite the name is a cache of
+    // profile parameter METADATA rather than any captured value. See utils/snapshotModel.js.
+    snapshots: [],
+    // Routes: one source to many targets, each with its own window, depth, offset and curve. On the
+    // DOCUMENT rather than on a component, and that is the answer to the design note's open
+    // question — three editors are planned (properties-panel link, Link Mapper, node-graph) and if
+    // each kept its own routes a cable drawn on the canvas would be invisible in the Mapper. The
+    // Macro's slots and the Router's destinations are READ as routes rather than copied into here;
+    // see utils/routeAdapters.js.
+    routes: [],
+    // One key and scale the whole panel plays in. Components opt in with `followPanelKey` on their
+    // own section, and changing this WRITES the new key into each of them — see utils/panelKey.js
+    // for why a broadcast beats an indirection here. Absent means nothing follows anything.
+    musicalContext: null,
     parameterSnapshots: {},
     // Host-automatable parameters this panel exposes (Milestone 2 / DAW automation). Empty = derive
     // automatically from the value-bearing controls at export time (see utils/exportParameters.js).
@@ -164,6 +195,12 @@ export function createPanel(name = null) {
       runInPreview: true,
       runOnExport: true,
     },
+    // Card presets the document carries. They also live in the user's localStorage library
+    // (stores/cardPresets.js) — that is what makes them reusable across panels — but a preset
+    // that ONLY lives there is a preset a shared .cepanel arrives without, and the design the
+    // file describes then cannot be reproduced by the person who received it. So the file
+    // carries its own copy and the store merges the two on open, document winning.
+    cardPresets: [],
     modified: false,
     controls: [],
     // Paint order, back to front. One layer to begin with, because a panel with none is a panel
@@ -213,6 +250,25 @@ function toDocumentForm(control) {
   return shrinkControl(control);
 }
 
+/**
+ * Card presets as read off a document: an array of entries with an id, deduplicated. Anything
+ * else in the field is dropped rather than repaired — a preset with no id cannot be merged,
+ * applied or deleted, so keeping it would only mean carrying it forward for ever.
+ */
+export function normalizeCardPresets(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const preset of value) {
+    if (!preset || typeof preset !== 'object' || Array.isArray(preset)) continue;
+    const id = preset.id;
+    if (typeof id !== 'string' || !id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(preset);
+  }
+  return out;
+}
+
 /** `Untitled 7` and friends — a stand-in the app invented, not a name anyone chose. */
 const PLACEHOLDER_PANEL_NAME = /^Untitled \d+$/;
 
@@ -260,6 +316,47 @@ export function serializePanel(panel, options = {}) {
   if (deviceSession) data.deviceSession = normalizeProjectDeviceSession(deviceSession);
   else delete data.deviceSession;
 
+  // An in-progress capture, on the same "right or absent" rule. It lives on the panel so a session
+  // survives whatever the panel survives and travels between machines with the file — the owner's
+  // call, made knowing a shared .cepanel then carries a half-finished capture and the raw dumps it
+  // took off somebody's synth.
+  //
+  // NOT in the build payload: `serializePanelForExport` passes `captureSession: null`. The exported
+  // plugin's C++ reads Core, Behavior and Scripts and has no idea what a capture is, so including
+  // one would compile a few tens of KB of somebody's SysEx into a binary for nothing.
+  const captureSession = options.captureSession === null
+    ? null
+    : (options.captureSession ?? data.captureSession);
+  if (captureSession) data.captureSession = captureSession;
+  else delete data.captureSession;
+
+  // Card presets, on the same "right or absent" rule as `name` and `deviceSession` above: a panel
+  // that defines none writes no key, so a document saved before presets travelled round-trips
+  // byte-identical and the committed .cepanel fixtures do not all grow an empty array. The key
+  // appears the moment there is a preset worth carrying.
+  const cardPresets = normalizeCardPresets(data.cardPresets);
+  if (cardPresets.length) data.cardPresets = cardPresets;
+  else delete data.cardPresets;
+
+  // The program bank, on the same "right or absent" rule as `name` and `cardPresets`: a panel with
+  // no bank writes no key, so every committed .cepanel does not grow a `"programBank": null` and
+  // the plugin's reader never has to tell "no bank" from "an empty one".
+  if (!data.programBank || !Array.isArray(data.programBank.programs) || data.programBank.programs.length === 0) {
+    delete data.programBank;
+  }
+
+  // Snapshots, same rule. An empty array on every panel would be noise in every committed fixture.
+  if (!Array.isArray(data.snapshots) || data.snapshots.length === 0) delete data.snapshots;
+
+  // Routes, same rule. Only the panel's OWN routes are stored — the ones derived from Macro slots
+  // and Router destinations are a view, and writing them here would give the panel a stale second
+  // copy of something the component already owns.
+  if (!Array.isArray(data.routes) || data.routes.length === 0) delete data.routes;
+
+  // The panel key, on the "right or absent" rule: a panel where nothing follows it writes no key,
+  // so a reader never has to tell "no panel key" from "a panel key nobody uses".
+  if (!data.musicalContext) delete data.musicalContext;
+
   // Bake the host-automatable parameter list (M2) so the exported plugin's APVTS can read it.
   // Author-defined `exportParameters` are kept as-is; an empty list is derived from the controls.
   if (!Array.isArray(data.exportParameters) || data.exportParameters.length === 0) {
@@ -286,6 +383,14 @@ export function deserializePanel(json, filePath, name) {
   if (data.deviceSession) {
     data.deviceSession = normalizeProjectDeviceSession(data.deviceSession);
   }
+  // Coerced rather than trusted: everything downstream indexes into `baselines` as arrays of byte
+  // arrays, and a document can be hand-edited. `normalizeCaptureSession` returns null for anything
+  // it cannot make sense of, and for an empty session, which then reads as no session at all.
+  if (data.captureSession) {
+    const session = normalizeCaptureSession(data.captureSession);
+    if (session) data.captureSession = session;
+    else delete data.captureSession;
+  }
 
   // The document stores each control as a diff against its type's defaults; the editor's model
   // is always the full control, because everything that reads one reads deep paths off it. Done
@@ -297,6 +402,11 @@ export function deserializePanel(json, filePath, name) {
     ...createPanel(),
     ...data,
     controls,
+    // A document written before presets travelled has no `cardPresets` key, and one written by
+    // hand can have anything at all in it. Normalising here means every reader downstream can
+    // assume an array of {id,…} and the merge in stores/cardPresets.js never has to defend
+    // itself against a string or a null.
+    cardPresets: normalizeCardPresets(data.cardPresets),
     // Migration lives here rather than in a version bump: a document with no `layers` gets one
     // built from first-appearance order, which is exactly what rendering used to infer, so it
     // looks identical on the first load and stops restacking on every load after it.

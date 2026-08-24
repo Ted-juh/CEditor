@@ -105,19 +105,19 @@
         hint="How many bars one full wander cycle takes."
       >
         {#snippet children()}
-          <PropertyCell label="Wander (bars)" span={2} compact hint="How many bars one full pass through the map takes.">
+          <PropertyCell label="Wander (bars)" span={1} compact hint="How many bars one full pass through the map takes.">
             <NumberCell label="Bars" value={cn.wanderBars ?? 8} step={1} min={MIN_BARS} max={MAX_BARS} defaultValue={8} onchange={(v) => set('wanderBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(v, 8))))} />
           </PropertyCell>
         {/snippet}
       </TransportSyncCells>
       {#if cn.syncToTransport !== true}
-        <PropertyCell label="Wander rate" span={2} compact hint="Wander speed (cycles per second).">
+        <PropertyCell label="Wander rate" span={1} compact hint="Wander speed (cycles per second).">
           <NumberCell label="Rate" value={cn.wanderRate ?? 0.08} step={0.01} min={0.01} max={2} defaultValue={0.08} onchange={(v) => set('wanderRate', Math.max(0.01, num(v, 0.08)))} />
         </PropertyCell>
       {/if}
     {/if}
     {#if String(cn.mode ?? 'blend') === 'blend'}
-      <PropertyCell label="Blend" span={2} compact hint="Morph sharpness — higher makes the nearest preset dominate sooner.">
+      <PropertyCell label="Blend" span={1} compact hint="Morph sharpness — higher makes the nearest preset dominate sooner.">
         <NumberCell label="Blend" value={cn.blendPower ?? 2} step={0.5} min={1} max={6} defaultValue={2} onchange={(v) => set('blendPower', Math.max(1, Math.min(6, num(v, 2))))} />
       </PropertyCell>
     {/if}
@@ -152,7 +152,7 @@
     {#snippet tools()}
       <button type="button" class="header-add-btn" title="Add target" onclick={addTarget}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Each target is one parameter the presets morph. Bind its 'Target' port in Device Bindings.">
+    <PropertyCell label="" span={4} hint="Each target is one parameter the presets morph. Bind its 'Target' port in Device Bindings." compact>
       <div class="rows">
         {#if targets.length === 0}<div class="empty">No targets yet. Add one, then bind its port.</div>{/if}
         {#each targets as t, i (t.id ?? i)}
@@ -174,7 +174,7 @@
     {#snippet tools()}
       <button type="button" class="header-add-btn" title="Add preset" onclick={addPreset}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Each preset is a star at X/Y (0–1) storing a value per target. Capture stamps the panel's current values.">
+    <PropertyCell label="" span={4} hint="Each preset is a star at X/Y (0–1) storing a value per target. Capture stamps the panel's current values." compact>
       <div class="rows">
         {#if presets.length === 0}<div class="empty">No presets yet. Add one and set its per-target values.</div>{/if}
         {#each presets as p, i (p.id ?? i)}
@@ -210,8 +210,8 @@
 {/if}
 
 <style>
-  .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .rows { display: flex; flex-direction: column; gap: 8px; }
   .trow { display: flex; align-items: center; gap: 8px; }
   .trow .name { flex: 1 1 auto; }

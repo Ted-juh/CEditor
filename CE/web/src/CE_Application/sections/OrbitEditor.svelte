@@ -47,13 +47,13 @@
       hint="How many bars one global cycle takes. Each satellite's ratio is turns per cycle."
     >
       {#snippet children()}
-        <PropertyCell label="Cycle (bars)" span={2} compact hint="How many bars one global cycle takes. A satellite at ratio 2 then makes two turns per cycle, on the bar.">
+        <PropertyCell label="Cycle (bars)" span={1} compact hint="How many bars one global cycle takes. A satellite at ratio 2 then makes two turns per cycle, on the bar.">
           <NumberCell label="Bars" value={o.cycleBars ?? 4} min={MIN_BARS} max={MAX_BARS} step={1} defaultValue={4} onchange={(v) => set('cycleBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(v, 4))))} />
         </PropertyCell>
       {/snippet}
     </TransportSyncCells>
     {#if o.syncToTransport !== true}
-      <PropertyCell label="Rate" span={2} compact hint="Global speed — cycles per second (all ratios are relative to this).">
+      <PropertyCell label="Rate" span={1} compact hint="Global speed — cycles per second (all ratios are relative to this).">
         <NumberCell label="Rate" value={o.rate ?? 0.25} min={0} max={10} step={0.05} defaultValue={0.25} onchange={(v) => set('rate', Math.max(0, num(v, 0.25)))} />
       </PropertyCell>
     {/if}
@@ -89,7 +89,7 @@
     {#snippet tools()}
       <button type="button" class="hdr-btn" title="Add satellite" onclick={addNode}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Each satellite emits a live 0–1 value from its position. Bind its 'Node' port in Device Bindings.">
+    <PropertyCell label="" span={4} hint="Each satellite emits a live 0–1 value from its position. Bind its 'Node' port in Device Bindings." compact>
       <div class="nodes">
         {#if nodes.length === 0}
           <div class="empty">No satellites yet. Add one, then bind its port in Device Bindings.</div>
@@ -101,7 +101,7 @@
               <span class="ncol"><SwatchCluster swatches={[
                 { key: 'colour', label: 'Colour', value: s.colour ?? 'FF5B9BD5', target: { type: 'callback', apply: (hex) => updateNode(i, 'colour', hex) } },
               ]} /></span>
-              <label class="flag"><input type="checkbox" checked={s.enabled !== false} onchange={(e) => updateNode(i, 'enabled', e.currentTarget.checked)} /><span>On</span></label>
+              <PropertyToggle compact label="On" value={s.enabled !== false} onchange={(next) => updateNode(i, 'enabled', next)} ariaLabel={`Node ${i + 1} enabled`} />
               <button type="button" class="action-btn danger" onclick={() => removeNode(i)} title="Remove">✕</button>
             </div>
             <div class="nrow2">
@@ -125,7 +125,7 @@
               <label class="fld"><span>Depth %</span>
                 <NumberCell value={pct(s.depth, 100)} min={0} max={100} step={5} onchange={(v) => updateNode(i, 'depth', Math.max(0, Math.min(1, num(v, 100) / 100)))} />
               </label>
-              <label class="flag inv"><input type="checkbox" checked={s.invert === true} onchange={(e) => updateNode(i, 'invert', e.currentTarget.checked)} /><span>Invert</span></label>
+              <span class="flag inv"><PropertyToggle compact label="Invert" value={s.invert === true} onchange={(next) => updateNode(i, 'invert', next)} ariaLabel={`Node ${i + 1} invert`} /></span>
             </div>
           </div>
         {/each}
@@ -135,11 +135,8 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
-    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .nodes { display: flex; flex-direction: column; gap: 8px; }
   .node { border: 1px solid #303030; border-radius: 6px; background: #171717; padding: 8px; display: flex; flex-direction: column; gap: 7px; }
   .node.off { opacity: 0.55; }

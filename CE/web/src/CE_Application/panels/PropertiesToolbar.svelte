@@ -20,10 +20,17 @@
   import Play from 'lucide-svelte/icons/play';
   import Square from 'lucide-svelte/icons/square';
   import { undo, redo, undoAvailable, redoAvailable } from '../stores/history.js';
+  import Search from 'lucide-svelte/icons/search';
+  import X from 'lucide-svelte/icons/x';
+  import ChevronsDownUp from 'lucide-svelte/icons/chevrons-down-up';
+  import ChevronsUpDown from 'lucide-svelte/icons/chevrons-up-down';
   import { updatePanel, saveActivePanel } from '../stores/panels.js';
+  import { propertyFilter, clearPropertyFilter } from '../stores/propertyFilter.js';
+  import { sectionCollapse, sectionKeysInScope, setAllCollapsedInScope } from '../stores/sectionCollapse.js';
 
   let {
     panel,
+    collapseScopes = [],
     pinPanelProps = false,
     viewMode = 'single',
     previewMode = false,
@@ -31,6 +38,36 @@
     ontoggleview = null,
     ontogglepreview = null,
   } = $props();
+
+  // Property search, for every context.
+  //
+  // The filter machinery has been in PropertyCell and PropertySection all along — cells match on
+  // label + hint, sections hide themselves when nothing under them matches, and there is a
+  // visible-row counter keeping the two honest. All of it was reachable only through a search box
+  // docked in the custom-component footer, so on an ordinary knob the feature existed, worked, and
+  // could not be typed into. Moving it here costs no height: it goes in the toolbar's spacer.
+  let searching = $state(false);
+
+  function stopSearch() {
+    clearPropertyFilter();
+    searching = false;
+  }
+
+  // Collapse-all over whatever sections are on screen. PropertySection registers its key under
+  // its scope, so this acts on the sections that actually rendered for this control rather than
+  // on a hardcoded list that would rot.
+  let sectionCount = $derived(
+    $sectionCollapse && collapseScopes.reduce((total, scope) => total + sectionKeysInScope(scope).length, 0)
+  );
+  let allCollapsed = $derived.by(() => {
+    const keys = collapseScopes.flatMap((scope) => sectionKeysInScope(scope));
+    return keys.length > 0 && keys.every((key) => $sectionCollapse[key] === true);
+  });
+
+  function toggleAllSections() {
+    const next = !allCollapsed;
+    for (const scope of collapseScopes) setAllCollapsedInScope(scope, next);
+  }
 </script>
 
 <div class="props-toolbar">
@@ -79,7 +116,41 @@
     <Magnet size={18} strokeWidth={1.5} />
   </button>
 
-  <div class="toolbar-spacer"></div>
+  {#if searching}
+    <div class="toolbar-search">
+      <!-- svelte-ignore a11y_autofocus -->
+      <input
+        type="text"
+        placeholder="Search properties…"
+        value={$propertyFilter}
+        autofocus
+        aria-label="Search properties"
+        oninput={(event) => propertyFilter.set(event.currentTarget.value)}
+        onkeydown={(event) => { if (event.key === 'Escape') stopSearch(); }}
+      />
+      <button class="search-clear" aria-label="Close search" onclick={stopSearch}>
+        <X size={12} strokeWidth={2} />
+      </button>
+    </div>
+  {:else}
+    <div class="toolbar-spacer"></div>
+    <button class="toolbar-btn" class:active={!!$propertyFilter} title="Search properties"
+      onclick={() => { searching = true; }}>
+      <Search size={16} strokeWidth={1.5} />
+    </button>
+  {/if}
+
+  {#if sectionCount > 0}
+    <button class="toolbar-btn"
+      title={allCollapsed ? 'Expand all sections' : 'Collapse all sections'}
+      onclick={toggleAllSections}>
+      {#if allCollapsed}
+        <ChevronsUpDown size={16} strokeWidth={1.5} />
+      {:else}
+        <ChevronsDownUp size={16} strokeWidth={1.5} />
+      {/if}
+    </button>
+  {/if}
 
   <button class="toolbar-btn" class:active={pinPanelProps}
     title={pinPanelProps ? 'Unpin panel properties' : 'Pin panel properties'}
@@ -110,6 +181,52 @@
     padding: 0 8px;
     border-bottom: 1px solid #2A2A2A;
     background: #222;
+  }
+
+  .toolbar-search {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: 0 4px;
+  }
+
+  .toolbar-search input {
+    box-sizing: border-box;
+    flex: 1;
+    min-width: 0;
+    height: 22px;
+    padding: 0 6px;
+    background: #1A1A1A;
+    border: 1px solid #3A3A3A;
+    border-radius: 3px;
+    color: #DDD;
+    font-size: 11px;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .toolbar-search input:focus {
+    border-color: #5B9BD5;
+  }
+
+  .search-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+
+  .search-clear:hover {
+    background: #333;
+    color: #DDD;
   }
 
   .toolbar-btn {

@@ -18,6 +18,7 @@
   import DisplayPanel from '../panels/DisplayPanel.svelte';
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
+  import { displayTabRequest } from '../stores/displayTab.js';
   import { openFillGradientEditor } from '../stores/gradientTarget.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { clipPathForKind } from '../utils/shapeGeometry.js';
@@ -25,6 +26,7 @@
   import { setActiveEditorTab } from '../stores/panels.js';
   import EditorRuler from '../editor/EditorRuler.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import PropertyToggle from '../properties/PropertyToggle.svelte';
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
   import {
@@ -64,8 +66,17 @@
   import CustomGeneratorsEditor from './CustomGeneratorsEditor.svelte';
   import CustomArpeggiatorEditor from './CustomArpeggiatorEditor.svelte';
   import CustomStateFilmstrip from './CustomStateFilmstrip.svelte';
+  import SurfaceToolStrip from './SurfaceToolStrip.svelte';
+  import SurfaceBottomBar from './SurfaceBottomBar.svelte';
+  import SurfacePalette from './SurfacePalette.svelte';
+  import SurfaceLookBar from './SurfaceLookBar.svelte';
+  import SurfaceDockLayers from './SurfaceDockLayers.svelte';
+  import SurfaceContextMenu from './SurfaceContextMenu.svelte';
+  import SurfaceDockInspector from './SurfaceDockInspector.svelte';
   import SurfaceHelpOverlay from './SurfaceHelpOverlay.svelte';
   import { numberOr } from '../utils/primitives.js';
+  import { confirmDestructive } from '../utils/confirmDiscard.js';
+  import { readStoredNumber, writeStoredNumber } from '../utils/localStorageState.js';
   import {
     angleFromCenter,
     computeResizedRect,
@@ -95,6 +106,15 @@
     smartGuideStyle,
     smartSnapTargets,
     snapGuides as snapGuidesBase,
+    clampSurfaceZoom,
+    clampZoomIncrement,
+    clampSnapSize,
+    snapToGrid,
+    snapFrameToGrid,
+    marqueeRect,
+    isMarqueeDrag,
+    partsInMarquee,
+    mergeMarqueeSelection,
     zoneFrame as zoneFrameBase,
   } from '../utils/customDesignSurfaceGeometry.js';
   import {
@@ -204,6 +224,7 @@
   // '?'-toggled overlay listing shortcuts plus a plain-language glossary.
   let helpOverlayOpen = $state(false);
   let surfaceShellEl = $state(null);
+  let surfaceArtboardEl = $state(null);
   // Inline readiness nudge: open required/recommended steps, dismissible. Steps that can be
   // scaffolded mechanically carry their fix inline, so the nudge is actionable rather than
   // just a scolding — readinessAutoFix returns null for anything needing a human decision.
@@ -1080,19 +1101,11 @@
   }
 
   function snapValue(value, event = null) {
-    if (!snapEnabled || event?.altKey) return value;
-    const size = Math.max(1, numberOr(snapSize, 10));
-    return Math.round(value / size) * size;
+    return snapToGrid(value, { enabled: snapEnabled, size: numberOr(snapSize, 10), bypass: event?.altKey === true });
   }
 
   function snapFrame(frame, event = null) {
-    if (!frame || !snapEnabled || event?.altKey) return frame;
-    return {
-      left: snapValue(frame.left, event),
-      top: snapValue(frame.top, event),
-      width: Math.max(1, snapValue(frame.width, event)),
-      height: Math.max(1, snapValue(frame.height, event)),
-    };
+    return snapFrameToGrid(frame, { enabled: snapEnabled, size: numberOr(snapSize, 10), bypass: event?.altKey === true });
   }
 
   function draftRect(draft = drawDraft) {
@@ -1283,8 +1296,21 @@
     }
   }
 
+  /**
+   * Replace everything on the canvas with an empty one.
+   *
+   * The 2026-07-12 review filed the placement rather than the action: a destructive reset sat in
+   * the middle of the insert buttons, one slot from "Dial". It has moved to the end of the strip
+   * and wears the danger colour, and it asks first when there is anything to lose. Undo does cover
+   * it — the component workspace has its own history context — but a one-click wipe of the whole
+   * canvas should not rely on the user knowing that.
+   */
   function resetToBlankCanvas() {
     if (!core?.id) return;
+    const partCount = Object.keys(authoredParts?._children ?? {}).length;
+    if (partCount > 0 && !confirmDestructive(
+      `Clear this component? ${partCount} layer${partCount === 1 ? '' : 's'} and every hit zone and generator will be replaced with a blank canvas.`
+    )) return;
     localSelectedLayerNames = [];
     activeFrame = null;
     activeLayerFrames = {};
@@ -1708,12 +1734,39 @@
     stops: [{ color: '555555', position: 0 }, { color: 'AAAAAA', position: 100 }],
   };
 
+  /**
+   * Reveal the editor a swatch just targeted.
+   *
+   * Setting the colour or gradient target only says WHAT is being edited. The thing that edits it
+   * is the DisplayPanel dock, and on this surface the dock can be hidden (the palette's third
+   * toggle) or sitting on Notepad or Console. So a swatch click could set a target perfectly and
+   * produce no visible effect at all — the 2026-07-12 review's bug §2.1, and the reason it called
+   * the dock "a fragile dependency".
+   *
+   * Both halves are needed. Un-hiding without the tab request lands the user on whatever tab they
+   * left open; the tab request without un-hiding switches a panel nobody can see.
+   */
+  function revealDisplayDock(tab) {
+    displayDockHidden = false;
+    displayTabRequest.set({ tab });
+  }
+
   function openLayerColour(relativePath, currentValue) {
     if (!core?.id || !selectedLayer) return;
-    activateColorTarget(
-      { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.${relativePath}` },
-      currentValue ?? 'FF5B9BD5'
-    );
+    // A colour dock edits one target, so a multi-selection goes through the callback form and
+    // writes to every selected layer. Without this the corner radius would reach all three layers
+    // and the colour beside it only one, which is a worse kind of confusing than neither working.
+    const target = multiSelectionActive
+      ? {
+          type: 'callback',
+          _swatchKey: `surface:${relativePath}`,
+          apply: (hex) => {
+            for (const name of selectedLayerNames) setLayerPropertyFor(name, relativePath, hex);
+          },
+        }
+      : { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.${relativePath}` };
+    activateColorTarget(target, currentValue ?? 'FF5B9BD5');
+    revealDisplayDock('colors');
   }
 
   function openArcColour() {
@@ -1722,10 +1775,12 @@
       { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.meta.arcTrack.colour` },
       selectedArcMeta?.colour ?? 'FF5B9BD5'
     );
+    revealDisplayDock('colors');
   }
 
   function openLayerGradient() {
     if (!core?.id || !selectedLayer || !selectedFill) return;
+    revealDisplayDock('gradient');
     openFillGradientEditor({
       controlId: core.id,
       targetPath: `Parts.${selectedLayer}.Background.Fill`,
@@ -1742,7 +1797,7 @@
   }
 
   function setZoom(value) {
-    surfaceZoom = Math.max(0.25, Math.min(5, numberOr(value, 1)));
+    surfaceZoom = clampSurfaceZoom(numberOr(value, 1));
   }
 
   // Wheel zoom on the design canvas (parity with the panel editor). Ctrl/Cmd
@@ -1788,8 +1843,8 @@
   }
 
   function setZoomIncrement(value) {
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num > 0) surfaceZoomIncrement = Math.min(100, num);
+    const next = clampZoomIncrement(value);
+    if (next !== null) surfaceZoomIncrement = next;
   }
 
   function openComponentScripts() {
@@ -1799,7 +1854,7 @@
   }
 
   function setSnapSize(value) {
-    snapSize = Math.max(1, Math.min(64, Math.round(numberOr(value, 10))));
+    snapSize = clampSnapSize(numberOr(value, 10));
   }
 
   function fitArtboardToView() {
@@ -1832,8 +1887,25 @@
     }
   }
 
+  /**
+   * Write a styling property to the selection.
+   *
+   * This used to write to `selectedLayer` alone, which made the Look bar and the palette
+   * multi-select-blind: with three layers selected, setting a corner radius changed one of them
+   * and left the field showing that one's value. The 2026-07-12 review filed it against the Look
+   * bar ("no multi-select awareness — with three layers selected it silently shows/edits the
+   * primary"), and it was the same one line behind both.
+   *
+   * Styling fans out and geometry does not, and the difference is not arbitrary: "make these three
+   * layers 4px-cornered" has exactly one meaning, while "make these three layers 200 wide" has
+   * several (see setSelectionFrameSize). Where the answer is unambiguous, do it to all of them.
+   */
   function setLayerProperty(relativePath, value) {
     if (!canPaintLayer || !relativePath) return;
+    if (multiSelectionActive) {
+      for (const name of selectedLayerNames) setLayerPropertyFor(name, relativePath, value);
+      return;
+    }
     updateControlProperty(core.id, `Parts.${selectedLayer}.${relativePath}`, value);
   }
 
@@ -1890,29 +1962,42 @@
     return inlineTextEditorStyleBase(frameForPart(name, part), part);
   }
 
-  function renameSelectedLayer(event) {
-    if (!core?.id || !selectedLayer || !selectedAuthoredPart) return;
-    const currentName = selectedLayer;
-    const nextName = String(event?.currentTarget?.value ?? '').trim().replace(/[^a-zA-Z0-9_]/g, '');
-    if (!nextName || nextName === currentName) {
-      event.currentTarget.value = currentName;
-      return;
-    }
-    if (authoredParts?._children?.[nextName]) {
-      event.currentTarget.value = currentName;
-      return;
-    }
+  /**
+   * Rename a part, by name.
+   *
+   * Was `renameSelectedLayer(event)` — event-shaped, and able to rename only the current
+   * selection, which is why renaming was inspector-only. The dock list can rename in place now
+   * (Tier 2 of the 2026-07-12 review), and both call sites want the same rules: a name is an
+   * identifier, it has to be unique, and a rejected rename must put the old one back rather than
+   * leave the field showing something that is not the part's name.
+   *
+   * Returns the applied name so an inline editor can restore it on rejection.
+   */
+  function renameLayer(currentName, requested) {
+    const part = authoredParts?._children?.[currentName];
+    if (!core?.id || !currentName || !part) return currentName;
+    const nextName = String(requested ?? '').trim().replace(/[^a-zA-Z0-9_]/g, '');
+    if (!nextName || nextName === currentName) return currentName;
+    if (authoredParts?._children?.[nextName]) return currentName;   // taken
 
-    const renamed = cloneValue(selectedAuthoredPart);
+    const renamed = cloneValue(part);
     renamed.name = nextName;
-    localSelectedLayerNames = selectedLayerNames.map((name) => name === currentName ? nextName : name);
+    const nextSelection = selectedLayerNames.map((name) => name === currentName ? nextName : name);
+    localSelectedLayerNames = nextSelection;
     applyControlPatch(core.id, {
       [`Parts.${nextName}`]: renamed,
       'Designer.selectedLayer': nextName,
-      'Designer.selectedLayers': selectedLayerNames.map((name) => name === currentName ? nextName : name),
+      'Designer.selectedLayers': nextSelection,
       'Designer.selectedSurfaceKind': 'layer',
     });
     removeControlNode(core.id, `Parts.${currentName}`);
+    return nextName;
+  }
+
+  function renameSelectedLayer(event) {
+    if (!selectedLayer) return;
+    const applied = renameLayer(selectedLayer, event?.currentTarget?.value);
+    if (event?.currentTarget) event.currentTarget.value = applied;
   }
 
   function duplicateSelectedLayer() {
@@ -2725,6 +2810,149 @@
     activeSmartGuides = [];
   }
 
+  /**
+   * The dock's X/Y/W/H, with a multi-selection meaning what it looks like it means.
+   *
+   * These four fields READ `activeSelectionFrame`, which is the group's bounding box when several
+   * layers are selected — and used to WRITE through `patchFromFrame(selectedAuthoredPart, ...)`,
+   * which is the primary layer alone. Typing an X with three layers selected moved one of them and
+   * left the field showing a recomputed bounds, so the number you typed was not the number that
+   * came back. Bug §2.2 of the 2026-07-12 review, and the kind that reads as the editor being
+   * flaky rather than as a wiring mistake.
+   *
+   * X and Y translate the whole selection by the delta, which is the only reading of "move the
+   * group to X" that is not a guess — and it is the same operation the arrow keys already do
+   * through `moveSelectedLayersBy`.
+   *
+   * W and H are NOT applied to a group. "Make the selection 200 wide" could mean scale every
+   * member proportionally, stretch each to 200, or resize the box and reflow — three different
+   * results with nothing to choose between them. The fields are disabled with a title that says
+   * so, which is the review's own second option and better than picking one silently.
+   */
+  function setSelectionFramePosition(axis, value) {
+    if (multiSelectionActive) {
+      const from = axis === 'left' ? activeSelectionFrame?.left : activeSelectionFrame?.top;
+      const delta = Math.round(value) - Math.round(from ?? 0);
+      if (delta) moveSelectedLayersBy(axis === 'left' ? delta : 0, axis === 'left' ? 0 : delta);
+      return;
+    }
+    const frame = { ...activeSelectionFrame, [axis]: value };
+    if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
+    else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
+  }
+
+  function setSelectionFrameSize(axis, value) {
+    if (multiSelectionActive) return;   // see above — no single honest meaning for a group
+    const frame = { ...activeSelectionFrame, [axis]: Math.max(1, value) };
+    if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
+    else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
+  }
+
+  // --- Marquee selection -------------------------------------------------------------------
+  //
+  // Tier 1 of the 2026-07-12 workspace review: the panel editor has had a rubber band since the
+  // beginning and this surface never did, so the only way to select several layers was to click
+  // one and then `+`-click the rest, or work down the dock list.
+  //
+  // The geometry is in customDesignSurfaceGeometry.js so it can be tested without a DOM. What
+  // stays here is the gesture: it starts on bare artboard with the select tool, tracks in
+  // artboard space (so it survives zoom and scroll), and commits on mouseup.
+  let marquee = $state(null);   // { start: {x,y}, end: {x,y}, additive: boolean } | null
+
+  let marqueeBox = $derived(marquee ? marqueeRect(marquee.start, marquee.end) : null);
+  let marqueeStyle = $derived(marqueeBox
+    ? `left:${marqueeBox.left}px;top:${marqueeBox.top}px;width:${marqueeBox.width}px;height:${marqueeBox.height}px;`
+    : '');
+
+  // --- Right-click menu ---------------------------------------------------------------------
+  //
+  // Tier 1 of the 2026-07-12 review. Every action it offers already existed; none of them was
+  // reachable from the canvas, which is where you are when you want them.
+  let contextMenuTarget = $state(null);
+
+  let contextGeneratorName = $derived(
+    activeSelectionKind === 'layer' && selectedAuthoredPart
+      ? (generatedSourceForNode(selectedAuthoredPart) ?? '')
+      : ''
+  );
+  let contextKitId = $derived(selectedKit || (selectedAuthoredPart ? (kitIdFor(selectedAuthoredPart) ?? '') : ''));
+
+  function openSurfaceContextMenu(event, name = '', part = null) {
+    if (designerPreviewing || activeTool !== 'select') return;
+    event.preventDefault();
+    event.stopPropagation();
+    // Right-clicking a part that is not selected selects it first — otherwise the menu acts on
+    // whatever happened to be selected before, which is the classic way to delete the wrong thing.
+    if (name && !isLayerSelected(name)) selectLayer(name, part, event);
+    contextMenuTarget = { screenX: event.clientX, screenY: event.clientY };
+  }
+
+  // --- Display dock height ------------------------------------------------------------------
+  //
+  // Tier 2 of the 2026-07-12 review, and §3's note on the dock: "Fixed 340px, not resizable, and
+  // the only place colours/gradients/align actually get edited". A gradient with a dozen stops and
+  // a 340px box is a scroll; a solid colour and the same box is wasted canvas. It is a drag now,
+  // remembered across sessions because a height you set once you meant.
+  const DISPLAY_DOCK_MIN = 160;
+  const DISPLAY_DOCK_MAX = 720;
+  let displayDockHeight = $state(readStoredNumber('ce.surface.displayDockHeight', 340));
+  let resizingDisplayDock = $state(false);
+
+  function beginDisplayDockResize(event) {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = displayDockHeight;
+    resizingDisplayDock = true;
+    // Dragging the divider UP grows the dock, because the dock is below it.
+    const move = (moveEvent) => {
+      const next = startHeight + (startY - moveEvent.clientY);
+      displayDockHeight = Math.max(DISPLAY_DOCK_MIN, Math.min(DISPLAY_DOCK_MAX, Math.round(next)));
+    };
+    const end = () => {
+      resizingDisplayDock = false;
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', end);
+      writeStoredNumber('ce.surface.displayDockHeight', displayDockHeight);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+  }
+
+  function beginMarquee(event) {
+    if (designerPreviewing || activeTool !== 'select' || event.button !== 0) return false;
+    const start = pointInArtboard(event);
+    if (!start) return false;
+    marquee = { start, end: start, additive: event.shiftKey === true };
+    window.addEventListener('mousemove', handleMarqueeMove);
+    window.addEventListener('mouseup', handleMarqueeEnd);
+    return true;
+  }
+
+  function handleMarqueeMove(event) {
+    if (!marquee || !surfaceArtboardEl) return;
+    const point = pointInArtboardFromElement(event, surfaceArtboardEl, artboardWidth, artboardHeight, surfaceZoom);
+    if (point) marquee = { ...marquee, end: point };
+  }
+
+  function handleMarqueeEnd() {
+    window.removeEventListener('mousemove', handleMarqueeMove);
+    window.removeEventListener('mouseup', handleMarqueeEnd);
+    const band = marquee;
+    marquee = null;
+    if (!band) return;
+    const rect = marqueeRect(band.start, band.end);
+    // A press with no drag is a click on empty canvas, which means deselect — but only when it is
+    // not extending, or Shift-clicking the background would throw the selection away.
+    if (!isMarqueeDrag(rect)) {
+      if (!band.additive) clearSurfaceSelection();
+      return;
+    }
+    const hits = partsInMarquee(topLevelPartEntries, rect, partFrame);
+    const names = mergeMarqueeSelection(band.additive ? selectedLayerNames : [], hits, band.additive);
+    if (names.length) commitLayerSelection(names, names[names.length - 1]);
+    else if (!band.additive) clearSurfaceSelection();
+  }
+
   function nudgeSelected(dx, dy) {
     if (multiSelectionActive) {
       moveSelectedLayersBy(dx, dy);
@@ -3090,741 +3318,60 @@
     bind:this={surfaceShellEl}
   >
     {#if !designerPreviewing}
-    <div class="surface-lookbar" aria-label="Component look bar">
-      {#if activeSelectionKind === 'layer' && selectedPart}
-      <div class="paint-strip" class:disabled={!canPaintLayer} aria-label="Layer paint controls">
-        {#if selectedBackground}
-          {#if !selectedIsArc}
-            <label class="paint-swatch">
-              <span>Fill</span>
-              <button
-                type="button"
-                class="fill-toggle"
-                class:active={selectedFill?.solidEnabled !== false}
-                disabled={!canPaintLayer}
-                title={selectedFill?.solidEnabled !== false ? 'Make transparent' : 'Enable fill'}
-                onclick={() => setLayerProperty('Background.Fill.solidEnabled', selectedFill?.solidEnabled !== false ? false : true)}
-              ></button>
-              <button type="button" class="mini-swatch-btn"
-                disabled={!canPaintLayer || selectedFill?.solidEnabled === false}
-                style={swatchCss(selectedFill?.colour)}
-                onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)}
-                title="Pick fill colour"
-              ></button>
-            </label>
-          {/if}
-          {#if selectedFill?.gradientEnabled}
-            <label class="paint-swatch">
-              <span>Grad</span>
-              <button type="button" class="mini-gradient-btn"
-                disabled={!canPaintLayer}
-                style="background:{gradientToCSS(selectedFill?.gradient, 'rectangle')}"
-                onclick={openLayerGradient}
-                title="Edit gradient"
-              ></button>
-            </label>
-          {/if}
-          <label class="paint-swatch">
-            <span>Gradient</span>
-            <button type="button" class="fill-toggle"
-              class:active={selectedFill?.gradientEnabled}
-              disabled={!canPaintLayer}
-              onclick={toggleFillGradient}
-              title={selectedFill?.gradientEnabled ? 'Disable gradient' : 'Enable gradient'}
-            >G</button>
-          </label>
-          <label class="paint-swatch">
-            <span>Stroke</span>
-              <button type="button" class="mini-swatch-btn"
-                disabled={!canPaintLayer}
-                style={swatchCss(selectedBorder?.colour, 'FFFFFF')}
-                onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)}
-                title="Pick stroke colour"
-              ></button>
-          </label>
-          <label class="paint-number">
-            <span>W</span>
-            <span class="nc-wrap">
-              <NumberCell
-                min={0}
-                max={32}
-                step={1}
-                value={numberOr(selectedBorder?.thickness, 0)}
-                defaultValue={0}
-                disabled={!canPaintLayer}
-                onchange={(value) => setLayerProperty('Background.Border.thickness', value)}
-              />
-            </span>
-          </label>
-          <label class="paint-number">
-            <span>R</span>
-            <span class="nc-wrap">
-              <NumberCell
-                min={0}
-                max={999}
-                step={1}
-                value={numberOr(selectedCorners?.radius, 0)}
-                defaultValue={0}
-                disabled={!canPaintLayer}
-                onchange={(value) => setLayerProperty('Background.Corners.radius', value)}
-              />
-            </span>
-          </label>
-        {/if}
-
-        {#if selectedText}
-          <label class="paint-swatch">
-            <span>Text</span>
-              <button type="button" class="mini-swatch-btn"
-                disabled={!canPaintLayer}
-                style={swatchCss(selectedTextFill?.colour, 'FFFFFF')}
-                onclick={() => openLayerColour('Text.Fill.colour', selectedTextFill?.colour)}
-                title="Pick text colour"
-              ></button>
-          </label>
-          <label class="paint-number text-size">
-            <span>Size</span>
-            <span class="nc-wrap">
-              <NumberCell
-                min={6}
-                max={144}
-                step={1}
-                value={numberOr(selectedTextFont?.size, 12)}
-                defaultValue={12}
-                disabled={!canPaintLayer}
-                onchange={(value) => setLayerProperty('Text.Font.size', value)}
-              />
-            </span>
-          </label>
-          <label class="text-content-field">
-            <span>Content</span>
-            <input
-              type="text"
-              value={selectedText?.content ?? ''}
-              disabled={!canPaintLayer}
-              oninput={(event) => setLayerProperty('Text.content', event.currentTarget.value)}
-            />
-          </label>
-        {/if}
-
-        <label class="paint-opacity">
-          <span>Opacity</span>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={numberOr(selectedAuthoredPart?.opacity, 1)}
-            disabled={!canPaintLayer}
-            oninput={(event) => setLayerProperty('opacity', numericInputValue(event, 1))}
-          />
-          <strong>{Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}%</strong>
-        </label>
-      </div>
-      {:else}
-        <div class="lookbar-empty">Select a layer to edit its look</div>
-      {/if}
-      <div class="lookbar-scripts" aria-label="Component scripts">
-        <div class="lb-s-row">
-          <span class="lb-s-chip">SCRIPTS</span>
-          {#if componentScriptList.length > 0}
-            <span class="lb-s-count">{componentScriptList.length} script{componentScriptList.length === 1 ? '' : 's'}</span>
-            <span class={['lb-s-badge', componentScriptsEnabled ? 'on' : 'off']}>{componentScriptsEnabled ? 'on' : 'off'}</span>
-          {:else}
-            <span class="lb-s-none">none</span>
-          {/if}
-        </div>
-        <div class="lb-s-row">
-          <span class="lb-s-hint">{componentScriptList.length > 0 ? 'logic attached' : 'no logic attached'}</span>
-          <button type="button" class="lb-s-btn" onclick={openComponentScripts} title="Open the Script Editor for this component">Script Editor</button>
-        </div>
-      </div>
-    </div>
+    <SurfaceLookBar
+      {activeSelectionKind} {canPaintLayer}
+      {selectedAuthoredPart} {selectedPart} {selectedBackground} {selectedFill} {selectedBorder}
+      {selectedCorners} {selectedIsArc} {selectedText} {selectedTextFill} {selectedTextFont}
+      {componentScriptsEnabled} {componentScriptList}
+      {setLayerProperty} {openLayerColour} {openLayerGradient} {toggleFillGradient}
+      {openComponentScripts}
+    />
     {/if}
 
-    {#if activeSelectionKind === 'layer' && selectedPart}
-      <div class="layer-action-strip" class:disabled={!canManageLayer} aria-label="Selected layer actions">
-        <label class="rename-field">
-          <span>Name</span>
-          <input
-            type="text"
-            value={selectedLayer}
-            disabled={!canManageLayer}
-            onblur={renameSelectedLayer}
-            onchange={renameSelectedLayer}
-          />
-        </label>
-        {#if canDetachLayer}
-          <button class="action-icon detach" type="button" onclick={detachSelectedLayer} title="Detach generated layer">
-            <Scissors size={14} aria-hidden="true" />
-            <span>Detach</span>
-          </button>
-        {/if}
-        <button class="action-icon" type="button" onclick={duplicateSelectedLayer} disabled={!canManageLayer} title="Duplicate layer">
-          <Copy size={14} aria-hidden="true" />
-          <span>Duplicate</span>
-        </button>
-        <button class="action-icon square" type="button" onclick={() => moveSelectedLayer(1)} disabled={!canManageLayer} title="Bring forward">
-          <ArrowUp size={14} aria-hidden="true" />
-        </button>
-        <button class="action-icon square" type="button" onclick={() => moveSelectedLayer(-1)} disabled={!canManageLayer} title="Send backward">
-          <ArrowDown size={14} aria-hidden="true" />
-        </button>
-        <button class="action-icon square" type="button" onclick={toggleSelectedVisibility} disabled={!canManageLayer} title={selectedAuthoredPart?.visible === false ? 'Show layer' : 'Hide layer'}>
-          {#if selectedAuthoredPart?.visible === false}
-            <Eye size={14} aria-hidden="true" />
-          {:else}
-            <EyeOff size={14} aria-hidden="true" />
-          {/if}
-        </button>
-        <button class="action-icon square" type="button" onclick={toggleSelectedLock} disabled={!canManageLayer} title={selectedAuthoredPart?.locked === true ? 'Unlock layer' : 'Lock layer'}>
-          {#if selectedAuthoredPart?.locked === true}
-            <Unlock size={14} aria-hidden="true" />
-          {:else}
-            <Lock size={14} aria-hidden="true" />
-          {/if}
-        </button>
-        <button class="action-icon square danger" type="button" onclick={removeSelectedLayer} disabled={!canManageLayer} title="Delete layer">
-          <Trash2 size={14} aria-hidden="true" />
-        </button>
-      </div>
-    {/if}
+    <!--
+      The layer-action, precision and arc strips used to render here and were then forced
+      display:none by a rule further down the stylesheet — 270 lines of markup, plus their CSS,
+      that the browser built and hid again on every selection change.
 
-    {#if !designerPreviewing && activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
-      <div class="precision-strip" aria-label="Selection precision controls">
-        <label>
-          <span>X</span>
-          <span class="nc-wrap">
-            <NumberCell
-              value={Math.round(activeSelectionFrame.left)}
-              disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-              onchange={(value) => {
-                const frame = { ...activeSelectionFrame, left: value };
-                if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-              }}
-            />
-          </span>
-        </label>
-        <label>
-          <span>Y</span>
-          <span class="nc-wrap">
-            <NumberCell
-              value={Math.round(activeSelectionFrame.top)}
-              disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-              onchange={(value) => {
-                const frame = { ...activeSelectionFrame, top: value };
-                if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-              }}
-            />
-          </span>
-        </label>
-        <label>
-          <span>W</span>
-          <span class="nc-wrap">
-            <NumberCell
-              min={1}
-              value={Math.round(activeSelectionFrame.width)}
-              disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-              onchange={(value) => {
-                const frame = { ...activeSelectionFrame, width: Math.max(1, value) };
-                if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-              }}
-            />
-          </span>
-        </label>
-        <label>
-          <span>H</span>
-          <span class="nc-wrap">
-            <NumberCell
-              min={1}
-              value={Math.round(activeSelectionFrame.height)}
-              disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-              onchange={(value) => {
-                const frame = { ...activeSelectionFrame, height: Math.max(1, value) };
-                if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-              }}
-            />
-          </span>
-        </label>
-        {#if activeSelectionKind === 'layer'}
-          <label>
-            <span>Rot</span>
-            <span class="nc-wrap">
-              <NumberCell
-                step={1}
-                value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.rotation, 0))}
-                defaultValue={0}
-                disabled={!selectedPartEditable}
-                onchange={(value) => setLayerLayoutProperty('rotation', normalizeRotation(value))}
-              />
-            </span>
-          </label>
-        {/if}
-        <button type="button" onclick={() => alignSelection('left')} title="Align left">Left</button>
-        <button type="button" onclick={() => alignSelection('centerX')} title="Align horizontal center">Center X</button>
-        <button type="button" onclick={() => alignSelection('right')} title="Align right">Right</button>
-        <button type="button" onclick={() => alignSelection('top')} title="Align top">Top</button>
-        <button type="button" onclick={() => alignSelection('centerY')} title="Align vertical center">Center Y</button>
-        <button type="button" onclick={() => alignSelection('bottom')} title="Align bottom">Bottom</button>
-      </div>
-    {/if}
+      Removed rather than un-hidden. Everything they offered is in the dock already: rename,
+      X/Y/W/H, the six align buttons, the arc start/end/thickness fields. What made deletion the
+      right call rather than leaving them is what the 2026-07-12 review called them — a trap.
+      Anyone grepping this file for "align" found a full canvas align bar and reasonably concluded
+      it shipped.
+    -->
 
-    {#if !designerPreviewing && selectedIsArc}
-      <div class="arc-strip" aria-label="Arc controls">
-        <strong>Arc</strong>
-        <label>
-          <span>Start</span>
-          <span class="nc-wrap">
-            <NumberCell
-              step={1}
-              value={Math.round(numberOr(selectedArcMeta?.startAngle, -135))}
-              defaultValue={-135}
-              onchange={(value) => setArcMetaProperty('startAngle', normalizeRotation(value))}
-            />
-          </span>
-        </label>
-        <label>
-          <span>Sweep</span>
-          <span class="nc-wrap">
-            <NumberCell
-              min={1}
-              max={360}
-              step={1}
-              value={Math.round(numberOr(selectedArcMeta?.sweepAngle, 270))}
-              defaultValue={270}
-              onchange={(value) => setArcMetaProperty('sweepAngle', Math.max(1, Math.min(360, value)))}
-            />
-          </span>
-        </label>
-        <label>
-          <span>Thick</span>
-          <span class="nc-wrap">
-            <NumberCell
-              min={1}
-              max={48}
-              step={1}
-              value={Math.round(numberOr(selectedArcMeta?.thickness, 4))}
-              defaultValue={4}
-              onchange={(value) => {
-                const thickness = Math.max(1, Math.min(48, value));
-                setArcMetaProperty('thickness', thickness);
-                setLayerProperty('Background.Border.thickness', thickness);
-              }}
-            />
-          </span>
-        </label>
-        <label>
-          <span>Colour</span>
-          <button type="button" class="mini-swatch-btn"
-            style={swatchCss(selectedArcMeta?.colour, '5B9BD5')}
-            onclick={openArcColour}
-            title="Pick arc colour"
-          ></button>
-        </label>
-        <div class="arc-toggle-group">
-          <button
-            type="button"
-            class:active={selectedArcMeta?.direction !== 'ccw'}
-            onclick={() => setArcMetaProperty('direction', 'cw')}
-            title="Clockwise"
-          >CW</button>
-          <button
-            type="button"
-            class:active={selectedArcMeta?.direction === 'ccw'}
-            onclick={() => setArcMetaProperty('direction', 'ccw')}
-            title="Counter-clockwise"
-          >CCW</button>
-        </div>
-        <div class="arc-toggle-group">
-          <button
-            type="button"
-            class:active={selectedArcMeta?.cap !== 'round'}
-            onclick={() => setArcMetaProperty('cap', 'flat')}
-            title="Flat end caps"
-          >Flat</button>
-          <button
-            type="button"
-            class:active={selectedArcMeta?.cap === 'round'}
-            onclick={() => setArcMetaProperty('cap', 'round')}
-            title="Round end caps"
-          >Round</button>
-        </div>
-      </div>
-    {/if}
+    <SurfaceBottomBar
+      {snapEnabled} setSnapEnabled={(v) => { snapEnabled = v; }}
+      {snapSize} {setSnapSize}
+      {smartSnapEnabled} setSmartSnapEnabled={(v) => { smartSnapEnabled = v; }}
+      {measureEnabled} setMeasureEnabled={(v) => { measureEnabled = v; }}
+      {showBounds} {showGeneratedLabels} {showHitZones} {setPreviewFlag}
+      {zoneDisplayMode} {setZoneDisplayMode}
+      {arpeggiatorEnabled} {arpStepCount} {setArpStepCount} {arpSelectedBlock}
+      {shiftArpOctave} {removeSelectedArpBlock}
+      {resetToBlankCanvas} {addDialKit} {addHorizontalScaleKit} {addVerticalScaleKit} {addArpeggiatorKit}
+      {helpOverlayOpen} setHelpOverlayOpen={(v) => { helpOverlayOpen = v; }}
+      {surfaceZoom} {setZoom} {zoomStep} {surfaceZoomIncrement} {setZoomIncrement}
+      {zoomEditing} bind:zoomEditValue {startZoomEdit} {commitZoomEdit} {zoomEditKeydown}
+      {fitArtboardToView}
+      {surfaceShowRulers} setSurfaceShowRulers={(v) => { surfaceShowRulers = v; }}
+    />
 
-    {#if !designerPreviewing && selectedIsWaveformIcon}
-      <div class="arc-strip" aria-label="Waveform presets">
-        <strong>Waveform</strong>
-        <div class="arc-toggle-group">
-          {#each WAVEFORM_SHAPES as shape (shape.id)}
-            <button
-              type="button"
-              class:active={String(selectedWaveformMeta?.type ?? 'sine') === shape.id}
-              onclick={() => applyRendererPreset(waveformIconPresetPatch(selectedLayer, { shape }))}
-              title={`${shape.label} waveform`}
-            >{shape.label}</button>
-          {/each}
-        </div>
-        <span class="preset-label">Colour</span>
-        <div class="preset-swatches">
-          {#each RENDERER_COLOR_PRESETS as preset (preset.id)}
-            <button
-              type="button"
-              class="mini-swatch-btn"
-              class:active={String(selectedWaveformMeta?.stroke ?? '') === preset.stroke}
-              style={swatchCss(preset.stroke, 'EAF0F6')}
-              onclick={() => applyRendererPreset(waveformIconPresetPatch(selectedLayer, { colorPreset: preset }))}
-              title={`${preset.label} colour preset`}
-            ></button>
-          {/each}
-        </div>
-      </div>
-    {/if}
-
-    {#if !designerPreviewing && selectedIsEnvelopePath}
-      <div class="arc-strip" aria-label="Envelope presets">
-        <strong>Envelope</strong>
-        <div class="arc-toggle-group">
-          {#each ENVELOPE_SHAPE_PRESETS as shape (shape.id)}
-            <button
-              type="button"
-              onclick={() => applyRendererPreset(envelopePathPresetPatch(selectedLayer, { shape }))}
-              title={`${shape.label}: A ${shape.attack} D ${shape.decay} S ${shape.sustain} R ${shape.release}`}
-            >{shape.label}</button>
-          {/each}
-        </div>
-        <span class="preset-label">Colour</span>
-        <div class="preset-swatches">
-          {#each RENDERER_COLOR_PRESETS as preset (preset.id)}
-            <button
-              type="button"
-              class="mini-swatch-btn"
-              class:active={String(selectedEnvelopeMeta?.stroke ?? '') === preset.stroke}
-              style={swatchCss(preset.stroke, '65E6A0')}
-              onclick={() => applyRendererPreset(envelopePathPresetPatch(selectedLayer, { colorPreset: preset }))}
-              title={`${preset.label} colour preset`}
-            ></button>
-          {/each}
-        </div>
-      </div>
-    {/if}
-
-    <div class="surface-options-strip" aria-label="Surface view + zoom options">
-      <div class="surface-toolbar-left">
-      <div class="zone-mode-control creator-mode" role="radiogroup" aria-label="Creator mode" title="Simple hides the raw graph editors; Advanced shows them">
-        <button type="button" class:active={$creatorMode === 'simple'} onclick={() => creatorMode.set('simple')}>Simple</button>
-        <button type="button" class:active={$creatorMode === 'advanced'} onclick={() => creatorMode.set('advanced')}>Adv</button>
-      </div>
-      <label class="toggle-option">
-        <input type="checkbox" checked={snapEnabled} onchange={(event) => { snapEnabled = event.currentTarget.checked; }} />
-        <span>Snap</span>
-      </label>
-      <label class="snap-size">
-        <span>Grid</span>
-        <span class="nc-wrap">
-          <NumberCell
-            min={1}
-            max={64}
-            step={1}
-            value={snapSize}
-            disabled={!snapEnabled}
-            onchange={(value) => setSnapSize(value)}
-          />
-        </span>
-      </label>
-      <label class="toggle-option" title="Snap to other parts' edges and the artboard (Alt bypasses)">
-        <input type="checkbox" checked={smartSnapEnabled} onchange={(event) => { smartSnapEnabled = event.currentTarget.checked; }} />
-        <span>Smart</span>
-      </label>
-      <label class="toggle-option" title="Show pixel gaps between two selected layers">
-        <input type="checkbox" checked={measureEnabled} onchange={(event) => { measureEnabled = event.currentTarget.checked; }} />
-        <span>Measure</span>
-      </label>
-      <label class="toggle-option">
-        <input type="checkbox" checked={showBounds} onchange={(event) => setPreviewFlag('showBounds', event.currentTarget.checked)} />
-        <span>Bounds</span>
-      </label>
-      <label class="toggle-option" title="Show generated layer names on the canvas">
-        <input type="checkbox" checked={showGeneratedLabels} onchange={(event) => setPreviewFlag('showGeneratedLabels', event.currentTarget.checked)} />
-        <span>Gen Names</span>
-      </label>
-      <label class="toggle-option">
-        <input type="checkbox" checked={showHitZones} onchange={(event) => setPreviewFlag('showHitZones', event.currentTarget.checked)} />
-        <span>Zones</span>
-      </label>
-      <div class="zone-mode-control" aria-label="Zone display mode">
-        <button type="button" class:active={zoneDisplayMode === 'selected'} onclick={() => setZoneDisplayMode('selected')} title="Show only the selected hit zone">Sel</button>
-        <button type="button" class:active={zoneDisplayMode === 'dim'} onclick={() => setZoneDisplayMode('dim')} title="Show all hit zones dimmed">Dim</button>
-        <button type="button" class:active={zoneDisplayMode === 'all'} onclick={() => setZoneDisplayMode('all')} title="Show all hit zones">All</button>
-      </div>
-      {#if arpeggiatorEnabled}
-        <label class="snap-size">
-          <span>Steps</span>
-          <span class="nc-wrap">
-            <NumberCell
-              min={1}
-              max={256}
-              step={1}
-              value={arpStepCount}
-              onchange={(value) => setArpStepCount(value)}
-            />
-          </span>
-        </label>
-        <div class="zone-mode-control" aria-label="Arpeggiator octave">
-          <button type="button" onclick={() => shiftArpOctave(-1)} title="Show lower octave">Oct -</button>
-          <button type="button" onclick={() => shiftArpOctave(1)} title="Show higher octave">Oct +</button>
-        </div>
-        <button type="button" class="surface-command danger" onclick={removeSelectedArpBlock} disabled={!arpSelectedBlock} title="Delete selected note block">Delete note</button>
-      {/if}
-      <button type="button" class="surface-command" onclick={resetToBlankCanvas} title="Clear this component to a blank drawing canvas">Blank</button>
-      <button type="button" class="surface-command accent" onclick={addDialKit} title="Add a circular value control">Dial</button>
-      <button type="button" class="surface-command accent" onclick={addHorizontalScaleKit} title="Add a horizontal value scale with ticks">H Scale</button>
-      <button type="button" class="surface-command accent" onclick={addVerticalScaleKit} title="Add a vertical value scale with ticks">V Scale</button>
-      <button type="button" class="surface-command accent" onclick={addArpeggiatorKit} title="Add a graphical arpeggiator step editor">Arp Kit</button>
-      <button type="button" class="surface-command" class:accent={helpOverlayOpen} onclick={() => { helpOverlayOpen = !helpOverlayOpen; }} title="Shortcuts &amp; glossary (?)">?</button>
-      </div>
-
-      <div class="surface-zoombar" aria-label="Zoom controls">
-        <button type="button" class="szb-btn" onclick={() => zoomStep(-surfaceZoomIncrement)} title="Zoom out">−</button>
-        {#if zoomEditing}
-          <!-- svelte-ignore a11y_autofocus -->
-          <input class="szb-zoom-input" type="text" bind:value={zoomEditValue} onblur={commitZoomEdit} onkeydown={zoomEditKeydown} onfocus={(event) => event.target.select()} autofocus />
-        {:else}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <span class="szb-zoom-value" ondblclick={startZoomEdit} title="Double-click to type a value">{Math.round(surfaceZoom * 100)}%</span>
-        {/if}
-        <button type="button" class="szb-btn" onclick={() => zoomStep(surfaceZoomIncrement)} title="Zoom in">+</button>
-        <span class="szb-inc-label">Dec/Inc</span>
-        <span class="szb-inc-input nc-wrap"><NumberCell value={surfaceZoomIncrement} onchange={(value) => setZoomIncrement(value)} min={1} max={100} /></span>
-        <div class="szb-divider"></div>
-        <button type="button" class="szb-btn icon" onclick={() => setZoom(1)} title="Reset to 100%">⊡</button>
-        <button type="button" class="szb-btn icon" onclick={fitArtboardToView} title="Fit to window"><Maximize size={12} strokeWidth={1.6} /></button>
-        <div class="szb-divider"></div>
-        <button type="button" class="szb-btn icon" class:toggle-on={surfaceShowRulers} onclick={() => { surfaceShowRulers = !surfaceShowRulers; }} title="Toggle rulers"><Ruler size={12} strokeWidth={1.6} /></button>
-      </div>
-    </div>
-
-      <aside class="palette-panel" aria-label="Designer quick tools">
-        <div class="palette-scroll">
-        <div class="palette-header">
-          <strong>Shapes</strong>
-          <span>Draw and style</span>
-        </div>
-
-        <section class="palette-group">
-          <span>Basic</span>
-          <div class="palette-grid">
-            {#each SHAPE_TOOLS as tool (tool.id)}
-              <button
-                type="button"
-                class:active={activeTool === tool.id}
-                title={`${tool.label} (${tool.key})`}
-                onclick={() => setActiveTool(tool.id)}
-              >
-                <span class={`tool-icon ${tool.id}`}></span>
-              </button>
-            {/each}
-          </div>
-        </section>
-
-        <section class="palette-group">
-          <span>Lines &amp; Polygons</span>
-          <div class="palette-grid">
-            {#each VECTOR_SHAPE_TOOLS as tool (tool.id)}
-              <button
-                type="button"
-                class:active={activeTool === tool.id}
-                title={tool.label}
-                onclick={() => setActiveTool(tool.id)}
-              >
-                {#if tool.id === 'line'}
-                  <span class="poly-glyph line-glyph"></span>
-                {:else}
-                  <span class="poly-glyph" style={`clip-path:${clipPathForKind(tool.id)}`}></span>
-                {/if}
-              </button>
-            {/each}
-          </div>
-        </section>
-
-        <section class="palette-group">
-          <span>Value Controls</span>
-          <div class="palette-grid">
-            <button type="button" onclick={addDialKit} title="Add circular dial value control">
-              <span class="palette-glyph dial"></span>
-            </button>
-            <button type="button" onclick={addHorizontalScaleKit} title="Add horizontal tick scale">
-              <span class="palette-glyph hscale"></span>
-            </button>
-            <button type="button" onclick={addVerticalScaleKit} title="Add vertical tick scale">
-              <span class="palette-glyph vscale"></span>
-            </button>
-            <button type="button" onclick={addArpeggiatorKit} title="Add graphical arpeggiator kit">
-              <span class="palette-glyph grid"></span>
-            </button>
-            <button type="button" onclick={addHitZoneAtCenter} title="Add hit zone">
-              <span class="tool-icon hitZone"></span>
-            </button>
-            <button type="button" onclick={() => addLayerAtCenter('text')} title="Add text layer">
-              <span class="tool-icon text"></span>
-            </button>
-          </div>
-        </section>
-
-        <section class="palette-group">
-          <span>Pen</span>
-          <div class="palette-grid brush-grid">
-            <button type="button" class:active={activeTool === 'arcTrack'} onclick={() => setActiveTool('arcTrack')} title="Arc pen">
-              <span class="brush-preview thin"></span>
-            </button>
-            <button type="button" class:active={activeTool === 'ring'} onclick={() => setActiveTool('ring')} title="Ring pen">
-              <span class="brush-preview soft"></span>
-            </button>
-            <button type="button" class:active={activeTool === 'capsule'} onclick={() => setActiveTool('capsule')} title="Capsule pen">
-              <span class="brush-preview bold"></span>
-            </button>
-          </div>
-          <label class="palette-stepper">
-            <span>Size</span>
-            <span class="nc-wrap">
-              <NumberCell
-                min={1}
-                max={24}
-                value={Math.round(numberOr(selectedBorder?.thickness, 1))}
-                defaultValue={1}
-                disabled={!canPaintLayer}
-                onchange={(value) => setLayerProperty('Background.Border.thickness', value)}
-              />
-            </span>
-            <strong>px</strong>
-          </label>
-        </section>
-
-        <section class="palette-group">
-          <span>Fill</span>
-          <label class="palette-swatch-row">
-            <button type="button" class="mini-swatch-btn"
-              disabled={!canPaintLayer || !selectedBackground}
-              style={swatchCss(selectedFill?.colour)}
-              onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)}
-              title="Pick fill colour"
-            ></button>
-            <code>{selectedFill?.colour ? `#${String(selectedFill.colour).slice(-6)}` : '#14B8A6'}</code>
-            <span class="swatch-num" title="Layer opacity (lower = more transparent)">
-              <span class="nc-wrap">
-                <NumberCell
-                  min={0}
-                  max={100}
-                  value={Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}
-                  defaultValue={100}
-                  disabled={!canPaintLayer || !selectedBackground}
-                  onchange={(value) => setLayerProperty('opacity', Math.max(0, Math.min(1, value / 100)))}
-                />
-              </span>%
-            </span>
-          </label>
-        </section>
-
-        <section class="palette-group">
-          <span>Gradient</span>
-          <div class="palette-grid compact">
-            <button type="button"
-              class:active={selectedFill?.gradientEnabled}
-              disabled={!canPaintLayer || !selectedBackground}
-              onclick={toggleFillGradient}
-              title={selectedFill?.gradientEnabled ? 'Disable gradient fill' : 'Enable gradient fill'}
-            >G</button>
-            {#if selectedFill?.gradientEnabled && selectedFill?.gradient}
-              <button type="button" class="mini-gradient-btn wide"
-                disabled={!canPaintLayer}
-                style="background:{gradientToCSS(selectedFill?.gradient, 'rectangle')}"
-                onclick={openLayerGradient}
-                title="Edit gradient"
-              ></button>
-            {/if}
-          </div>
-        </section>
-
-        <section class="palette-group">
-          <span>Stroke</span>
-          <label class="palette-swatch-row">
-              <button type="button" class="mini-swatch-btn"
-                disabled={!canPaintLayer || !selectedBackground}
-                style={swatchCss(selectedBorder?.colour, 'FFFFFF')}
-                onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)}
-                title="Pick stroke colour"
-              ></button>
-            <code>{selectedBorder?.colour ? `#${String(selectedBorder.colour).slice(-6)}` : '#FFFFFF'}</code>
-            <span class="swatch-num" title="Stroke thickness">
-              <span class="nc-wrap">
-                <NumberCell
-                  min={0}
-                  max={999}
-                  value={Math.round(numberOr(selectedBorder?.thickness, 1))}
-                  defaultValue={1}
-                  disabled={!canPaintLayer || !selectedBackground}
-                  onchange={(value) => setLayerProperty('Background.Border.thickness', value)}
-                />
-              </span>px
-            </span>
-          </label>
-        </section>
-
-        <section class="palette-group">
-          <span>Path Operations</span>
-          <div class="palette-grid compact">
-            <button type="button" onclick={duplicateSelectedLayer} disabled={!canManageLayer} title="Duplicate">
-              <Copy size={14} aria-hidden="true" />
-            </button>
-            <button type="button" onclick={() => moveSelectedLayerToExtreme('front')} disabled={!canManageLayer} title="Bring to front">
-              <ArrowUp size={14} aria-hidden="true" />
-            </button>
-            <button type="button" onclick={() => moveSelectedLayerToExtreme('back')} disabled={!canManageLayer} title="Send to back">
-              <ArrowDown size={14} aria-hidden="true" />
-            </button>
-            <button type="button" onclick={toggleSelectedLock} disabled={!canManageLayer} title="Toggle lock">
-              {#if selectedAuthoredPart?.locked === true}
-                <Unlock size={14} aria-hidden="true" />
-              {:else}
-                <Lock size={14} aria-hidden="true" />
-              {/if}
-            </button>
-          </div>
-        </section>
-
-        <section class="palette-group">
-          <span>Corner</span>
-          <label class="palette-corner">
-            <span class="nc-wrap">
-              <NumberCell
-                min={0}
-                max={999}
-                value={numberOr(selectedCorners?.radius, 0)}
-                defaultValue={0}
-                disabled={!canPaintLayer || !selectedBackground}
-                onchange={(value) => setLayerProperty('Background.Corners.radius', value)}
-              />
-            </span>
-            <strong>radius</strong>
-          </label>
-        </section>
-        </div>
-        <div class="palette-toggles" aria-label="Panel toggles">
-          <button type="button" class:active={!paletteCollapsed} title={paletteCollapsed ? 'Expand the Shapes palette' : 'Collapse the Shapes palette'} onclick={() => { paletteCollapsed = !paletteCollapsed; }}>
-            <PanelLeft size={18} strokeWidth={1.6} />
-          </button>
-          <button type="button" class:active={!dockHidden} title="Toggle the inspector (right)" onclick={() => { dockHidden = !dockHidden; }}>
-            <PanelRight size={18} strokeWidth={1.6} />
-          </button>
-          <button type="button" class:active={!displayDockHidden} title="Toggle the Display panel (colours / gradient / align)" onclick={() => { displayDockHidden = !displayDockHidden; }}>
-            <PanelBottom size={18} strokeWidth={1.6} />
-          </button>
-        </div>
-      </aside>
+      <SurfacePalette
+        {activeTool}
+        shapeTools={SHAPE_TOOLS}
+        vectorShapeTools={VECTOR_SHAPE_TOOLS}
+        {selectedAuthoredPart} {selectedBackground} {selectedFill} {selectedBorder} {selectedCorners}
+        {canPaintLayer} {canManageLayer}
+        {paletteCollapsed} setPaletteCollapsed={(v) => { paletteCollapsed = v; }}
+        {dockHidden} setDockHidden={(v) => { dockHidden = v; }}
+        {displayDockHidden} setDisplayDockHidden={(v) => { displayDockHidden = v; }}
+        {setActiveTool}
+        {addDialKit} {addHorizontalScaleKit} {addVerticalScaleKit} {addArpeggiatorKit}
+        {addHitZoneAtCenter} {addLayerAtCenter}
+        {setLayerProperty} {openLayerColour} {openLayerGradient} {toggleFillGradient}
+        {duplicateSelectedLayer} {moveSelectedLayerToExtreme} {toggleSelectedLock}
+      />
 
       <div class="surface-viewport" class:rulers-hidden={!surfaceShowRulers}>
         {#if surfaceShowRulers}
@@ -3885,9 +3432,19 @@
             class="artboard"
             class:drawing={activeTool !== 'select'}
             style={artboardStyle}
-            onclick={() => { if (!designerPreviewing) clearSurfaceSelection(); }}
-            onmousedown={(event) => { if (!designerPreviewing && !beginDraw(event)) clearSurfaceSelection(); }}
+            bind:this={surfaceArtboardEl}
+            oncontextmenu={(event) => openSurfaceContextMenu(event)}
+            onmousedown={(event) => {
+              if (designerPreviewing) return;
+              // Draw tool first, then the rubber band. The click handler that used to clear the
+              // selection here is gone: a click is now a zero-area marquee, so deselecting happens
+              // on mouseup in one place instead of racing the drag.
+              if (!beginDraw(event)) beginMarquee(event);
+            }}
           >
+            {#if marquee}
+              <div class="marquee-band" style={marqueeStyle} aria-hidden="true"></div>
+            {/if}
             {#if !designerPreviewing && surfaceNameTrayEntries.length}
               <div class="surface-name-tray" onmousedown={stopSelectionAction} onclick={stopSelectionAction}>
                 {#each surfaceNameTrayEntries as entry (`${entry.kind}:${entry.label}`)}
@@ -3964,6 +3521,7 @@
                   onpointerenter={() => setSurfaceHover('layer', name)}
                   onpointerleave={() => clearSurfaceHover('layer', name)}
                   onmousedown={(event) => beginMove(name, part, event)}
+                oncontextmenu={(event) => openSurfaceContextMenu(event, name, part)}
                 >
                   <span class="selection-label">{name}</span>
                   {#if activeSelectionKind === 'layer' && selectedLayer === name && selectedPartEditable && !multiSelectionActive}
@@ -4195,204 +3753,23 @@
             <div class="dock-tab-row" role="tablist" aria-label="Right dock sections">
               <button type="button" class:active={dockTab === 'layers'} role="tab" aria-selected={dockTab === 'layers'} onclick={() => { dockTab = 'layers'; }}>Layers</button>
               <button type="button" class:active={dockTab === 'generators'} role="tab" aria-selected={dockTab === 'generators'} onclick={() => { dockTab = 'generators'; }}>Generators</button>
-              <button type="button" class:active={dockTab === 'assets'} role="tab" aria-selected={dockTab === 'assets'} onclick={() => { dockTab = 'assets'; }} title="Assets stay in the inspector for now">Assets</button>
               <button type="button" class:active={dockTab === 'live'} role="tab" aria-selected={dockTab === 'live'} onclick={() => { dockTab = 'live'; }} title="Persistent live preview — what you build is what runs">Live</button>
             </div>
             <strong>{dockTab === 'generators' ? generatorEntries.length : topLevelPartEntries.length + kitEntries.length + generatedSourceEntries.length}</strong>
           </div>
           {#if dockTab === 'layers'}
-          <div class="dock-add-strip" aria-label="Create layer">
-            <button type="button" onclick={() => addLayerAtCenter('rectangle')} title="Add rectangle">
-              <span class="tool-icon rectangle"></span>
-            </button>
-            <button type="button" onclick={() => addLayerAtCenter('ellipse')} title="Add ellipse">
-              <span class="tool-icon ellipse"></span>
-            </button>
-            <button type="button" onclick={() => addLayerAtCenter('text')} title="Add text">
-              <span class="tool-icon text"></span>
-            </button>
-            <button type="button" onclick={addHitZoneAtCenter} title="Add hit zone">
-              <span class="tool-icon hitZone"></span>
-            </button>
-          </div>
-          <div class="list-scroll layer-scroll">
-          {#each kitEntries as kit (kit.id)}
-            <div
-              class="list-row kit-row"
-              class:selected={activeSelectionKind === 'kit' && selectedKit === kit.id}
-              class:primary={activeSelectionKind === 'kit' && selectedKit === kit.id}
-              class:pulse={selectionPulseTarget === `kit:${kit.id}`}
-              role="group"
-              aria-label={`${kit.label} kit controls`}
-              title={`${kit.label}: ${kit.layerNames.length} generated layers`}
-            >
-              <button type="button" class="row-main" onclick={() => selectKit(kit.id)}>
-                <span class={`layer-thumb kit-thumb ${kit.control?.style ?? 'dial'}`} aria-hidden="true">
-                  <span class="kit-thumb-ring"></span>
-                  <span class="kit-thumb-pointer"></span>
-                </span>
-                <span class="row-text">
-                  <strong>{kit.label}</strong>
-                  <em>{kit.layerNames.length} layers · {kit.zoneNames.length} zone{kit.zoneNames.length === 1 ? '' : 's'}</em>
-                </span>
-                <span class="row-badge kit">KIT</span>
-              </button>
-              <div class="row-actions">
-                <button
-                  type="button"
-                  onclick={(event) => { event.stopPropagation(); editKitParts(kit.id); }}
-                  title="Edit generated parts"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  class="danger"
-                  onclick={(event) => { event.stopPropagation(); removeKitEntry(kit); }}
-                  title="Delete value control"
-                >
-                  <Trash2 size={12} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-          {/each}
-          {#each generatedSourceEntries as source (source.source)}
-            <div
-              class="list-row generated-group-row"
-              class:collapsed={source.collapsed}
-              role="group"
-              aria-label={`${source.label} generated output group`}
-              title={`${source.label}: ${source.partCount} generated layers, ${source.zoneCount} generated zones`}
-            >
-              <button type="button" class="row-main" onclick={(event) => toggleGeneratedSource(source.source, event)}>
-                <span class="layer-thumb generated-group-thumb" aria-hidden="true">
-                  <span></span>
-                </span>
-                <span class="row-text">
-                  <strong>{source.label}</strong>
-                  <em>{source.partCount} layers · {source.zoneCount} zone{source.zoneCount === 1 ? '' : 's'} · {source.collapsed ? 'folded' : 'expanded'}</em>
-                </span>
-                <span class="row-badge gen-group">{source.collapsed ? '+' : '-'}</span>
-              </button>
-              <div class="row-actions">
-                {#if source.hasGenerator}
-                  <button
-                    type="button"
-                    onclick={(event) => { event.stopPropagation(); dockTab = 'generators'; applyControlPatch(core.id, { 'Designer.selectedGenerator': source.source }); }}
-                    title={`Edit ${source.source} generator`}
-                  >
-                    Gen
-                  </button>
-                {/if}
-              </div>
-            </div>
-          {/each}
-          {#each topLevelPartEntries as [name, part] (name)}
-            <div
-              class="list-row"
-              class:selected={isLayerSelected(name)}
-              class:primary={activeSelectionKind === 'layer' && selectedLayer === name}
-              class:generated={part?.generated === true || part?.meta?.generated === true}
-              class:hidden={part?.visible === false}
-              class:locked={part?.locked === true || part?.meta?.locked === true}
-              class:pulse={selectionPulseTarget === `layer:${name}`}
-              class:dragging={draggingLayerName === name}
-              role="group"
-              aria-label={`${name} layer controls`}
-              draggable="true"
-              title={`${name}: ${part?.kind ?? part?.role ?? 'part'}`}
-              ondragstart={(event) => beginLayerDrag(name, event)}
-              ondragend={() => { draggingLayerName = ''; }}
-              ondragover={(event) => event.preventDefault()}
-              ondrop={(event) => dropLayerOn(name, event)}
-          >
-            <button type="button" class="row-main" onclick={(event) => selectLayer(name, event)}>
-                <span class="layer-thumb" aria-hidden="true">
-                  <span class={`layer-thumb-shape ${layerKindClass(part)}`} style={layerThumbPartStyle(name, part)}>
-                    {#if layerKind(part) === 'text'}T{/if}
-                  </span>
-                </span>
-                <span class="row-text">
-                  <strong>{name}</strong>
-                  <em>{part?.visible === false ? 'hidden · ' : ''}{part?.locked === true || part?.meta?.locked === true ? 'locked · ' : ''}{layerKindLabel(part)}</em>
-                </span>
-                <span class="row-badge">{part?.generated === true || part?.meta?.generated === true ? 'GEN' : layerKindLabel(part)}</span>
-              </button>
-              <div class="row-actions">
-                {#if generatorNameForEntry(part)}
-                  <button
-                    type="button"
-                    onclick={(event) => editGeneratorForLayer(name, part, event)}
-                    title={`Edit ${generatorNameForEntry(part)} generator`}
-                  >
-                    Gen
-                  </button>
-                {/if}
-                <button
-                  type="button"
-                  class:selected={selectedLayerSet.has(name)}
-                  onclick={(event) => toggleLayerMultiSelection(name, event)}
-                  title={selectedLayerSet.has(name) ? 'Remove from selection' : 'Add to selection'}
-                  aria-label={selectedLayerSet.has(name) ? `Remove ${name} from selection` : `Add ${name} to selection`}
-                >
-                  +
-                </button>
-                <button type="button" onclick={(event) => { event.stopPropagation(); moveLayer(name, 1); }} disabled={!canManagePartName(name)} title={canManagePartName(name) ? 'Bring forward' : 'Generated layer: edit the generator or detach first'}>
-                  <ArrowUp size={12} aria-hidden="true" />
-                </button>
-                <button type="button" onclick={(event) => { event.stopPropagation(); moveLayer(name, -1); }} disabled={!canManagePartName(name)} title={canManagePartName(name) ? 'Send backward' : 'Generated layer: edit the generator or detach first'}>
-                  <ArrowDown size={12} aria-hidden="true" />
-                </button>
-                <button type="button" onclick={(event) => toggleLayerVisibility(name, part, event)} disabled={!canManagePartName(name)} title={canManagePartName(name) ? (part?.visible === false ? 'Show layer' : 'Hide layer') : 'Generated layer: edit the generator or detach first'}>
-                  {#if part?.visible === false}
-                    <Eye size={12} aria-hidden="true" />
-                  {:else}
-                    <EyeOff size={12} aria-hidden="true" />
-                  {/if}
-                </button>
-                <button type="button" onclick={(event) => toggleLayerLock(name, part, event)} disabled={!canManagePartName(name)} title={canManagePartName(name) ? (part?.locked === true || part?.meta?.locked === true ? 'Unlock layer' : 'Lock layer') : 'Generated layer: edit the generator or detach first'}>
-                  {#if part?.locked === true || part?.meta?.locked === true}
-                    <Unlock size={12} aria-hidden="true" />
-                  {:else}
-                    <Lock size={12} aria-hidden="true" />
-                  {/if}
-                </button>
-              </div>
-            </div>
-          {/each}
-          </div>
-          <div class="list-header secondary">
-            <span>Hit Zones</span>
-            <strong>{dockHitZoneEntries.length}</strong>
-          </div>
-          <div class="list-scroll zones">
-          {#if dockHitZoneEntries.length}
-            {#each dockHitZoneEntries as [name, zone] (name)}
-              <div
-                class="list-row zone-row"
-                class:selected={activeSelectionKind === 'hitZone' && selectedHitZone === name}
-                class:generated={zone?.generated === true || zone?.meta?.generated === true}
-                class:pulse={selectionPulseTarget === `zone:${name}`}
-                role="group"
-                aria-label={`${name} hit zone`}
-                title={`${name}: ${zone?.action ?? 'action'}`}
-              >
-                <button type="button" class="row-main" onclick={() => selectHitZone(name)}>
-                  <span class="layer-thumb zone-thumb" aria-hidden="true">
-                    <span class="zone-thumb-shape" style={zoneThumbPartStyle(name, zone)}></span>
-                  </span>
-                  <span class="row-text">
-                    <strong>{name}</strong>
-                    <em>{zone?.shape ?? 'zone'} · {zone?.action ?? 'action'}</em>
-                  </span>
-                  <span class="row-badge zone">ZONE</span>
-                </button>
-              </div>
-            {/each}
-          {:else}
-            <div class="list-empty">{hitZoneEntries.length ? 'Generated zones are folded above' : 'No zones'}</div>
-          {/if}
-          </div>
+          <SurfaceDockLayers
+            {core} {parts} {generators}
+            {topLevelPartEntries} {kitEntries} {generatedSourceEntries} {hitZoneEntries} {dockHitZoneEntries}
+            {activeSelectionKind} {selectedLayer} {selectedLayerSet} {selectedKit} {selectedHitZone}
+            {selectionPulseTarget} {draggingLayerName}
+            {isLayerSelected} {canManagePartName} {layerThumbPartStyle} {zoneThumbPartStyle}
+            {selectLayer} {selectKit} {selectHitZone} {toggleLayerMultiSelection}
+            {toggleLayerVisibility} {toggleLayerLock} {toggleGeneratedSource}
+            {moveLayer} {beginLayerDrag} {dropLayerOn}
+            {addLayerAtCenter} {addHitZoneAtCenter} {editKitParts} {editGeneratorForLayer} {removeKitEntry}
+            {renameLayer}
+          />
           {:else if dockTab === 'generators'}
             <div class="dock-generator-editor">
               <CustomGeneratorsEditor {control} />
@@ -4414,10 +3791,6 @@
                 onclick={() => { livePreviewSession = createInteractionPreviewSession(control); }}
                 title="Reset the live session to the component defaults"
               >Reset session</button>
-            </div>
-          {:else}
-            <div class="dock-empty dock-empty-tab">
-              Assets are edited in the inspector for now.
             </div>
           {/if}
         </section>
@@ -4451,593 +3824,53 @@
           </div>
 
           <div class="inspector-content">
-            {#if inspectorTab === 'object'}
-              {#if activeSelectionKind === 'artboard'}
-                <div class="dock-section">
-                  <div class="dock-section-title">Artboard</div>
-                  <div class="dock-number-grid">
-                    <label>
-                      <span>W</span>
-                      <NumberCell
-                        min={1}
-                        step={1}
-                        value={Math.round(artboardWidth)}
-                        onchange={(value) => setArtboardSize('width', value)}
-                      />
-                    </label>
-                    <label>
-                      <span>H</span>
-                      <NumberCell
-                        min={1}
-                        step={1}
-                        value={Math.round(artboardHeight)}
-                        onchange={(value) => setArtboardSize('height', value)}
-                      />
-                    </label>
-                  </div>
-                  <div class="dock-note">The saved custom component workspace size.</div>
-                  <div class="dock-button-grid">
-                    <button type="button" onclick={() => { setArtboardSize('width', 152); setArtboardSize('height', 92); }}>Button</button>
-                    <button type="button" onclick={() => { setArtboardSize('width', 260); setArtboardSize('height', 120); }}>Default</button>
-                    <button type="button" onclick={fitArtboardToView}>Fit view</button>
-                  </div>
-                </div>
-              {:else if !activeSelectionName && !multiSelectionActive}
-                <div class="dock-empty">Select artwork, a text layer, or a hit zone to edit it here.</div>
-              {:else}
-                {#if activeSelectionKind === 'kit' && selectedKitEntry}
-                  <div class="dock-section">
-                    <div class="dock-section-title">Value Control</div>
-                    <div class="segmented">
-                      <button type="button" class:active={selectedKitEntry.control?.style === 'dial'} onclick={() => convertSelectedValueControl('dial')}>Dial</button>
-                      <button type="button" class:active={selectedKitEntry.control?.style === 'horizontal'} onclick={() => convertSelectedValueControl('horizontal')}>Horizontal</button>
-                      <button type="button" class:active={selectedKitEntry.control?.style === 'vertical'} onclick={() => convertSelectedValueControl('vertical')}>Vertical</button>
-                    </div>
-                    <div class="mini-list">
-                      <div>
-                        <strong>Style</strong>
-                        <span>{valueControlStyleLabel(selectedKitEntry.control?.style)}</span>
-                      </div>
-                      <div>
-                        <strong>Channel</strong>
-                        <span>{selectedKitEntry.control?.channelName ?? 'value'}</span>
-                      </div>
-                      <div>
-                        <strong>Range</strong>
-                        <span>{selectedKitEntry.control?.min ?? 0} to {selectedKitEntry.control?.max ?? 127}</span>
-                      </div>
-                      <div>
-                        <strong>Ticks</strong>
-                        <span>{selectedKitEntry.control?.tickCount ?? 0}</span>
-                      </div>
-                      <div>
-                        <strong>Parts</strong>
-                        <span>{selectedKitEntry.layerNames.length} layers</span>
-                      </div>
-                      <div>
-                        <strong>Hit Zones</strong>
-                        <span>{selectedKitEntry.zoneNames.length}</span>
-                      </div>
-                    </div>
-                    <div class="dock-note">One smart value control — ticks, track, pointer, readout and hit area stay grouped.</div>
-                    <div class="dock-button-grid">
-                      <button type="button" onclick={() => editKitParts(selectedKitEntry.id)}>Edit internal parts</button>
-                      <button type="button" class="danger" onclick={removeSelectedKit}>
-                        <Trash2 size={13} aria-hidden="true" />
-                        <span>Delete</span>
-                      </button>
-                    </div>
-                  </div>
-                {/if}
-
-                {#if activeSelectionKind === 'layer' && selectedPart}
-                  <div class="dock-section">
-                    <div class="dock-section-title">Layer</div>
-                    <label class="dock-field wide">
-                      <span>Name</span>
-                      <input
-                        type="text"
-                        value={selectedLayer}
-                        disabled={!canManageLayer || multiSelectionActive}
-                        onblur={renameSelectedLayer}
-                        onchange={renameSelectedLayer}
-                      />
-                    </label>
-                    <div class="dock-button-grid">
-                      <button type="button" onclick={duplicateSelectedLayer} disabled={!canManageLayer} title="Duplicate layer">
-                        <Copy size={13} aria-hidden="true" />
-                        <span>Duplicate</span>
-                      </button>
-                      <button type="button" onclick={() => moveSelectedLayerToExtreme('front')} disabled={!canManageLayer} title="Bring to front">Front</button>
-                      <button type="button" onclick={() => moveSelectedLayerToExtreme('back')} disabled={!canManageLayer} title="Send to back">Back</button>
-                      <button type="button" onclick={toggleSelectedVisibility} disabled={!canManageLayer} title={selectedAuthoredPart?.visible === false ? 'Show layer' : 'Hide layer'}>
-                        {#if selectedAuthoredPart?.visible === false}
-                          <Eye size={13} aria-hidden="true" />
-                          <span>Show</span>
-                        {:else}
-                          <EyeOff size={13} aria-hidden="true" />
-                          <span>Hide</span>
-                        {/if}
-                      </button>
-                      <button type="button" onclick={toggleSelectedLock} disabled={!canManageLayer} title={selectedAuthoredPart?.locked === true ? 'Unlock layer' : 'Lock layer'}>
-                        {#if selectedAuthoredPart?.locked === true}
-                          <Unlock size={13} aria-hidden="true" />
-                          <span>Unlock</span>
-                        {:else}
-                          <Lock size={13} aria-hidden="true" />
-                          <span>Lock</span>
-                        {/if}
-                      </button>
-                      <button type="button" class="danger" onclick={removeSelectedLayer} disabled={!canManageLayer} title="Delete layer">
-                        <Trash2 size={13} aria-hidden="true" />
-                        <span>Delete</span>
-                      </button>
-                    </div>
-                  </div>
-                {/if}
-
-                {#if activeSelectionKind === 'hitZone' && selectedZone}
-                  <div class="dock-section">
-                    <div class="dock-section-title">Hit Zone</div>
-                    <label class="dock-field">
-                      <span>Shape</span>
-                      <select value={selectedZone?.shape ?? 'rectangle'} disabled={!selectedZoneEditable} onchange={(event) => setHitZoneProperty('shape', event.currentTarget.value)}>
-                        <option value="rectangle">Rectangle</option>
-                        <option value="circle">Circle</option>
-                        <option value="ring">Ring</option>
-                      </select>
-                    </label>
-                    <label class="dock-field">
-                      <span>Action</span>
-                      <select value={selectedZone?.action ?? 'dragValue'} disabled={!selectedZoneEditable} onchange={(event) => setHitZoneProperty('action', event.currentTarget.value)}>
-                        <option value="dragValue">Drag value</option>
-                        <option value="setValue">Set value</option>
-                        <option value="cycleValue">Cycle value</option>
-                        <option value="trigger">Trigger</option>
-                      </select>
-                    </label>
-                    <label class="dock-field">
-                      <span>Enabled</span>
-                      <input type="checkbox" checked={selectedZone?.enabled !== false} disabled={!selectedZoneEditable} onchange={(event) => setHitZoneProperty('enabled', event.currentTarget.checked)} />
-                    </label>
-                  </div>
-                {/if}
-
-                {#if activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
-                  <div class="dock-section">
-                    <div class="dock-section-title">Transform</div>
-                    <div class="dock-number-grid">
-                      <label>
-                        <span>X</span>
-                        <NumberCell
-                          value={Math.round(activeSelectionFrame.left)}
-                          disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(value) => {
-                            const frame = { ...activeSelectionFrame, left: value };
-                            if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                            else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-                          }}
-                        />
-                      </label>
-                      <label>
-                        <span>Y</span>
-                        <NumberCell
-                          value={Math.round(activeSelectionFrame.top)}
-                          disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(value) => {
-                            const frame = { ...activeSelectionFrame, top: value };
-                            if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                            else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-                          }}
-                        />
-                      </label>
-                      <label>
-                        <span>W</span>
-                        <NumberCell
-                          min={1}
-                          value={Math.round(activeSelectionFrame.width)}
-                          disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(value) => {
-                            const frame = { ...activeSelectionFrame, width: Math.max(1, value) };
-                            if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                            else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-                          }}
-                        />
-                      </label>
-                      <label>
-                        <span>H</span>
-                        <NumberCell
-                          min={1}
-                          value={Math.round(activeSelectionFrame.height)}
-                          disabled={activeSelectionKind === 'layer' ? !selectedPartEditable : !selectedZoneEditable}
-                          onchange={(value) => {
-                            const frame = { ...activeSelectionFrame, height: Math.max(1, value) };
-                            if (activeSelectionKind === 'hitZone') applyControlPatch(core.id, patchFromZoneFrame(selectedAuthoredZone, frame));
-                            else applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
-                          }}
-                        />
-                      </label>
-                      {#if activeSelectionKind === 'layer'}
-                        <label>
-                          <span>Rot</span>
-                          <NumberCell
-                            step={1}
-                            value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.rotation, 0))}
-                            defaultValue={0}
-                            disabled={!selectedPartEditable}
-                            onchange={(value) => setLayerLayoutProperty('rotation', normalizeRotation(value))}
-                          />
-                        </label>
-                        <label>
-                          <span>Pivot X</span>
-                          <NumberCell
-                            step={1}
-                            value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.pivotX, 50))}
-                            defaultValue={50}
-                            disabled={!selectedPartEditable}
-                            onchange={(value) => setLayerLayoutProperty('pivotX', value)}
-                          />
-                        </label>
-                        <label>
-                          <span>Pivot Y</span>
-                          <NumberCell
-                            step={1}
-                            value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.pivotY, 50))}
-                            defaultValue={50}
-                            disabled={!selectedPartEditable}
-                            onchange={(value) => setLayerLayoutProperty('pivotY', value)}
-                          />
-                        </label>
-                      {/if}
-                    </div>
-                    {#if activeSelectionKind === 'layer'}
-                      <label class="dock-field" title="Keep this part's authored size and font when instances scale">
-                        <span>Pin size</span>
-                        <input
-                          type="checkbox"
-                          checked={selectedAuthoredPart?._children?.Layout?.pinned === true}
-                          disabled={!selectedPartEditable}
-                          onchange={(event) => setLayerLayoutProperty('pinned', event.currentTarget.checked)}
-                        />
-                      </label>
-                    {/if}
-                    {#if activeSelectionKind === 'layer'}
-                      <div class="dock-section-subtitle">Rotation Pivot</div>
-                      <div class="pivot-actions">
-                        <button
-                          type="button"
-                          disabled={!selectedPartEditable || !selectedArcPivotTarget}
-                          onclick={setSelectedPivotToArcCenter}
-                          title={selectedArcPivotTarget ? `Set pivot to ${selectedArcPivotTarget.name} center` : 'No arc/value arc layer available'}
-                        >
-                          Rotate around arc centre
-                        </button>
-                        <span>{selectedArcPivotTarget ? selectedArcPivotTarget.name : 'No arc found'}</span>
-                      </div>
-                    {/if}
-                    <div class="dock-section-subtitle">Quick Positioning</div>
-                    <div class="align-grid">
-                      <button type="button" onclick={() => alignSelection('left')}>Left</button>
-                      <button type="button" onclick={() => alignSelection('centerX')}>Center X</button>
-                      <button type="button" onclick={() => alignSelection('right')}>Right</button>
-                      <button type="button" onclick={() => alignSelection('top')}>Top</button>
-                      <button type="button" onclick={() => alignSelection('centerY')}>Center Y</button>
-                      <button type="button" onclick={() => alignSelection('bottom')}>Bottom</button>
-                    </div>
-                  </div>
-                {/if}
-              {/if}
-            {:else if inspectorTab === 'display'}
-              {#if activeSelectionKind === 'layer' && selectedPart}
-                <div class="dock-section">
-                  <div class="dock-section-title">Paint</div>
-                  {#if selectedBackground}
-                    <div class="paint-grid">
-                      <label>
-                        <span>Fill</span>
-                        <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedFill?.colour)} onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)} title="Pick fill colour"></button>
-                      </label>
-                      <label>
-                        <span>Stroke</span>
-                        <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedBorder?.colour, 'FFFFFF')} onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)} title="Pick stroke colour"></button>
-                      </label>
-                      <label>
-                        <span>Stroke W</span>
-                        <NumberCell min={0} max={32} step={1} value={numberOr(selectedBorder?.thickness, 0)} defaultValue={0} disabled={!canPaintLayer} onchange={(value) => setLayerProperty('Background.Border.thickness', value)} />
-                      </label>
-                      <label>
-                        <span>Radius</span>
-                        <NumberCell min={0} max={999} step={1} value={numberOr(selectedCorners?.radius, 0)} defaultValue={0} disabled={!canPaintLayer} onchange={(value) => setLayerProperty('Background.Corners.radius', value)} />
-                      </label>
-                    </div>
-                  {/if}
-                  {#if selectedText}
-                    <label class="dock-field wide">
-                      <span>Text</span>
-                      <input type="text" value={selectedText?.content ?? ''} disabled={!canPaintLayer} oninput={(event) => setLayerProperty('Text.content', event.currentTarget.value)} />
-                    </label>
-                    <div class="paint-grid">
-                      <label>
-                        <span>Text Color</span>
-                        <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedTextFill?.colour, 'FFFFFF')} onclick={() => openLayerColour('Text.Fill.colour', selectedTextFill?.colour)} title="Pick text colour"></button>
-                      </label>
-                      <label>
-                        <span>Size</span>
-                        <NumberCell min={6} max={144} step={1} value={numberOr(selectedTextFont?.size, 12)} defaultValue={12} disabled={!canPaintLayer} onchange={(value) => setLayerProperty('Text.Font.size', value)} />
-                      </label>
-                    </div>
-                  {/if}
-                  <label class="dock-field wide">
-                    <span>Opacity</span>
-                    <input type="range" min="0" max="1" step="0.01" value={numberOr(selectedAuthoredPart?.opacity, 1)} disabled={!canPaintLayer} oninput={(event) => setLayerProperty('opacity', numericInputValue(event, 1))} />
-                    <strong>{Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}%</strong>
-                  </label>
-                </div>
-
-                {#if selectedIsArc}
-                  <div class="dock-section">
-                    <div class="dock-section-title">Arc</div>
-                    <div class="dock-number-grid">
-                      <label>
-                        <span>Start</span>
-                        <NumberCell step={1} value={Math.round(numberOr(selectedArcMeta?.startAngle, -135))} defaultValue={-135} onchange={(value) => setArcMetaProperty('startAngle', normalizeRotation(value))} />
-                      </label>
-                      <label>
-                        <span>Sweep</span>
-                        <NumberCell min={1} max={360} step={1} value={Math.round(numberOr(selectedArcMeta?.sweepAngle, 270))} defaultValue={270} onchange={(value) => setArcMetaProperty('sweepAngle', Math.max(1, Math.min(360, value)))} />
-                      </label>
-                      <label>
-                        <span>Thick</span>
-                        <NumberCell
-                          min={1}
-                          max={48}
-                          step={1}
-                          value={Math.round(numberOr(selectedArcMeta?.thickness, 4))}
-                          defaultValue={4}
-                          onchange={(value) => {
-                            const thickness = Math.max(1, Math.min(48, value));
-                            setArcMetaProperty('thickness', thickness);
-                            setLayerProperty('Background.Border.thickness', thickness);
-                          }}
-                        />
-                      </label>
-                    </div>
-                    <label class="dock-field">
-                      <span>Colour</span>
-                      <button type="button" class="mini-swatch-btn"
-                        style={swatchCss(selectedArcMeta?.colour, '5B9BD5')}
-                        onclick={openArcColour}
-                        title="Pick arc colour"
-                      ></button>
-                    </label>
-                    <label class="dock-field">
-                      <span>Direction</span>
-                      <div class="dock-toggle-row">
-                        <button type="button" class:active={selectedArcMeta?.direction !== 'ccw'} onclick={() => setArcMetaProperty('direction', 'cw')}>CW</button>
-                        <button type="button" class:active={selectedArcMeta?.direction === 'ccw'} onclick={() => setArcMetaProperty('direction', 'ccw')}>CCW</button>
-                      </div>
-                    </label>
-                    <label class="dock-field">
-                      <span>Caps</span>
-                      <div class="dock-toggle-row">
-                        <button type="button" class:active={selectedArcMeta?.cap !== 'round'} onclick={() => setArcMetaProperty('cap', 'flat')}>Flat</button>
-                        <button type="button" class:active={selectedArcMeta?.cap === 'round'} onclick={() => setArcMetaProperty('cap', 'round')}>Round</button>
-                      </div>
-                    </label>
-                  </div>
-                {/if}
-              {:else if activeSelectionKind === 'hitZone' && selectedZone}
-                <div class="dock-section">
-                  <div class="dock-section-title">Zone Display</div>
-                  <label class="dock-field">
-                    <span>Visible</span>
-                    <input type="checkbox" checked={selectedZone?.visibleInEditor !== false} disabled={!selectedZoneEditable} onchange={(event) => setHitZoneProperty('visibleInEditor', event.currentTarget.checked)} />
-                  </label>
-                  <label class="dock-field">
-                    <span>Priority</span>
-                    <NumberCell value={numberOr(selectedZone?.priority, 0)} defaultValue={0} disabled={!selectedZoneEditable} onchange={(value) => setHitZoneProperty('priority', value)} />
-                  </label>
-                </div>
-              {:else}
-                <div class="dock-empty">Select a layer to edit its styling.</div>
-              {/if}
-            {:else if inspectorTab === 'behavior'}
-              <div class="dock-section">
-                <div class="dock-section-title">Interaction</div>
-                {#if activeSelectionKind === 'hitZone' && selectedZone}
-                  <label class="dock-field">
-                    <span>Behavior</span>
-                    <select value={selectedZone?.targetBehavior ?? ''} disabled={!selectedZoneEditable} onchange={(event) => setHitZoneProperty('targetBehavior', event.currentTarget.value)}>
-                      {#each behaviorEntries as [name] (name)}
-                        <option value={name}>{name}</option>
-                      {/each}
-                    </select>
-                  </label>
-                  <label class="dock-field">
-                    <span>Channel</span>
-                    <select value={selectedZone?.targetValueChannel ?? ''} disabled={!selectedZoneEditable} onchange={(event) => setHitZoneProperty('targetValueChannel', event.currentTarget.value)}>
-                      {#each valueChannelEntries as [name] (name)}
-                        <option value={name}>{name}</option>
-                      {/each}
-                    </select>
-                  </label>
-                {:else}
-                  <div class="dock-note">Use hit zones to make artwork interactive.</div>
-                {/if}
-              </div>
-            {:else if inspectorTab === 'states'}
-              <div class="dock-section">
-                <div class="dock-section-title">Preview</div>
-                <label class="dock-field">
-                  <span>Bounds</span>
-                  <input type="checkbox" checked={showBounds} onchange={(event) => setPreviewFlag('showBounds', event.currentTarget.checked)} />
-                </label>
-                <label class="dock-field">
-                  <span>Gen Names</span>
-                  <input type="checkbox" checked={showGeneratedLabels} onchange={(event) => setPreviewFlag('showGeneratedLabels', event.currentTarget.checked)} />
-                </label>
-                <label class="dock-field">
-                  <span>Zones</span>
-                  <input type="checkbox" checked={showHitZones} onchange={(event) => setPreviewFlag('showHitZones', event.currentTarget.checked)} />
-                </label>
-                <div class="segmented">
-                  <button type="button" class:active={zoneDisplayMode === 'selected'} onclick={() => setZoneDisplayMode('selected')}>Sel</button>
-                  <button type="button" class:active={zoneDisplayMode === 'dim'} onclick={() => setZoneDisplayMode('dim')}>Dim</button>
-                  <button type="button" class:active={zoneDisplayMode === 'all'} onclick={() => setZoneDisplayMode('all')}>All</button>
-                </div>
-              </div>
-              <div class="dock-section">
-                <div class="dock-section-title">States</div>
-                <div class="dock-note">States are authored on the filmstrip below the canvas and in the panel's States tab.</div>
-              </div>
-            {/if}
+            <SurfaceDockInspector
+              {inspectorTab}
+              {activeSelectionKind} {activeSelectionName} {activeSelectionFrame} {multiSelectionActive}
+              {selectedLayer} {selectedPart} {selectedAuthoredPart} {selectedPartEditable}
+              {selectedZone} {selectedZoneEditable} {selectedKitEntry}
+              {selectedBackground} {selectedFill} {selectedBorder} {selectedCorners}
+              {selectedText} {selectedTextFill} {selectedTextFont}
+              {selectedIsArc} {selectedArcMeta} {selectedArcPivotTarget}
+              {canPaintLayer} {canManageLayer}
+              {parts} {states} {behaviorEntries} {valueChannelEntries} {artboardWidth} {artboardHeight}
+              {showBounds} {showGeneratedLabels} {showHitZones} {zoneDisplayMode}
+              {setLayerProperty} {setLayerLayoutProperty} {setHitZoneProperty}
+              {setArcMetaProperty} {setSelectedPivotToArcCenter}
+              {setSelectionFramePosition} {setSelectionFrameSize} {setArtboardSize}
+              {setPreviewFlag} {setZoneDisplayMode} {alignSelection}
+              {openLayerColour} {openArcColour} {renameSelectedLayer}
+              {duplicateSelectedLayer} {moveSelectedLayerToExtreme}
+              {toggleSelectedLock} {toggleSelectedVisibility}
+              {removeSelectedLayer} {removeSelectedKit} {convertSelectedValueControl}
+              {editKitParts} {fitArtboardToView}
+            />
           </div>
         </section>
       </div>
 
     {#if !designerPreviewing}
-    <div class="tool-strip" aria-label="Surface tools">
-      <button
-        type="button"
-        class:active={activeTool === 'select'}
-        title="Select (V)"
-        onclick={() => setActiveTool('select')}
-      >
-        <span class="tool-icon select"></span>
-        <strong>Select</strong>
-      </button>
-
-      <div class="tool-flyout-host">
-        <button
-          type="button"
-          class:active={shapeToolActive}
-          title={`Shape: ${activeShapeTool.label} (${activeShapeTool.key})`}
-          aria-haspopup="menu"
-          aria-expanded={shapeFlyoutOpen}
-          onclick={toggleShapeFlyout}
-        >
-          <span class={`tool-icon ${activeShapeTool.id}`}></span>
-          <strong>Shape: {activeShapeTool.label}</strong>
-        </button>
-        {#if shapeFlyoutOpen}
-          <div class="tool-flyout" role="menu" aria-label="Shape tools">
-            {#each SHAPE_TOOLS as tool (tool.id)}
-              <button
-                type="button"
-                role="menuitem"
-                class:active={activeTool === tool.id}
-                title={`${tool.label} (${tool.key})`}
-                onclick={(event) => { event.stopPropagation(); setActiveTool(tool.id); }}
-              >
-                <span class={`tool-icon ${tool.id}`}></span>
-                <span>{tool.label}</span>
-                <kbd>{tool.key}</kbd>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-
-      <button
-        type="button"
-        class:active={activeTool === 'text'}
-        title="Text (T)"
-        onclick={() => setActiveTool('text')}
-      >
-        <span class="tool-icon text"></span>
-        <strong>Text</strong>
-      </button>
-
-      <button
-        type="button"
-        class:active={activeTool === 'hitZone'}
-        title="Hit Zone (H)"
-        onclick={() => setActiveTool('hitZone')}
-      >
-        <span class="tool-icon hitZone"></span>
-        <strong>Hit Zone</strong>
-      </button>
-
-      <div class="tool-flyout-host">
-        <button
-          type="button"
-          class:active={activeTool === 'interactive'}
-          title={`Make Interactive: ${activeInteractiveMeta.label} (I) — draw a pre-wired control`}
-          aria-haspopup="menu"
-          aria-expanded={interactiveFlyoutOpen}
-          onclick={toggleInteractiveFlyout}
-        >
-          <span class="tool-icon interactive"></span>
-          <strong>Interactive: {activeInteractiveMeta.label}</strong>
-        </button>
-        {#if interactiveFlyoutOpen}
-          <div class="tool-flyout" role="menu" aria-label="Interactive archetypes">
-            {#each INTERACTIVE_ARCHETYPES as archetype (archetype.id)}
-              <button
-                type="button"
-                role="menuitem"
-                class:active={activeTool === 'interactive' && interactiveArchetype === archetype.id}
-                title={`Draw a ${archetype.label}`}
-                onclick={(event) => selectInteractiveArchetype(event, archetype.id)}
-              >
-                <span class="tool-icon interactive"></span>
-                <span>{archetype.label}</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-
-      <div class="tool-flyout-host">
-        <button
-          type="button"
-          title="Starters — load an editable archetype into this component"
-          aria-haspopup="menu"
-          aria-expanded={starterFlyoutOpen}
-          onclick={toggleStarterFlyout}
-        >
-          <span class="tool-icon rectangle"></span>
-          <strong>Starters</strong>
-        </button>
-        {#if starterFlyoutOpen}
-          <div class="tool-flyout rich" role="menu" aria-label="Starter components">
-            {#each CUSTOM_COMPONENT_STARTERS as starter (starter.id)}
-              <button type="button" role="menuitem" title={starter.summary} onclick={(event) => applyStarterFromFlyout(event, starter)}>
-                <span class="rich-copy">
-                  <span>{starter.label}</span>
-                  <small>{starter.creates.join(' + ')}</small>
-                </span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-
-      <div class="tool-flyout-host">
-        <button
-          type="button"
-          title="Assistant — apply a setup recipe"
-          aria-haspopup="menu"
-          aria-expanded={assistantFlyoutOpen}
-          onclick={toggleAssistantFlyout}
-        >
-          <span class="tool-icon hitZone"></span>
-          <strong>Assistant</strong>
-        </button>
-        {#if assistantFlyoutOpen}
-          <div class="tool-flyout rich" role="menu" aria-label="Assistant recipes">
-            {#each CUSTOM_ASSISTANT_RECIPES as recipe (recipe.id)}
-              <button type="button" role="menuitem" title={recipe.summary} onclick={(event) => applyRecipeFromFlyout(event, recipe)}>
-                <span class="rich-copy">
-                  <span>{recipe.label}</span>
-                  <small>{recipe.group} · {recipe.creates.join(' + ')}</small>
-                </span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </div>
+    <SurfaceToolStrip
+      {activeTool}
+      {activeShapeTool}
+      {shapeToolActive}
+      {activeInteractiveMeta}
+      {interactiveArchetype}
+      {shapeFlyoutOpen}
+      {interactiveFlyoutOpen}
+      {starterFlyoutOpen}
+      {assistantFlyoutOpen}
+      shapeTools={SHAPE_TOOLS}
+      interactiveArchetypes={INTERACTIVE_ARCHETYPES}
+      {setActiveTool}
+      {toggleShapeFlyout}
+      {toggleInteractiveFlyout}
+      {selectInteractiveArchetype}
+      {toggleStarterFlyout}
+      {applyStarterFromFlyout}
+      {toggleAssistantFlyout}
+      {applyRecipeFromFlyout}
+    />
     {/if}
 
     {#if !designerPreviewing}
@@ -5057,8 +3890,49 @@
     />
     {/if}
 
+    <SurfaceContextMenu
+      bind:target={contextMenuTarget}
+      {canManageLayer}
+      {canDetachLayer}
+      selectionLabel={activeSelectionLabel}
+      generatorName={contextGeneratorName}
+      kitId={contextKitId}
+      onDuplicate={duplicateSelectedLayer}
+      onBringToFront={() => moveSelectedLayerToExtreme('front')}
+      onSendToBack={() => moveSelectedLayerToExtreme('back')}
+      onBringForward={() => moveLayer(selectedLayer, 1)}
+      onSendBackward={() => moveLayer(selectedLayer, -1)}
+      onToggleLock={toggleSelectedLock}
+      onToggleVisibility={toggleSelectedVisibility}
+      onMakeInteractive={makeSelectedLayerInteractive}
+      onJumpToGenerator={() => editGeneratorForLayer(selectedLayer, selectedAuthoredPart)}
+      onEditKit={() => editKitParts(contextKitId)}
+      onDetach={detachSelectedLayer}
+      onDelete={removeSelectedLayer}
+    />
+
     {#if !designerPreviewing && !displayDockHidden}
-      <div class="surface-display-dock"><DisplayPanel /></div>
+      <div class="surface-display-dock" style={`height:${displayDockHeight}px;`}>
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <div
+          class="display-dock-grip"
+          class:dragging={resizingDisplayDock}
+          role="separator"
+          aria-label="Resize the display panel"
+          aria-orientation="horizontal"
+          tabindex="0"
+          onmousedown={beginDisplayDockResize}
+          ondblclick={() => { displayDockHeight = 340; writeStoredNumber('ce.surface.displayDockHeight', 340); }}
+          onkeydown={(event) => {
+            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+            event.preventDefault();
+            const delta = event.key === 'ArrowUp' ? 16 : -16;
+            displayDockHeight = Math.max(DISPLAY_DOCK_MIN, Math.min(DISPLAY_DOCK_MAX, displayDockHeight + delta));
+            writeStoredNumber('ce.surface.displayDockHeight', displayDockHeight);
+          }}
+        ></div>
+        <DisplayPanel />
+      </div>
     {/if}
 
     <SurfaceHelpOverlay open={helpOverlayOpen} onclose={() => { helpOverlayOpen = false; }} />
@@ -5068,7 +3942,39 @@
 {/if}
 
 <style>
+  /* --------------------------------------------------------------------------------------
+     Dock field metrics, on this surface's own tokens.
+
+     Step 10 of the 2026-08-14 review asks for these fields to be ported "onto the kit (or at
+     least onto its tokens)". Onto the kit is the wrong target and it is worth writing down why:
+     this editor does not render inside the properties panel. EditorCanvas hosts it as a
+     full-window workspace, so `--pp-field-*` never reaches it, and its darker dock is a
+     deliberately different surface rather than a drifted copy of the panel's. Recolouring it to
+     match would make the design workspace look like the inspector it is not.
+
+     What it did share with the panel was the actual problem: metrics as literals, repeated. They
+     are five values here now, so this dock is internally consistent and has the same density knob
+     the panel gained.
+     -------------------------------------------------------------------------------------- */
   .surface-shell {
+    /* The surface's accent. The 2026-07-12 review found the teal identity half-applied — the
+       Scripts chip, the ruler toggle and the zoom cluster wore it while the tool strip, the paint
+       focus rings and every selection outline were still the properties panel's blue. Half a
+       colour scheme reads as a bug in the other half. One token, inherited by the extracted
+       components, so the next person changes it in one place.
+
+       Only CHROME moved. `FF5B9BD5` also appears in the script as the fill a new layer is created
+       with, and that is document data: recolouring it would change what users' components look
+       like, which is not a theming pass. */
+    --surface-accent: #14B8A6;
+    --surface-accent-soft: rgba(20, 184, 166, 0.35);
+    --dk-field-height: 25px;
+    --dk-field-font: 10px;
+    --dk-field-padding: 0 7px;
+    --dk-field-radius: 4px;
+    --dk-field-bg: #101418;
+    --dk-field-border: #3B4650;
+    --dk-field-fg: #E8EEF5;
     display: grid;
     grid-template-columns: var(--palette-w, 220px) minmax(420px, 1fr) var(--dock-w, clamp(340px, 25vw, 430px));
     grid-template-rows: auto minmax(0, 1fr) auto auto auto;
@@ -5085,15 +3991,9 @@
     overflow: hidden;
     outline: none;
   }
-
-  .surface-options-strip { grid-area: toolbar; }
-  .surface-lookbar { grid-area: lookbar; }
-  .palette-panel { grid-area: palette; }
   .surface-viewport { grid-area: canvas; }
   .surface-dock { grid-area: dock; }
   .surface-display-dock { grid-area: display; }
-  /* The floating tool-strip overlaps the bottom of the canvas cell. */
-  .tool-strip { grid-area: canvas; align-self: end; }
 
   .surface-shell.previewing {
     grid-template-columns: 0 minmax(0, 1fr) 0;
@@ -5105,11 +4005,30 @@
 
   /* Shared DisplayPanel docked at the bottom of the centre column. */
   .surface-display-dock {
+    position: relative;
     min-height: 0;
-    height: 340px;
+    /* height comes from the inline style — see beginDisplayDockResize */
     overflow: hidden;
     border-top: 1px solid #26313A;
     background: #0E141A;
+  }
+
+  /* A 6px grab strip over the top border. Double-click restores 340, the height it always was. */
+  .display-dock-grip {
+    position: absolute;
+    top: -3px;
+    left: 0;
+    right: 0;
+    height: 6px;
+    z-index: 5;
+    cursor: ns-resize;
+  }
+
+  .display-dock-grip:hover,
+  .display-dock-grip.dragging,
+  .display-dock-grip:focus-visible {
+    background: var(--surface-accent, #14B8A6);
+    outline: none;
   }
 
   .surface-display-dock :global(.display-panel) {
@@ -5117,264 +4036,9 @@
   }
 
   .surface-shell:focus-within {
-    border-color: #3D6688;
+    border-color: var(--surface-accent-soft, rgba(20, 184, 166, 0.35));
   }
 
-  .surface-shell > .layer-action-strip,
-  .surface-shell > .precision-strip,
-  .surface-shell > .arc-strip {
-    display: none;
-  }
-
-  .tool-strip {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
-    overflow-x: auto;
-    justify-content: center;
-    gap: 5px;
-    min-width: 0;
-    min-height: 0;
-    padding: 8px 6px;
-    background: #171B1F;
-    border-top: 1px solid #2A2A2A;
-    overflow: visible;
-    z-index: 5;
-  }
-
-  .tool-strip button {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr;
-    align-items: center;
-    justify-items: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    background: #22272B;
-    color: #B9C8D4;
-    cursor: pointer;
-    font: inherit;
-    font-size: 10px;
-  }
-
-  .tool-strip button:hover,
-  .tool-strip button.active {
-    border-color: #5B9BD5;
-    background: #173449;
-    color: #EAF5FF;
-  }
-
-  .tool-strip strong {
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    top: auto;
-    z-index: 10;
-    max-width: 140px;
-    transform: translateX(-50%);
-    margin-bottom: 4px;
-    padding: 5px 7px;
-    border: 1px solid #3B4652;
-    border-radius: 4px;
-    background: #12181E;
-    color: #EAF5FF;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.32);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 90ms ease;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .tool-strip button:hover strong,
-  .tool-strip button:focus-visible strong {
-    opacity: 1;
-  }
-
-  .tool-flyout-host {
-    position: relative;
-  }
-
-  .tool-flyout-host {
-    display: flex;
-    align-items: center;
-  }
-
-  /* No divider line: it used to stack above the button, pushing flyout-tool
-     icons ~11px lower than the plain buttons and breaking the row alignment. */
-  .tool-flyout-host::before {
-    display: none;
-  }
-
-  .tool-flyout {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    top: auto;
-    z-index: 30;
-    width: 154px;
-    padding: 6px;
-    border: 1px solid #3B4652;
-    border-radius: 5px;
-    background: #151B21;
-    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.42);
-  }
-
-  /* Starters/Assistant flyouts: two-line entries, scroll when long. */
-  .tool-flyout.rich {
-    width: 236px;
-    max-height: 340px;
-    overflow-y: auto;
-  }
-
-  .tool-flyout.rich button {
-    height: auto;
-    min-height: 36px;
-    grid-template-columns: minmax(0, 1fr);
-    padding: 5px 7px;
-  }
-
-  .rich-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-    text-align: left;
-  }
-
-  .rich-copy small {
-    color: #7E8B98;
-    font-size: 9px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
-  }
-
-  .tool-flyout button {
-    width: 100%;
-    height: 30px;
-    display: grid;
-    grid-template-columns: 20px minmax(0, 1fr) auto;
-    align-items: center;
-    justify-items: start;
-    gap: 7px;
-    margin: 0;
-    padding: 0 7px;
-    border-color: transparent;
-    background: transparent;
-    color: #CBD7E0;
-    text-align: left;
-  }
-
-  .tool-flyout button:hover,
-  .tool-flyout button.active {
-    border-color: #3F6C92;
-    background: #173449;
-    color: #EAF5FF;
-  }
-
-  .tool-flyout span:not(.tool-icon) {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 700;
-  }
-
-  .tool-flyout kbd {
-    min-width: 16px;
-    height: 17px;
-    border: 1px solid #3B4652;
-    border-radius: 3px;
-    background: #0F1419;
-    color: #8DBFE5;
-    font: inherit;
-    font-size: 9px;
-    font-weight: 800;
-    line-height: 15px;
-    text-align: center;
-  }
-
-  .paint-strip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-    padding: 6px 8px;
-    background: #15191C;
-    border-bottom: 1px solid #2A2A2A;
-    color: #B9C8D4;
-    overflow-x: auto;
-  }
-
-  /* Top Look bar: quick-actions toolbar (left) + Scripts (right). */
-  .surface-lookbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    min-height: 50px;
-    padding: 0 10px;
-    background: linear-gradient(180deg, #172027, #11181F);
-    border-bottom: 1px solid #26313A;
-    overflow: hidden;
-  }
-
-  .surface-lookbar .paint-strip {
-    flex: 1;
-    min-width: 0;
-    background: transparent;
-    border-bottom: none;
-    padding: 6px 0;
-  }
-
-  .lookbar-empty {
-    flex: 1;
-    color: #6F7E8A;
-    font-size: 11px;
-    font-style: italic;
-  }
-
-  .lookbar-scripts {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding-left: 14px;
-    border-left: 1px solid #2D3A44;
-    font-size: 11px;
-  }
-
-  .lb-s-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .lb-s-chip {
-    color: #14B8A6;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.03em;
-  }
-
-  .lb-s-count {
-    color: #E6EEF3;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .lb-s-none,
-  .lb-s-hint {
-    color: #7F8B94;
-    font-size: 10px;
-    white-space: nowrap;
-  }
 
   .lb-s-badge {
     padding: 1px 5px;
@@ -5385,87 +4049,9 @@
     font-weight: 700;
   }
 
-  .lb-s-badge.on { color: #14B8A6; }
+  .lb-s-badge.on { color: var(--surface-accent, #14B8A6); }
   .lb-s-badge.off { color: #7F8B94; }
-
-  .lb-s-btn {
-    margin-left: auto;
-    height: 22px;
-    padding: 0 9px;
-    border-radius: 4px;
-    border: 1px solid #2D3A44;
-    background: #18232B;
-    color: #B9C8D4;
-    font-size: 10px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .lb-s-btn:hover {
-    color: #EAF5FF;
-    border-color: rgba(20, 184, 166, 0.5);
-    background: rgba(20, 184, 166, 0.14);
-  }
-
-  .paint-strip.disabled {
-    color: #727D86;
-  }
-
-  .paint-strip label {
-    display: inline-grid;
-    grid-auto-flow: column;
-    align-items: center;
-    gap: 5px;
-    height: 28px;
-    padding: 0 7px;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    background: #202427;
-    font-size: 10px;
-    white-space: nowrap;
-  }
-
-  .paint-strip label:focus-within {
-    border-color: #5B9BD5;
-    box-shadow: 0 0 0 1px rgba(91, 155, 213, 0.35);
-  }
-
-  .paint-strip span,
-  .paint-strip strong {
-    font-weight: 700;
-  }
-
-  .paint-strip input:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  .fill-toggle {
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 1px solid #2E3B45;
-    border-radius: 3px;
-    background: #1A242D;
-    color: #6B7A86;
-    font-size: 10px;
-    font-weight: 800;
-    cursor: pointer;
-    line-height: 1;
-  }
-
-  .fill-toggle.active {
-    border-color: #14B8A6;
-    background: rgba(20, 184, 166, 0.22);
-    color: #8FEDE3;
-  }
-
-  .fill-toggle:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  .mini-swatch-btn {
+  .surface-shell :global(.mini-swatch-btn) {
     width: 22px;
     height: 22px;
     padding: 0;
@@ -5474,32 +4060,17 @@
     cursor: pointer;
     flex-shrink: 0;
   }
-
-  .mini-swatch-btn:disabled {
+  .surface-shell :global(.mini-swatch-btn:disabled) {
     opacity: 0.4;
     cursor: not-allowed;
   }
-
-  .mini-swatch-btn:hover:not(:disabled) {
+  .surface-shell :global(.mini-swatch-btn:hover:not(:disabled)) {
     border-color: rgba(255,255,255,0.4);
   }
-
-  /* Compact editable numeric field (e.g. stroke thickness) in a swatch row. */
-  .swatch-num {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    color: #DFEAF0;
-    font-size: 10px;
-    font-weight: 800;
-    white-space: nowrap;
-  }
-
-  .swatch-num .nc-wrap {
+  .surface-shell :global(.swatch-num .nc-wrap) {
     width: 44px;
   }
-
-  .mini-gradient-btn {
+  .surface-shell :global(.mini-gradient-btn) {
     height: 18px;
     min-width: 32px;
     padding: 0;
@@ -5508,91 +4079,22 @@
     cursor: pointer;
     flex-shrink: 0;
   }
-
-  .mini-gradient-btn.wide {
+  .surface-shell :global(.mini-gradient-btn.wide) {
     min-width: 60px;
     flex: 1;
   }
-
-  .mini-gradient-btn:disabled {
+  .surface-shell :global(.mini-gradient-btn:disabled) {
     opacity: 0.4;
     cursor: not-allowed;
   }
-
-  .nc-wrap {
+  .surface-shell :global(.nc-wrap) {
     display: flex;
   }
-
-  .paint-number .nc-wrap {
+  .surface-shell :global(.paint-number .nc-wrap) {
     width: 46px;
   }
-
-  .paint-number.text-size .nc-wrap {
+  .surface-shell :global(.paint-number.text-size .nc-wrap) {
     width: 54px;
-  }
-
-  .text-content-field {
-    min-width: 176px;
-  }
-
-  .text-content-field input {
-    width: 128px;
-    min-width: 0;
-    box-sizing: border-box;
-    border: 1px solid #3B4650;
-    border-radius: 3px;
-    background: #111518;
-    color: #E8EEF5;
-    font: inherit;
-    font-size: 10px;
-  }
-
-  .paint-opacity {
-    min-width: 160px;
-  }
-
-  .paint-opacity input {
-    width: 78px;
-    accent-color: #5B9BD5;
-  }
-
-  .paint-opacity strong {
-    width: 34px;
-    text-align: right;
-    color: #E8EEF5;
-  }
-
-  .layer-action-strip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-    padding: 6px 8px;
-    background: #171717;
-    border-bottom: 1px solid #2A2A2A;
-    color: #B9C8D4;
-    overflow-x: auto;
-  }
-
-  .layer-action-strip.disabled {
-    color: #727D86;
-  }
-
-  .layer-action-strip button,
-  .rename-field {
-    height: 28px;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    background: #22272B;
-    color: #B9C8D4;
-    font: inherit;
-    font-size: 10px;
-  }
-
-  .layer-action-strip button {
-    cursor: pointer;
-    font-weight: 700;
-    white-space: nowrap;
   }
 
   .action-icon {
@@ -5615,104 +4117,6 @@
     color: #F3D39A;
   }
 
-  .layer-action-strip button:hover:not(:disabled) {
-    border-color: #5B9BD5;
-    background: #173449;
-    color: #EAF5FF;
-  }
-
-  .layer-action-strip button.danger:hover:not(:disabled) {
-    border-color: #D65A5A;
-    background: #4B2020;
-    color: #FFE8E8;
-  }
-
-  .layer-action-strip button:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  .rename-field {
-    display: inline-grid;
-    grid-template-columns: auto 120px;
-    align-items: center;
-    gap: 6px;
-    padding: 0 7px;
-  }
-
-  .rename-field span {
-    font-weight: 700;
-  }
-
-  .rename-field input {
-    width: 120px;
-    min-width: 0;
-    box-sizing: border-box;
-    border: 1px solid #3B4650;
-    border-radius: 3px;
-    background: #111518;
-    color: #E8EEF5;
-    font: inherit;
-    font-size: 10px;
-  }
-
-  .precision-strip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-    padding: 6px 8px;
-    background: #141719;
-    border-bottom: 1px solid #2A2A2A;
-    color: #B9C8D4;
-    overflow-x: auto;
-  }
-
-  .precision-strip label,
-  .precision-strip button {
-    display: inline-grid;
-    grid-auto-flow: column;
-    align-items: center;
-    gap: 5px;
-    height: 26px;
-    padding: 0 7px;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    background: #202427;
-    color: #B9C8D4;
-    font: inherit;
-    font-size: 10px;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .precision-strip .nc-wrap {
-    width: 54px;
-    min-width: 0;
-  }
-
-  .precision-strip button {
-    cursor: pointer;
-  }
-
-  .precision-strip button:hover {
-    border-color: #5B9BD5;
-    background: #173449;
-    color: #EAF5FF;
-  }
-
-  .arc-strip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-    padding: 6px 8px;
-    border-bottom: 1px solid #2A2A2A;
-    background: #171C20;
-    color: #B9C8D4;
-    overflow-x: auto;
-  }
-
   .preset-label {
     font-size: 9px;
     color: #7A8894;
@@ -5724,138 +4128,19 @@
     align-items: center;
     gap: 4px;
   }
-
-  .preset-swatches .mini-swatch-btn.active {
-    outline: 2px solid #5B9BD5;
+  .surface-shell :global(.preset-swatches .mini-swatch-btn.active) {
+    outline: 2px solid var(--surface-accent, #14B8A6);
     outline-offset: 1px;
   }
 
-  .arc-strip > strong {
-    color: #E5C06B;
-    font-size: 10px;
-    text-transform: uppercase;
-  }
-
-  .arc-strip label {
-    display: inline-grid;
-    grid-auto-flow: column;
-    align-items: center;
-    gap: 5px;
-    height: 26px;
-    padding: 0 7px;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    background: #202427;
-    color: #B9C8D4;
-    font-size: 10px;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .arc-strip .nc-wrap {
-    width: 58px;
-    min-width: 0;
-  }
-
-  .surface-options-strip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-    padding: 6px 8px;
-    background: #15181A;
-    border-bottom: 1px solid #2A2A2A;
-    color: #B9C8D4;
-    overflow-x: auto;
-  }
-
-  .surface-options-strip label,
-  .surface-options-strip button {
-    display: inline-grid;
-    grid-auto-flow: column;
-    align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 8px;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    background: #202427;
-    color: #B9C8D4;
-    font: inherit;
-    font-size: 10px;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .surface-options-strip button {
-    cursor: pointer;
-  }
-
-  .surface-options-strip button:hover {
-    border-color: #5B9BD5;
-    background: #173449;
-    color: #EAF5FF;
-  }
-
-  .surface-options-strip .surface-command {
-    border-color: #3B4650;
-    background: #1D252B;
-  }
-
-  .surface-options-strip .surface-command.accent {
-    border-color: rgba(229, 160, 41, 0.56);
-    color: #FFE6B2;
-  }
-
-  .surface-options-strip .surface-command.danger {
-    border-color: rgba(225, 88, 88, 0.5);
-    color: #FFD4D4;
-  }
-
-  .surface-options-strip .surface-command:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  .zone-mode-control {
-    display: inline-flex;
-    align-items: center;
-    height: 28px;
-    padding: 0 2px;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    background: #202427;
-  }
-
-  .surface-options-strip .zone-mode-control button {
-    height: 22px;
-    padding: 0 7px;
-    border-color: transparent;
-    background: transparent;
-  }
-
-  .surface-options-strip .zone-mode-control button.active {
-    border-color: rgba(229, 160, 41, 0.5);
-    background: rgba(229, 160, 41, 0.16);
-    color: #FFE6B2;
-  }
-
-  .surface-options-strip input[type='checkbox'] {
-    accent-color: #5B9BD5;
-  }
-
-  .surface-options-strip .snap-size .nc-wrap {
-    width: 52px;
-  }
-
-  .tool-icon {
+  .surface-shell :global(.tool-icon) {
     position: relative;
     width: 16px;
     height: 16px;
     display: block;
   }
 
-  .tool-icon.select::before {
+  .surface-shell :global(.tool-icon.select::before) {
     content: '';
     position: absolute;
     left: 4px;
@@ -5867,23 +4152,22 @@
     border-bottom: 5px solid transparent;
     transform: rotate(45deg);
   }
-
-  .tool-icon.rectangle::before,
-  .tool-icon.roundedRectangle::before,
-  .tool-icon.text::before {
+  .surface-shell :global(.tool-icon.rectangle::before),
+  .surface-shell :global(.tool-icon.roundedRectangle::before),
+  .surface-shell :global(.tool-icon.text::before) {
     content: '';
     position: absolute;
     inset: 3px 2px;
     border: 2px solid #DCEBFA;
   }
 
-  .tool-icon.roundedRectangle::before {
+  .surface-shell :global(.tool-icon.roundedRectangle::before) {
     border-radius: 4px;
   }
 
   /* Capsule — an elongated stadium pill: short, with straight sides and
      fully rounded ends. */
-  .tool-icon.capsule::before {
+  .surface-shell :global(.tool-icon.capsule::before) {
     content: '';
     position: absolute;
     inset: 5px 1px;
@@ -5893,7 +4177,7 @@
 
   /* Ellipse — a smooth oval, wider than tall (true elliptical curve, not a
      stadium). border-radius:50% is what makes the sides curve continuously. */
-  .tool-icon.ellipse::before {
+  .surface-shell :global(.tool-icon.ellipse::before) {
     content: '';
     position: absolute;
     inset: 4px 1px;
@@ -5902,7 +4186,7 @@
   }
 
   /* Ring — a perfect circle with a hole punched out (thick-rimmed donut). */
-  .tool-icon.ring::before {
+  .surface-shell :global(.tool-icon.ring::before) {
     content: '';
     position: absolute;
     inset: 2px;
@@ -5911,7 +4195,7 @@
   }
 
   /* Arc — an open C: a ring segment with a clear gap (two sides removed). */
-  .tool-icon.arcTrack::before {
+  .surface-shell :global(.tool-icon.arcTrack::before) {
     content: '';
     position: absolute;
     inset: 2px;
@@ -5922,7 +4206,7 @@
     transform: rotate(-45deg);
   }
 
-  .tool-icon.text::after {
+  .surface-shell :global(.tool-icon.text::after) {
     content: 'T';
     position: absolute;
     inset: 0;
@@ -5933,7 +4217,7 @@
     text-align: center;
   }
 
-  .tool-icon.hitZone::before {
+  .surface-shell :global(.tool-icon.hitZone::before) {
     content: '';
     position: absolute;
     inset: 2px;
@@ -5941,7 +4225,7 @@
     border-radius: 3px;
   }
 
-  .tool-icon.hitZone::after {
+  .surface-shell :global(.tool-icon.hitZone::after) {
     content: '';
     position: absolute;
     left: 6px;
@@ -5951,10 +4235,6 @@
     border-radius: 999px;
     background: #E5A029;
   }
-
-  /* (.surface-body wrapper removed — the shell itself is the CSS grid now.) */
-
-  .surface-shell.previewing .surface-options-strip,
   .surface-shell.previewing .palette-panel,
   .surface-shell.previewing .surface-dock {
     display: none;
@@ -6032,53 +4312,6 @@
     text-align: center;
   }
 
-  .list-header.secondary {
-    position: static;
-    border-top: 1px solid #2A2A2A;
-  }
-
-  .dock-add-strip {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-    flex-shrink: 0;
-    padding: 6px;
-    border-bottom: 1px solid #252C32;
-    background: #181D22;
-  }
-
-  .dock-add-strip button {
-    display: grid;
-    place-items: center;
-    height: 28px;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    background: #22272B;
-    color: #DCEBFA;
-    cursor: pointer;
-  }
-
-  .dock-add-strip button:hover {
-    border-color: #5B9BD5;
-    background: #173449;
-  }
-
-  .list-scroll {
-    min-height: 0;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .list-scroll.layer-scroll {
-    flex: 0 0 auto;
-    max-height: none;
-  }
-
-  .list-scroll.zones {
-    min-height: 0;
-    max-height: none;
-  }
-
   .dock-generator-editor {
     min-height: 0;
     flex: 0 0 auto;
@@ -6113,7 +4346,7 @@
   }
 
   .dock-live-reset:hover {
-    border-color: #5B9BD5;
+    border-color: var(--surface-accent, #14B8A6);
     color: #FFF;
   }
 
@@ -6213,579 +4446,11 @@
     padding: 8px;
   }
 
-  .dock-section {
-    padding: 9px;
-    border: 1px solid #2D343A;
-    border-radius: 5px;
-    background: #1B2024;
-  }
-
-  .dock-section + .dock-section {
-    margin-top: 8px;
-  }
-
-  .dock-section-title {
-    margin-bottom: 8px;
-    color: #8DBFE5;
-    font-size: 10px;
-    font-weight: 900;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .dock-section-subtitle {
-    margin: 9px 0 2px;
-    color: #7F929F;
-    font-size: 9px;
-    font-weight: 900;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .dock-empty,
-  .dock-note {
-    padding: 10px;
-    border: 1px dashed #35404A;
-    border-radius: 5px;
-    color: #87939E;
-    font-size: 11px;
-    line-height: 1.35;
-  }
-
-  .dock-note {
-    margin-bottom: 8px;
-    border-style: solid;
-    background: #171C20;
-  }
-
-  .dock-field,
-  .dock-number-grid label,
-  .paint-grid label {
-    display: grid;
-    gap: 4px;
-    color: #AFC5D8;
-    font-size: 10px;
-    font-weight: 800;
-  }
-
-  .dock-field {
-    grid-template-columns: 92px minmax(0, 1fr);
-    align-items: center;
-    min-height: 29px;
-    margin-top: 6px;
-  }
-
-  .dock-field.wide {
-    grid-template-columns: 64px minmax(0, 1fr) auto;
-  }
-
-  .dock-field input,
-  .dock-field select {
-    min-width: 0;
-    box-sizing: border-box;
-    border: 1px solid #3B4650;
-    border-radius: 4px;
-    background: #101418;
-    color: #E8EEF5;
-    font: inherit;
-    font-size: 10px;
-  }
-
-  .dock-field input:not([type='checkbox']):not([type='range']),
-  .dock-field select {
-    width: 100%;
-    height: 25px;
-    padding: 0 7px;
-  }
-
-  .dock-field input[type='checkbox'] {
-    width: 16px;
-    height: 16px;
-    accent-color: #5B9BD5;
-  }
-
-  .dock-field input[type='range'] {
-    width: 100%;
-    accent-color: #5B9BD5;
-  }
-
-  .dock-field strong {
-    color: #E8EEF5;
-    font-size: 10px;
-  }
-
-  .dock-button-grid,
-  .align-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 5px;
-    margin-top: 8px;
-  }
-
-  .pivot-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 6px;
-    align-items: center;
-    margin-top: 6px;
-  }
-
-  .dock-button-grid button,
-  .align-grid button,
-  .pivot-actions button,
-  .segmented button {
-    display: inline-grid;
-    grid-auto-flow: column;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    min-width: 0;
-    height: 27px;
-    padding: 0 7px;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    background: #22272B;
-    color: #B9C8D4;
-    cursor: pointer;
-    font: inherit;
-    font-size: 10px;
-    font-weight: 800;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .dock-button-grid button:hover:not(:disabled),
-  .align-grid button:hover,
-  .pivot-actions button:hover:not(:disabled),
-  .segmented button:hover,
-  .segmented button.active {
-    border-color: #5B9BD5;
-    background: #173449;
-    color: #EAF5FF;
-  }
-
-  .dock-button-grid button.danger:hover:not(:disabled) {
-    border-color: #D65A5A;
-    background: #4B2020;
-    color: #FFE8E8;
-  }
-
-  .pivot-actions span {
-    min-width: 0;
-    max-width: 92px;
-    overflow: hidden;
-    color: #8394A0;
-    font-size: 10px;
-    font-weight: 700;
-    text-align: right;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .dock-button-grid button:disabled,
-  .pivot-actions button:disabled,
-  .dock-field input:disabled,
-  .dock-field select:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  .dock-number-grid,
-  .paint-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 7px;
-  }
-
-  .segmented {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
-    margin-top: 8px;
-  }
-
-  .mini-list {
-    display: grid;
-    gap: 4px;
-  }
-
-  .mini-list div {
-    display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
-    gap: 8px;
-    align-items: center;
-    min-height: 27px;
-    padding: 5px 7px;
-    border: 1px solid #2A3036;
-    border-radius: 4px;
-    background: #15191D;
-    color: #87939E;
-    font-size: 10px;
-  }
-
-  .mini-list strong,
-  .mini-list span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .mini-list strong {
-    color: #D4DEE7;
-  }
-
   .dock-hint {
     margin-bottom: 6px;
     color: #6E7B87;
     font-size: 9.5px;
     line-height: 1.45;
-  }
-
-  .list-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: stretch;
-    width: 100%;
-    min-height: 43px;
-    padding: 0;
-    border: 0;
-    border-bottom: 1px solid #252525;
-    background: transparent;
-    color: #C9D5DE;
-    text-align: left;
-    font: inherit;
-  }
-
-  .list-row:hover {
-    background: #202A31;
-  }
-
-  .list-row.selected {
-    background: #173449;
-    color: #F1F8FF;
-    box-shadow:
-      inset 3px 0 0 #5B9BD5,
-      inset 0 0 0 1px rgba(91, 155, 213, 0.34);
-  }
-
-  .list-row.selected:not(.primary) {
-    background: #1E2C36;
-    box-shadow:
-      inset 3px 0 0 rgba(91, 155, 213, 0.68),
-      inset 0 0 0 1px rgba(91, 155, 213, 0.18);
-  }
-
-  .list-row.generated {
-    color: #EACB8C;
-  }
-
-  .list-row.hidden {
-    opacity: 0.58;
-  }
-
-  .list-row.dragging {
-    opacity: 0.42;
-  }
-
-  .list-row.locked strong::after {
-    content: ' locked';
-    color: #E5A029;
-    font-size: 9px;
-    font-weight: 700;
-  }
-
-  .list-row.zone-row.selected {
-    background: #3A2C16;
-    color: #FFF3D8;
-    box-shadow:
-      inset 3px 0 0 #E5A029,
-      inset 0 0 0 1px rgba(229, 160, 41, 0.36);
-  }
-
-  .list-row.kit-row {
-    color: #D9EAF4;
-  }
-
-  .list-row.kit-row.selected {
-    background: #18333A;
-    color: #F2FCFF;
-    box-shadow:
-      inset 3px 0 0 #14B8A6,
-      inset 0 0 0 1px rgba(20, 184, 166, 0.34);
-  }
-
-  .list-row.generated-group-row {
-    color: #F1D8A1;
-    background: #191710;
-  }
-
-  .list-row.generated-group-row:hover {
-    background: #242017;
-  }
-
-  .list-row.generated-group-row.collapsed {
-    background: #151512;
-  }
-
-  .list-row.pulse {
-    animation: row-pulse 720ms ease-out;
-  }
-
-  .row-main {
-    display: grid;
-    grid-template-columns: 46px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 9px;
-    min-width: 0;
-    padding: 6px 8px;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    text-align: left;
-    font: inherit;
-  }
-
-  .layer-thumb {
-    position: relative;
-    width: 42px;
-    height: 30px;
-    overflow: hidden;
-    border: 1px solid #31404A;
-    border-radius: 4px;
-    background:
-      linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
-      linear-gradient(0deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
-      #0C1217;
-    background-size: 7px 7px;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
-  }
-
-  .kit-thumb {
-    display: grid;
-    place-items: center;
-  }
-
-  .kit-thumb.horizontal .kit-thumb-ring,
-  .kit-thumb.vertical .kit-thumb-ring {
-    border: 0 !important;
-    border-radius: 999px !important;
-    background: #5B9BD5 !important;
-  }
-
-  .kit-thumb.horizontal .kit-thumb-ring {
-    width: 28px !important;
-    height: 3px !important;
-  }
-
-  .kit-thumb.vertical .kit-thumb-ring {
-    width: 3px !important;
-    height: 22px !important;
-  }
-
-  .kit-thumb.horizontal .kit-thumb-pointer {
-    width: 3px !important;
-    height: 18px !important;
-    transform: none !important;
-  }
-
-  .kit-thumb.vertical .kit-thumb-pointer {
-    width: 18px !important;
-    height: 3px !important;
-    transform: none !important;
-  }
-
-  .kit-thumb-ring {
-    width: 20px;
-    height: 20px;
-    border: 3px solid #5B9BD5;
-    border-right-color: #14B8A6;
-    border-radius: 999px;
-  }
-
-  .kit-thumb-pointer {
-    position: absolute;
-    width: 4px;
-    height: 14px;
-    border-radius: 99px;
-    background: #EAF6FF;
-    transform: translateY(-4px) rotate(-35deg);
-    transform-origin: 50% 100%;
-  }
-
-  .generated-group-thumb {
-    display: grid;
-    place-items: center;
-    border-color: #6E5A2E;
-    background:
-      linear-gradient(90deg, rgba(229, 192, 107, 0.18) 1px, transparent 1px),
-      linear-gradient(0deg, rgba(229, 192, 107, 0.18) 1px, transparent 1px),
-      #16140E;
-    background-size: 8px 8px;
-  }
-
-  .generated-group-thumb span {
-    width: 23px;
-    height: 15px;
-    border: 1px dashed #E5C06B;
-    border-radius: 3px;
-    box-shadow:
-      5px 4px 0 rgba(229, 192, 107, 0.16),
-      -5px -4px 0 rgba(229, 192, 107, 0.12);
-  }
-
-  .layer-thumb-shape,
-  .zone-thumb-shape {
-    position: absolute;
-    display: grid;
-    place-items: center;
-    min-width: 4px;
-    min-height: 4px;
-    border: 1px solid #5B9BD5;
-    color: #0A1116;
-    font-size: 9px;
-    font-weight: 900;
-    line-height: 1;
-  }
-
-  .layer-thumb-shape.text {
-    background: #E8F3FA !important;
-    border-color: #8FA4B0 !important;
-  }
-
-  .layer-thumb-shape.arc {
-    background: transparent !important;
-    border-width: 3px;
-    border-left-color: transparent !important;
-  }
-
-  .layer-thumb-shape.capsule {
-    border-radius: 999px !important;
-  }
-
-  .zone-thumb {
-    border-color: rgba(229, 160, 41, 0.42);
-    background:
-      linear-gradient(90deg, rgba(229, 160, 41, 0.07) 1px, transparent 1px),
-      linear-gradient(0deg, rgba(229, 160, 41, 0.07) 1px, transparent 1px),
-      #11120E;
-    background-size: 7px 7px;
-  }
-
-  .zone-thumb-shape {
-    border: 1px dashed #E5A029;
-    background: rgba(229, 160, 41, 0.16);
-  }
-
-  .row-text {
-    display: grid;
-    gap: 3px;
-    min-width: 0;
-  }
-
-  .row-badge {
-    justify-self: end;
-    max-width: 58px;
-    overflow: hidden;
-    padding: 2px 5px;
-    border: 1px solid #2F404B;
-    border-radius: 4px;
-    background: #10181E;
-    color: #8FA4B0;
-    font-size: 8px;
-    font-weight: 900;
-    line-height: 1.2;
-    text-overflow: ellipsis;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .row-badge.zone {
-    border-color: rgba(229, 160, 41, 0.34);
-    color: #E5A029;
-  }
-
-  .row-badge.kit {
-    border-color: rgba(20, 184, 166, 0.38);
-    color: #52D7CA;
-  }
-
-  .row-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    padding: 0 6px 0 2px;
-    opacity: 0.18;
-  }
-
-  .list-row.selected .row-actions,
-  .list-row:hover .row-actions,
-  .list-row:focus-within .row-actions {
-    opacity: 1;
-  }
-
-  .row-actions button {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 22px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    background: transparent;
-    color: #AFC5D8;
-    cursor: pointer;
-  }
-
-  .row-actions button:hover {
-    border-color: #5B9BD5;
-    background: rgba(91, 155, 213, 0.18);
-    color: #EAF5FF;
-  }
-
-  .row-actions button:disabled {
-    opacity: 0.32;
-    cursor: not-allowed;
-  }
-
-  .row-actions button:disabled:hover {
-    border-color: transparent;
-    background: transparent;
-    color: #AFC5D8;
-  }
-
-  .row-actions button.selected {
-    border-color: rgba(125, 196, 243, 0.75);
-    background: rgba(91, 155, 213, 0.24);
-    color: #EAF5FF;
-    font-weight: 900;
-  }
-
-  .list-row strong,
-  .list-row em {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .list-row strong {
-    font-size: 11px;
-    font-weight: 700;
-  }
-
-  .list-row em {
-    color: #7F8B94;
-    font-size: 10px;
-    font-style: normal;
-  }
-
-  .list-empty {
-    padding: 12px 10px;
-    color: #666;
-    font-size: 11px;
   }
 
   .surface-scroll {
@@ -6978,7 +4643,7 @@
   }
 
   .part-bound.kit-bound {
-    border: 2px solid #14B8A6;
+    border: 2px solid var(--surface-accent, #14B8A6);
     color: #DFFFFB;
     background: rgba(20, 184, 166, 0.04);
     box-shadow:
@@ -6993,7 +4658,7 @@
   }
 
   .part-bound.selected {
-    border: 2px solid #5B9BD5;
+    border: 2px solid var(--surface-accent, #14B8A6);
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.82),
       0 0 0 4px rgba(91, 155, 213, 0.18),
@@ -7030,7 +4695,7 @@
   }
 
   .part-bound.bounds-hidden.selected {
-    border-color: #5B9BD5;
+    border-color: var(--surface-accent, #14B8A6);
   }
 
   .part-bound > .selection-label,
@@ -7098,7 +4763,7 @@
   .hit-zone > .resize-handle {
     width: 8px;
     height: 8px;
-    background: #5B9BD5;
+    background: var(--surface-accent, #14B8A6);
     border: 1px solid #FFF;
     box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
   }
@@ -7636,128 +5301,6 @@
     border-color: transparent;
   }
 
-  .surface-options-strip {
-    justify-content: space-between;
-    min-height: 31px;
-    padding: 3px 8px;
-    background: linear-gradient(180deg, #172027, #11181F);
-    border-bottom: none;
-    border-top: 1px solid #26313A;
-    scrollbar-width: thin;
-    gap: 12px;
-  }
-
-  .surface-toolbar-left {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: thin;
-  }
-
-  /* Teal zoom controls (right side) — mirrors the Panel Designer's ZoomBar. */
-  .surface-zoombar {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
-  }
-
-  .surface-zoombar .szb-btn {
-    width: 22px;
-    height: 22px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid #2D3A44;
-    border-radius: 4px;
-    background: #18232B;
-    color: #9FB2BF;
-    cursor: pointer;
-    font-size: 13px;
-    line-height: 1;
-    padding: 0;
-  }
-
-  .surface-zoombar .szb-btn:hover {
-    color: #DCEBFA;
-    border-color: #3A4A56;
-  }
-
-  .surface-zoombar .szb-btn.icon {
-    width: auto;
-    padding: 0 5px;
-  }
-
-  .surface-zoombar .szb-btn.toggle-on {
-    color: #14B8A6;
-    border-color: rgba(20, 184, 166, 0.5);
-    background: rgba(20, 184, 166, 0.14);
-  }
-
-  .szb-zoom-value {
-    min-width: 38px;
-    text-align: center;
-    color: #B9C8D4;
-    font-size: 11px;
-    cursor: text;
-    padding: 1px 3px;
-    border-radius: 3px;
-  }
-
-  .szb-zoom-value:hover {
-    background: #1C2831;
-    color: #EAF5FF;
-  }
-
-  .szb-zoom-input {
-    width: 42px;
-    background: #0D1419;
-    border: 1px solid #14B8A6;
-    border-radius: 3px;
-    color: #E8EEF5;
-    font-size: 11px;
-    text-align: center;
-    padding: 1px 3px;
-    outline: none;
-  }
-
-  .szb-inc-label {
-    color: #6F7E8A;
-    font-size: 10px;
-    white-space: nowrap;
-  }
-
-  .surface-zoombar .szb-inc-input {
-    width: 44px;
-  }
-
-  .szb-divider {
-    width: 1px;
-    height: 14px;
-    background: #2D3A44;
-    margin: 0 3px;
-  }
-
-  .surface-options-strip label,
-  .surface-options-strip button,
-  .zone-mode-control {
-    height: 24px;
-    border-color: #2D3A44;
-    border-radius: 4px;
-    background: #18232B;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
-  }
-
-  .surface-options-strip .surface-command.accent {
-    border-color: rgba(20, 184, 166, 0.54);
-    color: #BFFAF2;
-  }
-
-  .surface-options-strip input[type='checkbox'] {
-    accent-color: #14B8A6;
-  }
 
   .surface-viewport {
     position: relative;
@@ -7770,331 +5313,57 @@
     inset: 20px 0 0 20px;
     overflow: auto;
   }
-
-  .tool-strip {
-    gap: 8px;
-    padding: 7px 12px;
-    /* Sits at the bottom of the canvas grid cell (align-self:end above) and
-       floats over the artboard rather than taking its own row. */
-    background: transparent;
-    border-top: none;
-    position: relative;
-    z-index: 6;
-    pointer-events: none;
-  }
-
-  /* Only the buttons should catch clicks — the empty strip lets them fall
-     through to the canvas underneath. */
-  .tool-strip > * {
-    pointer-events: auto;
-  }
-
-  .tool-strip button {
-    width: 38px;
-    height: 38px;
-    border-color: #32414B;
-    background: #172229;
-    color: #D8E6EE;
-  }
-
-  .tool-strip button:hover,
-  .tool-strip button.active {
-    border-color: #14B8A6;
-    background: rgba(20, 184, 166, 0.18);
-    box-shadow:
-      0 0 0 1px rgba(20, 184, 166, 0.22),
-      0 8px 18px rgba(20, 184, 166, 0.08);
-  }
-
-  .tool-flyout {
-    border-color: #31434F;
-    background: #111A21;
-  }
-
-  .tool-icon.rectangle::before,
-  .tool-icon.roundedRectangle::before,
-  .tool-icon.capsule::before,
-  .tool-icon.text::before,
-  .tool-icon.ellipse::before,
-  .tool-icon.ring::before {
+  .surface-shell :global(.tool-icon.rectangle::before),
+  .surface-shell :global(.tool-icon.roundedRectangle::before),
+  .surface-shell :global(.tool-icon.capsule::before),
+  .surface-shell :global(.tool-icon.text::before),
+  .surface-shell :global(.tool-icon.ellipse::before),
+  .surface-shell :global(.tool-icon.ring::before) {
     border-color: #DCEBFA;
   }
 
-  .tool-icon.text::after {
+  .surface-shell :global(.tool-icon.text::after) {
     color: #DCEBFA;
   }
 
-  .palette-panel {
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background:
-      linear-gradient(180deg, rgba(28, 40, 49, 0.96), rgba(15, 22, 28, 0.96)),
-      #111920;
-    border-right: 1px solid #2A3741;
-    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.025);
+  /* Collapsed is an ICON STRIP, not an empty rail.
+     
+     It used to be `display: none` on the whole scroll, so collapsing the palette left a 46px
+     column containing the three pane toggles and nothing else — the 2026-07-12 review's Tier 2
+     item, and a collapse that removes the feature rather than compacting it. The draw tools stay;
+     what goes is everything that needs width to be legible: the group captions, and the rows
+     built around a field or a hex readout rather than a button.
+
+     These reach into SurfacePalette, so they are :global — the state class lives on the shell and
+     the elements belong to the child. */
+  .surface-shell.palette-collapsed :global(.palette-scroll) {
+    padding: 4px 0;
   }
 
-  .palette-scroll {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 12px 12px 16px;
-    scrollbar-width: thin;
-  }
-
-  /* Pane-toggle footer pinned at the bottom of the palette (like the normal
-     editor's IconPanel toggles). Stays visible even when the palette collapses. */
-  .palette-toggles {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    margin-top: auto;
-    padding: 8px 6px;
-    border-top: 1px solid #26313A;
-    background: rgba(13, 19, 24, 0.55);
-  }
-
-  .palette-toggles button {
-    width: 34px;
-    height: 30px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid #2E3B45;
-    border-radius: 5px;
-    background: #172229;
-    color: #8A99A5;
-    cursor: pointer;
-  }
-
-  .palette-toggles button:hover {
-    color: #DCEBFA;
-    border-color: #3A4A56;
-  }
-
-  .palette-toggles button.active {
-    color: #14B8A6;
-    border-color: rgba(20, 184, 166, 0.5);
-    background: rgba(20, 184, 166, 0.12);
-  }
-
-  .surface-shell.palette-collapsed .palette-scroll {
+  .surface-shell.palette-collapsed :global(.palette-header),
+  .surface-shell.palette-collapsed :global(.palette-group > span),
+  .surface-shell.palette-collapsed :global(.palette-stepper),
+  .surface-shell.palette-collapsed :global(.palette-swatch-row),
+  .surface-shell.palette-collapsed :global(.palette-corner) {
     display: none;
+  }
+
+  .surface-shell.palette-collapsed :global(.palette-group) {
+    gap: 0;
+    padding: 2px 0;
+  }
+
+  .surface-shell.palette-collapsed :global(.palette-grid) {
+    grid-template-columns: 1fr;
+    padding: 0 6px;
   }
 
   .surface-shell.palette-collapsed .palette-toggles {
     flex-direction: column;
     padding: 8px 4px;
   }
-
-  .palette-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-    color: #E7F2F7;
-  }
-
-  .palette-header strong {
-    font-size: 12px;
-    font-weight: 800;
-  }
-
-  .palette-header span {
-    color: #93A5B1;
-    font-size: 10px;
-    font-weight: 800;
-  }
-
-  .palette-group {
-    display: grid;
-    gap: 8px;
-    padding: 0 0 13px;
-    margin-bottom: 13px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.055);
-  }
-
-  .palette-group > span {
-    color: #8FA4B0;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.03em;
-  }
-
-  .palette-grid {
-    display: grid;
-    /* 6 columns so the 6 Basic shapes / Value Controls fit on a single row
-       (no orphan icon wrapping to a second line). */
-    grid-template-columns: repeat(6, 1fr);
-    gap: 7px;
-  }
-
-  .palette-grid.compact,
-  .palette-grid.brush-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
-  .palette-grid button {
-    display: grid;
-    place-items: center;
-    min-width: 0;
-    height: 31px;
-    border: 1px solid #303F49;
-    border-radius: 4px;
-    background: #1C2831;
-    color: #DCEBFA;
-    cursor: pointer;
-  }
-
-  .palette-grid button:hover,
-  .palette-grid button.active {
-    border-color: #14B8A6;
-    background: rgba(20, 184, 166, 0.18);
-    color: #F3FFFD;
-  }
-
-  .palette-grid button:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  /* Lines & polygons palette glyphs: a filled box clipped to the shape. */
-  .poly-glyph {
-    display: block;
-    width: 16px;
-    height: 16px;
-    background: #DCEBFA;
-  }
-
-  .line-glyph {
-    height: 2px;
-    border-radius: 2px;
-  }
-
-  .palette-glyph {
-    position: relative;
-    display: block;
-    width: 18px;
-    height: 18px;
-  }
-
-  .palette-glyph.dial {
-    border: 2px solid #DCEBFA;
-    border-radius: 999px;
-  }
-
-  .palette-glyph.dial::after {
-    content: '';
-    position: absolute;
-    left: 8px;
-    top: 2px;
-    width: 2px;
-    height: 8px;
-    border-radius: 999px;
-    background: #14B8A6;
-  }
-
-  .palette-glyph.hscale::before,
-  .palette-glyph.vscale::before {
-    content: '';
-    position: absolute;
-    border-radius: 999px;
-    background: #DCEBFA;
-  }
-
-  .palette-glyph.hscale::before {
-    left: 1px;
-    right: 1px;
-    top: 8px;
-    height: 2px;
-  }
-
-  .palette-glyph.vscale::before {
-    top: 1px;
-    bottom: 1px;
-    left: 8px;
-    width: 2px;
-  }
-
-  .palette-glyph.hscale::after,
-  .palette-glyph.vscale::after {
-    content: '';
-    position: absolute;
-    background:
-      linear-gradient(90deg, #14B8A6 0 2px, transparent 2px 6px, #14B8A6 6px 8px, transparent 8px 12px, #14B8A6 12px 14px);
-  }
-
-  .palette-glyph.hscale::after {
-    left: 2px;
-    top: 12px;
-    width: 14px;
-    height: 5px;
-  }
-
-  .palette-glyph.vscale::after {
-    left: 1px;
-    top: 2px;
-    width: 5px;
-    height: 14px;
-    transform: rotate(90deg);
-  }
-
-  .palette-glyph.grid {
-    background:
-      linear-gradient(90deg, transparent 32%, #DCEBFA 32% 40%, transparent 40% 62%, #DCEBFA 62% 70%, transparent 70%),
-      linear-gradient(0deg, transparent 32%, #DCEBFA 32% 40%, transparent 40% 62%, #DCEBFA 62% 70%, transparent 70%);
-    border: 1px solid #DCEBFA;
-  }
-
-  .brush-preview {
-    display: block;
-    width: 24px;
-    height: 3px;
-    border-radius: 999px;
-    background: #DCEBFA;
-    transform: rotate(-20deg);
-  }
-
-  .brush-preview.soft {
-    height: 5px;
-    opacity: 0.8;
-  }
-
-  .brush-preview.bold {
-    height: 7px;
-    background: #8FA4B0;
-  }
-
-  .palette-stepper,
-  .palette-swatch-row,
-  .palette-corner {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 8px;
-    min-height: 30px;
-    color: #9FB2BF;
-    font-size: 10px;
-    font-weight: 800;
-  }
-
-  .palette-swatch-row code,
-  .palette-stepper strong,
-  .palette-corner strong {
-    min-width: 0;
-    color: #DFEAF0;
-    font: inherit;
-    font-size: 10px;
-    white-space: nowrap;
-  }
-
-  .palette-corner .nc-wrap,
-  .palette-stepper .nc-wrap {
+  .surface-shell :global(.palette-corner .nc-wrap),
+  .surface-shell :global(.palette-stepper .nc-wrap) {
     width: 60px;
   }
 
@@ -8134,7 +5403,7 @@
   }
 
   .part-bound.selected {
-    border-color: #14B8A6;
+    border-color: var(--surface-accent, #14B8A6);
     box-shadow:
       0 0 0 1px rgba(236, 255, 251, 0.82),
       0 0 0 5px rgba(20, 184, 166, 0.18),
@@ -8145,7 +5414,7 @@
   .rotate-handle,
   .arc-handle {
     border-color: #DAFFFA;
-    background: #14B8A6;
+    background: var(--surface-accent, #14B8A6);
   }
 
   .selection-quickbar {
@@ -8198,94 +5467,22 @@
     background: rgba(20, 184, 166, 0.16);
     color: #DFFFFA;
   }
-
   .list-header span,
-  .dock-section-title,
-  .dock-section-subtitle,
   .inspector-tabs button.active {
     color: #8FEDE3;
   }
-
-  .dock-add-strip,
   .inspector-tabs {
     background: #111A21;
     border-bottom-color: #24313A;
   }
-
-  .dock-add-strip button,
-  .dock-button-grid button,
-  .align-grid button,
-  .pivot-actions button,
-  .segmented button {
-    border-color: #303F49;
-    background: #1B2730;
-  }
-
-  .dock-add-strip button:hover,
-  .dock-button-grid button:hover:not(:disabled),
-  .align-grid button:hover,
-  .pivot-actions button:hover:not(:disabled),
-  .segmented button:hover,
-  .segmented button.active,
   .inspector-tabs button:hover,
   .inspector-tabs button.active {
-    border-color: #14B8A6;
+    border-color: var(--surface-accent, #14B8A6);
     background: rgba(20, 184, 166, 0.17);
     color: #F0FFFC;
   }
-
-  .list-row {
-    min-height: 54px;
-    border-bottom-color: #222D35;
-  }
-
-  .list-row:hover {
-    background: #18252D;
-  }
-
-  .list-row.selected {
-    background: linear-gradient(90deg, rgba(20, 184, 166, 0.28), rgba(20, 184, 166, 0.13));
-    box-shadow:
-      inset 3px 0 0 #14B8A6,
-      inset 0 0 0 1px rgba(20, 184, 166, 0.28);
-  }
-
-  .layer-thumb {
-    border-color: #344650;
-    background-color: #0B1116;
-  }
-
-  .list-row.selected .layer-thumb {
-    border-color: #14B8A6;
-    box-shadow:
-      inset 0 0 0 1px rgba(20, 184, 166, 0.24),
-      0 0 14px rgba(20, 184, 166, 0.12);
-  }
-
-  .row-badge {
-    border-color: #31404A;
-    background: rgba(13, 20, 25, 0.92);
-  }
-
-  .inspector-pane,
-  .dock-section {
+  .inspector-pane {
     background: #141E25;
-  }
-
-  .dock-section {
-    border-color: #2A3741;
-    border-radius: 6px;
-  }
-
-  .dock-field input,
-  .dock-field select {
-    border-color: #33434E;
-    background: #0D1419;
-  }
-
-  .dock-field input[type='checkbox'],
-  .dock-field input[type='range'] {
-    accent-color: #14B8A6;
   }
 
   @media (max-width: 1380px) {
@@ -8313,5 +5510,21 @@
     .palette-panel {
       display: none;
     }
+  }
+
+  .surface-shell :global(.surface-options-strip .snap-size .nc-wrap) {
+    width: 52px;
+  }
+  .surface-shell.previewing :global(.surface-options-strip) {
+    display: none;
+  }
+
+  /* The rubber band. Teal to match the surface identity rather than the panel editor's blue. */
+  .marquee-band {
+    position: absolute;
+    z-index: 40;
+    pointer-events: none;
+    border: 1px solid var(--surface-accent, #14B8A6);
+    background: rgba(20, 184, 166, 0.12);
   }
 </style>

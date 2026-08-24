@@ -1,6 +1,22 @@
 # CEditor
 
-**CEditor** (originally *Ctrlr Editor*) is a visual editor for designing and building audio plugin UIs. Create panels with interactive components, style them with rich property editors, add behaviour with scripts in any of seven languages, and export as a VST3 plugin or a standalone application.
+**CEditor** (originally *Ctrlr Editor*) builds editors for hardware synthesisers — and the editors
+it builds are instruments in their own right.
+
+Point it at a device, lay out a panel, and every knob is bound to a real synth parameter with the
+range and option names the manual gives it. That much other editors do. What no other editor does
+is the rest of the panel: it can **play** the synth. Chord pads, an arpeggiator, a ribbon keyboard,
+drum pads, a harmoniser and a phrase sequencer emit notes. Four independent modulation
+sources — geometric, gestural, generative and physical — move parameters on hardware that has none
+of its own. A transport that follows MIDI clock or the DAW playhead, a setlist, a keyboard splitter
+and a panic button make it a stage rig. Preset Constellation and Timbre Space turn a patch library
+into a map you navigate by musical intention rather than by parameter number.
+
+Panels carry behaviour written in any of seven languages, and export as a VST3, CLAP, LV2 or
+standalone application, so the hardware ends up in a DAW session behaving like a plugin.
+
+Windows only for now, and unsigned — see [RELEASE-NOTES.md](RELEASE-NOTES.md) before installing.
+[docs/README.md](docs/README.md) is the full documentation index.
 
 ## Architecture
 

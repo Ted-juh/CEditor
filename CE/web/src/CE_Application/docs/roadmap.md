@@ -79,9 +79,9 @@ Shipped, pure engine-reuse:
 ### Phase 5 — groundbreaking
 - **Macro & Snapshot-Morph** ([macro-and-morph.md](./macro-and-morph.md)) — mostly
   Phase 3 once Mapper + snapshots exist (packaging + assign UI).
-- **Auto-Panel generator** ([auto-panel.md](./auto-panel.md)) · **Patch
-  Diff/Compare** ([patch-diff.md](./patch-diff.md)) · **Randomizer**
-  ([randomizer.md](./randomizer.md)) — snapshots + DPD.
+- ~~**Auto-Panel generator**~~ ([auto-panel.md](./auto-panel.md)) — **built**, File → New Panel
+  from Device Profile. · **Patch Diff/Compare** ([patch-diff.md](./patch-diff.md)) ·
+  **Randomizer** ([randomizer.md](./randomizer.md)) — snapshots + DPD.
 - **Modulation node-graph** ([node-graph.md](./node-graph.md)) — biggest UI lift;
   visual editor over the existing route model.
 

@@ -24,6 +24,10 @@
   import Clock from 'lucide-svelte/icons/clock';
   import Target from 'lucide-svelte/icons/target';
   import Play from 'lucide-svelte/icons/play';
+  import Gauge from 'lucide-svelte/icons/gauge';
+  import Undo2 from 'lucide-svelte/icons/undo-2';
+  import { RETURN_CURVE, RETURN_MODE } from '../utils/returnToRest.js';
+  import { VALUE_FLOW, valueFlowOf } from '../utils/displayMode.js';
 
   let { control = null } = $props();
 
@@ -190,6 +194,30 @@
 </script>
 
 {#if behavior}
+  <PropertySection title="Value flow" icon={Gauge}>
+    <PropertyCell
+      label="Direction"
+      span={4}
+      hint="Two-way is a normal control: the device moves it and moving it sends. Display is read-only — it shows an inbound value and takes no input, which is what a meter, a bound LCD field or a lit pad is. Input sends but is not moved by feedback."
+    >
+      <Segmented
+        ariaLabel="Value flow"
+        value={valueFlowOf(behavior)}
+        options={[
+          { value: VALUE_FLOW.twoWay, label: 'Two-way' },
+          { value: VALUE_FLOW.display, label: 'Display' },
+          { value: VALUE_FLOW.input, label: 'Input' },
+        ]}
+        onchange={(next) => set('valueFlow', next)}
+      />
+    </PropertyCell>
+    {#if valueFlowOf(behavior) === VALUE_FLOW.display}
+      <PropertyCell label="Read-only" span={4} hint="A display takes no drag, wheel, keyboard or focus, and exports no host parameter — a DAW lane on it would be overwritten by the next feedback frame.">
+        <span class="val" style="opacity:.75">Input off · not a tab stop · no host parameter</span>
+      </PropertyCell>
+    {/if}
+  </PropertySection>
+
   <PropertySection title="Behavior" icon={Settings2}>
     <PropertyCell label="Type" span={showSubtypeSelector ? 2 : 4} hint="Behavior is defined by the inserted button type.">
       <input class="val" type="text" value={buttonType} readonly />
@@ -207,11 +235,11 @@
       <PropertyCell label="Initial text" span={4} hint="The field's starting value (Text section holds the empty-state placeholder).">
         <input class="val" type="text" value={behavior.defaultValue ?? ''} oninput={(event) => set('defaultValue', event.target.value)} />
       </PropertyCell>
-      <PropertyCell label="Editable" span={2} hint="Allow keyboard text entry in preview / player.">
-        <input type="checkbox" checked={behavior.keyboardEnabled !== false} onchange={(event) => set('keyboardEnabled', event.target.checked)} />
+      <PropertyCell label="Editable" span={1} hint="Allow keyboard text entry in preview / player.">
+        <PropertyToggle value={behavior.keyboardEnabled !== false} onchange={(next) => set('keyboardEnabled', next)} />
       </PropertyCell>
-      <PropertyCell label="Focusable" span={2} hint="Can receive keyboard focus (Tab).">
-        <input type="checkbox" checked={behavior.focusable !== false} onchange={(event) => set('focusable', event.target.checked)} />
+      <PropertyCell label="Focusable" span={1} hint="Can receive keyboard focus (Tab).">
+        <PropertyToggle value={behavior.focusable !== false} onchange={(next) => set('focusable', next)} />
       </PropertyCell>
     {/if}
   </PropertySection>
@@ -226,28 +254,28 @@
           </select>
         </PropertyCell>
       {/if}
-      <PropertyCell label="Min" span={2} compact hint="Lower bound the values are clamped to.">
+      <PropertyCell label="Min" span={1} compact hint="Lower bound the values are clamped to.">
         <NumberCell label="Min" value={behavior.min ?? 0} defaultValue={0} step={1} onchange={(value) => set('min', value)} />
       </PropertyCell>
-      <PropertyCell label="Max" span={2} compact hint="Upper bound the values are clamped to.">
+      <PropertyCell label="Max" span={1} compact hint="Upper bound the values are clamped to.">
         <NumberCell label="Max" value={behavior.max ?? 100} defaultValue={100} step={1} onchange={(value) => set('max', value)} />
       </PropertyCell>
-      <PropertyCell label="Step" span={2} compact hint="Increment per step / stepper click.">
+      <PropertyCell label="Step" span={1} compact hint="Increment per step / stepper click.">
         <NumberCell label="Step" value={behavior.step ?? 1} defaultValue={1} step={1} min={0} onchange={(value) => set('step', value)} />
       </PropertyCell>
-      <PropertyCell label="Integer" span={2} hint="Round values to whole numbers.">
+      <PropertyCell label="Integer" span={1} hint="Round values to whole numbers.">
         <PropertyToggle value={String(behavior.valueType ?? '') === 'int'} onchange={() => set('valueType', String(behavior.valueType ?? '') === 'int' ? 'float' : 'int')} />
       </PropertyCell>
       {#if isTwoValueRange}
-        <PropertyCell label="Low" span={2} compact hint="Default low (min) value of the range.">
+        <PropertyCell label="Low" span={1} compact hint="Default low (min) value of the range.">
           <NumberCell label="Low" value={behavior.defaultStartValue ?? behavior.min ?? 0} defaultValue={behavior.min ?? 0} step={1} onchange={(value) => setStartValue(value)} />
         </PropertyCell>
-        <PropertyCell label="High" span={2} compact hint="Default high (max) value of the range.">
+        <PropertyCell label="High" span={1} compact hint="Default high (max) value of the range.">
           <NumberCell label="High" value={behavior.defaultEndValue ?? behavior.max ?? 100} defaultValue={behavior.max ?? 100} step={1} onchange={(value) => setEndValue(value)} />
         </PropertyCell>
       {/if}
       {#if isRangeSpinbox}
-        <PropertyCell label="Font Size" span={2} compact hint="Height (px) of the value and ± glyphs.">
+        <PropertyCell label="Font Size" span={1} compact hint="Height (px) of the value and ± glyphs.">
           <NumberCell label="Size" value={valueFontSize} defaultValue={12} step={1} min={4} onchange={(value) => setValueFontSize(value)} />
         </PropertyCell>
       {/if}
@@ -272,10 +300,10 @@
         <PropertyCell label="Mode" span={4} hint="Repeating buttons keep firing while the button is held.">
           <div class="behavior-note">Repeats while held.</div>
         </PropertyCell>
-        <PropertyCell label="Delay" span={2} compact hint="Delay before repeating starts.">
+        <PropertyCell label="Delay" span={1} compact hint="Delay before repeating starts.">
           <NumberCell label="Delay" value={behavior.repeatDelay ?? 300} defaultValue={300} step={10} min={0} onchange={(value) => set('repeatDelay', value)} />
         </PropertyCell>
-        <PropertyCell label="Interval" span={2} compact hint="Repeat interval while the button is held.">
+        <PropertyCell label="Interval" span={1} compact hint="Repeat interval while the button is held.">
           <NumberCell label="Intvl" value={behavior.repeatInterval ?? 120} defaultValue={120} step={10} min={10} onchange={(value) => set('repeatInterval', value)} />
         </PropertyCell>
       {:else if momentarySubtype === 'press_to_talk'}
@@ -286,10 +314,10 @@
     </PropertySection>
   {:else if buttonType === 'toggle'}
     <PropertySection title="Toggle" icon={ToggleRight}>
-      <PropertyCell label="Allow Off" span={2} hint="Permit the active state to be switched back off.">
+      <PropertyCell label="Allow Off" span={1} hint="Permit the active state to be switched back off.">
         <PropertyToggle value={behavior.allowUncheck !== false} onchange={() => set('allowUncheck', !(behavior.allowUncheck !== false))} />
       </PropertyCell>
-      <PropertyCell label="Default On" span={2} hint="Start this toggle in the active state.">
+      <PropertyCell label="Default On" span={1} hint="Start this toggle in the active state.">
         <PropertyToggle value={behavior.defaultValue === true} onchange={() => set('defaultValue', !(behavior.defaultValue === true))} />
       </PropertyCell>
     </PropertySection>
@@ -327,7 +355,7 @@
           onchange={(v) => set('selectionMode', v)}
         />
       </PropertyCell>
-      <PropertyCell label="Deselect" span={2} hint="Allow the selected item to be turned off again.">
+      <PropertyCell label="Deselect" span={1} hint="Allow the selected item to be turned off again.">
         <PropertyToggle value={behavior.allowDeselect === true} onchange={() => handleToggle('allowDeselect')} />
       </PropertyCell>
       <PropertyCell label="Group ID" span={2} hint="Optional logical group id for external routing.">
@@ -368,13 +396,13 @@
       <PropertyCell label="Group ID" span={2} hint="Optional logical group id for external routing.">
         <input class="val" type="text" value={behavior.groupId ?? ''} onchange={(event) => set('groupId', event.target.value)} />
       </PropertyCell>
-      <PropertyCell label="Emit Value" span={2} hint="Expose selected value changes to the future scripting/runtime layer.">
+      <PropertyCell label="Emit Value" span={1} hint="Expose selected value changes to the future scripting/runtime layer.">
         <PropertyToggle value={behavior.emitValueChange === true} onchange={() => set('emitValueChange', !(behavior.emitValueChange === true))} />
       </PropertyCell>
     </PropertySection>
   {:else if buttonType === 'timed'}
     <PropertySection title="Timed" icon={Clock}>
-      <PropertyCell label="Hold ms" span={2} compact hint="Required hold time for hold-to-confirm buttons.">
+      <PropertyCell label="Hold ms" span={1} compact hint="Required hold time for hold-to-confirm buttons.">
         <NumberCell label="Hold" value={behavior.holdDuration ?? 1200} defaultValue={1200} step={50} min={0} onchange={(value) => set('holdDuration', value)} />
       </PropertyCell>
       <PropertyCell label="Clicks" span={1} compact hint="Required clicks for multi-click buttons.">
@@ -386,14 +414,50 @@
     </PropertySection>
   {:else if buttonType === 'one_shot'}
     <PropertySection title="One-Shot" icon={Target}>
-      <PropertyCell label="Disable" span={2} hint="Disable the button after the first successful use.">
+      <PropertyCell label="Disable" span={1} hint="Disable the button after the first successful use.">
         <PropertyToggle value={behavior.disableAfterUse !== false} onchange={() => set('disableAfterUse', !(behavior.disableAfterUse !== false))} />
       </PropertyCell>
-      <PropertyCell label="Lockout" span={2} compact hint="Temporary lockout duration after firing. Zero keeps it disabled.">
+      <PropertyCell label="Lockout" span={1} compact hint="Temporary lockout duration after firing. Zero keeps it disabled.">
         <NumberCell label="Lock" value={behavior.lockoutDuration ?? 0} defaultValue={0} step={50} min={0} onchange={(value) => set('lockoutDuration', value)} />
       </PropertyCell>
     </PropertySection>
   {/if}
+
+  <PropertySection title="Return to rest" icon={Undo2}>
+    <PropertyCell
+      label="On release"
+      span={2}
+      hint="Where the control goes when you let go. Latch keeps it where it was left — what most controls want, and the default. The glide EMITS on the way, so the device follows the spring rather than being told only the destination."
+    >
+      <select class="val" value={behavior.returnMode ?? RETURN_MODE.none} onchange={(event) => set('returnMode', event.target.value)}>
+        <option value={RETURN_MODE.none}>Latch (stay put)</option>
+        <option value={RETURN_MODE.center}>Centre</option>
+        <option value={RETURN_MODE.min}>Minimum</option>
+        <option value={RETURN_MODE.max}>Maximum</option>
+        <option value={RETURN_MODE.rest}>A set value</option>
+      </select>
+    </PropertyCell>
+    {#if String(behavior.returnMode ?? RETURN_MODE.none) !== RETURN_MODE.none}
+      {#if String(behavior.returnMode) === RETURN_MODE.rest}
+        <PropertyCell label="Rest value" span={2} hint="Clamped into the control's range.">
+          <input class="val" type="number" value={behavior.returnValue ?? 0} onchange={(event) => set('returnValue', Number(event.target.value))} />
+        </PropertyCell>
+      {/if}
+      <NumberCell
+        label="Time (ms)"
+        min={0} max={5000} step={10}
+        value={behavior.returnTime ?? 120}
+        onchange={(value) => set('returnTime', value)}
+      />
+      <PropertyCell label="Curve" span={2} hint="Exp covers most of the distance early, which is what a real spring does. Zero time snaps and emits nothing on the way.">
+        <select class="val" value={behavior.returnCurve ?? RETURN_CURVE.exp} onchange={(event) => set('returnCurve', event.target.value)}>
+          <option value={RETURN_CURVE.exp}>Spring (exp)</option>
+          <option value={RETURN_CURVE.linear}>Linear</option>
+          <option value={RETURN_CURVE.ease}>Ease</option>
+        </select>
+      </PropertyCell>
+    {/if}
+  </PropertySection>
 
   <PropertySection title="Runtime" icon={Play}>
     <PropertyCell label="Input" span={2} hint="Keyboard focus, keyboard activation. Hover a chip for its name.">
@@ -424,21 +488,10 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%;
-    min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
-    padding: 4px 6px;
-    font-family: inherit;
-    outline: none;
-  }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
 
   .val:focus {
-    border-color: #5B9BD5;
+    border-color: var(--pp-field-focus, #5B9BD5);
   }
 
   .behavior-note {

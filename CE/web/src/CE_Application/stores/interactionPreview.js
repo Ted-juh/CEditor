@@ -10,6 +10,7 @@ import { findExclusiveSelectGroupControls, isExclusiveSelectBehavior } from '../
 import { normalizeCustomChannelValue, seedCustomValues } from '../utils/customComponentInteraction.js';
 import { syncCustomArpeggiatorValues } from '../utils/customComponentArpeggiator.js';
 import { applyPanelCustomLinkRoutes } from '../utils/panelCustomComponentLinks.js';
+import { applyPanelValueRoutes } from '../utils/routeSessions.js';
 import { flatControls } from '../utils/containment.js';
 
 /**
@@ -165,9 +166,19 @@ export function applyPanelDependentChoices(controls = [], sessions = {}) {
   return changed ? nextSessions : sessions;
 }
 
-// Route custom-component links, then reconcile dependent (cascading) selectors.
-function applyPanelSessionEffects(controls, sessions) {
-  return applyPanelDependentChoices(controls, applyPanelCustomLinkRoutes(controls, sessions));
+// Route custom-component links, settle the panel's value routes, then reconcile dependent
+// (cascading) selectors.
+//
+// VALUE ROUTES RUN HERE for the same reason custom links do: a route is a function of the sessions,
+// so applying it inside the update needs no trigger, no re-entrancy guard and no frame budget. The
+// alternative was a store action called on every source change, which would have re-entered the
+// update it was called from. `panel` is optional so `createPreviewSessionsMap` can build a fresh map
+// before there is one — a panel with no sessions has no route sources to read, so there is nothing
+// to settle on that path anyway.
+function applyPanelSessionEffects(controls, sessions, panel = null) {
+  const linked = applyPanelCustomLinkRoutes(controls, sessions);
+  const routed = panel ? applyPanelValueRoutes(panel, linked) : linked;
+  return applyPanelDependentChoices(controls, routed);
 }
 
 function getActivePanel() {
@@ -226,7 +237,8 @@ export function updateInteractionPreviewSession(controlId, patch = {}) {
       ...current,
       [controlId]: nextSession,
     };
-    return applyPanelSessionEffects(allControls(getActivePanel()?.controls), nextSessions);
+    const panel = getActivePanel();
+    return applyPanelSessionEffects(allControls(panel?.controls), nextSessions, panel);
   });
 }
 
@@ -338,7 +350,8 @@ export function updatePanelPreviewSession(controlId, patch = {}) {
       ...current,
       [controlId]: nextSession,
     };
-    return applyPanelSessionEffects(allControls(getActivePanel()?.controls), nextSessions);
+    const panel = getActivePanel();
+    return applyPanelSessionEffects(allControls(panel?.controls), nextSessions, panel);
   });
 }
 
@@ -385,7 +398,8 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
       };
     }
 
-    panelPreviewSessions.set(applyPanelSessionEffects(allControls(getActivePanel()?.controls), nextSessions));
+    const panel = getActivePanel();
+    panelPreviewSessions.set(applyPanelSessionEffects(allControls(panel?.controls), nextSessions, panel));
     return {
       checked: true,
       mixed: false,

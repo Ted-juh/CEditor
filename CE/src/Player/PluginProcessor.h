@@ -10,6 +10,32 @@
  #define CEDITOR_PLAYER_PANEL_PATH ""
 #endif
 
+#ifndef CEDITOR_SIDECAR_IDENTITY
+ #define CEDITOR_SIDECAR_IDENTITY 0
+#endif
+
+#if CEDITOR_SIDECAR_IDENTITY
+ #include "Export/PanelIdentitySidecar.h"
+#endif
+
+/**
+ * The panel this build loads.
+ *
+ * A per-panel build bakes the path and this is that path, exactly as before. A TEMPLATE build --
+ * one prebuilt binary copied per panel rather than relinked -- has no meaningful path baked in and
+ * finds the panel sitting beside itself instead. See CE/src/Export/PanelIdentitySidecar.h.
+ *
+ * Behind the guard so a build that does not opt in cannot start reading files next to itself.
+ */
+static inline juce::File ceditorPlayerPanelFile()
+{
+   #if CEDITOR_SIDECAR_IDENTITY
+    return ceditor::exporter::resolvePlayerPanelFile (CEDITOR_PLAYER_PANEL_PATH);
+   #else
+    return juce::File (CEDITOR_PLAYER_PANEL_PATH);
+   #endif
+}
+
 #ifndef CEDITOR_VALUE_LAYER
  #define CEDITOR_VALUE_LAYER 0
 #endif
@@ -20,6 +46,8 @@
 
 #if CEDITOR_VALUE_LAYER
  #include "PanelParameters.h"
+ #include "ProgramBank.h"
+ #include "RestorePolicy.h"
 #endif
 
 #if CEDITOR_SCRIPTING
@@ -47,12 +75,24 @@ public:
               .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
               .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 #if CEDITOR_VALUE_LAYER
-        , panelParams (ce::parseExportParameters (juce::File (CEDITOR_PLAYER_PANEL_PATH)))
+        , panelParams (ce::parseExportParameters (ceditorPlayerPanelFile()))
         , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams))
 #endif
     {
         scriptMidiCollector.reset (44100.0);  // valid before prepareToPlay; the host resets with the real rate
 #if CEDITOR_VALUE_LAYER
+        // The panel document, parsed once for the two things the processor reads out of it directly:
+        // the restore policy and the baked program bank. Both are constant for the life of the
+        // plugin — the host caches getNumPrograms() the moment it loads us, so the bank had better
+        // not change afterwards.
+        //
+        // Absent policy means Ask, which is the conservative reading: a panel exported before that
+        // setting existed pushed nothing at all.
+        {
+            const auto document = juce::JSON::parse (ceditorPlayerPanelFile().loadFileAsString());
+            restorePolicy = ce::readPanelRestorePolicy (document);
+            programBank = ce::parseProgramBank (document);
+        }
         // Window-CLOSED automation -> MIDI: a message-thread timer that sends bound parameters to the
         // synth when there is no editor (when open, the WebView/JS does the sending). The MIDI service
         // lives here on the processor, so it persists across the editor window being closed.
@@ -210,11 +250,53 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
 
+    // --- Total Recall S4: host-visible programs ---------------------------------------------------
+    //
+    // These four reported one nameless program, so a DAW's program menu was empty and there was no
+    // host-automatable way to change patch — while the preset librarian had persisted banks,
+    // captured patch data and recall sitting in the editor's web layer where the plugin never saw
+    // them. The editor bakes a chosen bank into the panel document at export; ProgramBank.h reads
+    // it, and these are a thin adapter over that.
+    //
+    // The honest limit, which the Export tab states too: this is a PANEL-AUTHORED bank — a list
+    // somebody curated — not a live view of what is in the synth right now. The alternative is a
+    // memory scan on every project load, which is not a thing a plugin should do.
+#if CEDITOR_VALUE_LAYER
+    int getNumPrograms() override { return ce::hostProgramCount (programBank); }
+
+    int getCurrentProgram() override { return currentProgram; }
+
+    /**
+     * The host asked for a different patch.
+     *
+     * NOTHING IS SENT HERE. A host may call this from the audio thread — VST3 maps a program change
+     * onto a parameter, and JUCE delivers it wherever the message arrived — and the send path runs
+     * a script's interceptMidiOut filter, which is message-thread work. So this records the request
+     * and the timer performs it, the same discipline the restore push follows and for the same
+     * reason.
+     */
+    void setCurrentProgram (int index) override
+    {
+        if (! juce::isPositiveAndBelow (index, ce::hostProgramCount (programBank))) return;
+        if (index == currentProgram) return;
+        currentProgram = index;
+        programChangePending.store (true);
+    }
+
+    const juce::String getProgramName (int index) override { return ce::hostProgramName (programBank, index); }
+
+    // Renaming is refused rather than accepted-and-dropped. The bank is baked into the exported
+    // panel, so a name changed here would live until the plugin is unloaded and then be gone —
+    // which reads as the DAW losing the edit. The place to rename a preset is the librarian.
+    void changeProgramName (int, const juce::String&) override {}
+#else
+    // No value layer, no bank: the pre-S4 behaviour, unchanged.
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
     void setCurrentProgram (int) override {}
     const juce::String getProgramName (int) override { return {}; }
     void changeProgramName (int, const juce::String&) override {}
+#endif
 
     // DAW session save/restore: the APVTS state (every parameter value) AND the device role→port
     // mapping, so a reopened project restores control positions AND reconnects to the synth (the
@@ -227,6 +309,32 @@ public:
             root.addChildElement (apvtsXml.release());
         root.createNewChildElement ("DeviceMappings")
             ->addTextElement (juce::JSON::toString (deviceService.exportRoleMappings()));
+        // The answer to "restore the hardware from this session?", if it has been given. Saved with
+        // the project rather than globally: the decision was made about THIS session's patch and
+        // this session's synth, and a different project is a different question.
+        if (restoreAnswer.isNotEmpty())
+            root.createNewChildElement ("RestoreAnswer")->addTextElement (restoreAnswer);
+        // Which program the host had selected. Hosts do restore this themselves through
+        // setCurrentProgram, but not all of them and not always before setStateInformation, so it
+        // rides along and the two agree either way.
+        if (currentProgram != 0)
+            root.createNewChildElement ("CurrentProgram")->addTextElement (juce::String (currentProgram));
+
+        // S3: the whole patch, as bytes, beside the automation list.
+        //
+        // The APVTS is NOT the patch and was never going to be. buildParameterLayout builds one
+        // parameter per entry in `exportParameters` — the controls the author chose to expose to the
+        // host — and a sensible panel exposes a few dozen of a synth's several hundred. Restoring
+        // only those is a patch with the other four hundred left wherever the instrument had them.
+        //
+        // Read from a cache the message-thread timer maintains rather than built here: the host may
+        // call this from any thread, and assembling two dumps means walking the profile and running
+        // the shared encoder over every parameter in it.
+        {
+            const juce::SpinLock::ScopedLockType lock (capturedDumpsLock);
+            if (capturedDumps.isNotEmpty())
+                root.createNewChildElement ("DeviceDumps")->addTextElement (capturedDumps);
+        }
        #if CEDITOR_SCRIPTING
         if (scriptRuntime != nullptr)
         {
@@ -258,6 +366,29 @@ public:
                 apvts.replaceState (juce::ValueTree::fromXml (*apvtsXml));
             if (auto* dev = xml->getChildByName ("DeviceMappings"))
                 deviceService.importRoleMappings (juce::JSON::parse (dev->getAllSubText()));
+            if (auto* answer = xml->getChildByName ("RestoreAnswer"))
+                restoreAnswer = answer->getAllSubText().trim();
+            restoredDumps = juce::var();
+            if (auto* dumps = xml->getChildByName ("DeviceDumps"))
+                restoredDumps = juce::JSON::parse (dumps->getAllSubText());
+            if (auto* program = xml->getChildByName ("CurrentProgram"))
+            {
+                const int index = program->getAllSubText().trim().getIntValue();
+                // Set WITHOUT sending. The restore push is about to run and will put the whole
+                // patch back; a program change on top of it would recall a slot over the top of
+                // the patch that was just restored, which is the wrong sound and the wrong order.
+                if (juce::isPositiveAndBelow (index, ce::hostProgramCount (programBank)))
+                    currentProgram = index;
+            }
+
+            // ARM THE RESTORE PUSH — do not send here. This call can arrive before the ports are
+            // open, before prepareToPlay, and on a thread with no business emitting SysEx. The
+            // message-thread timer picks it up when the device says it is ready.
+            //
+            // Without this the whole feature was: values restored, ports reconnected, and the synth
+            // left on whatever patch it happened to be on. The state was known and not transmitted,
+            // which from the user's chair is the same as not having been saved.
+            armRestorePush();
            #if CEDITOR_SCRIPTING
             // Settings first: a script's onDawRestoreState may well read one back.
             if (auto* sset = xml->getChildByName ("ScriptSettings"))
@@ -282,7 +413,7 @@ public:
 
     bool isBusesLayoutSupported (const BusesLayout&) const override { return true; }
 
-    juce::File panelFile() const { return juce::File (CEDITOR_PLAYER_PANEL_PATH); }
+    juce::File panelFile() const { return ceditorPlayerPanelFile(); }
 
 #if CEDITOR_VALUE_LAYER
     juce::AudioProcessorValueTreeState& parameters() { return apvts; }
@@ -386,6 +517,14 @@ private:
             scriptWindowWasOpen = windowOpen;
         }
        #endif
+        // BEFORE the window-open early return, deliberately: a project reopened with the editor
+        // showing still has a synth sitting on the wrong patch, and the restore is exactly as due
+        // then as it is with the window closed. It is also the only state in which the question can
+        // be asked at all.
+        serviceRestorePush (windowOpen);
+        serviceDumpCapture();
+        serviceProgramChange();
+
         if (windowOpen) { wasWindowOpen = true; return; }
         if (wasWindowOpen) { lastSentMidi.clear(); wasWindowOpen = false; } // just closed -> resend all
         for (const auto& desc : panelParams)
@@ -432,6 +571,389 @@ private:
        #endif
     }
 
+    // --- Total Recall S2: pushing a restored patch back at the hardware --------------------------
+    //
+    // The rules are in RestorePolicy.h and are a pure function, so every ordering they encode is
+    // driven by RestorePolicyTests on any machine. What is here is the wiring: arming the flag,
+    // asking the service whether the device is ready, raising the question, and doing the send.
+
+    /** Called from setStateInformation. Never sends — see the comment there for why. */
+    void armRestorePush()
+    {
+        restorePending = true;
+        restorePromptSent = false;
+        restoreArmedAtMs = juce::Time::getMillisecondCounterHiRes();
+    }
+
+    /** Is any role this panel actually binds reporting `ready`? */
+    bool anyBoundDeviceReady() const
+    {
+        const auto session = deviceService.getSessionState();
+        auto* sessionObj = session.getDynamicObject();
+        if (sessionObj == nullptr) return false;
+
+        juce::StringArray roles;
+        for (const auto& desc : panelParams)
+            if (desc.deviceParameterId.isNotEmpty())
+                roles.addIfNotAlreadyThere (desc.deviceRole.isNotEmpty() ? desc.deviceRole : juce::String ("mainSynth"));
+
+        // A panel of purely raw-MIDI bindings names no role. Those go out on the plugin's MIDI bus
+        // rather than through a profile, so there is no port to be ready — the host is the route,
+        // and it is there.
+        if (roles.isEmpty()) return true;
+
+        for (const auto& role : roles)
+        {
+            auto* record = sessionObj->getProperty (role).getDynamicObject();
+            if (record != nullptr && record->getProperty ("state").toString() == "ready")
+                return true;
+        }
+        return false;
+    }
+
+    /** Anything at all to push? A panel that binds nothing must not raise a question about it. */
+    bool hasRestorableParameters() const
+    {
+        for (const auto& desc : panelParams)
+            if (desc.deviceParameterId.isNotEmpty() || desc.hasMidiControl)
+                return true;
+        return false;
+    }
+
+    /**
+     * Keep the captured-dump cache roughly current, cheaply.
+     *
+     * Every four seconds, and only when the patch has actually moved. A dump is a walk over the
+     * whole profile, and a knob being dragged would otherwise rebuild it thirty times a second for
+     * a save that may never come. Four seconds of staleness costs at most the last few knob moves
+     * before a save, and the APVTS values — which restore after the dump — carry those anyway.
+     */
+    void serviceDumpCapture()
+    {
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        if (now - dumpsLastCapturedMs < 4000.0) return;
+
+        // Cheap change detection off the same map the send loop keeps. An unchanged patch is the
+        // common case — a project sitting open — and it must cost nothing.
+        bool changed = capturedDumps.isEmpty();
+        for (const auto& desc : panelParams)
+        {
+            if (desc.deviceParameterId.isEmpty()) continue;
+            auto* raw = apvts.getRawParameterValue (desc.id);
+            if (raw == nullptr) continue;
+            const float v = raw->load();
+            const auto it = lastCapturedValue.find (desc.id);
+            if (it == lastCapturedValue.end() || it->second != v) { changed = true; }
+            lastCapturedValue[desc.id] = v;
+        }
+        if (! changed) return;
+
+        dumpsLastCapturedMs = now;
+        refreshCapturedDumps();
+    }
+
+    /**
+     * Perform a program change the host asked for. Message thread.
+     *
+     * TWO WAYS to recall, and the choice is the librarian's own: an entry that captured the patch
+     * sends THAT (the exact bytes, so the synth ends up on the sound somebody saved), and a
+     * name-only entry sends the profile's recall action for the slot (a Program Change, a bank
+     * select pair plus one, or a SysEx template — whatever the instrument wants). The second is
+     * weaker and honest: it tells the synth which of its own patches to load, and what is in that
+     * slot today is the synth's business.
+     */
+    void serviceProgramChange()
+    {
+        if (! programChangePending.exchange (false)) return;
+
+        const auto* program = ce::programForIndex (programBank, currentProgram);
+        if (program == nullptr) return;
+
+        if (program->hasData())
+        {
+            const auto bytes = ce::bytesFromHex (program->hex);
+            if (bytes.isEmpty())
+            {
+                scriptLogLine ("[program] \"" + program->name + "\" carries unreadable patch data");
+                return;
+            }
+            sendRawMidiBytes ("program_" + juce::String (program->slot), bytes);
+            scriptLogLine ("[program] sent captured patch \"" + program->name + "\" ("
+                           + juce::String (bytes.size()) + " bytes)");
+            return;
+        }
+
+        auto* engine = deviceService.engineForRole ({});
+        if (engine == nullptr)
+        {
+            scriptLogLine ("[program] no profile loaded, cannot recall slot " + juce::String (program->slot));
+            return;
+        }
+
+        const auto recall = engine->compilePresetRecall ({}, program->slot);
+        if (! recall.ok)
+        {
+            scriptLogLine ("[program] slot " + juce::String (program->slot) + " would not compile: " + recall.error);
+            return;
+        }
+        // A recall can be more than one message — `bankPc` is CC 0, CC 32 and a Program Change —
+        // and each goes out on its own so the funnel splits them the way a real sequence arrives.
+        for (const auto& message : recall.transaction.messages)
+            sendRawMidiBytes ("program_recall_" + juce::String (program->slot), message.bytes);
+        scriptLogLine ("[program] recalled slot " + juce::String (program->slot) + " (\"" + program->name
+                       + "\", " + juce::String (recall.transaction.messages.size()) + " message(s))");
+    }
+
+    void serviceRestorePush (bool windowOpen)
+    {
+        if (! restorePending) return;
+
+        // Not thirty times a second. A pending restore under Ask with the window closed waits
+        // indefinitely and correctly, and asking the service to build a whole session-state object
+        // at 30Hz for the entire life of that project would be a real cost for no extra
+        // responsiveness — half a second is imperceptible against a device that takes seconds to
+        // come up and a question that waits on a person.
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        if (now - restoreLastCheckedMs < 500.0) return;
+        restoreLastCheckedMs = now;
+
+        // The window that was carrying the question went away with it unanswered. Ask again when
+        // one comes back: closing a plugin window is not an answer, and the patch is still not on
+        // the synth. Without this the bar is shown once ever, and a user who closed the window
+        // before reading it never sees the question again.
+        if (restorePromptSent && ! windowOpen) restorePromptSent = false;
+
+        ce::RestoreSituation situation;
+        situation.policy = restorePolicy;
+        situation.rememberedAnswer = restoreAnswer;
+        situation.deviceReady = anyBoundDeviceReady();
+        situation.windowOpen = windowOpen;
+        situation.promptAlreadySent = restorePromptSent;
+        situation.waitedMs = juce::Time::getMillisecondCounterHiRes() - restoreArmedAtMs;
+        situation.hasParametersToSend = hasRestorableParameters();
+
+        const auto verdict = ce::decideRestore (situation);
+
+        switch (verdict.action)
+        {
+            case ce::RestoreAction::Wait:
+                return;
+
+            case ce::RestoreAction::Abandon:
+                // Logged, always. A restore that silently did not happen is the failure this whole
+                // feature exists to prevent, so "it did not, and here is why" is part of the deal.
+                restorePending = false;
+                scriptLogLine ("[restore] not pushing: " + verdict.reason);
+                return;
+
+            case ce::RestoreAction::Ask:
+                // No callback means no window has claimed the question yet — the editor sets it in
+                // its constructor. Marking it sent here would leave the restore pending forever
+                // with nothing on screen, which is the silent no-restore this feature exists to
+                // prevent. Try again on the next tick instead.
+                if (onRestorePrompt == nullptr) return;
+                restorePromptSent = true;
+                scriptLogLine ("[restore] " + verdict.reason);
+                onRestorePrompt (restorePromptDeviceName());
+                return;
+
+            case ce::RestoreAction::Send:
+                restorePending = false;
+                runRestorePush (verdict.reason);
+                return;
+        }
+    }
+
+    /**
+     * What to call the instrument in the question.
+     *
+     * "Send this session's values to the connected device?" is a question nobody can answer with
+     * confidence — the whole risk being guarded against is that the thing plugged in today is not
+     * the thing the session was saved against, and a generic noun hides exactly that. So: the port
+     * the role is actually bound to, then the profile it is bound as, then the generic.
+     *
+     * The session record has no `deviceName`; it has `midiDestination` (which carries the port's
+     * name) and `profileId`. `pendingRequests` is a sibling of the role entries rather than one of
+     * them, and is skipped by name.
+     */
+    juce::String restorePromptDeviceName() const
+    {
+        const auto session = deviceService.getSessionState();
+        auto* sessionObj = session.getDynamicObject();
+        if (sessionObj == nullptr) return "the connected device";
+
+        juce::String profileFallback;
+        for (const auto& property : sessionObj->getProperties())
+        {
+            if (property.name.toString() == "pendingRequests") continue;
+            auto* record = property.value.getDynamicObject();
+            if (record == nullptr) continue;
+            if (record->getProperty ("state").toString() != "ready") continue;
+
+            const auto port = record->getProperty ("midiDestination").getProperty ("name", juce::var()).toString();
+            if (port.isNotEmpty()) return port;
+            if (profileFallback.isEmpty()) profileFallback = record->getProperty ("profileId").toString();
+        }
+        return profileFallback.isNotEmpty() ? profileFallback : juce::String ("the connected device");
+    }
+
+    // --- Total Recall S3: the whole patch, not just the automation list ---------------------------
+    //
+    // The APVTS holds `exportParameters` — the controls the author exposed to the host, a few dozen
+    // of a synth's several hundred. A restore built only from those puts the automatable values
+    // back and leaves everything else wherever the instrument happened to be, which is a patch
+    // nobody saved. The dump is the patch.
+    //
+    // Two layers on restore, in this order: send the DUMP (the whole thing, exactly), then apply
+    // the VALUES (the automation-visible ones, which the host may have moved since the dump was
+    // captured). Dump first — the same rule the Setlist follows when it sends MIDI before values,
+    // and for the same reason: the stored values belong to the patch being restored, so the patch
+    // has to land first or they are overwritten by it.
+
+    /** Semantic values for every device-bound parameter, keyed by parameter id, out of the APVTS. */
+    juce::var boundParameterValues() const
+    {
+        auto* values = new juce::DynamicObject();
+        for (const auto& desc : panelParams)
+        {
+            if (desc.deviceParameterId.isEmpty()) continue;
+            if (auto* raw = apvts.getRawParameterValue (desc.id))
+                values->setProperty (desc.deviceParameterId, (double) raw->load());
+        }
+        return juce::var (values);
+    }
+
+    /**
+     * Rebuild the captured-dump cache. Message thread only.
+     *
+     * Not done inside getStateInformation, because a host may call that from any thread and this
+     * walks the profile and runs the shared encoder over every parameter in every dump. The cache
+     * is a string under a spin lock; the lock is held only for the swap.
+     */
+    void refreshCapturedDumps()
+    {
+        auto* engine = deviceService.engineForRole ({});
+        if (engine == nullptr) return;
+
+        const auto ids = engine->dumpDefinitionIds();
+        if (ids.isEmpty()) return;
+
+        const auto values = boundParameterValues();
+        auto* built = new juce::DynamicObject();
+        for (const auto& id : ids)
+        {
+            const auto result = engine->buildDumpMessage (id, values);
+            // A dump that will not build is skipped rather than aborting the others: a profile can
+            // declare a dump this panel binds nothing in, and one unbuildable block should not cost
+            // the user the block that would have worked.
+            if (result.ok && result.hex.isNotEmpty())
+                built->setProperty (id, result.hex);
+        }
+
+        auto json = juce::JSON::toString (juce::var (built), true);
+        const juce::SpinLock::ScopedLockType lock (capturedDumpsLock);
+        capturedDumps = built->getProperties().size() > 0 ? json : juce::String();
+    }
+
+    /**
+     * Send the restored dumps, in the profile's declared order.
+     *
+     * Order is the profile's own and it matters: a device with a common block and per-part blocks
+     * wants the common block first, and the profile author is the only one who knows which is
+     * which. Returns how many were sent, for the log.
+     */
+    int sendRestoredDumps()
+    {
+        auto* stored = restoredDumps.getDynamicObject();
+        if (stored == nullptr) return 0;
+
+        auto* engine = deviceService.engineForRole ({});
+        // Order from the profile when there is one to ask; otherwise whatever the saved object
+        // holds, which at least sends them.
+        juce::StringArray order = engine != nullptr ? engine->dumpDefinitionIds() : juce::StringArray();
+        if (order.isEmpty())
+            for (const auto& property : stored->getProperties())
+                order.add (property.name.toString());
+
+        int sent = 0;
+        for (const auto& id : order)
+        {
+            const auto hex = stored->getProperty (id).toString();
+            if (hex.isEmpty()) continue;
+
+            juce::Array<int> bytes;
+            for (const auto& token : juce::StringArray::fromTokens (hex, " ", ""))
+                if (token.isNotEmpty())
+                    bytes.add (token.getHexValue32() & 0xff);
+
+            if (bytes.isEmpty()) continue;
+            sendRawMidiBytes ("restore_dump_" + id, bytes);
+            ++sent;
+        }
+        return sent;
+    }
+
+    /**
+     * Send every bound parameter's restored value.
+     *
+     * `lastSentMidi` is cleared first, which is what makes this a full push rather than a diff: the
+     * map holds what was sent to a synth that is no longer the one in front of us, and a restore
+     * that skipped every value matching a stale cache entry would leave exactly those parameters
+     * wrong. Pacing is the engine's job — compileParameterMessage goes through the same paced
+     * transaction path a `syncDirection: push` already uses.
+     */
+    void runRestorePush (const juce::String& reason)
+    {
+        // THE DUMP FIRST. The values below belong to the patch this dump IS, so sending them first
+        // would have the dump overwrite them a moment later — the same ordering rule the Setlist
+        // follows when it sends MIDI before values.
+        const int dumps = sendRestoredDumps();
+
+        lastSentMidi.clear();
+
+        int sent = 0;
+        for (const auto& desc : panelParams)
+        {
+            if (desc.deviceParameterId.isEmpty() && ! desc.hasMidiControl) continue;
+            if (auto* raw = apvts.getRawParameterValue (desc.id))
+            {
+                const float v = raw->load();
+                lastSentMidi[desc.id] = v;
+                sendParamMidi (desc, v);
+                ++sent;
+            }
+        }
+
+        scriptLogLine ("[restore] pushed " + juce::String (dumps) + " dump(s) and "
+                       + juce::String (sent) + " parameter(s) to the device (" + reason + ")");
+        // The instrument is now on the restored patch, so the cache should describe that rather
+        // than whatever it held from the previous project.
+        refreshCapturedDumps();
+    }
+
+public:
+    /**
+     * The user's answer to the restore question: "always" or "never".
+     *
+     * Remembered for the session and saved with the project, so the question is asked once. Called
+     * from the editor on the message thread; the push itself still happens on the next timer tick,
+     * through the same decision path as every other route into it.
+     */
+    void answerRestorePrompt (const juce::String& answer)
+    {
+        const auto a = answer.trim().toLowerCase();
+        if (a != "always" && a != "never") return;
+        restoreAnswer = a;
+        updateHostDisplay();   // the project is dirty: this choice is saved with it
+    }
+
+    /** True while a restore is armed and unresolved — the editor shows the question off this. */
+    bool isRestorePending() const { return restorePending; }
+
+    /** Raised when the question needs asking. The editor wires this to the panel UI. */
+    std::function<void (const juce::String& deviceName)> onRestorePrompt;
+
+private:
     void sendParamMidi (const ce::PanelParameter& desc, float value)
     {
         if (desc.deviceParameterId.isEmpty() && desc.hasMidiControl)
@@ -514,6 +1036,31 @@ private:
     juce::AudioProcessorValueTreeState apvts;
     ceditor::device::DeviceProfileService deviceService;
     std::map<juce::String, float> lastSentMidi;
+
+    // Total Recall S2. `restorePolicy` is the panel author's default, read once at construction;
+    // `restoreAnswer` is the user's decision, which outranks it and is saved with the project.
+    ce::RestorePolicy restorePolicy = ce::RestorePolicy::Ask;
+    juce::String restoreAnswer;          // "", "always" or "never"
+    bool restorePending = false;
+    bool restorePromptSent = false;
+    double restoreArmedAtMs = 0.0;
+    double restoreLastCheckedMs = 0.0;
+
+    // S3. `capturedDumps` is a JSON object of dumpId -> hex, rebuilt on the message thread and read
+    // by getStateInformation, which the host may call from another one — hence the lock, held only
+    // for the swap. `restoredDumps` is what came back out of the project file.
+    juce::String capturedDumps;
+    juce::SpinLock capturedDumpsLock;
+    juce::var restoredDumps;
+    double dumpsLastCapturedMs = 0.0;
+    std::map<juce::String, float> lastCapturedValue;
+
+    // S4. The bank is baked at export and never changes — the host caches getNumPrograms() the
+    // moment it loads us. `programChangePending` is atomic because setCurrentProgram can arrive on
+    // the audio thread; the send itself happens on the timer.
+    ce::ProgramBank programBank;
+    int currentProgram = 0;
+    std::atomic<bool> programChangePending { false };
     // What preset each role is on, as far as anything has said — a recall going out or a Program
     // Change coming in. Not a reading of the instrument: a synth does not announce its patch, so
     // "unknown" (-1) is a real answer a script can act on rather than a confident wrong one.
@@ -595,6 +1142,19 @@ private:
     bool wasWindowOpen = false;
 #endif
 
+    // Window-closed activity, appended to a file, so it is observable without a debugger or a MIDI
+    // monitor: tail %TEMP%\ceditor-player-scripts.log.
+    //
+    // OUTSIDE BOTH GUARDS, for the reason written up on sendRawMidiBytes below: it used to live
+    // under `#if CEDITOR_SCRIPTING`, and the restore push (CEDITOR_VALUE_LAYER) logs through it
+    // too. The two flags are independent, so a build with the value layer on and scripting off had
+    // the call and not the callee — the exact `C3861: identifier not found` that bit once already.
+    static void scriptLogLine (const juce::String& line)
+    {
+        auto f = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("ceditor-player-scripts.log");
+        f.appendText (juce::Time::getCurrentTime().toString (true, true, true, true) + "  " + line + juce::newLine);
+    }
+
 #if CEDITOR_SCRIPTING
     // Window-closed script runtime (Model 2). The full-mirror value model (scriptValues) backs
     // get/set so a script behaves identically whether the GUI is open (WebView/JS) or closed (here).
@@ -602,14 +1162,6 @@ private:
     // via the plugin's MIDI output bus (scriptMidiCollector -> processBlock). JS<->C++ value sync for
     // UNBOUND controls (Stage 5) is still TODO. Declared after deviceService and in this order so the
     // runtime (holds host&) tears down before the host, and scriptValues outlives both.
-
-    // Script log()/errors append here, so window-closed activity is observable without a debugger
-    // or MIDI monitor: tail %TEMP%\ceditor-player-scripts.log.
-    static void scriptLogLine (const juce::String& line)
-    {
-        auto f = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("ceditor-player-scripts.log");
-        f.appendText (juce::Time::getCurrentTime().toString (true, true, true, true) + "  " + line + juce::newLine);
-    }
 
    #if CEDITOR_VALUE_LAYER
     // The role a routeMidi(role, fn) block is in force for, empty outside one.
@@ -805,9 +1357,18 @@ private:
     }
    #endif
 
+    /** The `{ ok: false, error }` shape a script-facing callback returns when it cannot answer. */
+    static juce::var errorVar (const juce::String& message)
+    {
+        auto* out = new juce::DynamicObject();
+        out->setProperty ("ok", false);
+        out->setProperty ("error", message);
+        return juce::var (out);
+    }
+
     void setupScripting()
     {
-        const auto json = juce::File (CEDITOR_PLAYER_PANEL_PATH).loadFileAsString();
+        const auto json = ceditorPlayerPanelFile().loadFileAsString();
         if (json.isEmpty() || ! scriptValues.loadFromJson (json)) return;
 
         using namespace ceditor::scripting;
@@ -935,7 +1496,51 @@ private:
         cb.applyDump  = [] (const juce::var&) {};
         cb.sendDump   = [] (const juce::String&) {};
        #endif
-        cb.buildDump  = [] (const juce::String&) { return juce::var(); };
+        // buildDump — the encode direction, and the counterpart to the requestDump/onDumpReceived
+        // pair above. It returned an empty var for a long time, which meant a script could read a
+        // patch out of an instrument and had no way to assemble one to send back.
+        //
+        // Values come from the panel itself. Every mapping in a dump definition names a device
+        // PARAMETER, and `panelParams` already knows which control drives which parameter (its
+        // `deviceParameterId`, derived at export), so the control's current value in `scriptValues`
+        // is the value that parameter should carry. Parameters no control is bound to are simply not
+        // supplied, and the engine leaves the definition's default bytes in place and says which
+        // they were — the ordinary case for a panel that covers part of a dump.
+        cb.buildDump = [this] (const juce::String& kind) -> juce::var
+        {
+            auto* engine = deviceService.engineForRole ({});
+            if (engine == nullptr)
+                return errorVar ("No device profile is loaded");
+
+            auto* values = new juce::DynamicObject();
+            for (const auto& desc : panelParams)
+            {
+                if (desc.deviceParameterId.isEmpty())
+                    continue;
+                const auto value = scriptValues.getValue (desc.path, {});
+                if (! value.isVoid())
+                    values->setProperty (desc.deviceParameterId, value);
+            }
+
+            const auto built = engine->buildDumpMessage (kind, juce::var (values));
+            if (! built.ok)
+                return errorVar (built.error);
+
+            // The shape a script gets back: the bytes to send, plus what was and was not covered.
+            // `unmapped` is the interesting field — it is how a script can tell it is about to send
+            // a patch with forty of sixty parameters left at their defaults.
+            auto* out = new juce::DynamicObject();
+            out->setProperty ("ok", true);
+            out->setProperty ("dumpId", built.dumpId);
+            out->setProperty ("hex", built.hex);
+            out->setProperty ("checksum", built.checksumStatus);
+            juce::Array<juce::var> byteVars;
+            for (const auto byte : built.bytes)
+                byteVars.add (byte);
+            out->setProperty ("bytes", byteVars);
+            out->setProperty ("unmapped", juce::var (built.unmappedParameters.joinIntoString (",")));
+            return juce::var (out);
+        };
         // ce.device reads. Window-CLOSED these are synchronous calls straight into
         // DeviceProfileService, so a script gets the complete answer on the first call — unlike
         // the editor, where the parameter table arrives over the async bridge (documented there).
@@ -1519,13 +2124,29 @@ public:
         host.onUiParamChange = [&p] (const juce::String& id, float value) { p.setParamFromUi (id, value); };
         // UI is ready -> force a full re-push of current parameter values on the next tick.
         host.onResyncRequest = [this] { lastPushed.clear(); };
+        // Total Recall S2: the processor decides WHEN to ask, the panel is WHERE the question goes.
+        // Both directions are set here rather than in PlayerHost, because the processor is the only
+        // thing that outlives the window and the answer has to be remembered by something that does.
+        p.onRestorePrompt = [this] (const juce::String& deviceName) { host.showRestorePrompt (deviceName); };
+        host.onRestoreAnswer = [&p] (const juce::String& answer) { p.answerRestorePrompt (answer); };
         // host parameter -> UI: poll the (atomic) parameter values and push changes to the panel so
         // automation playback moves the on-screen controls. Polling keeps us off the audio thread.
         startTimerHz (30);
        #endif
     }
 
-    ~PlayerAudioProcessorEditor() override { stopTimer(); }
+    ~PlayerAudioProcessorEditor() override
+    {
+        stopTimer();
+       #if CEDITOR_VALUE_LAYER
+        // The processor outlives this window and is holding a lambda that captures `this`. Leaving
+        // it set means the next restore prompt calls into a destroyed editor — and the prompt is
+        // raised precisely when a window has just been noticed, so it would be a live path rather
+        // than a theoretical one. host.onRestoreAnswer needs no such care: it lives on `host`,
+        // which is a member and dies here.
+        processor.onRestorePrompt = nullptr;
+       #endif
+    }
 
     void resized() override { host.setBounds (getLocalBounds()); }
 

@@ -7,9 +7,12 @@
   import PanelBottom from 'lucide-svelte/icons/panel-bottom';
   import PanelRight from 'lucide-svelte/icons/panel-right';
   import PanelLeftClose from 'lucide-svelte/icons/panel-left-close';
+  import Play from 'lucide-svelte/icons/play';
+  import Square from 'lucide-svelte/icons/square';
   import { addCustomComponentPackage } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
+  import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
   import InsertPanel from './InsertPanel.svelte';
 
   let {
@@ -20,10 +23,18 @@
     // workspace. These gates say what it may DO there (workspaceChrome.js).
     togglesEnabled = true,
     insertEnabled = true,
+    // Preview is a mode, not a panel, so it has its own gate: it needs a panel
+    // canvas, but NOT the panel toggles — that is the whole point of it being
+    // here (S4). Below 920px `togglesEnabled` goes false and the properties
+    // panel that used to hold the only Preview button is force-hidden; this
+    // button keeps working, because the rail is never hidden.
+    previewEnabled = true,
     onToggleDisplay = () => {},
     onToggleProperties = () => {},
     onToggleTree = () => {},
   } = $props();
+
+  let canPreview = $derived(previewEnabled && !!$activePanel);
 
   // Insertion needs an open panel AND a workspace whose canvas is that
   // panel — the component/script/device workspaces sit over a hidden panel
@@ -213,33 +224,70 @@
 
   <div class="separator"></div>
 
+  <!-- Preview's SECOND entry point (S4). The first one is a button inside the
+       properties panel, which the app force-hides below 920px along with the
+       toggle that would bring it back — so under that width preview was
+       unreachable by mouse entirely. The rail never hides, so this does not
+       share that fate. -->
+  <div class="rail-section preview-section">
+    <button
+      class="icon-btn rail-toggle"
+      class:active={canPreview && $previewModeEnabled}
+      title={canPreview
+        ? ($previewModeEnabled ? 'Leave preview mode (F5)' : 'Preview the panel — interact with it as the end user (F5)')
+        : 'Open a panel to preview it'}
+      aria-pressed={canPreview && $previewModeEnabled}
+      disabled={!canPreview}
+      onclick={() => togglePreviewMode()}
+    >
+      {#if $previewModeEnabled}
+        <Square size={16} strokeWidth={1.6} />
+      {:else}
+        <Play size={16} strokeWidth={1.6} />
+      {/if}
+      <span class="btn-label">{$previewModeEnabled ? 'Stop' : 'Preview'}</span>
+    </button>
+  </div>
+
+  <div class="separator"></div>
+
+  <!-- Labelled, not icon-only (B9). The display dock in particular was one
+       unlabelled PanelBottom glyph with a hover title, which is how nine tabs
+       — the app's only alignment UI, the device browser, the console — ended
+       up undiscoverable. A 7px caption costs eight pixels of rail. -->
   <div class="panel-toggles">
     <button
-      class="icon-btn"
+      class="icon-btn rail-toggle"
       class:active={togglesEnabled && showDisplayPanel}
-      title={togglesEnabled ? 'Toggle Display Panel' : 'Panels are unavailable in this workspace'}
+      title={togglesEnabled ? 'Display dock — colours, gradients, align, device, console' : 'Panels are unavailable in this workspace'}
+      aria-pressed={togglesEnabled && showDisplayPanel}
       disabled={!togglesEnabled}
       onclick={onToggleDisplay}
     >
       <PanelBottom size={18} strokeWidth={1.5} />
+      <span class="btn-label">Dock</span>
     </button>
     <button
-      class="icon-btn"
+      class="icon-btn rail-toggle"
       class:active={togglesEnabled && showTreePanel}
-      title={togglesEnabled ? 'Toggle Component Tree' : 'Panels are unavailable in this workspace'}
+      title={togglesEnabled ? 'Component tree' : 'Panels are unavailable in this workspace'}
+      aria-pressed={togglesEnabled && showTreePanel}
       disabled={!togglesEnabled}
       onclick={onToggleTree}
     >
       <PanelLeftClose size={18} strokeWidth={1.5} />
+      <span class="btn-label">Tree</span>
     </button>
     <button
-      class="icon-btn"
+      class="icon-btn rail-toggle"
       class:active={togglesEnabled && showPropertiesPanel}
-      title={togglesEnabled ? 'Toggle Properties Panel' : 'Panels are unavailable in this workspace'}
+      title={togglesEnabled ? 'Properties panel' : 'Panels are unavailable in this workspace'}
+      aria-pressed={togglesEnabled && showPropertiesPanel}
       disabled={!togglesEnabled}
       onclick={onToggleProperties}
     >
       <PanelRight size={18} strokeWidth={1.5} />
+      <span class="btn-label">Props</span>
     </button>
   </div>
 </div>
@@ -390,6 +438,7 @@
   }
 
   .insert-section,
+  .rail-section,
   .panel-toggles {
     display: flex;
     flex-direction: column;
@@ -438,6 +487,33 @@
   .icon-btn:disabled {
     color: #4E4E4E;
     cursor: not-allowed;
+  }
+
+  /* Labelled rail buttons: the icon keeps its 18px, the caption rides under it
+     and the button grows rather than the glyph shrinking. */
+  .rail-toggle {
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    width: 40px;
+    height: auto;
+    padding: 4px 0 3px;
+  }
+
+  .btn-label {
+    font-size: 7px;
+    line-height: 1;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    font-family: inherit;
+  }
+
+  .preview-section .icon-btn:not(:disabled) {
+    color: #8FC79A;
+  }
+  .preview-section .icon-btn.active {
+    background: #2E5C38;
+    color: #FFF;
   }
 
   .package-btn span {

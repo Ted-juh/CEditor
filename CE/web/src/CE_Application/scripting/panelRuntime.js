@@ -56,7 +56,7 @@ import { mapDeviceRole } from '../stores/deviceProfileSession.js';
 import {
   defineParameter as defineRuntimeParameter, defineDump as defineRuntimeDump,
   definedParameters, definedParameter, encodeParameter as encodeRuntimeParameter,
-  dumpRequestBytes, decodeDump as decodeRuntimeDump, clearDeviceDefinitions,
+  dumpRequestBytes, decodeDump as decodeRuntimeDump, buildDump as buildRuntimeDump, clearDeviceDefinitions,
   hasDefinedParameter, hasDefinedDump,
 } from './deviceDefinitions.js';
 import {
@@ -2139,16 +2139,32 @@ const midiApi = {
       addScriptTrace('midi', '', `sendDump(${JSON.stringify(kind ?? '')}) — no device host`);
     }
   },
-  // buildDump (panel → bytes) is encoded by the device profile's codec, which lives in the device
-  // host. This runtime cannot produce the bytes, so it reports at ERROR level and returns null —
-  // it used to report at 'midi' level, which reads as ordinary chatter, so a script that built a
-  // dump here got a quiet null and no indication that anything was wrong. Declared
-  // requiresDeviceHost in panelApi.js so the docs and the picker say it too.
-  buildDump: (kind) => {
-    addScriptTrace('error', '',
-      `buildDump(${JSON.stringify(kind ?? '')}) needs the device host — panel→bytes encoding is the device profile's codec, `
-      + 'which runs in the host, not the panel view. It returns bytes in the exported plugin; use sendDump to transmit from here.');
-    return null;
+  // buildDump (panel → bytes). Two cases, and only one of them still needs the host.
+  //
+  // A layout the SCRIPT declared with defineDump is one this runtime owns outright — the same reason
+  // requestDump can send its request bytes with no profile at all — so it is built here, by the
+  // local engine, and returns real bytes in the preview. A PROFILE dump's codec lives in the C++
+  // DeviceProfileEngine and the preview has no synchronous way to reach it, so that case still
+  // reports and returns null, which is what requiresDeviceHost in panelApi.js is about.
+  //
+  // The error is at ERROR level, not 'midi': it used to be the latter, which reads as ordinary
+  // chatter, so a script got a quiet null and no indication anything was wrong.
+  buildDump: (kind, values) => {
+    const built = buildRuntimeDump(DEFAULT_ROLE, String(kind ?? ''), values ?? {});
+    if (built === null) {
+      addScriptTrace('error', '',
+        `buildDump(${JSON.stringify(kind ?? '')}) needs the device host — panel→bytes encoding for a PROFILE dump is `
+        + "the device profile's codec, which runs in the host, not the panel view. It returns bytes in the exported "
+        + 'plugin. A layout you declare yourself with defineDump builds here and now.');
+      return null;
+    }
+    if (!built.ok) {
+      addScriptTrace('error', '', `buildDump(${JSON.stringify(kind ?? '')}): ${built.error}`);
+      return null;
+    }
+    if (built.unmapped?.length)
+      addScriptTrace('midi', '', `buildDump(${JSON.stringify(kind ?? '')}) — ${built.unmapped.length} parameter(s) left at their defaults`);
+    return built;
   },
 };
 
@@ -7159,6 +7175,39 @@ async function loadHandlersPython(script) {
 // Interpreted preview of the C++ behavior-handler subset (cppPreview.js). The real C++ is
 // compiled into the exported plugin; this lets a C++ script move live controls in the editor.
 // `ctx.*` maps onto the same panel API as Lua/JS; `event` is the handler payload.
+/**
+ * Run a compiled script's setup entry point, so `on()` registration works in C++, C# and Java.
+ *
+ * THE GAP THIS CLOSES. Lua and JS register listeners by running top-level code: the source calls
+ * `on("self", "valueChanged", fn)` at load and the runtime keeps the listener. The three compiled
+ * previews could not, and `scripting-runtime-gaps.md` recorded it as "named handlers only" — a real
+ * asymmetry, because a script that reacts to a custom event has no way to say so.
+ *
+ * The obvious fix — "execute top-level statements like loadHandlersJs does" — is wrong for these
+ * three languages: a bare statement at file scope is illegal in all of C++, C# and Java, so there is
+ * no top-level code to run. What a person actually writes is a function. So the convention is a
+ * function named `setup` (or `Setup`, which is what a C# author would reach for), called once at
+ * load with the same `ctx` the handlers get.
+ *
+ * Everything it needs already existed and nothing here is new machinery: `api.on` is spread into
+ * `ctx`, and the interpreters already turn a named function into a JS callable when it is referenced
+ * as a value, so `ctx.on("self", "valueChanged", myHandler)` hands the host a real function.
+ * The only missing piece was that nobody called `setup`.
+ *
+ * `setup` is not returned as a handler. It is an entry point, not an event, and leaving it in the
+ * map would make it fire on any event that happened to share the name.
+ */
+function runSetupEntryPoint(script, handlers, ctx, invoke, print, label) {
+  for (const name of ['setup', 'Setup']) {
+    const fnNode = handlers.get(name);
+    if (!fnNode) continue;
+    try { invoke(fnNode, [ctx, {}], { print }); }
+    catch (e) { addScriptTrace('error', script.id, `${label} preview setup error: ${e?.message ?? e}`); }
+    return name;
+  }
+  return null;
+}
+
 function loadHandlersCpp(script) {
   const api = buildApi(ownerOf(script), script.id);
   const ctx = { ...api, setValue: api.set, getValue: api.get };
@@ -7166,7 +7215,9 @@ function loadHandlersCpp(script) {
   const { handlers: parsed, diagnostics } = compileCpp(script.source);
   for (const d of diagnostics) addScriptTrace('error', script.id, `C++ preview: ${d}`);
   const out = {};
+  const entry = runSetupEntryPoint(script, parsed, ctx, invokeCpp, print, 'C++');
   for (const [name, fnNode] of parsed) {
+    if (name === entry) continue;
     out[name] = (payload) => {
       const event = payload && typeof payload === 'object' ? payload : { value: payload };
       try { return invokeCpp(fnNode, [ctx, event], { print }); }
@@ -7192,7 +7243,9 @@ function loadHandlersCsharp(script) {
   const { handlers: parsed, diagnostics } = compileCsharp(script.source);
   for (const d of diagnostics) addScriptTrace('error', script.id, `C# preview: ${d}`);
   const out = {};
+  const entry = runSetupEntryPoint(script, parsed, ctx, invokeCsharp, print, 'C#');
   for (const [name, fnNode] of parsed) {
+    if (name === entry) continue;
     const fire = (payload) => {
       const event = payload && typeof payload === 'object'
         ? { ...payload, Value: payload.value, FirstTime: payload.firstTime }
@@ -7216,7 +7269,9 @@ function loadHandlersJava(script) {
   const { handlers: parsed, diagnostics } = compileJava(script.source);
   for (const d of diagnostics) addScriptTrace('error', script.id, `Java preview: ${d}`);
   const out = {};
+  const entry = runSetupEntryPoint(script, parsed, ctx, invokeJava, print, 'Java');
   for (const [name, fnNode] of parsed) {
+    if (name === entry) continue;
     out[name] = (payload) => {
       const event = payload && typeof payload === 'object' ? payload : { value: payload };
       try { return invokeJava(fnNode, [ctx, event], { print }); }

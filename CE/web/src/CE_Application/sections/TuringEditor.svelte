@@ -66,7 +66,7 @@
         <NumberCell label="Rate" value={tr.rate ?? 2} min={0.1} max={30} step={0.5} defaultValue={2} onchange={(v) => set('rate', Math.max(0.1, num(v, 2)))} />
       </PropertyCell>
     {/if}
-    <PropertyCell label="Length" span={2} compact hint="Loop length in steps (2–64).">
+    <PropertyCell label="Length" span={1} compact hint="Loop length in steps (2–64).">
       <NumberCell label="Len" value={tr.length ?? 8} min={2} max={64} step={1} defaultValue={8} onchange={(v) => setLength(v)} />
     </PropertyCell>
     <PropertyCell label="Randomness" span={4} hint="0% = a locked loop; 100% = a new value every step; in between, the sequence slowly evolves.">
@@ -75,7 +75,7 @@
         <span class="pctlbl">{rndPct === 0 ? 'locked' : rndPct === 100 ? 'chaos' : `${rndPct}%`}</span>
       </div>
     </PropertyCell>
-    <PropertyCell label="Quantize" span={2} compact hint="Snap step values to N discrete levels (0 = continuous). Try 2 for on/off, 5 for a scale-like feel.">
+    <PropertyCell label="Quantize" span={1} compact hint="Snap step values to N discrete levels (0 = continuous). Try 2 for on/off, 5 for a scale-like feel.">
       <NumberCell label="Quant" value={tr.quantizeLevels ?? 0} min={0} max={24} step={1} defaultValue={0} onchange={(v) => set('quantizeLevels', Math.max(0, Math.min(24, Math.round(num(v, 0)))))} />
     </PropertyCell>
     <PropertyCell label="Gate at" span={1} compact hint="The Gate port fires when a step's value is at/above this threshold.">
@@ -118,7 +118,7 @@
   </PropertySection>
 
   <PropertySection title="Outputs" icon={LogOut}>
-    <PropertyCell label="" span={4} hint="Ports: Value = the current step's level; Gate = 1 above the threshold; Inverse = 1 − Value.">
+    <PropertyCell label="" span={4} hint="Ports: Value = the current step's level; Gate = 1 above the threshold; Inverse = 1 − Value." compact>
       <div class="ports">
         <span class="chip"><i style="background:#39D98A"></i>Value</span>
         <span class="chip"><i style="background:#F2C94C"></i>Gate</span>
@@ -129,11 +129,8 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
-    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
-  }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .rangewrap { display: flex; align-items: center; gap: 10px; }
   .range { flex: 1 1 auto; accent-color: #39D98A; }
   .pctlbl { font-size: 11px; color: #B9B9B9; min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; }

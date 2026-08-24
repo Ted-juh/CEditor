@@ -117,6 +117,7 @@ export const COMPONENT_FAMILIES = [
       v('latch', 'latch', BOOL, { toggle: true }),
       v('key', 'key', INT, { min: 0, max: 11, doc: 'Root as a pitch class, 0 = C.' }),
       v('scale', 'scale', ENUM),
+      v("followPanelKey", "followPanelKey", BOOL, { toggle: true, doc: "Follow the panel shared key and scale. Off lets this control hold its own key while the rest re-harmonise." }),
       v('degree', 'degree', INT, { min: 0, max: 6 }),
       v('chordType', 'chordType', ENUM),
       v('velocity', 'velocity', INT, VELOCITY),
@@ -146,6 +147,7 @@ export const COMPONENT_FAMILIES = [
       v('mode', 'mode', ENUM),
       v('key', 'key', INT, { min: 0, max: 11 }),
       v('scale', 'scale', ENUM),
+      v("followPanelKey", "followPanelKey", BOOL, { toggle: true, doc: "Follow the panel shared key and scale. Off lets this control hold its own key while the rest re-harmonise." }),
       v('chordType', 'chordType', ENUM),
       v('voicing', 'voicing', ENUM),
       v('inversion', 'inversion', INT, { min: 0, max: 3 }),
@@ -171,6 +173,7 @@ export const COMPONENT_FAMILIES = [
       v('mode', 'mode', ENUM),
       v('key', 'key', INT, { min: 0, max: 11 }),
       v('scale', 'scale', ENUM),
+      v("followPanelKey", "followPanelKey", BOOL, { toggle: true, doc: "Follow the panel shared key and scale. Off lets this control hold its own key while the rest re-harmonise." }),
       v('baseNote', 'baseNote', INT, NOTE),
       v('octaves', 'octaves', INT, { min: 1, max: 6 }),
       v('bendRange', 'bendRange', NUM, { min: 0, max: 24 }),
@@ -431,7 +434,11 @@ export const COMPONENT_FAMILIES = [
       v('bipolar', 'bipolar', BOOL, { toggle: true }),
       v('returnMode', 'returnMode', ENUM),
       v('returnValue', 'returnValue', NUM, UNIT),
-      v('returnRate', 'returnRate', NUM, { min: 0, max: 100 }),
+      // The unified spring's fields. `returnRate` was this component's own word for it and is
+      // still READ from old panels by normalizeReturnBehavior — but a verb writes, and a verb
+      // writing a field nothing reads back is a verb that appears to work.
+      v('returnTime', 'returnTime', NUM, { min: 0, max: 5000, doc: 'Milliseconds for the whole travel. 0 snaps.' }),
+      v('returnCurve', 'returnCurve', ENUM, { doc: 'linear | exp | ease.' }),
       v('snap', 'snap', NUM, UNIT),
       v('orientation', 'orientation', ENUM),
       v('style', 'style', ENUM, { doc: 'Ribbon, wheel, or the 3D wheel.' }),
@@ -447,8 +454,13 @@ export const COMPONENT_FAMILIES = [
       v('law', 'law', ENUM),
       v('bipolar', 'bipolar', BOOL, { toggle: true }),
       v('detent', 'detent', NUM, UNIT),
-      v('returnToCenter', 'returnToCenter', BOOL, { toggle: true }),
-      v('returnRate', 'returnRate', NUM, { min: 0, max: 100 }),
+      v('returnMode', 'returnMode', ENUM, { doc: 'none | center | min | max | rest.' }),
+      v('returnValue', 'returnValue', NUM, { min: 0, max: 1 }),
+      // The unified spring's fields. `returnRate` was this component's own word for it and is
+      // still READ from old panels by normalizeReturnBehavior — but a verb writes, and a verb
+      // writing a field nothing reads back is a verb that appears to work.
+      v('returnTime', 'returnTime', NUM, { min: 0, max: 5000, doc: 'Milliseconds for the whole travel. 0 snaps.' }),
+      v('returnCurve', 'returnCurve', ENUM, { doc: 'linear | exp | ease.' }),
       v('orientation', 'orientation', ENUM),
       v('labelA', 'labelA', STR),
       v('labelB', 'labelB', STR),
@@ -460,9 +472,14 @@ export const COMPONENT_FAMILIES = [
     verbs: [
       v('move', '', XY, { fx: 'x', fy: 'y', ...UNIT, flat: true }),
       v('bipolar', 'bipolar', BOOL, { toggle: true }),
-      v('returnToCenter', 'returnToCenter', BOOL, { toggle: true }),
-      v('returnAxes', 'returnAxes', ENUM),
-      v('returnRate', 'returnRate', NUM, { min: 0, max: 100 }),
+      v('returnMode', 'returnMode', ENUM, { doc: 'none | center | min | max | rest.' }),
+      v('returnValue', 'returnValue', NUM, { min: 0, max: 1 }),
+      v('returnAxes', 'returnAxes', ENUM, { doc: 'both | x | y — which axes spring back.' }),
+      // The unified spring's fields. `returnRate` was this component's own word for it and is
+      // still READ from old panels by normalizeReturnBehavior — but a verb writes, and a verb
+      // writing a field nothing reads back is a verb that appears to work.
+      v('returnTime', 'returnTime', NUM, { min: 0, max: 5000, doc: 'Milliseconds for the whole travel. 0 snaps.' }),
+      v('returnCurve', 'returnCurve', ENUM, { doc: 'linear | exp | ease.' }),
       v('cornerLabel', 'cornerLabels', LINE, { doc: 'Name one corner, 1-based, clockwise from the top left.' }),
     ],
   },

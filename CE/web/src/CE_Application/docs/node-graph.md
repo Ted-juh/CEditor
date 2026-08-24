@@ -45,3 +45,24 @@ live-flow viz. The routing/depth/curve math is already the Mapper's.
 - Shared route store shape (Mapper + node-graph + properties = one model).
 - Node taxonomy (sources/processors/destinations).
 - Performance with many nodes/cables (rendering).
+
+---
+
+## Built, 2026-08-23
+
+The canvas view of the Routes tab — the same routes the list view edits, drawn as patch cords. It
+was built with the Link Mapper rather than after it, because building them separately is the mistake
+the Mapper's own open question was warning about: they are two views of one list, and switching
+between them changes nothing but the drawing.
+
+**Nodes are laid out source-left, target-right rather than at the controls' panel positions.** A
+canvas that mirrored the layout would put two knobs sitting side by side on top of one another and
+draw a cable of no length. Readable beats faithful.
+
+**Cables are cubic with horizontal handles.** A straight line between two rows in the same column
+would vanish behind the nodes, and the sag is what makes crossing cables followable. Inverted routes
+(negative depth) are drawn in a different colour, disabled ones dashed, and any cable inside a cycle
+is highlighted — the loop is refused when drawn, and the ones already in the file are marked rather
+than silently dropped.
+
+See [link-mapper-component.md](./link-mapper-component.md) for the route model itself.

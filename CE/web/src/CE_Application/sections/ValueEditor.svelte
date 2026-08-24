@@ -4,6 +4,10 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import Hash from 'lucide-svelte/icons/hash';
+  import GitBranch from 'lucide-svelte/icons/git-branch';
+  import Timer from 'lucide-svelte/icons/timer';
+  import ListIcon from 'lucide-svelte/icons/list';
   import { materializePresetRows } from '../stores/presetChoiceSync.js';
 
   let { control = null } = $props();
@@ -87,8 +91,8 @@
 </script>
 
 {#if valueSection}
-  <PropertySection title="Value">
-    <PropertyCell label="Mapping" span={2} hint="Reveal the row-based mapping editor when this button carries payload or send values.">
+  <PropertySection title="Value" icon={Hash}>
+    <PropertyCell label="Mapping" span={1} hint="Reveal the row-based mapping editor when this button carries payload or send values.">
       <PropertyToggle
         value={valueSection.showMapping === true || buttonType !== 'momentary'}
         onchange={() => set('Value.showMapping', !(valueSection.showMapping === true))}
@@ -113,7 +117,7 @@
   </PropertySection>
 
   {#if isSelector}
-    <PropertySection title="Depends on">
+    <PropertySection title="Depends on" icon={GitBranch}>
       <PropertyCell label="Parent list" span={dependsOn ? 3 : 4} hint="Show only the rows that match another selector's current choice (bank → preset).">
         <select class="val" value={dependsOn} onchange={(event) => set('Value.dependsOn', event.target.value)}>
           <option value="">— None (independent) —</option>
@@ -130,7 +134,7 @@
           />
         </PropertyCell>
         {#if parentControl && parentRows.length === 0}
-          <PropertyCell label="" span={4}>
+          <PropertyCell label="" span={4} compact>
             <div class="empty">The parent list has no rows yet. Add rows there first.</div>
           </PropertyCell>
         {/if}
@@ -139,7 +143,7 @@
   {/if}
 
   {#if buttonType === 'momentary' && valueSection.showMapping !== true}
-    <PropertySection title="Momentary">
+    <PropertySection title="Momentary" icon={Timer}>
       <PropertyCell label="Label" span={4} hint="Keep simple momentary buttons label-first unless you need explicit payload mapping.">
         <input
           class="val"
@@ -150,7 +154,7 @@
       </PropertyCell>
     </PropertySection>
   {:else}
-    <PropertySection title="Rows">
+    <PropertySection title="Rows" icon={ListIcon}>
       <PropertyCell label="Items" span={4} hint="Each row ties together display text, internal value, and send mapping.">
         <div class="rows-editor">
           {#if rows.length === 0}
@@ -191,23 +195,11 @@
               </div>
               <div class="row-actions">
                 {#if buttonType === 'radio' || buttonType === 'combobox' || buttonType === 'listbox'}
-                  <label class="flag">
-                    <input
-                      type="checkbox"
-                      checked={row.selectedByDefault === true}
-                      onchange={(event) => updateRow(index, 'selectedByDefault', event.currentTarget.checked)}
-                    />
-                    <span>Default</span>
-                  </label>
+                  <PropertyToggle compact label="Default" value={row.selectedByDefault === true}
+                    onchange={(next) => updateRow(index, 'selectedByDefault', next)} />
                 {/if}
-                <label class="flag">
-                  <input
-                    type="checkbox"
-                    checked={row.enabled !== false}
-                    onchange={(event) => updateRow(index, 'enabled', event.currentTarget.checked)}
-                  />
-                  <span>Enabled</span>
-                </label>
+                <PropertyToggle compact label="Enabled" value={row.enabled !== false}
+                  onchange={(next) => updateRow(index, 'enabled', next)} />
                 <button type="button" class="action-btn danger" onclick={() => removeRow(index)}>Remove</button>
               </div>
               {#if isSelector && dependsOn && row.isHeader !== true}
@@ -227,10 +219,8 @@
               {/if}
               {#if buttonType === 'listbox'}
                 <div class="row-rich">
-                  <label class="flag">
-                    <input type="checkbox" checked={row.isHeader === true} onchange={(event) => updateRow(index, 'isHeader', event.currentTarget.checked)} />
-                    <span>Header</span>
-                  </label>
+                  <PropertyToggle compact label="Header" value={row.isHeader === true}
+                    onchange={(next) => updateRow(index, 'isHeader', next)} />
                   {#if row.isHeader !== true}
                     <input class="rich-in" type="text" placeholder="icon (glyph or URL)" value={row.icon ?? ''} onchange={(event) => updateRow(index, 'icon', event.target.value)} />
                     <input class="rich-in" type="text" placeholder="subtitle" value={row.subtitle ?? ''} onchange={(event) => updateRow(index, 'subtitle', event.target.value)} />
@@ -248,21 +238,10 @@
 {/if}
 
 <style>
-  .val {
-    width: 100%;
-    min-width: 0;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
-    padding: 4px 6px;
-    font-family: inherit;
-    outline: none;
-  }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
 
   .val:focus {
-    border-color: #5B9BD5;
+    border-color: var(--pp-field-focus, #5B9BD5);
   }
 
   .rows-editor {
@@ -314,13 +293,6 @@
   }
   .row-rich .rich-in:focus-visible { outline: 2px solid #5B9BD5; outline-offset: 1px; }
 
-  .flag {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: #B9B9B9;
-    font-size: 11px;
-  }
 
   .show-for {
     display: flex;

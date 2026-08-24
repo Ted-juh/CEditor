@@ -11,9 +11,12 @@ and builds on the universal Device Profile Designer (DPD) and its dump pipeline.
 
 ## TL;DR — sequencing by ROI
 
-1. **M1 — MIDI-CI live discovery (Identity + Property Exchange).** Highest ROI. Turns a connected,
-   CI-capable device into a profile automatically. Reuses `juce_midi_ci` (already vendored) and
-   `import-midici.mjs` (already written, offline). Works over an ordinary MIDI 1.0 cable.
+1. ~~**M1 — MIDI-CI live discovery (Identity + Property Exchange).**~~ ***Wired*** *(verified
+   2026-08-23)* — `CE/src/DeviceProfile/MidiCiSession.cpp` calls `startDiscovery()`,
+   `DeviceProfileServiceMidiCi.cpp:96` emits `midiCiDiscoveryComplete`, and
+   `DeviceRuntimeBridge.cpp:153` exposes `startMidiCiDiscovery` to the panel. What has NOT happened
+   is a CI-capable device on the other end of the cable, which is the same gap as everything else
+   here: no hardware session yet.
 2. **M2 — MIDI-CI Profile Configuration.** Enable/select a device's own MIDI-CI profiles; report them
    in the DPD. Small, builds on M1's session.
 3. **M3 — UMP transport + schema scaffolding.** Add `midiVersion`, group/per-note wire qualifiers, and

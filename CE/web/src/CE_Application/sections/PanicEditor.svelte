@@ -35,7 +35,7 @@
       </select>
     </PropertyCell>
     {#if String(p.scope ?? 'all') === 'channel'}
-      <PropertyCell label="Channel" span={2} compact hint="The single channel to silence.">
+      <PropertyCell label="Channel" span={1} compact hint="The single channel to silence.">
         <NumberCell label="Ch" min={1} max={16} step={1} value={num(p.channel, 1)} defaultValue={1} onchange={(v) => set('channel', clampInt(v, 1, 16, 1))} />
       </PropertyCell>
     {/if}
@@ -51,7 +51,7 @@
     <PropertyCell label="Pressable" span={1} hint="Allow firing it in preview / the player.">
       <PropertyToggle value={p.editable !== false} onchange={() => set('editable', !(p.editable !== false))} />
     </PropertyCell>
-    <PropertyCell label="" span={4} hint="Sound-off is sent before notes-off, so long release tails are cut too.">
+    <PropertyCell label="" span={4} hint="Sound-off is sent before notes-off, so long release tails are cut too." compact>
       <div class="note">Sends {count} message{count === 1 ? '' : 's'} on the 'mainSynth' role</div>
     </PropertyCell>
   </PropertySection>
@@ -72,7 +72,7 @@
 {/if}
 
 <style>
-  .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
-  .val:focus { border-color: #5B9BD5; }
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
+  .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .note { font-size: 11px; color: #8a8a94; }
 </style>
