@@ -23,7 +23,9 @@
   import { activePanel } from '../stores/panels.js';
   import { addRoute, removeRoute, updateRoute } from '../stores/routes.js';
   import { panelRoutes, routeEndpointCandidates, routeWriteTarget } from '../utils/routeAdapters.js';
-  import { ROUTE_CURVE, ROUTE_MODE, describeRoute, endpointAddress, routeCycles } from '../utils/routeModel.js';
+  import {
+    ROUTE_CURVE, ROUTE_MODE, contestedTargets, describeRoute, endpointAddress, routeCycles,
+  } from '../utils/routeModel.js';
   import { cinfo, cwarn } from '../stores/console.js';
 
   let view = $state('list');
@@ -39,6 +41,10 @@
   // A route inside a cycle is the one to remove, so the row says so rather than a banner naming
   // addresses the author then has to match up by eye.
   let cycleAddresses = $derived(new Set(cycles.flat()));
+  // Two `set` routes onto one target is not a loop and is just as invisible: the last one wins and
+  // the other is a knob that turns while nothing moves. Marked the same way, for the same reason.
+  let contested = $derived(contestedTargets(routes));
+  let contestedRoutes = $derived(new Set(contested.flatMap((entry) => entry.routes)));
 
   function labelFor(endpoint) {
     if (!endpoint) return '—';
@@ -163,6 +169,14 @@
         marked below feed back into themselves and are not evaluated.
       </div>
     {/if}
+    {#if contested.length}
+      <div class="notice">
+        <TriangleAlert size={11} />
+        {contested.length === 1 ? 'One target is' : `${contested.length} targets are`} set by more
+        than one route — {contested.map((entry) => labelFor(entry.endpoint)).join(', ')}. The last
+        route wins and the others do nothing. Switch one to “add” to have them combine.
+      </div>
+    {/if}
   </div>
 
   {#if routes.length === 0}
@@ -175,7 +189,8 @@
         {#each routes as route (route.id)}
           {@const owned = (route.origin ?? 'panel') === 'panel'}
           {@const looped = cycleAddresses.has(endpointAddress(route.to))}
-          <li class="item" class:looped>
+          {@const shadowed = contestedRoutes.has(route.id)}
+          <li class="item" class:looped class:shadowed>
             <label class="chk" title="Enabled">
               <input
                 type="checkbox"
@@ -246,6 +261,7 @@
             class:off={route.enabled === false}
             class:inverted={route.depth < 0}
             class:looped
+            class:shadowed={contestedRoutes.has(route.id)}
             d={cablePath(route)}
           >
             <title>{describeRoute(route, { sourceLabel: labelFor(route.from), targetLabel: labelFor(route.to) })}</title>
@@ -313,6 +329,8 @@
   .list { list-style: none; margin: 0; padding: 0; }
   .item { display: flex; align-items: center; gap: 5px; padding: 3px 0; flex-wrap: wrap; }
   .item.looped { background: rgba(242, 201, 76, 0.07); }
+  /* Dimmer than the loop mark and not the same colour: a shadowed route is inert, not broken. */
+  .item.shadowed { background: rgba(130, 150, 190, 0.08); }
   .chk { display: inline-flex; }
   .ends { flex: 1; min-width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tag {
@@ -326,6 +344,7 @@
   .cable.inverted { stroke: #F2994A; }
   .cable.off { stroke: #555; stroke-dasharray: 3 3; }
   .cable.looped { stroke: #F2C94C; stroke-width: 2.2; }
+  .cable.shadowed { stroke: #6E7C99; stroke-dasharray: 3 3; }
   .node rect { fill: #1F1F26; stroke: #3A3A44; }
   .node.target rect { fill: #21262E; stroke: #3E4A58; }
   .node text { fill: #C8C8C8; font-size: 10px; font-family: inherit; }

@@ -14,7 +14,7 @@ import { panels, resolvedActivePanelId, updatePanel } from './panels.js';
 import { panelPreviewSessions, updatePanelPreviewSession } from './interactionPreview.js';
 import { panelRoutes, routeWriteTarget } from '../utils/routeAdapters.js';
 import {
-  endpointAddress, evaluateRoutes, makeRoute, normalizeRoute, routeCycles, wouldCycle,
+  endpointAddress, makeRoute, normalizeRoute, routeCycles, settleRoutes, wouldCycle,
 } from '../utils/routeModel.js';
 import { flatControls } from '../utils/containment.js';
 
@@ -81,39 +81,56 @@ function readEndpointValue(panel, sessions, endpoint) {
 }
 
 /**
+ * Guard against re-entry.
+ *
+ * `applyRoutes` writes preview sessions, and a session write is what would call `applyRoutes` again
+ * once this is wired to a source change. Settling already loops internally, so a nested call has
+ * nothing to add and everything to lose — it would restart the walk from inside its own pass.
+ */
+let applying = false;
+
+/**
  * Evaluate the panel's routes and write the results into the preview sessions.
  *
- * Called on a source change, not on a clock. A route whose target already holds the computed value
- * writes nothing, so a stable panel settles rather than re-rendering forever — which matters here
- * because a route's target can be another route's source.
+ * Called on a source change, not on a clock, and it SETTLES rather than taking one step: a chain
+ * A→B→C moves the whole way on one call. `settleRoutes` holds the loop and the pass cap; this
+ * function is only the part that knows where a control's value lives.
+ *
+ * The cap earns its place even though `addRoute` refuses to draw a loop. A panel file can carry a
+ * ring the editor never saw — hand-edited, written by an older build, produced by a converter — and
+ * without a limit the settle walks it until the frame dies. With one, the ring costs eight passes
+ * and is handed back so the caller can say which wire to cut.
  */
 export function applyRoutes() {
   const panel = activePanel();
-  if (!panel) return 0;
+  if (!panel || applying) return { writes: 0, passes: 0, settled: true, cycles: [] };
 
   const routes = panelRoutes(panel);
-  if (routes.length === 0) return 0;
+  if (routes.length === 0) return { writes: 0, passes: 0, settled: true, cycles: [] };
 
-  const sessions = get(panelPreviewSessions) ?? {};
-  const results = evaluateRoutes(routes, {
-    readSource: (endpoint) => readEndpointValue(panel, sessions, endpoint),
-    readTarget: (endpoint) => readEndpointValue(panel, sessions, endpoint),
-    specFor: (endpoint) => specForEndpoint(panel, endpoint),
-  });
-
-  let written = 0;
-  for (const result of results) {
-    if (result.endpoint.kind !== 'control') continue;   // device targets go out over MIDI, not here
-    const current = readEndpointValue(panel, sessions, result.endpoint);
-    if (Number(current) === Number(result.value)) continue;
-
-    const port = result.endpoint.port || 'value';
-    updatePanelPreviewSession(result.endpoint.controlId, port === 'value'
-      ? { valueOverrideEnabled: true, valueOverride: result.value }
-      : { customValues: { ...(sessions?.[result.endpoint.controlId]?.customValues ?? {}), [port]: result.value } });
-    written += 1;
+  applying = true;
+  try {
+    return settleRoutes(routes, {
+      // Re-read the sessions store every time rather than closing over one snapshot: the point of
+      // settling is that a later pass sees what an earlier one wrote.
+      readSource: (endpoint) => readEndpointValue(panel, get(panelPreviewSessions) ?? {}, endpoint),
+      readTarget: (endpoint) => readEndpointValue(panel, get(panelPreviewSessions) ?? {}, endpoint),
+      specFor: (endpoint) => specForEndpoint(panel, endpoint),
+      writeTarget: (endpoint, value) => {
+        // Device targets go out over MIDI, not into a session. Returning false keeps them out of the
+        // change count, so a panel whose only routes point at the device still settles.
+        if (endpoint.kind !== 'control') return false;
+        const sessions = get(panelPreviewSessions) ?? {};
+        const port = endpoint.port || 'value';
+        updatePanelPreviewSession(endpoint.controlId, port === 'value'
+          ? { valueOverrideEnabled: true, valueOverride: value }
+          : { customValues: { ...(sessions?.[endpoint.controlId]?.customValues ?? {}), [port]: value } });
+        return true;
+      },
+    });
+  } finally {
+    applying = false;
   }
-  return written;
 }
 
 function writePanelRoutes(next) {

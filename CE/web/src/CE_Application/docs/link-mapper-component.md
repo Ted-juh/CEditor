@@ -123,12 +123,36 @@ offset around the target's own value — a mod matrix row. `set` replaces it —
 because a macro that sets a parameter and a wheel that nudges it is the normal case and the nudge
 belongs above.
 
+**But the DEFAULT was wrong, and is `add` now (2026-08-24).** Having both modes was right; starting
+a new route on `set` was not. The note said sum, a route drawn by hand on a canvas is a modulation
+far more often than a replacement, and a matrix whose rows replace each other by default is not a
+matrix. Nothing saved moves: `makeRoute` writes a complete record, so every route in every panel
+file already carries an explicit mode. The Macro and Router adapters still say `set` for themselves,
+because a macro knob really *is* the value.
+
+**Two `set` routes onto one target now warn.** Last-wins is deterministic and it is also silent —
+two macros wired to one cutoff means one of them is a knob that turns while nothing moves.
+`contestedTargets` names them and the Mapper marks the rows, dimmer than the loop mark and in a
+different colour, because a shadowed route is inert rather than broken. Not refused: a converter or
+an older file can hold this and should still load.
+
 **Cycle detection is not in the note and is what would have taken the feature down.** Fan-out plus a
 canvas makes a loop trivially easy to draw — A modulates B, B modulates A, or a longer ring nobody
 can see at once — and the runtime would chase it forever. `routeCycles` finds them, `wouldCycle`
 answers before the cable is drawn, and a cycle is reported from where the ring *closes* rather than
 from where the walk began, so the author is sent to a wire that is actually part of it. A fan-out
 that reconverges is not a cycle, which is the obvious false positive and is pinned.
+
+**And the refusal is only half of it, 2026-08-24.** `wouldCycle` guards one door — the editor's. A
+panel file can carry a ring that door never saw: hand-edited, written by an older build, produced by
+a converter. `routeCycleWarnings` shows an author that ring and does not stop the runtime walking
+it. So `settleRoutes` holds the loop now, capped at `ROUTE_PASS_LIMIT`, and hands back the rings it
+found instead of a bare failure.
+
+The cap paid for itself on something unrelated to loops. `evaluateRoutes` reads every source once,
+so one pass moves a chain by one link: A→B→C left C reading B's *old* value, and the far end caught
+up only when something happened to re-trigger. Settling means one source change produces one settled
+panel rather than a result that depends on how many times it fired.
 
 **The Router's transfer curve is declared, not flattened.** Its curve is a breakpoint list with
 per-segment shapes; a route's single `curve` name cannot express that, so the derived route says

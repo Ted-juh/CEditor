@@ -143,6 +143,45 @@ test('a nibble-encoded parameter is recovered with its width', () => {
   assert.deepEqual(hypothesis.offsets, [8, 9, 10, 11]);
 });
 
+test('a width taken from the widest move is held to a higher bar than one every sample agreed on', () => {
+  // The false negative this rule exists to prevent: 0x0064 → 0x1234 moves three of four nibbles
+  // because the last is 4 either way, and demanding identical signatures would call that "two
+  // controls were moved". Taking the union is right. It is also INFERRED, and it cannot tell this
+  // apart from a two-byte parameter followed by a four-byte one — so it needs a sample more before
+  // it pre-fills, and it says in `why` where the width came from.
+  const synth = createFakeSynth();
+  const mask = maskFor(synth);
+  const checksum = fitChecksum([synth.dump(), (synth.set('amp.level', 100), synth.dump())]);
+  const options = { checksum, payloadLength: synth.layout.payloadLength };
+
+  // The synth sits at 0x0064 after the checksum fit, so this walk is 0x0064 → 0x1234 → 0x1230 →
+  // 0x5678. The first step leaves the low nibble alone (4 either side) and the second moves nothing
+  // else, so the three signatures differ and the union is what makes this one parameter, not three.
+  const inferred = classifyDiff(observe(synth, 'amp.level', [0x1234, 0x1230, 0x5678], mask), options);
+  assert.equal(inferred.kind, 'nibbles', 'the union is still taken — that is the point of the rule');
+  assert.deepEqual(inferred.offsets, [8, 9, 10, 11]);
+  assert.equal(inferred.confidence, CONFIDENCE.candidate, 'three samples and an inferred width');
+  assert.match(inferred.why, /widest move/);
+
+  // A fourth sample clears the higher bar.
+  const more = createFakeSynth();
+  const enough = classifyDiff(
+    observe(more, 'amp.level', [0x1234, 0x1230, 0x5678, 0x9ABC], maskFor(more)),
+    { checksum, payloadLength: more.layout.payloadLength },
+  );
+  assert.equal(enough.confidence, CONFIDENCE.probable);
+
+  // And a run where every sample moved the same four bytes is probable on three, as it always was.
+  // The synth sits at 0x1000, so these three values move all four nibbles every time.
+  const same = createFakeSynth();
+  const agreed = classifyDiff(
+    observe(same, 'amp.level', [0x2345, 0x6789, 0xABCD], maskFor(same)),
+    { checksum, payloadLength: same.layout.payloadLength },
+  );
+  assert.equal(agreed.confidence, CONFIDENCE.probable);
+  assert.doesNotMatch(agreed.why, /widest move/);
+});
+
 test('A SHARED BYTE IS A FINDING, not a failure — and it says which bits are still free', () => {
   // Two parameters in one byte is the case only a person can finish. The engine's job is to notice
   // and say so, with enough detail that the next capture into the same byte lands as the other
@@ -164,6 +203,30 @@ test('A SHARED BYTE IS A FINDING, not a failure — and it says which bits are s
   });
   assert.equal(octave.kind, 'bitslice');
   assert.equal(octave.sharedByte, 12);
+});
+
+test('a bit-field needs more evidence than a plain byte before it is called probable', () => {
+  // The one hypothesis with a higher bar, and the asymmetry is about what being wrong costs. A u7
+  // called wrongly writes the whole byte and is visibly wrong the first time somebody moves the
+  // control. A bit-field called wrongly writes a MASK — the neighbouring bits are left alone, so
+  // whatever owns them keeps a stale value and nothing looks broken until a patch comes back wrong.
+  const synth = createFakeSynth();
+  const mask = maskFor(synth);
+  const checksum = fitChecksum([synth.dump(), (synth.set('osc.wave', 3), synth.dump())]);
+  const options = { checksum, payloadLength: synth.layout.payloadLength };
+
+  const three = classifyDiff(observe(synth, 'osc.wave', [1, 4, 7], mask), options);
+  assert.equal(three.kind, 'bitslice');
+  assert.equal(three.confidence, CONFIDENCE.candidate, 'three samples barely test contiguity');
+
+  const five = classifyDiff(observe(synth, 'osc.wave', [1, 2, 4, 5, 7], mask), options);
+  assert.equal(five.kind, 'bitslice');
+  assert.equal(five.confidence, CONFIDENCE.probable);
+
+  // And the bar is raised for bit-fields ONLY: an ordinary byte still settles on three.
+  const cutoff = classifyDiff(observe(synth, 'filter.cutoff', [10, 60, 100], mask), options);
+  assert.equal(cutoff.kind, 'u7');
+  assert.equal(cutoff.confidence, CONFIDENCE.probable);
 });
 
 test('two moves that touch different offsets are reported as inconsistent, not averaged', () => {

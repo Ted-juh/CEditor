@@ -116,6 +116,13 @@ export function fitChecksum(payloads, { algorithms = CHECKSUM_IDS } = {}) {
 
 // --- the diff table --------------------------------------------------------------------------------
 
+/**
+ * How many observations a bit-field needs before it is called `probable`.
+ *
+ * Three is enough for every other hypothesis; see the call site for why this one is different.
+ */
+const BITSLICE_OBSERVATIONS = 5;
+
 function contiguous(offsets) {
   if (offsets.length === 0) return false;
   for (let i = 1; i < offsets.length; i += 1) if (offsets[i] !== offsets[i - 1] + 1) return false;
@@ -182,6 +189,7 @@ export function classifyDiff(observations, { checksum = null, payloadLength = 0 
   // So: if every observation is a SUBSET of the widest one and the widest is contiguous, take the
   // union — the field is as wide as the widest move proves it is. Disjoint signatures are still
   // inconsistent, because that genuinely is two controls.
+  let unionInferred = false;
   const signature = (o) => o.changed.map((entry) => entry.offset).join(',');
   const signatures = new Set(withoutChecksum.map(signature));
   const union = [...new Set(withoutChecksum.flatMap((o) => o.changed.map((e) => e.offset)))].sort((a, b) => a - b);
@@ -200,10 +208,28 @@ export function classifyDiff(observations, { checksum = null, payloadLength = 0 
         offsets: union,
       };
     }
+
+    // Nested and contiguous, so the union stands — but it is INFERRED rather than observed, and the
+    // hypothesis below should not read as if every sample agreed.
+    //
+    // The case this cannot tell apart: a two-byte parameter at [8,9] moved, then a four-byte one at
+    // [8,9,10,11]. Nested, contiguous, and genuinely two controls. Rarer than the false negative
+    // this rule exists to avoid — demanding identical signatures calls every 0x0064 → 0x1234 "two
+    // controls were moved" — so the union is still the right default. It just is not as well
+    // evidenced as an exact match, and saying so costs nothing.
+    unionInferred = true;
   }
 
   const offsets = signatures.size > 1 ? union : withoutChecksum[0].changed.map((entry) => entry.offset);
-  const enough = withoutChecksum.length >= 3;
+  // An inferred union needs one more sample than an agreed signature does, for the same reason a
+  // bit-field needs two more: the weaker the evidence, the less it should pre-fill.
+  const enough = withoutChecksum.length >= (unionInferred ? 4 : 3);
+  // Appended to whichever hypothesis wins, so the author reading it knows the width came from the
+  // widest move rather than from every sample agreeing on it.
+  const unionNote = unionInferred
+    ? `; width taken from the widest move (${[...signatures].join(' | ')}) — a narrower sample can `
+      + 'just mean a byte held the same value either side'
+    : '';
 
   // Indexed by offset rather than by position: with a union signature, observation 0's third entry
   // is not necessarily the same byte as observation 1's third entry.
@@ -233,7 +259,20 @@ export function classifyDiff(observations, { checksum = null, payloadLength = 0 
     const outsideMask = 0x7f & ~runBits.reduce((m, bit) => m | (1 << bit), 0);
     const restUsed = seen.some((entry) => (entry.to & outsideMask) !== 0 || (entry.from & outsideMask) !== 0);
     if (bitsMoved.size > 0 && bitsMoved.size <= 5 && contiguousBits(bitsMoved) && high <= 0x7f && restUsed) {
-      return bitsliceHypothesis(offset, bitsMoved, enough);
+      // A BITSLICE NEEDS MORE EVIDENCE THAN A PLAIN BYTE, and it is the only hypothesis that does.
+      //
+      // Contiguity is the load-bearing condition and three observations barely test it: bits 2 and 3
+      // moving while 4 stays put is a real bit-field, and it is equally a u7 whose three sampled
+      // values happened not to cross 16. The other conditions narrow that and cannot close it —
+      // only more samples can.
+      //
+      // The asymmetry is deliberate, because being wrong costs differently. A u7 called wrongly
+      // writes the whole byte, which is visibly wrong the first time somebody moves the control. A
+      // bit-field called wrongly writes a MASK: it leaves the neighbouring bits alone, so the
+      // parameter that actually owns them silently keeps a stale value and nothing looks broken
+      // until a patch comes back wrong. So a shaky bit-field is offered as a candidate rather than
+      // pre-filled as the answer, and the author is the one who promotes it.
+      return bitsliceHypothesis(offset, bitsMoved, seen.length >= BITSLICE_OBSERVATIONS);
     }
 
     return {
@@ -243,7 +282,7 @@ export function classifyDiff(observations, { checksum = null, payloadLength = 0 
       size: 1,
       confidence: enough ? CONFIDENCE.probable : CONFIDENCE.candidate,
       why: `one byte at offset ${offset}, values ${Math.min(...values)}–${Math.max(...values)}`
-        + (checksum ? ', checksum moved with it' : ', no checksum in this dump'),
+        + (checksum ? ', checksum moved with it' : ', no checksum in this dump') + unionNote,
       observedValues: values,
     };
   }
@@ -266,7 +305,7 @@ export function classifyDiff(observations, { checksum = null, payloadLength = 0 
       size: 2,
       confidence: enough ? CONFIDENCE.probable : CONFIDENCE.candidate,
       why: `two adjacent bytes at ${offsets[0]}–${offsets[1]}; offset ${msbFirst ? offsets[0] : offsets[1]} `
-        + 'moves in coarser steps, so it is the high byte',
+        + 'moves in coarser steps, so it is the high byte' + unionNote,
     };
   }
 
@@ -282,7 +321,8 @@ export function classifyDiff(observations, { checksum = null, payloadLength = 0 
         offsets,
         size: offsets.length,
         confidence: enough ? CONFIDENCE.probable : CONFIDENCE.candidate,
-        why: `${offsets.length} adjacent bytes at ${offsets[0]}–${offsets.at(-1)}, none above 0x0F — high nibble first`,
+        why: `${offsets.length} adjacent bytes at ${offsets[0]}–${offsets.at(-1)}, none above 0x0F — `
+          + 'high nibble first' + unionNote,
       };
     }
     return {

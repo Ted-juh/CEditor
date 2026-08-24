@@ -13,7 +13,8 @@ import assert from 'node:assert/strict';
 
 import {
   ROUTE_CURVE, ROUTE_MODE, applyCurve, describeRoute, endpointAddress, evaluateRoute,
-  evaluateRoutes, makeRoute, normalizeRoute, routeCycles, routeEndpoint, wouldCycle,
+  ROUTE_DEFAULTS, ROUTE_PASS_LIMIT, contestedTargets, evaluateRoutes, makeRoute, normalizeRoute,
+  routeCycles, routeEndpoint, settleRoutes, wouldCycle,
 } from '../src/CE_Application/utils/routeModel.js';
 import {
   macroRoutes, ownRoutes, panelRoutes, routeWriteTarget, routerRoutes,
@@ -42,7 +43,7 @@ test('a route defaults every field, and an unknown field is not smuggled in', ()
   assert.equal(route.enabled, true);
   assert.equal(route.depth, 1);
   assert.equal(route.curve, ROUTE_CURVE.linear);
-  assert.equal(route.mode, ROUTE_MODE.set);
+  assert.equal(route.mode, ROUTE_MODE.add);
   assert.equal(route.nonsense, undefined);
   assert.equal(route.id, 'control:knob:value>control:cutoff:value');
 });
@@ -214,6 +215,133 @@ test('an editor can ask before it draws the cable', () => {
   assert.equal(wouldCycle(existing, makeRoute({ from: CUTOFF, to: KNOB })), true);
   assert.equal(wouldCycle(existing, makeRoute({ from: CUTOFF, to: RES })), false);
   assert.equal(wouldCycle([], makeRoute({ from: KNOB, to: KNOB })), true, 'a self-route is a loop');
+});
+
+// --- what a new route starts as, and what two of them do to one target ---------------------------
+
+test('a new route sums rather than replaces', () => {
+  // The note said "sum when multiple sources hit one target" and the first build defaulted to the
+  // opposite. A matrix whose rows replace each other by default is not a matrix.
+  assert.equal(ROUTE_DEFAULTS.mode, ROUTE_MODE.add);
+  assert.equal(makeRoute({ from: KNOB, to: CUTOFF }).mode, ROUTE_MODE.add);
+});
+
+test('changing the default does not move a saved route', () => {
+  // Why the change is safe: `makeRoute` writes a complete record, so anything a panel file holds
+  // carries an explicit mode and keeps it. Only a route with no mode at all takes the new default.
+  assert.equal(normalizeRoute({ from: KNOB, to: CUTOFF, mode: 'set' }).mode, ROUTE_MODE.set);
+  assert.equal(normalizeRoute({ from: KNOB, to: CUTOFF, mode: 'nonsense' }).mode, ROUTE_DEFAULTS.mode);
+});
+
+test('two set routes onto one target are reported', () => {
+  // Deterministic and silent: the last one wins and the other is a knob that turns while nothing
+  // moves. Not refused — a converter can produce this — but the editor is told which two.
+  const contested = contestedTargets([
+    makeRoute({ id: 'a', from: KNOB, to: CUTOFF, mode: ROUTE_MODE.set }),
+    makeRoute({ id: 'b', from: RES, to: CUTOFF, mode: ROUTE_MODE.set }),
+  ]);
+  assert.equal(contested.length, 1);
+  assert.deepEqual(contested[0].routes, ['a', 'b']);
+  assert.equal(contested[0].address, 'control:cutoff:value');
+});
+
+test('summing routes are not contested, and neither is a disabled one', () => {
+  // Summing is what `add` is for, so two of them onto one target is the normal case and not a
+  // warning. A disabled `set` route is not fighting for anything either.
+  assert.deepEqual(contestedTargets([
+    makeRoute({ id: 'a', from: KNOB, to: CUTOFF, mode: ROUTE_MODE.add }),
+    makeRoute({ id: 'b', from: RES, to: CUTOFF, mode: ROUTE_MODE.add }),
+  ]), []);
+  assert.deepEqual(contestedTargets([
+    makeRoute({ id: 'a', from: KNOB, to: CUTOFF, mode: ROUTE_MODE.set }),
+    makeRoute({ id: 'b', from: RES, to: CUTOFF, mode: ROUTE_MODE.set, enabled: false }),
+  ]), []);
+});
+
+test('an evaluated target carries the contest with it', () => {
+  // So a runtime consumer sees the same thing the editor does rather than having to ask separately.
+  const out = evaluateRoutes([
+    makeRoute({ id: 'a', from: KNOB, to: CUTOFF, mode: ROUTE_MODE.set }),
+    makeRoute({ id: 'b', from: RES, to: CUTOFF, mode: ROUTE_MODE.set }),
+    makeRoute({ id: 'c', from: KNOB, to: RES, mode: ROUTE_MODE.set }),
+  ], { readSource: () => 1, specFor: () => UNIT });
+
+  const cutoff = out.find((entry) => entry.address === 'control:cutoff:value');
+  const res = out.find((entry) => entry.address === 'control:res:value');
+  assert.deepEqual(cutoff.contested, ['a', 'b']);
+  assert.deepEqual(res.contested, [], 'one setter is not a contest');
+});
+
+// --- settling, which is the brace to the editor's belt --------------------------------------------
+//
+// `wouldCycle` guards one door: the editor's. A panel file can carry a ring the editor never saw,
+// so the runtime needs its own limit rather than trusting that nothing upstream let one through.
+
+/** A tiny value store, so these tests exercise the settle loop and not a mock of it. */
+function bench(initial = {}) {
+  const values = { ...initial };
+  return {
+    values,
+    io: {
+      readSource: (endpoint) => values[endpoint.controlId] ?? 0,
+      readTarget: (endpoint) => values[endpoint.controlId] ?? 0,
+      specFor: () => UNIT,
+      writeTarget: (endpoint, value) => { values[endpoint.controlId] = value; return true; },
+    },
+  };
+}
+
+test('a chain settles in one call, not one link per call', () => {
+  // The bug that is there whether or not anybody draws a loop: `evaluateRoutes` reads every source
+  // once, so a single pass moves A into B and leaves C reading B's old value.
+  const { values, io } = bench({ knob: 1, cutoff: 0, res: 0 });
+  const result = settleRoutes([
+    makeRoute({ from: KNOB, to: CUTOFF }),
+    makeRoute({ from: CUTOFF, to: RES }),
+  ], io);
+
+  assert.equal(result.settled, true);
+  assert.equal(values.cutoff, 1);
+  assert.equal(values.res, 1, 'the far end of the chain moved on the same call');
+  assert.ok(result.passes > 1, 'settling a chain takes more than one pass, by construction');
+});
+
+test('a settled panel stops rather than writing forever', () => {
+  const { io } = bench({ knob: 1, cutoff: 1 });
+  const result = settleRoutes([makeRoute({ from: KNOB, to: CUTOFF })], io);
+  assert.equal(result.settled, true);
+  assert.equal(result.writes, 0, 'a target already holding the computed value is not written');
+  assert.equal(result.passes, 1);
+});
+
+test('a ring stops at the pass limit and names itself', () => {
+  // The whole point: this ring could never be drawn through `addRoute`, and a file can still hold
+  // it. Without the cap the loop runs until the frame dies.
+  // `set`, spelled out: two `add` routes around a ring saturate against the target's range and then
+  // settle, which is the clamp doing its job and not what this test is about.
+  const { io } = bench({ knob: 0.25, cutoff: 0 });
+  const result = settleRoutes([
+    makeRoute({ from: KNOB, to: CUTOFF, depth: 0.5, mode: ROUTE_MODE.set }),
+    makeRoute({ from: CUTOFF, to: KNOB, depth: 0.5, mode: ROUTE_MODE.set }),
+  ], io);
+
+  assert.equal(result.settled, false);
+  assert.equal(result.passes, ROUTE_PASS_LIMIT, 'it gave up rather than running on');
+  assert.equal(result.cycles.length, 1, 'and handed back the ring, so the editor can say which wire');
+});
+
+test('a target the caller refuses does not count as a change', () => {
+  // Device endpoints go out over MIDI rather than into a session. If a refused write still counted,
+  // a panel whose only routes point at the device would never settle.
+  const device = routeEndpoint({ kind: 'device', parameterId: 'cc74' });
+  const result = settleRoutes([makeRoute({ from: KNOB, to: device })], {
+    readSource: () => 1,
+    readTarget: () => undefined,
+    specFor: () => UNIT,
+    writeTarget: () => false,
+  });
+  assert.equal(result.settled, true);
+  assert.equal(result.passes, 1);
 });
 
 // --- the adapters, which are what makes "one model" true ------------------------------------------

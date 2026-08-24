@@ -50,7 +50,15 @@ export const ROUTE_MODE = {
 
 export const ROUTE_DEFAULTS = {
   enabled: true,
-  mode: ROUTE_MODE.set,
+  // ADD, following the design note's "sum when multiple sources hit one target". A route drawn by
+  // hand on a canvas is a modulation far more often than it is a replacement, and a matrix whose
+  // rows replace each other by default is not a matrix.
+  //
+  // Changing this does not touch a single saved route. `makeRoute` writes a complete record, so
+  // every route ever stored in a panel file carries an explicit `mode` and keeps whatever it was
+  // authored with. The default is only what a NEW route starts as. The Macro and Router adapters
+  // say `set` for themselves, because a macro knob really is the value rather than an offset to it.
+  mode: ROUTE_MODE.add,
   inputMin: null,     // null = the source endpoint's own min
   inputMax: null,
   outputMin: null,    // null = the target endpoint's own min
@@ -105,7 +113,7 @@ export function normalizeRoute(route) {
     ...route,
   });
   merged.enabled = route.enabled !== false;
-  merged.mode = merged.mode === ROUTE_MODE.add ? ROUTE_MODE.add : ROUTE_MODE.set;
+  merged.mode = Object.values(ROUTE_MODE).includes(merged.mode) ? merged.mode : ROUTE_DEFAULTS.mode;
   merged.curve = Object.values(ROUTE_CURVE).includes(merged.curve) ? merged.curve : ROUTE_CURVE.linear;
   merged.depth = numberOr(merged.depth, 1);
   merged.offset = numberOr(merged.offset, 0);
@@ -183,6 +191,30 @@ export function evaluateRoute(route, sourceValue, { sourceSpec = null, targetSpe
 }
 
 /**
+ * Targets that more than one `set` route claims.
+ *
+ * The fan-in rule below says the LAST `set` wins as the base. That is deterministic and it is also
+ * silent: two macros wired to one cutoff means one of them does nothing, and the author sees a knob
+ * that turns and a parameter that ignores it. Nothing is refused here — a converter or an older
+ * file can hold this and should still load — but the editor is told, so it can say which two.
+ *
+ * `add` routes are not contested. Summing is what they are for.
+ */
+export function contestedTargets(routes) {
+  const byTarget = new Map();
+  for (const raw of routes ?? []) {
+    const route = normalizeRoute(raw);
+    if (!route || route.enabled === false || route.mode !== ROUTE_MODE.set) continue;
+    const address = endpointAddress(route.to);
+    if (!address) continue;
+    const bucket = byTarget.get(address) ?? { address, endpoint: route.to, routes: [] };
+    bucket.routes.push(route.id);
+    byTarget.set(address, bucket);
+  }
+  return [...byTarget.values()].filter((bucket) => bucket.routes.length > 1);
+}
+
+/**
  * Every target a set of routes writes, with its resulting value.
  *
  * `readSource` and `readTarget` are injected so this stays pure: the caller knows where a control's
@@ -217,6 +249,10 @@ export function evaluateRoutes(routes, { readSource, readTarget = () => undefine
     byTarget.set(targetAddress, bucket);
   }
 
+  // Computed once from the same route list rather than tracked in the loop above, so the editor's
+  // warning and the runtime's report can never disagree about which routes are fighting.
+  const contested = new Map(contestedTargets(routes).map((entry) => [entry.address, entry.routes]));
+
   const out = [];
   for (const [address, bucket] of byTarget) {
     const spec = specFor(bucket.endpoint);
@@ -228,9 +264,72 @@ export function evaluateRoutes(routes, { readSource, readTarget = () => undefine
       endpoint: bucket.endpoint,
       value: spec ? clamp(value, numberOr(spec.min, -Infinity), numberOr(spec.max, Infinity)) : value,
       routes: bucket.count,
+      // Empty for every ordinary target. Non-empty means two `set` routes wanted this one and only
+      // the last of them is in `value`.
+      contested: contested.get(address) ?? [],
     });
   }
   return out;
+}
+
+/**
+ * The most passes `settleRoutes` will make before it gives up.
+ *
+ * A chain settles in as many passes as it is long — A→B→C needs two, because the second pass is the
+ * one that can see what the first wrote — so the cap has to clear the longest chain anybody would
+ * really build. Eight does, comfortably, and still costs nothing when a ring makes it unreachable.
+ */
+export const ROUTE_PASS_LIMIT = 8;
+
+/**
+ * Evaluate routes repeatedly until nothing changes, or the pass limit stops it.
+ *
+ * WHY THIS EXISTS, given that `wouldCycle` already refuses to draw a loop: the editor's refusal is
+ * the only thing standing between the runtime and a ring, and it only guards one door. A panel file
+ * edited by hand, written by an older build, or produced by a converter can carry a cycle that
+ * nothing ever asked `addRoute` about. `routeCycleWarnings` shows the author that ring; it does not
+ * stop the runtime walking it. This does, and it is the belt to that brace.
+ *
+ * It also fixes something a single pass got wrong regardless of loops. `evaluateRoutes` reads every
+ * source once, so a chain A→B→C moves one link per call: C only sees A's change on the SECOND
+ * evaluation. Settling here means one source change produces one settled panel, rather than a
+ * result that depends on how many times something happened to re-trigger.
+ *
+ * `writeTarget` is injected for the same reason `readSource` is — this file does not know where a
+ * control's value lives. Returning `{ settled, cycles }` rather than throwing lets the caller decide:
+ * the editor can surface the ring, and a player can carry on with the values it reached.
+ */
+export function settleRoutes(routes, {
+  readSource,
+  readTarget = () => undefined,
+  writeTarget,
+  specFor = () => null,
+  passLimit = ROUTE_PASS_LIMIT,
+} = {}) {
+  let writes = 0;
+  let passes = 0;
+
+  while (passes < passLimit) {
+    passes += 1;
+    const results = evaluateRoutes(routes, { readSource, readTarget, specFor });
+
+    let changed = 0;
+    for (const result of results) {
+      const current = Number(readTarget(result.endpoint));
+      // The idempotence guard, and the reason a settled panel stops rather than re-rendering
+      // forever: a target that already holds the computed value is not written.
+      if (Number.isFinite(current) && current === Number(result.value)) continue;
+      if (writeTarget?.(result.endpoint, result.value) === false) continue;
+      changed += 1;
+    }
+
+    writes += changed;
+    if (changed === 0) return { writes, passes, settled: true, cycles: [] };
+  }
+
+  // Out of passes. Either there is a ring, or somebody built a chain longer than the limit — and the
+  // caller is told WHICH by being handed the rings themselves rather than a bare "did not settle".
+  return { writes, passes, settled: false, cycles: routeCycles(routes) };
 }
 
 /**
