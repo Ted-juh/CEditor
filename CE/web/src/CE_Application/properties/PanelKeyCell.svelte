@@ -54,7 +54,15 @@
         {#each NOTE_NAMES as name, index}<option value={index}>{name}</option>{/each}
       </select>
       <select class="val" value={context.scale} onchange={(event) => setScale(event.target.value)} aria-label="Panel scale">
-        {#each Object.keys(SCALES) as name}<option value={name}>{SCALE_LABELS[name] ?? name}</option>{/each}
+        <!-- Chromatic and whole tone are marked rather than removed. They are legitimate panel keys
+             — the arpeggiator and the quantiser both use one — and they are the two the note
+             components have no name for, so every follower keeps its own. Saying so in the list
+             beats saying it in a warning after the author has already picked one. -->
+        {#each Object.keys(SCALES) as name}
+          <option value={name}>
+            {SCALE_LABELS[name] ?? name}{componentScaleName(name) === null ? ' — followers keep their own' : ''}
+          </option>
+        {/each}
       </select>
     {:else}
       <span class="note"><Link2 size={11} /> using its own key</span>

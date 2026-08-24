@@ -123,7 +123,8 @@ export function profileConsumers(profileId, panels, roleProfiles = {}) {
  */
 function findRename(removed, added) {
   const label = String(removed?.label ?? removed?.name ?? '').trim().toLowerCase();
-  if (!label) return null;
+  // An unlabelled parameter has nothing to match on, so there is no match and nothing to offer.
+  if (!label) return { match: null, candidates: [] };
   const shape = String(removed?.messageRecipe ?? '');
 
   const matches = added.filter((candidate) => {
@@ -132,7 +133,15 @@ function findRename(removed, added) {
   });
   // Exactly one, or it is a guess. Two candidates with the same label and shape are genuinely
   // ambiguous and saying so is more use than picking.
-  return matches.length === 1 ? matches[0] : null;
+  //
+  // But NOT saying anything is worse than either. The ambiguous case used to come back as a bare
+  // null, so the finding read "gone; every binding to it is dead" — which is almost certainly
+  // false, and hides the two ids the matcher was looking at. Refusing to choose is the right call;
+  // refusing to mention what the choice was between is just losing evidence the tool already had.
+  return {
+    match: matches.length === 1 ? matches[0] : null,
+    candidates: matches.length > 1 ? matches.map((candidate) => String(candidate.id)) : [],
+  };
 }
 
 function choiceValues(parameter) {
@@ -159,18 +168,24 @@ export function impactOfChange(before, after, bindings = []) {
 
   for (const id of removedIds) {
     const parameter = oldParameters.get(id);
-    const rename = findRename(parameter, addedList);
+    const { match: rename, candidates } = findRename(parameter, addedList);
     findings.push({
       kind: rename ? 'renamed' : 'removed',
       parameterId: id,
       label: String(parameter?.label ?? parameter?.name ?? id),
       newId: rename ? String(rename.id) : null,
+      // Empty unless the match was ambiguous. The finding stays `removed` — that is the safe
+      // reading and the one a binding experiences — and these are what it could have been.
+      renameCandidates: candidates,
       bindings: bindingsFor(id),
       // A rename looks harmless in a diff — the parameter is still there, under a new name — and is
       // exactly as broken as a removal from a binding's point of view.
       detail: rename
         ? `renamed to ${rename.id}; every binding still names the old id`
-        : 'gone; every binding to it is dead',
+        : candidates.length
+          ? `gone; every binding to it is dead. It may have become ${candidates.join(' or ')} — same `
+            + 'label and same message shape, so which one cannot be told from here'
+          : 'gone; every binding to it is dead',
     });
   }
 

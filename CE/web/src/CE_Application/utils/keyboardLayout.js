@@ -55,6 +55,9 @@ export function keyboardKeys(control, width, height, { held = [], context = null
   const geom = keyboardGeometry(width, height, control);
   const heldSet = held instanceof Set ? held : new Set(held ?? []);
   const key = context ? normalizeContext(context) : null;
+  // Only `refuse` makes a key inert. Under `off` and `quantize` an out-of-key key still sounds
+  // something, so shading it is information; marking it dead would be a lie about what a press does.
+  const refusing = String(keyboardConfig(control).scaleLock ?? 'off') === 'refuse';
 
   const keys = [];
   for (let note = lowNote; note <= highNote; note += 1) {
@@ -67,6 +70,10 @@ export function keyboardKeys(control, width, height, { held = [], context = null
       // scale-locked keyboard that simply refused the note would leave the player wondering whether
       // the click registered; shading says "that one is not in the key" before they press it.
       inKey: key ? isInScale(note, key) : true,
+      // Pressing this key sends nothing. The shading above says "not in the key"; this says "and
+      // this one will not sound", which is the difference between information and a dead key. A
+      // player finding that out by silence assumes the panel is broken.
+      refused: refusing && key ? !isInScale(note, key) : false,
       label: note % 12 === OCTAVE_LABEL_PC ? `C${Math.floor(note / 12) - 1}` : '',
     });
   }

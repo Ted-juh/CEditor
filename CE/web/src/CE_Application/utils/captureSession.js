@@ -257,8 +257,18 @@ export function undoLast(session) {
  */
 export function sessionHarvest(session) {
   const learned = session.learned ?? [];
+  const parameters = learned.filter((entry) => entry.confidence === CONFIDENCE.confirmed
+    || entry.confidence === CONFIDENCE.probable);
   return {
-    parameters: learned.filter((entry) => entry.confidence === CONFIDENCE.confirmed || entry.confidence === CONFIDENCE.probable),
+    parameters,
+    // Both land as parameters, and they are not the same thing. `confirmed` means a person moved
+    // the control and said the synth did what it should; `probable` means the bytes looked right
+    // and nobody checked. Kept apart here because the summary below is the only place anybody sees
+    // the shape of a session, and a run where two of thirty were verified read exactly like a run
+    // where all thirty were — which is the failure this function's own comment warns about, one
+    // level up.
+    verified: parameters.filter((entry) => entry.confidence === CONFIDENCE.confirmed),
+    unverified: parameters.filter((entry) => entry.confidence === CONFIDENCE.probable),
     candidates: learned.filter((entry) => entry.confidence === CONFIDENCE.candidate),
     conflicts: learned.filter((entry) => entry.confidence === CONFIDENCE.conflict),
     total: learned.length,
@@ -275,6 +285,13 @@ export function sessionHarvest(session) {
 export function sessionSummary(session) {
   const harvest = sessionHarvest(session);
   const parts = [`${harvest.parameters.length} parameter${harvest.parameters.length === 1 ? '' : 's'}`];
+  // Only when some were and some were not. "30 parameters, 30 verified" is noise, and "30
+  // parameters" alone when none were verified is the thing worth not saying quietly.
+  if (harvest.unverified.length) {
+    parts.push(harvest.verified.length
+      ? `${harvest.verified.length} verified on the synth`
+      : 'none verified on the synth');
+  }
   if (harvest.candidates.length) parts.push(`${harvest.candidates.length} still a guess`);
   if (harvest.conflicts.length) parts.push(`${harvest.conflicts.length} in conflict`);
   const shared = (session.learned ?? []).filter((entry) => entry.kind === 'bitslice');

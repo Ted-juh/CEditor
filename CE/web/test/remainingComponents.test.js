@@ -225,6 +225,31 @@ test('out-of-key keys are shaded whichever lock is on, so the rule is visible be
   assert.equal(keys.find((key) => key.note === 61).inKey, false);
 });
 
+test('a key that will sound nothing is marked dead, and only under refuse', () => {
+  // Shading and deadness are two different statements. "Not in the key" is information, and under
+  // `off` and `quantize` it is the whole truth — the key still sounds something. Under `refuse` it
+  // sounds NOTHING, and a player who learns that by pressing and hearing silence concludes the
+  // panel is broken rather than that it is doing what its author asked for.
+  const context = { root: 0, scale: 'major' };
+  const at = (keyboard, note) => keyboardKeys(keyboard, 320, 90, { context })
+    .find((key) => key.note === note);
+
+  const refuse = control('Keyboard', 'Keyboard', { scaleLock: 'refuse' });
+  assert.equal(at(refuse, 61).refused, true, 'C# sends nothing, so it is drawn dead');
+  assert.equal(at(refuse, 60).refused, false, 'C is in the key and plays');
+  assert.equal(keyboardPress(refuse, 61, { context }), null, 'and the mark agrees with the press');
+
+  for (const lock of ['off', 'quantize']) {
+    const keyboard = control('Keyboard', 'Keyboard', { scaleLock: lock });
+    assert.equal(at(keyboard, 61).inKey, false, `${lock}: still shaded`);
+    assert.equal(at(keyboard, 61).refused, false, `${lock}: but it sounds, so it is not dead`);
+    assert.ok(keyboardPress(keyboard, 61, { context }), `${lock}: proof that it sounds`);
+  }
+
+  // No musical context means no scale to be outside of, so nothing is refused whatever the setting.
+  assert.equal(keyboardKeys(refuse, 320, 90).find((key) => key.note === 61).refused, false);
+});
+
 test('latch is what makes a chord possible with one pointer', () => {
   let held = keyboardHold(new Set(), 60, { latch: true });
   held = keyboardHold(held, 64, { latch: true });

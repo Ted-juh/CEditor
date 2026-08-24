@@ -134,7 +134,23 @@ test('an ambiguous rename is reported as a removal rather than guessed', () => {
       { id: 'c', label: 'Level', messageRecipe: 'cc7' },
     ],
   };
-  assert.equal(impactOfChange(before, after, []).findings[0].kind, 'removed');
+  const finding = impactOfChange(before, after, []).findings[0];
+  assert.equal(finding.kind, 'removed');
+
+  // Refusing to choose is right. Refusing to say what the choice was between is just losing
+  // evidence the matcher already had — "gone; every binding to it is dead" is almost certainly
+  // false here, and the author is the one who can tell b from c.
+  assert.deepEqual(finding.renameCandidates, ['b', 'c']);
+  assert.match(finding.detail, /b or c/);
+});
+
+test('an unambiguous removal says nothing about candidates', () => {
+  const before = { parameters: [{ id: 'a', label: 'Level', messageRecipe: 'cc7' }] };
+  const after = { parameters: [{ id: 'b', label: 'Cutoff', messageRecipe: 'cc74' }] };
+  const finding = impactOfChange(before, after, []).findings[0];
+  assert.equal(finding.kind, 'removed');
+  assert.deepEqual(finding.renameCandidates, []);
+  assert.doesNotMatch(finding.detail, /may have become/);
 });
 
 test('a parameter with no label cannot be matched as a rename', () => {

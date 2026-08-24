@@ -37,6 +37,18 @@
     if (!key.inKey) return key.black ? blackCss : outCss;
     return key.black ? blackCss : whiteCss;
   }
+
+  // A REFUSED KEY IS DRAWN DEAD, and only under `refuse`.
+  //
+  // Out-of-key shading says "that one is not in the key", which under `off` and `quantize` is all
+  // there is to say — the key still sounds something. Under `refuse` it sounds NOTHING, and a player
+  // who finds that out by pressing and hearing silence concludes the panel is broken rather than
+  // that the panel is doing what its author asked for. So the two are drawn differently: heavier
+  // dim, no label, and a cursor that says the key is not for pressing.
+  function opacityFor(key) {
+    if (key.refused) return 0.34;
+    return key.inKey ? 1 : 0.72;
+  }
 </script>
 
 <svg class="keyboard" viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} width={width} height={height} aria-hidden="true">
@@ -47,9 +59,10 @@
       fill={fillFor(key)}
       stroke="rgba(0,0,0,0.55)"
       stroke-width={key.black ? 0 : 0.75}
-      opacity={key.inKey ? 1 : 0.72}
+      opacity={opacityFor(key)}
+      class:refused={key.refused}
     />
-    {#if key.label && !key.black && cfg.showLabels !== false && key.rect.w >= 11}
+    {#if key.label && !key.black && !key.refused && cfg.showLabels !== false && key.rect.w >= 11}
       <text
         x={key.rect.x + key.rect.w / 2}
         y={key.rect.y + key.rect.h - 3}
@@ -63,5 +76,8 @@
 
 <style>
   .keyboard { display: block; overflow: visible; }
+  /* Pointer-inert as well as dim: the press would return null anyway, and a cursor that promises
+     otherwise is the same lie the dimming is there to stop. */
+  rect.refused { cursor: not-allowed; }
   text { font-family: inherit; pointer-events: none; user-select: none; }
 </style>

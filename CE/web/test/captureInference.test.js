@@ -542,3 +542,30 @@ test('the summary says what is unsettled as loudly as what is settled', () => {
   assert.match(summary, /1 still a guess/);
   assert.match(summary, /sharing a byte/);
 });
+
+test('and it separates what a person checked from what only looked right', () => {
+  // Both land as parameters, and they are not the same claim. `confirmed` means somebody moved the
+  // control and said the synth did what it should; `probable` means the bytes looked right and
+  // nobody checked. A run where two of thirty were verified used to read exactly like a run where
+  // all thirty were — the same failure the line above exists to prevent, one level up.
+  const mixed = sessionSummary({ learned: [
+    { confidence: CONFIDENCE.confirmed, kind: 'u7' },
+    { confidence: CONFIDENCE.probable, kind: 'u7' },
+    { confidence: CONFIDENCE.probable, kind: 'u7' },
+  ] });
+  assert.match(mixed, /3 parameters/);
+  assert.match(mixed, /1 verified on the synth/);
+
+  const none = sessionSummary({ learned: [
+    { confidence: CONFIDENCE.probable, kind: 'u7' },
+    { confidence: CONFIDENCE.probable, kind: 'u7' },
+  ] });
+  assert.match(none, /none verified on the synth/);
+
+  // All verified is not worth a clause — "2 parameters, 2 verified" is noise.
+  const all = sessionSummary({ learned: [
+    { confidence: CONFIDENCE.confirmed, kind: 'u7' },
+    { confidence: CONFIDENCE.confirmed, kind: 'u7' },
+  ] });
+  assert.doesNotMatch(all, /verified on the synth/);
+});
