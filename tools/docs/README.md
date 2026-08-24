@@ -79,8 +79,3 @@ written to be argued with before anybody builds one. The overview is
 | [Total Recall](total-recall-plan.md) | Hardware that behaves like a plugin — the session restores the rig's state. |
 | [Ctrlr import](ctrlr-import-plan.md) | Reading the existing Ctrlr panel library, so a user's collection is not stranded. |
 
-## Snapshots
-
-- [Legacy controls snapshot](legacy-controls/README.md) — the pre-rewrite interactive control
-  system, kept as a parts bin rather than a base architecture. The code it describes is beside it
-  under `legacy-controls/reference/`, at its original source paths.
