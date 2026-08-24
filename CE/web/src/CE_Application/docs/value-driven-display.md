@@ -99,11 +99,23 @@ unable to say *which kind* of display it is. `readOnly: true` is accepted as an 
 There are three values, not two: `input` (sends, is not moved by feedback) falls out for free and is
 what a trigger button actually is.
 
-**Pointer events are deliberately NOT turned off**, and the note asked for them. `interceptClicks:
-false` is `pointer-events: none`, which also kills hover — so a meter you can hover to read would
-lose its tooltip, and clicks would start landing on whatever sits behind it, which is a layout
-change nobody asked for. Read-only means "your input does not change the value", not "you cannot
-point at it". What it *does* turn off: drag, wheel, keyboard, focus and tab order — and the host
+**Pointer events ARE turned off**, as this note asked. A display is transparent to the pointer:
+`pointer-events: none`, and read-only wins over an author's `interceptClicks: true`, because
+ticking "take clicks" on a control that cannot be operated is not a thing somebody meant.
+
+*(This shipped the other way first, on the argument that a meter you can hover to read is worth
+keeping. The owner's call on 2026-08-24 was to follow the note; both the argument and the outcome
+are recorded here rather than quietly replaced, because the cost is real and somebody will meet
+it.)*
+
+**What that costs, stated where it will be looked for.** A display has no hover, so it cannot carry
+a tooltip and cannot show a hover state — there is no way to hover a meter and read its exact
+value. And what a click does now depends on STACKING ORDER: a display laid over a knob means
+clicking the display drags the knob. That is the intended reading of read-only — the control is a
+picture of a value and the pointer goes past it — but it makes overlap a layout decision rather
+than a cosmetic one.
+
+Everything else read-only turns off: drag, wheel, keyboard, focus and tab order — and the host
 parameter, which is the one that would otherwise have been found last. A DAW automation lane on a
 meter records perfectly and moves nothing, because the next feedback frame overwrites every value
 it writes.

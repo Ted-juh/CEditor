@@ -129,6 +129,21 @@ export function resolveTabIndexFor(mouse = null, behavior = null) {
   return isDisplayOnly(behavior) ? -1 : resolveTabIndex(mouse);
 }
 
+/**
+ * Whether the control takes the pointer, with the value flow taken into account.
+ *
+ * A DISPLAY IS TRANSPARENT TO THE POINTER, whatever the Mouse tab says. An author who ticked "take
+ * clicks" on a read-only control did not mean "and also be interactive", because it cannot be.
+ *
+ * What that costs is worth knowing where somebody reads it: a display has no hover, so it cannot
+ * carry a tooltip or a hover state, and a click passes through to whatever sits behind it — which
+ * makes overlap a layout decision rather than a cosmetic one. Sits here beside the other two
+ * flow-aware resolvers so a surface finds all three in one place.
+ */
+export function acceptsPointerFor(mouse = null, behavior = null) {
+  return isDisplayOnly(behavior) ? false : acceptsPointer(mouse);
+}
+
 export function showsFocusOutline(mouse = null) {
   return mouse?.focusOutline === true;
 }

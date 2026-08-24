@@ -70,10 +70,10 @@
     resolveHitTestClipPath,
     resolveTabIndexFor,
     resolveTabIndex,
-    acceptsPointer,
     childrenAcceptPointer,
     showsFocusOutline,
     isFocusableFor,
+    acceptsPointerFor,
     raisesOnClick,
   } from '../utils/mouseBehavior.js';
   import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
@@ -449,7 +449,9 @@
   let mouseFocusable = $derived(mouseAppliesToSurface && isFocusableFor(mouseSection, flowBehavior));
   let mouseCursorCSS = $derived(mouseAppliesToSurface ? resolveCursorCss(mouseSection) : '');
   let mouseClipCSS = $derived(mouseAppliesToSurface ? resolveHitTestClipPath(mouseSection) : '');
-  let mouseBlocksPointer = $derived(mouseAppliesToSurface && !acceptsPointer(mouseSection));
+  // A display is transparent to the pointer, whatever the Mouse tab says — clicks pass through to
+  // whatever sits behind it, and it has no hover. See utils/displayMode.js for the trade.
+  let mouseBlocksPointer = $derived(mouseAppliesToSurface && !acceptsPointerFor(mouseSection, flowBehavior));
   let mouseChildrenTakePointer = $derived(mouseAppliesToSurface && childrenAcceptPointer(mouseSection));
   let mouseFocusOutline = $derived(mouseAppliesToSurface && showsFocusOutline(mouseSection));
   let mouseRaisesOnClick = $derived(mouseAppliesToSurface && raisesOnClick(mouseSection));

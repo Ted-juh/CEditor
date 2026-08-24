@@ -81,12 +81,15 @@ export function acceptsInput(behavior = null) {
  * forget the fifth — which is exactly how a "read-only" meter ends up still responding to the
  * mouse wheel.
  *
- * POINTER EVENTS ARE DELIBERATELY NOT IN HERE, and the design note asked for them. Turning off
- * `Mouse.interceptClicks` is `pointer-events: none`, which also kills hover — so a meter you can
- * hover to read would stop having a tooltip, and clicks would start landing on whatever sits
- * behind it, which is a layout change nobody asked for. Read-only means "your input does not
- * change the value", not "you cannot point at it". An author who does want the control transparent
- * still has `interceptClicks` in the Mouse tab, unchanged and doing one job.
+ * POINTER EVENTS ARE IN HERE, per the design note and the owner's call. A display is transparent to
+ * the pointer: `pointer-events: none`, so a click passes through to whatever sits behind it.
+ *
+ * Know what that costs, because it is not free and it will be met. A display has NO HOVER, so it
+ * cannot carry a tooltip and cannot show a hover state — a meter you could hover to read the exact
+ * value is not available. And what a click does now depends on STACKING ORDER: a display laid over
+ * a knob means clicking the display drags the knob. That is the intended reading of "read-only" —
+ * the control is a picture of a value and the pointer goes past it — but it makes overlap a layout
+ * decision rather than a cosmetic one.
  */
 export function interactionPolicy(behavior = null) {
   const flow = valueFlowOf(behavior);
@@ -98,6 +101,7 @@ export function interactionPolicy(behavior = null) {
       focusable: null,
       keyboard: null,
       wheel: null,
+      pointer: null,
       sendsOnChange: true,
       cursor: null,
     };
@@ -109,11 +113,14 @@ export function interactionPolicy(behavior = null) {
     focusable: false,
     keyboard: false,
     wheel: false,
+    // Transparent to the pointer: no hover, no tooltip, and a click goes through to whatever is
+    // behind. See the note above for what that costs — it is a deliberate trade, not an oversight.
+    pointer: false,
     // The one that matters most and is easiest to miss: a display must not emit. A meter that
     // echoed its feedback back to the device would make a loop out of a level display.
     sendsOnChange: false,
-    // Not `not-allowed`: nothing was disallowed. `default` says "this is not a handle" without
-    // implying the user did something wrong by pointing at it.
+    // Moot while pointer-events are off, and kept so a surface that re-enables the pointer for its
+    // own reasons still has an answer rather than falling back to a grab cursor.
     cursor: 'default',
   };
 }
@@ -136,6 +143,7 @@ export function applyDisplayPolicy(resolved = {}, behavior = null) {
     keyboardEnabled: false,
     wheelEnabled: false,
     dragEnabled: false,
+    interceptClicks: false,
   };
 }
 

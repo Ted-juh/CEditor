@@ -18,7 +18,7 @@ import {
 import {
   FILL_MODE, bandFor, barGeometry, litCells, normalizedLevel, peakHold, segmentStates, textFromValue,
 } from '../src/CE_Application/utils/displayMaps.js';
-import { isFocusableFor, resolveTabIndexFor } from '../src/CE_Application/utils/mouseBehavior.js';
+import { acceptsPointerFor, isFocusableFor, resolveTabIndexFor } from '../src/CE_Application/utils/mouseBehavior.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import { deriveExportParameters } from '../src/CE_Application/utils/exportParameters.js';
 
@@ -64,8 +64,22 @@ test('read-only turns off every input route, including the one that sends', () =
   assert.equal(policy.focusable, false);
   assert.equal(policy.keyboard, false);
   assert.equal(policy.wheel, false);
+  assert.equal(policy.pointer, false);
   // The one easiest to miss: a meter that echoed its own feedback back would be a loop.
   assert.equal(policy.sendsOnChange, false);
+});
+
+test('A DISPLAY IS TRANSPARENT TO THE POINTER, and that is a trade with a cost', () => {
+  // No hover means no tooltip and no hover state, and a click passes through to whatever sits
+  // behind it — which makes overlap a layout decision rather than a cosmetic one. Pinned so the
+  // cost is visible to whoever next wonders why their meter has no tooltip.
+  assert.equal(acceptsPointerFor({ interceptClicks: true }, { valueFlow: 'display' }), false);
+  assert.equal(acceptsPointerFor({}, { valueFlow: 'display' }), false);
+
+  // ...and an ordinary control still answers only to the Mouse section.
+  assert.equal(acceptsPointerFor({ interceptClicks: true }, {}), true);
+  assert.equal(acceptsPointerFor({}, {}), true);
+  assert.equal(acceptsPointerFor({ interceptClicks: false }, {}), false);
 });
 
 test('a two-way control gets no opinion at all, rather than a default', () => {
@@ -75,6 +89,7 @@ test('a two-way control gets no opinion at all, rather than a default', () => {
   assert.equal(policy.readOnly, false);
   assert.equal(policy.draggable, null);
   assert.equal(policy.focusable, null);
+  assert.equal(policy.pointer, null);
   assert.equal(policy.sendsOnChange, true);
 });
 
@@ -83,7 +98,7 @@ test('read-only wins over an author who ticked draggable', () => {
   const resolved = { draggable: true, focusable: true, tabIndex: 3, wheelEnabled: true };
   assert.deepEqual(applyDisplayPolicy(resolved, { valueFlow: 'display' }), {
     draggable: false, focusable: false, tabIndex: -1,
-    keyboardEnabled: false, wheelEnabled: false, dragEnabled: false,
+    keyboardEnabled: false, wheelEnabled: false, dragEnabled: false, interceptClicks: false,
   });
   assert.deepEqual(applyDisplayPolicy(resolved, {}), resolved, 'and leaves a normal control alone');
 });
