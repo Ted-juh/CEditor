@@ -45,6 +45,7 @@
   import Disc3 from 'lucide-svelte/icons/disc-3';
   import Layers from 'lucide-svelte/icons/layers';
   import ScrollText from 'lucide-svelte/icons/scroll-text';
+  import Pentagon from 'lucide-svelte/icons/pentagon';
   import ListOrdered from 'lucide-svelte/icons/list-ordered';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
@@ -190,6 +191,7 @@
     { id: 'listbox',    icon: Rows3,         label: 'Listbox',    section: 'Listbox' },
     { id: 'meter',      icon: Gauge,         label: 'Meter',      section: 'Meter' },
     { id: 'keyboard',   icon: Piano,         label: 'Keyboard',   section: 'Keyboard' },
+    { id: 'shape',      icon: Pentagon,      label: 'Shape',      section: 'Shape' },
     { id: 'stepsequencer', icon: Grid3x3,    label: 'Sequencer',  section: 'StepSequencer' },
     { id: 'tabcontainer', icon: Layers,      label: 'Pages',      section: 'TabContainer' },
     { id: 'scrollarea', icon: ScrollText,    label: 'Scroll',     section: 'ScrollArea' },

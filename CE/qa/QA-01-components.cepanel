@@ -344,6 +344,38 @@
       "deviceParameterId": ""
     },
     {
+      "id": "qa01_PitchWheel.value",
+      "label": "qa01_PitchWheel",
+      "controlName": "qa01_PitchWheel",
+      "path": "qa01_PitchWheel.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Ribbon",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "qa01_ModWheel.value",
+      "label": "qa01_ModWheel",
+      "controlName": "qa01_ModWheel",
+      "path": "qa01_ModWheel.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Ribbon",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
       "id": "qa01_VectorJoystick.x",
       "label": "qa01_VectorJoystick X",
       "controlName": "qa01_VectorJoystick",
@@ -1190,6 +1222,58 @@
           }
         },
         "Text": {
+          "content": "Shape",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_Shape",
+          "id": "qa01_Shape",
+          "controlType": "Shape"
+        },
+        "Transform": {
+          "x": 212,
+          "y": 356
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_7",
+          "id": "qa_cap_7",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 368,
+          "y": 334,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
           "content": "TestBox",
           "_children": {
             "Font": {
@@ -1215,7 +1299,7 @@
           "controlType": "TestBox"
         },
         "Transform": {
-          "x": 212,
+          "x": 368,
           "y": 356
         }
       },
@@ -1270,8 +1354,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_7",
-          "id": "qa_cap_7",
+          "name": "caption_qa_cap_8",
+          "id": "qa_cap_8",
           "controlType": "Label"
         },
         "Transform": {
@@ -1321,8 +1405,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_8",
-          "id": "qa_cap_8",
+          "name": "caption_qa_cap_9",
+          "id": "qa_cap_9",
           "controlType": "Label"
         },
         "Transform": {
@@ -1373,8 +1457,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_9",
-          "id": "qa_cap_9",
+          "name": "caption_qa_cap_10",
+          "id": "qa_cap_10",
           "controlType": "Label"
         },
         "Transform": {
@@ -1425,8 +1509,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_10",
-          "id": "qa_cap_10",
+          "name": "caption_qa_cap_11",
+          "id": "qa_cap_11",
           "controlType": "Label"
         },
         "Transform": {
@@ -1523,8 +1607,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_11",
-          "id": "qa_cap_11",
+          "name": "caption_qa_cap_12",
+          "id": "qa_cap_12",
           "controlType": "Label"
         },
         "Transform": {
@@ -1575,8 +1659,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_12",
-          "id": "qa_cap_12",
+          "name": "caption_qa_cap_13",
+          "id": "qa_cap_13",
           "controlType": "Label"
         },
         "Transform": {
@@ -1627,8 +1711,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_13",
-          "id": "qa_cap_13",
+          "name": "caption_qa_cap_14",
+          "id": "qa_cap_14",
           "controlType": "Label"
         },
         "Transform": {
@@ -1679,8 +1763,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_14",
-          "id": "qa_cap_14",
+          "name": "caption_qa_cap_15",
+          "id": "qa_cap_15",
           "controlType": "Label"
         },
         "Transform": {
@@ -1731,8 +1815,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_15",
-          "id": "qa_cap_15",
+          "name": "caption_qa_cap_16",
+          "id": "qa_cap_16",
           "controlType": "Label"
         },
         "Transform": {
@@ -1783,8 +1867,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_16",
-          "id": "qa_cap_16",
+          "name": "caption_qa_cap_17",
+          "id": "qa_cap_17",
           "controlType": "Label"
         },
         "Transform": {
@@ -1835,8 +1919,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_17",
-          "id": "qa_cap_17",
+          "name": "caption_qa_cap_18",
+          "id": "qa_cap_18",
           "controlType": "Label"
         },
         "Transform": {
@@ -1933,8 +2017,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_18",
-          "id": "qa_cap_18",
+          "name": "caption_qa_cap_19",
+          "id": "qa_cap_19",
           "controlType": "Label"
         },
         "Transform": {
@@ -1985,8 +2069,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_19",
-          "id": "qa_cap_19",
+          "name": "caption_qa_cap_20",
+          "id": "qa_cap_20",
           "controlType": "Label"
         },
         "Transform": {
@@ -2037,8 +2121,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_20",
-          "id": "qa_cap_20",
+          "name": "caption_qa_cap_21",
+          "id": "qa_cap_21",
           "controlType": "Label"
         },
         "Transform": {
@@ -2135,8 +2219,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_21",
-          "id": "qa_cap_21",
+          "name": "caption_qa_cap_22",
+          "id": "qa_cap_22",
           "controlType": "Label"
         },
         "Transform": {
@@ -2187,8 +2271,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_22",
-          "id": "qa_cap_22",
+          "name": "caption_qa_cap_23",
+          "id": "qa_cap_23",
           "controlType": "Label"
         },
         "Transform": {
@@ -2239,8 +2323,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_23",
-          "id": "qa_cap_23",
+          "name": "caption_qa_cap_24",
+          "id": "qa_cap_24",
           "controlType": "Label"
         },
         "Transform": {
@@ -2291,8 +2375,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_24",
-          "id": "qa_cap_24",
+          "name": "caption_qa_cap_25",
+          "id": "qa_cap_25",
           "controlType": "Label"
         },
         "Transform": {
@@ -2343,12 +2427,116 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_25",
-          "id": "qa_cap_25",
+          "name": "caption_qa_cap_26",
+          "id": "qa_cap_26",
           "controlType": "Label"
         },
         "Transform": {
           "x": 808,
+          "y": 1138,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "PitchWheel",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_PitchWheel",
+          "id": "qa01_PitchWheel",
+          "controlType": "PitchWheel"
+        },
+        "Transform": {
+          "x": 808,
+          "y": 1160
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_27",
+          "id": "qa_cap_27",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 964,
+          "y": 1138,
+          "width": 132,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "ModWheel",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_ModWheel",
+          "id": "qa01_ModWheel",
+          "controlType": "ModWheel"
+        },
+        "Transform": {
+          "x": 964,
+          "y": 1160
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_28",
+          "id": "qa_cap_28",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1120,
           "y": 1138,
           "width": 160,
           "height": 18
@@ -2386,7 +2574,7 @@
           "controlType": "VectorJoystick"
         },
         "Transform": {
-          "x": 808,
+          "x": 1120,
           "y": 1160
         }
       },
@@ -2441,8 +2629,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_26",
-          "id": "qa_cap_26",
+          "name": "caption_qa_cap_29",
+          "id": "qa_cap_29",
           "controlType": "Label"
         },
         "Transform": {
@@ -2493,8 +2681,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_27",
-          "id": "qa_cap_27",
+          "name": "caption_qa_cap_30",
+          "id": "qa_cap_30",
           "controlType": "Label"
         },
         "Transform": {
@@ -2545,8 +2733,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_28",
-          "id": "qa_cap_28",
+          "name": "caption_qa_cap_31",
+          "id": "qa_cap_31",
           "controlType": "Label"
         },
         "Transform": {
@@ -2589,6 +2777,58 @@
         },
         "Transform": {
           "x": 596,
+          "y": 1412
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_32",
+          "id": "qa_cap_32",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 840,
+          "y": 1390,
+          "width": 220,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "ProgressBar",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "qa01_ProgressBar",
+          "id": "qa01_ProgressBar",
+          "controlType": "ProgressBar"
+        },
+        "Transform": {
+          "x": 840,
           "y": 1412
         }
       },
@@ -2643,8 +2883,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_29",
-          "id": "qa_cap_29",
+          "name": "caption_qa_cap_33",
+          "id": "qa_cap_33",
           "controlType": "Label"
         },
         "Transform": {
@@ -2695,8 +2935,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_30",
-          "id": "qa_cap_30",
+          "name": "caption_qa_cap_34",
+          "id": "qa_cap_34",
           "controlType": "Label"
         },
         "Transform": {
@@ -2747,8 +2987,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_31",
-          "id": "qa_cap_31",
+          "name": "caption_qa_cap_35",
+          "id": "qa_cap_35",
           "controlType": "Label"
         },
         "Transform": {
@@ -2799,8 +3039,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_32",
-          "id": "qa_cap_32",
+          "name": "caption_qa_cap_36",
+          "id": "qa_cap_36",
           "controlType": "Label"
         },
         "Transform": {
@@ -2851,8 +3091,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_33",
-          "id": "qa_cap_33",
+          "name": "caption_qa_cap_37",
+          "id": "qa_cap_37",
           "controlType": "Label"
         },
         "Transform": {
@@ -2903,8 +3143,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_34",
-          "id": "qa_cap_34",
+          "name": "caption_qa_cap_38",
+          "id": "qa_cap_38",
           "controlType": "Label"
         },
         "Transform": {
@@ -2955,8 +3195,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_35",
-          "id": "qa_cap_35",
+          "name": "caption_qa_cap_39",
+          "id": "qa_cap_39",
           "controlType": "Label"
         },
         "Transform": {
@@ -3007,8 +3247,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_36",
-          "id": "qa_cap_36",
+          "name": "caption_qa_cap_40",
+          "id": "qa_cap_40",
           "controlType": "Label"
         },
         "Transform": {
@@ -3059,8 +3299,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_37",
-          "id": "qa_cap_37",
+          "name": "caption_qa_cap_41",
+          "id": "qa_cap_41",
           "controlType": "Label"
         },
         "Transform": {
@@ -3111,8 +3351,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_38",
-          "id": "qa_cap_38",
+          "name": "caption_qa_cap_42",
+          "id": "qa_cap_42",
           "controlType": "Label"
         },
         "Transform": {
@@ -3209,8 +3449,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_39",
-          "id": "qa_cap_39",
+          "name": "caption_qa_cap_43",
+          "id": "qa_cap_43",
           "controlType": "Label"
         },
         "Transform": {
@@ -3261,8 +3501,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_40",
-          "id": "qa_cap_40",
+          "name": "caption_qa_cap_44",
+          "id": "qa_cap_44",
           "controlType": "Label"
         },
         "Transform": {
@@ -3313,8 +3553,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_41",
-          "id": "qa_cap_41",
+          "name": "caption_qa_cap_45",
+          "id": "qa_cap_45",
           "controlType": "Label"
         },
         "Transform": {
@@ -3365,8 +3605,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_42",
-          "id": "qa_cap_42",
+          "name": "caption_qa_cap_46",
+          "id": "qa_cap_46",
           "controlType": "Label"
         },
         "Transform": {
@@ -3417,8 +3657,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_43",
-          "id": "qa_cap_43",
+          "name": "caption_qa_cap_47",
+          "id": "qa_cap_47",
           "controlType": "Label"
         },
         "Transform": {
@@ -3469,8 +3709,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_44",
-          "id": "qa_cap_44",
+          "name": "caption_qa_cap_48",
+          "id": "qa_cap_48",
           "controlType": "Label"
         },
         "Transform": {
@@ -3521,8 +3761,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_45",
-          "id": "qa_cap_45",
+          "name": "caption_qa_cap_49",
+          "id": "qa_cap_49",
           "controlType": "Label"
         },
         "Transform": {
@@ -3573,8 +3813,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_46",
-          "id": "qa_cap_46",
+          "name": "caption_qa_cap_50",
+          "id": "qa_cap_50",
           "controlType": "Label"
         },
         "Transform": {
@@ -3625,8 +3865,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_47",
-          "id": "qa_cap_47",
+          "name": "caption_qa_cap_51",
+          "id": "qa_cap_51",
           "controlType": "Label"
         },
         "Transform": {
@@ -3677,8 +3917,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_48",
-          "id": "qa_cap_48",
+          "name": "caption_qa_cap_52",
+          "id": "qa_cap_52",
           "controlType": "Label"
         },
         "Transform": {
@@ -3729,8 +3969,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_49",
-          "id": "qa_cap_49",
+          "name": "caption_qa_cap_53",
+          "id": "qa_cap_53",
           "controlType": "Label"
         },
         "Transform": {
@@ -3781,8 +4021,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_50",
-          "id": "qa_cap_50",
+          "name": "caption_qa_cap_54",
+          "id": "qa_cap_54",
           "controlType": "Label"
         },
         "Transform": {
@@ -3833,8 +4073,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_51",
-          "id": "qa_cap_51",
+          "name": "caption_qa_cap_55",
+          "id": "qa_cap_55",
           "controlType": "Label"
         },
         "Transform": {
@@ -3885,8 +4125,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_52",
-          "id": "qa_cap_52",
+          "name": "caption_qa_cap_56",
+          "id": "qa_cap_56",
           "controlType": "Label"
         },
         "Transform": {
@@ -3983,8 +4223,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_53",
-          "id": "qa_cap_53",
+          "name": "caption_qa_cap_57",
+          "id": "qa_cap_57",
           "controlType": "Label"
         },
         "Transform": {

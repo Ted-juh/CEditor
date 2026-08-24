@@ -28,10 +28,15 @@ const at = (control, x, y, width, height) => {
   return control;
 };
 
-test('scenery is read off the component type, and only four types qualify', () => {
+test('scenery is read off the component type, and only five types qualify', () => {
   // Not a hardcoded list — the module asks COMPONENT_TYPES which sections each type declares. This
   // pins the answer so that a type GAINING behaviour is a failing test rather than a silent fold.
-  assert.deepEqual(sceneryTypes(), ['Background', 'Image', 'Label', 'TestBox']);
+  //
+  // Shape joined when it shipped (2026-08-24) and the derivation caught it without being told: it
+  // declares Background, Shape and Effects, all inert, so it folds like a rectangle drawn with a
+  // Background did before it. That is the right answer — a decorative primitive is scenery — and
+  // arriving at it through the ratchet rather than through an edit here is the point of the ratchet.
+  assert.deepEqual(sceneryTypes(), ['Background', 'Image', 'Label', 'Shape', 'TestBox']);
 });
 
 test('the sections a scenery type may declare are all inert', () => {
@@ -40,12 +45,19 @@ test('the sections a scenery type may declare are all inert', () => {
   // than defaulting to inert. Add the section to this list only after deciding it cannot change.
   const declared = new Set();
   for (const type of sceneryTypes()) for (const s of COMPONENT_TYPES[type].sections) declared.add(s);
-  assert.deepEqual([...declared].sort(), ['Background', 'ContentLayout', 'Effects', 'Icon', 'Text']);
+  // `Shape` is classified INERT: it holds a primitive kind, colours and a stroke — appearance and
+  // nothing else. A Shape carries no value, cannot be bound, clicked or scripted, and there is
+  // no path by which one changes at runtime.
+  assert.deepEqual([...declared].sort(), ['Background', 'ContentLayout', 'Effects', 'Icon', 'Shape', 'Text']);
 });
 
 test('nothing that can be bound, clicked, valued or scripted is scenery', () => {
   for (const type of ['Knob', 'Slider', 'ToggleButton', 'Combobox', 'Listbox', 'TextInput',
-                      'CustomComponent', 'Meter', 'Envelope', 'Transport', 'Container', 'Group']) {
+                      'CustomComponent', 'Meter', 'Envelope', 'Transport', 'Container', 'Group',
+                      // The four promoted from catalog presets to real types. Three carry a value
+                      // and the fourth is a container; only Shape is decoration.
+                      'ProgressBar', 'PitchWheel', 'ModWheel', 'Keyboard', 'StepSequencer',
+                      'TabContainer', 'ScrollArea']) {
     assert.equal(isSceneryType(type), false, `${type} was treated as scenery`);
   }
 });

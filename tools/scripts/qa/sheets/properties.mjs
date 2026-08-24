@@ -42,6 +42,7 @@ export const EXEMPT = {
   // belongs to one component, QA-01 places it at its defaults, and a non-default recipe for it is
   // that component's own sheet to write.
   Keyboard: 'ditto', StepSequencer: 'ditto', TabContainer: 'ditto', ScrollArea: 'ditto',
+  Shape: 'ditto',
 
   // Custom-component authoring sections. These describe a component being *designed*, not one
   // being used, and they only mean anything inside a package. QA-07 instantiates real packages

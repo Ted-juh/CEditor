@@ -1,11 +1,14 @@
-// remainingComponents.test.js — the last four components, and the three that turned out to be presets.
+// remainingComponents.test.js — the last of the backlog's components.
 //
-// The backlog's "remaining components" row listed nine. Three of them were already built as
-// something else and only needed surfacing, two were the substantial work it said they were, and
-// two more were containers. What this pins is mostly the decisions:
+// The row listed nine. Two (Group, Image) had shipped; the other seven are here. What this pins is
+// mostly the decisions:
 //
-//   * a progress bar, a pitch wheel and a rectangle are PRESETS of components that already exist,
-//     not new controlTypes — minting a type for each would have duplicated a working engine;
+//   * ProgressBar, PitchWheel and ModWheel are their OWN controlTypes over an existing engine —
+//     the way Knob is its own type over the slider family. They shipped first as catalog presets
+//     and were promoted, because a preset forgets itself the moment it is inserted: the identity
+//     has to survive into the inspector, the saved file, and anything that walks a panel;
+//   * Shape is the one where a type buys more than identity — a Background cannot be an ellipse at
+//     an arbitrary aspect ratio, a line at an angle, or a polygon;
 //   * the keyboard reuses the Zone Splitter's key geometry rather than growing its own, because two
 //     keyboards on one panel must not disagree about where middle C is;
 //   * a scroll area measures its own extent from its children, because an author-set one goes stale.
@@ -15,6 +18,12 @@ import assert from 'node:assert/strict';
 
 import { INSERT_CATEGORIES } from '../src/CE_Application/models/insertCatalog.js';
 import { COMPONENT_TYPES } from '../src/CE_Application/models/componentTypes.js';
+import {
+  METER_FAMILY, RIBBON_FAMILY, isMeterFamily, isRibbonFamily,
+} from '../src/CE_Application/models/componentFamilies.js';
+import {
+  SHAPE_KINDS, shapeNeedsRoundCap, shapePath, shapeStrokeDash, shapeTakesFill,
+} from '../src/CE_Application/utils/shapePrimitives.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import { getComponentPorts } from '../src/CE_Application/models/componentPorts.js';
 import { deriveExportParameters } from '../src/CE_Application/utils/exportParameters.js';
@@ -33,7 +42,6 @@ import {
 } from '../src/CE_Application/utils/scrollAreaLayout.js';
 
 const allItems = INSERT_CATEGORIES.flatMap((category) => category.items);
-const itemById = (id) => allItems.find((item) => item.id === id);
 
 function control(type, section, patch = {}) {
   return {
@@ -44,52 +52,117 @@ function control(type, section, patch = {}) {
   };
 }
 
-// --- the three that were presets ------------------------------------------------------------------
+// --- the three promoted from presets to their own types ---------------------------------------
 
-test('a progress bar is a Meter, not a second Meter', () => {
-  // The design note offered the choice — "its own entry if wanted, else a Meter preset" — and a new
-  // controlType would have been a worse copy of a working engine.
-  const item = itemById('Meter:progress');
-  assert.ok(item, 'no Progress Bar in the catalog');
-  assert.equal(item.type, 'Meter');
-  assert.equal(item.overrides.Meter.peakHold, false, 'a progress bar has no peak to hold');
-  assert.equal(item.overrides.Meter.zones.length, 1, 'and no threshold zones — it is not a level');
-  assert.equal(COMPONENT_TYPES.ProgressBar, undefined);
+test('ProgressBar is its own type over the Meter engine, not a second Meter', () => {
+  // A preset is a starting position and forgets itself the instant it is inserted; a type stays a
+  // type in the inspector, in the file, and to anything that walks a panel asking what is on it.
+  // No new SECTION though — a determinate bar and a level meter differ in their settings, not in
+  // what they need to store, and a second twenty-field section would be a copy that drifts.
+  assert.ok(COMPONENT_TYPES.ProgressBar, 'no ProgressBar type');
+  assert.ok(COMPONENT_TYPES.ProgressBar.sections.includes('Meter'));
+  assert.equal(isMeterFamily('ProgressBar'), true, 'it must be drawn by the meter renderer');
+  assert.deepEqual(getComponentPorts('ProgressBar').map((port) => port.id), ['level'],
+    'a family member inherits its engine\'s ports rather than shipping with none');
+
+  const defaults = COMPONENT_TYPES.ProgressBar.defaultOverrides.Meter;
+  assert.equal(defaults.peakHold, false, 'a known quantity has no peak to hold');
+  assert.equal(defaults.zones.length, 1, '40% of a file copied is not "amber", it is 40%');
 });
 
-test('the two wheels differ only in whether they spring back', () => {
-  // Which is exactly why they are two presets of one Ribbon rather than two components.
-  const pitch = itemById('Ribbon:pitch');
-  const mod = itemById('Ribbon:mod');
-  assert.equal(pitch.type, 'Ribbon');
-  assert.equal(mod.type, 'Ribbon');
-  assert.equal(pitch.overrides.Ribbon.returnMode, 'center');
-  assert.equal(pitch.overrides.Ribbon.bipolar, true);
-  assert.equal(mod.overrides.Ribbon.returnMode, 'none');
-  assert.equal(mod.overrides.Ribbon.bipolar, false);
-  assert.equal(pitch.overrides.Ribbon.style, mod.overrides.Ribbon.style, 'both are wheels');
-});
+test('the two wheels are two types, because the spring IS the difference', () => {
+  // A pitch wheel that stayed where you left it is broken; a mod wheel that sprang back is broken.
+  // Two names for two instruments beats one name and a setting somebody can get wrong twice.
+  assert.equal(COMPONENT_TYPES.PitchWheel.defaultOverrides.Ribbon.returnMode, 'center');
+  assert.equal(COMPONENT_TYPES.PitchWheel.defaultOverrides.Ribbon.bipolar, true);
+  assert.equal(COMPONENT_TYPES.ModWheel.defaultOverrides.Ribbon.returnMode, 'none');
+  assert.equal(COMPONENT_TYPES.ModWheel.defaultOverrides.Ribbon.bipolar, false);
 
-test('the shape primitives are Backgrounds', () => {
-  for (const id of ['Background:rect', 'Background:circle', 'Background:divider']) {
-    const item = itemById(id);
-    assert.ok(item, id);
-    assert.equal(item.type, 'Background', id);
+  for (const type of ['PitchWheel', 'ModWheel']) {
+    assert.equal(isRibbonFamily(type), true, type);
+    assert.ok(COMPONENT_TYPES[type].sections.includes('Ribbon'), type);
+    assert.equal(COMPONENT_TYPES[type].defaultOverrides.Ribbon.style, 'wheel', type);
+    // One scalar stored 0..1. The bipolar flag changes the readout, not the stored domain, so
+    // exporting -1..1 would hand a host a range the control does not hold.
+    assert.deepEqual(COMPONENT_TYPES[type].exportValues,
+      [{ field: 'value', section: 'Ribbon', kind: 'float' }], type);
   }
-  // A circle is a square with a radius large enough to round it. Stretch it and you get a stadium,
-  // which is a shape somebody may well want — hence the square default rather than a special case.
-  const circle = itemById('Background:circle');
-  assert.equal(circle.overrides.Transform.width, circle.overrides.Transform.height);
-  assert.ok(circle.overrides.Background._children.Corners.radius >= circle.overrides.Transform.width / 2);
 });
 
-test('every catalog item names a real type, and presets are distinguishable from plain ones', () => {
-  for (const item of allItems) {
-    assert.ok(item.type, JSON.stringify(item));
-    assert.ok(item.label, item.type);
+test('the Ribbon itself is still the Ribbon', () => {
+  // Promoting two presets must not have quietly re-specialised the thing they were presets of.
+  assert.equal(COMPONENT_TYPES.Ribbon.defaultOverrides.Ribbon, undefined);
+  assert.equal(isRibbonFamily('Ribbon'), true);
+  assert.equal(isMeterFamily('Meter'), true);
+  assert.equal(isRibbonFamily('Knob'), false);
+  assert.equal(isMeterFamily('Knob'), false);
+});
+
+test('a family is the one place a member is added', () => {
+  // The surfaces ask "is this drawn by the meter renderer", not "is this called Meter". If that
+  // ever goes back to string comparison, a new family member ships invisible.
+  assert.deepEqual([...METER_FAMILY].sort(), ['Meter', 'ProgressBar']);
+  assert.deepEqual([...RIBBON_FAMILY].sort(), ['ModWheel', 'PitchWheel', 'Ribbon']);
+  assert.equal(isMeterFamily(undefined), false);
+  assert.equal(isMeterFamily('SomethingFromTheFuture'), false);
+});
+
+// --- Shape, the one where a type buys more than identity -----------------------------------------
+
+test('Shape draws things a Background cannot', () => {
+  // A Background is a rectangle, and past half its width a stadium. It is never an ellipse at an
+  // arbitrary aspect ratio, a line at an angle, or a polygon.
+  assert.ok(COMPONENT_TYPES.Shape, 'no Shape type');
+  assert.deepEqual(COMPONENT_TYPES.Shape.exportValues, [], 'decoration holds no value');
+
+  const ellipse = shapePath({ kind: 'ellipse', strokeWidth: 0, strokeEnabled: false }, 200, 60);
+  assert.match(ellipse, /^M .* A .* A .* Z$/, 'two arcs — a single 360 arc draws nothing');
+  assert.match(ellipse, /A 100 30 /, 'the radii follow the box, so it is an oblong ellipse');
+
+  const line = shapePath({ kind: 'line', strokeEnabled: false }, 100, 40);
+  assert.equal(line, 'M 0 0 L 100 40', 'corner to corner: dragging the box aims the line');
+});
+
+test('the polygon library is READ, not redefined', () => {
+  // shapeGeometry.js already holds twelve polygons for the designer's draw tools and palette
+  // glyphs. A second table would be twelve shapes that drift from the twelve in the palette.
+  for (const kind of ['triangle', 'hexagon', 'star', 'chevron', 'arrow', 'plus', 'diamond']) {
+    assert.ok(SHAPE_KINDS.includes(kind), `${kind} missing from the Shape kinds`);
+    const path = shapePath({ kind, strokeEnabled: false }, 100, 100);
+    assert.match(path, /^M .*Z$/, kind);
   }
-  const keys = allItems.map((item) => String(item.id ?? item.type));
-  assert.equal(new Set(keys).size, keys.length, 'two catalog entries share a key');
+  assert.ok(SHAPE_KINDS.includes('rectangle') && SHAPE_KINDS.includes('ellipse') && SHAPE_KINDS.includes('line'));
+});
+
+test('an unknown kind falls back to a rectangle rather than drawing nothing', () => {
+  assert.equal(shapePath({ kind: 'dodecahedron', strokeEnabled: false }, 10, 10),
+               shapePath({ kind: 'rectangle', strokeEnabled: false }, 10, 10));
+});
+
+test('a stroked shape stays inside its own box', () => {
+  // Without the inset a 4px stroke paints two pixels outside the control, overlaps its neighbour,
+  // and makes alignment lie.
+  const path = shapePath({ kind: 'rectangle', strokeEnabled: true, strokeWidth: 4 }, 100, 100);
+  assert.equal(path, 'M 2 2 L 98 2 L 98 98 L 2 98 Z');
+});
+
+test('a corner radius past half the box is clamped, not folded', () => {
+  const path = shapePath({ kind: 'rectangle', cornerRadius: 9999, strokeEnabled: false }, 100, 60);
+  assert.match(path, /A 30 30 /, 'clamped to half the SHORTER side');
+});
+
+test('a line is never filled, whatever the fill toggle says', () => {
+  assert.equal(shapeTakesFill({ kind: 'line', fillEnabled: true }), false);
+  assert.equal(shapeTakesFill({ kind: 'ellipse', fillEnabled: true }), true);
+  assert.equal(shapeTakesFill({ kind: 'ellipse', fillEnabled: false }), false);
+});
+
+test('a dotted stroke is dots, which needs the round cap the renderer is told about', () => {
+  assert.equal(shapeStrokeDash({ strokeStyle: 'solid' }), null);
+  assert.match(shapeStrokeDash({ strokeStyle: 'dashed', strokeDash: 10 }), /^10 6$/);
+  assert.match(shapeStrokeDash({ strokeStyle: 'dotted', strokeWidth: 3 }), /^0\.01 6$/);
+  assert.equal(shapeNeedsRoundCap({ strokeStyle: 'dotted' }), true);
+  assert.equal(shapeNeedsRoundCap({ strokeStyle: 'dashed' }), false);
 });
 
 // --- the keyboard -----------------------------------------------------------------------------------

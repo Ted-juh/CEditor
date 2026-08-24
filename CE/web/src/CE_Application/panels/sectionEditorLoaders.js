@@ -31,6 +31,7 @@ const LAZY_COMPONENT_LOADERS = {
   listbox: () => import('../sections/ListboxEditor.svelte'),
   meter: () => import('../sections/MeterEditor.svelte'),
   keyboard: () => import('../sections/KeyboardEditor.svelte'),
+  shape: () => import('../sections/ShapeEditor.svelte'),
   stepsequencer: () => import('../sections/StepSequencerEditor.svelte'),
   tabcontainer: () => import('../sections/TabContainerEditor.svelte'),
   scrollarea: () => import('../sections/ScrollAreaEditor.svelte'),

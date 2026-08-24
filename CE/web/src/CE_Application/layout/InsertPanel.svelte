@@ -29,11 +29,8 @@
 
   let query = $state('');
 
-  // Keyed by the item's `id` where it has one, so a preset and its plain type are two entries
-  // rather than one overwriting the other.
-  const ITEM_KEY = (item) => String(item.id ?? item.type);
   const CATALOG_ITEMS = new Map(
-    INSERT_CATEGORIES.flatMap((category) => category.items.map((item) => [ITEM_KEY(item), item]))
+    INSERT_CATEGORIES.flatMap((category) => category.items.map((item) => [item.type, item]))
   );
 
   let filteredCategories = $derived.by(() => {
@@ -54,8 +51,8 @@
 
   let recentItems = $derived(
     $insertRecents
-      .filter((key) => CATALOG_ITEMS.has(key))
-      .map((key) => CATALOG_ITEMS.get(key))
+      .filter((type) => CATALOG_ITEMS.has(type))
+      .map((type) => CATALOG_ITEMS.get(type))
       .slice(0, 6)
   );
 
@@ -68,9 +65,7 @@
 
   function insertItem(item) {
     if (!hasActivePanel) return;
-    // A catalog item is either a bare type or a preset of one; both go through the same path,
-    // because a preset is section defaults and nothing more.
-    addControl(item.type, item.overrides ?? {});
+    addControl(item.type);
   }
 
   function insertPackage(entry) {
@@ -84,9 +79,7 @@
   function handleTypeDragStart(item, e) {
     if (!hasActivePanel) { e.preventDefault(); return; }
     e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('application/x-ceditor-insert', JSON.stringify({
-      kind: 'type', type: item.type, overrides: item.overrides ?? null,
-    }));
+    e.dataTransfer.setData('application/x-ceditor-insert', JSON.stringify({ kind: 'type', type: item.type }));
   }
 
   function handlePackageDragStart(entry, e) {
@@ -119,7 +112,7 @@
     {#if recentItems.length && !query.trim()}
       <div class="section-title">Recent</div>
       <div class="recent-row">
-        {#each recentItems as item (ITEM_KEY(item))}
+        {#each recentItems as item (item.type)}
           {@const Icon = TYPE_ICONS[item.type] ?? FALLBACK_TYPE_ICON}
           <button
             class="recent-chip"
@@ -141,7 +134,7 @@
         <category.icon size={12} strokeWidth={1.6} />
         <span>{category.label}</span>
       </div>
-      {#each category.items as item (ITEM_KEY(item))}
+      {#each category.items as item (item.type)}
         {@const Icon = TYPE_ICONS[item.type] ?? FALLBACK_TYPE_ICON}
         <button
           class="insert-item"

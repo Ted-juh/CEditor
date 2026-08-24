@@ -6,6 +6,7 @@ import { routerPorts } from '../utils/routerLayout.js';
 import { timbrePorts } from '../utils/timbreLayout.js';
 import { constellationPorts } from '../utils/constellationLayout.js';
 import { constraintPorts } from '../utils/constraintLayout.js';
+import { isMeterFamily, isRibbonFamily } from './componentFamilies.js';
 import { keyboardPorts } from '../utils/keyboardLayout.js';
 import { sequencerPorts } from '../utils/stepSequencerLayout.js';
 import { tabPorts } from '../utils/tabContainerLayout.js';
@@ -379,6 +380,12 @@ export function getComponentPorts(componentOrType) {
   // rather than derived from the control, so they could equally have gone in the table above —
   // they live with their own layout modules instead, so a component's ports and its geometry are
   // never in two files that can disagree.
+  // Family members share their engine's ports: a ProgressBar takes a level like any meter, and a
+  // wheel takes a value like any ribbon. Resolved by type name here rather than duplicated in
+  // the table above, so a new family member cannot ship with an empty port list.
+  if (isMeterFamily(componentType)) return DEFAULT_COMPONENT_PORTS.Meter ?? [];
+  if (isRibbonFamily(componentType)) return DEFAULT_COMPONENT_PORTS.Ribbon ?? [];
+
   if (componentType === 'Keyboard') return keyboardPorts(componentOrType, PARAMETER_TYPES);
   if (componentType === 'StepSequencer') return sequencerPorts(componentOrType, PARAMETER_TYPES);
   if (componentType === 'TabContainer') return tabPorts(componentOrType, PARAMETER_TYPES);

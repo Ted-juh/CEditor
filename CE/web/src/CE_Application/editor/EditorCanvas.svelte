@@ -686,9 +686,7 @@
     };
 
     if (payload.kind === 'type' && payload.type) {
-      // A catalog PRESET drags the same way a bare type does and carries its section patch with it;
-      // dropping a Pitch Wheel has to land a sprung bipolar Ribbon, not a plain one.
-      addControl(payload.type, payload.overrides ?? {}, { at });
+      addControl(payload.type, {}, { at });
       return;
     }
     if (payload.kind === 'package' && payload.id) {

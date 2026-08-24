@@ -1,4 +1,7 @@
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
+export {
+  METER_FAMILY, RIBBON_FAMILY, isMeterFamily, isRibbonFamily,
+} from './componentFamilies.js';
 import { deepClone } from '../utils/deepClone.js';
 import { createDefaultInteractiveSections } from './interactionDefaults.js';
 import { getComponentPorts } from './componentPorts.js';
@@ -1321,6 +1324,113 @@ export const COMPONENT_TYPES = {
           Corners: { radius: 6 },
         },
       },
+    },
+  },
+
+  /**
+   * ProgressBar — a meter reading a KNOWN quantity rather than a live level.
+   *
+   * Its own controlType over the Meter engine and the Meter section, the way Knob is its own type
+   * over the slider family. It shipped first as a catalog preset; the difference a real type makes
+   * is that a progress bar stays a progress bar — in the inspector, in the saved file, and to
+   * anything that walks a panel asking what is on it. A preset is a starting position and forgets
+   * itself the moment it is inserted.
+   *
+   * No new section: a determinate bar and a level meter differ in their SETTINGS, not in what they
+   * need to store, and a second twenty-field section would be a copy that drifts.
+   */
+  ProgressBar: {
+    sections: ['Background', 'Meter', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION: none, for the Meter's reason. It reports; a host writing the reading would
+    // be arguing with whatever is doing the work.
+    exportValues: [],
+    ports: getComponentPorts('Meter'),
+    defaultOverrides: {
+      Transform: { width: 220, height: 20 },
+      Meter: {
+        // No peak to hold and no threshold zones: 40% of a file copied is not "amber", it is 40%.
+        peakHold: false,
+        segments: 0,
+        gradient: false,
+        zones: [{ from: 0, colour: 'FF5B9BD5' }],
+        fillColour: 'FF5B9BD5',
+        valueMin: 0,
+        valueMax: 1,
+        value: 0.35,
+        showReadout: true,
+      },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 4 },
+        },
+      },
+    },
+  },
+
+  /**
+   * PitchWheel — bipolar, sprung to centre.
+   *
+   * Over the Ribbon engine and section. The two wheels are separate types rather than one with a
+   * flag because THE SPRING IS THE DIFFERENCE: a pitch wheel that stayed where you left it is a
+   * broken pitch wheel, and a mod wheel that sprang back is a broken mod wheel. Two names for two
+   * instruments beats one name and a setting nobody can get wrong twice.
+   */
+  PitchWheel: {
+    sections: ['Background', 'Ribbon', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // HOST AUTOMATION. One scalar stored 0..1, same as the Ribbon — the bipolar flag changes the
+    // readout, not the stored domain, so exporting -1..1 would hand the host a range it does not hold.
+    exportValues: [{ field: 'value', section: 'Ribbon', kind: 'float' }],
+    ports: getComponentPorts('Ribbon'),
+    defaultOverrides: {
+      Transform: { width: 44, height: 150 },
+      Ribbon: { style: 'wheel', bipolar: true, returnMode: 'center', returnValue: 0.5, returnRate: 12, value: 0.5 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  /** ModWheel — unipolar, and it LATCHES. See PitchWheel for why these are two types. */
+  ModWheel: {
+    sections: ['Background', 'Ribbon', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    exportValues: [{ field: 'value', section: 'Ribbon', kind: 'float' }],
+    ports: getComponentPorts('Ribbon'),
+    defaultOverrides: {
+      Transform: { width: 44, height: 150 },
+      Ribbon: { style: 'wheel', bipolar: false, returnMode: 'none', value: 0 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  /**
+   * Shape — a real vector primitive, not a Background wearing a corner radius.
+   *
+   * This is the one of the four where a type buys more than identity. A Background can be a
+   * rectangle and, with a radius past half its width, a stadium; it cannot be an ELLIPSE at an
+   * arbitrary aspect ratio, a line at an angle, or a polygon at all. Those need a path, so they
+   * need a renderer, so they need a type.
+   */
+  Shape: {
+    sections: ['Background', 'Shape', 'Effects'],
+    // HOST AUTOMATION: none. Decoration holds no value.
+    exportValues: [],
+    defaultOverrides: {
+      Transform: { width: 120, height: 90 },
+      // The Background is off by default: the Shape section paints, and two fills stacked would
+      // make every shape a rectangle with a shape drawn inside it.
+      Background: { _children: { Fill: { solidEnabled: false }, Border: { enabled: false } } },
     },
   },
 

@@ -2016,6 +2016,34 @@ export const SECTION_DEFAULTS = {
     thumbColour: 'FF454550',
   },
 
+  /**
+   * Shape — a vector primitive drawn as a real path.
+   *
+   * The Background section can already be a rectangle, and with a big enough corner radius a
+   * stadium. What it cannot be is an ellipse at an arbitrary aspect ratio, a line at an angle, or a
+   * polygon — and those are the shapes somebody wants when they say "shape". Hence a path, hence a
+   * renderer, hence this section.
+   */
+  Shape: {
+    _type: 'Shape',
+    // rectangle | ellipse | line, plus every polygon in shapeGeometry.js — triangle, diamond,
+    // pentagon, hexagon, star, chevron, arrow, plus and the rest. Read from there rather than
+    // listed again here, so the placeable Shape and the designer's draw tools cannot drift.
+    kind: 'rectangle',
+    cornerRadius: 0,         // rectangle only
+    // A line runs corner to corner of the box by default, so dragging the box IS drawing the line —
+    // an angle field on top of that would give two ways to say the same thing and let them disagree.
+    lineCap: 'butt',         // butt | round | square
+    rotation: 0,
+    fillEnabled: true,
+    fillColour: 'FF2A2A32',
+    strokeEnabled: true,
+    strokeColour: 'FF3A3A44',
+    strokeWidth: 1,
+    strokeStyle: 'solid',    // solid | dashed | dotted
+    strokeDash: 6,
+  },
+
   /** Bindings — value-driven mappings into root or part properties. */
   Bindings: {
     _type: 'Bindings',

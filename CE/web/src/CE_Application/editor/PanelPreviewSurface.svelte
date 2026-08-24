@@ -3,6 +3,7 @@
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
   import { isDisplayOnly } from '../utils/displayMode.js';
+  import { isMeterFamily, isRibbonFamily } from '../models/componentFamilies.js';
   import { RETURN_MODE, restValueFor, returnStep } from '../utils/returnToRest.js';
   import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout } from '../utils/lcdZones.js';
   import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
@@ -1048,7 +1049,7 @@
     meterTickerRunning = true;
     const loop = () => {
       const anyPeak = (orderedControls ?? []).some((c) =>
-        String(c?._children?.Core?.controlType ?? '') === 'Meter' && c?._children?.Meter?.peakHold === true);
+        isMeterFamily(c?._children?.Core?.controlType) && c?._children?.Meter?.peakHold === true);
       if (!anyPeak) { meterTickerRunning = false; return; } // self-stop when none remain
       meterClock = Date.now();
       requestAnimationFrame(loop);
@@ -1061,7 +1062,7 @@
   // config; the peak decays via the ticker. The renderer reads Meter.__value /
   // Meter.__peak.
   function applyMeterValueSource(control, resolved) {
-    if (String(control?._children?.Core?.controlType ?? '') !== 'Meter') return resolved;
+    if (!isMeterFamily(control?._children?.Core?.controlType)) return resolved;
     const base = resolved?.control ?? control;
     const meter = base?._children?.Meter;
     if (!meter) return resolved;
@@ -1465,7 +1466,7 @@
   const RIB_PAD = 8;
   let ribbonDrag = null; // { id } while touching the strip
   function isRibbonControl(control) {
-    return String(control?._children?.Core?.controlType ?? '') === 'Ribbon';
+    return isRibbonFamily(control?._children?.Core?.controlType);
   }
   function ribGeomFor(control) {
     const t = control?._children?.Transform ?? {};

@@ -3792,7 +3792,7 @@
           }
         },
         "Text": {
-          "content": "Meter — the component these drive",
+          "content": "ProgressBar — the component these drive",
           "_children": {
             "Font": {
               "size": 11
@@ -3814,7 +3814,7 @@
         "Core": {
           "name": "qa05_meter",
           "id": "qa05_meter_component",
-          "controlType": "Meter"
+          "controlType": "ProgressBar"
         },
         "Transform": {
           "x": 28,

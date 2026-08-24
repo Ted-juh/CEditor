@@ -115,15 +115,42 @@ new work here (both generative-MIDI family).
 All nine. Four became components; three became catalog **presets** of components that already
 existed; two (Group, Image) had shipped already.
 
-**Three of these did not need a controlType, and minting one would have made the codebase worse.**
-A progress bar is a Meter reading a known quantity instead of a live level — no peak hold, no
-threshold zones, one flat fill. A pitch wheel is a Ribbon with `style: 'wheel'`, `bipolar` and a
-spring to centre; a mod wheel is the same Ribbon that latches, and *the difference between the two
-wheels is entirely whether they spring back*. The shape primitives are Backgrounds: a rectangle is
-one already, and a corner radius larger than half the box makes a circle. So the insert catalog now
-carries `overrides` — a section patch applied at insert time — and a preset is a catalog entry. This
-note itself offered the choice ("its own entry if wanted, else a Meter preset"); taking it avoided
-three duplicate engines.
+**All nine are real controlTypes — and three of them got there the long way.**
+
+Progress Bar, Pitch Wheel and Mod Wheel shipped first as *catalog presets*: the insert catalog grew
+an `overrides` field and a preset was an entry that applied a section patch. The argument was that a
+progress bar is a Meter reading a known quantity, a pitch wheel is a Ribbon that springs to centre,
+and a controlType each would be three duplicate engines. This note had offered exactly that ("its
+own entry if wanted, else a Meter preset").
+
+**The owner's call was to promote them, and the reason is the half the preset argument missed: a
+preset forgets itself the moment it is inserted.** The engine really is shared — that part was
+right — but the *identity* has to survive into the inspector, into the saved file, and into
+anything that walks a panel asking what is on it. A Pitch Wheel that reports itself as a Ribbon is a
+Pitch Wheel only until somebody looks. So they are types now, the way `Knob` is its own type over
+the slider family, and `overrides` is gone because nothing used it any more.
+
+What makes that cheap rather than three copies is `componentFamilies.js`: `METER_FAMILY` and
+`RIBBON_FAMILY` say which types one engine draws, and the five places that used to compare a type
+name to `'Meter'` or `'Ribbon'` ask the family instead. Adding a member is one edit there rather
+than a grep. It is its own module and not a corner of `componentTypes.js` because that file and
+`componentPorts.js` already import each other — put the sets in either and they resolve only
+because of the order the declarations happen to be in, which works until somebody moves a block and
+gets an empty Set at import time, silently.
+
+**Shape is the one where a type bought more than identity.** As a Background preset it could be a
+rectangle and, past half its width, a stadium — never an ellipse at an arbitrary aspect ratio, a
+line at an angle, or a polygon. Those need a path, so `shapePrimitives.js` builds one. It does *not*
+define the polygons: `shapeGeometry.js` already held twelve of them as normalized vertex lists for
+the custom-component designer's draw tools and palette glyphs, so the placeable Shape reads that and
+gets triangle, diamond, pentagon, hexagon, star, chevron, arrow and plus for free. A second table
+would have been twelve shapes that drift from the twelve in the palette. (Found the hard way: the
+first attempt overwrote `shapeGeometry.js` and broke its five existing consumers.)
+
+Shape also joined **scenery** without being told to — `sceneryModel` derives that from the sections
+a type declares, and Shape's three are all inert. A decorative primitive folding like a Background
+is the right answer, and arriving at it through the ratchet rather than an edit is the point of
+having one.
 
 **The keyboard's key geometry was already written.** `splitZoneLayout.js` grew `keyRect`,
 `whiteKeyCount`, `isBlackKey` and `noteAtPoint` for the Zone Splitter's keyboard strip, and geometry
