@@ -26,6 +26,7 @@
   import {
     ROUTE_CURVE, ROUTE_MODE, contestedTargets, describeRoute, endpointAddress, routeCycles,
   } from '../utils/routeModel.js';
+  import { deviceTargetedRoutes } from '../utils/routeSessions.js';
   import { cinfo, cwarn } from '../stores/console.js';
 
   let view = $state('list');
@@ -45,6 +46,12 @@
   // the other is a knob that turns while nothing moves. Marked the same way, for the same reason.
   let contested = $derived(contestedTargets(routes));
   let contestedRoutes = $derived(new Set(contested.flatMap((entry) => entry.routes)));
+  // A route to a control is settled into the preview sessions; a route to a DEVICE parameter is
+  // not sent from there and nothing else sends it either. A Macro's own slots are excluded — those
+  // reach the synth through the fan-out path on every drag — so this only names the combination
+  // that genuinely does nothing, which is the only kind of warning worth showing.
+  let deviceRoutes = $derived(deviceTargetedRoutes(routes));
+  let deviceRouteIds = $derived(new Set(deviceRoutes.map((route) => route.id)));
 
   function labelFor(endpoint) {
     if (!endpoint) return '—';
@@ -169,6 +176,15 @@
         marked below feed back into themselves and are not evaluated.
       </div>
     {/if}
+    {#if deviceRoutes.length}
+      <div class="notice">
+        <TriangleAlert size={11} />
+        {deviceRoutes.length} route{deviceRoutes.length === 1 ? '' : 's'} end{deviceRoutes.length === 1 ? 's' : ''}
+        at a device parameter, and nothing sends {deviceRoutes.length === 1 ? 'it' : 'them'} yet — a
+        route moves controls on this panel. To drive a synth parameter, bind the target control to it
+        under Device Bindings, or use a Macro slot, which does send.
+      </div>
+    {/if}
     {#if contested.length}
       <div class="notice">
         <TriangleAlert size={11} />
@@ -189,7 +205,7 @@
         {#each routes as route (route.id)}
           {@const owned = (route.origin ?? 'panel') === 'panel'}
           {@const looped = cycleAddresses.has(endpointAddress(route.to))}
-          {@const shadowed = contestedRoutes.has(route.id)}
+          {@const shadowed = contestedRoutes.has(route.id) || deviceRouteIds.has(route.id)}
           <li class="item" class:looped class:shadowed>
             <label class="chk" title="Enabled">
               <input

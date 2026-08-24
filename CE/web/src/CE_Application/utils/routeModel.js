@@ -302,6 +302,10 @@ export const ROUTE_PASS_LIMIT = 8;
 export function settleRoutes(routes, {
   readSource,
   readTarget = () => undefined,
+  // The target's LIVE value, which is not always the same thing as its evaluation base — see the
+  // note on the idempotence guard below. Defaults to `readTarget`, which is right whenever a caller
+  // has only one notion of a target's value.
+  readCurrent = null,
   writeTarget,
   specFor = () => null,
   passLimit = ROUTE_PASS_LIMIT,
@@ -313,11 +317,17 @@ export function settleRoutes(routes, {
     passes += 1;
     const results = evaluateRoutes(routes, { readSource, readTarget, specFor });
 
+    const live = readCurrent ?? readTarget;
     let changed = 0;
     for (const result of results) {
-      const current = Number(readTarget(result.endpoint));
+      const current = Number(live(result.endpoint));
       // The idempotence guard, and the reason a settled panel stops rather than re-rendering
       // forever: a target that already holds the computed value is not written.
+      //
+      // It asks for the LIVE value, which is why `readCurrent` exists as its own hook. `readTarget`
+      // answers a different question — what an `add` route sums ONTO — and for a caller that
+      // remembers a base those two diverge the moment a route writes. Comparing the computed value
+      // against the base instead would never match, and nothing would ever settle.
       if (Number.isFinite(current) && current === Number(result.value)) continue;
       if (writeTarget?.(result.endpoint, result.value) === false) continue;
       changed += 1;

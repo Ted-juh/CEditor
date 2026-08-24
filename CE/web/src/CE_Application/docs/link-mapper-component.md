@@ -161,3 +161,40 @@ confidently.
 
 **An inverted input window is a feature.** `inputMin: 127, inputMax: 0` reverses the source, which
 people set up deliberately, so nothing validates it away.
+
+## And then nothing evaluated any of it, 2026-08-24
+
+Everything above was built and tested: the record, the curve, the fan-in rule, the cycle refusal,
+the three views. What none of it did was MOVE anything. A cable drawn on the canvas was stored in
+the `.cepanel`, refused if it looped, marked if two `set` routes fought over it — and never
+evaluated, because the one function that would have evaluated it had no caller anywhere in the app.
+A feature that validates carefully and then does nothing is worse than an absent one: everything
+about it says it works.
+
+**It is a session effect, not a store action.** The first version was `applyRoutes()` in
+`stores/routes.js`, which read the sessions, settled, and wrote each target back through
+`updatePanelPreviewSession` — re-entering the update it would have been called from, needing a
+guard, and still needing a trigger nobody had wired. `utils/routeSessions.js` does it as a pure
+function of the sessions instead, run inside `interactionPreview.applyPanelSessionEffects` beside
+`applyPanelCustomLinkRoutes`. Custom-component links — the nearest neighbour this feature has — have
+always worked that way. There is no trigger to forget, no re-entry to guard and no frame budget to
+tune, and a settled panel returns the same object so nothing re-renders.
+
+**`add` had no base, and evaluating routes is what made that reachable.** A route in `add` mode
+contributes a signed offset around the target's current value. Correct for one evaluation, and it
+compounds on the second: pass one writes base + 0.25, pass two reads that back as the base and
+writes base + 0.5, and a modulated parameter walks to its own ceiling with nobody touching it.
+
+So the base is remembered per target and invalidates itself with no coordination. The effect writes
+the computed value and, beside it, the base it used and the value it wrote. Next time: the stored
+value still matches what is there, so routes own this target and the base stands; it does not, so
+somebody else wrote it and what they wrote IS the new base. That second case is what makes a
+modulated fader still draggable — you drag it to set the base and the modulator rides on top, which
+is what a mod matrix row means. Nothing has to be told about the drag; the mismatch is the signal.
+
+**What reaches a synth, and what does not.** A route ending at a CONTROL is applied here. A route
+ending at a DEVICE parameter is not, and cannot be from a pure function of the sessions. A Macro
+slot bound to a device does not need it — that already goes out through `emitControlPortFanout` on
+every drag, a separate and older path. The gap is a route an author draws by hand from a control to
+a device parameter, and `deviceTargetedRoutes` names those so the Mapper says so rather than leaving
+somebody to discover it by watching a synth not move.

@@ -11,12 +11,10 @@
 
 import { derived, get } from 'svelte/store';
 import { panels, resolvedActivePanelId, updatePanel } from './panels.js';
-import { panelPreviewSessions, updatePanelPreviewSession } from './interactionPreview.js';
 import { panelRoutes, routeWriteTarget } from '../utils/routeAdapters.js';
 import {
-  endpointAddress, makeRoute, normalizeRoute, routeCycles, settleRoutes, wouldCycle,
+  endpointAddress, makeRoute, normalizeRoute, routeCycles, wouldCycle,
 } from '../utils/routeModel.js';
-import { flatControls } from '../utils/containment.js';
 
 function activePanel() {
   const id = get(resolvedActivePanelId);
@@ -32,106 +30,20 @@ export const activeRoutes = derived(
 /** The cycles among them, if any. Empty is the normal state and the editor shows nothing for it. */
 export const routeCycleWarnings = derived(activeRoutes, ($routes) => routeCycles($routes));
 
-function controlById(panel, id) {
-  return flatControls(Array.isArray(panel?.controls) ? panel.controls : [])
-    .find((control) => String(control?._children?.Core?.id ?? '') === String(id)) ?? null;
-}
-
 /**
- * A control port's value spec — min, max, step — so a route can map into the target's real range.
+ * The panel's routes, applied.
  *
- * Falls back to 0..1 rather than to nothing, because a route into a port whose range we cannot read
- * should still move something. A route that silently did nothing would be indistinguishable from a
- * route that was never made.
+ * NOT HERE ANY MORE, and worth a signpost rather than a silent absence. This file used to carry an
+ * `applyRoutes()` that read the sessions, settled the routes and wrote each target back through
+ * `updatePanelPreviewSession` — which meant it re-entered the store update it would have been
+ * called from, needed a re-entrancy guard, and still had no trigger: nothing ever called it, so
+ * every route on every panel was stored, validated and never evaluated.
+ *
+ * `utils/routeSessions.js` does it as a pure function of the sessions instead, run inside
+ * `interactionPreview.applyPanelSessionEffects` beside the custom-component links — the nearest
+ * neighbour this feature has, which has always worked that way. No trigger to forget, no re-entry
+ * to guard, no frame budget to tune.
  */
-export function specForEndpoint(panel, endpoint) {
-  if (!endpoint || endpoint.kind === 'device') return null;
-  const control = controlById(panel, endpoint.controlId);
-  if (!control) return null;
-
-  const channel = control?._children?.ValueChannels?._children?.[endpoint.port];
-  if (channel) return { min: channel.min ?? 0, max: channel.max ?? 1, step: channel.step, type: channel.type };
-
-  const behavior = control?._children?.Behavior;
-  if (behavior) return { min: behavior.min ?? 0, max: behavior.max ?? 1, step: behavior.step, type: behavior.valueType };
-
-  return { min: 0, max: 1 };
-}
-
-/**
- * Read a route endpoint's current value out of the preview sessions.
- *
- * Deliberately narrower than `readParameterValue`, which resolves an EXPORT parameter through three
- * doors. A route endpoint is a control and a port, which is one lookup: a named port is a value
- * channel, and `value` is the control's own. `undefined` for a control nobody has touched, so a
- * route does not fire on a value that was never set.
- */
-function readEndpointValue(panel, sessions, endpoint) {
-  if (!endpoint || endpoint.kind === 'device') return undefined;
-  const session = sessions?.[endpoint.controlId];
-  if (!session) return undefined;
-
-  const port = endpoint.port || 'value';
-  if (port !== 'value') return session.customValues?.[port];
-
-  if (session.currentValueOverrideEnabled) return session.currentValueOverride;
-  if (session.valueOverrideEnabled) return session.valueOverride;
-  if (typeof session.checked === 'boolean') return session.checked ? 1 : 0;
-  return undefined;
-}
-
-/**
- * Guard against re-entry.
- *
- * `applyRoutes` writes preview sessions, and a session write is what would call `applyRoutes` again
- * once this is wired to a source change. Settling already loops internally, so a nested call has
- * nothing to add and everything to lose — it would restart the walk from inside its own pass.
- */
-let applying = false;
-
-/**
- * Evaluate the panel's routes and write the results into the preview sessions.
- *
- * Called on a source change, not on a clock, and it SETTLES rather than taking one step: a chain
- * A→B→C moves the whole way on one call. `settleRoutes` holds the loop and the pass cap; this
- * function is only the part that knows where a control's value lives.
- *
- * The cap earns its place even though `addRoute` refuses to draw a loop. A panel file can carry a
- * ring the editor never saw — hand-edited, written by an older build, produced by a converter — and
- * without a limit the settle walks it until the frame dies. With one, the ring costs eight passes
- * and is handed back so the caller can say which wire to cut.
- */
-export function applyRoutes() {
-  const panel = activePanel();
-  if (!panel || applying) return { writes: 0, passes: 0, settled: true, cycles: [] };
-
-  const routes = panelRoutes(panel);
-  if (routes.length === 0) return { writes: 0, passes: 0, settled: true, cycles: [] };
-
-  applying = true;
-  try {
-    return settleRoutes(routes, {
-      // Re-read the sessions store every time rather than closing over one snapshot: the point of
-      // settling is that a later pass sees what an earlier one wrote.
-      readSource: (endpoint) => readEndpointValue(panel, get(panelPreviewSessions) ?? {}, endpoint),
-      readTarget: (endpoint) => readEndpointValue(panel, get(panelPreviewSessions) ?? {}, endpoint),
-      specFor: (endpoint) => specForEndpoint(panel, endpoint),
-      writeTarget: (endpoint, value) => {
-        // Device targets go out over MIDI, not into a session. Returning false keeps them out of the
-        // change count, so a panel whose only routes point at the device still settles.
-        if (endpoint.kind !== 'control') return false;
-        const sessions = get(panelPreviewSessions) ?? {};
-        const port = endpoint.port || 'value';
-        updatePanelPreviewSession(endpoint.controlId, port === 'value'
-          ? { valueOverrideEnabled: true, valueOverride: value }
-          : { customValues: { ...(sessions?.[endpoint.controlId]?.customValues ?? {}), [port]: value } });
-        return true;
-      },
-    });
-  } finally {
-    applying = false;
-  }
-}
 
 function writePanelRoutes(next) {
   const panel = activePanel();
