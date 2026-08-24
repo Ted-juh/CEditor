@@ -76,14 +76,3 @@ export function crossfaderPortValues(control) {
   const mix = cfg.bipolar === true ? m * 2 - 1 : m;
   return { a, b, mix };
 }
-
-// One return glide step toward `target` mix at `rate` (units/sec) over `dtSec`;
-// never overshoots. Returns { mix, settled }.
-export function crossfaderGlide(mix, target, rate, dtSec) {
-  const step = Math.max(0, num(rate, 4)) * Math.max(0, num(dtSec, 0));
-  const from = clamp01(num(mix, 0.5));
-  const to = clamp01(num(target, 0.5));
-  const d = to - from;
-  if (Math.abs(d) <= step) return { mix: to, settled: true };
-  return { mix: from + Math.sign(d) * step, settled: false };
-}

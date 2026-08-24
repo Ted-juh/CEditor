@@ -22,6 +22,14 @@ export const RETURN_MODE = {
   rest: 'rest',
 };
 
+/**
+ * The modes and curves as ordered lists, for a picker or a script verb's enum.
+ *
+ * Derived from the objects rather than written twice — a fourth mode added above would otherwise
+ * be invisible to every editor and every script until somebody noticed the list was short.
+ */
+export const RETURN_MODES = ['none', 'center', 'min', 'max', 'rest'];
+
 export const RETURN_CURVE = {
   linear: 'linear',
   /** Fast at first, slow into the rest — what a real spring does. */
@@ -29,6 +37,8 @@ export const RETURN_CURVE = {
   /** Slow, fast, slow. Reads as deliberate rather than sprung. */
   ease: 'ease',
 };
+
+export const RETURN_CURVES = ['linear', 'exp', 'ease'];
 
 /** The defaults a Behavior section carries. `none` so nothing existing starts springing. */
 export const RETURN_DEFAULTS = {
@@ -133,5 +143,76 @@ export function returnFrames(from, rest, behavior, { fps = 60 } = {}) {
 export function returnStep2D(from, rest, elapsedMs, behavior) {
   const x = returnStep(from?.x, rest?.x, elapsedMs, behavior);
   const y = returnStep(from?.y, rest?.y, elapsedMs, behavior);
+  return { value: { x: x.value, y: y.value }, done: x.done && y.done };
+}
+
+/**
+ * One canonical return spec out of any of the vocabularies that grew before this module existed.
+ *
+ * Three components shipped their own spring before the capability was factored out, and each
+ * invented its own words for it:
+ *
+ *   Joystick    `returnToCenter: true`, `returnAxes`, `returnRate: 4`
+ *   Crossfader  `returnToCenter: true`, `returnRate: 4`
+ *   Ribbon      `returnMode: 'center'|'min'|'max'|'rest'`, `returnValue`, `returnRate: 8`
+ *
+ * They are unified onto `returnMode` / `returnValue` / `returnTime` / `returnCurve` — but READ-TIME
+ * rather than by rewriting panel files. A file migration can corrupt a document and has to be right
+ * first time on data nobody can re-check; a normaliser cannot, runs on every load forever, and
+ * keeps working for a panel authored years ago that nobody re-saved.
+ *
+ * RATE BECOMES TIME, and the conversion is exact rather than a feel-match: the old glide moved at
+ * `rate` units per second across a 0..1 range, so it crossed the whole range in `1000 / rate`
+ * milliseconds. Rate 4 was 250ms, rate 8 was 125ms. The curve becomes `linear`, because the old
+ * glide was a constant-speed walk — giving these three the default `exp` spring would be a
+ * different feel silently applied to existing panels.
+ */
+export function normalizeReturnBehavior(section, { defaultRate = 4, range = 1 } = {}) {
+  const source = section ?? {};
+
+  // `returnToCenter` is the boolean spelling; `returnMode` the named one. A component carrying both
+  // is a component mid-migration, and the named one is the newer statement of intent.
+  const named = String(source.returnMode ?? '').trim();
+  const mode = Object.values(RETURN_MODE).includes(named)
+    ? named
+    : (source.returnToCenter === true ? RETURN_MODE.center : RETURN_MODE.none);
+
+  const rate = Number(source.returnRate);
+  const explicitTime = Number(source.returnTime);
+  const time = Number.isFinite(explicitTime) && explicitTime >= 0
+    ? explicitTime
+    // Rate 0 meant "snap instantly" in all three, and 0ms means the same here.
+    : (Number.isFinite(rate) && rate > 0 ? 1000 / rate : (rate === 0 ? 0 : 1000 / defaultRate));
+
+  const curve = Object.values(RETURN_CURVE).includes(String(source.returnCurve ?? ''))
+    ? String(source.returnCurve)
+    : RETURN_CURVE.linear;
+
+  return {
+    returnMode: mode,
+    returnValue: Number.isFinite(Number(source.returnValue)) ? Number(source.returnValue) : 0,
+    returnTime: time,
+    returnCurve: curve,
+    // The three all work in 0..1, which restValueFor needs told: without a range it assumes 0..1
+    // anyway, but saying so keeps a component with real units working through the same path.
+    min: Number.isFinite(Number(source.min)) ? Number(source.min) : 0,
+    max: Number.isFinite(Number(source.max)) ? Number(source.max) : range,
+    // Joystick-only, and passed through rather than interpreted here: which axes spring back is a
+    // question only a 2-D control can ask, and returnStep2D takes it as an argument.
+    returnAxes: String(source.returnAxes ?? 'both'),
+  };
+}
+
+/**
+ * A 2-D return that can spring one axis and leave the other.
+ *
+ * The joystick's `returnAxes`. An axis that is not returning holds its value and reports itself
+ * done, so the glide finishes when the axes that ARE returning have arrived rather than never.
+ */
+export function returnStep2DAxes(from, rest, elapsedMs, behavior, axes = 'both') {
+  const doX = axes === 'both' || axes === 'x';
+  const doY = axes === 'both' || axes === 'y';
+  const x = doX ? returnStep(from?.x, rest?.x, elapsedMs, behavior) : { value: from?.x, done: true };
+  const y = doY ? returnStep(from?.y, rest?.y, elapsedMs, behavior) : { value: from?.y, done: true };
   return { value: { x: x.value, y: y.value }, done: x.done && y.done };
 }

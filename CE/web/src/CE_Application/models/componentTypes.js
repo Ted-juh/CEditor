@@ -1385,7 +1385,9 @@ export const COMPONENT_TYPES = {
     ports: getComponentPorts('Ribbon'),
     defaultOverrides: {
       Transform: { width: 44, height: 150 },
-      Ribbon: { style: 'wheel', bipolar: true, returnMode: 'center', returnValue: 0.5, returnRate: 12, value: 0.5 },
+      // 83ms is `returnRate: 12` in the shared spring's vocabulary — the exact conversion,
+      // 1000/12. The normaliser would still accept the rate; the default should not teach it.
+      Ribbon: { style: 'wheel', bipolar: true, returnMode: 'center', returnValue: 0.5, returnTime: 83, value: 0.5 },
       Background: {
         _children: {
           Fill: { colour: 'FF121212' },

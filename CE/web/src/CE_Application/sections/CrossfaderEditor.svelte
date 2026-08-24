@@ -54,15 +54,24 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Return to centre" icon={IterationCcw}>
-    {#snippet tools()}
-      <HeaderPill value={x.returnToCenter === true}
-                  title="Glide the handle back to centre when released."
-                  onchange={() => toggle('returnToCenter')} />
-    {/snippet}
-    {#if x.returnToCenter === true}
-      <PropertyCell label="Speed" span={4} compact hint="Glide speed (units/sec).">
-        <NumberCell label="Spd" min={0.5} step={0.5} value={x.returnRate ?? 4} defaultValue={4} onchange={(v) => set('returnRate', Math.max(0.1, v))} />
+  <PropertySection title="Return to rest" icon={IterationCcw}>
+    <PropertyCell label="On release" span={2} hint="Where the handle goes when you let go. Shared with the ribbon and the joystick, so an end is reachable now and not only the centre.">
+        <select class="val" value={x.returnMode ?? 'none'} onchange={(e) => set('returnMode', e.target.value)}>
+          <option value="none">Latch (stay put)</option>
+          <option value="center">Centre</option>
+          <option value="min">Minimum</option>
+          <option value="max">Maximum</option>
+          <option value="rest">A set value</option>
+        </select>
+    </PropertyCell>
+    {#if String(x.returnMode ?? 'none') !== 'none'}
+      <NumberCell label="Time (ms)" min={0} max={5000} step={10} value={x.returnTime ?? 250} onchange={(v) => set('returnTime', Math.max(0, v))} />
+      <PropertyCell label="Curve" span={2} hint="Linear is the constant-speed walk these controls always had. Exp covers most of the distance early, which is what a real spring does.">
+        <select class="val" value={x.returnCurve ?? 'linear'} onchange={(e) => set('returnCurve', e.target.value)}>
+          <option value="linear">Linear</option>
+          <option value="exp">Spring (exp)</option>
+          <option value="ease">Ease</option>
+        </select>
       </PropertyCell>
     {/if}
   </PropertySection>

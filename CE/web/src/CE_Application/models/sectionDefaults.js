@@ -1699,7 +1699,13 @@ export const SECTION_DEFAULTS = {
     editable: true,
     returnMode: 'none',           // none | center | min | max | rest
     returnValue: 0.5,             // rest value when returnMode = rest
-    returnRate: 8,                // glide speed (units/sec; 0 = instant snap)
+    // The shared spring's vocabulary. `returnRate` (units/sec) and `returnToCenter` (a boolean)
+    // were this component's own words for it before the three private springs were unified;
+    // both are still READ by normalizeReturnBehavior, so an old panel keeps its feel exactly —
+    // rate 4 was 250ms of constant-speed walk, which is what it converts to. New panels get
+    // these. See utils/returnToRest.js.
+    returnTime: 125,         // ms for the whole travel; 0 = instant snap
+    returnCurve: 'linear',   // linear | exp | ease
     snap: 0,                      // value snap step (0 = continuous)
     showGlow: true,               // touch glow while held
     showValue: false,
@@ -1772,8 +1778,15 @@ export const SECTION_DEFAULTS = {
     orientation: 'horizontal',    // horizontal | vertical
     editable: true,
     detent: 0.03,                 // centre detent snap threshold (0 = off)
-    returnToCenter: false,        // spring back to centre on release
-    returnRate: 4,                // glide speed (units/sec)
+    // The shared spring's vocabulary. `returnRate` (units/sec) and `returnToCenter` (a boolean)
+    // were this component's own words for it before the three private springs were unified;
+    // both are still READ by normalizeReturnBehavior, so an old panel keeps its feel exactly —
+    // rate 4 was 250ms of constant-speed walk, which is what it converts to. New panels get
+    // these. See utils/returnToRest.js.
+    returnMode: 'none',      // none | center | min | max | rest — an end is now reachable
+    returnValue: 0.5,
+    returnTime: 250,
+    returnCurve: 'linear',
     labelA: 'A',
     labelB: 'B',
     showLabels: true,
@@ -1796,9 +1809,16 @@ export const SECTION_DEFAULTS = {
     bipolar: true,                // X/Y ports emit −1..1 (vs 0..1)
     editable: true,
     // Spring return-to-rest on release.
-    returnToCenter: false,
-    returnAxes: 'both',           // both | x | y
-    returnRate: 4,                // normalized units/sec glide speed
+    // The shared spring's vocabulary. `returnRate` (units/sec) and `returnToCenter` (a boolean)
+    // were this component's own words for it before the three private springs were unified;
+    // both are still READ by normalizeReturnBehavior, so an old panel keeps its feel exactly —
+    // rate 4 was 250ms of constant-speed walk, which is what it converts to. New panels get
+    // these. See utils/returnToRest.js.
+    returnMode: 'none',      // none | center | min | max | rest — a corner is now reachable
+    returnValue: 0.5,
+    returnAxes: 'both',      // both | x | y — the one genuinely 2-D question, kept
+    returnTime: 250,
+    returnCurve: 'linear',
     // Display.
     showGrid: true,
     gridDiv: 4,

@@ -4,7 +4,9 @@
   import GuideLines from './GuideLines.svelte';
   import { isDisplayOnly } from '../utils/displayMode.js';
   import { isMeterFamily, isRibbonFamily } from '../models/componentFamilies.js';
-  import { RETURN_MODE, restValueFor, returnStep } from '../utils/returnToRest.js';
+  import {
+    RETURN_MODE, normalizeReturnBehavior, restValueFor, returnStep, returnStep2DAxes,
+  } from '../utils/returnToRest.js';
   import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout } from '../utils/lcdZones.js';
   import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
@@ -52,16 +54,16 @@
     matrixAmountAt, matrixAmountFromDrag, matrixSetAmount, matrixIndex, matrixCols,
   } from '../utils/matrixLayout.js';
   import {
-    joystickConfig, joystickPos, joystickGeometry, joyFromPx, joystickGlide,
+    joystickConfig, joystickPos, joystickGeometry, joyFromPx,
   } from '../utils/joystickLayout.js';
   import {
     crossfaderConfig, crossfaderMix, crossfaderGeometry, crossfaderMixFromPx,
-    crossfaderDetent, crossfaderGlide,
+    crossfaderDetent,
   } from '../utils/crossfaderLayout.js';
   import { numpadConfig, numpadDisplayText, numpadKeyAt, numpadPress } from '../utils/numpadLayout.js';
   import {
     ribbonConfig, ribbonValue, ribbonVertical, ribbonGeometry, ribbonValueFromPx,
-    ribbonSnap, ribbonReturnTarget, ribbonGlide,
+    ribbonSnap,
   } from '../utils/ribbonLayout.js';
   import { macroConfig, macroValue, macroGeometry, macroKnobHit } from '../utils/macroLayout.js';
   import {
@@ -1312,31 +1314,80 @@
     return true;
   }
   // Spring-return glide back to centre on release (rAF loop, emits fan-out).
+  // --- The spring-back, once ------------------------------------------------
+  //
+  // The joystick, the crossfader and the ribbon each shipped their own return glide before the
+  // capability existed, and all three were the same twenty lines: cancel if re-grabbed, step toward
+  // a target, write the session, fan out, and on arrival commit and raise onSettled. What differed
+  // was the glide maths (a constant-rate walk, per-axis on the joystick), the session keys, and one
+  // component's extras.
+  //
+  // So: one driver, `returnStep` for the maths, and the differences injected. Their three
+  // vocabularies (`returnToCenter` + `returnRate`, versus `returnMode` + `returnValue`) are
+  // normalised at READ time by `normalizeReturnBehavior` rather than migrated in the file — a
+  // migration has to be right first time on documents nobody can re-check, and a normaliser keeps
+  // working for a panel authored years ago that was never re-saved.
+  //
+  // The three gain something from this beyond tidiness: they had `returnToCenter` and now have the
+  // whole vocabulary, so a crossfader can spring to an end and a joystick to a corner.
+  function startComponentReturn({ id, section, control, read, write, commit, cancelled, settled2D = false, defaultRate = 4 }) {
+    const behavior = normalizeReturnBehavior(section, { defaultRate });
+    const restScalar = restValueFor(behavior);
+    // `null` is "this control does not return" — the latch case, which is not this function's job.
+    if (restScalar === null) return false;
+
+    cancelReturn(id);
+    const from = read();
+    const rest = settled2D ? { x: restScalar, y: restScalar } : restScalar;
+    const token = { cancelled: false };
+    activeReturns.set(id, token);
+
+    const startedAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const tick = () => {
+      if (token.cancelled) return;
+      // A new grab wins over the spring — the hand on the control beats the glide.
+      if (cancelled()) { activeReturns.delete(id); return; }
+
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const step = settled2D
+        ? returnStep2DAxes(from, rest, now - startedAt, behavior, behavior.returnAxes)
+        : returnStep(from, rest, now - startedAt, behavior);
+
+      write(step.value, step.done);
+      if (step.done) {
+        activeReturns.delete(id);
+        commit(step.value);
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    // Run the first frame now rather than waiting one: a zero return time means snap, and a snap
+    // that takes 16ms is not a snap.
+    tick();
+    return true;
+  }
+
   function startJoystickReturn(control) {
-    const cfg = joystickConfig(control);
-    if (cfg.returnToCenter !== true) return false;
     const id = getControlId(control);
-    const axes = String(cfg.returnAxes ?? 'both');
-    const rate = numberOr(cfg.returnRate, 4);
-    let lastT = Date.now();
-    const loop = () => {
-      if (joyDrag && joyDrag.id === id) return; // a new grab cancels the return
-      const now = Date.now();
-      const dt = Math.min(0.05, (now - lastT) / 1000);
-      lastT = now;
-      const { pos, settled } = joystickGlide(joyWorkingPos(control), { x: 0.5, y: 0.5 }, rate, dt, axes);
-      patchControlSession(id, { joyPos: pos, joyTrail: joyTrailNext(control, pos) });
-      emitControlPortFanout(joyControlWith(control, pos), settled ? 'commit' : 'continuous');
-      if (settled) {
+    return startComponentReturn({
+      id,
+      control,
+      section: joystickConfig(control),
+      settled2D: true,
+      read: () => joyWorkingPos(control),
+      // The trail is the joystick's own extra and stays with it: the driver knows about a value,
+      // not about the ribbon of past positions this component draws behind its puck.
+      write: (pos, done) => {
+        patchControlSession(id, { joyPos: pos, joyTrail: joyTrailNext(control, pos) });
+        emitControlPortFanout(joyControlWith(control, pos), done ? 'commit' : 'continuous');
+      },
+      commit: (pos) => {
         commitJoyPos(control, pos);
         patchControlSession(id, { joyPos: undefined });
         raiseComponent(control, 'onSettled', { value: pos.x, x: pos.x, y: pos.y });
-        return;
-      }
-      requestAnimationFrame(loop);
-    };
-    requestAnimationFrame(loop);
-    return true;
+      },
+      cancelled: () => !!joyDrag && joyDrag.id === id,
+    });
   }
 
   // --- Crossfader: 1-D A/B blend fader ------------------------------------
@@ -1378,29 +1429,23 @@
     return true;
   }
   function startCrossfaderReturn(control) {
-    const cfg = crossfaderConfig(control);
-    if (cfg.returnToCenter !== true) return false;
     const id = getControlId(control);
-    const rate = numberOr(cfg.returnRate, 4);
-    let lastT = Date.now();
-    const loop = () => {
-      if (xfadeDrag && xfadeDrag.id === id) return; // a new grab cancels the return
-      const now = Date.now();
-      const dt = Math.min(0.05, (now - lastT) / 1000);
-      lastT = now;
-      const { mix, settled } = crossfaderGlide(xfadeWorkingMix(control), 0.5, rate, dt);
-      patchControlSession(id, { xfadeMix: mix });
-      emitControlPortFanout(xfadeControlWith(control, mix), settled ? 'commit' : 'continuous');
-      if (settled) {
+    return startComponentReturn({
+      id,
+      control,
+      section: crossfaderConfig(control),
+      read: () => xfadeWorkingMix(control),
+      write: (mix, done) => {
+        patchControlSession(id, { xfadeMix: mix });
+        emitControlPortFanout(xfadeControlWith(control, mix), done ? 'commit' : 'continuous');
+      },
+      commit: (mix) => {
         commitXfadeMix(control, mix);
         patchControlSession(id, { xfadeMix: undefined });
         raiseComponent(control, 'onSettled', { value: mix });
-        return;
-      }
-      requestAnimationFrame(loop);
-    };
-    requestAnimationFrame(loop);
-    return true;
+      },
+      cancelled: () => !!xfadeDrag && xfadeDrag.id === id,
+    });
   }
 
   // --- Numpad: type a number, commit it -----------------------------------
@@ -1506,33 +1551,33 @@
   // to the rest value (returnMode).
   function releaseRibbon(control) {
     const id = getControlId(control);
-    const target = ribbonReturnTarget(control);
-    if (target === null) { // latch / hold
-      const v = ribWorkingValue(control);
-      commitRibbonValue(control, v);
-      patchControlSession(id, { ribbonTouch: false, ribbonValue: undefined });
-      emitControlPortFanout(ribControlWith(control, v, false), 'commit');
-      return;
-    }
-    const rate = numberOr(ribbonConfig(control).returnRate, 8);
-    let lastT = Date.now();
-    const loop = () => {
-      if (ribbonDrag && ribbonDrag.id === id) return; // a new touch cancels the return
-      const now = Date.now();
-      const dt = Math.min(0.05, (now - lastT) / 1000);
-      lastT = now;
-      const { value, settled } = ribbonGlide(ribWorkingValue(control), target, rate, dt);
-      patchControlSession(id, { ribbonValue: value, ribbonTouch: false });
-      emitControlPortFanout(ribControlWith(control, value, false), settled ? 'commit' : 'continuous');
-      if (settled) {
+    // The touch gate is the ribbon's own extra: a released ribbon is untouched whether it springs
+    // back or latches, so it is cleared on both paths rather than inside the glide.
+    const started = startComponentReturn({
+      id,
+      control,
+      section: ribbonConfig(control),
+      defaultRate: 8,
+      read: () => ribWorkingValue(control),
+      write: (value, done) => {
+        patchControlSession(id, { ribbonValue: value, ribbonTouch: false });
+        emitControlPortFanout(ribControlWith(control, value, false), done ? 'commit' : 'continuous');
+      },
+      commit: (value) => {
         commitRibbonValue(control, value);
         patchControlSession(id, { ribbonValue: undefined });
         raiseComponent(control, 'onSettled', { value });
-        return;
-      }
-      requestAnimationFrame(loop);
-    };
-    requestAnimationFrame(loop);
+      },
+      cancelled: () => !!ribbonDrag && ribbonDrag.id === id,
+    });
+    if (started) return;
+
+    // Latch / hold: `restValueFor` said this control does not return, so the value it was left at
+    // IS the value. Committed here rather than glided to itself.
+    const value = ribWorkingValue(control);
+    commitRibbonValue(control, value);
+    patchControlSession(id, { ribbonTouch: false, ribbonValue: undefined });
+    emitControlPortFanout(ribControlWith(control, value, false), 'commit');
   }
 
   // --- Macro: one knob → many assignments (fan-out) -----------------------

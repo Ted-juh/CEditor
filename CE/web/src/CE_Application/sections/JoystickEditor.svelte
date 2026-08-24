@@ -44,21 +44,30 @@
   </PropertySection>
 
   <PropertySection title="Return to rest" icon={IterationCcw}>
-    {#snippet tools()}
-      <HeaderPill value={j.returnToCenter === true}
-                  title="Glide the puck back to centre when released (pitch/mod-wheel feel)"
-                  onchange={() => toggle('returnToCenter')} />
-    {/snippet}
-    {#if j.returnToCenter === true}
-      <PropertyCell label="Axes" span={2} hint="Which axes spring back.">
+    <PropertyCell label="On release" span={2} hint="Where the puck goes when you let go. Shared with the ribbon and the crossfader, so a corner is reachable now and not only the centre.">
+        <select class="val" value={j.returnMode ?? 'none'} onchange={(e) => set('returnMode', e.target.value)}>
+          <option value="none">Latch (stay put)</option>
+          <option value="center">Centre</option>
+          <option value="min">Minimum</option>
+          <option value="max">Maximum</option>
+          <option value="rest">A set value</option>
+        </select>
+    </PropertyCell>
+    {#if String(j.returnMode ?? 'none') !== 'none'}
+      <PropertyCell label="Axes" span={2} hint="Which axes spring back. Both travel on ONE progress, so the puck moves in a straight line — per-axis timing would make it curve.">
         <select class="val" value={j.returnAxes ?? 'both'} onchange={(e) => set('returnAxes', e.target.value)}>
           <option value="both">Both</option>
           <option value="x">X only</option>
           <option value="y">Y only</option>
         </select>
       </PropertyCell>
-      <PropertyCell label="Speed" span={1} compact hint="Glide speed (units/sec).">
-        <NumberCell label="Spd" value={j.returnRate ?? 4} min={0.5} step={0.5} defaultValue={4} onchange={(v) => set('returnRate', Math.max(0.1, num(v, 4)))} />
+      <NumberCell label="Time (ms)" min={0} max={5000} step={10} value={j.returnTime ?? 250} onchange={(v) => set('returnTime', Math.max(0, num(v, 250)))} />
+      <PropertyCell label="Curve" span={2} hint="Linear is the constant-speed walk these controls always had. Exp covers most of the distance early, which is what a real spring does.">
+        <select class="val" value={j.returnCurve ?? 'linear'} onchange={(e) => set('returnCurve', e.target.value)}>
+          <option value="linear">Linear</option>
+          <option value="exp">Spring (exp)</option>
+          <option value="ease">Ease</option>
+        </select>
       </PropertyCell>
     {/if}
   </PropertySection>

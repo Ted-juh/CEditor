@@ -15,12 +15,12 @@
   "scriptId": "qa_05_verbs",
   "author": "",
   "version": "1.0.0",
-  "description": "QA-05 — 23 verb families, 429 verbs",
+  "description": "QA-05 — 23 verb families, 434 verbs",
   "enabled": true,
   "locked": false,
   "filePath": null,
   "width": 1600,
-  "height": 6166,
+  "height": 6179,
   "resizable": false,
   "panicShortcut": "Escape",
   "minWidth": 0,
@@ -114,7 +114,7 @@
     "notes": [
       {
         "name": "How to read this sheet",
-        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 429 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
+        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 434 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
       }
     ]
   },
@@ -3304,7 +3304,7 @@
           }
         },
         "Text": {
-          "content": "14 verbs",
+          "content": "15 verbs",
           "_children": {
             "Font": {
               "size": 11
@@ -3332,7 +3332,7 @@
           "x": 184,
           "y": 4295,
           "width": 470,
-          "height": 107
+          "height": 120
         },
         "Background": {
           "_children": {
@@ -3349,7 +3349,7 @@
           }
         },
         "Text": {
-          "content": "ribbon.value(num)             ribbon.style(enum)\nribbon.bipolar[on]            ribbon.label(str)\nribbon.returnMode(enum)       ribbon.valuePrecision(int)\nribbon.returnValue(num)       ribbon.editable[on]\nribbon.returnRate(num)        ribbon.showGlow[on]\nribbon.snap(num)              ribbon.showValue[on]\nribbon.orientation(enum)      ribbon.read(read)",
+          "content": "ribbon.value(num)             ribbon.style(enum)\nribbon.bipolar[on]            ribbon.label(str)\nribbon.returnMode(enum)       ribbon.valuePrecision(int)\nribbon.returnValue(num)       ribbon.editable[on]\nribbon.returnTime(num)        ribbon.showGlow[on]\nribbon.returnCurve(enum)      ribbon.showValue[on]\nribbon.snap(num)              ribbon.read(read)\nribbon.orientation(enum)",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -3484,7 +3484,7 @@
           }
         },
         "Text": {
-          "content": "13 verbs",
+          "content": "15 verbs",
           "_children": {
             "Font": {
               "size": 11
@@ -3512,7 +3512,7 @@
           "x": 252,
           "y": 4537,
           "width": 470,
-          "height": 107
+          "height": 120
         },
         "Background": {
           "_children": {
@@ -3529,7 +3529,7 @@
           }
         },
         "Text": {
-          "content": "crossfader.mix(num)           crossfader.labelA(str)\ncrossfader.law(enum)          crossfader.labelB(str)\ncrossfader.bipolar[on]        crossfader.editable[on]\ncrossfader.detent(num)        crossfader.showLabels[on]\ncrossfader.returnToCenter[on] crossfader.showGains[on]\ncrossfader.returnRate(num)    crossfader.read(read)\ncrossfader.orientation(enum)",
+          "content": "crossfader.mix(num)           crossfader.orientation(enum)\ncrossfader.law(enum)          crossfader.labelA(str)\ncrossfader.bipolar[on]        crossfader.labelB(str)\ncrossfader.detent(num)        crossfader.editable[on]\ncrossfader.returnMode(enum)   crossfader.showLabels[on]\ncrossfader.returnValue(num)   crossfader.showGains[on]\ncrossfader.returnTime(num)    crossfader.read(read)\ncrossfader.returnCurve(enum)",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -3554,7 +3554,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 4678,
+          "y": 4691,
           "width": 1544,
           "height": 26
         },
@@ -3600,7 +3600,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 4714,
+          "y": 4727,
           "width": 160,
           "height": 18
         },
@@ -3638,7 +3638,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 4736
+          "y": 4749
         }
       },
       "_type": "Control"
@@ -3652,7 +3652,7 @@
         },
         "Transform": {
           "x": 212,
-          "y": 4714,
+          "y": 4727,
           "width": 470,
           "height": 18
         },
@@ -3664,7 +3664,7 @@
           }
         },
         "Text": {
-          "content": "14 verbs",
+          "content": "16 verbs",
           "_children": {
             "Font": {
               "size": 11
@@ -3690,9 +3690,9 @@
         },
         "Transform": {
           "x": 212,
-          "y": 4736,
+          "y": 4749,
           "width": 470,
-          "height": 107
+          "height": 120
         },
         "Background": {
           "_children": {
@@ -3709,7 +3709,7 @@
           }
         },
         "Text": {
-          "content": "joystick.move(xy)             joystick.showGrid[on]\njoystick.bipolar[on]          joystick.showCrosshair[on]\njoystick.returnToCenter[on]   joystick.showCorners[on]\njoystick.returnAxes(enum)     joystick.showTrail[on]\njoystick.returnRate(num)      joystick.read(read)\njoystick.cornerLabel(line)    joystick.size(size)\njoystick.editable[on]         joystick.fill(fill)",
+          "content": "joystick.move(xy)             joystick.editable[on]\njoystick.bipolar[on]          joystick.showGrid[on]\njoystick.returnMode(enum)     joystick.showCrosshair[on]\njoystick.returnValue(num)     joystick.showCorners[on]\njoystick.returnAxes(enum)     joystick.showTrail[on]\njoystick.returnTime(num)      joystick.read(read)\njoystick.returnCurve(enum)    joystick.size(size)\njoystick.cornerLabel(line)    joystick.fill(fill)",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -3734,7 +3734,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 4930,
+          "y": 4943,
           "width": 1544,
           "height": 26
         },
@@ -3780,7 +3780,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 4966,
+          "y": 4979,
           "width": 220,
           "height": 18
         },
@@ -3818,7 +3818,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 4988
+          "y": 5001
         }
       },
       "_type": "Control"
@@ -3832,7 +3832,7 @@
         },
         "Transform": {
           "x": 272,
-          "y": 4966,
+          "y": 4979,
           "width": 470,
           "height": 18
         },
@@ -3870,7 +3870,7 @@
         },
         "Transform": {
           "x": 272,
-          "y": 4988,
+          "y": 5001,
           "width": 470,
           "height": 185
         },
@@ -3914,7 +3914,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5207,
+          "y": 5220,
           "width": 1544,
           "height": 26
         },
@@ -3960,7 +3960,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5243,
+          "y": 5256,
           "width": 230,
           "height": 18
         },
@@ -3998,7 +3998,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5265
+          "y": 5278
         }
       },
       "_type": "Control"
@@ -4012,7 +4012,7 @@
         },
         "Transform": {
           "x": 282,
-          "y": 5243,
+          "y": 5256,
           "width": 470,
           "height": 18
         },
@@ -4050,7 +4050,7 @@
         },
         "Transform": {
           "x": 282,
-          "y": 5265,
+          "y": 5278,
           "width": 470,
           "height": 120
         },
@@ -4094,7 +4094,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5419,
+          "y": 5432,
           "width": 1544,
           "height": 26
         },
@@ -4140,7 +4140,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5455,
+          "y": 5468,
           "width": 132,
           "height": 18
         },
@@ -4178,7 +4178,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5477
+          "y": 5490
         }
       },
       "_type": "Control"
@@ -4192,7 +4192,7 @@
         },
         "Transform": {
           "x": 184,
-          "y": 5455,
+          "y": 5468,
           "width": 470,
           "height": 18
         },
@@ -4230,7 +4230,7 @@
         },
         "Transform": {
           "x": 184,
-          "y": 5477,
+          "y": 5490,
           "width": 470,
           "height": 81
         },
@@ -4274,7 +4274,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5592,
+          "y": 5605,
           "width": 1544,
           "height": 26
         },
@@ -4320,7 +4320,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5628,
+          "y": 5641,
           "width": 260,
           "height": 18
         },
@@ -4358,7 +4358,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5650
+          "y": 5663
         }
       },
       "_type": "Control"
@@ -4372,7 +4372,7 @@
         },
         "Transform": {
           "x": 312,
-          "y": 5628,
+          "y": 5641,
           "width": 470,
           "height": 18
         },
@@ -4410,7 +4410,7 @@
         },
         "Transform": {
           "x": 312,
-          "y": 5650,
+          "y": 5663,
           "width": 470,
           "height": 250
         },
@@ -4454,7 +4454,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5934,
+          "y": 5947,
           "width": 1544,
           "height": 26
         },
@@ -4500,7 +4500,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5970,
+          "y": 5983,
           "width": 260,
           "height": 18
         },
@@ -4538,7 +4538,7 @@
         },
         "Transform": {
           "x": 28,
-          "y": 5992
+          "y": 6005
         }
       },
       "_type": "Control"
@@ -4552,7 +4552,7 @@
         },
         "Transform": {
           "x": 312,
-          "y": 5970,
+          "y": 5983,
           "width": 470,
           "height": 18
         },
@@ -4590,7 +4590,7 @@
         },
         "Transform": {
           "x": 312,
-          "y": 5992,
+          "y": 6005,
           "width": 470,
           "height": 146
         },

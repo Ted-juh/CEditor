@@ -32,7 +32,7 @@ import { POLY_PRESSURE_MODES } from '../utils/midiNoteInput.js';
 import { MACRO_CURVES } from '../utils/macroLayout.js';
 import { CONSTRAINT_MODES } from '../utils/constraintLayout.js';
 import { ENVELOPE_CURVES, ENVELOPE_PRESETS } from '../utils/envelopeLayout.js';
-import { RIBBON_RETURN_MODES } from '../utils/ribbonLayout.js';
+import { RETURN_CURVES, RETURN_MODES } from '../utils/returnToRest.js';
 import { CROSSFADER_LAWS } from '../utils/crossfaderLayout.js';
 import { JOYSTICK_RETURN_AXES } from '../utils/joystickLayout.js';
 import { METER_SCALES } from '../utils/meterLayout.js';
@@ -109,7 +109,14 @@ export const VERB_VALUES = {
   'constraint.mode': CONSTRAINT_MODES,
   'envelope.preset': ENVELOPE_PRESETS,
   'envelope.pointCurve': ENVELOPE_CURVES,
-  'ribbon.returnMode': RIBBON_RETURN_MODES,
+  // One spring, one vocabulary: the ribbon, the crossfader and the joystick all answer from the
+  // same two lists now that they share an implementation.
+  'ribbon.returnMode': RETURN_MODES,
+  'ribbon.returnCurve': RETURN_CURVES,
+  'crossfader.returnMode': RETURN_MODES,
+  'crossfader.returnCurve': RETURN_CURVES,
+  'joystick.returnMode': RETURN_MODES,
+  'joystick.returnCurve': RETURN_CURVES,
   'crossfader.law': CROSSFADER_LAWS,
   'joystick.returnAxes': JOYSTICK_RETURN_AXES,
   'meter.scale': METER_SCALES,

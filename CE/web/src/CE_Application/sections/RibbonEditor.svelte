@@ -25,7 +25,7 @@
   function applyPreset(name) {
     if (!core?.id) return;
     const fields = name === 'pitch'
-      ? { style: 'wheel3d', orientation: 'vertical', bipolar: true, value: 0.5, returnMode: 'center', returnRate: 12 }
+      ? { style: 'wheel3d', orientation: 'vertical', bipolar: true, value: 0.5, returnMode: 'center', returnTime: 85 }
       : name === 'mod'
         ? { style: 'wheel3d', orientation: 'vertical', bipolar: false, value: 0, returnMode: 'none' }
         : { style: 'ribbon', bipolar: false, returnMode: 'none' };
@@ -84,8 +84,13 @@
       </PropertyCell>
     {/if}
     {#if String(r.returnMode ?? 'none') !== 'none'}
-      <PropertyCell label="Speed" span={1} compact hint="Glide speed (units/sec; 0 = instant snap).">
-        <NumberCell label="Spd" min={0} step={0.5} value={r.returnRate ?? 8} defaultValue={8} onchange={(v) => set('returnRate', Math.max(0, v))} />
+      <NumberCell label="Time (ms)" min={0} max={5000} step={10} value={r.returnTime ?? 125} onchange={(v) => set('returnTime', Math.max(0, v))} />
+      <PropertyCell label="Curve" span={2} hint="Linear is the constant-speed walk these controls always had. Exp covers most of the distance early, which is what a real spring does.">
+        <select class="val" value={r.returnCurve ?? 'linear'} onchange={(e) => set('returnCurve', e.target.value)}>
+          <option value="linear">Linear</option>
+          <option value="exp">Spring (exp)</option>
+          <option value="ease">Ease</option>
+        </select>
       </PropertyCell>
     {/if}
     <PropertyCell label="Snap" span={1} compact hint="Value snap step (0 = continuous).">
