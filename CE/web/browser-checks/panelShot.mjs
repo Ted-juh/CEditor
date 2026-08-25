@@ -26,6 +26,11 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '../dist-scenery');
 const PANEL = join(HERE, '../../panels/Yamaha AN1x.cepanel');
 const OUT = process.env.PANEL_SHOT_OUT ?? '';
+// The panel is 2802x2216 CSS pixels, which is a picture you cannot read a control legend off at
+// 1:1 on a normal display. PANEL_SHOT_SCALE is the device pixel ratio the shot is taken at, so a
+// scale of 2 writes 5604x4432 and the legends survive being looked at. It changes nothing the
+// assertions see: getBoundingClientRect reports CSS pixels whatever the ratio is.
+const SCALE = Number(process.env.PANEL_SHOT_SCALE ?? 1) || 1;
 // Every type the page asks for. Dropping .css once turned a whole panel into an 18,000px black
 // column, because the stylesheet is what makes a control position: absolute.
 const TYPES = {
@@ -47,7 +52,7 @@ const server = createServer(async (req, res) => {
 await new Promise((resolve) => server.listen(0, resolve));
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
-const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, deviceScaleFactor: 1 });
+const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, deviceScaleFactor: SCALE });
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error).slice(0, 300)));
 
@@ -80,7 +85,7 @@ try {
     await page.waitForTimeout(800);
     await page.screenshot({ path: OUT, fullPage: true });
   }
-  console.log(`panelShot: ${panel.controls} controls, ${panel.width}x${panel.height}, all sized and inside the panel${OUT ? ` -> ${OUT}` : ''}`);
+  console.log(`panelShot: ${panel.controls} controls, ${panel.width}x${panel.height}, all sized and inside the panel${OUT ? ` -> ${OUT} at ${SCALE}x` : ''}`);
 } finally {
   await browser.close();
   server.close();
