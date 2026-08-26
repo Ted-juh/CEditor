@@ -49,7 +49,10 @@ bool InstrumentRackHost::removePart (const juce::String& partId)
     lp->filter->getCore().requestClear();
 
     if (lp->instrumentNode != nullptr)
+    {
+        notifyInstrumentWillBeRemoved (partId, *lp);
         graph.removeNode (lp->instrumentNode->nodeID);
+    }
     graph.removeNode (lp->filterNode->nodeID);
     graph.removeNode (lp->gainNode->nodeID);
 
@@ -196,7 +199,10 @@ bool InstrumentRackHost::commitLoad (const juce::String& partId, int generation,
     lp->filter->getCore().requestClear();
 
     if (lp->instrumentNode != nullptr)
+    {
+        notifyInstrumentWillBeRemoved (partId, *lp);
         graph.removeNode (lp->instrumentNode->nodeID);
+    }
 
     lp->instrumentNode = graph.addNode (std::move (instrument));
     if (lp->instrumentNode == nullptr)
@@ -220,6 +226,7 @@ bool InstrumentRackHost::unloadInstrument (const juce::String& partId)
 
     refreshStateBlob (*part);   // reloading the same class later resumes where it left off
     lp->filter->getCore().requestClear();
+    notifyInstrumentWillBeRemoved (partId, *lp);
     graph.removeNode (lp->instrumentNode->nodeID);
     lp->instrumentNode = nullptr;
     return true;
@@ -249,9 +256,11 @@ juce::Array<InstrumentRackHost::UnresolvedPart> InstrumentRackHost::loadModel (P
 {
     for (auto& [partId, lp] : live)
     {
-        juce::ignoreUnused (partId);
         if (lp.instrumentNode != nullptr)
+        {
+            notifyInstrumentWillBeRemoved (partId, lp);
             graph.removeNode (lp.instrumentNode->nodeID);
+        }
         graph.removeNode (lp.filterNode->nodeID);
         graph.removeNode (lp.gainNode->nodeID);
     }
@@ -359,6 +368,12 @@ void InstrumentRackHost::applyMixerState()
             lp->gain->setVolumePan (part.volume, part.pan, audible);
         }
     }
+}
+
+void InstrumentRackHost::notifyInstrumentWillBeRemoved (const juce::String& partId, const LivePart& lp)
+{
+    if (onInstrumentWillBeRemoved != nullptr && lp.instrumentNode != nullptr)
+        onInstrumentWillBeRemoved (partId, *lp.instrumentNode->getProcessor());
 }
 
 void InstrumentRackHost::refreshStateBlob (RackPart& part)

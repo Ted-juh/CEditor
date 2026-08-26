@@ -15,7 +15,7 @@
     hostState, hostScanLog, hostLastError, initInstrumentHostBridge,
     filterInstruments, scanForInstruments, addScanPath, removeScanPath, clearQuarantine,
     addRackPart, removeRackPart, focusRackPart, loadInstrument, unloadInstrument,
-    setPartMixer, setPartMidiRules, hostPanic,
+    setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor,
   } from '../stores/instrumentHost.js';
 
   initInstrumentHostBridge();
@@ -29,6 +29,18 @@
   let focusedPart = $derived(parts.find((p) => p.partId === focusedPartId) ?? null);
   let quarantined = $derived($hostState.modules.filter((m) => m.quarantined));
   let lastScanLine = $derived($hostScanLog.at(-1) ?? '');
+  let audioLine = $derived(
+    $hostState.audio.running
+      ? `${$hostState.audio.deviceName} · ${Math.round($hostState.audio.sampleRate / 100) / 10} kHz · ${$hostState.audio.bufferSize}`
+      : $hostState.audio.enabled
+        ? 'No audio device'
+        : 'Audio off (browser preview)'
+  );
+
+  function toggleEditor(part) {
+    if ($hostState.editorOpenPartId === part.partId) closeEditor();
+    else openEditor(part.partId);
+  }
 
   function partTitle(part) {
     if (part.hasInstrument) return part.pluginName || 'Loaded instrument';
@@ -48,7 +60,7 @@
   <header class="host-header">
     <div class="host-title">
       <strong>Instrument Host</strong>
-      <span class="host-subtitle">VST3 rack — the plug-in editor pane arrives in a later build</span>
+      <span class="host-subtitle">{audioLine}</span>
     </div>
     <div class="host-actions">
       {#if $hostState.scanning}
@@ -106,6 +118,9 @@
                      oninput={(e) => setPartMixer(part.partId, { pan: Number(e.currentTarget.value) })} />
             </label>
             {#if part.hasInstrument}
+              <button type="button" class="toggle" class:on={$hostState.editorOpenPartId === part.partId}
+                      title="Show the plug-in's own interface in the native pane"
+                      onclick={() => toggleEditor(part)}>Editor</button>
               <button type="button" class="ghost" title="Unload the instrument, keep the part"
                       onclick={() => unloadInstrument(part.partId)}>Unload</button>
             {/if}

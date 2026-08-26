@@ -300,6 +300,13 @@ WebViewHost::WebViewHost (AppSettings* settings)
 {
     bridge.setAppSettings (settings);
 
+    // The instrument host's native editor pane: a reserved region beside the WebView, never
+    // overlapping it. Hidden until an editor opens; the split in resized() follows.
+    addChildComponent (editorPane);
+    editorPane.onLayoutChanged = [this] { resized(); };
+    editorPane.onCloseRequested = [this] { bridge.requestInstrumentEditorClose(); };
+    bridge.setEditorPane (&editorPane);
+
     auto webview2Options = juce::WebBrowserComponent::Options::WinWebView2()
         .withBackgroundColour (juce::Colour (0xFF1E1E1E))
         .withStatusBarDisabled();
@@ -397,8 +404,19 @@ void WebViewHost::showStatusMessage (const juce::String& title, const juce::Stri
 
 void WebViewHost::resized()
 {
+    auto area = getLocalBounds();
+
+    if (editorPane.isVisible())
+    {
+        // The editor's own width, clamped so a huge vendor UI cannot squeeze the WebView out
+        // of existence — anything wider scrolls inside the pane's viewport.
+        const auto paneWidth = juce::jlimit (280, juce::jmax (280, area.getWidth() / 2),
+                                             editorPane.preferredWidth());
+        editorPane.setBounds (area.removeFromRight (paneWidth));
+    }
+
     if (webView != nullptr)
-        webView->setBounds (getLocalBounds());
+        webView->setBounds (area);
 
     if (statusLabel != nullptr)
         statusLabel->setBounds (getLocalBounds());

@@ -131,6 +131,40 @@ test('opening the instrument host tab survives the panel-selection sync', () => 
   assert.notEqual(get(activeEditorTab).type, 'instrumentHost');
 });
 
+test('mock reducer: the editor opens on loaded parts and follows focus', () => {
+  let state = mockHostState();
+  const loaded = state.rack.parts[0].partId;   // Stage Keys, has an instrument
+  const empty = state.rack.parts[1].partId;
+
+  state = applyMockCommand(state, { cmd: 'openEditor', partId: empty });
+  assert.equal(state.editorOpenPartId, '', 'an empty part cannot open an editor');
+
+  state = applyMockCommand(state, { cmd: 'openEditor', partId: loaded });
+  assert.equal(state.editorOpenPartId, loaded);
+
+  state = applyMockCommand(state, { cmd: 'focusPart', partId: empty });
+  assert.equal(state.editorOpenPartId, '', 'focusing an empty part hides the editor');
+
+  state = applyMockCommand(state, { cmd: 'openEditor', partId: loaded });
+  state = applyMockCommand(state, { cmd: 'removePart', partId: loaded });
+  assert.equal(state.editorOpenPartId, '', 'removing the part closes its editor');
+
+  state = applyMockCommand(state, { cmd: 'closeEditor' });
+  assert.equal(state.editorOpenPartId, '');
+});
+
+test('normalizeHostState shapes the editor and audio fields', () => {
+  const shaped = normalizeHostState({
+    editorOpenPartId: 42,
+    audio: { enabled: true, running: 'yes', deviceName: 'Speakers', sampleRate: '48000' },
+  });
+  assert.equal(shaped.editorOpenPartId, '42');
+  assert.equal(shaped.audio.enabled, true);
+  assert.equal(shaped.audio.running, false, 'running is strictly boolean');
+  assert.equal(shaped.audio.deviceName, 'Speakers');
+  assert.equal(shaped.audio.sampleRate, 48000);
+});
+
 test('the instrument host is a chrome-owning workspace like script and screen', () => {
   const kind = classifyWorkspace({ activeTab: { type: 'instrumentHost', id: 'instrumentHost' } });
   assert.equal(kind, 'instrumentHost');

@@ -73,11 +73,20 @@ struct StubSynthProcessor final : juce::AudioProcessor
     const juce::String getProgramName (int) override          { return {}; }
     void changeProgramName (int, const juce::String&) override {}
 
+    ~StubSynthProcessor() override
+    {
+        if (destroyedFlag != nullptr)
+            *destroyedFlag = true;
+    }
+
     float amp;
     int patch = 0;
     int activeNotes = 0;
     double preparedRate = 0.0;
     std::vector<juce::MidiMessage> received;   // test instrumentation, not RT-safe, fine here
+    // For destruction-ordering assertions (the editor-before-processor invariant): the test
+    // parks a flag here and checks it is still false inside onInstrumentWillBeRemoved.
+    std::shared_ptr<bool> destroyedFlag;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StubSynthProcessor)
 };

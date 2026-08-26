@@ -90,8 +90,14 @@ public:
 
     bool partHasInstrument (const juce::String& partId) const;
 
-    /** The live instrument, for the later editor host and for tests. Nullptr when empty. */
+    /** The live instrument, for the editor host and for tests. Nullptr when empty. */
     juce::AudioProcessor* getInstrument (const juce::String& partId) const;
+
+    /** Fires immediately BEFORE a live instrument is destroyed, on every path that destroys
+        one — replacement, unload, part removal, and a whole-rack loadModel teardown. The
+        editor host hangs off this: an AudioProcessorEditor must be gone before its processor
+        is, and this hook is what makes that invariant enforceable rather than remembered. */
+    std::function<void (const juce::String& partId, juce::AudioProcessor&)> onInstrumentWillBeRemoved;
 
     // -- state --------------------------------------------------------------------------
     /** The document with every live instrument's state freshly captured into its blob. */
@@ -126,6 +132,7 @@ private:
 
     LivePart* findLive (const juce::String& partId);
     const LivePart* findLive (const juce::String& partId) const;
+    void notifyInstrumentWillBeRemoved (const juce::String& partId, const LivePart& lp);
     void createLiveNodes (const RackPart& part);
     void connectInstrument (LivePart& live);
     void applyPartToLive (const RackPart& part, LivePart& live);

@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <thread>
+#include <juce_audio_utils/juce_audio_utils.h>
 #include "PluginScannerCoordinator.h"
 #include "InstrumentRackHost.h"
 
@@ -28,6 +29,20 @@
 //   setPartMidiRules {partId, channel,keyLow,keyHigh,velocityLow,velocityHigh,transpose}
 //   setPartMixer {partId, enabled?,mute?,solo?,volume?,pan?}    (absent fields untouched)
 //   loadInstrument {partId, ceId} | unloadInstrument {partId} | panic {partId?}
+//   openEditor {partId} | closeEditor
+//
+// THE EDITOR PANE is presentation the service commands but does not own: Options::editorPane
+// carries show/hide hooks into the native PluginEditorHost (stubs in tests). The service owns
+// the POLICY — one editor, following the focused part; hidden before its processor dies (via
+// the rack's onInstrumentWillBeRemoved); re-shown across a same-part replacement; close is
+// never unload. The pane object must outlive this service or be unhooked first; in the app
+// the pane is destroyed before the bridge that owns this service, which also guarantees any
+// last editor dies before the rack's processors do.
+//
+// AUDIO (Options::enableAudio) makes the editor the Preview Runtime in the simplest honest
+// form: default output device, every MIDI input enabled, AudioProcessorPlayer driving the
+// rack's graph. Explicit device selection is a later step; the state payload reports what is
+// actually open so the UI never pretends.
 //
 // THE INSTANTIATOR is injected because it is the one piece that genuinely needs a real
 // plug-in format: the app passes AudioPluginFormatManager::createPluginInstanceAsync over the
@@ -57,6 +72,13 @@ public:
     using InstantiateCallback = std::function<void (std::unique_ptr<juce::AudioProcessor>,
                                                     const juce::String& error)>;
 
+    struct EditorPaneHooks
+    {
+        std::function<void (const juce::String& partId, juce::AudioProcessor& processor,
+                            const juce::String& title)> show;
+        std::function<void()> hide;
+    };
+
     struct Options
     {
         juce::File dataDirectory;
@@ -67,6 +89,8 @@ public:
         // Runs the scan body. Default (nullptr) = the service's own background thread;
         // tests pass [] (auto fn) { fn(); } to run inline.
         std::function<void (std::function<void()>)> scanExecutor;
+        EditorPaneHooks editorPane;
+        bool enableAudio = false;
         double sampleRate = 44100.0;
         int blockSize = 512;
     };
@@ -100,6 +124,10 @@ private:
 
     void runScanNow();
     void requestInstrument (const juce::String& partId, const juce::String& ceId);
+    void showEditorFor (const juce::String& partId);
+    void hideEditor();
+    void startAudio();
+    void stopAudio();
 
     /** Caller holds catalogLock. */
     const PluginClassRecord* findClass (const juce::String& ceId,
@@ -121,7 +149,14 @@ private:
     mutable std::mutex catalogLock;
     InstrumentRackHost rack;
     juce::StringArray userScanPaths;
+    juce::String editorPartId;      // the part whose editor the pane is showing, or empty
     bool sessionRestored = false;
+
+    // Declared after the rack so destruction stops them first; stopAudio() in the destructor
+    // detaches the callbacks before the graph they drive goes down.
+    juce::AudioDeviceManager deviceManager;
+    juce::AudioProcessorPlayer player;
+    bool audioRunning = false;
 
     // Cleared in the destructor so an asynchronous instantiate callback that outlives this
     // service returns without touching a corpse — ValueTreeBridge.h documents the pattern.

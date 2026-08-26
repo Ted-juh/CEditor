@@ -201,6 +201,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
     )
 
     target_compile_definitions(CEditor PRIVATE
@@ -227,6 +228,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_audio_basics
         juce::juce_audio_devices
         juce::juce_audio_processors
+        juce::juce_audio_utils
         juce::juce_midi_ci
         juce::juce_data_structures
         juce::juce_events
@@ -953,7 +955,7 @@ target_compile_features(CEditorInstrumentHostServiceTests PRIVATE cxx_std_23)
 target_include_directories(CEditorInstrumentHostServiceTests PRIVATE "${CE_ROOT}/src")
 target_link_libraries(CEditorInstrumentHostServiceTests PRIVATE
     juce::juce_core
-    juce::juce_audio_processors
+    juce::juce_audio_utils   # AudioProcessorPlayer for the service's preview audio engine
 )
 add_test(NAME InstrumentHostService
          COMMAND CEditorInstrumentHostServiceTests $<TARGET_FILE:CEditorScannerStub>)

@@ -2,6 +2,7 @@
 #include "AppSettings.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
 #include "InstrumentHost/InstrumentHostService.h"
+#include "InstrumentHost/PluginEditorHost.h"
 #include "UpdateCheck.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -1638,6 +1639,24 @@ void ValueTreeBridge::ensureInstrumentHost()
         });
     };
 
+    // The editor the user asked for shows in WebViewHost's native pane. The guards matter:
+    // the pane pointer clears nothing here at teardown, but member order in WebViewHost means
+    // the pane (and any editor in it) is destroyed before this bridge — these hooks are only
+    // ever called while both are alive, on the message thread.
+    options.editorPane.show = [this] (const juce::String&, juce::AudioProcessor& processor,
+                                      const juce::String& title)
+    {
+        if (editorPane != nullptr)
+            editorPane->show (processor, title);
+    };
+    options.editorPane.hide = [this]
+    {
+        if (editorPane != nullptr)
+            editorPane->hide();
+    };
+
+    options.enableAudio = true;
+
     options.instantiate = [this] (const juce::String& descriptionXml, double sampleRate,
                                   int blockSize,
                                   ceditor::host::InstrumentHostService::InstantiateCallback done)
@@ -1658,4 +1677,14 @@ void ValueTreeBridge::ensureInstrumentHost()
     };
 
     instrumentHost = std::make_unique<ceditor::host::InstrumentHostService> (std::move (options));
+}
+
+void ValueTreeBridge::requestInstrumentEditorClose()
+{
+    if (instrumentHost == nullptr)
+        return;
+
+    auto* payload = new juce::DynamicObject();
+    payload->setProperty ("cmd", "closeEditor");
+    instrumentHost->handleCommand (juce::var (payload));
 }

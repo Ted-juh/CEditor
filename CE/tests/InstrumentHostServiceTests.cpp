@@ -149,6 +149,18 @@ struct Harness
             else
                 body();
         };
+        options.editorPane.show = [this] (const juce::String& partId,
+                                          juce::AudioProcessor& processor,
+                                          const juce::String& title)
+        {
+            paneLog.push_back ("show:" + partId + ":" + title);
+            lastShownProcessor = &processor;
+        };
+        options.editorPane.hide = [this]
+        {
+            paneLog.push_back ("hide");
+            lastShownProcessor = nullptr;
+        };
         service = std::make_unique<InstrumentHostService> (options);
     }
 
@@ -163,15 +175,27 @@ struct Harness
         return payload;
     }
 
-    juce::String firstPartId() const
+    juce::String partIdAt (int index) const
     {
         const auto* state = emits.lastState();
         if (state == nullptr) return {};
         const auto parts = state->getProperty ("rack", {}).getProperty ("parts", {});
-        return parts.size() > 0 ? parts[0].getProperty ("partId", {}).toString() : juce::String();
+        return index < parts.size() ? parts[index].getProperty ("partId", {}).toString()
+                                    : juce::String();
+    }
+
+    juce::String firstPartId() const   { return partIdAt (0); }
+
+    juce::String editorOpenPartId() const
+    {
+        const auto* state = emits.lastState();
+        return state != nullptr ? state->getProperty ("editorOpenPartId", {}).toString()
+                                : juce::String();
     }
 
     Emits emits;
+    std::vector<juce::String> paneLog;
+    juce::AudioProcessor* lastShownProcessor = nullptr;
     juce::String lastDescriptionXml;
     StubSynthProcessor* lastStub = nullptr;
     bool failInstantiation = false;
@@ -352,6 +376,75 @@ void testDeadManStartup()
            "clearQuarantine brings them back");
 }
 
+void testEditorPolicy()
+{
+    std::cout << "\neditor pane policy" << std::endl;
+
+    const auto dir = freshDataDir ("editor");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("addPart");
+    h.cmd ("addPart");
+    const auto a = h.partIdAt (0);
+    const auto b = h.partIdAt (1);
+    const auto empty = h.partIdAt (2);
+
+    h.cmd ("loadInstrument", { { "partId", a }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("loadInstrument", { { "partId", b }, { "ceId", "VST3-good-synth" } });
+
+    h.emits.clear();
+    h.cmd ("openEditor", { { "partId", empty } });
+    check (h.emits.lastError().contains ("no instrument"), "an empty part cannot open an editor");
+    check (h.paneLog.empty(), "and the pane was never asked to");
+
+    h.cmd ("openEditor", { { "partId", a } });
+    check (! h.paneLog.empty() && h.paneLog.back() == "show:" + a + ":Good Synth",
+           "openEditor shows the part's instrument with its display name");
+    check (h.lastShownProcessor == h.service->getRackHost().getInstrument (a),
+           "and it is the live processor, not a copy");
+    check (h.editorOpenPartId() == a, "state carries the open editor's part");
+
+    h.cmd ("focusPart", { { "partId", b } });
+    check (h.paneLog.back() == "show:" + b + ":Good Synth",
+           "the editor follows the focused part");
+    check (h.editorOpenPartId() == b, "state follows too");
+
+    h.cmd ("focusPart", { { "partId", empty } });
+    check (h.paneLog.back() == "hide", "focusing an empty part hides the pane");
+    check (h.editorOpenPartId().isEmpty(), "and state says so");
+
+    // Replacement continuity: reopen on B, replace B's instrument, the pane comes back on
+    // the new one — hidden first (the old editor must die before its processor), then shown.
+    h.cmd ("openEditor", { { "partId", b } });
+    h.paneLog.clear();
+    h.cmd ("loadInstrument", { { "partId", b }, { "ceId", "VST3-good-synth" } });
+    check (h.paneLog.size() >= 2 && h.paneLog.front() == "hide"
+             && h.paneLog.back() == "show:" + b + ":Good Synth",
+           "a replacement hides the old editor first and re-shows on the new instrument");
+    check (h.lastShownProcessor == h.service->getRackHost().getInstrument (b),
+           "showing the replacement instrument, not the destroyed one");
+
+    h.cmd ("closeEditor");
+    check (h.paneLog.back() == "hide" && h.editorOpenPartId().isEmpty(), "closeEditor hides");
+    check (h.service->getRackHost().partHasInstrument (b),
+           "and close is not unload — the instrument stays");
+
+    h.cmd ("openEditor", { { "partId", b } });
+    h.paneLog.clear();
+    h.cmd ("removePart", { { "partId", b } });
+    check (! h.paneLog.empty() && h.paneLog.front() == "hide",
+           "removing the part hides its editor before the processor dies");
+    check (h.editorOpenPartId().isEmpty(), "and clears the open-editor state");
+
+    h.cmd ("openEditor", { { "partId", a } });
+    h.paneLog.clear();
+    h.cmd ("unloadInstrument", { { "partId", a } });
+    check (! h.paneLog.empty() && h.paneLog.front() == "hide",
+           "unloading hides the editor too");
+}
+
 void testScan (const juce::File& stubWorker)
 {
     std::cout << "\nscan through the stub worker" << std::endl;
@@ -414,6 +507,7 @@ int main (int argc, char* argv[])
     testUnresolvedAndFailures();
     testSupersededLoad();
     testDeadManStartup();
+    testEditorPolicy();
     testScan (stubWorker);
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)

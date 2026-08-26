@@ -347,6 +347,58 @@ void testStateCaptureRestore()
            "and the stale blob is cleared rather than kept misleading");
 }
 
+void testWillBeRemovedHook()
+{
+    std::cout << "\nonInstrumentWillBeRemoved" << std::endl;
+
+    Rig rig;
+    std::vector<juce::String> fired;
+    bool firedBeforeDestruction = true;
+    std::shared_ptr<bool> watchedFlag;
+
+    rig.host.onInstrumentWillBeRemoved = [&] (const juce::String& partId, juce::AudioProcessor& p)
+    {
+        fired.push_back (partId);
+        if (auto* stub = dynamic_cast<StubSynth*> (&p);
+            stub != nullptr && stub->destroyedFlag != nullptr && *stub->destroyedFlag)
+            firedBeforeDestruction = false;
+        juce::ignoreUnused (watchedFlag);
+    };
+
+    const auto a = rig.host.addPart();
+    const auto b = rig.host.addPart();
+
+    auto* stubA = rig.load (a, 0.25f);
+    watchedFlag = std::make_shared<bool> (false);
+    stubA->destroyedFlag = watchedFlag;
+
+    // Replacement destroys the old instrument.
+    rig.load (a, 0.5f);
+    check (fired.size() == 1 && fired.back() == a, "replacement announces the old instrument");
+    check (*watchedFlag, "which is then actually destroyed");
+
+    // Unload destroys.
+    rig.load (b, 0.25f);
+    fired.clear();
+    rig.host.unloadInstrument (b);
+    check (fired.size() == 1 && fired.back() == b, "unload announces");
+
+    // Part removal destroys.
+    fired.clear();
+    rig.host.removePart (a);
+    check (fired.size() == 1 && fired.back() == a, "part removal announces");
+
+    // A whole-rack teardown announces every live instrument.
+    const auto c = rig.host.addPart();
+    rig.load (c, 0.25f);
+    fired.clear();
+    rig.host.loadModel (Performance::create());
+    check (fired.size() == 1 && fired.back() == c, "loadModel teardown announces");
+
+    check (firedBeforeDestruction,
+           "every announcement arrived while the instrument was still alive");
+}
+
 void testUnloadAndRemove()
 {
     std::cout << "\nunload and remove" << std::endl;
@@ -390,6 +442,7 @@ int main()
     testMuteSoloDisable();
     testLoadTransactions();
     testStateCaptureRestore();
+    testWillBeRemovedHook();
     testUnloadAndRemove();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;

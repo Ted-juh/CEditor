@@ -6,7 +6,7 @@
 
 class AppSettings;
 namespace juce { class AudioPluginFormatManager; }
-namespace ceditor::host { class InstrumentHostService; }
+namespace ceditor::host { class InstrumentHostService; class PluginEditorHost; }
 
 /**
  * Bridges a juce::ValueTree to a WebBrowserComponent via native events.
@@ -36,6 +36,15 @@ public:
 
     /** Set the AppSettings reference for panel persistence */
     void setAppSettings (AppSettings* s) { appSettings = s; }
+
+    /** WebViewHost hands over its native plug-in editor pane; the instrument host drives it.
+        Must outlive the bridge or be cleared first — WebViewHost's member order guarantees
+        the pane empties before the processors do. */
+    void setEditorPane (ceditor::host::PluginEditorHost* pane) { editorPane = pane; }
+
+    /** The pane's own close button, routed through the instrument host so the WebView's
+        state stays authoritative. No-op before the host exists. */
+    void requestInstrumentEditorClose();
 
     /** Returns WebBrowserComponent::Options with all native functions and event listeners
      *  registered. Chain this into your Options builder before constructing the WebBrowserComponent.
@@ -146,5 +155,6 @@ private:
     // incomplete types on purpose — only the handlers .cpp needs juce_audio_processors.
     std::unique_ptr<ceditor::host::InstrumentHostService> instrumentHost;
     std::unique_ptr<juce::AudioPluginFormatManager> pluginFormatManager;
+    ceditor::host::PluginEditorHost* editorPane = nullptr;
     void ensureInstrumentHost();
 };

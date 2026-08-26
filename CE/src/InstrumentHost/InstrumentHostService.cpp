@@ -6,10 +6,19 @@ namespace ceditor::host
 InstrumentHostService::InstrumentHostService (Options optionsToUse)
     : options (std::move (optionsToUse))
 {
+    // The pane's half of the editor-before-processor invariant: whatever path destroys an
+    // instrument, its editor is torn down first. Replacement re-shows afterwards (see the
+    // commit callback in requestInstrument).
+    rack.onInstrumentWillBeRemoved = [this] (const juce::String& partId, juce::AudioProcessor&)
+    {
+        if (partId == editorPartId)
+            hideEditor();
+    };
 }
 
 InstrumentHostService::~InstrumentHostService()
 {
+    stopAudio();
     *alive = false;
     stopRequested.store (true);
     if (scanThread.joinable())
@@ -113,12 +122,45 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "focusPart")
     {
-        if (! rack.focusPart (payload.getProperty ("partId", {}).toString()))
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        if (! rack.focusPart (partId))
         {
             emitError ("Unknown rack part.");
             return;
         }
+
+        // The editor follows the focused part (baseline §8.6.9): showEditorFor hides the
+        // pane when the newly focused part has nothing to show.
+        if (editorPartId.isNotEmpty() && editorPartId != partId)
+            showEditorFor (partId);
+
         savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "openEditor")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        if (rack.getPerformance().findPart (partId) == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        if (rack.getInstrument (partId) == nullptr)
+        {
+            emitError ("That part has no instrument loaded.");
+            return;
+        }
+
+        showEditorFor (partId);
+        emitState();
+        return;
+    }
+
+    if (cmd == "closeEditor")
+    {
+        hideEditor();
         emitState();
         return;
     }
@@ -261,6 +303,9 @@ void InstrumentHostService::restoreSession()
             emitError ("The saved rack session could not be read; starting empty.");
         }
     }
+
+    if (options.enableAudio)
+        startAudio();
 }
 
 void InstrumentHostService::requestInstrument (const juce::String& partId, const juce::String& ceId)
@@ -329,6 +374,10 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
                 return;
             }
 
+            // The replacement will tear down the old editor through the rack hook; remember
+            // whether the pane was on this part so it can come straight back on the new one.
+            const bool editorWasHere = (editorPartId == partId);
+
             if (! rack.commitLoad (partId, generation, std::move (instrument),
                                    { info.ceId, info.modulePath, info.name, info.vendor }))
             {
@@ -338,9 +387,70 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
                 return;
             }
 
+            if (editorWasHere)
+                showEditorFor (partId);
+
             savePerformance();
             emitState();
         });
+}
+
+void InstrumentHostService::showEditorFor (const juce::String& partId)
+{
+    const auto* part = rack.getPerformance().findPart (partId);
+    auto* instrument = rack.getInstrument (partId);
+
+    if (part == nullptr || instrument == nullptr)
+    {
+        hideEditor();
+        return;
+    }
+
+    editorPartId = partId;
+    if (options.editorPane.show != nullptr)
+        options.editorPane.show (partId, *instrument,
+                                 part->pluginName.isNotEmpty() ? part->pluginName
+                                                               : juce::String ("Instrument"));
+}
+
+void InstrumentHostService::hideEditor()
+{
+    if (editorPartId.isEmpty())
+        return;
+
+    editorPartId = {};
+    if (options.editorPane.hide != nullptr)
+        options.editorPane.hide();
+}
+
+void InstrumentHostService::startAudio()
+{
+    // The simplest honest Preview Runtime: default output, every MIDI input, the player
+    // driving the rack's graph. What actually opened is reported through the state payload;
+    // explicit device selection is a later step.
+    const auto error = deviceManager.initialiseWithDefaultDevices (0, 2);
+
+    player.setProcessor (&rack.getGraph());
+    deviceManager.addAudioCallback (&player);
+    deviceManager.addMidiInputDeviceCallback ({}, &player);
+    for (const auto& input : juce::MidiInput::getAvailableDevices())
+        deviceManager.setMidiInputDeviceEnabled (input.identifier, true);
+
+    audioRunning = true;
+
+    if (error.isNotEmpty())
+        emitError ("Audio device: " + error);
+}
+
+void InstrumentHostService::stopAudio()
+{
+    if (! audioRunning)
+        return;
+
+    deviceManager.removeMidiInputDeviceCallback ({}, &player);
+    deviceManager.removeAudioCallback (&player);
+    player.setProcessor (nullptr);
+    audioRunning = false;
 }
 
 const PluginClassRecord* InstrumentHostService::findClass (const juce::String& ceId,
@@ -499,6 +609,14 @@ juce::var InstrumentHostService::buildStatePayload() const
     rackObj->setProperty ("focusedPartId", performance.focusedPartId);
     rackObj->setProperty ("parts", parts);
 
+    auto* audio = new juce::DynamicObject();
+    auto* device = deviceManager.getCurrentAudioDevice();
+    audio->setProperty ("enabled",    options.enableAudio);
+    audio->setProperty ("running",    audioRunning && device != nullptr);
+    audio->setProperty ("deviceName", device != nullptr ? device->getName() : juce::String());
+    audio->setProperty ("sampleRate", device != nullptr ? device->getCurrentSampleRate() : 0.0);
+    audio->setProperty ("bufferSize", device != nullptr ? device->getCurrentBufferSizeSamples() : 0);
+
     auto* root = new juce::DynamicObject();
     root->setProperty ("instruments", instruments);
     root->setProperty ("modules", modules);
@@ -510,6 +628,8 @@ juce::var InstrumentHostService::buildStatePayload() const
         return paths;
     }());
     root->setProperty ("scanning", scanBusy.load());
+    root->setProperty ("editorOpenPartId", editorPartId);
+    root->setProperty ("audio", juce::var (audio));
     root->setProperty ("rack", juce::var (rackObj));
     return juce::var (root);
 }

@@ -29,6 +29,8 @@ export function emptyHostState() {
     modules: [],
     scanPaths: [],
     scanning: false,
+    editorOpenPartId: '',
+    audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0 },
     rack: { performanceId: '', focusedPartId: '', parts: [] },
   };
 }
@@ -56,6 +58,14 @@ export function normalizeHostState(payload) {
     })),
     scanPaths: (Array.isArray(p.scanPaths) ? p.scanPaths : []).map(String),
     scanning: p.scanning === true,
+    editorOpenPartId: String(p.editorOpenPartId ?? ''),
+    audio: {
+      enabled: p.audio?.enabled === true,
+      running: p.audio?.running === true,
+      deviceName: String(p.audio?.deviceName ?? ''),
+      sampleRate: Number(p.audio?.sampleRate ?? 0),
+      bufferSize: Number(p.audio?.bufferSize ?? 0),
+    },
     rack: {
       performanceId: String(rack.performanceId ?? ''),
       focusedPartId: String(rack.focusedPartId ?? ''),
@@ -132,10 +142,24 @@ export function applyMockCommand(state, payload) {
     next.rack.parts = next.rack.parts.filter((p) => p.partId !== payload.partId);
     if (next.rack.focusedPartId === payload.partId)
       next.rack.focusedPartId = next.rack.parts[0]?.partId ?? '';
+    if (next.editorOpenPartId === payload.partId) next.editorOpenPartId = '';
     return next;
   }
   if (cmd === 'focusPart') {
-    if (part(payload.partId)) next.rack.focusedPartId = payload.partId;
+    if (part(payload.partId)) {
+      next.rack.focusedPartId = payload.partId;
+      // The editor follows focus, hiding over an empty part — the native rule, mirrored.
+      if (next.editorOpenPartId && next.editorOpenPartId !== payload.partId)
+        next.editorOpenPartId = part(payload.partId)?.hasInstrument ? payload.partId : '';
+    }
+    return next;
+  }
+  if (cmd === 'openEditor') {
+    if (part(payload.partId)?.hasInstrument) next.editorOpenPartId = payload.partId;
+    return next;
+  }
+  if (cmd === 'closeEditor') {
+    next.editorOpenPartId = '';
     return next;
   }
   if (cmd === 'loadInstrument') {
@@ -153,6 +177,7 @@ export function applyMockCommand(state, payload) {
   if (cmd === 'unloadInstrument') {
     const target = part(payload.partId);
     if (target) { target.hasInstrument = false; target.unresolved = target.pluginCeId !== ''; }
+    if (next.editorOpenPartId === payload.partId) next.editorOpenPartId = '';
     return next;
   }
   if (cmd === 'setPartMixer') {
@@ -232,3 +257,5 @@ export const unloadInstrument = (partId) => send({ cmd: 'unloadInstrument', part
 export const setPartMixer = (partId, fields) => send({ cmd: 'setPartMixer', partId, ...fields });
 export const setPartMidiRules = (partId, fields) => send({ cmd: 'setPartMidiRules', partId, ...fields });
 export const hostPanic = (partId) => send(partId ? { cmd: 'panic', partId } : { cmd: 'panic' });
+export const openEditor = (partId) => send({ cmd: 'openEditor', partId });
+export const closeEditor = () => send({ cmd: 'closeEditor' });
