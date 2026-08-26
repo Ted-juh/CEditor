@@ -34,6 +34,12 @@ with an *as built* section per phase.
 | [Panel export pipeline plan](panel-export-pipeline-plan.md) | Turning a panel into a self-contained JUCE artifact — a VST3 or standalone built fresh per panel. The scripts that do it are `tools/scripts/export-panel-vst3.mjs` and friends. |
 | [Windows installer setup](windows-installer.md) | The Inno Setup 6 packaging flow and the `build/` layout it expects. The script is `tools/installer/CEditor.iss`. |
 
+## Instrument host
+
+| Document | What it is |
+|---|---|
+| [Instrument Host integration audit](instrument-host-integration-audit.md) | The VIP-successor baseline's required first task: what the host builder reuses (bridge, documents, settings, pages, CTRL49, export identity, installer route), what is genuinely new (hosting, the audio path, the scanner helper), and the documented deviations. |
+
 ## Controls and components
 
 | Document | What it is |
