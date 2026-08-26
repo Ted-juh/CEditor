@@ -849,6 +849,65 @@ if(WIN32)
     target_link_libraries(Ctrl49PresetTest PRIVATE winmm juce::juce_core)
 endif()
 
+# --- Instrument host (VIP-successor Stage 1): VST3 catalogue + isolated scanner ----------------
+# The reuse rulings and the reasoning behind this block are in
+# docs/design/instrument-host-integration-audit.md. The catalogue and coordinator are
+# juce_core-only ON PURPOSE: their tests drive a stub worker (ScannerStubMain.cpp) through
+# every hostile behaviour — hang, crash, garbage, reported error — so the whole scan loop is
+# provable on any machine with no real VST3 and no juce_audio_processors. Only the worker
+# executable below ever loads a third-party module, and never in the editor's process.
+
+add_executable(CEditorPluginCatalogTests
+    "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
+    "${CE_ROOT}/tests/PluginCatalogTests.cpp"
+)
+target_compile_features(CEditorPluginCatalogTests PRIVATE cxx_std_23)
+target_include_directories(CEditorPluginCatalogTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorPluginCatalogTests PRIVATE juce::juce_core)
+add_test(NAME PluginCatalog COMMAND CEditorPluginCatalogTests)
+ce_configure_test(CEditorPluginCatalogTests)
+
+# The stub is deliberately JUCE-free (pure std): it stands in for the worker in tests, and a
+# stub that could itself drag in module dependencies would defeat the point of having one.
+add_executable(CEditorScannerStub
+    "${CE_ROOT}/tests/ScannerStubMain.cpp"
+)
+target_compile_features(CEditorScannerStub PRIVATE cxx_std_23)
+
+add_executable(CEditorPluginScannerCoordinatorTests
+    "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
+    "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+    "${CE_ROOT}/tests/PluginScannerCoordinatorTests.cpp"
+)
+target_compile_features(CEditorPluginScannerCoordinatorTests PRIVATE cxx_std_23)
+target_include_directories(CEditorPluginScannerCoordinatorTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorPluginScannerCoordinatorTests PRIVATE juce::juce_core)
+add_test(NAME PluginScannerCoordinator
+         COMMAND CEditorPluginScannerCoordinatorTests $<TARGET_FILE:CEditorScannerStub>)
+ce_configure_test(CEditorPluginScannerCoordinatorTests)
+
+# The worker. Deliberately OUTSIDE the CEDITOR_BUILD_APP block: it needs none of what that
+# block exists to gate (no WebView2, no juceaide, no BinaryData) — juce_audio_processors with
+# VST3 hosting is its whole dependency, and that compiles on Linux too, given the same X11/ALSA
+# dev packages CEditorPanelParametersTests already needs. Default follows the app because the
+# worker ships beside it; -DCEDITOR_SCANNER_WORKER=ON builds it anywhere for verification.
+option(CEDITOR_SCANNER_WORKER "Build the out-of-process VST3 scanner helper (CEditorPluginScanner)" ${CEDITOR_BUILD_APP_DEFAULT})
+if (CEDITOR_SCANNER_WORKER)
+    add_executable(CEditorPluginScanner
+        "${CE_ROOT}/src/InstrumentHost/ScannerWorkerMain.cpp"
+    )
+    target_compile_features(CEditorPluginScanner PRIVATE cxx_std_23)
+    target_compile_definitions(CEditorPluginScanner PRIVATE
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_STANDALONE_APPLICATION=1
+    )
+    target_include_directories(CEditorPluginScanner PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(CEditorPluginScanner PRIVATE juce::juce_audio_processors)
+    message(STATUS "CEditor: VST3 scanner worker ENABLED (CEditorPluginScanner).")
+endif()
+
 # --- Panel scripting runtime (Milestone 1): Lua (Sol3) + JavaScript (juce_javascript) ----------
 # OFF by default so the existing build is unaffected. Turn on with -DCEDITOR_SCRIPTING=ON.
 # After enabling, add `ceditor_scripting` to the link libraries of whichever target hosts scripts
