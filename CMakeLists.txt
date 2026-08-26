@@ -886,6 +886,48 @@ add_test(NAME PluginScannerCoordinator
          COMMAND CEditorPluginScannerCoordinatorTests $<TARGET_FILE:CEditorScannerStub>)
 ce_configure_test(CEditorPluginScannerCoordinatorTests)
 
+# The rack: document model, per-part MIDI gate, and the live graph host. Split by dependency
+# so each layer is testable at the cheapest tier that can prove it: the model is juce_core,
+# the filter core is juce_core + juce_audio_basics (all the ordering rules, no X11 anywhere),
+# and only the host tests — which drive the REAL AudioProcessorGraph with stub instruments —
+# need juce_audio_processors, with the same Linux X11/ALSA dev-package story as
+# CEditorPanelParametersTests.
+add_executable(CEditorRackModelTests
+    "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
+    "${CE_ROOT}/tests/RackModelTests.cpp"
+)
+target_compile_features(CEditorRackModelTests PRIVATE cxx_std_23)
+target_include_directories(CEditorRackModelTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorRackModelTests PRIVATE juce::juce_core)
+add_test(NAME RackModel COMMAND CEditorRackModelTests)
+ce_configure_test(CEditorRackModelTests)
+
+add_executable(CEditorPartMidiFilterTests
+    "${CE_ROOT}/tests/PartMidiFilterTests.cpp"
+)
+target_compile_features(CEditorPartMidiFilterTests PRIVATE cxx_std_23)
+target_include_directories(CEditorPartMidiFilterTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorPartMidiFilterTests PRIVATE
+    juce::juce_core
+    juce::juce_audio_basics
+)
+add_test(NAME PartMidiFilter COMMAND CEditorPartMidiFilterTests)
+ce_configure_test(CEditorPartMidiFilterTests)
+
+add_executable(CEditorRackHostTests
+    "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
+    "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+    "${CE_ROOT}/tests/RackHostTests.cpp"
+)
+target_compile_features(CEditorRackHostTests PRIVATE cxx_std_23)
+target_include_directories(CEditorRackHostTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorRackHostTests PRIVATE
+    juce::juce_core
+    juce::juce_audio_processors
+)
+add_test(NAME RackHost COMMAND CEditorRackHostTests)
+ce_configure_test(CEditorRackHostTests)
+
 # The worker. Deliberately OUTSIDE the CEDITOR_BUILD_APP block: it needs none of what that
 # block exists to gate (no WebView2, no juceaide, no BinaryData) — juce_audio_processors with
 # VST3 hosting is its whole dependency, and that compiles on Linux too, given the same X11/ALSA
