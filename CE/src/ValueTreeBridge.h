@@ -5,6 +5,8 @@
 #include "DeviceProfile/DeviceProfileService.h"
 
 class AppSettings;
+namespace juce { class AudioPluginFormatManager; }
+namespace ceditor::host { class InstrumentHostService; }
 
 /**
  * Bridges a juce::ValueTree to a WebBrowserComponent via native events.
@@ -137,4 +139,12 @@ private:
     // handlers .cpp); null whenever perf logging is off, which is the normal case.
     std::unique_ptr<juce::Timer> stallWatch;
     ceditor::device::DeviceProfileService deviceProfileService;
+
+    // The instrument host (VIP-successor Stage 1): built lazily on the first "instrumentHost"
+    // command so no third-party plug-in code loads before the UI is up and asking. The format
+    // manager lives here because async instantiations must outlive any one command. Both are
+    // incomplete types on purpose — only the handlers .cpp needs juce_audio_processors.
+    std::unique_ptr<ceditor::host::InstrumentHostService> instrumentHost;
+    std::unique_ptr<juce::AudioPluginFormatManager> pluginFormatManager;
+    void ensureInstrumentHost();
 };

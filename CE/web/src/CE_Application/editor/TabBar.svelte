@@ -1,5 +1,5 @@
 <script>
-  import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, panels, setActiveEditorTab, closeSettingsTab, closeDeviceProfileTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
+  import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, panels, setActiveEditorTab, closeSettingsTab, closeInstrumentHostTab, closeDeviceProfileTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
   import { closeComponentDocument, createComponentDocument } from '../stores/componentWorkspace.js';
   import { closeScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile, scriptDocuments } from '../stores/scriptWorkspace.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
@@ -47,6 +47,7 @@
     script: 'Script Workspace',
     settings: 'Settings',
     screen: 'Screen',
+    instrumentHost: 'Instrument Host',
   };
 
   function tabTooltip(tab) {
@@ -287,6 +288,8 @@
   function closeTab(tab) {
     if (tab.tabType === 'settings') {
       closeSettingsTab();
+    } else if (tab.tabType === 'instrumentHost') {
+      closeInstrumentHostTab();
     } else if (tab.tabType === 'deviceProfile') {
       closeDeviceProfileTab(tab.id);
     } else if (tab.tabType === 'component') {

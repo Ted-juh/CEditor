@@ -196,6 +196,11 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ValueTreeBridge.cpp"
         "${CE_ROOT}/src/ValueTreeBridgeHandlers.cpp"
         "${CE_ROOT}/src/ValueTreeBridgeState.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+        "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
     )
 
     target_compile_definitions(CEditor PRIVATE
@@ -203,6 +208,10 @@ if(CEDITOR_BUILD_APP)
         JUCE_WEB_BROWSER=1
         JUCE_USE_WIN_WEBVIEW2=1
         JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
+        # The instrument host (VIP-successor Stage 1): the editor scans and hosts inner VST3
+        # instruments. The scanner runs out-of-process (CEditorPluginScanner below); this is
+        # the in-editor hosting half — catalogue resolution, instantiation, the rack.
+        JUCE_PLUGINHOST_VST3=1
         # Dev mode: load from Vite dev server (http://localhost:5173)
         # Set to 0 for production builds that serve files from the installed bundle
         CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
@@ -217,6 +226,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_core
         juce::juce_audio_basics
         juce::juce_audio_devices
+        juce::juce_audio_processors
         juce::juce_midi_ci
         juce::juce_data_structures
         juce::juce_events
@@ -927,6 +937,27 @@ target_link_libraries(CEditorRackHostTests PRIVATE
 )
 add_test(NAME RackHost COMMAND CEditorRackHostTests)
 ce_configure_test(CEditorRackHostTests)
+
+# The service: the whole "instrumentHost" bridge command surface, kept out of the handlers
+# file so it is provable here — command dispatch, session persistence, the load transaction
+# and scan orchestration, driven with the stub instantiator and the stub scanner worker.
+add_executable(CEditorInstrumentHostServiceTests
+    "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
+    "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+    "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
+    "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+    "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+    "${CE_ROOT}/tests/InstrumentHostServiceTests.cpp"
+)
+target_compile_features(CEditorInstrumentHostServiceTests PRIVATE cxx_std_23)
+target_include_directories(CEditorInstrumentHostServiceTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorInstrumentHostServiceTests PRIVATE
+    juce::juce_core
+    juce::juce_audio_processors
+)
+add_test(NAME InstrumentHostService
+         COMMAND CEditorInstrumentHostServiceTests $<TARGET_FILE:CEditorScannerStub>)
+ce_configure_test(CEditorInstrumentHostServiceTests)
 
 # The worker. Deliberately OUTSIDE the CEDITOR_BUILD_APP block: it needs none of what that
 # block exists to gate (no WebView2, no juceaide, no BinaryData) — juce_audio_processors with

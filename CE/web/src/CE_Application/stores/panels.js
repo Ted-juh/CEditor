@@ -384,6 +384,7 @@ export const activePanelId = writable(null);
 
 /** Whether the global Settings editor tab is open */
 export const settingsTabOpen = writable(false);
+export const instrumentHostTabOpen = writable(false);
 
 /** Open device profile editor tabs */
 export const deviceProfileTabs = writable([]);
@@ -436,8 +437,8 @@ export const scriptRuntimePanelId = derived(
 
 /** All editor tabs shown in the top tab bar */
 export const editorTabs = derived(
-  [panels, settingsTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments, screenDocuments],
-  ([$panels, $settingsTabOpen, $deviceProfileTabs, $componentDocuments, $scriptDocuments, $screenDocuments]) => {
+  [panels, settingsTabOpen, instrumentHostTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments, screenDocuments],
+  ([$panels, $settingsTabOpen, $instrumentHostTabOpen, $deviceProfileTabs, $componentDocuments, $scriptDocuments, $screenDocuments]) => {
     const tabs = $panels.map(panel => ({
       id: panel.id,
       tabType: 'panel',
@@ -450,6 +451,15 @@ export const editorTabs = derived(
         id: 'settings',
         tabType: 'settings',
         name: 'Settings',
+        modified: false,
+      });
+    }
+
+    if ($instrumentHostTabOpen) {
+      tabs.push({
+        id: 'instrumentHost',
+        tabType: 'instrumentHost',
+        name: 'Instrument Host',
         modified: false,
       });
     }
@@ -497,6 +507,7 @@ export const editorTabs = derived(
 function resolvePanelSelection(list, activeId, tab) {
   if (!Array.isArray(list) || list.length === 0) return null;
   if (tab?.type === 'settings') return null;
+  if (tab?.type === 'instrumentHost') return null;
   if (tab?.type === 'component') return null;
   if (tab?.type === 'deviceProfile') return null;
   // Script tabs edit script documents, not panels. Falling through here made
@@ -556,6 +567,28 @@ export function openSettingsTab() {
   activeEditorTab.set({ type: 'settings', id: 'settings' });
   editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'settings', id: 'settings' } } : layout);
   clearSelection();
+}
+
+/** Open the global Instrument Host workspace tab and activate it */
+export function openInstrumentHostTab() {
+  instrumentHostTabOpen.set(true);
+  activeEditorTab.set({ type: 'instrumentHost', id: 'instrumentHost' });
+  editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'instrumentHost', id: 'instrumentHost' } } : layout);
+  clearSelection();
+}
+
+/** Close the global Instrument Host workspace tab */
+export function closeInstrumentHostTab() {
+  instrumentHostTabOpen.set(false);
+
+  const panelId = get(activePanelId);
+  if (panelId != null) {
+    activeEditorTab.set({ type: 'panel', id: panelId });
+  } else if (get(settingsTabOpen)) {
+    activeEditorTab.set({ type: 'settings', id: 'settings' });
+  } else {
+    activeEditorTab.set({ type: 'panel', id: null });
+  }
 }
 
 /** Close the global Settings editor tab */
@@ -673,6 +706,8 @@ export function closeDeviceProfileTab(id) {
       activeEditorTab.set({ type: 'panel', id: panelId });
     } else if (get(settingsTabOpen)) {
       activeEditorTab.set({ type: 'settings', id: 'settings' });
+    } else if (get(instrumentHostTabOpen)) {
+      activeEditorTab.set({ type: 'instrumentHost', id: 'instrumentHost' });
     } else {
       activeEditorTab.set({ type: 'panel', id: null });
     }
@@ -842,6 +877,8 @@ export function closePanel(id) {
         activeEditorTab.set({ type: 'panel', id: nextPanelId });
       } else if (get(settingsTabOpen)) {
         activeEditorTab.set({ type: 'settings', id: 'settings' });
+      } else if (get(instrumentHostTabOpen)) {
+        activeEditorTab.set({ type: 'instrumentHost', id: 'instrumentHost' });
       } else {
         activeEditorTab.set({ type: 'panel', id: null });
       }
@@ -870,6 +907,11 @@ export function setActiveEditorTab(tab) {
   if (tab.tabType === 'settings' || tab.type === 'settings' || tab.id === 'settings') {
     openSettingsTab();
     editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'settings', id: 'settings' } } : layout);
+    return;
+  }
+
+  if (tab.tabType === 'instrumentHost' || tab.type === 'instrumentHost') {
+    openInstrumentHostTab();
     return;
   }
 
@@ -920,6 +962,11 @@ export function closeActiveEditorTab() {
 
   if (tab.type === 'settings') {
     closeSettingsTab();
+    return;
+  }
+
+  if (tab.type === 'instrumentHost') {
+    closeInstrumentHostTab();
     return;
   }
 
@@ -1112,7 +1159,7 @@ function persistOpenPanelPaths() {
 
 function syncPanelSelection() {
   const tab = get(activeEditorTab);
-  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
+  if (tab?.type === 'settings' || tab?.type === 'instrumentHost' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script' || tab?.type === 'screen') return;
 
   const list = get(panels);
   const activeId = get(activePanelId);

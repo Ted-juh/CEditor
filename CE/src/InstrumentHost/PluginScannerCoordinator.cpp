@@ -111,6 +111,12 @@ PluginScannerCoordinator::ScanOutcome PluginScannerCoordinator::scanModules (con
 
     for (const auto& path : modulePaths)
     {
+        if (options.shouldContinue != nullptr && ! options.shouldContinue())
+        {
+            log ("scan stopped before: " + path);
+            break;
+        }
+
         const auto* existing = catalog.findModule (path);
         if (existing != nullptr && existing->quarantined)
         {

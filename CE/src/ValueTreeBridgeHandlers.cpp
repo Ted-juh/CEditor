@@ -1,8 +1,10 @@
 #include "ValueTreeBridge.h"
 #include "AppSettings.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
+#include "InstrumentHost/InstrumentHostService.h"
 #include "UpdateCheck.h"
 
+#include <juce_audio_processors/juce_audio_processors.h>
 #include <cstdlib>
 
 namespace
@@ -1561,6 +1563,16 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
         .withEventListener ("removeToolchains", [this] (const juce::var& payload)
         {
             juce::MessageManager::callAsync ([this, payload]() { runToolchainJob (payload, "remove"); });
+        })
+        .withEventListener ("instrumentHost", [this] (const juce::var& payload)
+        {
+            // One listener for the whole instrument host; the payload's `cmd` selects. The
+            // command surface and its events are CE/src/InstrumentHost/InstrumentHostService.h.
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                ensureInstrumentHost();
+                instrumentHost->handleCommand (payload);
+            });
         });
 
     options = ceditor::device::withDeviceRuntimeEvents (std::move (options), deviceProfileService,
@@ -1571,4 +1583,79 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
         });
 
     return options;
+}
+
+// ------------------------------------------------------------------ the instrument host (Stage 1)
+
+// Where the scanner helper lives. Installed builds ship CEditorPluginScanner beside the app;
+// a dev build's exe sits in build/native/CEditor_artefacts/<Config>/ while the helper lands in
+// build/native/<Config>/, so the fallback climbs to the sibling config directory. A path that
+// resolves to nothing is fine to hand over — the coordinator pre-checks existence and reports
+// "scanner worker not found" instead of blaming a module.
+static juce::File findScannerWorker()
+{
+   #if JUCE_WINDOWS
+    const juce::String workerName ("CEditorPluginScanner.exe");
+   #else
+    const juce::String workerName ("CEditorPluginScanner");
+   #endif
+
+    const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+                            .getParentDirectory();
+
+    const auto installed = exeDir.getChildFile (workerName);
+    if (installed.existsAsFile())
+        return installed;
+
+    return exeDir.getParentDirectory().getParentDirectory()
+                 .getChildFile (exeDir.getFileName())
+                 .getChildFile (workerName);
+}
+
+void ValueTreeBridge::ensureInstrumentHost()
+{
+    if (instrumentHost != nullptr)
+        return;
+
+    // The UI-capable registration path, as the audit requires — editor creation stays possible.
+    pluginFormatManager = std::make_unique<juce::AudioPluginFormatManager>();
+    pluginFormatManager->addFormat (new juce::VST3PluginFormat());
+
+    ceditor::host::InstrumentHostService::Options options;
+
+    options.dataDirectory = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                                .getChildFile ("CEditor").getChildFile ("instrument-host");
+    options.workerExecutable = findScannerWorker();
+
+    // May fire from the scan thread; callAsync is the marshal. `this` raw is this file's
+    // documented lifetime pattern (ValueTreeBridge.h) — same as every listener above.
+    options.emit = [this] (const juce::String& eventName, const juce::var& payload)
+    {
+        juce::MessageManager::callAsync ([this, eventName, payload]()
+        {
+            if (browser != nullptr)
+                browser->emitEventIfBrowserIsVisible (eventName, payload);
+        });
+    };
+
+    options.instantiate = [this] (const juce::String& descriptionXml, double sampleRate,
+                                  int blockSize,
+                                  ceditor::host::InstrumentHostService::InstantiateCallback done)
+    {
+        juce::PluginDescription description;
+        const auto parsed = juce::XmlDocument::parse (descriptionXml);
+        if (parsed == nullptr || ! description.loadFromXml (*parsed))
+        {
+            done (nullptr, "unreadable plugin description");
+            return;
+        }
+
+        pluginFormatManager->createPluginInstanceAsync (description, sampleRate, blockSize,
+            [done] (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error)
+            {
+                done (std::move (instance), error);
+            });
+    };
+
+    instrumentHost = std::make_unique<ceditor::host::InstrumentHostService> (std::move (options));
 }

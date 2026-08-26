@@ -48,6 +48,8 @@ public:
         int perModuleTimeoutMs = 30'000;
         int failuresBeforeQuarantine = 2;                 // for non-crash failures
         std::function<void (const juce::String&)> log;    // optional progress sink
+        std::function<bool()> shouldContinue;             // optional; checked between modules so
+                                                          // a shutdown does not wait out a scan
     };
 
     explicit PluginScannerCoordinator (Options optionsToUse);

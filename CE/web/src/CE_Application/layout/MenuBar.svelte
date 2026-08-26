@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, selectedComponentIds, setActiveEditorTab, buildActivePanelVst3, activePanel, editorZoom, updatePanel } from '../stores/panels.js';
+  import { closeActiveEditorTab, openSettingsTab, openInstrumentHostTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, selectedComponentIds, setActiveEditorTab, buildActivePanelVst3, activePanel, editorZoom, updatePanel } from '../stores/panels.js';
   import { undoAvailable, redoAvailable } from '../stores/history.js';
   import { hasClipboardContent } from '../stores/clipboard.js';
   import { styleClipboard, copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
@@ -184,6 +184,7 @@
       { label: 'Open Shared Panel...', action: () => openSharedPanelFromFile() },
       { type: 'separator' },
       { label: 'Close Tab', shortcut: 'Ctrl+W', action: () => closeActiveEditorTab() },
+      { label: 'Instrument Host...', action: () => openInstrumentHostTab() },
       { label: 'Settings...', shortcut: 'Ctrl+,', action: () => openSettingsTab() },
       { type: 'separator' },
       { label: 'Close Program', shortcut: 'Alt+F4', action: () => closeApplication() },

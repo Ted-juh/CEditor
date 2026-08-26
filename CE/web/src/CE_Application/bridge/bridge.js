@@ -937,3 +937,37 @@ export function onFontsImported(callback) {
   const token = window.__JUCE__.backend.addEventListener('fontsImported', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
+
+// --- Instrument Host (VIP-successor Stage 1) ---
+// One command event in ({ cmd, ... }), three events out. The whole surface is
+// CE/src/InstrumentHost/InstrumentHostService.h — its header comment is the contract.
+
+/** Send one instrument-host command ({ cmd: 'getState' | 'scan' | 'addPart' | ... }). */
+export function sendInstrumentHostCommand(payload) {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — instrumentHost command ignored:', payload?.cmd);
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('instrumentHost', payload ?? {});
+}
+
+/** Full host state ({ instruments, modules, scanPaths, scanning, rack }), after every mutation. */
+export function onInstrumentHostState(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostState', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Scan progress lines ({ line, done }); done:true means "ask for state again". */
+export function onInstrumentHostScanProgress(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostScanProgress', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Refused or failed commands ({ message }). */
+export function onInstrumentHostError(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostError', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}

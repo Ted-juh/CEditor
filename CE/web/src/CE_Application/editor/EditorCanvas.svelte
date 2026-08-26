@@ -28,6 +28,7 @@
   import DeviceProfileDesignerV2 from './DeviceProfileDesignerV2.svelte';
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
+  import InstrumentHostView from '../sections/InstrumentHostView.svelte';
   import { isTextEntryTarget } from '../utils/textEntry.js';
   import BehaviorDesigner from './BehaviorDesigner.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
@@ -1012,6 +1013,8 @@
         </div>
       {:else if $activeEditorTab?.type === 'settings'}
         <SettingsView />
+      {:else if $activeEditorTab?.type === 'instrumentHost'}
+        <InstrumentHostView />
       {:else if $activeEditorTab?.type === 'screen'}
         {#key $activeEditorTab.id}
           <ScreenBuilderEditor documentId={$activeEditorTab.id} />

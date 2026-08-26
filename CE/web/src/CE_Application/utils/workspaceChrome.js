@@ -8,11 +8,14 @@ export function classifyWorkspace({ activeTab = null, componentWorkspaceMode = '
   if (activeTab?.type === 'screen') return 'screen';
   if (activeTab?.type === 'component') return 'component';
   if (activeTab?.type === 'settings') return 'settings';
+  if (activeTab?.type === 'instrumentHost') return 'instrumentHost';
   return 'panel';
 }
 
 export function workspaceOwnsChrome(workspaceKind) {
-  return ['component', 'device', 'script', 'screen'].includes(workspaceKind);
+  // The instrument host owns its layout the way the other full workspaces do: the tree,
+  // display and properties panels are panel-editor chrome and mean nothing over a rack.
+  return ['component', 'device', 'script', 'screen', 'instrumentHost'].includes(workspaceKind);
 }
 
 export function resolveWorkspaceChrome({
