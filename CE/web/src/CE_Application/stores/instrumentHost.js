@@ -17,11 +17,41 @@ import {
   onInstrumentHostState,
   onInstrumentHostScanProgress,
   onInstrumentHostError,
+  onInstrumentHostAudioDevices,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
 export const hostScanLog = writable([]);
 export const hostLastError = writable('');
+export const hostAudioDevices = writable(emptyAudioDevices());
+
+export function emptyAudioDevices() {
+  return { outputs: [], current: '', midiInputs: [] };
+}
+
+export function normalizeAudioDevices(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  return {
+    outputs: (Array.isArray(p.outputs) ? p.outputs : []).map(String),
+    current: String(p.current ?? ''),
+    midiInputs: (Array.isArray(p.midiInputs) ? p.midiInputs : []).map((m) => ({
+      id: String(m?.id ?? ''),
+      name: String(m?.name ?? ''),
+      enabled: m?.enabled === true,
+    })),
+  };
+}
+
+export function mockAudioDevices() {
+  return normalizeAudioDevices({
+    outputs: ['Speakers (Mock Audio Device)', 'Headphones (Mock Audio Device)'],
+    current: 'Speakers (Mock Audio Device)',
+    midiInputs: [
+      { id: 'mock-in-1', name: 'CTRL49 USB', enabled: true },
+      { id: 'mock-in-2', name: 'Mock MIDI Keyboard', enabled: false },
+    ],
+  });
+}
 
 export function emptyHostState() {
   return {
@@ -221,9 +251,11 @@ export function initInstrumentHostBridge() {
 
   if (!isJuceAvailable()) {
     hostState.set(mockHostState());
+    hostAudioDevices.set(mockAudioDevices());
     return;
   }
 
+  onInstrumentHostAudioDevices((payload) => hostAudioDevices.set(normalizeAudioDevices(payload)));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);
@@ -237,6 +269,21 @@ export function initInstrumentHostBridge() {
 
 function send(payload) {
   if (!isJuceAvailable()) {
+    // Device commands mutate the device store, everything else the host state.
+    if (payload?.cmd === 'setAudioDevice') {
+      hostAudioDevices.update((d) => ({ ...d, current: String(payload.name ?? d.current) }));
+      return;
+    }
+    if (payload?.cmd === 'setMidiInputEnabled') {
+      hostAudioDevices.update((d) => ({
+        ...d,
+        midiInputs: d.midiInputs.map((m) =>
+          m.id === payload.id ? { ...m, enabled: payload.enabled === true } : m
+        ),
+      }));
+      return;
+    }
+    if (payload?.cmd === 'getAudioDevices') return;
     hostState.set(applyMockCommand(get(hostState), payload));
     return;
   }
@@ -259,3 +306,6 @@ export const setPartMidiRules = (partId, fields) => send({ cmd: 'setPartMidiRule
 export const hostPanic = (partId) => send(partId ? { cmd: 'panic', partId } : { cmd: 'panic' });
 export const openEditor = (partId) => send({ cmd: 'openEditor', partId });
 export const closeEditor = () => send({ cmd: 'closeEditor' });
+export const requestAudioDevices = () => send({ cmd: 'getAudioDevices' });
+export const setAudioDevice = (name) => send({ cmd: 'setAudioDevice', name });
+export const setMidiInputEnabled = (id, enabled) => send({ cmd: 'setMidiInputEnabled', id, enabled });

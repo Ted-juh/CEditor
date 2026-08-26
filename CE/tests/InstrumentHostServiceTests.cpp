@@ -115,7 +115,8 @@ struct Emits
 
 struct Harness
 {
-    explicit Harness (const juce::File& dataDir, const juce::File& worker = {})
+    explicit Harness (const juce::File& dataDir, const juce::File& worker = {},
+                      std::function<void (InstrumentHostService::Options&)> tweak = {})
     {
         InstrumentHostService::Options options;
         options.dataDirectory = dataDir;
@@ -124,10 +125,11 @@ struct Harness
         {
             emits.entries.push_back ({ name, payload });
         };
-        options.instantiate = [this] (const juce::String& descriptionXml, double, int,
+        options.instantiate = [this] (const juce::String& descriptionXml, double sampleRate, int,
                                       InstrumentHostService::InstantiateCallback callback)
         {
             lastDescriptionXml = descriptionXml;
+            lastSampleRate = sampleRate;
             if (deferCallbacks)
             {
                 deferred.push_back (std::move (callback));
@@ -161,6 +163,8 @@ struct Harness
             paneLog.push_back ("hide");
             lastShownProcessor = nullptr;
         };
+        if (tweak != nullptr)
+            tweak (options);
         service = std::make_unique<InstrumentHostService> (options);
     }
 
@@ -197,6 +201,7 @@ struct Harness
     std::vector<juce::String> paneLog;
     juce::AudioProcessor* lastShownProcessor = nullptr;
     juce::String lastDescriptionXml;
+    double lastSampleRate = 0.0;
     StubSynthProcessor* lastStub = nullptr;
     bool failInstantiation = false;
     bool deferCallbacks = false;
@@ -483,6 +488,91 @@ void testScan (const juce::File& stubWorker)
 
     moduleDir.deleteRecursively();
 }
+
+// The wrapper-context API — what the generated targets use instead of the bridge. The outer
+// VST3 is the demanding one: the DAW owns the session (persistSession=false, state through
+// capture/restore vars), announces its own rate, and destroys/recreates the editor window at
+// will. Each of those contracts is asserted here so the wrappers stay thin glue.
+void testWrapperContext()
+{
+    std::cout << "\nwrapper context (the generated targets)" << std::endl;
+
+    const auto dir = freshDataDir ("wrapper");
+    seedCatalog (dir);
+
+    const auto asPlugin = [] (InstrumentHostService::Options& o) { o.persistSession = false; };
+
+    juce::var chunk;
+    {
+        Harness h (dir, {}, asPlugin);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+
+        h.service->prepareRuntime (96000.0, 256);
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        check (juce::approximatelyEqual (h.lastSampleRate, 96000.0),
+               "instantiation after prepareRuntime uses the host's sample rate");
+
+        h.lastStub->patch = 7;
+        h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 0.25 } });
+        check (! dir.getChildFile ("session-performance.json").existsAsFile(),
+               "persistSession=false never writes the session file");
+
+        chunk = h.service->captureStateVar();
+        check (chunk.isObject(), "captureStateVar hands back the session as a var");
+    }
+
+    {
+        // A fresh processor in a reopened project: state arrives through the chunk, not a file.
+        Harness h (dir, {}, asPlugin);
+        h.service->restoreFromVar (chunk);
+        check (h.lastStub != nullptr && h.lastStub->patch == 7,
+               "restoreFromVar rebuilds the rack and its instrument state from the chunk");
+
+        const auto part = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
+        check (juce::approximatelyEqual ((float) (double) part.getProperty ("volume", 0.0), 0.25f),
+               "and the mixer values ride along");
+
+        // The DAW closes the window: hooks detach, the service keeps its editor intent.
+        const auto partId = h.firstPartId();
+        h.cmd ("openEditor", { { "partId", partId } });
+        check (h.lastShownProcessor != nullptr, "the editor opens into the attached pane");
+        h.service->setEditorPaneHooks ({});
+        h.paneLog.clear();
+
+        // The DAW reopens it: a new pane attaches and asks for whatever was open.
+        InstrumentHostService::EditorPaneHooks reopened;
+        reopened.show = [&h] (const juce::String& partIdShown, juce::AudioProcessor&,
+                              const juce::String&)
+        {
+            h.paneLog.push_back ("reopened:" + partIdShown);
+        };
+        h.service->setEditorPaneHooks (std::move (reopened));
+        h.service->reassertEditorPane();
+        check (! h.paneLog.empty() && h.paneLog.back() == "reopened:" + partId,
+               "reassertEditorPane re-shows the intended editor into the new pane");
+
+        check (h.editorOpenPartId() == partId,
+               "the state payload still names the open editor across the gap");
+    }
+
+    // A garbage chunk must not tear down a working rack.
+    {
+        Harness h (dir, {}, asPlugin);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+
+        h.emits.clear();
+        h.service->restoreFromVar (juce::var ("nonsense"));
+        check (h.emits.lastError().contains ("could not be read"),
+               "an unreadable chunk is refused aloud");
+        check (h.service->getRackHost().getInstrument (partId) != nullptr,
+               "and the current rack survives it");
+    }
+}
 } // namespace
 
 int main (int argc, char* argv[])
@@ -509,6 +599,7 @@ int main (int argc, char* argv[])
     testDeadManStartup();
     testEditorPolicy();
     testScan (stubWorker);
+    testWrapperContext();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)
         .getChildFile ("ceditor-host-service-tests").deleteRecursively();

@@ -30,6 +30,9 @@
 //   setPartMixer {partId, enabled?,mute?,solo?,volume?,pan?}    (absent fields untouched)
 //   loadInstrument {partId, ceId} | unloadInstrument {partId} | panic {partId?}
 //   openEditor {partId} | closeEditor
+//   getAudioDevices | setAudioDevice {name} | setMidiInputEnabled {id, enabled}
+//     (getAudioDevices answers with instrumentHostAudioDevices — enumeration can touch
+//      drivers, so it runs on demand rather than inside every state push)
 //
 // THE EDITOR PANE is presentation the service commands but does not own: Options::editorPane
 // carries show/hide hooks into the native PluginEditorHost (stubs in tests). The service owns
@@ -91,6 +94,10 @@ public:
         std::function<void (std::function<void()>)> scanExecutor;
         EditorPaneHooks editorPane;
         bool enableAudio = false;
+        // The editor and the standalone persist the rack session to dataDirectory after every
+        // mutation; the outer VST3 sets this false because the DAW owns the session through
+        // get/setStateInformation — a host file would fight the project file over the truth.
+        bool persistSession = true;
         double sampleRate = 44100.0;
         int blockSize = 512;
     };
@@ -111,6 +118,42 @@ public:
     const InstrumentRackHost& getRackHost() const     { return rack; }
     bool isScanning() const                           { return scanBusy.load(); }
 
+    // -- wrapper-context API --------------------------------------------------------------
+    // The generated targets drive the service beside the bridge, not through it. The
+    // standalone shell only needs enableAudio; the outer VST3 needs all of this: the DAW
+    // owns audio (delegate processBlock to the graph), owns the session (capture/restore a
+    // var through the plug-in state chunk), and opens/closes the editor window at will
+    // (detach and reassert the pane).
+
+    /** The rack's graph, for the plug-in wrapper's processBlock delegation. */
+    juce::AudioProcessorGraph& getGraph()             { return rack.getGraph(); }
+
+    /** The plug-in wrapper's prepareToPlay: adopt the host's rate and block size and
+        (re)prepare the graph. Safe to call repeatedly; later instantiations use the new
+        values too. */
+    void prepareRuntime (double sampleRate, int blockSize);
+
+    /** The plug-in wrapper's releaseResources. */
+    void releaseRuntime();
+
+    /** The whole rack session as a var, for getStateInformation. */
+    juce::var captureStateVar();
+
+    /** Replaces the rack from a var captureStateVar produced — setStateInformation. Restores
+        the catalogue first if it has not loaded yet, so part ceIds can resolve; a var that
+        does not parse keeps the current rack rather than tearing it down. */
+    void restoreFromVar (const juce::var& state);
+
+    /** Swaps the editor-pane hooks. The plug-in's editor component owns the real pane and
+        comes and goes at the DAW's pleasure: it attaches on construction and detaches (empty
+        hooks) on destruction. The service keeps its editor intent across the gap. */
+    void setEditorPaneHooks (EditorPaneHooks hooks);
+
+    /** Re-shows the intended part's editor into a freshly attached pane — the DAW reopened
+        the plug-in window and the pane is new, but which editor was open is service state
+        and survived. */
+    void reassertEditorPane();
+
 private:
     struct ClassInfoForCommit
     {
@@ -128,6 +171,7 @@ private:
     void hideEditor();
     void startAudio();
     void stopAudio();
+    void emitAudioDevices();
 
     /** Caller holds catalogLock. */
     const PluginClassRecord* findClass (const juce::String& ceId,

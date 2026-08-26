@@ -12,16 +12,24 @@
    * the vendor UI does not show yet.
    */
   import {
-    hostState, hostScanLog, hostLastError, initInstrumentHostBridge,
+    hostState, hostScanLog, hostLastError, hostAudioDevices, initInstrumentHostBridge,
     filterInstruments, scanForInstruments, addScanPath, removeScanPath, clearQuarantine,
     addRackPart, removeRackPart, focusRackPart, loadInstrument, unloadInstrument,
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor,
+    requestAudioDevices, setAudioDevice, setMidiInputEnabled,
   } from '../stores/instrumentHost.js';
+  import PropertyToggle from '../properties/PropertyToggle.svelte';
 
   initInstrumentHostBridge();
 
   let search = $state('');
   let newScanPath = $state('');
+  let devicesOpen = $state(false);
+
+  function toggleDevices() {
+    devicesOpen = !devicesOpen;
+    if (devicesOpen) requestAudioDevices();
+  }
 
   let instruments = $derived(filterInstruments($hostState.instruments, search));
   let parts = $derived($hostState.rack.parts);
@@ -72,11 +80,42 @@
               data-testid="host-scan">
         {$hostState.scanning ? 'Scanning…' : 'Scan for instruments'}
       </button>
+      <button type="button" class="toggle" class:on={devicesOpen} onclick={toggleDevices}
+              data-testid="host-devices">Audio &amp; MIDI</button>
       <button type="button" class="panic" title="All notes off, every part" onclick={() => hostPanic()}>
         Panic
       </button>
     </div>
   </header>
+
+  {#if devicesOpen}
+    <div class="device-panel" aria-label="Audio and MIDI devices">
+      <label class="device-output">Output
+        <select value={$hostAudioDevices.current}
+                onchange={(e) => setAudioDevice(e.currentTarget.value)}>
+          {#if !$hostAudioDevices.outputs.includes($hostAudioDevices.current) && $hostAudioDevices.current}
+            <option value={$hostAudioDevices.current}>{$hostAudioDevices.current}</option>
+          {/if}
+          {#each $hostAudioDevices.outputs as output (output)}
+            <option value={output}>{output}</option>
+          {/each}
+        </select>
+      </label>
+      <div class="device-midi">
+        <span class="device-midi-title">MIDI inputs</span>
+        {#if $hostAudioDevices.midiInputs.length === 0}
+          <span class="device-midi-empty">None found.</span>
+        {/if}
+        {#each $hostAudioDevices.midiInputs as input (input.id)}
+          <span class="device-midi-row">
+            <PropertyToggle compact value={input.enabled} ariaLabel={input.name}
+                            onchange={(enabled) => setMidiInputEnabled(input.id, enabled)} />
+            {input.name}
+          </span>
+        {/each}
+      </div>
+    </div>
+  {/if}
 
   {#if $hostLastError}
     <div class="host-error" role="alert">
@@ -254,6 +293,23 @@
   .host-subtitle { color: #7d8894; font-size: 11px; }
   .host-actions { display: flex; align-items: center; gap: 8px; }
   .scan-status { color: #7d8894; font-size: 11px; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .device-panel {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    margin: 8px 14px 0;
+    padding: 10px;
+    border: 1px solid #3b4652;
+    border-radius: 6px;
+    background: #171a1d;
+    flex-wrap: wrap;
+  }
+  .device-output { display: flex; flex-direction: column; gap: 4px; color: #9aa5b1; font-size: 11px; min-width: 260px; }
+  .device-midi { display: flex; flex-direction: column; gap: 4px; }
+  .device-midi-title { color: #9aa5b1; font-size: 11px; }
+  .device-midi-empty { color: #7d8894; font-size: 12px; }
+  .device-midi-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #d6dbe0; }
 
   .host-error {
     display: flex;

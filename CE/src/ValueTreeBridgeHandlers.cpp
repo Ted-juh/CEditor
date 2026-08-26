@@ -2,6 +2,7 @@
 #include "AppSettings.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
 #include "InstrumentHost/InstrumentHostService.h"
+#include "InstrumentHost/PluginInstantiator.h"
 #include "InstrumentHost/PluginEditorHost.h"
 #include "UpdateCheck.h"
 
@@ -1657,24 +1658,9 @@ void ValueTreeBridge::ensureInstrumentHost()
 
     options.enableAudio = true;
 
-    options.instantiate = [this] (const juce::String& descriptionXml, double sampleRate,
-                                  int blockSize,
-                                  ceditor::host::InstrumentHostService::InstantiateCallback done)
-    {
-        juce::PluginDescription description;
-        const auto parsed = juce::XmlDocument::parse (descriptionXml);
-        if (parsed == nullptr || ! description.loadFromXml (*parsed))
-        {
-            done (nullptr, "unreadable plugin description");
-            return;
-        }
-
-        pluginFormatManager->createPluginInstanceAsync (description, sampleRate, blockSize,
-            [done] (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error)
-            {
-                done (std::move (instance), error);
-            });
-    };
+    // The same instantiator the generated wrappers use (PluginInstantiator.h); the manager
+    // member outlives the service that holds this function.
+    options.instantiate = ceditor::host::makePluginInstantiator (*pluginFormatManager);
 
     instrumentHost = std::make_unique<ceditor::host::InstrumentHostService> (std::move (options));
 }

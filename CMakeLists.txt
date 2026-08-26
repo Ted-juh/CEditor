@@ -448,6 +448,124 @@ if(CEDITOR_BUILD_APP)
             CLAP_FEATURES utility external)
         message(STATUS "CEditor: CLAP format ENABLED (target CEditorPlayerVST_CLAP, id ${CE_CLAP_ID}).")
     endif()
+
+    # --- The generated instrument-host product (VIP-successor Stage 1) --------------------------
+    # Two wrappers around the same InstrumentHostService the editor's preview uses: a standalone
+    # (CEHostStandalone — owns the audio device, persists its session per user) and an outer VST3
+    # (CEHostVST3 — the DAW owns audio and session; the rack rides in the project chunk). Both
+    # serve host.html out of PlayerWebData — the bundle glob above already embeds every dist/
+    # entry, so the runtime page ships without any packaging change.
+    #
+    # Identity is stamped from cache variables because the Host Project build reuses these targets
+    # per product: same shape, whatever name/code the project chose (the CEditorPlayerVST
+    # pattern, applied to the host).
+    set(CE_HOST_PRODUCT_NAME    "CE Instrument Host" CACHE STRING "Generated host product name")
+    set(CE_HOST_PRODUCT_VERSION "0.1.0"              CACHE STRING "Generated host product version")
+    set(CE_HOST_COMPANY_NAME    "Tedjuh-inc"         CACHE STRING "Generated host vendor / company name")
+    set(CE_HOST_MFR_CODE        "Tdjh"               CACHE STRING "Generated host 4-char manufacturer code")
+    set(CE_HOST_PLUGIN_CODE     "CehR"               CACHE STRING "Generated host 4-char plugin code")
+
+    set(CE_HOST_COMMON_SOURCES
+        "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+        "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
+    )
+
+    juce_add_gui_app(CEHostStandalone
+        PRODUCT_NAME "${CE_HOST_PRODUCT_NAME}"
+        COMPANY_NAME "${CE_HOST_COMPANY_NAME}"
+    )
+
+    target_sources(CEHostStandalone PRIVATE
+        "${CE_ROOT}/src/InstrumentHost/HostRuntimeMain.cpp"
+        "${CE_ROOT}/src/InstrumentHost/HostRuntimeShell.cpp"
+        ${CE_HOST_COMMON_SOURCES}
+    )
+
+    target_compile_definitions(CEHostStandalone PRIVATE
+        JUCE_WEB_BROWSER=1
+        JUCE_USE_WIN_WEBVIEW2=1
+        JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
+        JUCE_PLUGINHOST_VST3=1
+        CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
+        CEHOST_PRODUCT_NAME="${CE_HOST_PRODUCT_NAME}"
+        CEHOST_PRODUCT_VERSION="${CE_HOST_PRODUCT_VERSION}"
+    )
+
+    target_include_directories(CEHostStandalone PRIVATE
+        "${WEBVIEW2_INCLUDE}"
+        "${CE_ROOT}/src"
+        "${CMAKE_BINARY_DIR}/PlayerWebData"
+    )
+
+    target_link_libraries(CEHostStandalone PRIVATE
+        juce::juce_core
+        juce::juce_audio_basics
+        juce::juce_audio_devices
+        juce::juce_audio_processors
+        juce::juce_audio_utils
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
+        dwmapi
+        PlayerWebData
+    )
+
+    juce_add_plugin(CEHostVST3
+        PRODUCT_NAME "${CE_HOST_PRODUCT_NAME}"
+        COMPANY_NAME "${CE_HOST_COMPANY_NAME}"
+        PLUGIN_MANUFACTURER_CODE "${CE_HOST_MFR_CODE}"
+        PLUGIN_CODE "${CE_HOST_PLUGIN_CODE}"
+        VERSION "${CE_HOST_PRODUCT_VERSION}"
+        FORMATS VST3
+        IS_SYNTH TRUE
+        NEEDS_MIDI_INPUT TRUE
+        NEEDS_MIDI_OUTPUT FALSE
+        VST3_CATEGORIES Instrument
+        COPY_PLUGIN_AFTER_BUILD FALSE
+    )
+
+    target_sources(CEHostVST3 PRIVATE
+        "${CE_ROOT}/src/InstrumentHost/HostPluginProcessor.cpp"
+        ${CE_HOST_COMMON_SOURCES}
+    )
+
+    target_compile_definitions(CEHostVST3 PRIVATE
+        JUCE_WEB_BROWSER=1
+        JUCE_USE_WIN_WEBVIEW2=1
+        JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_VST3_CAN_REPLACE_VST2=0
+        CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
+    )
+
+    target_include_directories(CEHostVST3 PRIVATE
+        "${WEBVIEW2_INCLUDE}"
+        "${CE_ROOT}/src"
+        "${CMAKE_BINARY_DIR}/PlayerWebData"
+    )
+
+    target_link_libraries(CEHostVST3 PRIVATE
+        juce::juce_core
+        juce::juce_audio_basics
+        juce::juce_audio_devices
+        juce::juce_audio_processors
+        juce::juce_audio_utils
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
+        dwmapi
+        PlayerWebData
+    )
 endif()
 
 # ----------------------------------------------------------------------------------- the tests

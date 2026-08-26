@@ -971,3 +971,10 @@ export function onInstrumentHostError(callback) {
   const token = window.__JUCE__.backend.addEventListener('instrumentHostError', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
+
+/** Device enumeration answers ({ outputs, current, midiInputs }) to the getAudioDevices command. */
+export function onInstrumentHostAudioDevices(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostAudioDevices', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}

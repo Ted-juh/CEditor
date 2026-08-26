@@ -139,6 +139,35 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "getAudioDevices")
+    {
+        emitAudioDevices();
+        return;
+    }
+
+    if (cmd == "setAudioDevice")
+    {
+        auto setup = deviceManager.getAudioDeviceSetup();
+        setup.outputDeviceName = payload.getProperty ("name", {}).toString();
+        setup.useDefaultOutputChannels = true;
+
+        const auto error = deviceManager.setAudioDeviceSetup (setup, true);
+        if (error.isNotEmpty())
+            emitError ("Audio device: " + error);
+
+        emitAudioDevices();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setMidiInputEnabled")
+    {
+        deviceManager.setMidiInputDeviceEnabled (payload.getProperty ("id", {}).toString(),
+                                                 (bool) payload.getProperty ("enabled", true));
+        emitAudioDevices();
+        return;
+    }
+
     if (cmd == "openEditor")
     {
         const auto partId = payload.getProperty ("partId", {}).toString();
@@ -290,7 +319,9 @@ void InstrumentHostService::restoreSession()
 
     rack.prepare (options.sampleRate, options.blockSize);
 
-    if (performanceFile().existsAsFile())
+    // With persistence off (the outer VST3) the session arrives through restoreFromVar from
+    // the DAW's chunk instead — reading a file here would race it for the rack.
+    if (options.persistSession && performanceFile().existsAsFile())
     {
         Performance restored;
         if (Performance::fromVar (juce::JSON::parse (performanceFile().loadFileAsString()), restored))
@@ -442,6 +473,36 @@ void InstrumentHostService::startAudio()
         emitError ("Audio device: " + error);
 }
 
+void InstrumentHostService::emitAudioDevices()
+{
+    juce::Array<juce::var> outputs;
+    if (auto* type = deviceManager.getCurrentDeviceTypeObject())
+    {
+        type->scanForDevices();
+        for (const auto& name : type->getDeviceNames (false))
+            outputs.add (name);
+    }
+
+    juce::Array<juce::var> midiInputs;
+    for (const auto& input : juce::MidiInput::getAvailableDevices())
+    {
+        auto* device = new juce::DynamicObject();
+        device->setProperty ("id", input.identifier);
+        device->setProperty ("name", input.name);
+        device->setProperty ("enabled", deviceManager.isMidiInputDeviceEnabled (input.identifier));
+        midiInputs.add (juce::var (device));
+    }
+
+    auto* current = deviceManager.getCurrentAudioDevice();
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("outputs", outputs);
+    obj->setProperty ("current", current != nullptr ? current->getName() : juce::String());
+    obj->setProperty ("midiInputs", midiInputs);
+
+    if (options.emit != nullptr)
+        options.emit ("instrumentHostAudioDevices", juce::var (obj));
+}
+
 void InstrumentHostService::stopAudio()
 {
     if (! audioRunning)
@@ -451,6 +512,55 @@ void InstrumentHostService::stopAudio()
     deviceManager.removeAudioCallback (&player);
     player.setProcessor (nullptr);
     audioRunning = false;
+}
+
+void InstrumentHostService::prepareRuntime (double sampleRate, int blockSize)
+{
+    options.sampleRate = sampleRate;
+    options.blockSize = blockSize;
+    rack.prepare (sampleRate, blockSize);
+}
+
+void InstrumentHostService::releaseRuntime()
+{
+    rack.release();
+}
+
+juce::var InstrumentHostService::captureStateVar()
+{
+    return rack.captureState().toVar();
+}
+
+void InstrumentHostService::restoreFromVar (const juce::var& state)
+{
+    // The catalogue must be live before part ceIds can resolve to real instruments —
+    // setStateInformation can arrive before any UI has asked getState.
+    if (! sessionRestored)
+        restoreSession();
+
+    Performance restored;
+    if (! Performance::fromVar (state, restored))
+    {
+        emitError ("The saved host state could not be read; keeping the current rack.");
+        return;
+    }
+
+    for (const auto& unresolved : rack.loadModel (std::move (restored)))
+        requestInstrument (unresolved.partId, unresolved.ceId);
+
+    savePerformance();
+    emitState();
+}
+
+void InstrumentHostService::setEditorPaneHooks (EditorPaneHooks hooks)
+{
+    options.editorPane = std::move (hooks);
+}
+
+void InstrumentHostService::reassertEditorPane()
+{
+    if (editorPartId.isNotEmpty())
+        showEditorFor (editorPartId);
 }
 
 const PluginClassRecord* InstrumentHostService::findClass (const juce::String& ceId,
@@ -636,6 +746,9 @@ juce::var InstrumentHostService::buildStatePayload() const
 
 void InstrumentHostService::savePerformance()
 {
+    if (! options.persistSession)
+        return;
+
     performanceFile().replaceWithText (juce::JSON::toString (rack.captureState().toVar()));
 }
 
