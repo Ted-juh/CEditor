@@ -978,3 +978,18 @@ export function onInstrumentHostAudioDevices(callback) {
   const token = window.__JUCE__.backend.addEventListener('instrumentHostAudioDevices', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
+
+/** The Host Project manifest ({ productName, version, publisher, appId, includeStandalone,
+    includeVst3 }), answered by getHostProject and after every setHostProject. */
+export function onInstrumentHostProject(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostProject', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Host product build lines ({ line, done, ok? }); done:true carries the verdict. */
+export function onInstrumentHostBuildProgress(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostBuildProgress', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}

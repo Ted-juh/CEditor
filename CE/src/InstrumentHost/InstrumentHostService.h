@@ -33,6 +33,11 @@
 //   getAudioDevices | setAudioDevice {name} | setMidiInputEnabled {id, enabled}
 //     (getAudioDevices answers with instrumentHostAudioDevices — enumeration can touch
 //      drivers, so it runs on demand rather than inside every state push)
+//   getHostProject | setHostProject {productName?,version?,publisher?,includeStandalone?,
+//     includeVst3?} | buildHostProduct {outputDirectory?}
+//     (both project commands answer with instrumentHostProject; the appId is minted once and
+//      never writable from the page — installer identity survives every rename. Building goes
+//      through Options::runBuild; without the hook the command refuses aloud.)
 //
 // THE EDITOR PANE is presentation the service commands but does not own: Options::editorPane
 // carries show/hide hooks into the native PluginEditorHost (stubs in tests). The service owns
@@ -92,6 +97,10 @@ public:
         // Runs the scan body. Default (nullptr) = the service's own background thread;
         // tests pass [] (auto fn) { fn(); } to run inline.
         std::function<void (std::function<void()>)> scanExecutor;
+        // Launches the Host Project build pipeline (the app streams a node child process;
+        // tests capture the call). Absent = building is not available in this build, and
+        // buildHostProduct says so instead of doing nothing.
+        std::function<void (const juce::var& project, const juce::String& outputDirectory)> runBuild;
         EditorPaneHooks editorPane;
         bool enableAudio = false;
         // The editor and the standalone persist the rack session to dataDirectory after every
@@ -166,6 +175,8 @@ private:
     static juce::var scanProgressPayload (const juce::String& line, bool done);
 
     void runScanNow();
+    void ensureHostProject();
+    void emitHostProject();
     void requestInstrument (const juce::String& partId, const juce::String& ceId);
     void showEditorFor (const juce::String& partId);
     void hideEditor();
@@ -183,6 +194,7 @@ private:
     juce::File catalogFile() const      { return options.dataDirectory.getChildFile ("plugin-catalog.json"); }
     juce::File performanceFile() const  { return options.dataDirectory.getChildFile ("session-performance.json"); }
     juce::File scanPathsFile() const    { return options.dataDirectory.getChildFile ("scan-paths.json"); }
+    juce::File hostProjectFile() const  { return options.dataDirectory.getChildFile ("host-project.json"); }
 
     Options options;
     PluginCatalog catalog;
@@ -195,6 +207,8 @@ private:
     juce::StringArray userScanPaths;
     juce::String editorPartId;      // the part whose editor the pane is showing, or empty
     bool sessionRestored = false;
+    juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask
+    bool hostProjectLoaded = false;
 
     // Declared after the rack so destruction stops them first; stopAudio() in the destructor
     // detaches the callbacks before the graph they drive goes down.

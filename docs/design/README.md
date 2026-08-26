@@ -39,6 +39,7 @@ with an *as built* section per phase.
 | Document | What it is |
 |---|---|
 | [Instrument Host integration audit](instrument-host-integration-audit.md) | The VIP-successor baseline's required first task: what the host builder reuses (bridge, documents, settings, pages, CTRL49, export identity, installer route), what is genuinely new (hosting, the audio path, the scanner helper), and the documented deviations. |
+| [Generated instrument-host product](instrument-host-product.md) | Stage 1 as built: one service under four consumers (editor tab, `CEHostStandalone`, `CEHostVST3`, tests), the Host Project manifest with its minted-once installer identity, and the assemble-don't-compile build pipeline (`tools/scripts/build-host-product.mjs` + `tools/installer/HostProductTemplate.iss`). Ends with what Stage 1 leaves open. |
 
 ## Controls and components
 

@@ -17,6 +17,7 @@
     addRackPart, removeRackPart, focusRackPart, loadInstrument, unloadInstrument,
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor,
     requestAudioDevices, setAudioDevice, setMidiInputEnabled,
+    hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
@@ -25,10 +26,16 @@
   let search = $state('');
   let newScanPath = $state('');
   let devicesOpen = $state(false);
+  let projectOpen = $state(false);
 
   function toggleDevices() {
     devicesOpen = !devicesOpen;
     if (devicesOpen) requestAudioDevices();
+  }
+
+  function toggleProject() {
+    projectOpen = !projectOpen;
+    if (projectOpen) requestHostProject();
   }
 
   let instruments = $derived(filterInstruments($hostState.instruments, search));
@@ -82,6 +89,8 @@
       </button>
       <button type="button" class="toggle" class:on={devicesOpen} onclick={toggleDevices}
               data-testid="host-devices">Audio &amp; MIDI</button>
+      <button type="button" class="toggle" class:on={projectOpen} onclick={toggleProject}
+              data-testid="host-project">Project</button>
       <button type="button" class="panic" title="All notes off, every part" onclick={() => hostPanic()}>
         Panic
       </button>
@@ -114,6 +123,41 @@
           </span>
         {/each}
       </div>
+    </div>
+  {/if}
+
+  {#if projectOpen}
+    <div class="project-panel" aria-label="Host Project">
+      <div class="project-fields">
+        <label class="project-field">Product name
+          <input type="text" value={$hostProject.productName}
+                 onchange={(e) => setHostProject({ productName: e.currentTarget.value })} />
+        </label>
+        <label class="project-field">Version
+          <input type="text" value={$hostProject.version}
+                 onchange={(e) => setHostProject({ version: e.currentTarget.value })} />
+        </label>
+        <label class="project-field">Publisher
+          <input type="text" value={$hostProject.publisher}
+                 onchange={(e) => setHostProject({ publisher: e.currentTarget.value })} />
+        </label>
+        <span class="project-target">
+          <PropertyToggle compact label="Standalone" value={$hostProject.includeStandalone}
+                          onchange={(v) => setHostProject({ includeStandalone: v })} />
+          <PropertyToggle compact label="VST3" value={$hostProject.includeVst3}
+                          onchange={(v) => setHostProject({ includeVst3: v })} />
+        </span>
+        <button type="button" class="project-build" data-testid="host-build"
+                disabled={$hostBuild.running} onclick={() => buildHostProduct()}>
+          {$hostBuild.running ? 'Building…' : 'Build product'}
+        </button>
+      </div>
+      <!-- Identity is minted, not authored — shown so support can match an installer to a
+           project, never editable (a changed AppId splits upgrades into a second install). -->
+      <span class="project-appid">Installer identity: {$hostProject.appId || '(minted on first save)'}</span>
+      {#if $hostBuild.lines.length > 0}
+        <pre class="project-build-log" class:failed={$hostBuild.done && !$hostBuild.ok}>{$hostBuild.lines.join('\n')}</pre>
+      {/if}
     </div>
   {/if}
 
@@ -310,6 +354,35 @@
   .device-midi-title { color: #9aa5b1; font-size: 11px; }
   .device-midi-empty { color: #7d8894; font-size: 12px; }
   .device-midi-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #d6dbe0; }
+
+  .project-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 8px 14px 0;
+    padding: 10px;
+    border: 1px solid #3b4652;
+    border-radius: 6px;
+    background: #171a1d;
+  }
+  .project-fields { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .project-field { display: flex; flex-direction: column; gap: 4px; color: #9aa5b1; font-size: 11px; }
+  .project-field input { width: 180px; }
+  .project-target { display: flex; align-items: center; gap: 6px; padding-bottom: 2px; }
+  .project-appid { color: #7d8894; font-size: 11px; }
+  .project-build-log {
+    margin: 0;
+    padding: 8px;
+    max-height: 160px;
+    overflow: auto;
+    background: #101315;
+    border: 1px solid #2a333d;
+    border-radius: 4px;
+    color: #9fb2a9;
+    font-size: 11px;
+    white-space: pre-wrap;
+  }
+  .project-build-log.failed { color: #e4b3b3; border-color: #7a4a4a; }
 
   .host-error {
     display: flex;

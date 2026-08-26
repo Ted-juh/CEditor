@@ -573,6 +573,81 @@ void testWrapperContext()
                "and the current rack survives it");
     }
 }
+
+// The Host Project manifest and the build command. The manifest is what the generated product
+// IS — name, version, publisher, targets — and its appId is the installer's identity, minted
+// once and never authored, so upgrades keep upgrading whatever the product gets renamed to.
+void testHostProject()
+{
+    std::cout << "\nhost project manifest and build" << std::endl;
+
+    const auto dir = freshDataDir ("project");
+    juce::String mintedAppId;
+
+    {
+        Harness h (dir);
+        h.emits.clear();
+        h.cmd ("getHostProject");
+
+        const auto& entry = h.emits.entries.back();
+        check (entry.name == "instrumentHostProject", "getHostProject answers with the project");
+        check (entry.payload.getProperty ("productName", {}).toString() == "My Instrument Rack"
+                 && entry.payload.getProperty ("version", {}).toString() == "1.0.0"
+                 && (bool) entry.payload.getProperty ("includeStandalone", false)
+                 && (bool) entry.payload.getProperty ("includeVst3", false),
+               "a fresh project carries the defaults");
+        mintedAppId = entry.payload.getProperty ("appId", {}).toString();
+        check (mintedAppId.length() == 36, "and a minted appId");
+        check (dir.getChildFile ("host-project.json").existsAsFile(), "persisted on first ask");
+
+        h.cmd ("setHostProject", { { "productName", "  Super Rack  " }, { "version", "2.1.0" },
+                                   { "appId", "attacker-chosen" }, { "includeVst3", false } });
+        const auto& updated = h.emits.entries.back().payload;
+        check (updated.getProperty ("productName", {}).toString() == "Super Rack",
+               "setHostProject merges and trims the authored fields");
+        check (! (bool) updated.getProperty ("includeVst3", true), "including the target flags");
+        check (updated.getProperty ("appId", {}).toString() == mintedAppId,
+               "but the appId is not writable from the page");
+    }
+
+    {
+        Harness h (dir);
+        h.cmd ("getHostProject");
+        check (h.emits.entries.back().payload.getProperty ("appId", {}).toString() == mintedAppId,
+               "the appId survives the process, like any identity");
+
+        h.emits.clear();
+        h.cmd ("buildHostProduct");
+        check (h.emits.lastError().contains ("not available"),
+               "building without a runBuild hook refuses aloud");
+    }
+
+    {
+        juce::var builtProject;
+        juce::String builtOutputDir;
+        Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+        {
+            o.runBuild = [&] (const juce::var& project, const juce::String& outputDirectory)
+            {
+                builtProject = project;
+                builtOutputDir = outputDirectory;
+            };
+        });
+
+        h.cmd ("buildHostProduct", { { "outputDirectory", "D:\\out" } });
+        check (builtProject.getProperty ("productName", {}).toString() == "Super Rack"
+                 && builtOutputDir == "D:\\out",
+               "buildHostProduct hands the hook the manifest and the destination");
+
+        h.cmd ("setHostProject", { { "includeStandalone", false } });   // includeVst3 already off
+        h.emits.clear();
+        builtProject = juce::var();
+        h.cmd ("buildHostProduct");
+        check (h.emits.lastError().contains ("no targets"),
+               "a project with every target off refuses to build");
+        check (builtProject.isVoid(), "and the hook never runs");
+    }
+}
 } // namespace
 
 int main (int argc, char* argv[])
@@ -600,6 +675,7 @@ int main (int argc, char* argv[])
     testEditorPolicy();
     testScan (stubWorker);
     testWrapperContext();
+    testHostProject();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)
         .getChildFile ("ceditor-host-service-tests").deleteRecursively();

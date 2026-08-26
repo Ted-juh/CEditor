@@ -303,6 +303,77 @@ private:
     juce::String pending;
 };
 
+/**
+ * Streams a `node tools/scripts/build-host-product.mjs` run — the Host Project build
+ * (VIP-successor Stage 1). Same shape as VstBuildJob/ToolchainJob above; the events ride the
+ * instrument host's own channel: every line -> "instrumentHostBuildProgress" { line, done:false },
+ * terminal -> { line: summary, done:true, ok }. One event stream, one UI listener, mirroring how
+ * the scanner reports.
+ */
+class HostBuildJob : public juce::Timer
+{
+public:
+    HostBuildJob (juce::WebBrowserComponent* browserToUse, const juce::StringArray& command)
+        : browser (browserToUse)
+    {
+        emitLine ("$ " + command.joinIntoString (" "), false, false);
+        if (! process.start (command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr))
+        {
+            emitLine ("Failed to launch node (the build process could not start).", true, false);
+            return;   // timer never starts — isTimerRunning() stays false, so a retry is allowed
+        }
+        startTimerHz (8);
+    }
+
+private:
+    void timerCallback() override
+    {
+        char buffer[1 << 14];
+        for (;;)
+        {
+            const int n = process.readProcessOutput (buffer, (int) sizeof (buffer));
+            if (n <= 0) break;
+            pending += juce::String::fromUTF8 (buffer, n);
+        }
+        flushLines (false);
+        if (! process.isRunning())
+        {
+            flushLines (true);
+            stopTimer();
+            const int code = process.getExitCode();
+            emitLine (code == 0 ? juce::String ("Host product build finished.")
+                                : ("Host product build failed (exit code " + juce::String (code) + ")."),
+                      true, code == 0);
+        }
+    }
+
+    void flushLines (bool flushRemainder)
+    {
+        for (int nl; (nl = pending.indexOfChar ('\n')) >= 0; )
+        {
+            emitLine (pending.substring (0, nl).trimEnd(), false, false);
+            pending = pending.substring (nl + 1);
+        }
+        if (flushRemainder && pending.trim().isNotEmpty()) { emitLine (pending.trimEnd(), false, false); pending.clear(); }
+    }
+
+    void emitLine (const juce::String& line, bool done, bool ok)
+    {
+        if (browser == nullptr || (line.isEmpty() && ! done))
+            return;
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("line", line);
+        obj->setProperty ("done", done);
+        if (done)
+            obj->setProperty ("ok", ok);
+        browser->emitEventIfBrowserIsVisible ("instrumentHostBuildProgress", juce::var (obj));
+    }
+
+    juce::WebBrowserComponent* browser = nullptr;
+    juce::ChildProcess process;
+    juce::String pending;
+};
+
 // Resolve the root that holds the export pipeline (tools/scripts/export-panel-vst3.mjs). A dev build
 // runs from a source checkout (CEDITOR_SOURCE_ROOT / cwd); an installed build has tools/ staged beside
 // the executable. Try, in order: the compile-time source root, the executable's dir (and its parent),
@@ -1661,6 +1732,48 @@ void ValueTreeBridge::ensureInstrumentHost()
     // The same instantiator the generated wrappers use (PluginInstantiator.h); the manager
     // member outlives the service that holds this function.
     options.instantiate = ceditor::host::makePluginInstantiator (*pluginFormatManager);
+
+    // The Host Project build: the node pipeline as a streamed child process, one at a time.
+    // The service already validated the manifest; the persisted file is what the script reads,
+    // and every manifest mutation saves before this can run.
+    options.runBuild = [this, dataDir = options.dataDirectory]
+                       (const juce::var&, const juce::String& outputDirectory)
+    {
+        const auto emitHostError = [this] (const juce::String& message)
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("message", message);
+            if (browser != nullptr)
+                browser->emitEventIfBrowserIsVisible ("instrumentHostError", juce::var (obj));
+        };
+
+        if (hostBuildJob != nullptr && hostBuildJob->isTimerRunning())
+        {
+            emitHostError ("A host product build is already running.");
+            return;
+        }
+
+        const auto node = findNodeExecutable();
+        if (node == juce::File())
+        {
+            emitHostError ("Node.js is required to build the host product and was not found.");
+            return;
+        }
+
+        const auto root = ceditorSourceRoot();
+        const auto out = outputDirectory.isNotEmpty() ? juce::File (outputDirectory)
+                                                      : dataDir.getChildFile ("build-output");
+        const juce::StringArray command {
+            node.getFullPathName(),
+            root.getChildFile ("tools").getChildFile ("scripts")
+                .getChildFile ("build-host-product.mjs").getFullPathName(),
+            "--project",   dataDir.getChildFile ("host-project.json").getFullPathName(),
+            "--build-dir", root.getChildFile ("build").getChildFile ("native").getFullPathName(),
+            "--config",    "Release",
+            "--out",       out.getFullPathName(),
+        };
+        hostBuildJob = std::make_unique<HostBuildJob> (browser, command);
+    };
 
     instrumentHost = std::make_unique<ceditor::host::InstrumentHostService> (std::move (options));
 }

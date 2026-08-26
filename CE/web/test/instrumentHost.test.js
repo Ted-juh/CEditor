@@ -14,6 +14,9 @@ import {
   filterInstruments,
   mockHostState,
   applyMockCommand,
+  normalizeHostProject,
+  emptyHostBuild,
+  applyBuildProgress,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
 import { get } from 'svelte/store';
@@ -172,4 +175,33 @@ test('the instrument host is a chrome-owning workspace like script and screen', 
     'tree/display/properties panels are panel-editor chrome and stay hidden over the rack');
   assert.equal(workspaceOwnsChrome(classifyWorkspace({ activeTab: { type: 'settings' } })), false,
     'and the settings tab keeps behaving as before');
+});
+
+// --- the Host Project manifest and the build stream ---------------------------------------------
+
+test('normalizeHostProject shapes garbage and defaults the target flags on', () => {
+  const project = normalizeHostProject({ productName: 42, includeVst3: false });
+  assert.equal(project.productName, '42');
+  assert.equal(project.includeStandalone, true, 'absent flag defaults on');
+  assert.equal(project.includeVst3, false);
+  assert.equal(project.appId, '');
+});
+
+test('applyBuildProgress folds lines while running and lands on the verdict', () => {
+  let build = emptyHostBuild();
+  build = applyBuildProgress(build, { line: '$ node build-host-product.mjs' });
+  assert.equal(build.running, true);
+  build = applyBuildProgress(build, { line: 'staged Standalone/My Rack.exe' });
+  build = applyBuildProgress(build, { line: 'Host product build failed (exit code 3).', done: true, ok: false });
+  assert.equal(build.running, false);
+  assert.equal(build.done, true);
+  assert.equal(build.ok, false);
+  assert.equal(build.lines.length, 3, 'the terminal line joins the log');
+});
+
+test('the build log keeps a bounded tail rather than growing forever', () => {
+  let build = emptyHostBuild();
+  for (let i = 0; i < 250; i += 1) build = applyBuildProgress(build, { line: `line ${i}` });
+  assert.equal(build.lines.length, 200);
+  assert.equal(build.lines.at(-1), 'line 249');
 });

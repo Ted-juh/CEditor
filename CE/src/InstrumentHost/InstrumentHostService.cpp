@@ -282,6 +282,64 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "getHostProject")
+    {
+        ensureHostProject();
+        emitHostProject();
+        return;
+    }
+
+    if (cmd == "setHostProject")
+    {
+        ensureHostProject();
+
+        // Only the authored fields merge; the appId never does. Installer identity is minted
+        // once and survives every rename — Inno treats a changed AppId as a different product,
+        // which is exactly the upgrade-breaks-into-two-installs bug this rule prevents.
+        auto* project = hostProject.getDynamicObject();
+        const auto* fields = payload.getDynamicObject();
+        if (project != nullptr && fields != nullptr)
+        {
+            for (const auto* key : { "productName", "version", "publisher" })
+                if (fields->hasProperty (key))
+                    project->setProperty (key, payload.getProperty (key, {}).toString().trim());
+            for (const auto* key : { "includeStandalone", "includeVst3" })
+                if (fields->hasProperty (key))
+                    project->setProperty (key, (bool) payload.getProperty (key, true));
+        }
+
+        hostProjectFile().replaceWithText (juce::JSON::toString (hostProject));
+        emitHostProject();
+        return;
+    }
+
+    if (cmd == "buildHostProduct")
+    {
+        ensureHostProject();
+
+        if (options.runBuild == nullptr)
+        {
+            emitError ("Building is not available in this build.");
+            return;
+        }
+
+        const auto name = hostProject.getProperty ("productName", {}).toString().trim();
+        if (name.isEmpty())
+        {
+            emitError ("The Host Project needs a product name before it can build.");
+            return;
+        }
+        if (! (bool) hostProject.getProperty ("includeStandalone", true)
+            && ! (bool) hostProject.getProperty ("includeVst3", true))
+        {
+            emitError ("The Host Project has no targets enabled — nothing to build.");
+            return;
+        }
+
+        options.runBuild (hostProject, payload.getProperty ("outputDirectory", {}).toString());
+        return;
+    }
+
     emitError ("Unknown instrument-host command: " + cmd);
 }
 
@@ -512,6 +570,55 @@ void InstrumentHostService::stopAudio()
     deviceManager.removeAudioCallback (&player);
     player.setProcessor (nullptr);
     audioRunning = false;
+}
+
+void InstrumentHostService::ensureHostProject()
+{
+    if (hostProjectLoaded)
+        return;
+    hostProjectLoaded = true;
+
+    options.dataDirectory.createDirectory();
+    hostProject = juce::JSON::parse (hostProjectFile().loadFileAsString());
+
+    auto* project = hostProject.getDynamicObject();
+    if (project == nullptr)
+    {
+        hostProject = juce::var (new juce::DynamicObject());
+        project = hostProject.getDynamicObject();
+    }
+
+    // Fill only what is absent, so a manifest from a newer build keeps its extra fields. The
+    // appId is the one field minted rather than defaulted — a fresh GUID per project, then
+    // pinned in the file forever (see setHostProject for why it is not writable).
+    bool changed = false;
+    const auto fillString = [&] (const char* key, const juce::String& fallback)
+    {
+        if (! project->hasProperty (key) || project->getProperty (key).toString().isEmpty())
+        {
+            project->setProperty (key, fallback);
+            changed = true;
+        }
+    };
+    fillString ("productName", "My Instrument Rack");
+    fillString ("version", "1.0.0");
+    if (! project->hasProperty ("publisher"))     { project->setProperty ("publisher", "");           changed = true; }
+    if (! project->hasProperty ("appId"))
+    {
+        project->setProperty ("appId", juce::Uuid().toDashedString().toUpperCase());
+        changed = true;
+    }
+    for (const auto* key : { "includeStandalone", "includeVst3" })
+        if (! project->hasProperty (key))         { project->setProperty (key, true);                 changed = true; }
+
+    if (changed)
+        hostProjectFile().replaceWithText (juce::JSON::toString (hostProject));
+}
+
+void InstrumentHostService::emitHostProject()
+{
+    if (options.emit != nullptr)
+        options.emit ("instrumentHostProject", hostProject);
 }
 
 void InstrumentHostService::prepareRuntime (double sampleRate, int blockSize)

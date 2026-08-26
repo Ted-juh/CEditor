@@ -18,12 +18,61 @@ import {
   onInstrumentHostScanProgress,
   onInstrumentHostError,
   onInstrumentHostAudioDevices,
+  onInstrumentHostProject,
+  onInstrumentHostBuildProgress,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
 export const hostScanLog = writable([]);
 export const hostLastError = writable('');
 export const hostAudioDevices = writable(emptyAudioDevices());
+export const hostProject = writable(emptyHostProject());
+export const hostBuild = writable(emptyHostBuild());
+
+export function emptyHostProject() {
+  return {
+    productName: '',
+    version: '',
+    publisher: '',
+    appId: '',
+    includeStandalone: true,
+    includeVst3: true,
+  };
+}
+
+export function normalizeHostProject(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  return {
+    productName: String(p.productName ?? ''),
+    version: String(p.version ?? ''),
+    publisher: String(p.publisher ?? ''),
+    appId: String(p.appId ?? ''),
+    includeStandalone: p.includeStandalone !== false,
+    includeVst3: p.includeVst3 !== false,
+  };
+}
+
+export function mockHostProject() {
+  return normalizeHostProject({
+    productName: 'My Instrument Rack',
+    version: '1.0.0',
+    publisher: '',
+    appId: 'M0CK0000-0000-4000-8000-000000000000',
+  });
+}
+
+export function emptyHostBuild() {
+  return { running: false, done: false, ok: false, lines: [] };
+}
+
+/** Folds one instrumentHostBuildProgress event into the build store's value. */
+export function applyBuildProgress(build, payload) {
+  const line = String(payload?.line ?? '');
+  const lines = line ? [...build.lines.slice(-199), line] : build.lines;
+  if (payload?.done === true)
+    return { running: false, done: true, ok: payload?.ok === true, lines };
+  return { running: true, done: false, ok: false, lines };
+}
 
 export function emptyAudioDevices() {
   return { outputs: [], current: '', midiInputs: [] };
@@ -252,10 +301,13 @@ export function initInstrumentHostBridge() {
   if (!isJuceAvailable()) {
     hostState.set(mockHostState());
     hostAudioDevices.set(mockAudioDevices());
+    hostProject.set(mockHostProject());
     return;
   }
 
   onInstrumentHostAudioDevices((payload) => hostAudioDevices.set(normalizeAudioDevices(payload)));
+  onInstrumentHostProject((payload) => hostProject.set(normalizeHostProject(payload)));
+  onInstrumentHostBuildProgress((payload) => hostBuild.update((b) => applyBuildProgress(b, payload)));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);
@@ -284,6 +336,25 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'getAudioDevices') return;
+    if (payload?.cmd === 'getHostProject') return; // seeded by init
+    if (payload?.cmd === 'setHostProject') {
+      // The native rule, mirrored: authored fields merge, the appId never does.
+      hostProject.update((project) => {
+        const next = { ...project };
+        for (const key of ['productName', 'version', 'publisher'])
+          if (payload[key] !== undefined) next[key] = String(payload[key]).trim();
+        for (const key of ['includeStandalone', 'includeVst3'])
+          if (payload[key] !== undefined) next[key] = payload[key] === true;
+        return next;
+      });
+      return;
+    }
+    if (payload?.cmd === 'buildHostProduct') {
+      const project = get(hostProject);
+      hostBuild.set(applyBuildProgress(emptyHostBuild(), { line: `Building "${project.productName}" ${project.version} (mock)` }));
+      hostBuild.update((b) => applyBuildProgress(b, { line: 'Staged mock product folder.', done: true, ok: true }));
+      return;
+    }
     hostState.set(applyMockCommand(get(hostState), payload));
     return;
   }
@@ -309,3 +380,9 @@ export const closeEditor = () => send({ cmd: 'closeEditor' });
 export const requestAudioDevices = () => send({ cmd: 'getAudioDevices' });
 export const setAudioDevice = (name) => send({ cmd: 'setAudioDevice', name });
 export const setMidiInputEnabled = (id, enabled) => send({ cmd: 'setMidiInputEnabled', id, enabled });
+export const requestHostProject = () => send({ cmd: 'getHostProject' });
+export const setHostProject = (fields) => send({ cmd: 'setHostProject', ...fields });
+export const buildHostProduct = () => {
+  hostBuild.set({ ...emptyHostBuild(), running: true });
+  send({ cmd: 'buildHostProduct' });
+};

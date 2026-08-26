@@ -156,5 +156,8 @@ private:
     std::unique_ptr<ceditor::host::InstrumentHostService> instrumentHost;
     std::unique_ptr<juce::AudioPluginFormatManager> pluginFormatManager;
     ceditor::host::PluginEditorHost* editorPane = nullptr;
+    // Active Host Project build (tools/scripts/build-host-product.mjs as a child process), held
+    // as its Timer base for the same reason as buildJob above.
+    std::unique_ptr<juce::Timer> hostBuildJob;
     void ensureInstrumentHost();
 };
