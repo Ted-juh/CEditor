@@ -17,6 +17,15 @@ import {
   normalizeHostProject,
   emptyHostBuild,
   applyBuildProgress,
+  normalizeHostParameters,
+  applyParamValues,
+  filterParameters,
+  mockHostParameters,
+  hostState as hostStateStore,
+  hostParameters,
+  requestParameters,
+  setParameter,
+  resetParameter,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
 import { get } from 'svelte/store';
@@ -217,4 +226,57 @@ test('mock reducer: browsing a scan folder adds the stand-in path once', () => {
   state = applyMockCommand(state, { cmd: 'browseScanPath' });
   state = applyMockCommand(state, { cmd: 'browseScanPath' });
   assert.deepEqual(state.scanPaths, ['D:\\Browsed VST3s']);
+});
+
+// --- the Stage 2 parameter view ------------------------------------------------------------------
+
+test('normalizeHostParameters shapes garbage into the structure the view renders', () => {
+  const shaped = normalizeHostParameters({ partId: 7, parameters: [{ id: 9, value: '0.5', discrete: 1 }] });
+  assert.equal(shaped.partId, '7');
+  assert.equal(shaped.parameters[0].id, '9');
+  assert.equal(shaped.parameters[0].value, 0.5);
+  assert.equal(shaped.parameters[0].discrete, false, 'truthy is not true — the native side sends real booleans');
+  assert.equal(shaped.parameters[0].automatable, true, 'absent automatable defaults on');
+});
+
+test('applyParamValues patches the matching part and ignores the rest', () => {
+  const registry = mockHostParameters('part-1');
+  const patched = applyParamValues(registry, {
+    partId: 'part-1',
+    changes: [{ id: 'cutoff', value: 0.9, text: '0.90' }, { id: 'no-such', value: 1 }],
+  });
+  assert.equal(patched.parameters[0].value, 0.9);
+  assert.equal(patched.parameters[0].text, '0.90');
+  assert.equal(patched.parameters[1].value, 0, 'unnamed parameters are untouched');
+
+  const other = applyParamValues(registry, { partId: 'part-2', changes: [{ id: 'cutoff', value: 1 }] });
+  assert.equal(other, registry, "another part's delta leaves the snapshot alone");
+});
+
+test('filterParameters matches name, group and id', () => {
+  const { parameters } = mockHostParameters('p');
+  assert.equal(filterParameters(parameters, 'cut').length, 1);
+  assert.equal(filterParameters(parameters, 'oscil').length, 1, 'group text matches');
+  assert.equal(filterParameters(parameters, 'drive').length, 1, 'id matches');
+  assert.equal(filterParameters(parameters, '').length, 3);
+});
+
+test('mock reducer: the parameter view round-trips set and reset', () => {
+  hostStateStore.set(mockHostState()); // what initInstrumentHostBridge seeds in a plain browser
+  const partId = 'mock-part-1'; // has an instrument in mockHostState
+  requestParameters(partId);
+  assert.equal(get(hostParameters).partId, partId);
+
+  setParameter(partId, 'cutoff', 0.75);
+  assert.equal(get(hostParameters).parameters[0].value, 0.75);
+  assert.equal(get(hostParameters).parameters[0].text, '0.75');
+
+  setParameter(partId, 'wave', 1);
+  assert.equal(get(hostParameters).parameters[1].text, 'Sine', 'discrete text follows the step');
+
+  resetParameter(partId, 'cutoff');
+  assert.equal(get(hostParameters).parameters[0].value, 0.5);
+
+  requestParameters('mock-part-2'); // empty part -> empty registry
+  assert.equal(get(hostParameters).partId, '');
 });

@@ -18,6 +18,8 @@
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor,
     requestAudioDevices, setAudioDevice, setMidiInputEnabled,
     hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
+    hostParameters, emptyHostParameters, filterParameters, requestParameters,
+    setParameter, resetParameter, beginParameterGesture, endParameterGesture,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
@@ -27,6 +29,8 @@
   let newScanPath = $state('');
   let devicesOpen = $state(false);
   let projectOpen = $state(false);
+  let paramSearch = $state('');
+  let paramDiagnostics = $state(false);
 
   function toggleDevices() {
     devicesOpen = !devicesOpen;
@@ -39,6 +43,26 @@
   }
 
   let instruments = $derived(filterInstruments($hostState.instruments, search));
+  let visibleParameters = $derived(filterParameters($hostParameters.parameters, paramSearch));
+  // Group headers derive from the registry order so a plug-in's own hierarchy shows once,
+  // above its first parameter, rather than being re-sorted out of recognition.
+  let groupedParameters = $derived(visibleParameters.map((p, i) => ({
+    ...p,
+    groupHeader: p.group && (i === 0 || visibleParameters[i - 1].group !== p.group) ? p.group : '',
+  })));
+
+  // The registry follows the focused part: ask when a loaded part takes focus, clear when
+  // focus lands somewhere without an instrument. Load state matters too — the same part
+  // gains a registry the moment its instrument commits.
+  $effect(() => {
+    const partId = focusedPart?.hasInstrument ? focusedPart.partId : '';
+    if (partId) requestParameters(partId);
+    else hostParameters.set(emptyHostParameters());
+  });
+
+  function stepFor(parameter) {
+    return parameter.numSteps > 1 ? 1 / (parameter.numSteps - 1) : 0.001;
+  }
   let parts = $derived($hostState.rack.parts);
   let focusedPartId = $derived($hostState.rack.focusedPartId);
   let focusedPart = $derived(parts.find((p) => p.partId === focusedPartId) ?? null);
@@ -245,6 +269,56 @@
               <input type="number" min="-60" max="60" value={focusedPart.transpose}
                      onchange={(e) => setPartMidiRules(focusedPart.partId, { transpose: Number(e.currentTarget.value) })} />
             </label>
+          </div>
+        </div>
+      {/if}
+
+      <!-- The Stage 2 generic parameter view: the common, inspectable control surface the
+           vendor editor is not — and the same registry hardware pages and macros will use. -->
+      {#if focusedPart?.hasInstrument && $hostParameters.partId === focusedPart.partId}
+        <div class="param-view" data-testid="host-parameters">
+          <div class="param-head">
+            <strong>Parameters — {partTitle(focusedPart)}</strong>
+            <input type="search" placeholder="Search parameters…" bind:value={paramSearch} />
+            <button type="button" class="toggle" class:on={paramDiagnostics}
+                    title="Show native IDs and indices"
+                    onclick={() => (paramDiagnostics = !paramDiagnostics)}>ID</button>
+          </div>
+          {#each $hostParameters.warnings as warning (warning)}
+            <div class="param-warning">{warning}</div>
+          {/each}
+          {#if groupedParameters.length === 0}
+            <div class="empty-hint">
+              {$hostParameters.parameters.length === 0
+                ? 'This instrument exposes no host-visible parameters.'
+                : 'Nothing matches the search.'}
+            </div>
+          {/if}
+          <div class="param-list">
+            {#each groupedParameters as parameter (parameter.id)}
+              {#if parameter.groupHeader}
+                <div class="param-group">{parameter.groupHeader}</div>
+              {/if}
+              <div class="param-row">
+                <span class="param-name" title={parameter.name}>{parameter.name}</span>
+                {#if parameter.boolean}
+                  <PropertyToggle compact value={parameter.value >= 0.5} ariaLabel={parameter.name}
+                                  onchange={(on) => setParameter(focusedPart.partId, parameter.id, on ? 1 : 0)} />
+                {:else}
+                  <input type="range" min="0" max="1" step={stepFor(parameter)} value={parameter.value}
+                         aria-label={parameter.name}
+                         onpointerdown={() => beginParameterGesture(focusedPart.partId, parameter.id)}
+                         onpointerup={() => endParameterGesture(focusedPart.partId, parameter.id)}
+                         oninput={(e) => setParameter(focusedPart.partId, parameter.id, Number(e.currentTarget.value))} />
+                {/if}
+                <span class="param-value">{parameter.text}{parameter.label ? ` ${parameter.label}` : ''}</span>
+                <button type="button" class="ghost" title="Reset to the plug-in's default"
+                        onclick={() => resetParameter(focusedPart.partId, parameter.id)}>↺</button>
+              </div>
+              {#if paramDiagnostics}
+                <div class="param-diag">{parameter.id} · index {parameter.index}{parameter.automatable ? '' : ' · not automatable'}{parameter.meta ? ' · meta' : ''}</div>
+              {/if}
+            {/each}
           </div>
         </div>
       {/if}
@@ -545,6 +619,32 @@
   .module-name { color: #d6dbe0; overflow-wrap: anywhere; }
   .module-detail { color: #7d8894; font-size: 11px; }
   .module-row.trouble .module-detail { color: #d6a3a3; }
+
+  .param-view {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid #2c343d;
+    padding-top: 8px;
+    min-height: 0;
+  }
+  .param-head { display: flex; align-items: center; gap: 8px; }
+  .param-head input { flex: 1; min-width: 0; }
+  .param-warning {
+    padding: 4px 8px;
+    border: 1px solid #7a6a3a;
+    border-radius: 4px;
+    background: #2a2618;
+    color: #e0cf9a;
+    font-size: 11px;
+  }
+  .param-list { overflow-y: auto; max-height: 260px; display: flex; flex-direction: column; gap: 4px; }
+  .param-group { color: #7d8894; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; }
+  .param-row { display: flex; align-items: center; gap: 8px; }
+  .param-name { flex: 0 0 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .param-row input[type='range'] { flex: 1; min-width: 60px; }
+  .param-value { flex: 0 0 84px; text-align: right; color: #9aa5b1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .param-diag { color: #66707b; font-size: 10px; margin: -2px 0 0 138px; }
 
   button {
     background: #232a31;

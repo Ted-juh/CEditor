@@ -20,6 +20,8 @@ import {
   onInstrumentHostAudioDevices,
   onInstrumentHostProject,
   onInstrumentHostBuildProgress,
+  onInstrumentHostParameters,
+  onInstrumentHostParamValues,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
@@ -28,6 +30,7 @@ export const hostLastError = writable('');
 export const hostAudioDevices = writable(emptyAudioDevices());
 export const hostProject = writable(emptyHostProject());
 export const hostBuild = writable(emptyHostBuild());
+export const hostParameters = writable(emptyHostParameters());
 
 export function emptyHostProject() {
   return {
@@ -63,6 +66,82 @@ export function mockHostProject() {
 
 export function emptyHostBuild() {
   return { running: false, done: false, ok: false, lines: [] };
+}
+
+// --- the Stage 2 parameter view -----------------------------------------------------------------
+
+export function emptyHostParameters() {
+  return { partId: '', parameters: [], warnings: [] };
+}
+
+export function normalizeHostParameters(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  return {
+    partId: String(p.partId ?? ''),
+    parameters: (Array.isArray(p.parameters) ? p.parameters : []).map((d) => ({
+      id: String(d?.id ?? ''),
+      index: Number(d?.index ?? 0),
+      name: String(d?.name ?? ''),
+      label: String(d?.label ?? ''),
+      group: String(d?.group ?? ''),
+      value: Number(d?.value ?? 0),
+      text: String(d?.text ?? ''),
+      defaultValue: Number(d?.defaultValue ?? 0),
+      numSteps: Number(d?.numSteps ?? 0),
+      discrete: d?.discrete === true,
+      boolean: d?.boolean === true,
+      automatable: d?.automatable !== false,
+      meta: d?.meta === true,
+    })),
+    warnings: (Array.isArray(p.warnings) ? p.warnings : []).map(String),
+  };
+}
+
+/** Applies one instrumentHostParamValues delta to the registry snapshot the view renders.
+ *  A delta for a different part leaves the snapshot untouched — the native side speaks per
+ *  part, and the view holds the focused part's registry only. */
+export function applyParamValues(registry, payload) {
+  if (!payload || String(payload.partId ?? '') !== registry.partId) return registry;
+  const changes = Array.isArray(payload.changes) ? payload.changes : [];
+  if (changes.length === 0) return registry;
+  const byId = new Map(changes.map((c) => [String(c?.id ?? ''), c]));
+  return {
+    ...registry,
+    parameters: registry.parameters.map((d) => {
+      const change = byId.get(d.id);
+      return change
+        ? { ...d, value: Number(change.value ?? d.value), text: String(change.text ?? d.text) }
+        : d;
+    }),
+  };
+}
+
+/** Case-insensitive name/group/id filter for the parameter list. */
+export function filterParameters(parameters, query) {
+  const q = String(query ?? '').trim().toLowerCase();
+  if (!q) return parameters;
+  return parameters.filter(
+    (d) => d.name.toLowerCase().includes(q) || d.group.toLowerCase().includes(q)
+        || d.id.toLowerCase().includes(q)
+  );
+}
+
+const MOCK_WAVES = ['Saw', 'Square', 'Sine'];
+const mockParamText = (d, value) => {
+  if (d.id === 'wave') return MOCK_WAVES[Math.min(2, Math.round(value * 2))];
+  if (d.boolean) return value >= 0.5 ? 'On' : 'Off';
+  return value.toFixed(2);
+};
+
+export function mockHostParameters(partId) {
+  return normalizeHostParameters({
+    partId,
+    parameters: [
+      { id: 'cutoff', index: 0, name: 'Cutoff', group: 'Filter', value: 0.5, text: '0.50', defaultValue: 0.5 },
+      { id: 'wave', index: 1, name: 'Wave', group: 'Oscillator', value: 0, text: 'Saw', defaultValue: 0, numSteps: 3, discrete: true },
+      { id: 'drive', index: 2, name: 'Drive', value: 0, text: 'Off', defaultValue: 0, numSteps: 2, discrete: true, boolean: true },
+    ],
+  });
 }
 
 /** Folds one instrumentHostBuildProgress event into the build store's value. */
@@ -315,6 +394,8 @@ export function initInstrumentHostBridge() {
   onInstrumentHostAudioDevices((payload) => hostAudioDevices.set(normalizeAudioDevices(payload)));
   onInstrumentHostProject((payload) => hostProject.set(normalizeHostProject(payload)));
   onInstrumentHostBuildProgress((payload) => hostBuild.update((b) => applyBuildProgress(b, payload)));
+  onInstrumentHostParameters((payload) => hostParameters.set(normalizeHostParameters(payload)));
+  onInstrumentHostParamValues((payload) => hostParameters.update((r) => applyParamValues(r, payload)));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);
@@ -362,6 +443,28 @@ function send(payload) {
       hostBuild.update((b) => applyBuildProgress(b, { line: 'Staged mock product folder.', done: true, ok: true }));
       return;
     }
+    if (payload?.cmd === 'getParameters') {
+      const part = get(hostState).rack.parts.find((p) => p.partId === payload.partId);
+      hostParameters.set(part?.hasInstrument ? mockHostParameters(payload.partId) : emptyHostParameters());
+      return;
+    }
+    if (payload?.cmd === 'setParameter' || payload?.cmd === 'resetParameter') {
+      hostParameters.update((registry) => {
+        if (registry.partId !== payload.partId) return registry;
+        return {
+          ...registry,
+          parameters: registry.parameters.map((d) => {
+            if (d.id !== payload.id) return d;
+            const value = payload.cmd === 'resetParameter'
+              ? d.defaultValue
+              : Math.min(1, Math.max(0, Number(payload.value ?? 0)));
+            return { ...d, value, text: mockParamText(d, value) };
+          }),
+        };
+      });
+      return;
+    }
+    if (payload?.cmd === 'beginParameterGesture' || payload?.cmd === 'endParameterGesture') return;
     hostState.set(applyMockCommand(get(hostState), payload));
     return;
   }
@@ -388,6 +491,11 @@ export const closeEditor = () => send({ cmd: 'closeEditor' });
 export const requestAudioDevices = () => send({ cmd: 'getAudioDevices' });
 export const setAudioDevice = (name) => send({ cmd: 'setAudioDevice', name });
 export const setMidiInputEnabled = (id, enabled) => send({ cmd: 'setMidiInputEnabled', id, enabled });
+export const requestParameters = (partId) => send({ cmd: 'getParameters', partId });
+export const setParameter = (partId, id, value) => send({ cmd: 'setParameter', partId, id, value });
+export const resetParameter = (partId, id) => send({ cmd: 'resetParameter', partId, id });
+export const beginParameterGesture = (partId, id) => send({ cmd: 'beginParameterGesture', partId, id });
+export const endParameterGesture = (partId, id) => send({ cmd: 'endParameterGesture', partId, id });
 export const requestHostProject = () => send({ cmd: 'getHostProject' });
 export const setHostProject = (fields) => send({ cmd: 'setHostProject', ...fields });
 export const buildHostProduct = () => {

@@ -993,3 +993,19 @@ export function onInstrumentHostBuildProgress(callback) {
   const token = window.__JUCE__.backend.addEventListener('instrumentHostBuildProgress', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
+
+/** One part's full parameter registry with live values ({ partId, parameters, warnings }),
+    answered by the getParameters command. */
+export function onInstrumentHostParameters(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostParameters', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Coalesced parameter deltas ({ partId, changes:[{id,value,text}], gestures:[{id,phase}] })
+    — vendor-editor edits and automation, drained at UI rate by the native side. */
+export function onInstrumentHostParamValues(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostParamValues', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
