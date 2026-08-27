@@ -157,6 +157,26 @@ inline juce::String hostRuntimeStartUrl()
    #endif
 }
 
+// -- finding the factory rack ------------------------------------------------------------------
+// The Host Project's authored Performance ships as factory-performance.json: beside the
+// standalone's exe, and in the VST3 bundle's Contents/Resources (the SDK's own place for
+// things that are not the binary — the same convention the panel sidecar uses). Missing is
+// fine: a product built without a saved rack starts empty.
+
+inline juce::File findFactoryPerformance()
+{
+    const auto moduleDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+                               .getParentDirectory();
+
+    for (const auto& candidate : { moduleDir.getChildFile ("factory-performance.json"),
+                                   moduleDir.getParentDirectory().getChildFile ("Resources")
+                                            .getChildFile ("factory-performance.json") })
+        if (candidate.existsAsFile())
+            return candidate;
+
+    return {};
+}
+
 // -- finding the scanner worker ----------------------------------------------------------------
 // The generated product ships CEditorPluginScanner beside its binaries, same as the editor
 // does; a dev build finds it in the build tree. A path that resolves to nothing is fine to

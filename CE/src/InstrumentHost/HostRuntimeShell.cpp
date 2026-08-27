@@ -17,6 +17,7 @@ HostRuntimeShell::HostRuntimeShell()
     options.dataDirectory = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
                                 .getChildFile ("CEditorInstrumentHost");
     options.workerExecutable = findHostScannerWorker ({ options.dataDirectory });
+    options.factoryPerformanceFile = findFactoryPerformance();
 
     options.emit = [safe = juce::Component::SafePointer<HostRuntimeShell> (this)]
                    (const juce::String& eventName, const juce::var& payload)

@@ -367,6 +367,11 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
 void InstrumentHostService::restoreSession()
 {
+    restoreSessionImpl (true);
+}
+
+void InstrumentHostService::restoreSessionImpl (bool includePerformance)
+{
     if (sessionRestored)
         return;
     sessionRestored = true;
@@ -399,12 +404,25 @@ void InstrumentHostService::restoreSession()
 
     rack.prepare (options.sampleRate, options.blockSize);
 
-    // With persistence off (the outer VST3) the session arrives through restoreFromVar from
-    // the DAW's chunk instead — reading a file here would race it for the rack.
-    if (options.persistSession && performanceFile().existsAsFile())
+    // Which Performance boots the rack, in order of who knows best: the user's own saved
+    // session (only where persistence is on — the outer VST3's session arrives through
+    // restoreFromVar from the DAW's chunk, and a file read would race it); otherwise the
+    // product's shipped factory rack, so a generated product opens as the rack its author
+    // built rather than empty. restoreFromVar suppresses both — the chunk it carries is
+    // about to replace whatever this would load.
+    const auto performanceSource = [this]() -> juce::File
+    {
+        if (options.persistSession && performanceFile().existsAsFile())
+            return performanceFile();
+        if (options.factoryPerformanceFile.existsAsFile())
+            return options.factoryPerformanceFile;
+        return {};
+    }();
+
+    if (includePerformance && performanceSource != juce::File())
     {
         Performance restored;
-        if (Performance::fromVar (juce::JSON::parse (performanceFile().loadFileAsString()), restored))
+        if (Performance::fromVar (juce::JSON::parse (performanceSource.loadFileAsString()), restored))
         {
             for (const auto& unresolved : rack.loadModel (std::move (restored)))
                 requestInstrument (unresolved.partId, unresolved.ceId);
@@ -663,9 +681,11 @@ juce::var InstrumentHostService::captureStateVar()
 void InstrumentHostService::restoreFromVar (const juce::var& state)
 {
     // The catalogue must be live before part ceIds can resolve to real instruments —
-    // setStateInformation can arrive before any UI has asked getState.
+    // setStateInformation can arrive before any UI has asked getState. The performance half
+    // is skipped: the chunk in hand is about to replace it, and booting the factory rack
+    // first would fire instantiations whose commits the replacement then refuses.
     if (! sessionRestored)
-        restoreSession();
+        restoreSessionImpl (false);
 
     Performance restored;
     if (! Performance::fromVar (state, restored))

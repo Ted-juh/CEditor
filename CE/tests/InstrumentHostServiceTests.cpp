@@ -130,6 +130,7 @@ struct Harness
         {
             lastDescriptionXml = descriptionXml;
             lastSampleRate = sampleRate;
+            ++instantiateCount;
             if (deferCallbacks)
             {
                 deferred.push_back (std::move (callback));
@@ -202,6 +203,7 @@ struct Harness
     juce::AudioProcessor* lastShownProcessor = nullptr;
     juce::String lastDescriptionXml;
     double lastSampleRate = 0.0;
+    int instantiateCount = 0;
     StubSynthProcessor* lastStub = nullptr;
     bool failInstantiation = false;
     bool deferCallbacks = false;
@@ -574,6 +576,84 @@ void testWrapperContext()
     }
 }
 
+// The factory Performance: the authored rack ships beside the generated binaries, and a
+// product boots as that rack — until something newer exists. The standalone's own session
+// outranks it; the outer VST3's DAW chunk replaces it without ever booting it first.
+void testFactoryPerformance()
+{
+    std::cout << "\nfactory performance" << std::endl;
+
+    // Author a one-part rack and keep its session file as the shipped factory rack.
+    const auto authoringDir = freshDataDir ("factory-author");
+    seedCatalog (authoringDir);
+    juce::String factoryPartId;
+    {
+        Harness h (authoringDir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        factoryPartId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", factoryPartId }, { "ceId", "VST3-good-synth" } });
+        h.lastStub->patch = 9;
+        h.cmd ("setPartMixer", { { "partId", factoryPartId }, { "volume", 0.5 } });
+    }
+    const auto factoryFile = freshDataDir ("factory-asset").getChildFile ("factory-performance.json");
+    authoringDir.getChildFile ("session-performance.json").copyFileTo (factoryFile);
+
+    const auto withFactory = [factoryFile] (InstrumentHostService::Options& o)
+    {
+        o.factoryPerformanceFile = factoryFile;
+    };
+
+    // A fresh standalone boots the factory rack, instruments and state included.
+    const auto standaloneDir = freshDataDir ("factory-standalone");
+    seedCatalog (standaloneDir);
+    {
+        Harness h (standaloneDir, {}, withFactory);
+        h.cmd ("getState");
+        check (h.firstPartId() == factoryPartId, "a fresh product boots the shipped rack");
+        check (h.lastStub != nullptr && h.lastStub->patch == 9,
+               "with the authored instrument state");
+
+        h.cmd ("addPart");   // the user makes it their own; savePerformance writes their session
+    }
+    {
+        Harness h (standaloneDir, {}, withFactory);
+        h.cmd ("getState");
+        check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {}).size() == 2,
+               "the user's own session outranks the factory rack from then on");
+    }
+
+    // A fresh plug-in instance boots the factory rack too; a DAW chunk replaces it, and a
+    // chunk arriving BEFORE any UI never boots the factory rack at all.
+    const auto pluginDir = freshDataDir ("factory-plugin");
+    seedCatalog (pluginDir);
+    juce::var chunk;
+    {
+        Harness h (pluginDir, {}, [&] (InstrumentHostService::Options& o)
+        {
+            o.persistSession = false;
+            withFactory (o);
+        });
+        h.cmd ("getState");
+        check (h.firstPartId() == factoryPartId, "a fresh plug-in instance boots the shipped rack");
+
+        h.cmd ("addPart");
+        chunk = h.service->captureStateVar();
+    }
+    {
+        Harness h (pluginDir, {}, [&] (InstrumentHostService::Options& o)
+        {
+            o.persistSession = false;
+            withFactory (o);
+        });
+        h.service->restoreFromVar (chunk);   // the DAW speaks before any UI does
+        check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {}).size() == 2,
+               "a DAW chunk replaces the factory rack");
+        check (h.instantiateCount == 1,
+               "and the factory rack was never booted first just to be torn down");
+    }
+}
+
 // The browse dialog behind "Add scan folder", and the module projection the browser column
 // cannot explain scans without. A cancelled picker changes nothing; a module full of effects
 // says so through numInstruments instead of silently showing nothing.
@@ -732,6 +812,7 @@ int main (int argc, char* argv[])
     testEditorPolicy();
     testScan (stubWorker);
     testWrapperContext();
+    testFactoryPerformance();
     testScanFolderBrowseAndModuleProjection();
     testHostProject();
 

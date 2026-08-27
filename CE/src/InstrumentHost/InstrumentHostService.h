@@ -108,6 +108,11 @@ public:
         // browseScanPath refuse aloud rather than silently do nothing.
         std::function<void (std::function<void (const juce::String& directory)>)> pickDirectory;
         EditorPaneHooks editorPane;
+        // The Host Project's authored rack, shipped beside the generated binaries. Loaded
+        // when nothing newer exists: the standalone uses it until the user has a session of
+        // their own; the outer VST3 uses it for a fresh instance until the DAW hands over a
+        // project chunk. Never written to — the product's factory state is read-only.
+        juce::File factoryPerformanceFile;
         bool enableAudio = false;
         // The editor and the standalone persist the rack session to dataDirectory after every
         // mutation; the outer VST3 sets this false because the DAW owns the session through
@@ -126,8 +131,9 @@ public:
 
     /** Loads the catalogue and saved session from the data directory, quarantines any module
         a leftover dead-man marker names, rebuilds the rack and asks the instantiator for
-        every resolved part's instrument. Runs once — getState calls it lazily so plug-in
-        code only ever loads after the UI is up and asking. */
+        every resolved part's instrument. Falls back to Options::factoryPerformanceFile when
+        no user session exists. Runs once — getState calls it lazily so plug-in code only
+        ever loads after the UI is up and asking. */
     void restoreSession();
 
     const InstrumentRackHost& getRackHost() const     { return rack; }
@@ -181,6 +187,7 @@ private:
     static juce::var scanProgressPayload (const juce::String& line, bool done);
 
     void runScanNow();
+    void restoreSessionImpl (bool includePerformance);
     void ensureHostProject();
     void emitHostProject();
     void requestInstrument (const juce::String& partId, const juce::String& ceId);

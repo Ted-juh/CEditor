@@ -1783,10 +1783,13 @@ void ValueTreeBridge::ensureInstrumentHost()
             node.getFullPathName(),
             root.getChildFile ("tools").getChildFile ("scripts")
                 .getChildFile ("build-host-product.mjs").getFullPathName(),
-            "--project",   dataDir.getChildFile ("host-project.json").getFullPathName(),
-            "--build-dir", root.getChildFile ("build").getChildFile ("native").getFullPathName(),
-            "--config",    "Release",
-            "--out",       out.getFullPathName(),
+            "--project",     dataDir.getChildFile ("host-project.json").getFullPathName(),
+            // The editor's preview session IS the authored rack; it ships as the product's
+            // factory Performance (the script skips it gracefully when none exists yet).
+            "--performance", dataDir.getChildFile ("session-performance.json").getFullPathName(),
+            "--build-dir",   root.getChildFile ("build").getChildFile ("native").getFullPathName(),
+            "--config",      "Release",
+            "--out",         out.getFullPathName(),
         };
         hostBuildJob = std::make_unique<HostBuildJob> (browser, command);
     };

@@ -162,3 +162,21 @@ test('the template pins identity to the manifest appId, braces escaped for Inno'
   assert.match(template, /AppId=\{\{\{#MyAppId\}\}/,
     'AppId must render {GUID} — {{ is the literal brace, {#MyAppId} the preprocessor value');
 });
+
+test('a factory performance stages beside the exe and into the bundle resources', () => {
+  const { project } = normalizeProject(goodProject);
+  const { ops } = stagePlan({
+    project, artifacts: foundArtifacts, stageDir: '/s', performanceFile: '/author/session-performance.json',
+  });
+  const targets = ops.map((op) => op.to);
+  assert.ok(targets.includes(path.join('/s', 'Standalone', 'factory-performance.json')));
+  assert.ok(targets.includes(path.join('/s', 'VST3', 'CE Instrument Host.vst3',
+    'Contents', 'Resources', 'factory-performance.json')));
+});
+
+test('no factory performance stages none — the product starts empty, not broken', () => {
+  const { project } = normalizeProject(goodProject);
+  const { ops, missing } = stagePlan({ project, artifacts: foundArtifacts, stageDir: '/s' });
+  assert.deepEqual(missing, []);
+  assert.ok(ops.every((op) => !op.to.includes('factory-performance')));
+});
