@@ -22,6 +22,8 @@
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
     addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     generateControlPages,
+    hostLibrary, requestLibrary, scanLibrary, browseLibraryPath, removeLibraryPath,
+    saveUserPreset, saveRackToLibrary, setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
@@ -33,6 +35,20 @@
   let projectOpen = $state(false);
   let paramSearch = $state('');
   let paramDiagnostics = $state(false);
+  let libraryOpen = $state(false);
+  let libraryQuery = $state('');
+  let libraryType = $state('');
+
+  function toggleLibrary() {
+    libraryOpen = !libraryOpen;
+    if (libraryOpen) requestLibrary(libraryQuery, libraryType);
+  }
+
+  function setLibraryFilter(query, type) {
+    libraryQuery = query;
+    libraryType = type;
+    requestLibrary(query, type);
+  }
 
   function toggleDevices() {
     devicesOpen = !devicesOpen;
@@ -124,6 +140,8 @@
               data-testid="host-scan">
         {$hostState.scanning ? 'Scanning…' : 'Scan for instruments'}
       </button>
+      <button type="button" class="toggle" class:on={libraryOpen} onclick={toggleLibrary}
+              data-testid="host-library">Library</button>
       <button type="button" class="toggle" class:on={devicesOpen} onclick={toggleDevices}
               data-testid="host-devices">Audio &amp; MIDI</button>
       <button type="button" class="toggle" class:on={projectOpen} onclick={toggleProject}
@@ -158,6 +176,90 @@
                             onchange={(enabled) => setMidiInputEnabled(input.id, enabled)} />
             {input.name}
           </span>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  {#if libraryOpen}
+    <div class="library-panel" data-testid="host-library-panel" aria-label="Library">
+      <div class="library-head">
+        <input type="search" placeholder="Search sounds and racks…" value={libraryQuery}
+               oninput={(e) => setLibraryFilter(e.currentTarget.value, libraryType)} />
+        <span class="library-filters">
+          {#each [['', 'All'], ['preset', 'Presets'], ['rack', 'Racks']] as [value, label] (value)}
+            <button type="button" class="toggle" class:on={libraryType === value}
+                    onclick={() => setLibraryFilter(libraryQuery, value)}>{label}</button>
+          {/each}
+        </span>
+        <button type="button" onclick={() => scanLibrary()} data-testid="host-scan-library">Scan presets</button>
+        <button type="button" onclick={() => browseLibraryPath()}>Add folder…</button>
+        <span class="library-counts">{$hostLibrary.counts.presets} presets · {$hostLibrary.counts.racks} racks</span>
+      </div>
+
+      <div class="library-capture">
+        <button type="button" disabled={!focusedPart?.hasInstrument}
+                title={focusedPart?.hasInstrument ? `Capture ${partTitle(focusedPart)}'s current state`
+                                                  : 'Focus a part with an instrument first'}
+                onclick={() => saveUserPreset(focusedPart.partId)}
+                data-testid="host-save-preset">Save preset of focused part</button>
+        <button type="button" onclick={() => saveRackToLibrary()} data-testid="host-save-rack">
+          Save rack to library
+        </button>
+      </div>
+
+      {#if $hostLibrary.paths.length > 0}
+        <div class="library-paths">
+          {#each $hostLibrary.paths as path (path)}
+            <span class="scan-path"><span>{path}</span>
+              <button type="button" class="ghost danger" onclick={() => removeLibraryPath(path)}>×</button></span>
+          {/each}
+        </div>
+      {/if}
+
+      {#if $hostLibrary.records.length === 0}
+        <div class="empty-hint">
+          {$hostLibrary.counts.total === 0
+            ? 'Nothing in the library yet — scan presets, or capture the focused part.'
+            : 'Nothing matches the search.'}
+        </div>
+      {/if}
+
+      <div class="library-list">
+        {#each $hostLibrary.records as record (record.recordId)}
+          <div class="library-row" class:unavailable={!record.available}>
+            <button type="button" class="ghost star" class:on={record.favourite}
+                    title={record.favourite ? 'Unfavourite' : 'Favourite'}
+                    onclick={() => setLibraryUserMetadata(record.recordId, { favourite: !record.favourite })}>
+              {record.favourite ? '★' : '☆'}
+            </button>
+            <div class="library-id">
+              <span class="library-name">{record.name}</span>
+              <span class="library-detail">
+                {record.type === 'rack' ? 'Rack'
+                  : [record.instrument, record.manufacturer].filter(Boolean).join(' · ') || 'Preset'}
+                {#if record.sourceType === 'userState' || record.sourceType === 'rackCapture'} · yours{/if}
+                {#if record.tags.length > 0} · {record.tags.join(', ')}{/if}
+              </span>
+              {#if !record.available}
+                <span class="library-reason">{record.reason}</span>
+              {/if}
+            </div>
+            {#if record.type === 'rack'}
+              <button type="button" disabled={!record.available}
+                      onclick={() => loadLibraryRecord(record.recordId)}>Restore</button>
+            {:else}
+              <button type="button" disabled={!record.available || !focusedPart}
+                      title={focusedPart ? `Load into ${partTitle(focusedPart)}` : 'Focus a rack part first'}
+                      onclick={() => loadLibraryRecord(record.recordId, 'focused')}>Load</button>
+              <button type="button" disabled={!record.available} title="Add as a new part"
+                      onclick={() => loadLibraryRecord(record.recordId, 'add')}>+ Part</button>
+            {/if}
+            {#if !record.factory}
+              <button type="button" class="ghost danger" title="Remove this record"
+                      onclick={() => removeLibraryRecord(record.recordId)}>×</button>
+            {/if}
+          </div>
         {/each}
       </div>
     </div>
@@ -556,6 +658,33 @@
     white-space: pre-wrap;
   }
   .project-build-log.failed { color: #e4b3b3; border-color: #7a4a4a; }
+
+  .library-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 8px 14px 0;
+    padding: 10px;
+    border: 1px solid #3b4652;
+    border-radius: 6px;
+    background: #171a1d;
+    max-height: 340px;
+  }
+  .library-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .library-head input { flex: 1; min-width: 180px; }
+  .library-filters { display: flex; gap: 4px; }
+  .library-counts { color: #7d8894; font-size: 11px; }
+  .library-capture { display: flex; gap: 8px; }
+  .library-paths { display: flex; flex-direction: column; gap: 4px; }
+  .library-list { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+  .library-row { display: flex; align-items: center; gap: 8px; }
+  .library-id { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .library-name { font-weight: 600; font-size: 12px; }
+  .library-detail { color: #7d8894; font-size: 11px; }
+  .library-reason { color: #d6a3a3; font-size: 11px; }
+  .library-row.unavailable .library-name { color: #8a939d; }
+  button.star { padding: 2px 4px; font-size: 14px; color: #7d8894; }
+  button.star.on { color: #d5a93a; }
 
   .host-error {
     display: flex;

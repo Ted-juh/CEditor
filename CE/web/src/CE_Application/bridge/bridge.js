@@ -1009,3 +1009,11 @@ export function onInstrumentHostParamValues(callback) {
   const token = window.__JUCE__.backend.addEventListener('instrumentHostParamValues', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
+
+/** The Stage 4 library ({ records, counts, paths, query, type }), answered by getLibrary and
+    after every library mutation. */
+export function onInstrumentHostLibrary(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostLibrary', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}

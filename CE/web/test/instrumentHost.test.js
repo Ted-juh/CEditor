@@ -30,6 +30,13 @@ import {
   assignControlSlot,
   clearControlSlot,
   setControlSlotValue,
+  normalizeHostLibrary,
+  hostLibrary,
+  requestLibrary,
+  saveUserPreset,
+  setLibraryUserMetadata,
+  removeLibraryRecord,
+  loadLibraryRecord,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
 import { get } from 'svelte/store';
@@ -339,4 +346,49 @@ test('mock reducer: auto pages generate from the loaded part and regenerate in p
 
   const unchanged = applyMockCommand(state, { cmd: 'generateControlPages', partId: 'mock-part-2' });
   assert.equal(unchanged.rack.pages.length, 2, 'an empty part generates nothing');
+});
+
+// --- the Stage 4 library -------------------------------------------------------------------------
+
+test('normalizeHostLibrary shapes records with availability and user metadata', () => {
+  const shaped = normalizeHostLibrary({ records: [{ recordId: 1, available: 'yes', reason: 7, tags: ['a', 2] }],
+                                        counts: { total: '3' } });
+  const record = shaped.records[0];
+  assert.equal(record.recordId, '1');
+  assert.equal(record.available, false, 'truthy strings are not availability');
+  assert.equal(record.reason, '7');
+  assert.deepEqual(record.tags, ['a', '2']);
+  assert.equal(shaped.counts.total, 3);
+});
+
+test('mock reducer: the library round trip — search, capture, favourite, load-as-part', () => {
+  hostStateStore.set(mockHostState());
+  requestLibrary('', '');
+  assert.equal(get(hostLibrary).records.length, 4);
+
+  requestLibrary('warm', '');
+  assert.equal(get(hostLibrary).records.length, 1, 'search narrows');
+  requestLibrary('', 'rack');
+  assert.equal(get(hostLibrary).records[0].type, 'rack', 'the type filter holds');
+
+  requestLibrary('', '');
+  saveUserPreset('mock-part-1');
+  assert.equal(get(hostLibrary).records.length, 5, 'a capture joins the library');
+
+  setLibraryUserMetadata('lib-2', { favourite: true });
+  assert.equal(get(hostLibrary).records.find((r) => r.recordId === 'lib-2').favourite, true);
+
+  const partsBefore = get(hostStateStore).rack.parts.length;
+  loadLibraryRecord('lib-1', 'add');
+  const parts = get(hostStateStore).rack.parts;
+  assert.equal(parts.length, partsBefore + 1, 'loading as a new part grows the rack');
+  assert.equal(parts.at(-1).pluginName, 'Warm Pad');
+
+  loadLibraryRecord('lib-3', 'add');
+  assert.equal(get(hostStateStore).rack.parts.length, partsBefore + 1,
+    'an unavailable record loads nothing');
+
+  removeLibraryRecord('lib-1');
+  assert.equal(get(hostLibrary).records.some((r) => r.recordId === 'lib-1'), true,
+    'factory records refuse removal in the mock too');
 });

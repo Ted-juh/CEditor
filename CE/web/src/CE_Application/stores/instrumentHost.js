@@ -22,6 +22,7 @@ import {
   onInstrumentHostBuildProgress,
   onInstrumentHostParameters,
   onInstrumentHostParamValues,
+  onInstrumentHostLibrary,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
@@ -31,6 +32,76 @@ export const hostAudioDevices = writable(emptyAudioDevices());
 export const hostProject = writable(emptyHostProject());
 export const hostBuild = writable(emptyHostBuild());
 export const hostParameters = writable(emptyHostParameters());
+export const hostLibrary = writable(emptyHostLibrary());
+
+// --- the Stage 4 library ------------------------------------------------------------------------
+
+export function emptyHostLibrary() {
+  return {
+    records: [],
+    counts: { total: 0, presets: 0, racks: 0, missing: 0 },
+    paths: [],
+    query: '',
+    type: '',
+  };
+}
+
+export function normalizeHostLibrary(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  return {
+    records: (Array.isArray(p.records) ? p.records : []).map((r) => ({
+      recordId: String(r?.recordId ?? ''),
+      type: String(r?.type ?? ''),
+      sourceType: String(r?.sourceType ?? ''),
+      name: String(r?.name ?? ''),
+      manufacturer: String(r?.manufacturer ?? ''),
+      instrument: String(r?.instrument ?? ''),
+      category: String(r?.category ?? ''),
+      factory: r?.factory === true,
+      missing: r?.missing === true,
+      available: r?.available === true,
+      reason: String(r?.reason ?? ''),
+      favourite: r?.favourite === true,
+      rating: Number(r?.rating ?? 0),
+      notes: String(r?.notes ?? ''),
+      tags: (Array.isArray(r?.tags) ? r.tags : []).map(String),
+    })),
+    counts: {
+      total: Number(p.counts?.total ?? 0),
+      presets: Number(p.counts?.presets ?? 0),
+      racks: Number(p.counts?.racks ?? 0),
+      missing: Number(p.counts?.missing ?? 0),
+    },
+    paths: (Array.isArray(p.paths) ? p.paths : []).map(String),
+    query: String(p.query ?? ''),
+    type: String(p.type ?? ''),
+  };
+}
+
+export function mockHostLibrary(query = '', type = '') {
+  const all = [
+    { recordId: 'lib-1', type: 'preset', sourceType: 'vstpreset', name: 'Warm Pad',
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', factory: true, available: true, favourite: true },
+    { recordId: 'lib-2', type: 'preset', sourceType: 'userState', name: 'My Growl',
+      manufacturer: 'Mock Audio', instrument: 'Analog One', available: true, tags: ['bass'] },
+    { recordId: 'lib-3', type: 'preset', sourceType: 'vstpreset', name: 'Lost Lead',
+      manufacturer: 'Someone', instrument: 'Uninstalled Synth', factory: true,
+      available: false, reason: 'Requires Uninstalled Synth, which is not in the catalogue.' },
+    { recordId: 'lib-4', type: 'rack', sourceType: 'rackCapture', name: 'Live Rig', available: true },
+  ];
+  const q = query.trim().toLowerCase();
+  const records = all.filter((r) =>
+    (!type || r.type === type)
+    && (!q || r.name.toLowerCase().includes(q) || (r.instrument ?? '').toLowerCase().includes(q)
+        || (r.manufacturer ?? '').toLowerCase().includes(q)));
+  return normalizeHostLibrary({
+    records,
+    counts: { total: all.length, presets: 3, racks: 1, missing: 0 },
+    paths: [],
+    query,
+    type,
+  });
+}
 
 export function emptyHostProject() {
   return {
@@ -483,6 +554,7 @@ export function initInstrumentHostBridge() {
   onInstrumentHostBuildProgress((payload) => hostBuild.update((b) => applyBuildProgress(b, payload)));
   onInstrumentHostParameters((payload) => hostParameters.set(normalizeHostParameters(payload)));
   onInstrumentHostParamValues((payload) => hostParameters.update((r) => applyParamValues(r, payload)));
+  onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);
@@ -552,6 +624,62 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'beginParameterGesture' || payload?.cmd === 'endParameterGesture') return;
+    if (payload?.cmd === 'getLibrary' || payload?.cmd === 'scanLibrary') {
+      hostLibrary.set(mockHostLibrary(payload.query ?? '', payload.type ?? ''));
+      return;
+    }
+    if (payload?.cmd === 'saveUserPreset' || payload?.cmd === 'saveRackToLibrary') {
+      const isRack = payload.cmd === 'saveRackToLibrary';
+      const part = get(hostState).rack.parts.find((p) => p.partId === payload.partId);
+      hostLibrary.update((lib) => normalizeHostLibrary({
+        ...lib,
+        records: [...lib.records, {
+          recordId: `lib-user-${Date.now()}`,
+          type: isRack ? 'rack' : 'preset',
+          sourceType: isRack ? 'rackCapture' : 'userState',
+          name: payload.name || (isRack ? 'Rack capture' : `${part?.pluginName ?? 'Instrument'} preset`),
+          instrument: part?.pluginName ?? '',
+          available: true,
+        }],
+        counts: { ...lib.counts, total: lib.counts.total + 1 },
+      }));
+      return;
+    }
+    if (payload?.cmd === 'setLibraryUserMetadata') {
+      hostLibrary.update((lib) => ({
+        ...lib,
+        records: lib.records.map((r) => r.recordId === payload.recordId
+          ? { ...r,
+              favourite: payload.favourite !== undefined ? payload.favourite === true : r.favourite,
+              rating: payload.rating !== undefined ? Number(payload.rating) : r.rating,
+              notes: payload.notes !== undefined ? String(payload.notes) : r.notes }
+          : r),
+      }));
+      return;
+    }
+    if (payload?.cmd === 'removeLibraryRecord') {
+      hostLibrary.update((lib) => ({
+        ...lib,
+        records: lib.records.filter((r) => r.recordId !== payload.recordId || r.factory),
+      }));
+      return;
+    }
+    if (payload?.cmd === 'loadLibraryRecord') {
+      // Mirrors the visible half: an added part appears; a focused load leaves structure alone.
+      const record = get(hostLibrary).records.find((r) => r.recordId === payload.recordId);
+      if (!record?.available) return;
+      if (record.type === 'preset' && payload.action === 'add') {
+        const next = applyMockCommand(get(hostState), { cmd: 'addPart' });
+        const added = next.rack.parts.at(-1);
+        added.pluginName = record.name;
+        added.pluginVendor = record.manufacturer;
+        added.hasInstrument = true;
+        hostState.set(next);
+      }
+      return;
+    }
+    if (payload?.cmd === 'addLibraryPath' || payload?.cmd === 'removeLibraryPath'
+        || payload?.cmd === 'browseLibraryPath') return;
     if (payload?.cmd === 'setControlSlotValue') {
       // Mirror the native mapping far enough for the demo: drive the parameter view when the
       // bound part's registry is on screen.
@@ -613,6 +741,18 @@ export const setControlSlotOptions = (pageId, slotId, fields) =>
   send({ cmd: 'setControlSlotOptions', pageId, slotId, ...fields });
 export const setControlSlotValue = (pageId, slotId, value) =>
   send({ cmd: 'setControlSlotValue', pageId, slotId, value });
+export const requestLibrary = (query = '', type = '') => send({ cmd: 'getLibrary', query, type });
+export const scanLibrary = () => send({ cmd: 'scanLibrary' });
+export const browseLibraryPath = () => send({ cmd: 'browseLibraryPath' });
+export const removeLibraryPath = (path) => send({ cmd: 'removeLibraryPath', path });
+export const saveUserPreset = (partId, name) => send({ cmd: 'saveUserPreset', partId, name });
+export const saveRackToLibrary = (name) => send({ cmd: 'saveRackToLibrary', name });
+export const setLibraryUserMetadata = (recordId, fields) =>
+  send({ cmd: 'setLibraryUserMetadata', recordId, ...fields });
+export const removeLibraryRecord = (recordId) => send({ cmd: 'removeLibraryRecord', recordId });
+export const loadLibraryRecord = (recordId, action = 'focused', partId) =>
+  send(partId ? { cmd: 'loadLibraryRecord', recordId, action, partId }
+              : { cmd: 'loadLibraryRecord', recordId, action });
 export const requestHostProject = () => send({ cmd: 'getHostProject' });
 export const setHostProject = (fields) => send({ cmd: 'setHostProject', ...fields });
 export const buildHostProduct = () => {
