@@ -796,6 +796,19 @@ target_include_directories(CEditorCtrl49ReducerTests PRIVATE
 add_test(NAME Ctrl49Reducer COMMAND CEditorCtrl49ReducerTests)
 ce_configure_test(CEditorCtrl49ReducerTests)
 
+# CTRL49 rack surface display payloads + the reducer's normalized control events (Stage 3).
+# Pure std like the protocol tests; the payload shapes follow contracts proven on hardware.
+add_executable(CEditorCtrl49RackDisplayTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
+    "${CE_ROOT}/tests/Ctrl49RackDisplayTests.cpp"
+)
+target_compile_features(CEditorCtrl49RackDisplayTests PRIVATE cxx_std_23)
+target_include_directories(CEditorCtrl49RackDisplayTests PRIVATE "${CE_ROOT}/src")
+add_test(NAME Ctrl49RackDisplay COMMAND CEditorCtrl49RackDisplayTests)
+ce_configure_test(CEditorCtrl49RackDisplayTests)
+
 # CTRL49 preset selection primitive: Bank Select + Program Change bytes + browser index math.
 add_executable(CEditorCtrl49PresetTests
     "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
@@ -873,6 +886,37 @@ ce_configure_test(CEditorCtrl49PresetBankTests)
 # executable itself compiles everywhere (guarded), but the WinMM/KSPROPERTY backends are
 # only added on Windows. Not a test — build and run against real hardware.
 if(WIN32)
+    # CTRL49 rack demo (Stage 3): the keyboard drives the instrument host's control pages —
+    # real VST3 instruments through the Stage 2 parameter model, sharing the generated
+    # standalone's per-user session by default. The one hardware demo that hosts plug-ins,
+    # hence the JUCE hosting defines and the modal-loop permission (its console main loop
+    # pumps the message thread itself).
+    add_executable(Ctrl49RackDemo
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49RackDemo.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+        "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+        "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
+    )
+    target_compile_features(Ctrl49RackDemo PRIVATE cxx_std_23)
+    target_compile_definitions(Ctrl49RackDemo PRIVATE
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_MODAL_LOOPS_PERMITTED=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_STANDALONE_APPLICATION=1
+    )
+    target_include_directories(Ctrl49RackDemo PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49RackDemo PRIVATE winmm juce::juce_audio_utils)
+
     add_executable(Ctrl49BridgeDemo
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"

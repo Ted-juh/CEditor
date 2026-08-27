@@ -25,6 +25,14 @@ struct Ctrl49Action
     bool padChanged  = false;  // pad strike or release
     int  pad         = -1;     // 1..8 when padChanged
     int  velocity    = -1;     // strike velocity, 0 on release
+    // The normalized control event a mapping runtime consumes (VIP-successor Stage 3): the
+    // raw relative movement, before the reducer's own 0..127 bookkeeping absorbs it. A rack
+    // host applies the delta to ITS value model (the parameter position) and builds its own
+    // display payload — the internal values_ then only serve hosts without one.
+    bool encoderMoved = false; // encoder turn or data dial
+    int  encoderSlot  = -1;    // 0..7 when encoderMoved
+    int  encoderDelta = 0;     // signed detents when encoderMoved
+    bool pageChanged  = false; // page navigation (mode buttons, Page Left/Right)
     std::string text;          // human-readable description for logging
 };
 
