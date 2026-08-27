@@ -1729,6 +1729,22 @@ void ValueTreeBridge::ensureInstrumentHost()
 
     options.enableAudio = true;
 
+    // The scan-folder browse dialog. Reuses the bridge's chooser member the way every other
+    // file dialog in this file does; the service's callback guards its own lifetime.
+    options.pickDirectory = [this] (std::function<void (const juce::String&)> done)
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            "Add VST3 Scan Folder",
+            juce::File::getSpecialLocation (juce::File::userHomeDirectory));
+        fileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+            [done] (const juce::FileChooser& fc)
+            {
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
     // The same instantiator the generated wrappers use (PluginInstantiator.h); the manager
     // member outlives the service that holds this function.
     options.instantiate = ceditor::host::makePluginInstantiator (*pluginFormatManager);

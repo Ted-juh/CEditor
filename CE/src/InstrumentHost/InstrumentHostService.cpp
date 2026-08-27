@@ -56,6 +56,28 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "browseScanPath")
+    {
+        if (options.pickDirectory == nullptr)
+        {
+            emitError ("A folder picker is not available in this build — type the path instead.");
+            return;
+        }
+
+        options.pickDirectory ([this, aliveToken = alive] (const juce::String& directory)
+        {
+            // The picker is asynchronous; the token guards a choice arriving after teardown,
+            // and an empty result is a cancel — nothing changes, nothing is said.
+            if (! aliveToken->load() || directory.isEmpty())
+                return;
+
+            userScanPaths.addIfNotAlreadyThere (directory);
+            saveScanPaths();
+            emitState();
+        });
+        return;
+    }
+
     if (cmd == "addScanPath" || cmd == "removeScanPath")
     {
         const auto path = payload.getProperty ("path", {}).toString().trim();
@@ -784,6 +806,14 @@ juce::var InstrumentHostService::buildStatePayload() const
 
         for (const auto& module : catalog.allModules())
         {
+            // The browser projection lists instruments only, so the module row must say how
+            // many of its classes qualify — "3 candidates scanned, nothing shown" is
+            // undiagnosable without this number in the UI.
+            int numInstruments = 0;
+            for (const auto& record : module.classes)
+                if (record.isInstrument)
+                    ++numInstruments;
+
             auto* obj = new juce::DynamicObject();
             obj->setProperty ("path",              module.path);
             obj->setProperty ("quarantined",       module.quarantined);
@@ -791,6 +821,7 @@ juce::var InstrumentHostService::buildStatePayload() const
             obj->setProperty ("failureCount",      module.failureCount);
             obj->setProperty ("lastFailureReason", module.lastFailureReason);
             obj->setProperty ("numClasses",        module.classes.size());
+            obj->setProperty ("numInstruments",    numInstruments);
             modules.add (juce::var (obj));
         }
     }

@@ -132,6 +132,22 @@ HostPluginProcessor::HostPluginProcessor()
         });
     };
 
+    options.pickDirectory = [this, aliveToken = alive] (std::function<void (const juce::String&)> done)
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            "Add VST3 Scan Folder",
+            juce::File::getSpecialLocation (juce::File::userHomeDirectory));
+        fileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+            [aliveToken, done] (const juce::FileChooser& fc)
+            {
+                if (! aliveToken->load())
+                    return;
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
     options.instantiate = makePluginInstantiator (formatManager);
     options.enableAudio = false;    // the DAW owns the device
     options.persistSession = false; // the DAW owns the session (get/setStateInformation)

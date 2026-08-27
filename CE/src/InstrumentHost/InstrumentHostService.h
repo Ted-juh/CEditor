@@ -24,7 +24,9 @@
 //
 // COMMANDS IN (handleCommand payload.cmd):
 //   getState                                     (first call restores the saved session)
-//   scan | addScanPath {path} | removeScanPath {path} | clearQuarantine {modulePath}
+//   scan | addScanPath {path} | removeScanPath {path} | browseScanPath | clearQuarantine {modulePath}
+//     (browseScanPath opens the native directory picker through Options::pickDirectory and
+//      adds whatever the user chose; cancelling chooses nothing and changes nothing)
 //   addPart | removePart {partId} | movePart {partId,index} | focusPart {partId}
 //   setPartMidiRules {partId, channel,keyLow,keyHigh,velocityLow,velocityHigh,transpose}
 //   setPartMixer {partId, enabled?,mute?,solo?,volume?,pan?}    (absent fields untouched)
@@ -101,6 +103,10 @@ public:
         // tests capture the call). Absent = building is not available in this build, and
         // buildHostProduct says so instead of doing nothing.
         std::function<void (const juce::var& project, const juce::String& outputDirectory)> runBuild;
+        // Opens the native directory picker and calls back with the chosen path — empty for
+        // cancel. The app provides an async FileChooser; absent (tests, plain browser) makes
+        // browseScanPath refuse aloud rather than silently do nothing.
+        std::function<void (std::function<void (const juce::String& directory)>)> pickDirectory;
         EditorPaneHooks editorPane;
         bool enableAudio = false;
         // The editor and the standalone persist the rack session to dataDirectory after every

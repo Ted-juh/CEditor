@@ -13,7 +13,7 @@
    */
   import {
     hostState, hostScanLog, hostLastError, hostAudioDevices, initInstrumentHostBridge,
-    filterInstruments, scanForInstruments, addScanPath, removeScanPath, clearQuarantine,
+    filterInstruments, scanForInstruments, addScanPath, browseScanPath, removeScanPath, clearQuarantine,
     addRackPart, removeRackPart, focusRackPart, loadInstrument, unloadInstrument,
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor,
     requestAudioDevices, setAudioDevice, setMidiInputEnabled,
@@ -42,7 +42,6 @@
   let parts = $derived($hostState.rack.parts);
   let focusedPartId = $derived($hostState.rack.focusedPartId);
   let focusedPart = $derived(parts.find((p) => p.partId === focusedPartId) ?? null);
-  let quarantined = $derived($hostState.modules.filter((m) => m.quarantined));
   let lastScanLine = $derived($hostScanLog.at(-1) ?? '');
   let audioLine = $derived(
     $hostState.audio.running
@@ -285,7 +284,8 @@
       <div class="scan-paths">
         <strong>Extra scan folders</strong>
         <div class="scan-path-add">
-          <input type="text" placeholder="D:\\More VST3s" bind:value={newScanPath}
+          <button type="button" onclick={() => browseScanPath()} data-testid="host-browse">Browse…</button>
+          <input type="text" placeholder="or type a path: D:\\More VST3s" bind:value={newScanPath}
                  onkeydown={(e) => e.key === 'Enter' && submitScanPath()} />
           <button type="button" onclick={submitScanPath}>Add</button>
         </div>
@@ -297,13 +297,34 @@
         {/each}
       </div>
 
-      {#if quarantined.length > 0}
-        <div class="quarantine">
-          <strong>Quarantined modules</strong>
-          {#each quarantined as module (module.path)}
-            <div class="quarantined-module" title={module.lastFailureReason}>
-              <span>{module.path}</span>
-              <button type="button" onclick={() => clearQuarantine(module.path)}>Retry</button>
+      <!-- Every module the scan touched, whatever came of it. The browser above lists
+           instruments only, so without this a folder full of effects reads as "the scan
+           found things and shows nothing" — undiagnosable from the UI. -->
+      {#if $hostState.modules.length > 0}
+        <div class="modules" data-testid="host-modules">
+          <strong>Scanned modules</strong>
+          {#each $hostState.modules as module (module.path)}
+            <div class="module-row" class:trouble={module.quarantined || module.failureCount > 0 || module.missing}
+                 title={module.path}>
+              <div class="module-id">
+                <span class="module-name">{module.path.split('\\').pop().split('/').pop()}</span>
+                <span class="module-detail">
+                  {#if module.quarantined}
+                    quarantined — {module.lastFailureReason || 'failed to scan'}
+                  {:else if module.missing}
+                    missing — the file is gone from where it was scanned
+                  {:else if module.failureCount > 0}
+                    scan failed — {module.lastFailureReason || 'no reason reported'}
+                  {:else if module.numInstruments === 0}
+                    {module.numClasses} {module.numClasses === 1 ? 'class' : 'classes'}, no instruments — effects are not shown in the browser
+                  {:else}
+                    {module.numInstruments} of {module.numClasses} {module.numClasses === 1 ? 'class is an instrument' : 'classes are instruments'}
+                  {/if}
+                </span>
+              </div>
+              {#if module.quarantined}
+                <button type="button" onclick={() => clearQuarantine(module.path)}>Retry</button>
+              {/if}
             </div>
           {/each}
         </div>
@@ -495,7 +516,7 @@
   .instrument-name { font-weight: 600; }
   .instrument-vendor { color: #7d8894; font-size: 11px; }
 
-  .scan-paths, .quarantine {
+  .scan-paths, .modules {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -504,7 +525,7 @@
   }
   .scan-path-add { display: flex; gap: 6px; }
   .scan-path-add input { flex: 1; }
-  .scan-path, .quarantined-module {
+  .scan-path {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -513,6 +534,17 @@
     font-size: 12px;
     overflow-wrap: anywhere;
   }
+  .module-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .module-id { display: flex; flex-direction: column; min-width: 0; }
+  .module-name { color: #d6dbe0; overflow-wrap: anywhere; }
+  .module-detail { color: #7d8894; font-size: 11px; }
+  .module-row.trouble .module-detail { color: #d6a3a3; }
 
   button {
     background: #232a31;

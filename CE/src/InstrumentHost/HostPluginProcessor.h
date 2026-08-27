@@ -67,6 +67,7 @@ public:
 
 private:
     juce::AudioPluginFormatManager formatManager;
+    std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<InstrumentHostService> service;
 
     // Guards the setStateInformation marshal: cleared in the destructor so a project-load

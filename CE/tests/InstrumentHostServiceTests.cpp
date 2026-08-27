@@ -574,6 +574,63 @@ void testWrapperContext()
     }
 }
 
+// The browse dialog behind "Add scan folder", and the module projection the browser column
+// cannot explain scans without. A cancelled picker changes nothing; a module full of effects
+// says so through numInstruments instead of silently showing nothing.
+void testScanFolderBrowseAndModuleProjection()
+{
+    std::cout << "\nscan-folder browse and module projection" << std::endl;
+
+    const auto dir = freshDataDir ("browse");
+    seedCatalog (dir);
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.emits.clear();
+        h.cmd ("browseScanPath");
+        check (h.emits.lastError().contains ("not available"),
+               "browsing without a picker hook refuses aloud");
+    }
+
+    {
+        std::function<void (const juce::String&)> deliverChoice;
+        Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+        {
+            o.pickDirectory = [&] (std::function<void (const juce::String&)> done)
+            {
+                deliverChoice = std::move (done);   // async, like the real FileChooser
+            };
+        });
+        h.cmd ("getState");
+
+        h.cmd ("browseScanPath");
+        check (deliverChoice != nullptr, "the picker opens");
+        deliverChoice ("");   // the user cancels
+        check (h.emits.lastState()->getProperty ("scanPaths", {}).size() == 0,
+               "a cancelled picker changes nothing");
+
+        h.cmd ("browseScanPath");
+        deliverChoice ("D:\\Chosen VST3s");
+        const auto* state = h.emits.lastState();
+        check (state->getProperty ("scanPaths", {})[0].toString() == "D:\\Chosen VST3s",
+               "the chosen folder joins the scan paths");
+
+        bool sawInstrumentCount = false;
+        for (const auto& module : *state->getProperty ("modules", {}).getArray())
+            if (module.getProperty ("path", {}).toString() == "C:\\VST3\\Good.vst3")
+                sawInstrumentCount = (int) module.getProperty ("numInstruments", -1) == 1
+                                     && (int) module.getProperty ("numClasses", -1) == 1;
+        check (sawInstrumentCount,
+               "each module reports how many of its classes the browser will actually show");
+    }
+
+    Harness h2 (dir);
+    h2.cmd ("getState");
+    check (h2.emits.lastState()->getProperty ("scanPaths", {})[0].toString() == "D:\\Chosen VST3s",
+           "and the browsed folder persists like a typed one");
+}
+
 // The Host Project manifest and the build command. The manifest is what the generated product
 // IS — name, version, publisher, targets — and its appId is the installer's identity, minted
 // once and never authored, so upgrades keep upgrading whatever the product gets renamed to.
@@ -675,6 +732,7 @@ int main (int argc, char* argv[])
     testEditorPolicy();
     testScan (stubWorker);
     testWrapperContext();
+    testScanFolderBrowseAndModuleProjection();
     testHostProject();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)

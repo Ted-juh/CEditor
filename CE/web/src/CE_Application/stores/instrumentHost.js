@@ -134,6 +134,7 @@ export function normalizeHostState(payload) {
       failureCount: Number(m?.failureCount ?? 0),
       lastFailureReason: String(m?.lastFailureReason ?? ''),
       numClasses: Number(m?.numClasses ?? 0),
+      numInstruments: Number(m?.numInstruments ?? 0),
     })),
     scanPaths: (Array.isArray(p.scanPaths) ? p.scanPaths : []).map(String),
     scanning: p.scanning === true,
@@ -189,7 +190,8 @@ export function mockHostState() {
       { ceId: 'mock-strings', name: 'String Machine', vendor: 'Tape Labs', version: '1.1' },
     ],
     modules: [
-      { path: 'C:\\Program Files\\Common Files\\VST3\\MockAudio.vst3', numClasses: 2 },
+      { path: 'C:\\Program Files\\Common Files\\VST3\\MockAudio.vst3', numClasses: 2, numInstruments: 2 },
+      { path: 'C:\\Program Files\\Common Files\\VST3\\TapeLabs.vst3', numClasses: 3, numInstruments: 1 },
       { path: 'C:\\Program Files\\Common Files\\VST3\\Rusty.vst3', quarantined: true, failureCount: 2, lastFailureReason: 'scanner exited with code 3', numClasses: 0 },
     ],
     scanPaths: [],
@@ -282,6 +284,11 @@ export function applyMockCommand(state, payload) {
     if (payload.path && !next.scanPaths.includes(payload.path)) next.scanPaths.push(payload.path);
     return next;
   }
+  if (cmd === 'browseScanPath') {
+    // No native dialog in a plain browser; stand in with a fixed choice so the flow demos.
+    if (!next.scanPaths.includes('D:\\Browsed VST3s')) next.scanPaths.push('D:\\Browsed VST3s');
+    return next;
+  }
   if (cmd === 'removeScanPath') {
     next.scanPaths = next.scanPaths.filter((p) => p !== payload.path);
     return next;
@@ -364,6 +371,7 @@ function send(payload) {
 export const requestHostState = () => send({ cmd: 'getState' });
 export const scanForInstruments = () => send({ cmd: 'scan' });
 export const addScanPath = (path) => send({ cmd: 'addScanPath', path });
+export const browseScanPath = () => send({ cmd: 'browseScanPath' });
 export const removeScanPath = (path) => send({ cmd: 'removeScanPath', path });
 export const clearQuarantine = (modulePath) => send({ cmd: 'clearQuarantine', modulePath });
 export const addRackPart = () => send({ cmd: 'addPart' });

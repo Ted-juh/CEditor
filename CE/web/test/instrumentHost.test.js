@@ -205,3 +205,16 @@ test('the build log keeps a bounded tail rather than growing forever', () => {
   assert.equal(build.lines.length, 200);
   assert.equal(build.lines.at(-1), 'line 249');
 });
+
+test('module rows carry the instrument count the browser filters by', () => {
+  const shaped = normalizeHostState({ modules: [{ path: 'X.vst3', numClasses: 3, numInstruments: 1 }] });
+  assert.equal(shaped.modules[0].numInstruments, 1);
+  assert.equal(normalizeHostState({ modules: [{ path: 'Y.vst3' }] }).modules[0].numInstruments, 0);
+});
+
+test('mock reducer: browsing a scan folder adds the stand-in path once', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'browseScanPath' });
+  state = applyMockCommand(state, { cmd: 'browseScanPath' });
+  assert.deepEqual(state.scanPaths, ['D:\\Browsed VST3s']);
+});

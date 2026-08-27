@@ -34,6 +34,7 @@ private:
     void emitToWebView (const juce::String& eventName, const juce::var& payload);
 
     juce::AudioPluginFormatManager formatManager;
+    std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<InstrumentHostService> service;
     std::unique_ptr<juce::WebBrowserComponent> webView;
     juce::Label statusLabel;   // only ever visible when WebView2 could not start

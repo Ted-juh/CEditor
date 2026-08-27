@@ -37,6 +37,20 @@ HostRuntimeShell::HostRuntimeShell()
     };
     options.editorPane.hide = [this] { editorPane.hide(); };
 
+    options.pickDirectory = [this] (std::function<void (const juce::String&)> done)
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            "Add VST3 Scan Folder",
+            juce::File::getSpecialLocation (juce::File::userHomeDirectory));
+        fileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+            [done] (const juce::FileChooser& fc)
+            {
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
     options.instantiate = makePluginInstantiator (formatManager);
     options.enableAudio = true;   // the shell is the Performance Runtime: it owns the device
 
