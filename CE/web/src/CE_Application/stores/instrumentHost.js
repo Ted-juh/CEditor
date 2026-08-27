@@ -225,7 +225,7 @@ export function applyBuildProgress(build, payload) {
 }
 
 export function emptyAudioDevices() {
-  return { outputs: [], current: '', midiInputs: [] };
+  return { outputs: [], current: '', midiInputs: [], midiOutputs: [], inputChannels: 0 };
 }
 
 export function normalizeAudioDevices(payload) {
@@ -238,6 +238,11 @@ export function normalizeAudioDevices(payload) {
       name: String(m?.name ?? ''),
       enabled: m?.enabled === true,
     })),
+    midiOutputs: (Array.isArray(p.midiOutputs) ? p.midiOutputs : []).map((m) => ({
+      id: String(m?.id ?? ''),
+      name: String(m?.name ?? ''),
+    })),
+    inputChannels: Number(p.inputChannels ?? 0),
   };
 }
 
@@ -249,6 +254,11 @@ export function mockAudioDevices() {
       { id: 'mock-in-1', name: 'CTRL49 USB', enabled: true },
       { id: 'mock-in-2', name: 'Mock MIDI Keyboard', enabled: false },
     ],
+    midiOutputs: [
+      { id: 'mock-out-1', name: 'AN1x MIDI Out' },
+      { id: 'mock-out-2', name: 'USB MIDI Interface' },
+    ],
+    inputChannels: 4,
   });
 }
 
@@ -260,8 +270,10 @@ export function emptyHostState() {
     scanPaths: [],
     scanning: false,
     editorOpenPartId: '',
-    audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0 },
-    rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], macros: [], pages: [] },
+    audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0,
+             inputChannels: 0, cpu: 0, xruns: 0 },
+    rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], returns: [],
+            macros: [], pages: [], masterLatencyMs: 0 },
   };
 }
 
@@ -312,11 +324,21 @@ export function normalizeHostState(payload) {
       deviceName: String(p.audio?.deviceName ?? ''),
       sampleRate: Number(p.audio?.sampleRate ?? 0),
       bufferSize: Number(p.audio?.bufferSize ?? 0),
+      inputChannels: Number(p.audio?.inputChannels ?? 0),
+      cpu: Number(p.audio?.cpu ?? 0),
+      xruns: Number(p.audio?.xruns ?? 0),
     },
     rack: {
       performanceId: String(rack.performanceId ?? ''),
       focusedPartId: String(rack.focusedPartId ?? ''),
+      masterLatencyMs: Number(rack.masterLatencyMs ?? 0),
       masterEffects: (Array.isArray(rack.masterEffects) ? rack.masterEffects : []).map(normalizeEffectSlot),
+      returns: (Array.isArray(rack.returns) ? rack.returns : []).map((r) => ({
+        returnId: String(r?.returnId ?? ''),
+        name: String(r?.name ?? ''),
+        level: Number(r?.level ?? 1),
+        effects: (Array.isArray(r?.effects) ? r.effects : []).map(normalizeEffectSlot),
+      })),
       macros: (Array.isArray(rack.macros) ? rack.macros : []).map((m) => ({
         macroId: String(m?.macroId ?? ''),
         name: String(m?.name ?? ''),
@@ -366,6 +388,25 @@ export function normalizeHostState(payload) {
         velocityHigh: Number(part?.velocityHigh ?? 127),
         transpose: Number(part?.transpose ?? 0),
         effects: (Array.isArray(part?.effects) ? part.effects : []).map(normalizeEffectSlot),
+        sends: (Array.isArray(part?.sends) ? part.sends : []).map((s) => ({
+          returnId: String(s?.returnId ?? ''),
+          level: Number(s?.level ?? 0),
+        })),
+        extraOuts: (Array.isArray(part?.extraOuts) ? part.extraOuts : []).map((o) => ({
+          pairIndex: Number(o?.pairIndex ?? 1),
+          gain: Number(o?.gain ?? 1),
+        })),
+        outputChannels: Number(part?.outputChannels ?? 0),
+        latencyMs: Number(part?.latencyMs ?? 0),
+        hardware: part?.hardware === true,
+        midiOutputId: String(part?.midiOutputId ?? ''),
+        midiOutputName: String(part?.midiOutputName ?? ''),
+        midiOutChannel: Number(part?.midiOutChannel ?? 1),
+        audioReturnChannel: Number(part?.audioReturnChannel ?? -1),
+        audioReturnStereo: part?.audioReturnStereo !== false,
+        programBank: Number(part?.programBank ?? -1),
+        programNumber: Number(part?.programNumber ?? -1),
+        midiOutError: String(part?.midiOutError ?? ''),
         enabled: part?.enabled !== false,
         mute: part?.mute === true,
         solo: part?.solo === true,
@@ -412,6 +453,16 @@ export function mockHostState() {
       ],
     },
   });
+}
+
+/** The native virtualParameterName rule, mirrored for the mock's bindings and chips. */
+function mockBindingName(parameterId, rack) {
+  const id = String(parameterId ?? '');
+  if (id === '@gain') return 'Level';
+  if (id === '@pan') return 'Pan';
+  if (id.startsWith('@send:'))
+    return `Send — ${rack.returns.find((r) => r.returnId === id.slice(6))?.name ?? 'gone'}`;
+  return id.replace(/^./, (c) => c.toUpperCase());
 }
 
 /** The mock reducer: applies one command to a normalized state, so the browser-only app
@@ -506,11 +557,13 @@ export function applyMockCommand(state, payload) {
       hasProcessor: true,
     }] } }).rack.masterEffects[0];
     if (payload.chainId === 'master') next.rack.masterEffects.push(slot);
-    else part(payload.chainId)?.effects.push(slot);
+    else if (part(payload.chainId)) part(payload.chainId).effects.push(slot);
+    else next.rack.returns.find((r) => r.returnId === payload.chainId)?.effects.push(slot);
     return next;
   }
   if (cmd === 'removeEffect' || cmd === 'setEffectBypassed' || cmd === 'moveEffect') {
-    const chains = [next.rack.masterEffects, ...next.rack.parts.map((p) => p.effects)];
+    const chains = [next.rack.masterEffects, ...next.rack.parts.map((p) => p.effects),
+                    ...next.rack.returns.map((r) => r.effects)];
     for (const chain of chains) {
       const index = chain.findIndex((e) => e.effectId === payload.effectId);
       if (index < 0) continue;
@@ -521,6 +574,78 @@ export function applyMockCommand(state, payload) {
       break;
     }
     return next;
+  }
+  if (cmd === 'addReturn') {
+    next.rack.returns.push(normalizeHostState({ rack: { returns: [{
+      returnId: `mock-return-${Date.now()}-${next.rack.returns.length + 1}`,
+      name: payload.name || `Return ${next.rack.returns.length + 1}`,
+    }] } }).rack.returns[0]);
+    return next;
+  }
+  if (cmd === 'removeReturn') {
+    next.rack.returns = next.rack.returns.filter((r) => r.returnId !== payload.returnId);
+    // The native rule, mirrored: stranded sends are dropped, never kept dangling.
+    for (const p of next.rack.parts)
+      p.sends = p.sends.filter((s) => s.returnId !== payload.returnId);
+    return next;
+  }
+  if (cmd === 'renameReturn') {
+    const ret = next.rack.returns.find((r) => r.returnId === payload.returnId);
+    if (ret) ret.name = String(payload.name ?? ret.name);
+    return next;
+  }
+  if (cmd === 'setReturnLevel') {
+    const ret = next.rack.returns.find((r) => r.returnId === payload.returnId);
+    if (ret) ret.level = Math.min(2, Math.max(0, Number(payload.level ?? 1)));
+    return next;
+  }
+  if (cmd === 'setSendLevel') {
+    const target = part(payload.partId);
+    if (!target || !next.rack.returns.some((r) => r.returnId === payload.returnId)) return next;
+    const level = Math.min(2, Math.max(0, Number(payload.level ?? 0)));
+    const send = target.sends.find((s) => s.returnId === payload.returnId);
+    if (send) send.level = level;
+    else target.sends.push({ returnId: payload.returnId, level });
+    return next;
+  }
+  if (cmd === 'setExtraOut') {
+    const target = part(payload.partId);
+    const pairIndex = Number(payload.pairIndex ?? 0);
+    if (!target || pairIndex < 1) return next;
+    const gain = Math.min(2, Math.max(0, Number(payload.gain ?? 1)));
+    const extra = target.extraOuts.find((o) => o.pairIndex === pairIndex);
+    if (extra) extra.gain = gain;
+    else target.extraOuts.push({ pairIndex, gain });
+    return next;
+  }
+  if (cmd === 'removeExtraOut') {
+    const target = part(payload.partId);
+    if (target) target.extraOuts = target.extraOuts.filter((o) => o.pairIndex !== Number(payload.pairIndex));
+    return next;
+  }
+  if (cmd === 'setHardwareConfig') {
+    const target = part(payload.partId);
+    if (!target) return next;
+    target.hardware = true;
+    target.hasInstrument = false;
+    for (const key of ['midiOutputId', 'midiOutputName', 'deviceProfileId'])
+      if (payload[key] !== undefined) target[key] = String(payload[key]);
+    for (const key of ['midiOutChannel', 'audioReturnChannel', 'programBank', 'programNumber'])
+      if (payload[key] !== undefined) target[key] = Number(payload[key]);
+    if (payload.audioReturnStereo !== undefined) target.audioReturnStereo = payload.audioReturnStereo === true;
+    // The port-gone diagnostic, mirrored against the mock device list.
+    target.midiOutError = target.midiOutputId
+      && !['mock-out-1', 'mock-out-2'].includes(target.midiOutputId)
+      ? 'No such MIDI output.' : '';
+    return next;
+  }
+  if (cmd === 'clearHardware') {
+    const target = part(payload.partId);
+    if (target) { target.hardware = false; target.midiOutError = ''; }
+    return next;
+  }
+  if (cmd === 'sendHardwareProgram') {
+    return next; // nothing observable in the browser — the port lives with the native side
   }
   if (cmd === 'addMacro') {
     next.rack.macros.push(normalizeHostState({ rack: { macros: [{
@@ -554,10 +679,11 @@ export function applyMockCommand(state, payload) {
         targetId: String(payload.targetId ?? ''),
         parameterId: String(payload.parameterId ?? ''),
         targetName: part(payload.targetId)?.pluginName
-          ?? [...next.rack.masterEffects, ...next.rack.parts.flatMap((p) => p.effects)]
+          ?? [...next.rack.masterEffects, ...next.rack.parts.flatMap((p) => p.effects),
+              ...next.rack.returns.flatMap((r) => r.effects)]
                .find((e) => e.effectId === payload.targetId)?.pluginName
           ?? '',
-        displayName: String(payload.parameterId ?? '').replace(/^./, (c) => c.toUpperCase()),
+        displayName: mockBindingName(payload.parameterId, next.rack),
         rangeMin: 0, rangeMax: 1, inverted: false, resolved: true,
       });
     }
@@ -613,14 +739,16 @@ export function applyMockCommand(state, payload) {
                             inverted: false, bipolar: false, resolved: false });
     } else if (cmd === 'assignControlSlot') {
       const target = part(payload.partId);
-      // Mirrors the native rule: assignment needs the live instrument.
-      if (!target?.hasInstrument) return next;
+      const virtual = String(payload.parameterId ?? '').startsWith('@');
+      // Mirrors the native rule: a plug-in address needs the live instrument; a mixer
+      // address needs only its part.
+      if (!target || (!virtual && !target.hasInstrument)) return next;
       Object.assign(slot, {
         assigned: true,
         partId: payload.partId,
         parameterId: String(payload.parameterId ?? ''),
-        displayName: String(payload.parameterId ?? '').replace(/^./, (c) => c.toUpperCase()),
-        partName: target.pluginName,
+        displayName: mockBindingName(payload.parameterId, next.rack),
+        partName: target.pluginName || (target.hardware ? target.midiOutputName : ''),
         resolved: true,
       });
     } else {
@@ -709,11 +837,28 @@ function send(payload) {
     if (payload?.cmd === 'getParameters') {
       const state = get(hostState);
       const part = state.rack.parts.find((p) => p.partId === payload.partId);
-      if (part?.hasInstrument) {
-        hostParameters.set(mockHostParameters(payload.partId));
+      if (part) {
+        // A part answers with its plug-in rows (when loaded) plus its mixer addresses —
+        // the native Stage 5 registry, mirrored.
+        const base = part.hasInstrument ? mockHostParameters(payload.partId).parameters : [];
+        const mixer = [
+          { id: '@gain', name: 'Level', group: 'Mixer', value: part.volume / 2,
+            text: part.volume.toFixed(2), defaultValue: 0.5 },
+          { id: '@pan', name: 'Pan', group: 'Mixer', value: (part.pan + 1) / 2,
+            text: part.pan.toFixed(2), defaultValue: 0.5 },
+          ...state.rack.returns.map((r) => ({
+            id: `@send:${r.returnId}`, name: `Send — ${r.name}`, group: 'Mixer',
+            value: (part.sends.find((s) => s.returnId === r.returnId)?.level ?? 0) / 2,
+            text: (part.sends.find((s) => s.returnId === r.returnId)?.level ?? 0).toFixed(2),
+            defaultValue: 0,
+          })),
+        ];
+        hostParameters.set(normalizeHostParameters({ partId: payload.partId,
+                                                     parameters: [...base, ...mixer] }));
         return;
       }
-      const effect = [...state.rack.masterEffects, ...state.rack.parts.flatMap((p) => p.effects)]
+      const effect = [...state.rack.masterEffects, ...state.rack.parts.flatMap((p) => p.effects),
+                      ...state.rack.returns.flatMap((r) => r.effects)]
         .find((e) => e.effectId === payload.partId);
       hostParameters.set(effect?.hasProcessor
         ? normalizeHostParameters({ partId: payload.partId, parameters: [
@@ -735,6 +880,21 @@ function send(payload) {
           }),
         };
       });
+      // Virtual addresses write the rack itself; the demo mirrors the visible half.
+      const id = String(payload.id ?? '');
+      if (id === '@gain' || id === '@pan') {
+        const value = Math.min(1, Math.max(0, Number(payload.value ?? 0)));
+        hostState.set(applyMockCommand(get(hostState), {
+          cmd: 'setPartMixer', partId: payload.partId,
+          ...(id === '@gain' ? { volume: value * 2 } : { pan: value * 2 - 1 }),
+        }));
+      } else if (id.startsWith('@send:')) {
+        const value = Math.min(1, Math.max(0, Number(payload.value ?? 0)));
+        hostState.set(applyMockCommand(get(hostState), {
+          cmd: 'setSendLevel', partId: payload.partId,
+          returnId: id.slice(6), level: value * 2,
+        }));
+      }
       return;
     }
     if (payload?.cmd === 'beginParameterGesture' || payload?.cmd === 'endParameterGesture') return;
@@ -849,6 +1009,18 @@ export const removeEffect = (effectId) => send({ cmd: 'removeEffect', effectId }
 export const moveEffect = (effectId, index) => send({ cmd: 'moveEffect', effectId, index });
 export const setEffectBypassed = (effectId, bypassed) => send({ cmd: 'setEffectBypassed', effectId, bypassed });
 export const openEffectEditor = (effectId) => send({ cmd: 'openEffectEditor', effectId });
+export const addReturn = (name) => send(name ? { cmd: 'addReturn', name } : { cmd: 'addReturn' });
+export const removeReturn = (returnId) => send({ cmd: 'removeReturn', returnId });
+export const renameReturn = (returnId, name) => send({ cmd: 'renameReturn', returnId, name });
+export const setReturnLevel = (returnId, level) => send({ cmd: 'setReturnLevel', returnId, level });
+export const setSendLevel = (partId, returnId, level) =>
+  send({ cmd: 'setSendLevel', partId, returnId, level });
+export const setExtraOut = (partId, pairIndex, gain) =>
+  send({ cmd: 'setExtraOut', partId, pairIndex, gain });
+export const removeExtraOut = (partId, pairIndex) => send({ cmd: 'removeExtraOut', partId, pairIndex });
+export const setHardwareConfig = (partId, fields) => send({ cmd: 'setHardwareConfig', partId, ...fields });
+export const clearHardware = (partId) => send({ cmd: 'clearHardware', partId });
+export const sendHardwareProgram = (partId) => send({ cmd: 'sendHardwareProgram', partId });
 export const addMacro = (name) => send(name ? { cmd: 'addMacro', name } : { cmd: 'addMacro' });
 export const removeMacro = (macroId) => send({ cmd: 'removeMacro', macroId });
 export const renameMacro = (macroId, name) => send({ cmd: 'renameMacro', macroId, name });

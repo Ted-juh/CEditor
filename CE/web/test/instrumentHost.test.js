@@ -288,8 +288,12 @@ test('mock reducer: the parameter view round-trips set and reset', () => {
   resetParameter(partId, 'cutoff');
   assert.equal(get(hostParameters).parameters[0].value, 0.5);
 
-  requestParameters('mock-part-2'); // empty part -> empty registry
-  assert.equal(get(hostParameters).partId, '');
+  // Since Stage 5 an empty part still answers — with its mixer addresses only.
+  requestParameters('mock-part-2');
+  assert.equal(get(hostParameters).partId, 'mock-part-2');
+  assert.ok(get(hostParameters).parameters.length > 0
+              && get(hostParameters).parameters.every((d) => d.id.startsWith('@')),
+    'an empty part keeps only its mixer registry');
 });
 
 // --- neutral control pages -----------------------------------------------------------------------
@@ -444,4 +448,116 @@ test('mock reducer: macros collect targets and hold their value', () => {
   assert.equal(state.rack.macros[0].targets.length, 0);
   state = applyMockCommand(state, { cmd: 'removeMacro', macroId });
   assert.equal(state.rack.macros.length, 0);
+});
+
+// --- Stage 5 completion: returns, sends, hardware parts, multi-out, engine -----------------------
+
+test('normalizeHostState shapes returns, sends, hardware and engine fields', () => {
+  const shaped = normalizeHostState({
+    audio: { cpu: '0.3', xruns: 2, inputChannels: 4 },
+    rack: {
+      masterLatencyMs: '10.5',
+      returns: [{ returnId: 'r1', name: 'Verb Bus', level: '0.5',
+                  effects: [{ effectId: 'e9', hasProcessor: true }] }],
+      parts: [{
+        partId: 'p1',
+        sends: [{ returnId: 'r1', level: '1.5' }],
+        extraOuts: [{ pairIndex: '1', gain: 0.5 }],
+        outputChannels: 4,
+        latencyMs: 10,
+        hardware: true,
+        midiOutputId: 'port-1',
+        midiOutputName: 'AN1x',
+        midiOutChannel: 3,
+        audioReturnChannel: 2,
+        programNumber: 45,
+        midiOutError: 'gone',
+      }],
+    },
+  });
+  assert.equal(shaped.audio.cpu, 0.3);
+  assert.equal(shaped.audio.xruns, 2);
+  assert.equal(shaped.rack.masterLatencyMs, 10.5);
+  assert.equal(shaped.rack.returns[0].name, 'Verb Bus');
+  assert.equal(shaped.rack.returns[0].effects[0].hasProcessor, true);
+  const part = shaped.rack.parts[0];
+  assert.equal(part.sends[0].level, 1.5);
+  assert.equal(part.extraOuts[0].pairIndex, 1);
+  assert.equal(part.hardware, true);
+  assert.equal(part.midiOutChannel, 3);
+  assert.equal(part.audioReturnChannel, 2);
+  assert.equal(part.midiOutError, 'gone');
+  const older = normalizeHostState({});
+  assert.deepEqual(older.rack.returns, [], 'older payloads load clean');
+  assert.equal(older.audio.cpu, 0);
+});
+
+test('mock reducer: returns and sends, with the drop-stranded-sends rule', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'addReturn', name: 'Verb Bus' });
+  const returnId = state.rack.returns[0].returnId;
+  assert.equal(state.rack.returns[0].name, 'Verb Bus');
+
+  state = applyMockCommand(state, { cmd: 'addEffect', chainId: returnId, ceId: 'mock-reverb' });
+  assert.equal(state.rack.returns[0].effects[0].pluginName, 'Sweet Reverb',
+    'the return chain takes effects like any other chain');
+
+  state = applyMockCommand(state, { cmd: 'setSendLevel', partId: 'mock-part-1', returnId, level: 1.5 });
+  assert.equal(state.rack.parts[0].sends[0].level, 1.5);
+  state = applyMockCommand(state, { cmd: 'setReturnLevel', returnId, level: 5 });
+  assert.equal(state.rack.returns[0].level, 2, 'levels clamp to 0..2');
+
+  state = applyMockCommand(state, { cmd: 'removeReturn', returnId });
+  assert.equal(state.rack.returns.length, 0);
+  assert.equal(state.rack.parts[0].sends.length, 0, 'stranded sends are dropped, never dangling');
+});
+
+test('mock reducer: hardware parts carry their config and the port-gone diagnostic', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'setHardwareConfig', partId: 'mock-part-2',
+                                    midiOutputId: 'mock-out-1', midiOutputName: 'AN1x MIDI Out',
+                                    midiOutChannel: 3, programNumber: 45 });
+  const part = state.rack.parts[1];
+  assert.equal(part.hardware, true);
+  assert.equal(part.midiOutChannel, 3);
+  assert.equal(part.midiOutError, '', 'a known port opens clean');
+
+  state = applyMockCommand(state, { cmd: 'setHardwareConfig', partId: 'mock-part-2',
+                                    midiOutputId: 'unplugged' });
+  assert.ok(state.rack.parts[1].midiOutError, 'a gone port is a diagnostic on the part');
+
+  state = applyMockCommand(state, { cmd: 'clearHardware', partId: 'mock-part-2' });
+  assert.equal(state.rack.parts[1].hardware, false);
+  assert.equal(state.rack.parts[1].midiOutError, '');
+});
+
+test('mock reducer: explicit multi-output routes add, retune and remove', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'setExtraOut', partId: 'mock-part-1', pairIndex: 1, gain: 1 });
+  state = applyMockCommand(state, { cmd: 'setExtraOut', partId: 'mock-part-1', pairIndex: 1, gain: 0.5 });
+  assert.equal(state.rack.parts[0].extraOuts.length, 1, 'the same pair updates in place');
+  assert.equal(state.rack.parts[0].extraOuts[0].gain, 0.5);
+  state = applyMockCommand(state, { cmd: 'setExtraOut', partId: 'mock-part-1', pairIndex: 0, gain: 1 });
+  assert.equal(state.rack.parts[0].extraOuts.length, 1, 'the main pair is refused');
+  state = applyMockCommand(state, { cmd: 'removeExtraOut', partId: 'mock-part-1', pairIndex: 1 });
+  assert.equal(state.rack.parts[0].extraOuts.length, 0);
+});
+
+test('mock parameters: a part answers with its mixer addresses beside the plug-in rows', () => {
+  hostStateStore.set(mockHostState());
+  hostStateStore.set(applyMockCommand(get(hostStateStore), { cmd: 'addReturn', name: 'Verb Bus' }));
+  requestParameters('mock-part-1');
+  const rows = get(hostParameters).parameters;
+  assert.ok(rows.some((d) => d.id === 'cutoff'), 'the plug-in rows are there');
+  assert.ok(rows.some((d) => d.id === '@gain' && d.group === 'Mixer'), 'and the fader');
+  assert.ok(rows.some((d) => d.id.startsWith('@send:') && d.name === 'Send — Verb Bus'),
+    'and one send per return');
+
+  // A virtual write moves the rack itself, not just the registry row.
+  setParameter('mock-part-1', '@gain', 0.25);
+  assert.equal(get(hostStateStore).rack.parts[0].volume, 0.5, '@gain writes the fader');
+
+  requestParameters('mock-part-2');
+  assert.ok(get(hostParameters).parameters.every((d) => d.id.startsWith('@')),
+    'an empty part keeps only its mixer registry');
 });

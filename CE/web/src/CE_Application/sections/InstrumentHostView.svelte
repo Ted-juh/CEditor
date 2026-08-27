@@ -26,6 +26,8 @@
     saveUserPreset, saveRackToLibrary, setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
     addEffect, removeEffect, setEffectBypassed, openEffectEditor,
     addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
+    addReturn, removeReturn, setReturnLevel, setSendLevel,
+    setExtraOut, removeExtraOut, setHardwareConfig, clearHardware, sendHardwareProgram,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
@@ -74,24 +76,34 @@
   // The parameter view's target: the focused part by default, or an effect the user asked
   // to inspect (its "P" button). Only a focus CHANGE or the target vanishing resets it —
   // every state push re-derives the part objects, and resetting on mere identity churn
-  // would knock an effect inspection back to the part on any unrelated mutation.
+  // would knock an effect inspection back to the part on any unrelated mutation. Since
+  // Stage 5 every part answers — an empty or hardware part still has its mixer addresses.
   let paramTargetId = $state('');
   let lastFocusedPartId = $state('');
   let allEffects = $derived([
     ...$hostState.rack.masterEffects,
     ...$hostState.rack.parts.flatMap((p) => p.effects),
+    ...$hostState.rack.returns.flatMap((r) => r.effects),
   ]);
   $effect(() => {
-    const focusedLoaded = focusedPart?.hasInstrument ? focusedPart.partId : '';
+    const focusedTarget = focusedPart ? focusedPart.partId : '';
     const targetStillExists = paramTargetId
-      && (paramTargetId === focusedLoaded
+      && (paramTargetId === focusedTarget
           || allEffects.some((e) => e.effectId === paramTargetId && e.hasProcessor));
     if (focusedPartId !== lastFocusedPartId || !targetStillExists) {
       lastFocusedPartId = focusedPartId;
-      paramTargetId = focusedLoaded;
+      paramTargetId = focusedTarget;
     }
   });
+  // The hardware config needs the MIDI-output list; enumeration stays on demand.
   $effect(() => {
+    if (focusedPart?.hardware) requestAudioDevices();
+  });
+  // Re-request on target change AND when the returns roster changes — each return adds a
+  // send address to every part's registry, and a stale list would hide it until a refocus.
+  let returnsStamp = $derived($hostState.rack.returns.map((r) => r.returnId).join(','));
+  $effect(() => {
+    returnsStamp;
     if (paramTargetId) requestParameters(paramTargetId);
     else hostParameters.set(emptyHostParameters());
   });
@@ -127,10 +139,14 @@
   let audioLine = $derived(
     $hostState.audio.running
       ? `${$hostState.audio.deviceName} · ${Math.round($hostState.audio.sampleRate / 100) / 10} kHz · ${$hostState.audio.bufferSize}`
+        + ` · CPU ${Math.round($hostState.audio.cpu * 100)}%`
+        + ($hostState.audio.xruns > 0 ? ` · ${$hostState.audio.xruns} xruns` : '')
       : $hostState.audio.enabled
         ? 'No audio device'
         : 'Audio off (browser preview)'
   );
+
+  const latencySuffix = (ms) => (ms >= 0.05 ? ` · ${ms.toFixed(1)} ms` : '');
 
   function toggleEditor(part) {
     if ($hostState.editorOpenPartId === part.partId) closeEditor();
@@ -138,6 +154,7 @@
   }
 
   function partTitle(part) {
+    if (part.hardware) return `${part.midiOutputName || 'External hardware'} (HW)`;
     if (part.hasInstrument) return part.pluginName || 'Loaded instrument';
     if (part.unresolved) return `${part.pluginName || part.pluginCeId} (missing)`;
     return 'Empty part';
@@ -416,8 +433,8 @@
         </div>
       {/if}
 
-      {#snippet effectChain(chain, chainId, title)}
-        <div class="fx-chain" data-testid={chainId === 'master' ? 'host-master-fx' : 'host-part-fx'}>
+      {#snippet effectChain(chain, chainId, title, testId)}
+        <div class="fx-chain" data-testid={testId ?? (chainId === 'master' ? 'host-master-fx' : 'host-part-fx')}>
           <div class="fx-head">
             <strong>{title}</strong>
             <select value="" aria-label={`Add an effect to ${title}`}
@@ -450,10 +467,146 @@
         </div>
       {/snippet}
 
-      {#if focusedPart}
-        {@render effectChain(focusedPart.effects, focusedPart.partId, `Inserts — ${partTitle(focusedPart)}`)}
+      {#if focusedPart?.hardware}
+        <!-- Hardware-instrument parts (Stage 5): the part reaches an external synth over
+             MIDI and can return audio through the interface — same zones, fader, inserts
+             and sends as any part. A gone port is a diagnostic, never silence. -->
+        <div class="hw-config" data-testid="host-hardware">
+          <div class="fx-head">
+            <strong>External hardware — {partTitle(focusedPart)}</strong>
+            <button type="button" class="ghost" title="Back to a software part (identity and zones stay)"
+                    onclick={() => clearHardware(focusedPart.partId)}>Make software part</button>
+          </div>
+          {#if focusedPart.midiOutError}
+            <div class="hw-error" role="alert">{focusedPart.midiOutError}</div>
+          {/if}
+          <div class="zone-grid">
+            <label>MIDI output
+              <select value={focusedPart.midiOutputId}
+                      onchange={(e) => {
+                        const id = e.currentTarget.value;
+                        const name = $hostAudioDevices.midiOutputs.find((m) => m.id === id)?.name ?? '';
+                        setHardwareConfig(focusedPart.partId, { midiOutputId: id, midiOutputName: name });
+                      }}>
+                <option value="">(no port)</option>
+                {#if focusedPart.midiOutputId
+                     && !$hostAudioDevices.midiOutputs.some((m) => m.id === focusedPart.midiOutputId)}
+                  <option value={focusedPart.midiOutputId}>{focusedPart.midiOutputName || focusedPart.midiOutputId} (gone)</option>
+                {/if}
+                {#each $hostAudioDevices.midiOutputs as out (out.id)}
+                  <option value={out.id}>{out.name}</option>
+                {/each}
+              </select>
+            </label>
+            <label>Channel
+              <select value={focusedPart.midiOutChannel}
+                      onchange={(e) => setHardwareConfig(focusedPart.partId, { midiOutChannel: Number(e.currentTarget.value) })}>
+                {#each Array.from({ length: 16 }, (_, i) => i + 1) as ch}
+                  <option value={ch}>{ch}</option>
+                {/each}
+              </select>
+            </label>
+            <label>Audio return
+              <select value={focusedPart.audioReturnChannel}
+                      onchange={(e) => setHardwareConfig(focusedPart.partId, { audioReturnChannel: Number(e.currentTarget.value) })}>
+                <option value={-1}>None</option>
+                {#each Array.from({ length: Math.max($hostAudioDevices.inputChannels, 8) / 2 }, (_, i) => i * 2) as ch}
+                  <option value={ch}>Inputs {ch + 1}/{ch + 2}</option>
+                {/each}
+              </select>
+            </label>
+            <label>Bank (-1 = none)
+              <input type="number" min="-1" max="16383" value={focusedPart.programBank}
+                     onchange={(e) => setHardwareConfig(focusedPart.partId, { programBank: Number(e.currentTarget.value) })} />
+            </label>
+            <label>Program (-1 = none)
+              <input type="number" min="-1" max="127" value={focusedPart.programNumber}
+                     onchange={(e) => setHardwareConfig(focusedPart.partId, { programNumber: Number(e.currentTarget.value) })} />
+            </label>
+            <span class="hw-send">
+              <button type="button" disabled={focusedPart.programBank < 0 && focusedPart.programNumber < 0}
+                      title="Send the bank select / program change now"
+                      onclick={() => sendHardwareProgram(focusedPart.partId)}>Send program</button>
+            </span>
+          </div>
+        </div>
+      {:else if focusedPart && !focusedPart.hasInstrument && !focusedPart.unresolved}
+        <div class="hw-config" data-testid="host-hardware-offer">
+          <button type="button" title="Use this part for an external synth: MIDI out, optional audio return"
+                  onclick={() => setHardwareConfig(focusedPart.partId, {})}>Use external hardware…</button>
+        </div>
       {/if}
-      {@render effectChain($hostState.rack.masterEffects, 'master', 'Master effects')}
+
+      {#if focusedPart}
+        {@render effectChain(focusedPart.effects, focusedPart.partId,
+                             `Inserts — ${partTitle(focusedPart)}${latencySuffix(focusedPart.latencyMs)}`)}
+      {/if}
+
+      {#if focusedPart && $hostState.rack.returns.length > 0}
+        <div class="sends" data-testid="host-sends">
+          <strong>Sends — {partTitle(focusedPart)}</strong>
+          {#each $hostState.rack.returns as ret (ret.returnId)}
+            <div class="send-row">
+              <span class="send-name">{ret.name}</span>
+              <input type="range" min="0" max="2" step="0.01"
+                     value={focusedPart.sends.find((s) => s.returnId === ret.returnId)?.level ?? 0}
+                     aria-label={`Send to ${ret.name}`}
+                     oninput={(e) => setSendLevel(focusedPart.partId, ret.returnId, Number(e.currentTarget.value))} />
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      {#if focusedPart && !focusedPart.hardware && focusedPart.outputChannels > 2}
+        <!-- Explicit multi-output routing: extra pairs to the mix at their own gain; the
+             main pair 1/2 keeps the inserts and the fader. -->
+        <div class="outputs" data-testid="host-outputs">
+          <strong>Outputs — {partTitle(focusedPart)}</strong>
+          {#each Array.from({ length: Math.floor(focusedPart.outputChannels / 2) - 1 }, (_, i) => i + 1) as pairIndex (pairIndex)}
+            {@const route = focusedPart.extraOuts.find((o) => o.pairIndex === pairIndex)}
+            <div class="send-row">
+              <PropertyToggle compact label={`${pairIndex * 2 + 1}/${pairIndex * 2 + 2}`} value={!!route}
+                              ariaLabel={`Route output pair ${pairIndex * 2 + 1}/${pairIndex * 2 + 2}`}
+                              onchange={(on) => on ? setExtraOut(focusedPart.partId, pairIndex, 1)
+                                                   : removeExtraOut(focusedPart.partId, pairIndex)} />
+              {#if route}
+                <input type="range" min="0" max="2" step="0.01" value={route.gain}
+                       aria-label={`Pair ${pairIndex * 2 + 1}/${pairIndex * 2 + 2} gain`}
+                       oninput={(e) => setExtraOut(focusedPart.partId, pairIndex, Number(e.currentTarget.value))} />
+              {:else}
+                <span class="slot-empty">not routed</span>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      {@render effectChain($hostState.rack.masterEffects, 'master',
+                           `Master effects${latencySuffix($hostState.rack.masterLatencyMs)}`)}
+
+      <!-- Shared send/return buses (Stage 5): each return is one more effect chain, fed by
+           the per-part send sliders above, rejoining ahead of the master inserts. -->
+      <div class="returns" data-testid="host-returns">
+        <div class="fx-head">
+          <strong>Returns</strong>
+          <button type="button" onclick={() => addReturn()} data-testid="host-add-return">+ Return</button>
+        </div>
+        {#each $hostState.rack.returns as ret (ret.returnId)}
+          <div class="return-block">
+            <div class="fx-head">
+              <span class="send-name">{ret.name}</span>
+              <label class="mini return-level" title="Return level">
+                <input type="range" min="0" max="2" step="0.01" value={ret.level}
+                       aria-label={`${ret.name} level`}
+                       oninput={(e) => setReturnLevel(ret.returnId, Number(e.currentTarget.value))} />
+              </label>
+              <button type="button" class="ghost danger" title="Remove this return (its sends go with it)"
+                      onclick={() => removeReturn(ret.returnId)}>×</button>
+            </div>
+            {@render effectChain(ret.effects, ret.returnId, `${ret.name} effects`, 'host-return-fx')}
+          </div>
+        {/each}
+      </div>
 
       <!-- Stage 5 macros: one value fanning across parts and effects, always through the
            central parameter path. Select a macro, then add targets from the parameter view. -->
@@ -955,13 +1108,28 @@
   .param-value { flex: 0 0 84px; text-align: right; color: #9aa5b1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .param-diag { color: #66707b; font-size: 10px; margin: -2px 0 0 138px; }
 
-  .fx-chain, .macros {
+  .fx-chain, .macros, .sends, .outputs, .returns, .hw-config {
     display: flex;
     flex-direction: column;
     gap: 6px;
     border-top: 1px solid #2c343d;
     padding-top: 8px;
   }
+  .send-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .send-name { flex: 0 0 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .send-row input[type='range'] { flex: 1; min-width: 60px; }
+  .return-block { display: flex; flex-direction: column; gap: 4px; }
+  .return-block .fx-chain { border-top: none; padding-top: 0; margin-left: 8px; }
+  .return-level input[type='range'] { width: 120px; }
+  .hw-error {
+    padding: 4px 8px;
+    border: 1px solid #7a4a4a;
+    border-radius: 4px;
+    background: #2a1d1d;
+    color: #e4b3b3;
+    font-size: 11px;
+  }
+  .hw-send { display: flex; align-items: flex-end; }
   .fx-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .fx-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
   .fx-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
