@@ -248,6 +248,11 @@ public:
         // mutation; the outer VST3 sets this false because the DAW owns the session through
         // get/setStateInformation — a host file would fight the project file over the truth.
         bool persistSession = true;
+        /** Whether a scan also sweeps the standard system VST3 folders (§8.6.5) on top of the
+            user's own scan paths. The product wants them; a TEST must not, because a test that
+            reads whatever the developer happens to have installed is not a test — it passes on
+            a clean machine and fails on a working one, which is the worst way round. */
+        bool includeDefaultScanRoots = true;
         double sampleRate = 44100.0;
         int blockSize = 512;
     };

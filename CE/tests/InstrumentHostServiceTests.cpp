@@ -268,6 +268,12 @@ struct Harness
         InstrumentHostService::Options options;
         options.dataDirectory = dataDir;
         options.workerExecutable = worker;
+        // Never sweep the machine the tests are running on. With this left at its product
+        // default, testScan below picked up every VST3 installed on the developer's computer,
+        // handed each one to the stub worker, and counted a "Stub Synth" for all of them — so
+        // it passed on a clean Linux container and failed on any real Windows box with
+        // plug-ins on it. The fixtures under the scan path are the whole world here.
+        options.includeDefaultScanRoots = false;
         options.emit = [this] (const juce::String& name, const juce::var& payload)
         {
             emits.entries.push_back ({ name, payload });

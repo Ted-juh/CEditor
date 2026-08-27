@@ -3892,7 +3892,9 @@ void InstrumentHostService::runScanNow()
         working = catalog;
     }
 
-    juce::Array<juce::File> roots = PluginScannerCoordinator::defaultWindowsVst3Roots();
+    juce::Array<juce::File> roots;
+    if (options.includeDefaultScanRoots)
+        roots = PluginScannerCoordinator::defaultWindowsVst3Roots();
     for (const auto& path : userScanPaths)
         if (juce::File (path).isDirectory())
             roots.add (juce::File (path));
