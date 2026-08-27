@@ -162,6 +162,19 @@ const Macro* Performance::findMacro (const juce::String& macroId) const
     return const_cast<Performance*> (this)->findMacro (macroId);
 }
 
+ReturnChain* Performance::findReturn (const juce::String& returnId)
+{
+    for (auto& chain : returns)
+        if (chain.returnId == returnId)
+            return &chain;
+    return nullptr;
+}
+
+const ReturnChain* Performance::findReturn (const juce::String& returnId) const
+{
+    return const_cast<Performance*> (this)->findReturn (returnId);
+}
+
 EffectSlot* Performance::findEffect (const juce::String& effectId, juce::String* chainIdOut)
 {
     for (auto& part : parts)
@@ -178,6 +191,14 @@ EffectSlot* Performance::findEffect (const juce::String& effectId, juce::String*
             if (chainIdOut != nullptr) *chainIdOut = "master";
             return &slot;
         }
+
+    for (auto& chain : returns)
+        for (auto& slot : chain.effects)
+            if (slot.effectId == effectId)
+            {
+                if (chainIdOut != nullptr) *chainIdOut = chain.returnId;
+                return &slot;
+            }
 
     return nullptr;
 }
@@ -226,6 +247,46 @@ juce::var Performance::toVar() const
         p->setProperty ("pan",              part.pan);
         p->setProperty ("editorOpen",       part.editorOpen);
         p->setProperty ("effects",          effectsToVar (part.effects));
+
+        if (! part.sends.isEmpty())
+        {
+            juce::Array<juce::var> sendVars;
+            for (const auto& send : part.sends)
+            {
+                auto* s = new juce::DynamicObject();
+                s->setProperty ("returnId", send.returnId);
+                s->setProperty ("level",    send.level);
+                sendVars.add (juce::var (s));
+            }
+            p->setProperty ("sends", sendVars);
+        }
+
+        if (! part.extraOuts.isEmpty())
+        {
+            juce::Array<juce::var> outVars;
+            for (const auto& extra : part.extraOuts)
+            {
+                auto* o = new juce::DynamicObject();
+                o->setProperty ("pairIndex", extra.pairIndex);
+                o->setProperty ("gain",      extra.gain);
+                outVars.add (juce::var (o));
+            }
+            p->setProperty ("extraOuts", outVars);
+        }
+
+        if (part.hardware)
+        {
+            p->setProperty ("hardware",           true);
+            p->setProperty ("midiOutputId",       part.midiOutputId);
+            p->setProperty ("midiOutputName",     part.midiOutputName);
+            p->setProperty ("midiOutChannel",     part.midiOutChannel);
+            p->setProperty ("audioReturnChannel", part.audioReturnChannel);
+            p->setProperty ("audioReturnStereo",  part.audioReturnStereo);
+            p->setProperty ("programBank",        part.programBank);
+            p->setProperty ("programNumber",      part.programNumber);
+            p->setProperty ("deviceProfileId",    part.deviceProfileId);
+        }
+
         partVars.add (juce::var (p));
     }
 
@@ -285,8 +346,20 @@ juce::var Performance::toVar() const
     root->setProperty ("performanceId", performanceId);
     root->setProperty ("name",          name);
     root->setProperty ("focusedPartId", focusedPartId);
+    juce::Array<juce::var> returnVars;
+    for (const auto& chain : returns)
+    {
+        auto* r = new juce::DynamicObject();
+        r->setProperty ("returnId", chain.returnId);
+        r->setProperty ("name",     chain.name);
+        r->setProperty ("level",    chain.level);
+        r->setProperty ("effects",  effectsToVar (chain.effects));
+        returnVars.add (juce::var (r));
+    }
+
     root->setProperty ("parts",         partVars);
     root->setProperty ("masterEffects", effectsToVar (masterEffects));
+    root->setProperty ("returns",       returnVars);
     root->setProperty ("macros",        macroVars);
     root->setProperty ("pages",         pageVars);
     return juce::var (root);
@@ -347,6 +420,35 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
         part.pan        = floatOf (p, "pan", 0.0f, -1.0f, 1.0f);
         part.editorOpen = (bool) p.getProperty ("editorOpen", false);
 
+        // Explicit multi-output pairs: a clamped pair index, duplicates dropped — a damaged
+        // route is a nit, not a reason to refuse the rig.
+        if (const auto* outArray = p.getProperty ("extraOuts", {}).getArray())
+            for (const auto& o : *outArray)
+            {
+                ExtraOut extra;
+                extra.pairIndex = intOf (o, "pairIndex", 1, 1, 15);
+                extra.gain      = floatOf (o, "gain", 1.0f, 0.0f, 2.0f);
+
+                bool duplicate = false;
+                for (const auto& existing : part.extraOuts)
+                    duplicate = duplicate || existing.pairIndex == extra.pairIndex;
+                if (! duplicate)
+                    part.extraOuts.add (extra);
+            }
+
+        if ((bool) p.getProperty ("hardware", false))
+        {
+            part.hardware           = true;
+            part.midiOutputId       = p.getProperty ("midiOutputId", {}).toString();
+            part.midiOutputName     = p.getProperty ("midiOutputName", {}).toString();
+            part.midiOutChannel     = intOf (p, "midiOutChannel", 1, 1, 16);
+            part.audioReturnChannel = intOf (p, "audioReturnChannel", -1, -1, 63);
+            part.audioReturnStereo  = (bool) p.getProperty ("audioReturnStereo", true);
+            part.programBank        = intOf (p, "programBank", -1, -1, 16383);
+            part.programNumber      = intOf (p, "programNumber", -1, -1, 127);
+            part.deviceProfileId    = p.getProperty ("deviceProfileId", {}).toString();
+        }
+
         parsed.parts.add (std::move (part));
     }
 
@@ -359,6 +461,46 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
             return false;
     if (! effectsFromVar (stored.getProperty ("masterEffects", {}), parsed.masterEffects, seenEffectIds))
         return false;
+
+    // Return chains carry the same identity rules as everything else; their effect ids share
+    // the one namespace with every insert chain.
+    if (const auto* returnArray = stored.getProperty ("returns", {}).getArray())
+    {
+        juce::StringArray seenReturnIds;
+        for (const auto& r : *returnArray)
+        {
+            ReturnChain chain;
+            chain.returnId = r.getProperty ("returnId", {}).toString();
+            if (chain.returnId.isEmpty() || seenReturnIds.contains (chain.returnId))
+                return false;
+            seenReturnIds.add (chain.returnId);
+
+            chain.name  = r.getProperty ("name", {}).toString();
+            chain.level = floatOf (r, "level", 1.0f, 0.0f, 2.0f);
+            if (! effectsFromVar (r.getProperty ("effects", {}), chain.effects, seenEffectIds))
+                return false;
+
+            parsed.returns.add (std::move (chain));
+        }
+    }
+
+    // Sends parse after returns so a send into a return that no longer exists can be dropped
+    // (a stranded send is the damaged nit; the rig still loads).
+    for (int i = 0; i < parsed.parts.size(); ++i)
+        if (const auto* sendArray = (*partArray)[i].getProperty ("sends", {}).getArray())
+            for (const auto& s : *sendArray)
+            {
+                PartSend send;
+                send.returnId = s.getProperty ("returnId", {}).toString();
+                send.level    = floatOf (s, "level", 0.0f, 0.0f, 2.0f);
+
+                bool duplicate = false;
+                for (const auto& existing : parsed.parts.getReference (i).sends)
+                    duplicate = duplicate || existing.returnId == send.returnId;
+
+                if (! duplicate && parsed.findReturn (send.returnId) != nullptr)
+                    parsed.parts.getReference (i).sends.add (std::move (send));
+            }
 
     if (const auto* macroArray = stored.getProperty ("macros", {}).getArray())
     {

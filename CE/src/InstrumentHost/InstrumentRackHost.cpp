@@ -10,18 +10,24 @@ InstrumentRackHost::InstrumentRackHost()
 {
     model = Performance::create();
     midiInNode   = graph.addNode (std::make_unique<IOProcessor> (IOProcessor::midiInputNode));
+    audioInNode  = graph.addNode (std::make_unique<IOProcessor> (IOProcessor::audioInputNode));
     audioOutNode = graph.addNode (std::make_unique<IOProcessor> (IOProcessor::audioOutputNode));
 }
 
 InstrumentRackHost::~InstrumentRackHost() = default;
 
-void InstrumentRackHost::prepare (double sampleRate, int blockSize)
+void InstrumentRackHost::prepare (double sampleRate, int blockSize, int numInputChannels)
 {
     currentSampleRate = sampleRate;
     currentBlockSize = blockSize;
-    graph.setPlayConfigDetails (0, 2, sampleRate, blockSize);
+    graph.setPlayConfigDetails (juce::jmax (0, numInputChannels), 2, sampleRate, blockSize);
     graph.prepareToPlay (sampleRate, blockSize);
     prepared = true;
+
+    // The input IO node only knows its channels once prepared, and a hardware part's return
+    // wires against those channels — so the wiring is rebuilt on every prepare rather than
+    // trusted to predate it.
+    rewireAudio();
 }
 
 void InstrumentRackHost::release()
@@ -38,14 +44,20 @@ juce::String InstrumentRackHost::addPart()
     return partId;
 }
 
+juce::Array<EffectSlot>* InstrumentRackHost::chainFor (const juce::String& chainId)
+{
+    if (chainId == masterChainId)
+        return &model.masterEffects;
+    if (auto* part = model.findPart (chainId))
+        return &part->effects;
+    if (auto* ret = model.findReturn (chainId))
+        return &ret->effects;
+    return nullptr;
+}
+
 juce::String InstrumentRackHost::addEffectSlot (const juce::String& chainId)
 {
-    juce::Array<EffectSlot>* chain = nullptr;
-    if (chainId == masterChainId)
-        chain = &model.masterEffects;
-    else if (auto* part = model.findPart (chainId))
-        chain = &part->effects;
-
+    auto* chain = chainFor (chainId);
     if (chain == nullptr)
         return {};
 
@@ -78,8 +90,7 @@ bool InstrumentRackHost::removeEffectSlot (const juce::String& effectId)
 
     destroyEffectNode (effectId);
 
-    auto& chain = chainId == masterChainId ? model.masterEffects
-                                           : model.findPart (chainId)->effects;
+    auto& chain = *chainFor (chainId);
     for (int i = 0; i < chain.size(); ++i)
         if (chain.getReference (i).effectId == effectId)
         {
@@ -97,8 +108,7 @@ bool InstrumentRackHost::moveEffectSlot (const juce::String& effectId, int newIn
     if (model.findEffect (effectId, &chainId) == nullptr)
         return false;
 
-    auto& chain = chainId == masterChainId ? model.masterEffects
-                                           : model.findPart (chainId)->effects;
+    auto& chain = *chainFor (chainId);
     for (int i = 0; i < chain.size(); ++i)
         if (chain.getReference (i).effectId == effectId)
         {
@@ -201,6 +211,253 @@ bool InstrumentRackHost::effectHasProcessor (const juce::String& effectId) const
     return getEffect (effectId) != nullptr;
 }
 
+juce::String InstrumentRackHost::addReturn (const juce::String& name)
+{
+    ReturnChain chain;
+    chain.returnId = juce::Uuid().toDashedString();
+    chain.name = name;
+    const auto returnId = chain.returnId;
+    model.returns.add (std::move (chain));
+    rewireAudio();
+    return returnId;
+}
+
+bool InstrumentRackHost::removeReturn (const juce::String& returnId)
+{
+    auto* chain = model.findReturn (returnId);
+    if (chain == nullptr)
+        return false;
+
+    for (const auto& slot : juce::Array<EffectSlot> (chain->effects))
+        destroyEffectNode (slot.effectId);
+
+    for (int i = 0; i < model.returns.size(); ++i)
+        if (model.returns.getReference (i).returnId == returnId)
+        {
+            model.returns.remove (i);
+            break;
+        }
+
+    // Sends into a gone return are stranded, and stranded means dropped — the model never
+    // keeps an address nothing can resolve.
+    for (auto& part : model.parts)
+        for (int i = part.sends.size(); --i >= 0;)
+            if (part.sends.getReference (i).returnId == returnId)
+                part.sends.remove (i);
+
+    rewireAudio();
+    return true;
+}
+
+bool InstrumentRackHost::renameReturn (const juce::String& returnId, const juce::String& name)
+{
+    if (auto* chain = model.findReturn (returnId))
+    {
+        chain->name = name;
+        return true;
+    }
+    return false;
+}
+
+bool InstrumentRackHost::setReturnLevel (const juce::String& returnId, float level)
+{
+    auto* chain = model.findReturn (returnId);
+    if (chain == nullptr)
+        return false;
+
+    chain->level = juce::jlimit (0.0f, 2.0f, level);
+    if (const auto it = returnLevelNodes.find (returnId); it != returnLevelNodes.end())
+        static_cast<GainPanProcessor*> (it->second->getProcessor())
+            ->setVolumePan (chain->level, 0.0f, true);
+    return true;
+}
+
+bool InstrumentRackHost::setSendLevel (const juce::String& partId, const juce::String& returnId,
+                                       float level)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr || model.findReturn (returnId) == nullptr)
+        return false;
+
+    PartSend* send = nullptr;
+    for (auto& existing : part->sends)
+        if (existing.returnId == returnId)
+            send = &existing;
+
+    if (send == nullptr)
+    {
+        part->sends.add ({ returnId, 0.0f });
+        send = &part->sends.getReference (part->sends.size() - 1);
+    }
+
+    send->level = juce::jlimit (0.0f, 2.0f, level);
+
+    // A send created just now needs its node and wire; an existing one only a new level.
+    auto* lp = findLive (partId);
+    if (lp != nullptr)
+    {
+        if (const auto it = lp->sendNodes.find (returnId); it != lp->sendNodes.end())
+        {
+            static_cast<GainPanProcessor*> (it->second->getProcessor())
+                ->setVolumePan (send->level, 0.0f, true);
+            return true;
+        }
+    }
+    rewireAudio();
+    return true;
+}
+
+bool InstrumentRackHost::setExtraOut (const juce::String& partId, int pairIndex, float gain)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr || pairIndex < 1 || pairIndex > 15)
+        return false;
+
+    ExtraOut* extra = nullptr;
+    for (auto& existing : part->extraOuts)
+        if (existing.pairIndex == pairIndex)
+            extra = &existing;
+
+    const bool created = extra == nullptr;
+    if (created)
+    {
+        part->extraOuts.add ({ pairIndex, 1.0f });
+        extra = &part->extraOuts.getReference (part->extraOuts.size() - 1);
+    }
+
+    extra->gain = juce::jlimit (0.0f, 2.0f, gain);
+
+    auto* lp = findLive (partId);
+    if (! created && lp != nullptr)
+        if (const auto it = lp->extraOutNodes.find (pairIndex); it != lp->extraOutNodes.end())
+        {
+            static_cast<GainPanProcessor*> (it->second->getProcessor())
+                ->setVolumePan (extra->gain, 0.0f, true);
+            return true;
+        }
+    rewireAudio();
+    return true;
+}
+
+bool InstrumentRackHost::removeExtraOut (const juce::String& partId, int pairIndex)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+
+    for (int i = 0; i < part->extraOuts.size(); ++i)
+        if (part->extraOuts.getReference (i).pairIndex == pairIndex)
+        {
+            part->extraOuts.remove (i);
+            rewireAudio();
+            return true;
+        }
+    return false;
+}
+
+int InstrumentRackHost::instrumentOutputChannels (const juce::String& partId) const
+{
+    if (auto* instrument = getInstrument (partId))
+        return instrument->getTotalNumOutputChannels();
+    return 0;
+}
+
+bool InstrumentRackHost::setHardwareConfig (const juce::String& partId, const HardwareConfig& config)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+
+    // The two roles are exclusive live: a plug-in instrument leaves (its identity and blob
+    // stay in the document for the day the part turns back to software).
+    if (! part->hardware && partHasInstrument (partId))
+        unloadInstrument (partId);
+
+    part->hardware           = true;
+    part->midiOutputId       = config.midiOutputId;
+    part->midiOutputName     = config.midiOutputName;
+    part->midiOutChannel     = juce::jlimit (1, 16, config.midiOutChannel);
+    part->audioReturnChannel = juce::jlimit (-1, 63, config.audioReturnChannel);
+    part->audioReturnStereo  = config.audioReturnStereo;
+    part->programBank        = juce::jlimit (-1, 16383, config.programBank);
+    part->programNumber      = juce::jlimit (-1, 127, config.programNumber);
+    part->deviceProfileId    = config.deviceProfileId;
+
+    rewireAudio();
+    return true;
+}
+
+bool InstrumentRackHost::clearHardware (const juce::String& partId)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr || ! part->hardware)
+        return false;
+
+    part->hardware = false;
+    rewireAudio();
+    return true;
+}
+
+bool InstrumentRackHost::setHardwareMidiSink (const juce::String& partId, MidiSendProcessor::Sink sink)
+{
+    auto* lp = findLive (partId);
+    if (lp == nullptr || lp->midiSend == nullptr)
+        return false;
+
+    lp->midiSend->setSink (std::move (sink));
+    return true;
+}
+
+bool InstrumentRackHost::sendHardwareProgram (const juce::String& partId)
+{
+    const auto* part = model.findPart (partId);
+    auto* lp = findLive (partId);
+    if (part == nullptr || ! part->hardware || lp == nullptr || lp->midiSend == nullptr)
+        return false;
+    if (part->programBank < 0 && part->programNumber < 0)
+        return false;
+
+    juce::MidiBuffer messages;
+    int sample = 0;
+    if (part->programBank >= 0)
+    {
+        messages.addEvent (juce::MidiMessage::controllerEvent (part->midiOutChannel, 0,
+                                                               part->programBank >> 7), sample++);
+        messages.addEvent (juce::MidiMessage::controllerEvent (part->midiOutChannel, 32,
+                                                               part->programBank & 0x7f), sample++);
+    }
+    if (part->programNumber >= 0)
+        messages.addEvent (juce::MidiMessage::programChange (part->midiOutChannel,
+                                                             part->programNumber), sample);
+
+    lp->midiSend->sendNow (messages);
+    return true;
+}
+
+int InstrumentRackHost::partLatencySamples (const juce::String& partId) const
+{
+    const auto* part = model.findPart (partId);
+    const auto* lp = findLive (partId);
+    if (part == nullptr || lp == nullptr)
+        return 0;
+
+    int total = lp->instrumentNode != nullptr
+                  ? lp->instrumentNode->getProcessor()->getLatencySamples() : 0;
+    for (const auto& slot : part->effects)
+        if (auto* fx = getEffect (slot.effectId))
+            total += fx->getLatencySamples();
+    return total;
+}
+
+int InstrumentRackHost::masterLatencySamples() const
+{
+    int total = 0;
+    for (const auto& slot : model.masterEffects)
+        if (auto* fx = getEffect (slot.effectId))
+            total += fx->getLatencySamples();
+    return total;
+}
+
 bool InstrumentRackHost::primePartState (const juce::String& partId, const ClassInfo& info,
                                          const juce::String& stateBlobBase64)
 {
@@ -299,6 +556,7 @@ bool InstrumentRackHost::removePart (const juce::String& partId)
         for (const auto& slot : juce::Array<EffectSlot> (part->effects))
             destroyEffectNode (slot.effectId);
 
+    destroyAuxNodes (*lp);
     graph.removeNode (lp->filterNode->nodeID);
     graph.removeNode (lp->gainNode->nodeID);
 
@@ -501,6 +759,8 @@ Performance InstrumentRackHost::captureState()
         refreshEffectBlobs (part.effects);
     }
     refreshEffectBlobs (model.masterEffects);
+    for (auto& chain : model.returns)
+        refreshEffectBlobs (chain.effects);
     return model;
 }
 
@@ -524,10 +784,18 @@ juce::Array<InstrumentRackHost::UnresolvedPart> InstrumentRackHost::loadModel (P
             notifyInstrumentWillBeRemoved (partId, lp);
             graph.removeNode (lp.instrumentNode->nodeID);
         }
+        destroyAuxNodes (lp);
         graph.removeNode (lp.filterNode->nodeID);
         graph.removeNode (lp.gainNode->nodeID);
     }
     live.clear();
+
+    for (auto& [returnId, node] : returnLevelNodes)
+    {
+        juce::ignoreUnused (returnId);
+        graph.removeNode (node->nodeID);
+    }
+    returnLevelNodes.clear();
 
     // Every live insert dies with the old rack, announced like the instruments.
     while (! liveEffects.empty())
@@ -539,7 +807,9 @@ juce::Array<InstrumentRackHost::UnresolvedPart> InstrumentRackHost::loadModel (P
     for (const auto& part : model.parts)
     {
         createLiveNodes (part);
-        if (part.pluginCeId.isNotEmpty())
+        // A hardware part's plug-in identity (if it ever had one) is dormant, not missing —
+        // no instantiation is asked for while the part plays an external synth.
+        if (part.pluginCeId.isNotEmpty() && ! part.hardware)
             unresolved.add ({ part.partId, part.pluginCeId, part.pluginModulePath });
     }
 
@@ -598,31 +868,154 @@ void InstrumentRackHost::createLiveNodes (const RackPart& part)
 void InstrumentRackHost::connectAudio (juce::AudioProcessorGraph::Node* from,
                                        juce::AudioProcessorGraph::Node* to)
 {
+    connectAudioPair (from, 0, from->getProcessor()->getTotalNumOutputChannels() >= 2, to);
+}
+
+void InstrumentRackHost::connectAudioPair (juce::AudioProcessorGraph::Node* from, int firstChannel,
+                                           bool stereo, juce::AudioProcessorGraph::Node* to)
+{
     // One stereo pair remains the rack's currency: a mono source feeds both sides, a mono
     // destination sums both sides, several sources into one destination sum on its inputs.
     // The output IO node reports its channels only once the graph is prepared, and the rack
     // is always stereo out — so it is pinned rather than asked.
-    const auto outs = juce::jmax (1, from->getProcessor()->getTotalNumOutputChannels());
     const auto ins  = to == audioOutNode.get()
                         ? 2
                         : juce::jmax (1, to->getProcessor()->getTotalNumInputChannels());
-    const auto sourceRight = outs >= 2 ? 1 : 0;
+    const auto sourceRight = stereo ? firstChannel + 1 : firstChannel;
 
     if (ins >= 2)
     {
-        graph.addConnection ({ { from->nodeID, 0 },           { to->nodeID, 0 } });
-        graph.addConnection ({ { from->nodeID, sourceRight }, { to->nodeID, 1 } });
+        graph.addConnection ({ { from->nodeID, firstChannel }, { to->nodeID, 0 } });
+        graph.addConnection ({ { from->nodeID, sourceRight },  { to->nodeID, 1 } });
     }
     else
     {
-        graph.addConnection ({ { from->nodeID, 0 }, { to->nodeID, 0 } });
-        if (sourceRight != 0)
+        graph.addConnection ({ { from->nodeID, firstChannel }, { to->nodeID, 0 } });
+        if (sourceRight != firstChannel)
             graph.addConnection ({ { from->nodeID, sourceRight }, { to->nodeID, 0 } });
+    }
+}
+
+void InstrumentRackHost::destroyAuxNodes (LivePart& lp)
+{
+    for (auto& [returnId, node] : lp.sendNodes)
+    {
+        juce::ignoreUnused (returnId);
+        graph.removeNode (node->nodeID);
+    }
+    lp.sendNodes.clear();
+
+    for (auto& [pairIndex, node] : lp.extraOutNodes)
+    {
+        juce::ignoreUnused (pairIndex);
+        graph.removeNode (node->nodeID);
+    }
+    lp.extraOutNodes.clear();
+
+    if (lp.midiSendNode != nullptr)
+    {
+        graph.removeNode (lp.midiSendNode->nodeID);
+        lp.midiSendNode = nullptr;
+        lp.midiSend = nullptr;
+    }
+}
+
+void InstrumentRackHost::syncAuxNodes()
+{
+    // Return levels: one gain per chain, alive exactly as long as its chain.
+    for (auto it = returnLevelNodes.begin(); it != returnLevelNodes.end();)
+    {
+        if (model.findReturn (it->first) == nullptr)
+        {
+            graph.removeNode (it->second->nodeID);
+            it = returnLevelNodes.erase (it);
+        }
+        else
+            ++it;
+    }
+    for (const auto& chain : model.returns)
+    {
+        auto& node = returnLevelNodes[chain.returnId];
+        if (node == nullptr)
+            node = graph.addNode (std::make_unique<GainPanProcessor>());
+        static_cast<GainPanProcessor*> (node->getProcessor())
+            ->setVolumePan (chain.level, 0.0f, true);
+    }
+
+    for (auto& [partId, lp] : live)
+    {
+        const auto* part = model.findPart (partId);
+        if (part == nullptr)
+            continue;
+
+        // Send gains per (part, return) the model still names.
+        for (auto it = lp.sendNodes.begin(); it != lp.sendNodes.end();)
+        {
+            bool wanted = false;
+            for (const auto& send : part->sends)
+                wanted = wanted || send.returnId == it->first;
+            if (! wanted)
+            {
+                graph.removeNode (it->second->nodeID);
+                it = lp.sendNodes.erase (it);
+            }
+            else
+                ++it;
+        }
+        for (const auto& send : part->sends)
+        {
+            auto& node = lp.sendNodes[send.returnId];
+            if (node == nullptr)
+                node = graph.addNode (std::make_unique<GainPanProcessor>());
+            static_cast<GainPanProcessor*> (node->getProcessor())
+                ->setVolumePan (send.level, 0.0f, true);
+        }
+
+        // Extra-out gains per routed pair.
+        for (auto it = lp.extraOutNodes.begin(); it != lp.extraOutNodes.end();)
+        {
+            bool wanted = false;
+            for (const auto& extra : part->extraOuts)
+                wanted = wanted || extra.pairIndex == it->first;
+            if (! wanted)
+            {
+                graph.removeNode (it->second->nodeID);
+                it = lp.extraOutNodes.erase (it);
+            }
+            else
+                ++it;
+        }
+        for (const auto& extra : part->extraOuts)
+        {
+            auto& node = lp.extraOutNodes[extra.pairIndex];
+            if (node == nullptr)
+                node = graph.addNode (std::make_unique<GainPanProcessor>());
+            static_cast<GainPanProcessor*> (node->getProcessor())
+                ->setVolumePan (extra.gain, 0.0f, true);
+        }
+
+        // The hardware MIDI sender comes and goes with the part's role.
+        if (part->hardware && lp.midiSendNode == nullptr)
+        {
+            auto sender = std::make_unique<MidiSendProcessor>();
+            lp.midiSend = sender.get();
+            lp.midiSendNode = graph.addNode (std::move (sender));
+        }
+        else if (! part->hardware && lp.midiSendNode != nullptr)
+        {
+            graph.removeNode (lp.midiSendNode->nodeID);
+            lp.midiSendNode = nullptr;
+            lp.midiSend = nullptr;
+        }
+        if (lp.midiSend != nullptr)
+            lp.midiSend->setOutChannel (part->midiOutChannel);
     }
 }
 
 void InstrumentRackHost::rewireAudio()
 {
+    syncAuxNodes();
+
     // Every audio connection in this graph belongs to the one path this rebuilds (MIDI wires
     // ride the dedicated channel index), so drop-and-rebuild keeps the whole topology in one
     // readable place instead of tracking edits wire by wire.
@@ -630,43 +1023,119 @@ void InstrumentRackHost::rewireAudio()
         if (connection.source.channelIndex != midiChannel)
             graph.removeConnection (connection);
 
-    // Per part: instrument → its loaded inserts, in slot order → the part's gain. A part
-    // with no instrument leaves its chain idle rather than wiring effects to nothing.
-    for (auto& [partId, lp] : live)
-    {
-        const auto* part = model.findPart (partId);
-        auto* upstream = lp.instrumentNode.get();
-        if (part == nullptr || upstream == nullptr)
-            continue;
-
-        graph.addConnection ({ { lp.filterNode->nodeID, midiChannel },
-                               { lp.instrumentNode->nodeID, midiChannel } });
-
-        for (const auto& slot : part->effects)
-            if (const auto it = liveEffects.find (slot.effectId);
-                it != liveEffects.end() && it->second.node != nullptr)
-            {
-                connectAudio (upstream, it->second.node.get());
-                upstream = it->second.node.get();
-            }
-
-        connectAudio (upstream, lp.gainNode.get());
-    }
-
-    // Master: every gain into the chain head (summing there), serial hops, tail to the
-    // output — or straight to the output while the master chain is empty or unloaded.
+    // Master chain first, because everything downstream of the parts needs its head: part
+    // gains, extra outs and return tails all sum there (or at the output while it is empty).
     juce::Array<juce::AudioProcessorGraph::Node*> masterNodes;
     for (const auto& slot : model.masterEffects)
         if (const auto it = liveEffects.find (slot.effectId);
             it != liveEffects.end() && it->second.node != nullptr)
             masterNodes.add (it->second.node.get());
 
-    auto* sink = masterNodes.isEmpty() ? audioOutNode.get() : masterNodes.getFirst();
+    auto* masterSink = masterNodes.isEmpty() ? audioOutNode.get() : masterNodes.getFirst();
+
+    // Return chains: sends sum into the chain's head (its first loaded effect, else its
+    // level gain), run the effects in order, and the level gain rejoins the master path.
+    std::map<juce::String, juce::AudioProcessorGraph::Node*> returnHeads;
+    for (const auto& chain : model.returns)
+    {
+        auto* levelNode = returnLevelNodes[chain.returnId].get();
+
+        juce::Array<juce::AudioProcessorGraph::Node*> fx;
+        for (const auto& slot : chain.effects)
+            if (const auto it = liveEffects.find (slot.effectId);
+                it != liveEffects.end() && it->second.node != nullptr)
+                fx.add (it->second.node.get());
+
+        returnHeads[chain.returnId] = fx.isEmpty() ? levelNode : fx.getFirst();
+        for (int i = 0; i + 1 < fx.size(); ++i)
+            connectAudio (fx[i], fx[i + 1]);
+        if (! fx.isEmpty())
+            connectAudio (fx.getLast(), levelNode);
+        connectAudio (levelNode, masterSink);
+    }
+
+    // Per part: the audio source is the loaded instrument (software) or the configured
+    // audio-return input channels (hardware) → inserts in slot order → the part's gain. A
+    // part with neither leaves its chain idle rather than wiring effects to nothing.
     for (auto& [partId, lp] : live)
     {
-        juce::ignoreUnused (partId);
-        connectAudio (lp.gainNode.get(), sink);
+        const auto* part = model.findPart (partId);
+        if (part == nullptr)
+            continue;
+
+        if (part->hardware)
+        {
+            if (lp.midiSendNode != nullptr)
+                graph.addConnection ({ { lp.filterNode->nodeID, midiChannel },
+                                       { lp.midiSendNode->nodeID, midiChannel } });
+        }
+        else if (lp.instrumentNode != nullptr)
+            graph.addConnection ({ { lp.filterNode->nodeID, midiChannel },
+                                   { lp.instrumentNode->nodeID, midiChannel } });
+
+        juce::Array<juce::AudioProcessorGraph::Node*> inserts;
+        for (const auto& slot : part->effects)
+            if (const auto it = liveEffects.find (slot.effectId);
+                it != liveEffects.end() && it->second.node != nullptr)
+                inserts.add (it->second.node.get());
+
+        auto* chainHead = inserts.isEmpty() ? lp.gainNode.get() : inserts.getFirst();
+
+        bool hasSource = false;
+        if (part->hardware)
+        {
+            if (part->audioReturnChannel >= 0
+                && part->audioReturnChannel < audioInNode->getProcessor()->getTotalNumOutputChannels())
+            {
+                connectAudioPair (audioInNode.get(), part->audioReturnChannel,
+                                  part->audioReturnStereo, chainHead);
+                hasSource = true;
+            }
+        }
+        else if (lp.instrumentNode != nullptr)
+        {
+            connectAudio (lp.instrumentNode.get(), chainHead);
+            hasSource = true;
+        }
+
+        if (hasSource)
+        {
+            for (int i = 0; i + 1 < inserts.size(); ++i)
+                connectAudio (inserts[i], inserts[i + 1]);
+            if (! inserts.isEmpty())
+                connectAudio (inserts.getLast(), lp.gainNode.get());
+        }
+
+        connectAudio (lp.gainNode.get(), masterSink);
+
+        // Post-fader sends: the part's gain output, scaled per send, into each return head.
+        for (const auto& send : part->sends)
+            if (const auto nodeIt = lp.sendNodes.find (send.returnId);
+                nodeIt != lp.sendNodes.end())
+                if (const auto headIt = returnHeads.find (send.returnId);
+                    headIt != returnHeads.end())
+                {
+                    connectAudio (lp.gainNode.get(), nodeIt->second.get());
+                    connectAudio (nodeIt->second.get(), headIt->second);
+                }
+
+        // Explicit multi-output pairs, straight to the master path with their own gain —
+        // the main pair keeps the inserts and the fader.
+        if (! part->hardware && lp.instrumentNode != nullptr)
+        {
+            const auto channels = lp.instrumentNode->getProcessor()->getTotalNumOutputChannels();
+            for (const auto& extra : part->extraOuts)
+                if (const auto it = lp.extraOutNodes.find (extra.pairIndex);
+                    it != lp.extraOutNodes.end() && extra.pairIndex * 2 < channels)
+                {
+                    connectAudioPair (lp.instrumentNode.get(), extra.pairIndex * 2,
+                                      extra.pairIndex * 2 + 1 < channels, it->second.get());
+                    connectAudio (it->second.get(), masterSink);
+                }
+        }
     }
+
+    // Master serial hops, tail to the output.
     for (int i = 0; i + 1 < masterNodes.size(); ++i)
         connectAudio (masterNodes[i], masterNodes[i + 1]);
     if (! masterNodes.isEmpty())

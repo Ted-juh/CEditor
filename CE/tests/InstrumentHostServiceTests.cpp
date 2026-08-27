@@ -113,6 +113,57 @@ struct Emits
     }
 };
 
+// A two-bus instrument for the explicit multi-output tests: the main pair holds one known
+// level, the aux pair another, so which pairs reach the mix is an amplitude question.
+struct MultiOutSynth : juce::AudioProcessor
+{
+    MultiOutSynth()
+        : juce::AudioProcessor (BusesProperties()
+                                    .withOutput ("Main", juce::AudioChannelSet::stereo(), true)
+                                    .withOutput ("Aux",  juce::AudioChannelSet::stereo(), true))
+    {
+    }
+
+    void prepareToPlay (double, int) override {}
+    void releaseResources() override {}
+
+    void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi) override
+    {
+        for (const auto metadata : midi)
+        {
+            const auto message = metadata.getMessage();
+            if (message.isNoteOn())
+                ++activeNotes;
+            else if (message.isNoteOff())
+                activeNotes = juce::jmax (0, activeNotes - 1);
+        }
+
+        audio.clear();
+        if (activeNotes > 0)
+            for (int ch = 0; ch < audio.getNumChannels(); ++ch)
+                juce::FloatVectorOperations::fill (audio.getWritePointer (ch),
+                                                   ch < 2 ? 0.2f : 0.4f, audio.getNumSamples());
+    }
+
+    const juce::String getName() const override               { return "Multi Synth"; }
+    bool acceptsMidi() const override                         { return true; }
+    bool producesMidi() const override                        { return false; }
+    double getTailLengthSeconds() const override              { return 0.0; }
+    juce::AudioProcessorEditor* createEditor() override       { return nullptr; }
+    bool hasEditor() const override                           { return false; }
+    int getNumPrograms() override                             { return 1; }
+    int getCurrentProgram() override                          { return 0; }
+    void setCurrentProgram (int) override                     {}
+    const juce::String getProgramName (int) override          { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+    void getStateInformation (juce::MemoryBlock&) override    {}
+    void setStateInformation (const void*, int) override      {}
+
+    int activeNotes = 0;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MultiOutSynth)
+};
+
 struct Harness
 {
     explicit Harness (const juce::File& dataDir, const juce::File& worker = {},
@@ -146,6 +197,11 @@ struct Harness
                 auto fx = std::make_unique<ceditor::test::StubEffectProcessor>();
                 lastEffectStub = fx.get();
                 callback (std::move (fx), {});
+                return;
+            }
+            if (descriptionXml.contains ("Multi"))
+            {
+                callback (std::make_unique<MultiOutSynth>(), {});
                 return;
             }
             auto stub = std::make_unique<StubSynthProcessor>();
@@ -618,6 +674,19 @@ void seedTwoSynthCatalog (const juce::File& dataDir)
     fx.classes.add (reverb);
     catalog.commitScanResult (fx);
 
+    // And a multi-output instrument for the explicit routing tests.
+    ModuleScanResult multi;
+    multi.modulePath = "C:\\VST3\\Multi.vst3";
+    multi.fingerprint = "fp-multi";
+    PluginClassRecord multiSynth;
+    multiSynth.ceId = "VST3-multi-synth";
+    multiSynth.name = "Multi Synth";
+    multiSynth.vendor = "Test Audio";
+    multiSynth.isInstrument = true;
+    multiSynth.descriptionXml = "<PLUGIN name=\"Multi Synth\" ceId=\"VST3-multi-synth\"/>";
+    multi.classes.add (multiSynth);
+    catalog.commitScanResult (multi);
+
     catalog.saveTo (dataDir.getChildFile ("plugin-catalog.json"));
 }
 
@@ -744,7 +813,13 @@ void testParameterModel()
              && reply.payload.getProperty ("partId", {}).toString() == partA,
            "getParameters answers with the part's registry");
     const auto params = reply.payload.getProperty ("parameters", {});
-    check (params.size() == 3, "every host-visible parameter is listed");
+    // Three plug-in parameters plus the part's mixer addresses (@gain, @pan — no returns
+    // exist yet), which Stage 5 folds into the same registry.
+    check (params.size() == 5, "every host-visible parameter is listed");
+    check (params[3].getProperty ("id", {}).toString() == "@gain"
+             && params[4].getProperty ("id", {}).toString() == "@pan"
+             && params[3].getProperty ("group", {}).toString() == "Mixer",
+           "the mixer addresses follow the plug-in rows");
     check (params[0].getProperty ("id", {}).toString() == "cutoff"
              && ! (bool) params[0].getProperty ("discrete", true),
            "the plug-in's own paramID is the address, continuous classified");
@@ -811,7 +886,15 @@ void testParameterModel()
     h.cmd ("unloadInstrument", { { "partId", partB } });
     h.emits.clear();
     h.cmd ("getParameters", { { "partId", partB } });
-    check (h.emits.lastError().contains ("no instrument"), "an unloaded part has no registry");
+    {
+        // The plug-in registry is gone with the instrument; the part's mixer addresses
+        // remain — an empty (or hardware) part still has a fader to bind.
+        const auto& unloaded = h.emits.entries.back();
+        const auto remaining = unloaded.payload.getProperty ("parameters", {});
+        check (unloaded.name == "instrumentHostParameters" && remaining.size() == 2
+                 && remaining[0].getProperty ("id", {}).toString() == "@gain",
+               "an unloaded part keeps only its mixer registry");
+    }
     h.service->drainParameterEvents();   // and draining after the detach must not crash
 
     // Duplicate parameter IDs get unique addresses and a recorded warning, not silence.
@@ -881,7 +964,7 @@ void testEffectsAndMacros()
              && state->getProperty ("effectClasses", {})[0].getProperty ("name", {}).toString()
                     == "Nice Reverb",
            "the effect picker's projection lists the non-instrument class");
-    check (state->getProperty ("instruments", {}).size() == 2,
+    check (state->getProperty ("instruments", {}).size() == 3,
            "and the instrument browser still does not");
 
     const auto baseline = peak();
@@ -1005,6 +1088,479 @@ void testEnrichedPerformanceRestore()
              && macros[0].getProperty ("targets", {}).size() == 2
              && juce::approximatelyEqual ((float) (double) macros[0].getProperty ("value", 0.0), 1.0f),
            "macros restore with their targets and value");
+}
+
+// Shared send/return buses (§18.7.5, §18.7.7): post-fader sends into one more effect chain,
+// the chain's level rejoining ahead of the master inserts — all amplitude-provable through
+// the same graph, and all of it round-tripping through the session file.
+void testSendsAndReturns()
+{
+    std::cout << "\nsends and returns" << std::endl;
+
+    const auto dir = freshDataDir ("sendreturn");
+    seedTwoSynthCatalog (dir);
+
+    // Measures the SETTLED level (gain ramps span one block), not the transient peak.
+    const auto peakOf = [] (Harness& h)
+    {
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer midi;
+        midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        float settled = 0.0f;
+        for (int i = 0; i < 3; ++i)
+        {
+            buffer.clear();
+            h.service->getGraph().processBlock (buffer, midi);
+            midi.clear();
+            settled = buffer.getMagnitude (0, 512);
+        }
+        juce::MidiBuffer off;
+        off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+        buffer.clear();
+        h.service->getGraph().processBlock (buffer, off);
+        return settled;
+    };
+    const auto roughly = [] (float value, float expected)
+    {
+        return std::abs (value - expected) <= expected * 0.05f + 1.0e-6f;
+    };
+
+    juce::String returnId, partId;
+    float baseline = 0.0f;
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        baseline = peakOf (h);
+        check (baseline > 0.01f, "the dry part makes sound to begin with");
+
+        h.cmd ("addReturn", { { "name", "FX Bus" } });
+        const auto* state = h.emits.lastState();
+        const auto returns = state->getProperty ("rack", {}).getProperty ("returns", {});
+        check (returns.size() == 1
+                 && returns[0].getProperty ("name", {}).toString() == "FX Bus",
+               "a return chain appears in state");
+        returnId = returns[0].getProperty ("returnId", {}).toString();
+
+        h.cmd ("setSendLevel", { { "partId", partId }, { "returnId", returnId }, { "level", 1.0 } });
+        check (roughly (peakOf (h), baseline * 2.0f),
+               "an empty return at unity doubles the part (dry plus wet)");
+
+        h.cmd ("addEffect", { { "chainId", returnId }, { "ceId", "VST3-nice-reverb" } });
+        state = h.emits.lastState();
+        check ((bool) state->getProperty ("rack", {}).getProperty ("returns", {})[0]
+                   .getProperty ("effects", {})[0].getProperty ("hasProcessor", false),
+               "the return chain loads effects through the same transaction");
+        check (roughly (peakOf (h), baseline * 1.5f),
+               "the wet path runs the return's effects");
+
+        h.cmd ("setReturnLevel", { { "returnId", returnId }, { "level", 0.5 } });
+        check (roughly (peakOf (h), baseline * 1.25f), "the return's own level scales the wet path");
+        h.cmd ("setReturnLevel", { { "returnId", returnId }, { "level", 1.0 } });
+
+        h.cmd ("setPartMixer", { { "partId", partId }, { "mute", true } });
+        check (peakOf (h) < 1.0e-4f, "a post-fader send goes silent with its part");
+        h.cmd ("setPartMixer", { { "partId", partId }, { "mute", false } });
+        check (roughly (peakOf (h), baseline * 1.5f), "and comes back");
+
+        h.lastEffectStub->tone = 3;
+        h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 1.0 } });   // persists everything
+
+        // Removing the return heals the wiring and drops the stranded sends.
+        h.cmd ("addReturn", { { "name", "Doomed" } });
+        const auto doomedId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("returns", {})[1]
+                                  .getProperty ("returnId", {}).toString();
+        h.cmd ("setSendLevel", { { "partId", partId }, { "returnId", doomedId }, { "level", 1.0 } });
+        h.cmd ("removeReturn", { { "returnId", doomedId } });
+        state = h.emits.lastState();
+        check (state->getProperty ("rack", {}).getProperty ("returns", {}).size() == 1
+                 && state->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                        .getProperty ("sends", {}).size() == 1,
+               "removing a return drops its sends and keeps the others");
+        check (roughly (peakOf (h), baseline * 1.5f), "and the mix is undisturbed");
+    }
+
+    // The enriched manifest round trip: returns, their effects and states, and the sends.
+    Harness h2 (dir);
+    h2.cmd ("getState");
+    const auto* state = h2.emits.lastState();
+    const auto returns = state->getProperty ("rack", {}).getProperty ("returns", {});
+    check (returns.size() == 1
+             && (bool) returns[0].getProperty ("effects", {})[0].getProperty ("hasProcessor", false),
+           "the return chain restores with its processor");
+    check (h2.lastEffectStub != nullptr && h2.lastEffectStub->tone == 3,
+           "return-effect state rides the manifest");
+    const auto sends = state->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                           .getProperty ("sends", {});
+    check (sends.size() == 1
+             && juce::approximatelyEqual ((float) (double) sends[0].getProperty ("level", 0.0), 1.0f),
+           "sends restore with their levels");
+    const auto restoredBaseline = peakOf (h2) / 1.5f;
+    check (roughly (peakOf (h2), restoredBaseline * 1.5f) && peakOf (h2) > 0.01f,
+           "and the restored wet path is audible");
+}
+
+// Explicit multi-output routing (§18.7.7): an instrument's extra stereo pair reaches the
+// master path through its own gain; the main pair keeps the inserts and the fader.
+void testMultiOutputRouting()
+{
+    std::cout << "\nexplicit multi-output routing" << std::endl;
+
+    const auto dir = freshDataDir ("multiout");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-multi-synth" } });
+
+    // Settled level, not transient peak — the route gains ramp over one block.
+    const auto peak = [&h]
+    {
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer midi;
+        midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        float settled = 0.0f;
+        for (int i = 0; i < 3; ++i)
+        {
+            buffer.clear();
+            h.service->getGraph().processBlock (buffer, midi);
+            midi.clear();
+            settled = buffer.getMagnitude (0, 512);
+        }
+        juce::MidiBuffer off;
+        off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+        buffer.clear();
+        h.service->getGraph().processBlock (buffer, off);
+        return settled;
+    };
+    const auto roughly = [] (float value, float expected)
+    {
+        return std::abs (value - expected) <= expected * 0.05f + 1.0e-6f;
+    };
+
+    check ((int) h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+               .getProperty ("outputChannels", 0) == 4,
+           "the part reports its instrument's real output width");
+    check (roughly (peak(), 0.2f), "only the main pair sounds until a route exists");
+
+    h.cmd ("setExtraOut", { { "partId", partId }, { "pairIndex", 1 }, { "gain", 1.0 } });
+    check (roughly (peak(), 0.6f), "a routed extra pair joins the mix at its own gain");
+
+    h.cmd ("setExtraOut", { { "partId", partId }, { "pairIndex", 1 }, { "gain", 0.5 } });
+    check (roughly (peak(), 0.4f), "the route's gain is live");
+    const auto extraOuts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                               .getProperty ("extraOuts", {});
+    check (extraOuts.size() == 1
+             && (int) extraOuts[0].getProperty ("pairIndex", 0) == 1,
+           "the route is state, not a side effect");
+
+    h.emits.clear();
+    h.cmd ("setExtraOut", { { "partId", partId }, { "pairIndex", 0 }, { "gain", 1.0 } });
+    check (h.emits.lastError().isNotEmpty(), "the main pair is refused here — it has the fader");
+
+    h.cmd ("removeExtraOut", { { "partId", partId }, { "pairIndex", 1 } });
+    check (roughly (peak(), 0.2f), "an unrouted pair leaves the mix");
+}
+
+// Hardware-instrument parts (§18.7.6): an external synth as a first-class part — MIDI out
+// through an injected port, program recall, an audio return running the part's own inserts
+// and fader, and the port-gone diagnostic. No hardware in this container; the sink IS the
+// assertion.
+void testHardwareParts()
+{
+    std::cout << "\nhardware-instrument parts" << std::endl;
+
+    const auto dir = freshDataDir ("hardware");
+    seedTwoSynthCatalog (dir);
+
+    std::vector<juce::MidiMessage> captured;
+    const auto tweak = [&captured] (InstrumentHostService::Options& options)
+    {
+        options.listMidiOutputs = []
+        {
+            juce::StringPairArray outputs;
+            outputs.set ("an1x-port", "AN1x Port");
+            return outputs;
+        };
+        options.openMidiOutput = [&captured] (const juce::String& deviceId, juce::String& errorOut)
+            -> ceditor::host::MidiSendProcessor::Sink
+        {
+            if (deviceId != "an1x-port")
+            {
+                errorOut = "No such MIDI output.";
+                return {};
+            }
+            return [&captured] (const juce::MidiBuffer& messages)
+            {
+                for (const auto metadata : messages)
+                    captured.push_back (metadata.getMessage());
+            };
+        };
+    };
+
+    juce::String partId;
+    {
+        Harness h (dir, {}, tweak);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+
+        h.cmd ("setHardwareConfig", { { "partId", partId },
+                                      { "midiOutputId", "an1x-port" },
+                                      { "midiOutputName", "AN1x Port" },
+                                      { "midiOutChannel", 3 },
+                                      { "programBank", 2 },
+                                      { "programNumber", 45 } });
+        const auto* state = h.emits.lastState();
+        const auto part = state->getProperty ("rack", {}).getProperty ("parts", {})[0];
+        check ((bool) part.getProperty ("hardware", false)
+                 && part.getProperty ("midiOutError", "x").toString().isEmpty(),
+               "a hardware part configures and its port opens");
+
+        h.emits.clear();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        check (h.emits.lastError().contains ("hardware"),
+               "a hardware part refuses a plug-in load");
+
+        // The part's filtered MIDI reaches the port, rechannelled to the synth's channel.
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer midi;
+        midi.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 0);
+        h.service->getGraph().processBlock (buffer, midi);
+        check (! captured.empty() && captured.back().isNoteOn()
+                 && captured.back().getChannel() == 3
+                 && captured.back().getNoteNumber() == 64,
+               "performance MIDI reaches the hardware, on its channel");
+
+        captured.clear();
+        h.cmd ("sendHardwareProgram", { { "partId", partId } });
+        check (captured.size() == 3
+                 && captured[0].isController() && captured[0].getControllerNumber() == 0
+                 && captured[1].isController() && captured[1].getControllerNumber() == 32
+                 && captured[1].getControllerValue() == 2
+                 && captured[2].isProgramChange()
+                 && captured[2].getProgramChangeNumber() == 45
+                 && captured[2].getChannel() == 3,
+               "program recall sends bank select then program change");
+
+        // The managed audio return: interface inputs → the part's inserts → its fader.
+        h.service->prepareRuntime (44100.0, 512, 4);
+        h.cmd ("setHardwareConfig", { { "partId", partId }, { "audioReturnChannel", 2 } });
+
+        const auto returnPeak = [&h]
+        {
+            // Two blocks: the second is past any gain ramp.
+            float settled = 0.0f;
+            for (int i = 0; i < 2; ++i)
+            {
+                juce::AudioBuffer<float> io (4, 512);
+                io.clear();
+                juce::FloatVectorOperations::fill (io.getWritePointer (2), 0.5f, 512);
+                juce::FloatVectorOperations::fill (io.getWritePointer (3), 0.5f, 512);
+                juce::MidiBuffer none;
+                h.service->getGraph().processBlock (io, none);
+                settled = io.getMagnitude (0, 0, 512);
+            }
+            return settled;
+        };
+        check (std::abs (returnPeak() - 0.5f) < 0.03f,
+               "the audio return reaches the mix");
+
+        h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 0.5 } });
+        check (std::abs (returnPeak() - 0.25f) < 0.03f,
+               "the part's fader rides the returned audio");
+
+        h.cmd ("addEffect", { { "chainId", partId }, { "ceId", "VST3-nice-reverb" } });
+        check (std::abs (returnPeak() - 0.125f) < 0.03f,
+               "and the part's inserts process it");
+
+        // A port that is gone is a diagnostic on the part, never silence.
+        h.cmd ("addPart");
+        const auto partB = h.partIdAt (1);
+        h.cmd ("setHardwareConfig", { { "partId", partB }, { "midiOutputId", "unplugged" } });
+        const auto rowB = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[1];
+        check (rowB.getProperty ("midiOutError", "").toString().isNotEmpty(),
+               "a missing MIDI port is reported on its part");
+    }
+
+    // Restore: the port reopens, the program re-sends, the return re-wires — no commands.
+    captured.clear();
+    Harness h2 (dir, {}, tweak);
+    h2.cmd ("getState");
+    bool programResent = false;
+    for (const auto& message : captured)
+        programResent = programResent || (message.isProgramChange()
+                                            && message.getProgramChangeNumber() == 45
+                                            && message.getChannel() == 3);
+    check (programResent, "restore reconnects the port and recalls the program");
+
+    h2.service->prepareRuntime (44100.0, 512, 4);
+    float restoredLevel = 0.0f;
+    for (int i = 0; i < 2; ++i)
+    {
+        juce::AudioBuffer<float> io (4, 512);
+        io.clear();
+        juce::FloatVectorOperations::fill (io.getWritePointer (2), 0.5f, 512);
+        juce::FloatVectorOperations::fill (io.getWritePointer (3), 0.5f, 512);
+        juce::MidiBuffer none;
+        h2.service->getGraph().processBlock (io, none);
+        restoredLevel = io.getMagnitude (0, 0, 512);
+    }
+    check (std::abs (restoredLevel - 0.125f) < 0.03f,
+           "the audio return restores through fader and inserts");
+}
+
+// Virtual parameter addresses: faders, pans, sends and whole macros as ordinary parameter
+// targets — pages and macros drive the mixer through the same binding math, and a macro on
+// a page slot makes hardware encoders play macros (§18.7.8).
+void testVirtualAddressesAndMacroSlots()
+{
+    std::cout << "\nvirtual addresses and macro slots" << std::endl;
+
+    const auto dir = freshDataDir ("virtual");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+
+    const auto partVolume = [&h]
+    {
+        return (float) (double) h.emits.lastState()->getProperty ("rack", {})
+                   .getProperty ("parts", {})[0].getProperty ("volume", -1.0);
+    };
+
+    h.cmd ("setParameter", { { "partId", partId }, { "id", "@gain" }, { "value", 0.25 } });
+    check (juce::approximatelyEqual (partVolume(), 0.5f),
+           "@gain writes the part's fader through the parameter path");
+
+    h.cmd ("addReturn", { { "name", "Verb" } });
+    const auto returnId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("returns", {})[0]
+                              .getProperty ("returnId", {}).toString();
+    h.emits.clear();
+    h.cmd ("getParameters", { { "partId", partId } });
+    const auto rows = h.emits.entries.back().payload.getProperty ("parameters", {});
+    bool sendListed = false;
+    for (int i = 0; i < rows.size(); ++i)
+        sendListed = sendListed || rows[i].getProperty ("id", {}).toString() == "@send:" + returnId;
+    check (sendListed, "each return adds a send address to the part's registry");
+
+    // A fader on a page slot: assignment, absolute writes, relative nudges, the projection.
+    h.cmd ("addControlPage", { { "name", "Mix" } });
+    const auto pageId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[0]
+                            .getProperty ("pageId", {}).toString();
+    h.cmd ("assignControlSlot", { { "pageId", pageId }, { "slotId", "s1" },
+                                  { "partId", partId }, { "parameterId", "@gain" } });
+    h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "s1" }, { "value", 1.0 } });
+    check (juce::approximatelyEqual (partVolume(), 2.0f), "a page slot drives the fader");
+
+    check (h.service->nudgeControlSlot (pageId, "s1", -64), "a nudge is accepted");
+    check (std::abs (partVolume() - (2.0f - 64.0f / 127.0f * 2.0f)) < 0.02f,
+           "and moves the fader relatively");
+
+    const auto slots = h.service->surfaceSlots (pageId);
+    check (slots[0].resolved && slots[0].displayName == "Level"
+             && slots[0].valueText.isNotEmpty(),
+           "the surface projection names and formats the mixer address");
+
+    // A macro fans into a send level like any other target.
+    h.cmd ("addMacro", { { "name", "Space" } });
+    const auto macroId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0]
+                             .getProperty ("macroId", {}).toString();
+    h.cmd ("addMacroTarget", { { "macroId", macroId }, { "targetId", partId },
+                               { "parameterId", "@send:" + returnId } });
+    h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.5 }, { "final", true } });
+    const auto sends = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                           .getProperty ("sends", {});
+    check (sends.size() == 1
+             && juce::approximatelyEqual ((float) (double) sends[0].getProperty ("level", 0.0), 1.0f),
+           "a macro drives a send level through the central path");
+
+    // A macro ON a page slot: the encoder's target is the macro, the macro fans out.
+    h.cmd ("assignControlSlot", { { "pageId", pageId }, { "slotId", "s2" },
+                                  { "partId", macroId }, { "parameterId", "@macro" } });
+    h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "s2" }, { "value", 1.0 } });
+    const auto* state = h.emits.lastState();
+    check (juce::approximatelyEqual ((float) (double) state->getProperty ("rack", {})
+               .getProperty ("macros", {})[0].getProperty ("value", 0.0), 1.0f),
+           "a page slot drives the whole macro");
+    check (juce::approximatelyEqual ((float) (double) state->getProperty ("rack", {})
+               .getProperty ("parts", {})[0].getProperty ("sends", {})[0].getProperty ("level", 0.0), 2.0f),
+           "and the macro's targets follow");
+    check (h.service->surfaceSlots (pageId)[1].displayName == "Space",
+           "the slot shows the macro's name");
+
+    h.emits.clear();
+    h.cmd ("addMacroTarget", { { "macroId", macroId }, { "targetId", macroId },
+                               { "parameterId", "@macro" } });
+    check (h.emits.lastError().contains ("cannot target"),
+           "a macro may not target a macro — page slots may");
+
+    // Honesty when the address dies: the send binding unresolves, writes refuse.
+    h.cmd ("removeReturn", { { "returnId", returnId } });
+    const auto macroRow = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0];
+    check (! (bool) macroRow.getProperty ("targets", {})[0].getProperty ("resolved", true),
+           "a send target unresolves when its return is gone");
+    h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.2 }, { "final", true } });
+    check (true, "and applying the macro skips it without harm");
+}
+
+// §18.7.11's resource behavior: engine load visible in state, chain latency visible per
+// part, and the session file keeping revisions minutes apart instead of a keystroke log.
+void testRevisionsAndEngine()
+{
+    std::cout << "\nrevisions and engine visibility" << std::endl;
+
+    const auto dir = freshDataDir ("revisions");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+
+    const auto revisions = [&dir]
+    {
+        return dir.getChildFile ("session-revisions")
+                  .findChildFiles (juce::File::findFiles, false, "*.json");
+    };
+
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    check (revisions().size() == 1, "the first re-save snapshots the previous manifest");
+
+    h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 0.9 } });
+    check (revisions().size() == 1, "an immediate re-save does not — revisions are not keystrokes");
+
+    revisions().getFirst().setLastModificationTime (
+        juce::Time::getCurrentTime() - juce::RelativeTime::minutes (11.0));
+    h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 0.8 } });
+    check (revisions().size() == 2, "a save past the interval snapshots again");
+
+    for (int i = 0; i < 14; ++i)
+        dir.getChildFile ("session-revisions")
+           .getChildFile ("session-0000-" + juce::String (i).paddedLeft ('0', 2) + ".json")
+           .replaceWithText ("{}");
+    for (auto& file : revisions())
+        file.setLastModificationTime (juce::Time::getCurrentTime() - juce::RelativeTime::minutes (11.0));
+    h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 0.7 } });
+    check (revisions().size() == 12, "the revision trail prunes to its cap, oldest first");
+
+    // Latency is visible, not compensated: the stub effect reports 441 samples = 10ms.
+    h.cmd ("addEffect", { { "chainId", partId }, { "ceId", "VST3-nice-reverb" } });
+    const auto* state = h.emits.lastState();
+    check (std::abs ((double) state->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                         .getProperty ("latencyMs", 0.0) - 10.0) < 0.5,
+           "a part reports its chain's latency");
+    check ((double) state->getProperty ("rack", {}).getProperty ("masterLatencyMs", -1.0) == 0.0,
+           "the empty master chain reports none");
+
+    const auto audio = state->getProperty ("audio", {});
+    check (audio.hasProperty ("cpu") && audio.hasProperty ("xruns")
+             && (double) audio.getProperty ("cpu", 1.0) == 0.0,
+           "engine load reports zero while audio is off, never garbage");
 }
 
 // The Stage 4 library: one index, explicit provenance, loading only ever through Stage 1's
@@ -1581,6 +2137,11 @@ int main (int argc, char* argv[])
     testAutoPagesAndSurfaceRuntime();
     testEffectsAndMacros();
     testEnrichedPerformanceRestore();
+    testSendsAndReturns();
+    testMultiOutputRouting();
+    testHardwareParts();
+    testVirtualAddressesAndMacroSlots();
+    testRevisionsAndEngine();
     testLibrary();
     testFactoryPerformance();
     testScanFolderBrowseAndModuleProjection();

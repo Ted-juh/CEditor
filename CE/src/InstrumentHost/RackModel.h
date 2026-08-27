@@ -40,6 +40,35 @@ struct EffectSlot
     bool bypassed = false;
 };
 
+// A shared return chain (Stage 5): every part can tap its post-fader signal into it by send
+// level, the chain's effects process the sum, and the chain's own level rejoins the master
+// path. Effects here follow the insert rules exactly — same identities, same transaction.
+struct ReturnChain
+{
+    juce::String returnId;
+    juce::String name;
+    juce::Array<EffectSlot> effects;
+    float level = 1.0f;               // linear, 0..2, like part volume
+};
+
+// One part's send into one return chain. Absent = level 0; the pair (part, return) is the
+// identity, so removing a return simply strands (and drops) its sends.
+struct PartSend
+{
+    juce::String returnId;
+    float level = 0.0f;               // linear, 0..2
+};
+
+// Explicit multi-output routing (Stage 5): one extra stereo pair of a multi-output instrument
+// gets its own mixer gain into the master path. Pair k is instrument channels 2k/2k+1; pair 0
+// is the main pair and always takes the part's insert chain and fader, so it is never listed
+// here.
+struct ExtraOut
+{
+    int pairIndex = 1;
+    float gain = 1.0f;                // linear, 0..2
+};
+
 struct RackPart
 {
     juce::String partId;
@@ -49,6 +78,8 @@ struct RackPart
     juce::String pluginVendor;
     juce::String stateBlobBase64;     // captured processor state, or empty
     juce::Array<EffectSlot> effects;  // the part's serial insert chain, pre-fader (Stage 5)
+    juce::Array<PartSend> sends;      // post-fader taps into return chains (Stage 5)
+    juce::Array<ExtraOut> extraOuts;  // explicit multi-output pairs (Stage 5)
     PartMidiRules midi;
     bool enabled = true;
     bool mute = false;
@@ -56,6 +87,22 @@ struct RackPart
     float volume = 1.0f;              // linear gain, 0..2
     float pan = 0.0f;                 // -1..+1
     bool editorOpen = false;
+
+    // Hardware-instrument parts (Stage 5, baseline §18.7.6): the part is an external synth
+    // reached over MIDI, optionally returning audio through the interface's inputs. It reuses
+    // the whole Stage 1 story — zones, mute/solo/fader, focus, ordering — and its returned
+    // audio runs the same insert chain and gain as a plug-in's would. The MIDI output is
+    // identified by the system's device id; the name is a display cache for the "port is
+    // gone" diagnostic, never identity.
+    bool hardware = false;
+    juce::String midiOutputId;
+    juce::String midiOutputName;
+    int midiOutChannel = 1;           // 1..16 — the channel the external synth listens on
+    int audioReturnChannel = -1;      // first input channel of the managed return; -1 = none
+    bool audioReturnStereo = true;
+    int programBank = -1;             // -1 = never send bank select
+    int programNumber = -1;           // -1 = never send program change
+    juce::String deviceProfileId;     // reference into CEditor's Device Profiles, when linked
 };
 
 
@@ -126,6 +173,7 @@ struct Performance
     juce::String focusedPartId;
     juce::Array<RackPart> parts;
     juce::Array<EffectSlot> masterEffects;   // the master insert chain (Stage 5)
+    juce::Array<ReturnChain> returns;        // shared send/return chains (Stage 5)
     juce::Array<Macro> macros;
     juce::Array<ControlPage> pages;
 
@@ -151,7 +199,11 @@ struct Performance
     Macro* findMacro (const juce::String& macroId);
     const Macro* findMacro (const juce::String& macroId) const;
 
-    /** The slot and (via chainIdOut) whose chain holds it — a partId, or "master". */
+    ReturnChain* findReturn (const juce::String& returnId);
+    const ReturnChain* findReturn (const juce::String& returnId) const;
+
+    /** The slot and (via chainIdOut) whose chain holds it — a partId, "master", or a
+        returnId. */
     EffectSlot* findEffect (const juce::String& effectId, juce::String* chainIdOut = nullptr);
     const EffectSlot* findEffect (const juce::String& effectId, juce::String* chainIdOut = nullptr) const;
 

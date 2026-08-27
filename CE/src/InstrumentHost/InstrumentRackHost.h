@@ -51,8 +51,11 @@ public:
     };
 
     // -- engine lifecycle ---------------------------------------------------------------
-    void prepare (double sampleRate, int blockSize);
+    /** `numInputChannels` is the device's input side, for hardware parts' audio returns —
+        0 keeps the rack output-only. */
+    void prepare (double sampleRate, int blockSize, int numInputChannels = 0);
     void release();
+    double getSampleRate() const                          { return currentSampleRate; }
 
     /** The wrappers drive this: the standalone through an AudioProcessorPlayer, the outer
         VST3 by delegating its processBlock, tests directly. */
@@ -76,7 +79,7 @@ public:
 
     /** Appends an empty slot to a part's chain or (chainId=="master") the master chain and
         returns its minted effectId — empty for an unknown chain. */
-    juce::String addEffectSlot (const juce::String& chainId);
+    juce::String addEffectSlot (const juce::String& chainId);   // partId, "master" or a returnId
     bool removeEffectSlot (const juce::String& effectId);
     /** Reorders within its own chain; identities and nodes stay put. */
     bool moveEffectSlot (const juce::String& effectId, int newIndex);
@@ -89,6 +92,66 @@ public:
                            std::unique_ptr<juce::AudioProcessor> effect, const ClassInfo& info);
     juce::AudioProcessor* getEffect (const juce::String& effectId) const;
     bool effectHasProcessor (const juce::String& effectId) const;
+
+    // -- send/return chains (Stage 5) ---------------------------------------------------
+    // Shared buses through the same graph and the same effect transaction: every part gets a
+    // post-fader send gain per return, the chain's effects process the sum, and the chain's
+    // level rejoins the path ahead of the master inserts. addEffectSlot and the whole effect
+    // transaction accept a returnId as the chainId.
+
+    /** Mints and appends a return chain, returning its returnId. */
+    juce::String addReturn (const juce::String& name);
+    /** Destroys the chain's live effects (each announced first), drops every part's send
+        into it, and heals the wiring. */
+    bool removeReturn (const juce::String& returnId);
+    bool renameReturn (const juce::String& returnId, const juce::String& name);
+    bool setReturnLevel (const juce::String& returnId, float level);
+    /** Sets one part's send level into one return (creating the send on first use). */
+    bool setSendLevel (const juce::String& partId, const juce::String& returnId, float level);
+
+    // -- explicit multi-output routing (Stage 5) ----------------------------------------
+    /** Routes the instrument's output pair `pairIndex` (channels 2k/2k+1) to the master path
+        with its own gain — added on first call, updated after. Pair 0 is the part's main
+        pair and is refused here. */
+    bool setExtraOut (const juce::String& partId, int pairIndex, float gain);
+    bool removeExtraOut (const juce::String& partId, int pairIndex);
+    /** Output channels the part's LIVE instrument exposes — 0 when none is loaded. */
+    int instrumentOutputChannels (const juce::String& partId) const;
+
+    // -- hardware-instrument parts (Stage 5, §18.7.6) -----------------------------------
+    // A hardware part keeps everything a part already is — identity, zones, mute/solo/fader,
+    // ordering, insert chain — and swaps the plug-in for a MIDI output plus an optional
+    // managed audio return through the graph's input node. The MIDI device itself lives with
+    // the caller (the service opens it; tests inject a capture sink).
+
+    struct HardwareConfig
+    {
+        juce::String midiOutputId;
+        juce::String midiOutputName;
+        int midiOutChannel = 1;
+        int audioReturnChannel = -1;
+        bool audioReturnStereo = true;
+        int programBank = -1;
+        int programNumber = -1;
+        juce::String deviceProfileId;
+    };
+
+    /** Makes the part a hardware part (unloading any live instrument first — the part's
+        plug-in identity and blob stay for the day it turns back) or reconfigures one. */
+    bool setHardwareConfig (const juce::String& partId, const HardwareConfig& config);
+    /** Back to a software part: the sender and return wiring go; identity and zones stay. */
+    bool clearHardware (const juce::String& partId);
+    /** Hands the part's sender its device sink — empty disconnects. */
+    bool setHardwareMidiSink (const juce::String& partId, MidiSendProcessor::Sink sink);
+    /** Sends the configured bank select / program change through the sink, now. False when
+        the part is not hardware or nothing is configured. */
+    bool sendHardwareProgram (const juce::String& partId);
+
+    // -- latency reporting (Stage 5) ----------------------------------------------------
+    // The graph does not compensate parallel paths (a live rack keeps every path as fast as
+    // its plug-ins allow); these make the cost visible instead of pretended away.
+    int partLatencySamples (const juce::String& partId) const;
+    int masterLatencySamples() const;
 
     // -- macros (Stage 5) ---------------------------------------------------------------
     // Model-only, like pages: a macro is stored fan-out; the writes go through the service's
@@ -178,8 +241,12 @@ private:
         juce::AudioProcessorGraph::Node::Ptr filterNode;
         juce::AudioProcessorGraph::Node::Ptr gainNode;
         juce::AudioProcessorGraph::Node::Ptr instrumentNode;   // may be null
+        juce::AudioProcessorGraph::Node::Ptr midiSendNode;     // hardware parts only
         PartMidiFilterProcessor* filter = nullptr;             // owned by filterNode
         GainPanProcessor* gain = nullptr;                      // owned by gainNode
+        MidiSendProcessor* midiSend = nullptr;                 // owned by midiSendNode
+        std::map<juce::String, juce::AudioProcessorGraph::Node::Ptr> sendNodes;     // per returnId
+        std::map<int, juce::AudioProcessorGraph::Node::Ptr> extraOutNodes;          // per pairIndex
         int loadGeneration = 0;
     };
 
@@ -191,6 +258,8 @@ private:
 
     LivePart* findLive (const juce::String& partId);
     const LivePart* findLive (const juce::String& partId) const;
+    /** The chain behind a chainId — a part's inserts, the master chain, or a return's. */
+    juce::Array<EffectSlot>* chainFor (const juce::String& chainId);
     void notifyInstrumentWillBeRemoved (const juce::String& partId, const LivePart& lp);
     void destroyEffectNode (const juce::String& effectId);
     void createLiveNodes (const RackPart& part);
@@ -201,16 +270,26 @@ private:
     /** Stereo-adapting hop: mono fans out, stereo folds into mono, sums where several
         sources meet one input. */
     void connectAudio (juce::AudioProcessorGraph::Node* from, juce::AudioProcessorGraph::Node* to);
+    /** The same hop from an explicit channel pair of `from` — the audio-input node's return
+        channels, a multi-output instrument's extra pair. */
+    void connectAudioPair (juce::AudioProcessorGraph::Node* from, int firstChannel, bool stereo,
+                           juce::AudioProcessorGraph::Node* to);
+    /** Keeps the auxiliary node population — send gains, return levels, extra-out gains,
+        hardware MIDI senders — matched to the model, and re-applies their levels. */
+    void syncAuxNodes();
+    void destroyAuxNodes (LivePart& lp);
     /** Drops every audio connection and rebuilds the whole path — per-part chains into the
-        gains, gains through the master chain into the output. All the audio topology in one
-        place, so an edit anywhere cannot leave a stale wire somewhere else. */
+        gains, sends into the return chains, returns and gains through the master chain into
+        the output. All the audio topology in one place, so an edit anywhere cannot leave a
+        stale wire somewhere else. */
     void rewireAudio();
 
     Performance model;
     std::map<juce::String, LivePart> live;
-    std::map<juce::String, LiveEffect> liveEffects;   // keyed by effectId, both chains
+    std::map<juce::String, LiveEffect> liveEffects;   // keyed by effectId, every chain kind
+    std::map<juce::String, juce::AudioProcessorGraph::Node::Ptr> returnLevelNodes;   // per returnId
     juce::AudioProcessorGraph graph;
-    juce::AudioProcessorGraph::Node::Ptr midiInNode, audioOutNode;
+    juce::AudioProcessorGraph::Node::Ptr midiInNode, audioInNode, audioOutNode;
     double currentSampleRate = 44100.0;
     int currentBlockSize = 512;
     bool prepared = false;

@@ -76,6 +76,29 @@
 //      path as everything else — mapped per target, gesture-wrapped, unresolved targets
 //      skipped and shown. `final:true` persists and re-announces state; drags without it
 //      stay cheap.)
+//   addReturn {name?} | removeReturn {returnId} | renameReturn {returnId,name}
+//   setReturnLevel {returnId,level} | setSendLevel {partId,returnId,level}
+//     (Stage 5 shared buses: each return is one more effect chain — addEffect and the whole
+//      effect transaction take a returnId as the chainId — fed by post-fader sends from any
+//      part and rejoining ahead of the master inserts.)
+//   setExtraOut {partId,pairIndex,gain} | removeExtraOut {partId,pairIndex}
+//     (explicit multi-output routing: an instrument's extra stereo pair gets its own gain
+//      into the master path; the main pair keeps the inserts and the fader.)
+//   setHardwareConfig {partId, midiOutputId?,midiOutputName?,midiOutChannel?,
+//     audioReturnChannel?,audioReturnStereo?,programBank?,programNumber?,deviceProfileId?}
+//   clearHardware {partId} | sendHardwareProgram {partId}
+//     (hardware-instrument parts, §18.7.6: the part reaches an external synth over the named
+//      MIDI output — opened through Options::openMidiOutput, port failures reported per part
+//      in state — and can return audio through the interface's inputs, where it runs the
+//      part's own inserts, fader and sends. Absent config fields keep their value.)
+//
+// VIRTUAL PARAMETER ADDRESSES (Stage 5). A parameterId starting with '@' resolves against
+// the rack's own state instead of a plug-in registry: "@gain" and "@pan" on any part,
+// "@send:<returnId>" for that part's send level, "@macro" with the macroId as the target id.
+// They work everywhere a plug-in parameter does — setParameter, page slots, macro targets
+// (except "@macro" itself: a macro may not target a macro), surface nudges — so hardware
+// encoders drive faders, sends and whole macros through the same binding math. Their writes
+// persist and re-announce state, because the value lives in the manifest, not a plug-in.
 //   assignControlSlot {pageId,slotId,partId,parameterId} | clearControlSlot {pageId,slotId}
 //   setControlSlotOptions {pageId,slotId, rangeMin?,rangeMax?,inverted?,bipolar?,label?}
 //   setControlSlotValue {pageId,slotId,value}
@@ -155,6 +178,13 @@ public:
         // VST3 preset loader (it re-validates the class id internally); tests stub it.
         // Absent = vendor preset records refuse to load, aloud.
         std::function<bool (juce::AudioProcessor&, const juce::File& presetFile)> applyVstPreset;
+        // Hardware-part MIDI (Stage 5). Absent = the service talks to the real system
+        // devices (juce::MidiOutput); tests inject an id→name map and capture sinks.
+        // openMidiOutput returns the sink that will receive the part's MIDI, or nullptr
+        // with `errorOut` set.
+        std::function<juce::StringPairArray()> listMidiOutputs;
+        std::function<MidiSendProcessor::Sink (const juce::String& deviceId,
+                                               juce::String& errorOut)> openMidiOutput;
         EditorPaneHooks editorPane;
         // The Host Project's authored rack, shipped beside the generated binaries. Loaded
         // when nothing newer exists: the standalone uses it until the user has a session of
@@ -199,8 +229,9 @@ public:
 
     /** The plug-in wrapper's prepareToPlay: adopt the host's rate and block size and
         (re)prepare the graph. Safe to call repeatedly; later instantiations use the new
-        values too. */
-    void prepareRuntime (double sampleRate, int blockSize);
+        values too. `numInputChannels` feeds hardware parts' audio returns — the outer VST3
+        passes none, tests pass what their buffers carry. */
+    void prepareRuntime (double sampleRate, int blockSize, int numInputChannels = 0);
 
     /** The plug-in wrapper's releaseResources. */
     void releaseRuntime();
@@ -300,9 +331,32 @@ private:
     juce::AudioProcessorParameter* resolveParameter (const juce::String& partId,
                                                      const juce::String& definitionId,
                                                      const ParameterDescriptor** descriptorOut = nullptr);
+
+    // -- virtual parameter addresses (Stage 5) -----------------------------------------
+    // '@'-prefixed ids resolve against the rack's own state: "@gain"/"@pan"/"@send:<id>" on
+    // a part, "@macro" on a macro id. Values are normalized 0..1 like everything else on
+    // the parameter path; writes go through the rack's setters, never a second store.
+    static bool isVirtualParameterId (const juce::String& parameterId)
+    {
+        return parameterId.startsWith ("@");
+    }
+    bool virtualParameterExists (const juce::String& targetId, const juce::String& parameterId) const;
+    float virtualParameterValue (const juce::String& targetId, const juce::String& parameterId) const;
+    juce::String virtualParameterText (const juce::String& targetId, const juce::String& parameterId) const;
+    juce::String virtualParameterName (const juce::String& targetId, const juce::String& parameterId) const;
+    static float virtualParameterDefault (const juce::String& parameterId);
+    void setVirtualParameter (const juce::String& targetId, const juce::String& parameterId,
+                              float normalized);
+    /** True when targetId+parameterId can be written right now — plug-in or virtual. */
+    bool targetParameterExists (const juce::String& targetId, const juce::String& parameterId);
+    /** One mapped, gesture-wrapped write through a binding — page slots, nudges and macro
+        targets all funnel here so plug-in and virtual addresses share the transform. */
+    void writeMappedBinding (const ControlBinding& binding, float value01);
+
     /** A slot binding resolves only when its part still carries the class it was assigned
         against AND that parameter exists in the live registry — anything else is unresolved,
-        shown, and refused for writes. */
+        shown, and refused for writes. Virtual addresses resolve on existence alone: they
+        belong to the rack, not a plug-in class. */
     bool bindingResolves (const ControlBinding& binding) const;
     juce::String slotDisplayName (const ControlBinding& binding, bool resolved) const;
     /** The parameter's current value inverse-mapped into the slot's 0..1 position. */
@@ -314,17 +368,35 @@ private:
     void hideEditor();
     void startAudio();
     void stopAudio();
+    /** Reopens the device when a hardware audio return now needs more input channels than
+        the running device has. */
+    void restartAudioIfNeeded();
+    /** Input channels the model's hardware returns need — 0 when none are configured. */
+    int neededInputChannels() const;
     void emitAudioDevices();
+
+    // -- hardware-part MIDI (Stage 5) ---------------------------------------------------
+    juce::StringPairArray listMidiOutputsNow() const;
+    MidiSendProcessor::Sink openMidiOutputNow (const juce::String& deviceId, juce::String& errorOut) const;
+    /** (Re)opens the part's configured MIDI output into its sender; failures land in
+        `hardwareMidiErrors` and the state payload, never in silence. */
+    void openHardwareMidi (const juce::String& partId);
 
     /** Caller holds catalogLock. */
     const PluginClassRecord* findClass (const juce::String& ceId,
                                         const ModuleRecord** moduleOut = nullptr) const;
 
     void savePerformance();
+    /** Keeps previous manifest revisions beside the session file: before an overwrite, the
+        current file is copied into the revisions directory when the newest copy there is
+        older than the snapshot interval, and the directory is pruned to a fixed count. A
+        crash or a bad edit costs keystrokes, not the last good rig. */
+    void maybeSnapshotRevision();
     void saveScanPaths();
 
     juce::File catalogFile() const      { return options.dataDirectory.getChildFile ("plugin-catalog.json"); }
     juce::File performanceFile() const  { return options.dataDirectory.getChildFile ("session-performance.json"); }
+    juce::File revisionsDirectory() const { return options.dataDirectory.getChildFile ("session-revisions"); }
     juce::File scanPathsFile() const    { return options.dataDirectory.getChildFile ("scan-paths.json"); }
     juce::File hostProjectFile() const  { return options.dataDirectory.getChildFile ("host-project.json"); }
 
@@ -344,6 +416,9 @@ private:
     Library library;                // the Stage 4 unified index; loaded on first ask
     juce::StringArray libraryPaths; // user-added .vstpreset folders, beside the standard roots
     bool libraryLoaded = false;
+    // Per-part MIDI-output failures ("port is gone"), reported in state until the next
+    // successful open — the §18.7.7 missing-device diagnostic.
+    std::map<juce::String, juce::String> hardwareMidiErrors;
 
     // The Stage 2 registry, per part with a live instrument: descriptors plus the RT-safe
     // change listener. Attached on every successful commit, dropped from the same rack hook

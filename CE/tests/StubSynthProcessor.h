@@ -113,6 +113,9 @@ struct StubEffectProcessor : juce::AudioProcessor
           factor (factorToUse)
     {
         addParameter (wet = new juce::AudioParameterFloat ({ "wet", 1 }, "Wet", 0.0f, 1.0f, 1.0f));
+        // Reported, not implemented: the latency-visibility tests read this through the
+        // graph; the stub does not actually delay, so amplitude tests stay simple.
+        setLatencySamples (441);
     }
 
     void prepareToPlay (double, int) override {}

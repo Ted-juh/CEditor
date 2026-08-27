@@ -275,9 +275,15 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         const auto partId = payload.getProperty ("partId", {}).toString();
         const auto ceId = payload.getProperty ("ceId", {}).toString();
 
-        if (rack.getPerformance().findPart (partId) == nullptr)
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
         {
             emitError ("Unknown rack part.");
+            return;
+        }
+        if (part->hardware)
+        {
+            emitError ("That part is a hardware instrument — clear that first.");
             return;
         }
 
@@ -313,37 +319,71 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         const auto partId = payload.getProperty ("partId", {}).toString();
         const auto it = partParameters.find (partId);
-        if (it == partParameters.end())
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (it == partParameters.end() && part == nullptr)
         {
             emitError ("That part has no instrument loaded.");
             return;
         }
 
-        const auto& processorParams = targetProcessor (partId)->getParameters();
         juce::Array<juce::var> parameters;
-        for (const auto& d : it->second.inventory.descriptors)
+        if (it != partParameters.end())
         {
-            auto* parameter = processorParams[d.index];
-            auto* obj = new juce::DynamicObject();
-            obj->setProperty ("id",           d.definitionId);
-            obj->setProperty ("index",        d.index);
-            obj->setProperty ("name",         d.name);
-            obj->setProperty ("label",        d.label);
-            obj->setProperty ("group",        d.group);
-            obj->setProperty ("value",        parameter->getValue());
-            obj->setProperty ("text",         parameter->getCurrentValueAsText());
-            obj->setProperty ("defaultValue", d.defaultValue);
-            obj->setProperty ("numSteps",     d.numSteps);
-            obj->setProperty ("discrete",     d.discrete);
-            obj->setProperty ("boolean",      d.boolean);
-            obj->setProperty ("automatable",  d.automatable);
-            obj->setProperty ("meta",         d.metaParameter);
-            parameters.add (juce::var (obj));
+            const auto& processorParams = targetProcessor (partId)->getParameters();
+            for (const auto& d : it->second.inventory.descriptors)
+            {
+                auto* parameter = processorParams[d.index];
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty ("id",           d.definitionId);
+                obj->setProperty ("index",        d.index);
+                obj->setProperty ("name",         d.name);
+                obj->setProperty ("label",        d.label);
+                obj->setProperty ("group",        d.group);
+                obj->setProperty ("value",        parameter->getValue());
+                obj->setProperty ("text",         parameter->getCurrentValueAsText());
+                obj->setProperty ("defaultValue", d.defaultValue);
+                obj->setProperty ("numSteps",     d.numSteps);
+                obj->setProperty ("discrete",     d.discrete);
+                obj->setProperty ("boolean",      d.boolean);
+                obj->setProperty ("automatable",  d.automatable);
+                obj->setProperty ("meta",         d.metaParameter);
+                parameters.add (juce::var (obj));
+            }
+        }
+
+        // A rack part also answers with its mixer addresses — level, pan, one send per
+        // return — so pages, macros and hardware reach the mixer through the same registry
+        // the plug-in rows use. An empty or hardware part has exactly these.
+        if (part != nullptr)
+        {
+            juce::StringArray ids { "@gain", "@pan" };
+            for (const auto& chain : rack.getPerformance().returns)
+                ids.add ("@send:" + chain.returnId);
+
+            for (const auto& id : ids)
+            {
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty ("id",           id);
+                obj->setProperty ("index",        -1);
+                obj->setProperty ("name",         virtualParameterName (partId, id));
+                obj->setProperty ("label",        juce::String());
+                obj->setProperty ("group",        "Mixer");
+                obj->setProperty ("value",        virtualParameterValue (partId, id));
+                obj->setProperty ("text",         virtualParameterText (partId, id));
+                obj->setProperty ("defaultValue", virtualParameterDefault (id));
+                obj->setProperty ("numSteps",     0);
+                obj->setProperty ("discrete",     false);
+                obj->setProperty ("boolean",      false);
+                obj->setProperty ("automatable",  true);
+                obj->setProperty ("meta",         false);
+                parameters.add (juce::var (obj));
+            }
         }
 
         juce::Array<juce::var> warnings;
-        for (const auto& w : it->second.inventory.warnings)
-            warnings.add (w);
+        if (it != partParameters.end())
+            for (const auto& w : it->second.inventory.warnings)
+                warnings.add (w);
 
         auto* root = new juce::DynamicObject();
         root->setProperty ("partId", partId);
@@ -359,6 +399,29 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         const auto partId = payload.getProperty ("partId", {}).toString();
         const auto id = payload.getProperty ("id", {}).toString();
+
+        if (isVirtualParameterId (id))
+        {
+            if (! virtualParameterExists (partId, id))
+            {
+                emitError ("Unknown parameter " + id + " on that part.");
+                return;
+            }
+
+            // Gestures are accepted and mean nothing here — a mixer value has no plug-in
+            // host to notify. Writes persist because the value lives in the manifest.
+            if (cmd == "setParameter")
+                setVirtualParameter (partId, id, juce::jlimit (0.0f, 1.0f,
+                                     (float) (double) payload.getProperty ("value", 0.0)));
+            else if (cmd == "resetParameter")
+                setVirtualParameter (partId, id, virtualParameterDefault (id));
+            else
+                return;
+
+            savePerformance();
+            emitState();
+            return;
+        }
 
         auto* parameter = resolveParameter (partId, id);
         if (parameter == nullptr)
@@ -414,10 +477,11 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         const auto partId = payload.getProperty ("partId", {}).toString();   // any target id
         const auto parameterId = payload.getProperty ("parameterId", {}).toString();
 
-        if (resolveParameter (partId, parameterId) == nullptr)
+        if (! targetParameterExists (partId, parameterId))
         {
-            // Assignment needs the live processor: the registry is what proves the id and
-            // whose class identity the binding captures. Parts and effects alike.
+            // Assignment needs the live address: for a plug-in parameter the registry proves
+            // the id and whose class the binding captures; for a virtual one the rack itself
+            // does. Parts, effects, mixer values and macros alike.
             emitError ("Unknown parameter " + parameterId + " on that target.");
             return;
         }
@@ -535,11 +599,17 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
-        const auto& b = slot->binding;
-        const auto raw = juce::jlimit (0.0f, 1.0f, (float) (double) payload.getProperty ("value", 0.0));
-        const auto positioned = b.inverted ? 1.0f - raw : raw;
-        const auto mapped = b.rangeMin + positioned * (b.rangeMax - b.rangeMin);
-        resolveParameter (b.partId, b.parameterId)->setValueNotifyingHost (mapped);
+        writeMappedBinding (slot->binding,
+                            juce::jlimit (0.0f, 1.0f,
+                                          (float) (double) payload.getProperty ("value", 0.0)));
+
+        // A virtual write changed the manifest itself (a fader, a send, a macro), so it
+        // persists and re-announces; a plug-in write is captured by the next save as ever.
+        if (isVirtualParameterId (slot->binding.parameterId))
+        {
+            savePerformance();
+            emitState();
+        }
         return;
     }
 
@@ -741,7 +811,14 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         if (cmd == "addMacroTarget")
         {
-            if (resolveParameter (targetId, parameterId) == nullptr)
+            // A macro driving a macro would be a loop dressed as a feature; page slots may
+            // target macros, macros may not.
+            if (parameterId == "@macro")
+            {
+                emitError ("A macro cannot target another macro.");
+                return;
+            }
+            if (! targetParameterExists (targetId, parameterId))
             {
                 emitError ("Unknown parameter " + parameterId + " on that target.");
                 return;
@@ -785,6 +862,161 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         savePerformance();
         emitState();
+        return;
+    }
+
+    if (cmd == "addReturn")
+    {
+        const auto name = payload.getProperty ("name", {}).toString().trim();
+        rack.addReturn (name.isNotEmpty() ? name
+                                          : "Return " + juce::String (rack.getPerformance().returns.size() + 1));
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "removeReturn")
+    {
+        if (! rack.removeReturn (payload.getProperty ("returnId", {}).toString()))
+        {
+            emitError ("Unknown return.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "renameReturn")
+    {
+        if (! rack.renameReturn (payload.getProperty ("returnId", {}).toString(),
+                                 payload.getProperty ("name", {}).toString().trim()))
+        {
+            emitError ("Unknown return.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setReturnLevel")
+    {
+        if (! rack.setReturnLevel (payload.getProperty ("returnId", {}).toString(),
+                                   (float) (double) payload.getProperty ("level", 1.0)))
+        {
+            emitError ("Unknown return.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setSendLevel")
+    {
+        if (! rack.setSendLevel (payload.getProperty ("partId", {}).toString(),
+                                 payload.getProperty ("returnId", {}).toString(),
+                                 (float) (double) payload.getProperty ("level", 0.0)))
+        {
+            emitError ("Unknown part or return.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setExtraOut")
+    {
+        if (! rack.setExtraOut (payload.getProperty ("partId", {}).toString(),
+                                (int) payload.getProperty ("pairIndex", 0),
+                                (float) (double) payload.getProperty ("gain", 1.0)))
+        {
+            emitError ("Unknown part, or that is not an extra output pair.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "removeExtraOut")
+    {
+        if (! rack.removeExtraOut (payload.getProperty ("partId", {}).toString(),
+                                   (int) payload.getProperty ("pairIndex", 0)))
+        {
+            emitError ("That part has no such output route.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setHardwareConfig")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+
+        // Absent fields keep their value, like setPartMixer — the command is also how a
+        // software part BECOMES hardware, so the current values are the defaults.
+        InstrumentRackHost::HardwareConfig config;
+        config.midiOutputId       = part->midiOutputId;
+        config.midiOutputName     = part->midiOutputName;
+        config.midiOutChannel     = part->midiOutChannel;
+        config.audioReturnChannel = part->audioReturnChannel;
+        config.audioReturnStereo  = part->audioReturnStereo;
+        config.programBank        = part->programBank;
+        config.programNumber      = part->programNumber;
+        config.deviceProfileId    = part->deviceProfileId;
+
+        if (const auto* fields = payload.getDynamicObject())
+        {
+            if (fields->hasProperty ("midiOutputId"))       config.midiOutputId       = payload["midiOutputId"].toString();
+            if (fields->hasProperty ("midiOutputName"))     config.midiOutputName     = payload["midiOutputName"].toString();
+            if (fields->hasProperty ("midiOutChannel"))     config.midiOutChannel     = (int) payload["midiOutChannel"];
+            if (fields->hasProperty ("audioReturnChannel")) config.audioReturnChannel = (int) payload["audioReturnChannel"];
+            if (fields->hasProperty ("audioReturnStereo"))  config.audioReturnStereo  = (bool) payload["audioReturnStereo"];
+            if (fields->hasProperty ("programBank"))        config.programBank        = (int) payload["programBank"];
+            if (fields->hasProperty ("programNumber"))      config.programNumber      = (int) payload["programNumber"];
+            if (fields->hasProperty ("deviceProfileId"))    config.deviceProfileId    = payload["deviceProfileId"].toString();
+        }
+
+        rack.setHardwareConfig (partId, config);
+        openHardwareMidi (partId);
+        restartAudioIfNeeded();
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "clearHardware")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        if (! rack.clearHardware (partId))
+        {
+            emitError ("That part is not a hardware instrument.");
+            return;
+        }
+        hardwareMidiErrors.erase (partId);
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "sendHardwareProgram")
+    {
+        if (! rack.sendHardwareProgram (payload.getProperty ("partId", {}).toString()))
+        {
+            emitError ("That part has no program to send — configure a bank or program first.");
+            return;
+        }
         return;
     }
 
@@ -1095,9 +1327,27 @@ void InstrumentHostService::applyPerformance (Performance&& performance)
     for (const auto& slot : model.masterEffects)
         if (slot.pluginCeId.isNotEmpty())
             effectLoads.add ({ slot.effectId, slot.pluginCeId });
+    for (const auto& chain : model.returns)
+        for (const auto& slot : chain.effects)
+            if (slot.pluginCeId.isNotEmpty())
+                effectLoads.add ({ slot.effectId, slot.pluginCeId });
 
     for (const auto& [effectId, ceId] : effectLoads)
         requestEffect (effectId, ceId);
+
+    // Hardware parts reconnect their ports and recall their program; a port that is gone
+    // shows up as the part's diagnostic, never as a silent no-op.
+    juce::StringArray hardwarePartIds;
+    for (const auto& part : model.parts)
+        if (part.hardware)
+            hardwarePartIds.add (part.partId);
+    for (const auto& partId : hardwarePartIds)
+    {
+        openHardwareMidi (partId);
+        rack.sendHardwareProgram (partId);   // no-op unless a bank/program is configured
+    }
+
+    restartAudioIfNeeded();
 }
 
 void InstrumentHostService::requestInstrument (const juce::String& partId, const juce::String& ceId,
@@ -1287,9 +1537,13 @@ juce::String InstrumentHostService::targetClassCeId (const juce::String& targetI
 juce::String InstrumentHostService::targetDisplayName (const juce::String& targetId) const
 {
     if (const auto* part = rack.getPerformance().findPart (targetId))
-        return part->pluginName;
+        return part->hardware ? (part->midiOutputName.isNotEmpty() ? part->midiOutputName
+                                                                   : juce::String ("Hardware"))
+                              : part->pluginName;
     if (const auto* slot = rack.getPerformance().findEffect (targetId))
         return slot->pluginName;
+    if (rack.getPerformance().findMacro (targetId) != nullptr)
+        return "Macro";
     return {};
 }
 
@@ -1313,22 +1567,11 @@ void InstrumentHostService::showEditorForEffect (const juce::String& effectId)
 void InstrumentHostService::applyMacroValue (const Macro& macro)
 {
     // The same mapped write the page slots use — every fan-out target through the central
-    // parameter path, unresolved ones skipped (and shown as such in state).
+    // parameter path, unresolved ones skipped (and shown as such in state). Mixer and send
+    // addresses ride the same fan-out; "@macro" is refused at assignment, so no loops.
     for (const auto& target : macro.targets)
-    {
-        if (! bindingResolves (target))
-            continue;
-
-        auto* parameter = resolveParameter (target.partId, target.parameterId);
-        if (parameter == nullptr)
-            continue;
-
-        const auto positioned = target.inverted ? 1.0f - macro.value : macro.value;
-        const auto mapped = target.rangeMin + positioned * (target.rangeMax - target.rangeMin);
-        parameter->beginChangeGesture();
-        parameter->setValueNotifyingHost (mapped);
-        parameter->endChangeGesture();
-    }
+        if (bindingResolves (target))
+            writeMappedBinding (target, macro.value);
 }
 
 void InstrumentHostService::showEditorFor (const juce::String& partId)
@@ -1359,12 +1602,32 @@ void InstrumentHostService::hideEditor()
         options.editorPane.hide();
 }
 
+int InstrumentHostService::neededInputChannels() const
+{
+    // Only a hardware part's configured audio return asks for device inputs — an editor
+    // session with no hardware parts opens no input device (and trips no OS microphone
+    // permission it has no use for).
+    int needed = 0;
+    for (const auto& part : rack.getPerformance().parts)
+        if (part.hardware && part.audioReturnChannel >= 0)
+            needed = juce::jmax (needed, part.audioReturnChannel
+                                           + (part.audioReturnStereo ? 2 : 1));
+    return needed;
+}
+
 void InstrumentHostService::startAudio()
 {
-    // The simplest honest Preview Runtime: default output, every MIDI input, the player
-    // driving the rack's graph. What actually opened is reported through the state payload;
-    // explicit device selection is a later step.
-    const auto error = deviceManager.initialiseWithDefaultDevices (0, 2);
+    // The simplest honest Preview Runtime: default output (inputs only where a hardware
+    // return needs them), every MIDI input, the player driving the rack's graph. What
+    // actually opened is reported through the state payload; explicit device selection is a
+    // later step.
+    const auto error = deviceManager.initialiseWithDefaultDevices (neededInputChannels(), 2);
+
+    // The graph must know the real device shape before the wiring against the input node is
+    // rebuilt — prepare runs the rewire.
+    if (auto* device = deviceManager.getCurrentAudioDevice())
+        rack.prepare (device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples(),
+                      device->getActiveInputChannels().countNumberOfSetBits());
 
     player.setProcessor (&rack.getGraph());
     deviceManager.addAudioCallback (&player);
@@ -1376,6 +1639,20 @@ void InstrumentHostService::startAudio()
 
     if (error.isNotEmpty())
         emitError ("Audio device: " + error);
+}
+
+void InstrumentHostService::restartAudioIfNeeded()
+{
+    if (! audioRunning)
+        return;
+
+    auto* device = deviceManager.getCurrentAudioDevice();
+    const auto have = device != nullptr ? device->getActiveInputChannels().countNumberOfSetBits() : 0;
+    if (neededInputChannels() > have)
+    {
+        stopAudio();
+        startAudio();
+    }
 }
 
 void InstrumentHostService::emitAudioDevices()
@@ -1398,14 +1675,90 @@ void InstrumentHostService::emitAudioDevices()
         midiInputs.add (juce::var (device));
     }
 
+    // MIDI outputs ride the same on-demand answer: hardware parts pick their port here.
+    juce::Array<juce::var> midiOutputs;
+    const auto outputsNow = listMidiOutputsNow();
+    for (const auto& id : outputsNow.getAllKeys())
+    {
+        auto* device = new juce::DynamicObject();
+        device->setProperty ("id", id);
+        device->setProperty ("name", outputsNow[id]);
+        midiOutputs.add (juce::var (device));
+    }
+
     auto* current = deviceManager.getCurrentAudioDevice();
     auto* obj = new juce::DynamicObject();
     obj->setProperty ("outputs", outputs);
     obj->setProperty ("current", current != nullptr ? current->getName() : juce::String());
     obj->setProperty ("midiInputs", midiInputs);
+    obj->setProperty ("midiOutputs", midiOutputs);
+    obj->setProperty ("inputChannels", current != nullptr
+                                         ? current->getActiveInputChannels().countNumberOfSetBits() : 0);
 
     if (options.emit != nullptr)
         options.emit ("instrumentHostAudioDevices", juce::var (obj));
+}
+
+juce::StringPairArray InstrumentHostService::listMidiOutputsNow() const
+{
+    if (options.listMidiOutputs != nullptr)
+        return options.listMidiOutputs();
+
+    juce::StringPairArray out;
+    for (const auto& device : juce::MidiOutput::getAvailableDevices())
+        out.set (device.identifier, device.name);
+    return out;
+}
+
+MidiSendProcessor::Sink InstrumentHostService::openMidiOutputNow (const juce::String& deviceId,
+                                                                  juce::String& errorOut) const
+{
+    if (options.openMidiOutput != nullptr)
+        return options.openMidiOutput (deviceId, errorOut);
+
+    auto device = juce::MidiOutput::openDevice (deviceId);
+    if (device == nullptr)
+    {
+        errorOut = "Cannot open MIDI output.";
+        return {};
+    }
+
+    // sendMessageNow from the audio thread is the pragmatic choice for a live rig's note
+    // traffic — MIDI ports drain far faster than a block lasts; the shared_ptr keeps the
+    // device alive as long as any sender still holds the sink.
+    std::shared_ptr<juce::MidiOutput> shared (std::move (device));
+    return [shared] (const juce::MidiBuffer& messages)
+    {
+        for (const auto metadata : messages)
+            shared->sendMessageNow (metadata.getMessage());
+    };
+}
+
+void InstrumentHostService::openHardwareMidi (const juce::String& partId)
+{
+    const auto* part = rack.getPerformance().findPart (partId);
+    if (part == nullptr || ! part->hardware)
+        return;
+
+    hardwareMidiErrors.erase (partId);
+    if (part->midiOutputId.isEmpty())
+    {
+        rack.setHardwareMidiSink (partId, {});
+        return;   // not configured yet — nothing to fail
+    }
+
+    juce::String error;
+    auto sink = openMidiOutputNow (part->midiOutputId, error);
+    if (sink == nullptr)
+    {
+        rack.setHardwareMidiSink (partId, {});
+        hardwareMidiErrors[partId] = (error.isNotEmpty() ? error : juce::String ("Cannot open MIDI output."))
+                                       + (part->midiOutputName.isNotEmpty()
+                                            ? " (" + part->midiOutputName + ")" : juce::String());
+        return;
+    }
+
+    rack.setHardwareMidiSink (partId, std::move (sink));
 }
 
 void InstrumentHostService::stopAudio()
@@ -1468,11 +1821,11 @@ void InstrumentHostService::emitHostProject()
         options.emit ("instrumentHostProject", hostProject);
 }
 
-void InstrumentHostService::prepareRuntime (double sampleRate, int blockSize)
+void InstrumentHostService::prepareRuntime (double sampleRate, int blockSize, int numInputChannels)
 {
     options.sampleRate = sampleRate;
     options.blockSize = blockSize;
-    rack.prepare (sampleRate, blockSize);
+    rack.prepare (sampleRate, blockSize, numInputChannels);
 }
 
 void InstrumentHostService::releaseRuntime()
@@ -1535,6 +1888,145 @@ juce::AudioProcessorParameter* InstrumentHostService::resolveParameter (const ju
 
     auto* processor = targetProcessor (partId);
     return processor != nullptr ? processor->getParameters()[descriptor->index] : nullptr;
+}
+
+bool InstrumentHostService::virtualParameterExists (const juce::String& targetId,
+                                                    const juce::String& parameterId) const
+{
+    const auto& performance = rack.getPerformance();
+    if (parameterId == "@macro")
+        return performance.findMacro (targetId) != nullptr;
+
+    if (performance.findPart (targetId) == nullptr)
+        return false;
+    if (parameterId == "@gain" || parameterId == "@pan")
+        return true;
+    if (parameterId.startsWith ("@send:"))
+        return performance.findReturn (parameterId.substring (6)) != nullptr;
+    return false;
+}
+
+float InstrumentHostService::virtualParameterValue (const juce::String& targetId,
+                                                    const juce::String& parameterId) const
+{
+    const auto& performance = rack.getPerformance();
+    if (parameterId == "@macro")
+    {
+        const auto* macro = performance.findMacro (targetId);
+        return macro != nullptr ? macro->value : 0.0f;
+    }
+
+    const auto* part = performance.findPart (targetId);
+    if (part == nullptr)
+        return 0.0f;
+    if (parameterId == "@gain")
+        return part->volume * 0.5f;                     // 0..2 linear → 0..1
+    if (parameterId == "@pan")
+        return (part->pan + 1.0f) * 0.5f;               // -1..+1 → 0..1
+    if (parameterId.startsWith ("@send:"))
+    {
+        const auto returnId = parameterId.substring (6);
+        for (const auto& send : part->sends)
+            if (send.returnId == returnId)
+                return send.level * 0.5f;
+    }
+    return 0.0f;
+}
+
+juce::String InstrumentHostService::virtualParameterText (const juce::String& targetId,
+                                                          const juce::String& parameterId) const
+{
+    const auto value = virtualParameterValue (targetId, parameterId);
+    if (parameterId == "@macro")
+        return juce::String (juce::roundToInt (value * 100.0f)) + "%";
+    if (parameterId == "@pan")
+    {
+        const auto pan = value * 2.0f - 1.0f;
+        if (std::abs (pan) < 0.005f)
+            return "C";
+        return (pan < 0 ? "L" : "R") + juce::String (std::abs (pan), 2);
+    }
+    return juce::String (value * 2.0f, 2);              // gains and sends read linear
+}
+
+juce::String InstrumentHostService::virtualParameterName (const juce::String& targetId,
+                                                          const juce::String& parameterId) const
+{
+    if (parameterId == "@macro")
+    {
+        const auto* macro = rack.getPerformance().findMacro (targetId);
+        return macro != nullptr && macro->name.isNotEmpty() ? macro->name : juce::String ("Macro");
+    }
+    if (parameterId == "@gain")
+        return "Level";
+    if (parameterId == "@pan")
+        return "Pan";
+    if (parameterId.startsWith ("@send:"))
+    {
+        const auto* chain = rack.getPerformance().findReturn (parameterId.substring (6));
+        return "Send — " + (chain != nullptr && chain->name.isNotEmpty() ? chain->name
+                                                                          : juce::String ("gone"));
+    }
+    return parameterId;
+}
+
+float InstrumentHostService::virtualParameterDefault (const juce::String& parameterId)
+{
+    if (parameterId == "@gain")
+        return 0.5f;    // unity
+    if (parameterId == "@pan")
+        return 0.5f;    // centre
+    return 0.0f;        // sends and macros rest at zero
+}
+
+void InstrumentHostService::setVirtualParameter (const juce::String& targetId,
+                                                 const juce::String& parameterId, float normalized)
+{
+    const auto value = juce::jlimit (0.0f, 1.0f, normalized);
+
+    if (parameterId == "@macro")
+    {
+        if (auto* macro = rack.findMutableMacro (targetId))
+        {
+            macro->value = value;
+            applyMacroValue (*macro);
+        }
+        return;
+    }
+
+    if (parameterId == "@gain")
+        rack.setVolume (targetId, value * 2.0f);
+    else if (parameterId == "@pan")
+        rack.setPan (targetId, value * 2.0f - 1.0f);
+    else if (parameterId.startsWith ("@send:"))
+        rack.setSendLevel (targetId, parameterId.substring (6), value * 2.0f);
+}
+
+bool InstrumentHostService::targetParameterExists (const juce::String& targetId,
+                                                   const juce::String& parameterId)
+{
+    return isVirtualParameterId (parameterId)
+             ? virtualParameterExists (targetId, parameterId)
+             : resolveParameter (targetId, parameterId) != nullptr;
+}
+
+void InstrumentHostService::writeMappedBinding (const ControlBinding& binding, float value01)
+{
+    const auto positioned = binding.inverted ? 1.0f - value01 : value01;
+    const auto mapped = binding.rangeMin + positioned * (binding.rangeMax - binding.rangeMin);
+
+    if (isVirtualParameterId (binding.parameterId))
+    {
+        setVirtualParameter (binding.partId, binding.parameterId, mapped);
+        return;
+    }
+
+    if (auto* parameter = resolveParameter (binding.partId, binding.parameterId))
+    {
+        parameter->beginChangeGesture();
+        parameter->setValueNotifyingHost (mapped);
+        parameter->endChangeGesture();
+    }
 }
 
 void InstrumentHostService::ensureLibrary()
@@ -1824,6 +2316,9 @@ juce::String InstrumentHostService::slotDisplayName (const ControlBinding& bindi
     if (binding.label.isNotEmpty())
         return binding.label;
 
+    if (isVirtualParameterId (binding.parameterId))
+        return virtualParameterName (binding.partId, binding.parameterId);
+
     if (resolved)
         if (const auto it = partParameters.find (binding.partId); it != partParameters.end())
             if (const auto* d = it->second.inventory.find (binding.parameterId))
@@ -1859,11 +2354,18 @@ juce::Array<InstrumentHostService::SurfaceSlot> InstrumentHostService::surfaceSl
         view.displayName = view.assigned ? slotDisplayName (b, view.resolved) : juce::String();
 
         if (view.resolved)
-            if (auto* parameter = self->resolveParameter (b.partId, b.parameterId))
+        {
+            if (isVirtualParameterId (b.parameterId))
+            {
+                view.valueText = virtualParameterText (b.partId, b.parameterId);
+                view.position = slotPositionFor (b, virtualParameterValue (b.partId, b.parameterId));
+            }
+            else if (auto* parameter = self->resolveParameter (b.partId, b.parameterId))
             {
                 view.valueText = parameter->getCurrentValueAsText();
                 view.position = slotPositionFor (b, parameter->getValue());
             }
+        }
 
         out.add (std::move (view));
     }
@@ -1880,19 +2382,32 @@ bool InstrumentHostService::nudgeControlSlot (const juce::String& pageId, const 
         return false;
 
     const auto& b = slot->binding;
-    auto* parameter = resolveParameter (b.partId, b.parameterId);
-    if (parameter == nullptr)
+
+    float current = 0.0f;
+    if (isVirtualParameterId (b.parameterId))
+    {
+        current = virtualParameterValue (b.partId, b.parameterId);
+    }
+    else if (auto* parameter = resolveParameter (b.partId, b.parameterId))
+    {
+        current = parameter->getValue();
+    }
+    else
+    {
         return false;
+    }
 
     const auto position = juce::jlimit (0.0f, 1.0f,
-                                        slotPositionFor (b, parameter->getValue())
-                                          + (float) delta / 127.0f);
-    const auto positioned = b.inverted ? 1.0f - position : position;
-    const auto mapped = b.rangeMin + positioned * (b.rangeMax - b.rangeMin);
+                                        slotPositionFor (b, current) + (float) delta / 127.0f);
+    writeMappedBinding (b, position);
 
-    parameter->beginChangeGesture();
-    parameter->setValueNotifyingHost (mapped);
-    parameter->endChangeGesture();
+    // A virtual nudge changed the manifest (fader, send, macro): persist it and let the UI
+    // follow the hardware — plug-in nudges reach the UI through the drain instead.
+    if (isVirtualParameterId (b.parameterId))
+    {
+        savePerformance();
+        emitState();
+    }
     return true;
 }
 
@@ -1900,6 +2415,11 @@ bool InstrumentHostService::bindingResolves (const ControlBinding& binding) cons
 {
     if (binding.isEmpty())
         return false;
+
+    // A virtual address belongs to the rack itself, not a plug-in class: it resolves as
+    // long as its part/return/macro still exists, whatever the part now hosts.
+    if (isVirtualParameterId (binding.parameterId))
+        return virtualParameterExists (binding.partId, binding.parameterId);
 
     // The target may be a rack part or an effect slot; either way the class it CURRENTLY
     // carries must still be the one the binding was assigned against.
@@ -2173,6 +2693,48 @@ juce::var InstrumentHostService::buildStatePayload() const
         obj->setProperty ("solo",          part.solo);
         obj->setProperty ("volume",        part.volume);
         obj->setProperty ("pan",           part.pan);
+
+        juce::Array<juce::var> sends;
+        for (const auto& send : part.sends)
+        {
+            auto* s = new juce::DynamicObject();
+            s->setProperty ("returnId", send.returnId);
+            s->setProperty ("level",    send.level);
+            sends.add (juce::var (s));
+        }
+        obj->setProperty ("sends", sends);
+
+        juce::Array<juce::var> extraOuts;
+        for (const auto& extra : part.extraOuts)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("pairIndex", extra.pairIndex);
+            o->setProperty ("gain",      extra.gain);
+            extraOuts.add (juce::var (o));
+        }
+        obj->setProperty ("extraOuts", extraOuts);
+        obj->setProperty ("outputChannels", rack.instrumentOutputChannels (part.partId));
+
+        obj->setProperty ("hardware", part.hardware);
+        if (part.hardware)
+        {
+            obj->setProperty ("midiOutputId",       part.midiOutputId);
+            obj->setProperty ("midiOutputName",     part.midiOutputName);
+            obj->setProperty ("midiOutChannel",     part.midiOutChannel);
+            obj->setProperty ("audioReturnChannel", part.audioReturnChannel);
+            obj->setProperty ("audioReturnStereo",  part.audioReturnStereo);
+            obj->setProperty ("programBank",        part.programBank);
+            obj->setProperty ("programNumber",      part.programNumber);
+            obj->setProperty ("deviceProfileId",    part.deviceProfileId);
+            const auto errorIt = hardwareMidiErrors.find (part.partId);
+            obj->setProperty ("midiOutError", errorIt != hardwareMidiErrors.end()
+                                                ? errorIt->second : juce::String());
+        }
+
+        // Chain latency, visible rather than pretended away — the graph does not compensate
+        // parallel paths (a live rack keeps every path as fast as its plug-ins allow).
+        obj->setProperty ("latencyMs", rack.partLatencySamples (part.partId)
+                                         / rack.getSampleRate() * 1000.0);
         parts.add (juce::var (obj));
     }
 
@@ -2238,13 +2800,27 @@ juce::var InstrumentHostService::buildStatePayload() const
         macros.add (juce::var (m));
     }
 
+    juce::Array<juce::var> returns;
+    for (const auto& chain : performance.returns)
+    {
+        auto* r = new juce::DynamicObject();
+        r->setProperty ("returnId", chain.returnId);
+        r->setProperty ("name",     chain.name);
+        r->setProperty ("level",    chain.level);
+        r->setProperty ("effects",  effectsProjection (chain.effects));
+        returns.add (juce::var (r));
+    }
+
     auto* rackObj = new juce::DynamicObject();
     rackObj->setProperty ("performanceId", performance.performanceId);
     rackObj->setProperty ("focusedPartId", performance.focusedPartId);
     rackObj->setProperty ("parts", parts);
     rackObj->setProperty ("masterEffects", effectsProjection (performance.masterEffects));
+    rackObj->setProperty ("returns", returns);
     rackObj->setProperty ("macros", macros);
     rackObj->setProperty ("pages", pages);
+    rackObj->setProperty ("masterLatencyMs", rack.masterLatencySamples()
+                                               / rack.getSampleRate() * 1000.0);
 
     auto* audio = new juce::DynamicObject();
     auto* device = deviceManager.getCurrentAudioDevice();
@@ -2253,6 +2829,12 @@ juce::var InstrumentHostService::buildStatePayload() const
     audio->setProperty ("deviceName", device != nullptr ? device->getName() : juce::String());
     audio->setProperty ("sampleRate", device != nullptr ? device->getCurrentSampleRate() : 0.0);
     audio->setProperty ("bufferSize", device != nullptr ? device->getCurrentBufferSizeSamples() : 0);
+    audio->setProperty ("inputChannels", device != nullptr
+                                           ? device->getActiveInputChannels().countNumberOfSetBits() : 0);
+    // §18.7.11's resource visibility, in the simplest honest form the device layer offers:
+    // whole-engine DSP load and the xrun count. Zeros while audio is off.
+    audio->setProperty ("cpu",   audioRunning && device != nullptr ? deviceManager.getCpuUsage() : 0.0);
+    audio->setProperty ("xruns", audioRunning && device != nullptr ? deviceManager.getXRunCount() : 0);
 
     auto* root = new juce::DynamicObject();
     root->setProperty ("instruments", instruments);
@@ -2277,7 +2859,50 @@ void InstrumentHostService::savePerformance()
     if (! options.persistSession)
         return;
 
+    maybeSnapshotRevision();
     performanceFile().replaceWithText (juce::JSON::toString (rack.captureState().toVar()));
+}
+
+void InstrumentHostService::maybeSnapshotRevision()
+{
+    // Every mutation saves, so the revisions cannot be one-per-save — they would be a
+    // keystroke log. Instead the current file is copied aside when the newest copy is older
+    // than the interval: what survives is a trail of rigs minutes apart, not edits.
+    constexpr double snapshotIntervalMinutes = 10.0;
+    constexpr int maxRevisions = 12;
+
+    const auto current = performanceFile();
+    if (! current.existsAsFile())
+        return;
+
+    const auto directory = revisionsDirectory();
+    directory.createDirectory();
+
+    juce::Array<juce::File> revisions = directory.findChildFiles (juce::File::findFiles, false, "*.json");
+    revisions.sort();   // ISO-stamped names sort chronologically
+
+    if (! revisions.isEmpty())
+    {
+        const auto newest = revisions.getLast().getLastModificationTime();
+        if ((juce::Time::getCurrentTime() - newest).inMinutes() < snapshotIntervalMinutes)
+            return;
+    }
+
+    // Milliseconds keep snapshots in the same second apart, and the sibling bump covers even
+    // the same millisecond — rare live, routine when tests replay a day in a few hundred ms.
+    const auto now = juce::Time::getCurrentTime();
+    const auto stamp = now.formatted ("%Y%m%d-%H%M%S")
+                         + "-" + juce::String (now.getMilliseconds()).paddedLeft ('0', 3);
+    current.copyFileTo (directory.getChildFile ("session-" + stamp + ".json")
+                            .getNonexistentSibling());
+
+    revisions = directory.findChildFiles (juce::File::findFiles, false, "*.json");
+    revisions.sort();
+    while (revisions.size() > maxRevisions)
+    {
+        revisions.getFirst().deleteFile();
+        revisions.remove (0);
+    }
 }
 
 void InstrumentHostService::saveScanPaths()
