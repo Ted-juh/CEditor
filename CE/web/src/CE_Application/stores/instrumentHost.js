@@ -274,6 +274,149 @@ export function emptyHostState() {
              inputChannels: 0, cpu: 0, xruns: 0 },
     rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], returns: [],
             macros: [], pages: [], masterLatencyMs: 0 },
+    performance: emptyPerformance(),
+  };
+}
+
+/** The Stage 6 half of the state: one transport, the patterns and clips over it, the scenes
+ *  that recall whole rigs and the setlist that walks them. */
+export function emptyPerformance() {
+  return {
+    transport: {
+      playing: false, tempo: 120, numerator: 4, denominator: 4, positionPpq: 0,
+      bar: 1, beat: 1, beatFraction: 0, externalClock: false, clockLost: false,
+      defaultQuantize: 'bar',
+    },
+    patterns: [],
+    clips: [],
+    scenes: [],
+    setlist: { items: [], currentIndex: -1 },
+    capture: { armed: false, clipId: '', laneId: '' },
+    scales: [],
+  };
+}
+
+const normalizeStep = (s) => ({
+  active: s?.active === true,
+  note: Number(s?.note ?? 60),
+  velocity: Number(s?.velocity ?? 100),
+  value: Number(s?.value ?? 0),
+  gate: Number(s?.gate ?? 0.5),
+  microtiming: Number(s?.microtiming ?? 0),
+  probability: Number(s?.probability ?? 100),
+  ratchets: Number(s?.ratchets ?? 1),
+  tie: s?.tie === true,
+  every: Number(s?.every ?? 1),
+  offset: Number(s?.offset ?? 0),
+});
+
+const normalizeArp = (a) => ({
+  enabled: a?.enabled === true,
+  mode: String(a?.mode ?? 'up'),
+  stepsPerBeat: Number(a?.stepsPerBeat ?? 4),
+  gate: Number(a?.gate ?? 0.5),
+  swing: Number(a?.swing ?? 0),
+  octaves: Number(a?.octaves ?? 1),
+  latch: a?.latch === true,
+  constrainToScale: a?.constrainToScale === true,
+  velocityPattern: (Array.isArray(a?.velocityPattern) ? a.velocityPattern : []).map(Number),
+});
+
+const normalizeMidiFx = (f) => ({
+  transpose: Number(f?.transpose ?? 0),
+  constrainToScale: f?.constrainToScale === true,
+  scaleRoot: Number(f?.scaleRoot ?? 0),
+  scaleType: String(f?.scaleType ?? 'major'),
+  chord: String(f?.chord ?? 'off'),
+  velocityFixed: Number(f?.velocityFixed ?? 0),
+  velocityScale: Number(f?.velocityScale ?? 1),
+});
+
+export function normalizePerformance(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const t = p.transport && typeof p.transport === 'object' ? p.transport : {};
+  const setlist = p.setlist && typeof p.setlist === 'object' ? p.setlist : {};
+  const capture = p.capture && typeof p.capture === 'object' ? p.capture : {};
+
+  return {
+    transport: {
+      playing: t.playing === true,
+      tempo: Number(t.tempo ?? 120),
+      numerator: Number(t.numerator ?? 4),
+      denominator: Number(t.denominator ?? 4),
+      positionPpq: Number(t.positionPpq ?? 0),
+      bar: Number(t.bar ?? 1),
+      beat: Number(t.beat ?? 1),
+      beatFraction: Number(t.beatFraction ?? 0),
+      externalClock: t.externalClock === true,
+      clockLost: t.clockLost === true,
+      defaultQuantize: String(t.defaultQuantize ?? 'bar'),
+    },
+    patterns: (Array.isArray(p.patterns) ? p.patterns : []).map((pattern) => ({
+      patternId: String(pattern?.patternId ?? ''),
+      name: String(pattern?.name ?? ''),
+      swing: Number(pattern?.swing ?? 0),
+      lengthPpq: Number(pattern?.lengthPpq ?? 4),
+      lanes: (Array.isArray(pattern?.lanes) ? pattern.lanes : []).map((lane) => ({
+        laneId: String(lane?.laneId ?? ''),
+        type: String(lane?.type ?? 'note'),
+        name: String(lane?.name ?? ''),
+        targetPartId: String(lane?.targetPartId ?? ''),
+        targetId: String(lane?.targetId ?? ''),
+        parameterId: String(lane?.parameterId ?? ''),
+        targetName: String(lane?.targetName ?? ''),
+        resolved: lane?.resolved === true,
+        channel: Number(lane?.channel ?? 1),
+        ccNumber: Number(lane?.ccNumber ?? 74),
+        drumNote: Number(lane?.drumNote ?? 36),
+        stepCount: Number(lane?.stepCount ?? 16),
+        stepsPerBeat: Number(lane?.stepsPerBeat ?? 4),
+        muted: lane?.muted === true,
+        glide: lane?.glide === true,
+        euclidPulses: Number(lane?.euclidPulses ?? 0),
+        steps: (Array.isArray(lane?.steps) ? lane.steps : []).map(normalizeStep),
+      })),
+    })),
+    clips: (Array.isArray(p.clips) ? p.clips : []).map((c) => ({
+      clipId: String(c?.clipId ?? ''),
+      name: String(c?.name ?? ''),
+      patternId: String(c?.patternId ?? ''),
+      launchQuantize: String(c?.launchQuantize ?? 'bar'),
+      loop: c?.loop !== false,
+      followClipId: String(c?.followClipId ?? ''),
+      followAfterLoops: Number(c?.followAfterLoops ?? 0),
+      active: c?.active === true,
+      pending: c?.pending === true,
+      phase: Number(c?.phase ?? 0),
+    })),
+    scenes: (Array.isArray(p.scenes) ? p.scenes : []).map((s) => ({
+      sceneId: String(s?.sceneId ?? ''),
+      name: String(s?.name ?? ''),
+      clipIds: (Array.isArray(s?.clipIds) ? s.clipIds : []).map(String),
+      launchQuantize: String(s?.launchQuantize ?? 'bar'),
+      stopOtherClips: s?.stopOtherClips !== false,
+      tempo: Number(s?.tempo ?? 0),
+      numSlots: Number(s?.numSlots ?? 0),
+      numMacros: Number(s?.numMacros ?? 0),
+    })),
+    setlist: {
+      items: (Array.isArray(setlist.items) ? setlist.items : []).map((i) => ({
+        itemId: String(i?.itemId ?? ''),
+        name: String(i?.name ?? ''),
+        sceneId: String(i?.sceneId ?? ''),
+        sceneName: String(i?.sceneName ?? ''),
+        missing: i?.missing === true,
+        notes: String(i?.notes ?? ''),
+        tempo: Number(i?.tempo ?? 0),
+      })),
+      currentIndex: Number(setlist.currentIndex ?? -1),
+    },
+    capture: {
+      armed: capture.armed === true,
+      clipId: String(capture.clipId ?? ''),
+      laneId: String(capture.laneId ?? ''),
+    },
+    scales: (Array.isArray(p.scales) ? p.scales : []).map(String),
   };
 }
 
@@ -328,6 +471,7 @@ export function normalizeHostState(payload) {
       cpu: Number(p.audio?.cpu ?? 0),
       xruns: Number(p.audio?.xruns ?? 0),
     },
+    performance: normalizePerformance(p.performance),
     rack: {
       performanceId: String(rack.performanceId ?? ''),
       focusedPartId: String(rack.focusedPartId ?? ''),
@@ -407,6 +551,8 @@ export function normalizeHostState(payload) {
         programBank: Number(part?.programBank ?? -1),
         programNumber: Number(part?.programNumber ?? -1),
         midiOutError: String(part?.midiOutError ?? ''),
+        arp: normalizeArp(part?.arp),
+        midiFx: normalizeMidiFx(part?.midiFx),
         enabled: part?.enabled !== false,
         mute: part?.mute === true,
         solo: part?.solo === true,
@@ -451,6 +597,31 @@ export function mockHostState() {
         { partId: 'mock-part-1', pluginCeId: 'mock-keys', pluginName: 'Stage Keys', pluginVendor: 'Mock Audio', hasInstrument: true },
         { partId: 'mock-part-2', pluginCeId: '', pluginName: '' },
       ],
+    },
+    performance: {
+      transport: { tempo: 120, numerator: 4, denominator: 4, defaultQuantize: 'bar' },
+      patterns: [{
+        patternId: 'mock-pattern-1',
+        name: 'Riff',
+        lanes: [{
+          laneId: 'mock-lane-1',
+          type: 'note',
+          name: 'Notes',
+          targetPartId: 'mock-part-1',
+          targetName: 'Stage Keys',
+          resolved: true,
+          stepCount: 16,
+          stepsPerBeat: 4,
+          steps: Array.from({ length: 16 }, (_, i) => ({
+            active: i % 4 === 0, note: 60 + (i % 4) * 3, velocity: 100, gate: 0.5,
+          })),
+        }],
+      }],
+      clips: [{ clipId: 'mock-clip-1', name: 'Riff', patternId: 'mock-pattern-1',
+                launchQuantize: 'bar', loop: true }],
+      scenes: [],
+      setlist: { items: [], currentIndex: -1 },
+      scales: ['chromatic', 'major', 'minor', 'dorian', 'pentatonic minor'],
     },
   });
 }
@@ -763,6 +934,295 @@ export function applyMockCommand(state, payload) {
     return next;
   }
 
+  // --- Stage 6: the performance system ----------------------------------------------------
+  const perf = next.performance;
+  const pattern = (id) => perf.patterns.find((p) => p.patternId === id);
+  const lane = (patternId, laneId) => pattern(patternId)?.lanes.find((l) => l.laneId === laneId);
+
+  if (cmd === 'transportPlay' || cmd === 'transportStop' || cmd === 'transportContinue') {
+    perf.transport.playing = cmd !== 'transportStop';
+    if (cmd === 'transportPlay') { perf.transport.positionPpq = 0; perf.transport.bar = 1; perf.transport.beat = 1; }
+    return next;
+  }
+  if (cmd === 'setTempo') {
+    perf.transport.tempo = Math.min(300, Math.max(20, Number(payload.tempo ?? 120)));
+    return next;
+  }
+  if (cmd === 'setTimeSignature') {
+    perf.transport.numerator = Math.min(32, Math.max(1, Number(payload.numerator ?? 4)));
+    perf.transport.denominator = Math.min(16, Math.max(2, Number(payload.denominator ?? 4)));
+    return next;
+  }
+  if (cmd === 'setTransportPosition') {
+    perf.transport.positionPpq = Math.max(0, Number(payload.ppq ?? 0));
+    return next;
+  }
+  if (cmd === 'setExternalClock') {
+    perf.transport.externalClock = payload.enabled === true;
+    return next;
+  }
+  if (cmd === 'addPattern') {
+    const patternId = `mock-pattern-${Date.now()}`;
+    perf.patterns.push(normalizePerformance({ patterns: [{
+      patternId,
+      name: payload.name || `Pattern ${perf.patterns.length + 1}`,
+      lanes: [{ laneId: `${patternId}-lane-1`, type: 'note', name: 'Notes',
+                targetPartId: next.rack.focusedPartId, resolved: true,
+                targetName: part(next.rack.focusedPartId)?.pluginName ?? '',
+                stepCount: 16, stepsPerBeat: 4,
+                steps: Array.from({ length: 16 }, () => ({})) }],
+    }] }).patterns[0]);
+    return next;
+  }
+  if (cmd === 'removePattern') {
+    perf.patterns = perf.patterns.filter((p) => p.patternId !== payload.patternId);
+    perf.clips = perf.clips.filter((c) => c.patternId !== payload.patternId);
+    return next;
+  }
+  if (cmd === 'renamePattern') {
+    const target = pattern(payload.patternId);
+    if (target) target.name = String(payload.name ?? target.name);
+    return next;
+  }
+  if (cmd === 'setPatternOptions') {
+    const target = pattern(payload.patternId);
+    if (target && payload.swing !== undefined)
+      target.swing = Math.min(0.75, Math.max(0, Number(payload.swing)));
+    return next;
+  }
+  if (cmd === 'addLane') {
+    const target = pattern(payload.patternId);
+    if (!target) return next;
+    const type = String(payload.type ?? 'note');
+    target.lanes.push(normalizePerformance({ patterns: [{ patternId: 'x', lanes: [{
+      laneId: `mock-lane-${Date.now()}`,
+      type,
+      name: payload.name || type.charAt(0).toUpperCase() + type.slice(1),
+      targetPartId: payload.targetPartId ?? next.rack.focusedPartId,
+      targetName: part(payload.targetPartId ?? next.rack.focusedPartId)?.pluginName ?? '',
+      resolved: type !== 'parameter',
+      stepCount: 16, stepsPerBeat: 4,
+      steps: Array.from({ length: 16 }, () => ({})),
+    }] }] }).patterns[0].lanes[0]);
+    return next;
+  }
+  if (cmd === 'removeLane') {
+    const target = pattern(payload.patternId);
+    if (target) target.lanes = target.lanes.filter((l) => l.laneId !== payload.laneId);
+    return next;
+  }
+  if (cmd === 'setLaneOptions') {
+    const target = lane(payload.patternId, payload.laneId);
+    if (!target) return next;
+    for (const key of ['name', 'targetPartId', 'targetId', 'parameterId'])
+      if (payload[key] !== undefined) target[key] = String(payload[key]);
+    for (const key of ['channel', 'ccNumber', 'drumNote', 'stepsPerBeat'])
+      if (payload[key] !== undefined) target[key] = Number(payload[key]);
+    for (const key of ['muted', 'glide'])
+      if (payload[key] !== undefined) target[key] = payload[key] === true;
+    if (payload.targetPartId !== undefined)
+      target.targetName = part(payload.targetPartId)?.pluginName ?? '';
+    if (payload.stepCount !== undefined) {
+      target.stepCount = Math.min(128, Math.max(1, Number(payload.stepCount)));
+      while (target.steps.length < target.stepCount) target.steps.push(normalizeStep({}));
+      target.steps.length = target.stepCount;
+    }
+    return next;
+  }
+  if (cmd === 'clearLane') {
+    const target = lane(payload.patternId, payload.laneId);
+    if (target) { target.steps = target.steps.map(() => normalizeStep({})); target.euclidPulses = 0; }
+    return next;
+  }
+  if (cmd === 'euclidFill') {
+    const target = lane(payload.patternId, payload.laneId);
+    if (!target) return next;
+    const steps = target.stepCount;
+    const pulses = Math.min(steps, Math.max(0, Number(payload.pulses ?? 0)));
+    const rotation = Number(payload.rotation ?? 0);
+    target.euclidPulses = pulses;
+    let bucket = 0;
+    const hits = [];
+    for (let i = 0; i < steps; i += 1) {
+      bucket += pulses;
+      const hit = bucket >= steps;
+      if (hit) bucket -= steps;
+      hits.push(hit);
+    }
+    target.steps = target.steps.map((step, i) => ({
+      ...step,
+      active: hits[((i + rotation) % steps + steps) % steps],
+      note: step.note || 60,
+    }));
+    return next;
+  }
+  if (cmd === 'setStep' || cmd === 'toggleStep') {
+    const target = lane(payload.patternId, payload.laneId);
+    const step = target?.steps[Number(payload.index ?? -1)];
+    if (!step) return next;
+    if (cmd === 'toggleStep') {
+      step.active = !step.active;
+      if (step.active && !step.note) step.note = 60;
+      return next;
+    }
+    for (const key of ['note', 'velocity', 'value', 'gate', 'microtiming', 'probability',
+                       'ratchets', 'every', 'offset'])
+      if (payload[key] !== undefined) step[key] = Number(payload[key]);
+    for (const key of ['active', 'tie'])
+      if (payload[key] !== undefined) step[key] = payload[key] === true;
+    return next;
+  }
+  if (cmd === 'addClip') {
+    const source = pattern(payload.patternId);
+    if (!source) return next;
+    perf.clips.push(normalizePerformance({ clips: [{
+      clipId: `mock-clip-${Date.now()}`,
+      name: payload.name || source.name,
+      patternId: source.patternId,
+      launchQuantize: perf.transport.defaultQuantize,
+    }] }).clips[0]);
+    return next;
+  }
+  if (cmd === 'removeClip') {
+    perf.clips = perf.clips.filter((c) => c.clipId !== payload.clipId);
+    for (const scene of perf.scenes)
+      scene.clipIds = scene.clipIds.filter((id) => id !== payload.clipId);
+    return next;
+  }
+  if (cmd === 'setClipOptions') {
+    const clip = perf.clips.find((c) => c.clipId === payload.clipId);
+    if (!clip) return next;
+    for (const key of ['name', 'launchQuantize', 'followClipId'])
+      if (payload[key] !== undefined) clip[key] = String(payload[key]);
+    if (payload.loop !== undefined) clip.loop = payload.loop === true;
+    if (payload.followAfterLoops !== undefined) clip.followAfterLoops = Number(payload.followAfterLoops);
+    return next;
+  }
+  if (cmd === 'launchClip' || cmd === 'stopClip' || cmd === 'stopAllClips') {
+    // The mock has no clock, so a launch takes effect at once — the native side waits for the
+    // quantization boundary and the UI shows `pending` until it lands.
+    for (const clip of perf.clips) {
+      if (cmd === 'stopAllClips') clip.active = false;
+      else if (clip.clipId === payload.clipId) clip.active = cmd === 'launchClip';
+    }
+    return next;
+  }
+  if (cmd === 'armCapture') {
+    perf.capture = { armed: true, clipId: String(payload.clipId ?? ''), laneId: String(payload.laneId ?? '') };
+    return next;
+  }
+  if (cmd === 'disarmCapture') {
+    perf.capture = { armed: false, clipId: '', laneId: '' };
+    return next;
+  }
+  if (cmd === 'addScene') {
+    perf.scenes.push(normalizePerformance({ scenes: [{
+      sceneId: `mock-scene-${Date.now()}`,
+      name: payload.name || `Scene ${perf.scenes.length + 1}`,
+      clipIds: perf.clips.filter((c) => c.active).map((c) => c.clipId),
+      launchQuantize: perf.transport.defaultQuantize,
+      numSlots: next.rack.parts.length,
+      numMacros: next.rack.macros.length,
+    }] }).scenes[0]);
+    return next;
+  }
+  if (cmd === 'removeScene') {
+    perf.scenes = perf.scenes.filter((s) => s.sceneId !== payload.sceneId);
+    perf.setlist.items = perf.setlist.items.filter((i) => i.sceneId !== payload.sceneId);
+    return next;
+  }
+  if (cmd === 'renameScene' || cmd === 'captureScene' || cmd === 'setSceneOptions'
+      || cmd === 'setSceneClip') {
+    const scene = perf.scenes.find((s) => s.sceneId === payload.sceneId);
+    if (!scene) return next;
+    if (cmd === 'renameScene') scene.name = String(payload.name ?? scene.name);
+    else if (cmd === 'captureScene') {
+      scene.clipIds = perf.clips.filter((c) => c.active).map((c) => c.clipId);
+      scene.numSlots = next.rack.parts.length;
+      scene.numMacros = next.rack.macros.length;
+    } else if (cmd === 'setSceneClip') {
+      const included = payload.included === true;
+      scene.clipIds = scene.clipIds.filter((id) => id !== payload.clipId);
+      if (included) scene.clipIds.push(String(payload.clipId));
+    } else {
+      if (payload.launchQuantize !== undefined) scene.launchQuantize = String(payload.launchQuantize);
+      if (payload.stopOtherClips !== undefined) scene.stopOtherClips = payload.stopOtherClips === true;
+      if (payload.tempo !== undefined) scene.tempo = Number(payload.tempo);
+    }
+    return next;
+  }
+  if (cmd === 'launchScene') {
+    const scene = perf.scenes.find((s) => s.sceneId === payload.sceneId);
+    if (!scene) return next;
+    for (const clip of perf.clips) {
+      const inScene = scene.clipIds.includes(clip.clipId);
+      if (inScene) clip.active = true;
+      else if (scene.stopOtherClips) clip.active = false;
+    }
+    if (scene.tempo > 0) perf.transport.tempo = scene.tempo;
+    return next;
+  }
+  if (cmd === 'addSetlistItem') {
+    const scene = perf.scenes.find((s) => s.sceneId === payload.sceneId);
+    perf.setlist.items.push({
+      itemId: `mock-item-${Date.now()}`,
+      name: payload.name || scene?.name || `Item ${perf.setlist.items.length + 1}`,
+      sceneId: String(payload.sceneId ?? ''),
+      sceneName: scene?.name ?? '',
+      missing: !!payload.sceneId && !scene,
+      notes: '',
+      tempo: 0,
+    });
+    return next;
+  }
+  if (cmd === 'removeSetlistItem' || cmd === 'setSetlistItem' || cmd === 'moveSetlistItem') {
+    const index = perf.setlist.items.findIndex((i) => i.itemId === payload.itemId);
+    if (index < 0) return next;
+    if (cmd === 'removeSetlistItem') {
+      perf.setlist.items.splice(index, 1);
+      perf.setlist.currentIndex = Math.min(perf.setlist.currentIndex, perf.setlist.items.length - 1);
+    } else if (cmd === 'moveSetlistItem') {
+      const [item] = perf.setlist.items.splice(index, 1);
+      perf.setlist.items.splice(Math.min(perf.setlist.items.length,
+                                         Math.max(0, Number(payload.index ?? index))), 0, item);
+    } else {
+      const item = perf.setlist.items[index];
+      for (const key of ['name', 'notes'])
+        if (payload[key] !== undefined) item[key] = String(payload[key]);
+      if (payload.tempo !== undefined) item.tempo = Number(payload.tempo);
+      if (payload.sceneId !== undefined) {
+        item.sceneId = String(payload.sceneId);
+        const scene = perf.scenes.find((s) => s.sceneId === item.sceneId);
+        item.sceneName = scene?.name ?? '';
+        item.missing = !!item.sceneId && !scene;
+      }
+    }
+    return next;
+  }
+  if (cmd === 'setlistGo' || cmd === 'setlistNext' || cmd === 'setlistPrev') {
+    const target = cmd === 'setlistGo' ? Number(payload.index ?? 0)
+      : cmd === 'setlistNext' ? perf.setlist.currentIndex + 1 : perf.setlist.currentIndex - 1;
+    const item = perf.setlist.items[target];
+    // The native rule, mirrored: an item whose scene is gone leaves the rig where it was.
+    if (!item || item.missing) return next;
+    perf.setlist.currentIndex = target;
+    if (item.sceneId) return applyMockCommand(next, { cmd: 'launchScene', sceneId: item.sceneId });
+    return next;
+  }
+  if (cmd === 'setPartArp' || cmd === 'setPartMidiFx') {
+    const target = part(payload.partId);
+    if (!target) return next;
+    const block = cmd === 'setPartArp' ? target.arp : target.midiFx;
+    for (const [key, value] of Object.entries(payload)) {
+      if (key === 'cmd' || key === 'partId' || !(key in block)) continue;
+      block[key] = typeof block[key] === 'boolean' ? value === true
+        : typeof block[key] === 'number' ? Number(value)
+        : Array.isArray(block[key]) ? (Array.isArray(value) ? value.map(Number) : block[key])
+        : String(value);
+    }
+    return next;
+  }
+
   return next; // getState / scan / panic mutate nothing mockable
 }
 
@@ -1053,6 +1513,58 @@ export const removeLibraryRecord = (recordId) => send({ cmd: 'removeLibraryRecor
 export const loadLibraryRecord = (recordId, action = 'focused', partId) =>
   send(partId ? { cmd: 'loadLibraryRecord', recordId, action, partId }
               : { cmd: 'loadLibraryRecord', recordId, action });
+// --- Stage 6: the performance system -------------------------------------------------------
+export const transportPlay = () => send({ cmd: 'transportPlay' });
+export const transportStop = () => send({ cmd: 'transportStop' });
+export const transportContinue = () => send({ cmd: 'transportContinue' });
+export const setTempo = (tempo) => send({ cmd: 'setTempo', tempo });
+export const setTimeSignature = (numerator, denominator) =>
+  send({ cmd: 'setTimeSignature', numerator, denominator });
+export const setTransportPosition = (ppq) => send({ cmd: 'setTransportPosition', ppq });
+export const setExternalClock = (enabled) => send({ cmd: 'setExternalClock', enabled });
+export const addPattern = (name) => send(name ? { cmd: 'addPattern', name } : { cmd: 'addPattern' });
+export const removePattern = (patternId) => send({ cmd: 'removePattern', patternId });
+export const renamePattern = (patternId, name) => send({ cmd: 'renamePattern', patternId, name });
+export const setPatternOptions = (patternId, fields) =>
+  send({ cmd: 'setPatternOptions', patternId, ...fields });
+export const addLane = (patternId, fields = {}) => send({ cmd: 'addLane', patternId, ...fields });
+export const removeLane = (patternId, laneId) => send({ cmd: 'removeLane', patternId, laneId });
+export const setLaneOptions = (patternId, laneId, fields) =>
+  send({ cmd: 'setLaneOptions', patternId, laneId, ...fields });
+export const clearLane = (patternId, laneId) => send({ cmd: 'clearLane', patternId, laneId });
+export const euclidFill = (patternId, laneId, pulses, rotation = 0) =>
+  send({ cmd: 'euclidFill', patternId, laneId, pulses, rotation });
+export const setStep = (patternId, laneId, index, fields) =>
+  send({ cmd: 'setStep', patternId, laneId, index, ...fields });
+export const toggleStep = (patternId, laneId, index) =>
+  send({ cmd: 'toggleStep', patternId, laneId, index });
+export const addClip = (patternId, name) =>
+  send(name ? { cmd: 'addClip', patternId, name } : { cmd: 'addClip', patternId });
+export const removeClip = (clipId) => send({ cmd: 'removeClip', clipId });
+export const setClipOptions = (clipId, fields) => send({ cmd: 'setClipOptions', clipId, ...fields });
+export const launchClip = (clipId) => send({ cmd: 'launchClip', clipId });
+export const stopClip = (clipId) => send({ cmd: 'stopClip', clipId });
+export const stopAllClips = () => send({ cmd: 'stopAllClips' });
+export const armCapture = (clipId, laneId) => send({ cmd: 'armCapture', clipId, laneId });
+export const disarmCapture = () => send({ cmd: 'disarmCapture' });
+export const addScene = (name) => send(name ? { cmd: 'addScene', name } : { cmd: 'addScene' });
+export const removeScene = (sceneId) => send({ cmd: 'removeScene', sceneId });
+export const renameScene = (sceneId, name) => send({ cmd: 'renameScene', sceneId, name });
+export const captureScene = (sceneId) => send({ cmd: 'captureScene', sceneId });
+export const setSceneOptions = (sceneId, fields) => send({ cmd: 'setSceneOptions', sceneId, ...fields });
+export const setSceneClip = (sceneId, clipId, included) =>
+  send({ cmd: 'setSceneClip', sceneId, clipId, included });
+export const launchScene = (sceneId) => send({ cmd: 'launchScene', sceneId });
+export const addSetlistItem = (sceneId, name) => send({ cmd: 'addSetlistItem', sceneId, name });
+export const removeSetlistItem = (itemId) => send({ cmd: 'removeSetlistItem', itemId });
+export const setSetlistItem = (itemId, fields) => send({ cmd: 'setSetlistItem', itemId, ...fields });
+export const moveSetlistItem = (itemId, index) => send({ cmd: 'moveSetlistItem', itemId, index });
+export const setlistGo = (index) => send({ cmd: 'setlistGo', index });
+export const setlistNext = () => send({ cmd: 'setlistNext' });
+export const setlistPrev = () => send({ cmd: 'setlistPrev' });
+export const setPartArp = (partId, fields) => send({ cmd: 'setPartArp', partId, ...fields });
+export const setPartMidiFx = (partId, fields) => send({ cmd: 'setPartMidiFx', partId, ...fields });
+
 export const requestHostProject = () => send({ cmd: 'getHostProject' });
 export const setHostProject = (fields) => send({ cmd: 'setHostProject', ...fields });
 export const buildHostProduct = () => {

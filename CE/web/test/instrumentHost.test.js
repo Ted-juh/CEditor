@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 
 import {
   emptyHostState,
+  emptyPerformance,
   normalizeHostState,
   filterInstruments,
   mockHostState,
@@ -560,4 +561,133 @@ test('mock parameters: a part answers with its mixer addresses beside the plug-i
   requestParameters('mock-part-2');
   assert.ok(get(hostParameters).parameters.every((d) => d.id.startsWith('@')),
     'an empty part keeps only its mixer registry');
+});
+
+// --- Stage 6: the performance system -------------------------------------------------------------
+
+test('normalizeHostState shapes the performance system', () => {
+  const shaped = normalizeHostState({
+    performance: {
+      transport: { playing: 1, tempo: '128', bar: 3, beat: 2, externalClock: true },
+      // `playing: 1` is deliberate: the store is strictly boolean, like `scanning` above.
+      patterns: [{
+        patternId: 'p1', name: 'Riff', swing: '0.25',
+        lanes: [{ laneId: 'l1', type: 'drum', stepCount: '8', stepsPerBeat: 2, drumNote: 38,
+                  resolved: true,
+                  steps: [{ active: true, note: 40, ratchets: 3, probability: 60 }] }],
+      }],
+      clips: [{ clipId: 'c1', patternId: 'p1', active: true, phase: 0.5 }],
+      scenes: [{ sceneId: 's1', name: 'Verse', clipIds: ['c1'] }],
+      setlist: { items: [{ itemId: 'i1', name: 'Opener', sceneId: 's1' }], currentIndex: 0 },
+      capture: { armed: true, clipId: 'c1', laneId: 'l1' },
+      scales: ['major', 'minor'],
+    },
+  });
+
+  const perf = shaped.performance;
+  assert.equal(perf.transport.playing, false, 'truthy is not true');
+  assert.equal(perf.transport.externalClock, true, 'a real boolean passes through');
+  assert.equal(perf.transport.tempo, 128);
+  assert.equal(perf.patterns[0].swing, 0.25);
+  assert.equal(perf.patterns[0].lanes[0].type, 'drum');
+  assert.equal(perf.patterns[0].lanes[0].steps[0].ratchets, 3);
+  assert.equal(perf.clips[0].phase, 0.5);
+  assert.equal(perf.scenes[0].clipIds[0], 'c1');
+  assert.equal(perf.setlist.currentIndex, 0);
+  assert.equal(perf.capture.armed, true);
+  assert.deepEqual(normalizeHostState({}).performance, emptyPerformance(),
+    'an older payload loads clean');
+});
+
+test('mock reducer: patterns, lanes and steps', () => {
+  let state = mockHostState();
+  assert.equal(state.performance.patterns.length, 1, 'the preview ships a pattern to play with');
+
+  state = applyMockCommand(state, { cmd: 'addPattern', name: 'Bass' });
+  const patternId = state.performance.patterns[1].patternId;
+  assert.equal(state.performance.patterns[1].lanes.length, 1,
+    'a new pattern arrives with a lane, like the native side');
+
+  const laneId = state.performance.patterns[1].lanes[0].laneId;
+  state = applyMockCommand(state, { cmd: 'setLaneOptions', patternId, laneId, stepCount: 8 });
+  assert.equal(state.performance.patterns[1].lanes[0].steps.length, 8, 'resizing keeps the array honest');
+
+  state = applyMockCommand(state, { cmd: 'toggleStep', patternId, laneId, index: 2 });
+  assert.equal(state.performance.patterns[1].lanes[0].steps[2].active, true);
+  state = applyMockCommand(state, { cmd: 'setStep', patternId, laneId, index: 2, note: 48, ratchets: 4 });
+  assert.equal(state.performance.patterns[1].lanes[0].steps[2].note, 48);
+  assert.equal(state.performance.patterns[1].lanes[0].steps[2].ratchets, 4);
+
+  // Euclid writes real steps the user can then edit — not a mode.
+  state = applyMockCommand(state, { cmd: 'euclidFill', patternId, laneId, pulses: 3 });
+  const hits = state.performance.patterns[1].lanes[0].steps.filter((s) => s.active).length;
+  assert.equal(hits, 3, 'three pulses over eight steps');
+
+  state = applyMockCommand(state, { cmd: 'clearLane', patternId, laneId });
+  assert.equal(state.performance.patterns[1].lanes[0].steps.some((s) => s.active), false);
+
+  state = applyMockCommand(state, { cmd: 'removePattern', patternId });
+  assert.equal(state.performance.patterns.length, 1);
+});
+
+test('mock reducer: clips, scenes and the setlist recovery rule', () => {
+  let state = mockHostState();
+  const patternId = state.performance.patterns[0].patternId;
+  state = applyMockCommand(state, { cmd: 'addClip', patternId, name: 'Second' });
+  assert.equal(state.performance.clips.length, 2);
+
+  const clipId = state.performance.clips[1].clipId;
+  state = applyMockCommand(state, { cmd: 'launchClip', clipId });
+  assert.equal(state.performance.clips[1].active, true);
+
+  state = applyMockCommand(state, { cmd: 'addScene', name: 'Verse' });
+  const sceneId = state.performance.scenes[0].sceneId;
+  assert.deepEqual(state.performance.scenes[0].clipIds, [clipId],
+    'a new scene captures what is running');
+
+  state = applyMockCommand(state, { cmd: 'stopAllClips' });
+  state = applyMockCommand(state, { cmd: 'launchScene', sceneId });
+  assert.equal(state.performance.clips[1].active, true, 'recalling the scene starts its clips');
+  assert.equal(state.performance.clips[0].active, false, 'and stops the ones it omits');
+
+  state = applyMockCommand(state, { cmd: 'addSetlistItem', sceneId, name: 'Opener' });
+  state = applyMockCommand(state, { cmd: 'addSetlistItem', sceneId: 'gone', name: 'Broken' });
+  state = applyMockCommand(state, { cmd: 'setlistGo', index: 0 });
+  assert.equal(state.performance.setlist.currentIndex, 0);
+
+  state = applyMockCommand(state, { cmd: 'setlistNext' });
+  assert.equal(state.performance.setlist.currentIndex, 0,
+    'an item whose scene is gone leaves the rig on the last one that worked');
+
+  state = applyMockCommand(state, { cmd: 'removeClip', clipId });
+  assert.equal(state.performance.scenes[0].clipIds.includes(clipId), false,
+    'removing a clip takes it out of the scenes that named it');
+});
+
+test('mock reducer: transport, capture and the per-part event chain', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'transportPlay' });
+  assert.equal(state.performance.transport.playing, true);
+  state = applyMockCommand(state, { cmd: 'setTempo', tempo: 400 });
+  assert.equal(state.performance.transport.tempo, 300, 'tempo clamps');
+  state = applyMockCommand(state, { cmd: 'transportStop' });
+  assert.equal(state.performance.transport.playing, false);
+
+  const clipId = state.performance.clips[0].clipId;
+  const laneId = state.performance.patterns[0].lanes[0].laneId;
+  state = applyMockCommand(state, { cmd: 'armCapture', clipId, laneId });
+  assert.equal(state.performance.capture.armed, true);
+  state = applyMockCommand(state, { cmd: 'disarmCapture' });
+  assert.equal(state.performance.capture.armed, false);
+
+  state = applyMockCommand(state, { cmd: 'setPartMidiFx', partId: 'mock-part-1', transpose: 12,
+                                    constrainToScale: true, scaleType: 'dorian' });
+  assert.equal(state.rack.parts[0].midiFx.transpose, 12);
+  assert.equal(state.rack.parts[0].midiFx.scaleType, 'dorian');
+
+  state = applyMockCommand(state, { cmd: 'setPartArp', partId: 'mock-part-1', enabled: true,
+                                    mode: 'up-down', octaves: 3 });
+  assert.equal(state.rack.parts[0].arp.enabled, true);
+  assert.equal(state.rack.parts[0].arp.mode, 'up-down');
+  assert.equal(state.rack.parts[0].arp.octaves, 3);
 });

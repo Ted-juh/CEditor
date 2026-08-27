@@ -28,8 +28,11 @@
     addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
     addReturn, removeReturn, setReturnLevel, setSendLevel,
     setExtraOut, removeExtraOut, setHardwareConfig, clearHardware, sendHardwareProgram,
+    transportPlay, transportStop, setTempo, setTimeSignature, setExternalClock,
+    setPartArp, setPartMidiFx,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import PerformancePanel from './PerformancePanel.svelte';
 
   initInstrumentHostBridge();
 
@@ -42,6 +45,7 @@
   let libraryOpen = $state(false);
   let libraryQuery = $state('');
   let libraryType = $state('');
+  let performanceOpen = $state(false);
 
   function toggleLibrary() {
     libraryOpen = !libraryOpen;
@@ -133,6 +137,8 @@
     assignControlSlot(selectedPage.pageId, firstEmptySlot.slotId, paramTargetId, parameter.id);
   }
   let parts = $derived($hostState.rack.parts);
+  let transport = $derived($hostState.performance.transport);
+  let scales = $derived($hostState.performance.scales);
   let focusedPartId = $derived($hostState.rack.focusedPartId);
   let focusedPart = $derived(parts.find((p) => p.partId === focusedPartId) ?? null);
   let lastScanLine = $derived($hostScanLog.at(-1) ?? '');
@@ -184,6 +190,35 @@
               data-testid="host-scan">
         {$hostState.scanning ? 'Scanning…' : 'Scan for instruments'}
       </button>
+      <!-- The transport is always visible: it is the one clock everything else follows,
+           and a player needs to see whether it is running without opening a panel. -->
+      <span class="transport" data-testid="host-transport">
+        <button type="button" class="toggle" class:on={transport.playing}
+                title={transport.playing ? 'Stop' : 'Play'}
+                onclick={() => (transport.playing ? transportStop() : transportPlay())}
+                data-testid="host-transport-play">{transport.playing ? '■' : '▶'}</button>
+        <input type="number" class="tempo" min="20" max="300" step="0.1" value={transport.tempo}
+               aria-label="Tempo" title="Tempo"
+               onchange={(e) => setTempo(Number(e.currentTarget.value))} />
+        <span class="transport-position" title="Bar and beat">{transport.bar}.{transport.beat}</span>
+        <input type="number" class="ts" min="1" max="32" value={transport.numerator}
+               aria-label="Time signature numerator"
+               onchange={(e) => setTimeSignature(Number(e.currentTarget.value), transport.denominator)} />
+        <span class="ts-slash">/</span>
+        <select class="ts" value={transport.denominator} aria-label="Time signature denominator"
+                onchange={(e) => setTimeSignature(transport.numerator, Number(e.currentTarget.value))}>
+          {#each [2, 4, 8, 16] as d (d)}<option value={d}>{d}</option>{/each}
+        </select>
+        <button type="button" class="toggle" class:on={transport.externalClock}
+                class:warn={transport.clockLost}
+                title={transport.clockLost
+                         ? 'External clock selected, but nothing is sending one'
+                         : 'Follow an external MIDI clock'}
+                onclick={() => setExternalClock(!transport.externalClock)}>EXT</button>
+      </span>
+      <button type="button" class="toggle" class:on={performanceOpen}
+              onclick={() => (performanceOpen = !performanceOpen)}
+              data-testid="host-performance">Performance</button>
       <button type="button" class="toggle" class:on={libraryOpen} onclick={toggleLibrary}
               data-testid="host-library">Library</button>
       <button type="button" class="toggle" class:on={devicesOpen} onclick={toggleDevices}
@@ -223,6 +258,10 @@
         {/each}
       </div>
     </div>
+  {/if}
+
+  {#if performanceOpen}
+    <PerformancePanel />
   {/if}
 
   {#if libraryOpen}
@@ -466,6 +505,91 @@
           {/each}
         </div>
       {/snippet}
+
+      {#if focusedPart}
+        <!-- The part's Stage 6 event chain: what shapes what arrives, and what replays it.
+             Both are modes over the shared transport, which is why they live beside the zone
+             rules rather than in a panel of their own. -->
+        <div class="event-chain" data-testid="host-event-chain">
+          <strong>Event chain — {partTitle(focusedPart)}</strong>
+          <div class="zone-grid">
+            <label>Transpose
+              <input type="number" min="-48" max="48" value={focusedPart.midiFx.transpose}
+                     onchange={(e) => setPartMidiFx(focusedPart.partId, { transpose: Number(e.currentTarget.value) })} />
+            </label>
+            <label>Scale
+              <select value={focusedPart.midiFx.constrainToScale ? focusedPart.midiFx.scaleType : ''}
+                      onchange={(e) => setPartMidiFx(focusedPart.partId, e.currentTarget.value
+                                                       ? { constrainToScale: true, scaleType: e.currentTarget.value }
+                                                       : { constrainToScale: false })}>
+                <option value="">off</option>
+                {#each scales as scale (scale)}
+                  <option value={scale}>{scale}</option>
+                {/each}
+              </select>
+            </label>
+            <label>Root
+              <select value={focusedPart.midiFx.scaleRoot}
+                      onchange={(e) => setPartMidiFx(focusedPart.partId, { scaleRoot: Number(e.currentTarget.value) })}>
+                {#each ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as name, i (name)}
+                  <option value={i}>{name}</option>
+                {/each}
+              </select>
+            </label>
+            <label>Chord
+              <select value={focusedPart.midiFx.chord}
+                      onchange={(e) => setPartMidiFx(focusedPart.partId, { chord: e.currentTarget.value })}>
+                {#each ['off', 'power fifth', 'triad', 'triad (1st inv)', 'seventh', 'octave'] as type (type)}
+                  <option value={type}>{type}</option>
+                {/each}
+              </select>
+            </label>
+            <label>Vel scale
+              <input type="number" min="0.1" max="2" step="0.05" value={focusedPart.midiFx.velocityScale}
+                     onchange={(e) => setPartMidiFx(focusedPart.partId, { velocityScale: Number(e.currentTarget.value) })} />
+            </label>
+            <label>Fixed vel (0 = off)
+              <input type="number" min="0" max="127" value={focusedPart.midiFx.velocityFixed}
+                     onchange={(e) => setPartMidiFx(focusedPart.partId, { velocityFixed: Number(e.currentTarget.value) })} />
+            </label>
+          </div>
+
+          <div class="arp-row">
+            <PropertyToggle compact label="Arp" value={focusedPart.arp.enabled} ariaLabel="Arpeggiator"
+                            onchange={(on) => setPartArp(focusedPart.partId, { enabled: on })} />
+            <select value={focusedPart.arp.mode} aria-label="Arpeggiator mode"
+                    onchange={(e) => setPartArp(focusedPart.partId, { mode: e.currentTarget.value })}>
+              {#each ['up', 'down', 'up-down', 'down-up', 'order', 'random', 'chord'] as mode (mode)}
+                <option value={mode}>{mode}</option>
+              {/each}
+            </select>
+            <select value={focusedPart.arp.stepsPerBeat} aria-label="Arpeggiator rate"
+                    onchange={(e) => setPartArp(focusedPart.partId, { stepsPerBeat: Number(e.currentTarget.value) })}>
+              {#each [1, 2, 3, 4, 6, 8, 12, 16] as rate (rate)}
+                <option value={rate}>{rate}/beat</option>
+              {/each}
+            </select>
+            <label class="mini" title="Gate">
+              <input type="range" min="0.05" max="1" step="0.05" value={focusedPart.arp.gate}
+                     aria-label="Arpeggiator gate"
+                     onchange={(e) => setPartArp(focusedPart.partId, { gate: Number(e.currentTarget.value) })} />
+            </label>
+            <label class="mini" title="Swing">
+              <input type="range" min="0" max="0.75" step="0.01" value={focusedPart.arp.swing}
+                     aria-label="Arpeggiator swing"
+                     onchange={(e) => setPartArp(focusedPart.partId, { swing: Number(e.currentTarget.value) })} />
+            </label>
+            <select value={focusedPart.arp.octaves} aria-label="Arpeggiator octaves"
+                    onchange={(e) => setPartArp(focusedPart.partId, { octaves: Number(e.currentTarget.value) })}>
+              {#each [1, 2, 3, 4] as octaves (octaves)}
+                <option value={octaves}>{octaves} oct</option>
+              {/each}
+            </select>
+            <PropertyToggle compact label="Latch" value={focusedPart.arp.latch} ariaLabel="Latch the held chord"
+                            onchange={(on) => setPartArp(focusedPart.partId, { latch: on })} />
+          </div>
+        </div>
+      {/if}
 
       {#if focusedPart?.hardware}
         <!-- Hardware-instrument parts (Stage 5): the part reaches an external synth over
@@ -1108,7 +1232,20 @@
   .param-value { flex: 0 0 84px; text-align: right; color: #9aa5b1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .param-diag { color: #66707b; font-size: 10px; margin: -2px 0 0 138px; }
 
-  .fx-chain, .macros, .sends, .outputs, .returns, .hw-config {
+  .transport { display: flex; align-items: center; gap: 4px; }
+  .transport .tempo { width: 62px; }
+  .transport .ts { width: 44px; }
+  .ts-slash { color: #7d8894; }
+  .transport-position {
+    min-width: 44px;
+    text-align: center;
+    color: #9aa5b1;
+    font-variant-numeric: tabular-nums;
+  }
+  button.toggle.warn { color: #e4b3b3; border-color: #7a4a4a; }
+  .arp-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+  .fx-chain, .macros, .sends, .outputs, .returns, .hw-config, .event-chain {
     display: flex;
     flex-direction: column;
     gap: 6px;
