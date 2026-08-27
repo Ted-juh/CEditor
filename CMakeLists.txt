@@ -202,6 +202,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/Library.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
     )
 
@@ -473,6 +474,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/Library.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
     )
 
@@ -905,6 +907,7 @@ if(WIN32)
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/Library.cpp"
     )
     target_compile_features(Ctrl49RackDemo PRIVATE cxx_std_23)
     target_compile_definitions(Ctrl49RackDemo PRIVATE
@@ -1114,6 +1117,7 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
     "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
     "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
+    "${CE_ROOT}/src/InstrumentHost/Library.cpp"
     "${CE_ROOT}/tests/InstrumentHostServiceTests.cpp"
 )
 target_compile_features(CEditorInstrumentHostServiceTests PRIVATE cxx_std_23)

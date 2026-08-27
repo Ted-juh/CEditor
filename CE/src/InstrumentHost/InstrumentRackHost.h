@@ -100,6 +100,14 @@ public:
         identity and its rules — reloading the same class restores where it left off. */
     bool unloadInstrument (const juce::String& partId);
 
+    /** Writes a preset's identity and state blob into the part's DOCUMENT only — the live
+        instrument (if any) keeps playing untouched. The caller then runs the normal load
+        transaction, whose commit restores the primed blob into the new instrument: this is
+        how a library preset loads through Stage 1's one path instead of growing another
+        (baseline §18.6.7). */
+    bool primePartState (const juce::String& partId, const ClassInfo& info,
+                         const juce::String& stateBlobBase64);
+
     bool partHasInstrument (const juce::String& partId) const;
 
     /** The live instrument, for the editor host and for tests. Nullptr when empty. */

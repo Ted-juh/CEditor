@@ -1748,6 +1748,7 @@ void ValueTreeBridge::ensureInstrumentHost()
     // The same instantiator the generated wrappers use (PluginInstantiator.h); the manager
     // member outlives the service that holds this function.
     options.instantiate = ceditor::host::makePluginInstantiator (*pluginFormatManager);
+    options.applyVstPreset = ceditor::host::applyVstPresetFile;
 
     // The Host Project build: the node pipeline as a streamed child process, one at a time.
     // The service already validated the manifest; the persisted file is what the script reads,

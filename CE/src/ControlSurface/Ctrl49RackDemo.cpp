@@ -115,6 +115,8 @@ int wmain (int argc, wchar_t** argv)
         done (formatManager.createPluginInstance (description, sampleRate, blockSize, error), error);
     };
 
+    options.applyVstPreset = ceditor::host::applyVstPresetFile;
+
     ceditor::host::InstrumentHostService service (std::move (options));
 
     // Boot the saved session (catalogue, rack, instruments, audio).

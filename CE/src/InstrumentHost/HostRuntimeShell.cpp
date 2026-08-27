@@ -53,6 +53,7 @@ HostRuntimeShell::HostRuntimeShell()
     };
 
     options.instantiate = makePluginInstantiator (formatManager);
+    options.applyVstPreset = applyVstPresetFile;
     options.enableAudio = true;   // the shell is the Performance Runtime: it owns the device
 
     service = std::make_unique<InstrumentHostService> (std::move (options));

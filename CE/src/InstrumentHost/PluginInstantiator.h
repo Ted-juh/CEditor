@@ -40,4 +40,16 @@ makePluginInstantiator (juce::AudioPluginFormatManager& manager)
     };
 }
 
+/** The vendor .vstpreset loader for Options::applyVstPreset — JUCE's own, which re-validates
+    the class id inside the file against the live instance, so a mismatched preset fails
+    here instead of half-applying. Requires JUCE_PLUGINHOST_VST3, like everything hosting. */
+inline bool applyVstPresetFile (juce::AudioProcessor& processor, const juce::File& presetFile)
+{
+    auto* instance = dynamic_cast<juce::AudioPluginInstance*> (&processor);
+    juce::MemoryBlock data;
+    if (instance == nullptr || ! presetFile.loadFileAsData (data))
+        return false;
+    return juce::VST3PluginFormat::setStateFromVSTPresetFile (instance, data);
+}
+
 } // namespace ceditor::host

@@ -604,6 +604,227 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "getLibrary")
+    {
+        ensureLibrary();
+        emitLibrary (payload.getProperty ("query", {}).toString(),
+                     payload.getProperty ("type", {}).toString());
+        return;
+    }
+
+    if (cmd == "scanLibrary")
+    {
+        ensureLibrary();
+        scanVstPresets();
+        library.saveTo (libraryFile());
+        emitLibrary ({}, {});
+        return;
+    }
+
+    if (cmd == "addLibraryPath" || cmd == "removeLibraryPath")
+    {
+        ensureLibrary();
+        const auto path = payload.getProperty ("path", {}).toString().trim();
+        if (path.isEmpty())
+        {
+            emitError ("A preset folder must not be empty.");
+            return;
+        }
+
+        if (cmd == "addLibraryPath")
+            libraryPaths.addIfNotAlreadyThere (path);
+        else
+            libraryPaths.removeString (path);
+
+        auto* root = new juce::DynamicObject();
+        root->setProperty ("paths", [this] { juce::Array<juce::var> a;
+                                             for (const auto& p : libraryPaths) a.add (p);
+                                             return a; }());
+        libraryPathsFile().replaceWithText (juce::JSON::toString (juce::var (root)));
+        emitLibrary ({}, {});
+        return;
+    }
+
+    if (cmd == "browseLibraryPath")
+    {
+        if (options.pickDirectory == nullptr)
+        {
+            emitError ("A folder picker is not available in this build — type the path instead.");
+            return;
+        }
+
+        options.pickDirectory ([this, aliveToken = alive] (const juce::String& directory)
+        {
+            if (! aliveToken->load() || directory.isEmpty())
+                return;
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("cmd", "addLibraryPath");
+            obj->setProperty ("path", directory);
+            handleCommand (juce::var (obj));
+        });
+        return;
+    }
+
+    if (cmd == "saveUserPreset")
+    {
+        ensureLibrary();
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto* part = rack.getPerformance().findPart (partId);
+        auto* instrument = rack.getInstrument (partId);
+        if (part == nullptr || instrument == nullptr)
+        {
+            emitError ("That part has no instrument to capture.");
+            return;
+        }
+
+        juce::MemoryBlock state;
+        instrument->getStateInformation (state);
+
+        LibraryRecord record;
+        record.type = "preset";
+        record.sourceType = "userState";
+        record.targetCeId = part->pluginCeId;
+        record.instrument = part->pluginName;
+        record.manufacturer = part->pluginVendor;
+        record.name = payload.getProperty ("name", {}).toString().trim();
+        if (record.name.isEmpty())
+            record.name = part->pluginName + " preset";
+        record.category = payload.getProperty ("category", {}).toString().trim();
+        record.stateBlobBase64 = juce::Base64::toBase64 (state.getData(), state.getSize());
+        record.fingerprint = juce::String::toHexString (record.stateBlobBase64.hashCode64());
+
+        library.addCapturedRecord (std::move (record));
+        library.saveTo (libraryFile());
+        emitLibrary ({}, {});
+        return;
+    }
+
+    if (cmd == "saveRackToLibrary")
+    {
+        ensureLibrary();
+        LibraryRecord record;
+        record.type = "rack";
+        record.sourceType = "rackCapture";
+        record.name = payload.getProperty ("name", {}).toString().trim();
+        if (record.name.isEmpty())
+            record.name = rack.getPerformance().name.isNotEmpty() ? rack.getPerformance().name
+                                                                  : juce::String ("Rack capture");
+        record.rackManifestJson = juce::JSON::toString (rack.captureState().toVar());
+        record.fingerprint = juce::String::toHexString (record.rackManifestJson.hashCode64());
+
+        library.addCapturedRecord (std::move (record));
+        library.saveTo (libraryFile());
+        emitLibrary ({}, {});
+        return;
+    }
+
+    if (cmd == "setLibraryUserMetadata")
+    {
+        ensureLibrary();
+        auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr)
+        {
+            emitError ("Unknown library record.");
+            return;
+        }
+
+        // Partial merge, like setPartMixer: only named fields move.
+        auto user = record->user;
+        const auto* fields = payload.getDynamicObject();
+        if (fields != nullptr)
+        {
+            if (fields->hasProperty ("favourite")) user.favourite = (bool) payload["favourite"];
+            if (fields->hasProperty ("rating"))    user.rating = juce::jlimit (0, 5, (int) payload["rating"]);
+            if (fields->hasProperty ("notes"))     user.notes = payload["notes"].toString();
+            if (fields->hasProperty ("tags"))
+            {
+                user.tags.clear();
+                if (const auto* tags = payload["tags"].getArray())
+                    for (const auto& t : *tags)
+                        user.tags.add (t.toString().trim());
+            }
+            if (fields->hasProperty ("collections"))
+            {
+                user.collections.clear();
+                if (const auto* collections = payload["collections"].getArray())
+                    for (const auto& c : *collections)
+                        user.collections.add (c.toString().trim());
+            }
+        }
+
+        library.setUserMetadata (record->recordId, user);
+        library.saveTo (libraryFile());
+        emitLibrary ({}, {});
+        return;
+    }
+
+    if (cmd == "removeLibraryRecord")
+    {
+        ensureLibrary();
+        const auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr)
+        {
+            emitError ("Unknown library record.");
+            return;
+        }
+        if (record->factory)
+        {
+            // A vendor record's source is the file on disk; deleting the row would only last
+            // until the next rescan resurrected it. Say so instead of pretending.
+            emitError ("Vendor records come back on rescan — remove the source file instead.");
+            return;
+        }
+
+        library.removeRecord (record->recordId);
+        library.saveTo (libraryFile());
+        emitLibrary ({}, {});
+        return;
+    }
+
+    if (cmd == "loadLibraryRecord")
+    {
+        ensureLibrary();
+        const auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr)
+        {
+            emitError ("Unknown library record.");
+            return;
+        }
+
+        if (const auto reason = recordUnavailableReason (*record); reason.isNotEmpty()
+            && record->type != "rack")   // a rack loads degraded-but-loud; presets refuse
+        {
+            emitError (reason);
+            return;
+        }
+
+        if (record->type == "rack")
+        {
+            loadRackRecord (*record);
+            return;
+        }
+
+        // Resolve the target part per §18.6.7: focused, replace a named part, or add new.
+        const auto action = payload.getProperty ("action", "focused").toString();
+        juce::String partId;
+        if (action == "add")
+            partId = rack.addPart();
+        else if (action == "replace")
+            partId = payload.getProperty ("partId", {}).toString();
+        else
+            partId = rack.getPerformance().focusedPartId;
+
+        if (rack.getPerformance().findPart (partId) == nullptr)
+        {
+            emitError (action == "focused" ? "No rack part is focused."
+                                           : "Unknown rack part.");
+            return;
+        }
+
+        loadPresetRecord (*record, partId);
+        return;
+    }
+
     emitError ("Unknown instrument-host command: " + cmd);
 }
 
@@ -665,21 +886,23 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
     {
         Performance restored;
         if (Performance::fromVar (juce::JSON::parse (performanceSource.loadFileAsString()), restored))
-        {
-            for (const auto& unresolved : rack.loadModel (std::move (restored)))
-                requestInstrument (unresolved.partId, unresolved.ceId);
-        }
+            applyPerformance (std::move (restored));
         else
-        {
             emitError ("The saved rack session could not be read; starting empty.");
-        }
     }
 
     if (options.enableAudio)
         startAudio();
 }
 
-void InstrumentHostService::requestInstrument (const juce::String& partId, const juce::String& ceId)
+void InstrumentHostService::applyPerformance (Performance&& performance)
+{
+    for (const auto& unresolved : rack.loadModel (std::move (performance)))
+        requestInstrument (unresolved.partId, unresolved.ceId);
+}
+
+void InstrumentHostService::requestInstrument (const juce::String& partId, const juce::String& ceId,
+                                               std::function<void (juce::AudioProcessor&)> afterCommit)
 {
     juce::String descriptionXml, refusal;
     ClassInfoForCommit info;
@@ -731,7 +954,7 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
     // The callback can arrive after this service is gone (an async load racing shutdown);
     // the alive token is the same pattern ValueTreeBridge documents for its update check.
     options.instantiate (descriptionXml, options.sampleRate, options.blockSize,
-        [this, aliveToken = alive, partId, generation, info]
+        [this, aliveToken = alive, partId, generation, info, afterCommit = std::move (afterCommit)]
         (std::unique_ptr<juce::AudioProcessor> instrument, const juce::String& error)
         {
             if (! aliveToken->load())
@@ -757,6 +980,10 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
                 emitState();
                 return;
             }
+
+            if (afterCommit != nullptr)
+                if (auto* committed = rack.getInstrument (partId))
+                    afterCommit (*committed);
 
             attachParameters (partId);
 
@@ -938,9 +1165,7 @@ void InstrumentHostService::restoreFromVar (const juce::var& state)
         return;
     }
 
-    for (const auto& unresolved : rack.loadModel (std::move (restored)))
-        requestInstrument (unresolved.partId, unresolved.ceId);
-
+    applyPerformance (std::move (restored));
     savePerformance();
     emitState();
 }
@@ -972,6 +1197,288 @@ juce::AudioProcessorParameter* InstrumentHostService::resolveParameter (const ju
     if (descriptorOut != nullptr)
         *descriptorOut = descriptor;
     return rack.getInstrument (partId)->getParameters()[descriptor->index];
+}
+
+void InstrumentHostService::ensureLibrary()
+{
+    if (libraryLoaded)
+        return;
+    libraryLoaded = true;
+
+    options.dataDirectory.createDirectory();
+    library.loadFrom (libraryFile());
+
+    if (libraryPathsFile().existsAsFile())
+    {
+        const auto parsed = juce::JSON::parse (libraryPathsFile().loadFileAsString());
+        if (const auto* arr = parsed.getProperty ("paths", {}).getArray())
+            for (const auto& p : *arr)
+                libraryPaths.addIfNotAlreadyThere (p.toString());
+    }
+}
+
+juce::String InstrumentHostService::recordUnavailableReason (const LibraryRecord& record) const
+{
+    if (record.type == "rack")
+    {
+        Performance manifest;
+        if (! Performance::fromVar (juce::JSON::parse (record.rackManifestJson), manifest))
+            return "The captured rack manifest is damaged.";
+
+        juce::StringArray missing;
+        {
+            const std::scoped_lock lock (catalogLock);
+            for (const auto& part : manifest.parts)
+                if (part.pluginCeId.isNotEmpty() && findClass (part.pluginCeId) == nullptr)
+                    missing.addIfNotAlreadyThere (part.pluginName.isNotEmpty() ? part.pluginName
+                                                                               : part.pluginCeId);
+        }
+        return missing.isEmpty() ? juce::String()
+                                 : "Missing instruments: " + missing.joinIntoString (", ");
+    }
+
+    if (record.targetCeId.isEmpty())
+        return "No installed instrument matches this preset — scan for instruments, then "
+               "rescan the library.";
+
+    const ModuleRecord* module = nullptr;
+    const std::scoped_lock lock (catalogLock);
+    if (findClass (record.targetCeId, &module) == nullptr)
+        return "Requires " + (record.instrument.isNotEmpty() ? record.instrument : record.targetCeId)
+             + ", which is not in the catalogue.";
+    if (module != nullptr && (module->quarantined || module->missing))
+        return "Requires " + record.instrument + ", whose module is "
+             + (module->quarantined ? "quarantined." : "missing.");
+
+    if (record.sourceType == "vstpreset" && ! juce::File (record.sourceLocator).existsAsFile())
+        return "The preset file is gone: " + record.sourceLocator;
+
+    return {};
+}
+
+void InstrumentHostService::emitLibrary (const juce::String& query, const juce::String& type)
+{
+    juce::Array<juce::var> recordVars;
+    int presets = 0, racks = 0, missing = 0;
+
+    for (const auto* record : searchLibrary (library, query, type))
+    {
+        const auto reason = recordUnavailableReason (*record);
+
+        auto* r = new juce::DynamicObject();
+        r->setProperty ("recordId",     record->recordId);
+        r->setProperty ("type",         record->type);
+        r->setProperty ("sourceType",   record->sourceType);
+        r->setProperty ("name",         record->name);
+        r->setProperty ("manufacturer", record->manufacturer);
+        r->setProperty ("instrument",   record->instrument);
+        r->setProperty ("category",     record->category);
+        r->setProperty ("factory",      record->factory);
+        r->setProperty ("missing",      record->missing);
+        r->setProperty ("available",    reason.isEmpty());
+        r->setProperty ("reason",       reason);
+        r->setProperty ("favourite",    record->user.favourite);
+        r->setProperty ("rating",       record->user.rating);
+        r->setProperty ("notes",        record->user.notes);
+        r->setProperty ("tags",         [record] { juce::Array<juce::var> a;
+                                                   for (const auto& t : record->user.tags) a.add (t);
+                                                   return a; }());
+        recordVars.add (juce::var (r));
+    }
+
+    for (const auto& record : library.allRecords())
+    {
+        if (record.type == "preset") ++presets; else ++racks;
+        if (record.missing) ++missing;
+    }
+
+    auto* counts = new juce::DynamicObject();
+    counts->setProperty ("total",   library.allRecords().size());
+    counts->setProperty ("presets", presets);
+    counts->setProperty ("racks",   racks);
+    counts->setProperty ("missing", missing);
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("records", recordVars);
+    root->setProperty ("query",   query);
+    root->setProperty ("type",    type);
+    root->setProperty ("counts",  juce::var (counts));
+    root->setProperty ("paths",   [this] { juce::Array<juce::var> a;
+                                           for (const auto& p : libraryPaths) a.add (p);
+                                           return a; }());
+    if (options.emit != nullptr)
+        options.emit ("instrumentHostLibrary", juce::var (root));
+}
+
+void InstrumentHostService::scanVstPresets()
+{
+    // Steinberg's convention plus whatever folders the user added. Enumeration reads only
+    // each file's header — indexing thousands of presets is file-system bound, not parse
+    // bound — and one unreadable file skips, never aborts the scan (baseline §18.6.5).
+    juce::Array<juce::File> roots {
+        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("VST3 Presets"),
+        juce::File::getSpecialLocation (juce::File::commonApplicationDataDirectory).getChildFile ("VST3 Presets"),
+    };
+    for (const auto& path : libraryPaths)
+        if (juce::File (path).isDirectory())
+            roots.add (juce::File (path));
+
+    juce::Array<LibraryRecord> scanned;
+    for (const auto& root : roots)
+    {
+        if (! root.isDirectory())
+            continue;
+
+        for (const auto& entry : juce::RangedDirectoryIterator (root, true, "*.vstpreset",
+                                                                juce::File::findFiles))
+        {
+            const auto file = entry.getFile();
+            juce::MemoryBlock head;
+            {
+                juce::FileInputStream stream (file);
+                if (! stream.openedOk())
+                    continue;
+                stream.readIntoMemoryBlock (head, 4096);
+            }
+
+            const auto header = parseVstPresetHeader (head.getData(), head.getSize());
+            if (! header.valid)
+                continue;
+
+            LibraryRecord record;
+            record.type = "preset";
+            record.sourceType = "vstpreset";
+            record.factory = true;
+            record.sourceLocator = file.getFullPathName();
+            record.name = file.getFileNameWithoutExtension();
+            record.classIdHex = header.classIdHex;
+            // The Steinberg layout is <root>/<Vendor>/<Plugin>/<preset>.vstpreset; anything
+            // shallower keeps what path it has.
+            record.instrument = file.getParentDirectory() == root
+                                  ? juce::String()
+                                  : file.getParentDirectory().getFileName();
+            record.manufacturer = file.getParentDirectory().getParentDirectory() == root
+                                    || file.getParentDirectory() == root
+                                    ? juce::String()
+                                    : file.getParentDirectory().getParentDirectory().getFileName();
+            // Content identity follows the file, not the path: a renamed preset keeps its
+            // favourites through the fingerprint match in mergeVendorScan.
+            record.fingerprint = juce::String::toHexString (
+                head.toBase64Encoding().hashCode64() ^ (juce::int64) file.getSize());
+
+            // The class id is the preset's real identity, but the catalogue keys on JUCE's
+            // identifier — so the target resolves by the layout's plug-in name, and the
+            // format's own loader re-validates the class id at load time.
+            {
+                const std::scoped_lock lock (catalogLock);
+                for (const auto& instrumentClass : catalog.instrumentClasses())
+                    if (record.instrument.isNotEmpty()
+                        && instrumentClass.name.equalsIgnoreCase (record.instrument))
+                    {
+                        record.targetCeId = instrumentClass.ceId;
+                        break;
+                    }
+            }
+
+            scanned.add (std::move (record));
+        }
+    }
+
+    library.mergeVendorScan ("vstpreset", std::move (scanned));
+}
+
+void InstrumentHostService::loadPresetRecord (const LibraryRecord& record, const juce::String& partId)
+{
+    const auto* part = rack.getPerformance().findPart (partId);
+    const auto sameClassLoaded = part != nullptr
+                              && rack.getInstrument (partId) != nullptr
+                              && part->pluginCeId == record.targetCeId;
+
+    const auto applyVendorPreset = [this, record] (juce::AudioProcessor& instrument) -> bool
+    {
+        if (options.applyVstPreset == nullptr)
+        {
+            emitError ("Vendor preset loading is not available in this build.");
+            return false;
+        }
+        if (! options.applyVstPreset (instrument, juce::File (record.sourceLocator)))
+        {
+            emitError ("The plug-in refused this preset: " + record.name);
+            return false;
+        }
+        return true;
+    };
+
+    if (sameClassLoaded)
+    {
+        // §18.6.7's cheap path: the right processor is already live, so the state applies
+        // in place and nothing is torn down.
+        auto* instrument = rack.getInstrument (partId);
+        if (record.sourceType == "vstpreset")
+        {
+            if (! applyVendorPreset (*instrument))
+                return;
+        }
+        else
+        {
+            juce::MemoryOutputStream decoded;
+            if (! juce::Base64::convertFromBase64 (decoded, record.stateBlobBase64))
+            {
+                emitError ("The captured state for " + record.name + " is damaged.");
+                return;
+            }
+            instrument->setStateInformation (decoded.getData(), (int) decoded.getDataSize());
+        }
+
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    // The full path: prime the part's document with the preset's identity (and state, for
+    // captured presets), then run the one load transaction — commit restores the primed
+    // blob, and a vendor preset applies right after commit through afterCommit.
+    InstrumentRackHost::ClassInfo info;
+    {
+        const std::scoped_lock lock (catalogLock);
+        const ModuleRecord* module = nullptr;
+        const auto* classRecord = findClass (record.targetCeId, &module);
+        if (classRecord == nullptr || module == nullptr)
+        {
+            emitError ("Instrument not in the catalogue: " + record.targetCeId);
+            return;
+        }
+        info = { classRecord->ceId, module->path, classRecord->name, classRecord->vendor };
+    }
+
+    rack.primePartState (partId, info,
+                         record.sourceType == "userState" ? record.stateBlobBase64 : juce::String());
+
+    if (record.sourceType == "vstpreset")
+        requestInstrument (partId, record.targetCeId,
+                           [applyVendorPreset] (juce::AudioProcessor& instrument)
+                           { applyVendorPreset (instrument); });
+    else
+        requestInstrument (partId, record.targetCeId);
+}
+
+void InstrumentHostService::loadRackRecord (const LibraryRecord& record)
+{
+    Performance restored;
+    if (! Performance::fromVar (juce::JSON::parse (record.rackManifestJson), restored))
+    {
+        emitError ("The captured rack manifest for " + record.name + " is damaged.");
+        return;
+    }
+
+    // Degraded-but-loud (baseline §18.6.7): missing classes are named, the parts still load
+    // as unresolved-and-repairable — the same honesty the session restore already has.
+    if (const auto reason = recordUnavailableReason (record); reason.isNotEmpty())
+        emitError ("Degraded restore of " + record.name + " — " + reason);
+
+    applyPerformance (std::move (restored));
+    savePerformance();
+    emitState();
 }
 
 juce::String InstrumentHostService::slotDisplayName (const ControlBinding& binding, bool resolved) const

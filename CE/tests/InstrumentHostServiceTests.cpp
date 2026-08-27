@@ -815,6 +815,215 @@ void testParameterModel()
     check (sorted.size() == ids.size(), "no two parameters share one address");
 }
 
+// The Stage 4 library: one index, explicit provenance, loading only ever through Stage 1's
+// transaction. The identity story is the heart of it — user metadata survives rescans and
+// renames, a missing source marks instead of deletes, and availability is computed live
+// with a reason a person can act on.
+void testLibrary()
+{
+    std::cout << "\nthe unified library" << std::endl;
+
+    // The .vstpreset header parse, pure.
+    {
+        std::vector<std::uint8_t> good (64, 0);
+        std::memcpy (good.data(), "VST3", 4);
+        const char* cid = "abcdef0123456789ABCDEF0123456789";
+        std::memcpy (good.data() + 8, cid, 32);
+        const auto header = ceditor::host::parseVstPresetHeader (good.data(), good.size());
+        check (header.valid && header.classIdHex == "ABCDEF0123456789ABCDEF0123456789",
+               "a preset header parses and the class id normalizes to uppercase");
+
+        std::vector<std::uint8_t> bad = good;
+        bad[0] = 'X';
+        check (! ceditor::host::parseVstPresetHeader (bad.data(), bad.size()).valid,
+               "a wrong magic refuses");
+        check (! ceditor::host::parseVstPresetHeader (good.data(), 20).valid,
+               "a truncated header refuses");
+    }
+
+    const auto dir = freshDataDir ("library");
+    seedTwoSynthCatalog (dir);
+
+    // A vendor preset tree in Steinberg's layout, with the plug-in folder named after the
+    // catalogue class so the target resolves — and one folder nothing installed matches.
+    const auto presetRoot = freshDataDir ("library-presets");
+    const auto writePreset = [] (const juce::File& file)
+    {
+        std::vector<std::uint8_t> bytes (64, 0);
+        std::memcpy (bytes.data(), "VST3", 4);
+        std::memcpy (bytes.data() + 8, "ABCDEF0123456789ABCDEF0123456789", 32);
+        file.getParentDirectory().createDirectory();
+        file.replaceWithData (bytes.data(), bytes.size());
+    };
+    const auto goodPreset = presetRoot.getChildFile ("Test Audio").getChildFile ("Good Synth")
+                                      .getChildFile ("Warm Pad.vstpreset");
+    const auto orphanPreset = presetRoot.getChildFile ("Someone").getChildFile ("Uninstalled Synth")
+                                        .getChildFile ("Lost.vstpreset");
+    writePreset (goodPreset);
+    writePreset (orphanPreset);
+
+    juce::String userPresetId, rackId, vendorId, orphanId, partId;
+
+    {
+        std::vector<std::pair<juce::AudioProcessor*, juce::String>> applied;
+        Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+        {
+            o.applyVstPreset = [&applied] (juce::AudioProcessor& p, const juce::File& f)
+            {
+                applied.push_back ({ &p, f.getFullPathName() });
+                return true;
+            };
+        });
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+
+        // Capture a user preset with real state in it.
+        h.lastStub->patch = 5;
+        h.emits.clear();
+        h.cmd ("saveUserPreset", { { "partId", partId }, { "name", "My Warm Patch" } });
+        const auto& lib = h.emits.entries.back();
+        check (lib.name == "instrumentHostLibrary"
+                 && lib.payload.getProperty ("records", {}).size() == 1,
+               "saving a user preset answers with the library");
+        const auto saved = lib.payload.getProperty ("records", {})[0];
+        userPresetId = saved.getProperty ("recordId", {}).toString();
+        check (saved.getProperty ("sourceType", {}).toString() == "userState"
+                 && ! (bool) saved.getProperty ("factory", true)
+                 && (bool) saved.getProperty ("available", false),
+               "with captured provenance and live availability");
+
+        // Same-class in-place load: state applies, nothing re-instantiates.
+        h.lastStub->patch = 9;
+        const auto instantiationsBefore = h.instantiateCount;
+        h.cmd ("loadLibraryRecord", { { "recordId", userPresetId }, { "action", "focused" } });
+        check (h.lastStub->patch == 5, "loading onto the same class applies state in place");
+        check (h.instantiateCount == instantiationsBefore, "without re-instantiating anything");
+
+        // Add-as-new-part: the transaction builds a second part with the preset's state.
+        h.cmd ("loadLibraryRecord", { { "recordId", userPresetId }, { "action", "add" } });
+        check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {}).size() == 2,
+               "action add creates a new part");
+        check (h.lastStub->patch == 5, "and the new instrument carries the captured state");
+
+        // The vendor scan: the matched preset resolves, the orphan stays honest.
+        h.cmd ("addLibraryPath", { { "path", presetRoot.getFullPathName() } });
+        h.emits.clear();
+        h.cmd ("scanLibrary");
+        const auto records = h.emits.entries.back().payload.getProperty ("records", {});
+        check (records.size() == 3, "the scan indexes both vendor presets beside the capture");
+        for (const auto& r : *records.getArray())
+        {
+            if (r.getProperty ("name", {}).toString() == "Warm Pad")
+            {
+                vendorId = r.getProperty ("recordId", {}).toString();
+                check ((bool) r.getProperty ("available", false)
+                         && r.getProperty ("instrument", {}).toString() == "Good Synth",
+                       "a preset under an installed plug-in's folder resolves its target");
+            }
+            if (r.getProperty ("name", {}).toString() == "Lost")
+            {
+                orphanId = r.getProperty ("recordId", {}).toString();
+                check (! (bool) r.getProperty ("available", true)
+                         && r.getProperty ("reason", {}).toString().isNotEmpty(),
+                       "a preset for nothing installed says so, actionably");
+            }
+        }
+
+        // Vendor preset load: through the transaction, applied after commit.
+        h.cmd ("loadLibraryRecord", { { "recordId", vendorId }, { "action", "add" } });
+        check (applied.size() == 1 && applied[0].second == goodPreset.getFullPathName()
+                 && applied[0].first == h.lastStub,
+               "a vendor preset applies to the freshly committed instrument");
+        h.emits.clear();
+        h.cmd ("loadLibraryRecord", { { "recordId", orphanId }, { "action", "add" } });
+        check (h.emits.lastError().isNotEmpty(), "an unavailable preset refuses aloud");
+
+        // Favourites survive a rescan and a rename; a deleted source marks, never deletes.
+        h.cmd ("setLibraryUserMetadata", { { "recordId", vendorId }, { "favourite", true } });
+        goodPreset.moveFileTo (goodPreset.getSiblingFile ("Warm Pad (renamed).vstpreset"));
+        h.cmd ("scanLibrary");
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        int vendorRows = 0;
+        bool favouriteKept = false, orphanStillThere = false;
+        for (const auto& r : *h.emits.entries.back().payload.getProperty ("records", {}).getArray())
+        {
+            if (r.getProperty ("recordId", {}).toString() == vendorId)
+            {
+                ++vendorRows;
+                favouriteKept = (bool) r.getProperty ("favourite", false)
+                                  && r.getProperty ("name", {}).toString() == "Warm Pad (renamed)";
+            }
+            if (r.getProperty ("recordId", {}).toString() == orphanId)
+                orphanStillThere = true;
+        }
+        check (vendorRows == 1 && favouriteKept,
+               "a renamed source keeps its record and favourite through the fingerprint");
+        check (orphanStillThere, "and other records are untouched");
+
+        orphanPreset.deleteFile();
+        h.cmd ("scanLibrary");
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        bool orphanMarkedMissing = false;
+        for (const auto& r : *h.emits.entries.back().payload.getProperty ("records", {}).getArray())
+            if (r.getProperty ("recordId", {}).toString() == orphanId)
+                orphanMarkedMissing = (bool) r.getProperty ("missing", false);
+        check (orphanMarkedMissing, "a vanished source is marked missing, never deleted");
+
+        h.emits.clear();
+        h.cmd ("removeLibraryRecord", { { "recordId", vendorId } });
+        check (h.emits.lastError().contains ("rescan"),
+               "removing a vendor record explains why not instead of lying");
+
+        // The complete rack as a library entry.
+        h.emits.clear();
+        h.cmd ("saveRackToLibrary", { { "name", "My Rig" } });
+        for (const auto& r : *h.emits.entries.back().payload.getProperty ("records", {}).getArray())
+            if (r.getProperty ("type", {}).toString() == "rack")
+                rackId = r.getProperty ("recordId", {}).toString();
+        check (rackId.isNotEmpty(), "the whole rack captures as one record");
+    }
+
+    {
+        // Restart: everything persisted; the rack record restores the rig.
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("removePart", { { "partId", partId } });   // wreck the session a little
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        check (h.emits.entries.back().payload.getProperty ("counts", {})
+                   .getProperty ("total", 0).equals (4),
+               "the library survives its process");
+
+        h.cmd ("loadLibraryRecord", { { "recordId", rackId } });
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        check (parts.size() == 3 && h.lastStub != nullptr,
+               "a rack record restores its parts through the session path");
+        auto* firstPart = dynamic_cast<StubSynthProcessor*> (
+            h.service->getRackHost().getInstrument (partId));
+        check (firstPart != nullptr && firstPart->patch == 5, "instrument state included");
+
+        h.emits.clear();
+        h.cmd ("removeLibraryRecord", { { "recordId", rackId } });
+        check (h.emits.entries.back().payload.getProperty ("counts", {})
+                   .getProperty ("total", 0).equals (3),
+               "a captured record removes cleanly");
+
+        // Search narrows by text, filter narrows by type.
+        h.emits.clear();
+        h.cmd ("getLibrary", { { "query", "warm" } });
+        check (h.emits.entries.back().payload.getProperty ("records", {}).size() == 2,
+               "search matches names case-insensitively");
+        h.emits.clear();
+        h.cmd ("getLibrary", { { "type", "rack" } });
+        check (h.emits.entries.back().payload.getProperty ("records", {}).size() == 0,
+               "and the type filter holds after the rack record's removal");
+    }
+}
+
 // Stage 3's host-side half: the automatic first-pass pages and the surface runtime API.
 // The generator's rules run pure over a crafted inventory; the service level proves that
 // regeneration replaces only its own pages, and that a hardware-style relative nudge moves
@@ -1178,6 +1387,7 @@ int main (int argc, char* argv[])
     testParameterModel();
     testControlPages();
     testAutoPagesAndSurfaceRuntime();
+    testLibrary();
     testFactoryPerformance();
     testScanFolderBrowseAndModuleProjection();
     testHostProject();

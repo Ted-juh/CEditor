@@ -38,6 +38,21 @@ juce::String InstrumentRackHost::addPart()
     return partId;
 }
 
+bool InstrumentRackHost::primePartState (const juce::String& partId, const ClassInfo& info,
+                                         const juce::String& stateBlobBase64)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+
+    part->pluginCeId       = info.ceId;
+    part->pluginModulePath = info.modulePath;
+    part->pluginName       = info.name;
+    part->pluginVendor     = info.vendor;
+    part->stateBlobBase64  = stateBlobBase64;
+    return true;
+}
+
 juce::String InstrumentRackHost::addControlPage (const juce::String& name)
 {
     auto page = ControlPage::create (name);

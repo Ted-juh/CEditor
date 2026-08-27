@@ -6,6 +6,7 @@
 #include "PluginScannerCoordinator.h"
 #include "InstrumentRackHost.h"
 #include "ParameterModel.h"
+#include "Library.h"
 
 // InstrumentHostService — the instrument host behind one bridge event (VIP-successor Stage 1).
 //
@@ -51,6 +52,16 @@
 //   addControlPage {name?} | removeControlPage {pageId} | renameControlPage {pageId,name}
 //   generateControlPages {partId}   (the automatic first pass over the part's registry;
 //     replaces only that part's previously generated pages, never a user-authored one)
+//   getLibrary {query?,type?} | scanLibrary | addLibraryPath {path} | removeLibraryPath {path}
+//   browseLibraryPath | saveUserPreset {partId,name?,category?} | saveRackToLibrary {name?}
+//   setLibraryUserMetadata {recordId, favourite?,rating?,notes?,tags?,collections?}
+//   removeLibraryRecord {recordId} | loadLibraryRecord {recordId, action, partId?}
+//     (the Stage 4 library: getLibrary answers with instrumentHostLibrary — records
+//      projected with live availability. Loading goes through Stage 1's one transaction:
+//      action is "focused", "replace" (with partId) or "add"; a vendor .vstpreset applies
+//      through Options::applyVstPreset after the normal commit; a rack record restores
+//      through the same path the session file uses, degraded-but-loud when classes are
+//      missing. Vendor rescans never touch favourites, notes or captured records.)
 //   assignControlSlot {pageId,slotId,partId,parameterId} | clearControlSlot {pageId,slotId}
 //   setControlSlotOptions {pageId,slotId, rangeMin?,rangeMax?,inverted?,bipolar?,label?}
 //   setControlSlotValue {pageId,slotId,value}
@@ -126,6 +137,10 @@ public:
         // cancel. The app provides an async FileChooser; absent (tests, plain browser) makes
         // browseScanPath refuse aloud rather than silently do nothing.
         std::function<void (std::function<void (const juce::String& directory)>)> pickDirectory;
+        // Applies a vendor .vstpreset file to a live instrument. The app passes JUCE's own
+        // VST3 preset loader (it re-validates the class id internally); tests stub it.
+        // Absent = vendor preset records refuse to load, aloud.
+        std::function<bool (juce::AudioProcessor&, const juce::File& presetFile)> applyVstPreset;
         EditorPaneHooks editorPane;
         // The Host Project's authored rack, shipped beside the generated binaries. Loaded
         // when nothing newer exists: the standalone uses it until the user has a session of
@@ -239,10 +254,25 @@ private:
     juce::var buildStatePayload() const;
     static juce::var scanProgressPayload (const juce::String& line, bool done);
 
+    /** Runs the load transaction for a part: begin ticket, instantiate, commit; on success
+        `afterCommit` runs with the live instrument before anything is announced — the
+        vendor-preset apply rides there. */
+    void requestInstrument (const juce::String& partId, const juce::String& ceId,
+                            std::function<void (juce::AudioProcessor&)> afterCommit = {});
+
     void runScanNow();
     void restoreSessionImpl (bool includePerformance);
     void ensureHostProject();
+    void ensureLibrary();
+    void emitLibrary (const juce::String& query, const juce::String& type);
+    void scanVstPresets();
+    /** Availability, computed live against the catalogue (caller holds no locks; this takes
+        catalogLock itself): empty = loadable, else the actionable reason. */
+    juce::String recordUnavailableReason (const LibraryRecord& record) const;
+    void loadPresetRecord (const LibraryRecord& record, const juce::String& partId);
+    void loadRackRecord (const LibraryRecord& record);
     void attachParameters (const juce::String& partId);
+    void applyPerformance (Performance&& performance);
     juce::AudioProcessorParameter* resolveParameter (const juce::String& partId,
                                                      const juce::String& definitionId,
                                                      const ParameterDescriptor** descriptorOut = nullptr);
@@ -253,8 +283,9 @@ private:
     juce::String slotDisplayName (const ControlBinding& binding, bool resolved) const;
     /** The parameter's current value inverse-mapped into the slot's 0..1 position. */
     static float slotPositionFor (const ControlBinding& binding, float parameterValue);
+    juce::File libraryFile() const      { return options.dataDirectory.getChildFile ("library.json"); }
+    juce::File libraryPathsFile() const { return options.dataDirectory.getChildFile ("library-paths.json"); }
     void emitHostProject();
-    void requestInstrument (const juce::String& partId, const juce::String& ceId);
     void showEditorFor (const juce::String& partId);
     void hideEditor();
     void startAudio();
@@ -286,6 +317,9 @@ private:
     bool sessionRestored = false;
     juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask
     bool hostProjectLoaded = false;
+    Library library;                // the Stage 4 unified index; loaded on first ask
+    juce::StringArray libraryPaths; // user-added .vstpreset folders, beside the standard roots
+    bool libraryLoaded = false;
 
     // The Stage 2 registry, per part with a live instrument: descriptors plus the RT-safe
     // change listener. Attached on every successful commit, dropped from the same rack hook

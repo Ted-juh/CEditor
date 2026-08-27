@@ -158,6 +158,7 @@ HostPluginProcessor::HostPluginProcessor()
     };
 
     options.instantiate = makePluginInstantiator (formatManager);
+    options.applyVstPreset = applyVstPresetFile;
     options.enableAudio = false;    // the DAW owns the device
     options.persistSession = false; // the DAW owns the session (get/setStateInformation)
 
