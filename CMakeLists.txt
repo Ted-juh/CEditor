@@ -1093,6 +1093,25 @@ target_link_libraries(CEditorPartMidiFilterTests PRIVATE
 add_test(NAME PartMidiFilter COMMAND CEditorPartMidiFilterTests)
 ce_configure_test(CEditorPartMidiFilterTests)
 
+# The Stage 6 performance system: one transport, one compiled event model, one scheduler —
+# plus the arpeggiator and MIDI FX that are modes over it rather than clocks of their own.
+# juce_audio_basics is the whole dependency, so the timing arithmetic that decides where beat
+# three lands is provable on any machine rather than only on a Windows audio device.
+add_executable(CEditorPerformanceEngineTests
+    "${CE_ROOT}/src/Performance/PatternModel.cpp"
+    "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+    "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
+    "${CE_ROOT}/tests/PerformanceEngineTests.cpp"
+)
+target_compile_features(CEditorPerformanceEngineTests PRIVATE cxx_std_23)
+target_include_directories(CEditorPerformanceEngineTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorPerformanceEngineTests PRIVATE
+    juce::juce_core
+    juce::juce_audio_basics
+)
+add_test(NAME PerformanceEngine COMMAND CEditorPerformanceEngineTests)
+ce_configure_test(CEditorPerformanceEngineTests)
+
 add_executable(CEditorRackHostTests
     "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
