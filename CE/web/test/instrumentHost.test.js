@@ -40,6 +40,10 @@ import {
   loadLibraryRecord,
   emptyProduct,
   normalizeProduct,
+  emptyReliability,
+  normalizeReliability,
+  emptySupportBundle,
+  normalizeSupportBundle,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
 import { get } from 'svelte/store';
@@ -804,4 +808,143 @@ test('mock reducer: master level, output pairs, hardware focus and the incident 
   state = applyMockCommand(state, { cmd: 'clearActiveHostingIncidents' });
   assert.deepEqual(state.product.activeHostingIncidents, [],
     'the evidence log is clearable — it informs a decision, it is not a permanent accusation');
+});
+
+
+// --- §17: safe startup, recovery and the support bundle ---------------------------------------
+
+test('normalizeReliability: safe startup and the recovery report survive a hostile payload', () => {
+  assert.deepEqual(normalizeReliability(undefined), emptyReliability(),
+    'nothing at all normalizes to the shape the panel starts from');
+
+  const r = normalizeReliability({
+    safeMode: {
+      level: 'skipSuspects',
+      suspects: [
+        { modulePath: 'C:\\Rusty.vst3', name: 'Rusty', reason: 'live when it died', incidents: '3' },
+        null,
+      ],
+    },
+    refusedThisRun: [{ modulePath: 'C:\\Rusty.vst3', name: 'Rusty', reason: 'not loaded' }],
+    recovery: {
+      interrupted: 1, lastOperation: 'loadInstrument', lastOperationDetail: 'Rusty',
+      preservedStateFile: 'C:\\crash-state\\session.json', hasLastKnownGood: true,
+      lastKnownGoodAt: '2026-08-27T10:00:00',
+    },
+    damagedState: ['Part 1 state mismatch', 7],
+  });
+
+  assert.equal(r.safeMode.level, 'skipSuspects');
+  assert.equal(r.safeMode.suspects.length, 2, 'a hole in the list is still an entry');
+  assert.equal(r.safeMode.suspects[0].incidents, 3, 'counts arrive as numbers');
+  assert.equal(r.safeMode.suspects[1].modulePath, '', 'and an empty one is inert, not a crash');
+
+  // Strictly boolean, like every other flag the panel passes to `class:`.
+  assert.equal(r.recovery.interrupted, false, 'a truthy 1 is not a boolean');
+  assert.equal(r.recovery.hasLastKnownGood, true);
+  assert.equal(r.recovery.lastOperation, 'loadInstrument');
+  assert.deepEqual(r.damagedState, ['Part 1 state mismatch', '7']);
+
+  // An unrecognised level reads as normal, exactly as the native side reads it: a state file
+  // from a future build must not leave the panel claiming a safe mode it cannot explain.
+  assert.equal(normalizeReliability({ safeMode: { level: 'quarantineEverything' } }).safeMode.level,
+    'normal', 'an unknown level reads as normal');
+  assert.equal(normalizeReliability({ safeMode: { level: 'noThirdParty' } }).safeMode.level,
+    'noThirdParty', 'a known one is kept');
+});
+
+test('normalizeHostState carries the reliability block and each module\'s availability', () => {
+  const state = normalizeHostState({
+    reliability: { safeMode: { level: 'noThirdParty' } },
+    modules: [
+      { path: 'C:\\Old.vst3', architectures: ['x86'], unavailableReason: 'built for x86, this host is x86_64' },
+      { path: 'C:\\Fine.vst3' },
+    ],
+  });
+
+  assert.equal(state.reliability.safeMode.level, 'noThirdParty');
+  assert.deepEqual(state.modules[0].architectures, ['x86']);
+  assert.match(state.modules[0].unavailableReason, /x86_64/,
+    'the reason a module is not on offer reaches the view');
+  assert.equal(state.modules[1].unavailableReason, '', 'a healthy module has none');
+
+  assert.deepEqual(emptyHostState().reliability, emptyReliability(),
+    'the empty state is the same shape, so the panel renders before the first push');
+});
+
+test('normalizeSupportBundle: a preview is not a written file', () => {
+  assert.deepEqual(normalizeSupportBundle(undefined), emptySupportBundle());
+
+  const preview = normalizeSupportBundle({
+    entries: [
+      { name: 'support-manifest.json', description: 'What this is', sizeBytes: '0', included: true },
+      { name: 'crash-state/', description: 'None recorded', included: false },
+    ],
+    includeStateBlobs: false,
+  });
+
+  assert.equal(preview.entries.length, 2);
+  assert.equal(preview.entries[0].sizeBytes, 0, 'sizes arrive as numbers');
+  assert.equal(preview.entries[1].included, false, 'an entry that does not apply is still shown');
+  assert.equal(preview.written, false,
+    'a payload with no `written` is a preview — the panel must not claim a file exists');
+  assert.equal(preview.path, '');
+
+  const exported = normalizeSupportBundle({ entries: [], written: true, path: 'C:\\bundle.zip' });
+  assert.equal(exported.written, true);
+  assert.equal(exported.path, 'C:\\bundle.zip');
+});
+
+test('mock reducer: safe startup levels, vouching, and the recovery notice', () => {
+  let state = mockHostState();
+  assert.equal(state.reliability.safeMode.level, 'normal');
+
+  // A wrong-architecture module is catalogued and out of the browser, with its reason.
+  const unavailable = state.modules.filter((m) => m.unavailableReason);
+  assert.ok(unavailable.length >= 2, 'the mock carries a quarantined and a wrong-architecture module');
+  assert.ok(unavailable.some((m) => /x86/.test(m.unavailableReason)),
+    'and the architecture one says which architecture');
+
+  state = applyMockCommand(state, { cmd: 'setSafeMode', level: 'noThirdParty' });
+  assert.equal(state.reliability.safeMode.level, 'noThirdParty');
+  state = applyMockCommand(state, { cmd: 'setSafeMode', level: 'nonsense' });
+  assert.equal(state.reliability.safeMode.level, 'normal', 'an unknown level falls back to normal');
+
+  // Vouching: the native rule is that skipSuspects with nothing left to skip drops back, but a
+  // safe mode the user chose is theirs to end.
+  state.reliability.safeMode = {
+    level: 'skipSuspects',
+    suspects: [
+      { modulePath: 'C:\\A.vst3', name: 'A', reason: 'live when it died', incidents: 1 },
+      { modulePath: 'C:\\B.vst3', name: 'B', reason: 'live when it died', incidents: 2 },
+    ],
+  };
+  state = applyMockCommand(state, { cmd: 'clearSafeModeSuspect', modulePath: 'C:\\A.vst3' });
+  assert.equal(state.reliability.safeMode.suspects.length, 1, 'clearing removes just that one');
+  assert.equal(state.reliability.safeMode.level, 'skipSuspects', 'and the level holds while one remains');
+
+  state = applyMockCommand(state, { cmd: 'clearSafeModeSuspect', modulePath: 'C:\\B.vst3' });
+  assert.equal(state.reliability.safeMode.level, 'normal',
+    'the level drops back once there is nothing to skip');
+
+  state = applyMockCommand(state, { cmd: 'setSafeMode', level: 'noThirdParty' });
+  state = applyMockCommand(state, { cmd: 'clearAllSafeModeSuspects' });
+  assert.equal(state.reliability.safeMode.level, 'noThirdParty',
+    'clearing suspects leaves a safe mode the user chose alone');
+
+  // The recovery notice clears; the standing offer does not.
+  state.reliability.recovery = {
+    interrupted: true, lastOperation: 'loadInstrument', lastOperationDetail: 'Rusty',
+    preservedStateFile: 'C:\\crash-state\\session.json', hasLastKnownGood: true,
+    lastKnownGoodAt: '2026-08-27T10:00:00',
+  };
+  state = applyMockCommand(state, { cmd: 'acknowledgeRecovery' });
+  assert.equal(state.reliability.recovery.interrupted, false, 'acknowledging clears the notice');
+  assert.equal(state.reliability.recovery.hasLastKnownGood, true,
+    'but the known-good offer stands — it is a state, not a message');
+
+  state.reliability.damagedState = ['Part 1 state mismatch'];
+  state = applyMockCommand(state, { cmd: 'restoreLastKnownGood' });
+  assert.deepEqual(state.reliability.damagedState, [],
+    'going back to a rig that booted clears what the damaged one reported');
 });

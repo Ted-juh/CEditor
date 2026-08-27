@@ -34,6 +34,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PerformancePanel from './PerformancePanel.svelte';
   import ProductPanel from './ProductPanel.svelte';
+  import ReliabilityPanel from './ReliabilityPanel.svelte';
 
   initInstrumentHostBridge();
 
@@ -48,6 +49,7 @@
   let libraryType = $state('');
   let performanceOpen = $state(false);
   let productOpen = $state(false);
+  let reliabilityOpen = $state(false);
 
   function toggleLibrary() {
     libraryOpen = !libraryOpen;
@@ -224,6 +226,16 @@
       <button type="button" class="toggle" class:on={productOpen}
               onclick={() => (productOpen = !productOpen)}
               data-testid="host-product">Product</button>
+      <button type="button" class="toggle" class:on={reliabilityOpen}
+              class:warn={$hostState.reliability.recovery.interrupted
+                          || $hostState.reliability.safeMode.level !== 'normal'}
+              title={$hostState.reliability.recovery.interrupted
+                       ? 'The last run stopped without finishing'
+                       : $hostState.reliability.safeMode.level !== 'normal'
+                         ? 'Safe startup is on'
+                         : 'Safe startup, recovery and the support bundle'}
+              onclick={() => (reliabilityOpen = !reliabilityOpen)}
+              data-testid="host-reliability">Health</button>
       <button type="button" class="toggle" class:on={libraryOpen} onclick={toggleLibrary}
               data-testid="host-library">Library</button>
       <button type="button" class="toggle" class:on={devicesOpen} onclick={toggleDevices}
@@ -271,6 +283,10 @@
 
   {#if productOpen}
     <ProductPanel />
+  {/if}
+
+  {#if reliabilityOpen}
+    <ReliabilityPanel />
   {/if}
 
   {#if libraryOpen}

@@ -1017,3 +1017,12 @@ export function onInstrumentHostLibrary(callback) {
   const token = window.__JUCE__.backend.addEventListener('instrumentHostLibrary', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
+
+/** The §17.7 support-bundle answer ({ entries, includeStateBlobs, written?, path? }). The same
+    event carries the preview and the export, because they are the same list — the difference
+    is only whether a file was written, which the payload says. */
+export function onInstrumentHostSupportBundle(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostSupportBundle', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}

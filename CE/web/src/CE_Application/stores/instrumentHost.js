@@ -23,6 +23,7 @@ import {
   onInstrumentHostParameters,
   onInstrumentHostParamValues,
   onInstrumentHostLibrary,
+  onInstrumentHostSupportBundle,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
@@ -33,6 +34,31 @@ export const hostProject = writable(emptyHostProject());
 export const hostBuild = writable(emptyHostBuild());
 export const hostParameters = writable(emptyHostParameters());
 export const hostLibrary = writable(emptyHostLibrary());
+export const hostSupportBundle = writable(emptySupportBundle());
+
+// --- §17.7: the support bundle ------------------------------------------------------------------
+
+export function emptySupportBundle() {
+  return { entries: [], includeStateBlobs: false, written: false, path: '' };
+}
+
+export function normalizeSupportBundle(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  return {
+    entries: (Array.isArray(p.entries) ? p.entries : []).map((e) => ({
+      name: String(e?.name ?? ''),
+      description: String(e?.description ?? ''),
+      sizeBytes: Number(e?.sizeBytes ?? 0),
+      included: e?.included === true,
+      note: String(e?.note ?? ''),
+    })),
+    includeStateBlobs: p.includeStateBlobs === true,
+    // Absent means "this was a preview", which is not the same as a failed export — the panel
+    // has to be able to tell them apart or it will report a file that does not exist.
+    written: p.written === true,
+    path: String(p.path ?? ''),
+  };
+}
 
 // --- the Stage 4 library ------------------------------------------------------------------------
 
@@ -276,6 +302,59 @@ export function emptyHostState() {
             macros: [], pages: [], masterLatencyMs: 0 },
     performance: emptyPerformance(),
     product: emptyProduct(),
+    reliability: emptyReliability(),
+  };
+}
+
+/** The §17 block: whether this install is healthy and, when it is not, what the product did
+ *  about it rather than what it merely noticed. */
+export function emptyReliability() {
+  return {
+    safeMode: { level: 'normal', suspects: [] },
+    refusedThisRun: [],
+    recovery: {
+      interrupted: false, lastOperation: '', lastOperationDetail: '',
+      preservedStateFile: '', hasLastKnownGood: false, lastKnownGoodAt: '',
+    },
+    damagedState: [],
+  };
+}
+
+export function normalizeReliability(payload) {
+  const r = payload && typeof payload === 'object' ? payload : {};
+  const safe = r.safeMode && typeof r.safeMode === 'object' ? r.safeMode : {};
+  const recovery = r.recovery && typeof r.recovery === 'object' ? r.recovery : {};
+
+  // Anything unrecognised reads as normal, exactly as the native side reads it: a state file
+  // from a future build must not leave the panel claiming a safe mode it cannot explain.
+  const level = ['normal', 'skipSuspects', 'noThirdParty'].includes(safe.level)
+    ? safe.level
+    : 'normal';
+
+  return {
+    safeMode: {
+      level,
+      suspects: (Array.isArray(safe.suspects) ? safe.suspects : []).map((s) => ({
+        modulePath: String(s?.modulePath ?? ''),
+        name: String(s?.name ?? ''),
+        reason: String(s?.reason ?? ''),
+        incidents: Number(s?.incidents ?? 0),
+      })),
+    },
+    refusedThisRun: (Array.isArray(r.refusedThisRun) ? r.refusedThisRun : []).map((f) => ({
+      modulePath: String(f?.modulePath ?? ''),
+      name: String(f?.name ?? ''),
+      reason: String(f?.reason ?? ''),
+    })),
+    recovery: {
+      interrupted: recovery.interrupted === true,
+      lastOperation: String(recovery.lastOperation ?? ''),
+      lastOperationDetail: String(recovery.lastOperationDetail ?? ''),
+      preservedStateFile: String(recovery.preservedStateFile ?? ''),
+      hasLastKnownGood: recovery.hasLastKnownGood === true,
+      lastKnownGoodAt: String(recovery.lastKnownGoodAt ?? ''),
+    },
+    damagedState: (Array.isArray(r.damagedState) ? r.damagedState : []).map(String),
   };
 }
 
@@ -528,6 +607,8 @@ export function normalizeHostState(payload) {
       missing: m?.missing === true,
       failureCount: Number(m?.failureCount ?? 0),
       lastFailureReason: String(m?.lastFailureReason ?? ''),
+      architectures: (Array.isArray(m?.architectures) ? m.architectures : []).map(String),
+      unavailableReason: String(m?.unavailableReason ?? ''),
       numClasses: Number(m?.numClasses ?? 0),
       numInstruments: Number(m?.numInstruments ?? 0),
     })),
@@ -546,6 +627,7 @@ export function normalizeHostState(payload) {
     },
     performance: normalizePerformance(p.performance),
     product: normalizeProduct(p.product),
+    reliability: normalizeReliability(p.reliability),
     rack: {
       performanceId: String(rack.performanceId ?? ''),
       focusedPartId: String(rack.focusedPartId ?? ''),
@@ -662,7 +744,8 @@ export function mockHostState() {
     modules: [
       { path: 'C:\\Program Files\\Common Files\\VST3\\MockAudio.vst3', numClasses: 2, numInstruments: 2 },
       { path: 'C:\\Program Files\\Common Files\\VST3\\TapeLabs.vst3', numClasses: 3, numInstruments: 1 },
-      { path: 'C:\\Program Files\\Common Files\\VST3\\Rusty.vst3', quarantined: true, failureCount: 2, lastFailureReason: 'scanner exited with code 3', numClasses: 0 },
+      { path: 'C:\\Program Files\\Common Files\\VST3\\Rusty.vst3', quarantined: true, failureCount: 2, lastFailureReason: 'scanner exited with code 3', numClasses: 0, unavailableReason: 'quarantined (scanner exited with code 3)' },
+      { path: 'C:\\Program Files (x86)\\Common Files\\VST3\\Vintage.vst3', numClasses: 1, architectures: ['x86'], unavailableReason: 'built for x86, this host is x86_64' },
     ],
     scanPaths: [],
     rack: {
@@ -694,6 +777,15 @@ export function mockHostState() {
       hardware: { owner: 'nobody', owned: false },
       activeHostingIncidents: [],
       surfaceProfiles: ['akai-ctrl49'],
+    },
+    reliability: {
+      safeMode: { level: 'normal', suspects: [] },
+      refusedThisRun: [],
+      recovery: {
+        interrupted: false, lastOperation: '', lastOperationDetail: '',
+        preservedStateFile: '', hasLastKnownGood: false, lastKnownGoodAt: '',
+      },
+      damagedState: [],
     },
     performance: {
       transport: { tempo: 120, numerator: 4, denominator: 4, defaultQuantize: 'bar' },
@@ -1333,6 +1425,42 @@ export function applyMockCommand(state, payload) {
     next.product.activeHostingIncidents = [];
     return next;
   }
+  if (cmd === 'setSafeMode') {
+    const level = ['normal', 'skipSuspects', 'noThirdParty'].includes(payload.level)
+      ? payload.level
+      : 'normal';
+    next.reliability.safeMode.level = level;
+    return next;
+  }
+  if (cmd === 'clearSafeModeSuspect') {
+    const safe = next.reliability.safeMode;
+    safe.suspects = safe.suspects.filter((s) => s.modulePath !== payload.modulePath);
+    // The native rule, mirrored: skipSuspects with nothing to skip is a warning light nobody
+    // can turn off, so it drops back. A safe mode the user chose is left alone.
+    if (safe.suspects.length === 0 && safe.level === 'skipSuspects') safe.level = 'normal';
+    return next;
+  }
+  if (cmd === 'clearAllSafeModeSuspects') {
+    const safe = next.reliability.safeMode;
+    safe.suspects = [];
+    if (safe.level === 'skipSuspects') safe.level = 'normal';
+    return next;
+  }
+  if (cmd === 'acknowledgeRecovery') {
+    // Clears the notice, never the standing offer — the known-good is a state, not a message.
+    Object.assign(next.reliability.recovery, {
+      interrupted: false, lastOperation: '', lastOperationDetail: '', preservedStateFile: '',
+    });
+    return next;
+  }
+  if (cmd === 'restoreLastKnownGood') {
+    if (!next.reliability.recovery.hasLastKnownGood) return next;
+    Object.assign(next.reliability.recovery, {
+      interrupted: false, lastOperation: '', lastOperationDetail: '', preservedStateFile: '',
+    });
+    next.reliability.damagedState = [];
+    return next;
+  }
   if (cmd === 'setPartArp' || cmd === 'setPartMidiFx') {
     const target = part(payload.partId);
     if (!target) return next;
@@ -1371,6 +1499,7 @@ export function initInstrumentHostBridge() {
   onInstrumentHostParameters((payload) => hostParameters.set(normalizeHostParameters(payload)));
   onInstrumentHostParamValues((payload) => hostParameters.update((r) => applyParamValues(r, payload)));
   onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
+  onInstrumentHostSupportBundle((payload) => hostSupportBundle.set(normalizeSupportBundle(payload)));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);
@@ -1696,6 +1825,17 @@ export const setPartOutputPair = (partId, pair) => send({ cmd: 'setPartOutputPai
 export const claimHardwareSurface = () => send({ cmd: 'claimHardwareSurface' });
 export const releaseHardwareSurface = () => send({ cmd: 'releaseHardwareSurface' });
 export const clearActiveHostingIncidents = () => send({ cmd: 'clearActiveHostingIncidents' });
+
+// --- §17: safe startup, recovery and the support bundle --------------------------------------
+export const setSafeMode = (level) => send({ cmd: 'setSafeMode', level });
+export const clearSafeModeSuspect = (modulePath) => send({ cmd: 'clearSafeModeSuspect', modulePath });
+export const clearAllSafeModeSuspects = () => send({ cmd: 'clearAllSafeModeSuspects' });
+export const acknowledgeRecovery = () => send({ cmd: 'acknowledgeRecovery' });
+export const restoreLastKnownGood = () => send({ cmd: 'restoreLastKnownGood' });
+export const previewSupportBundle = (options = {}) =>
+  send({ cmd: 'previewSupportBundle', ...options });
+export const exportSupportBundle = (options = {}) =>
+  send({ cmd: 'exportSupportBundle', ...options });
 
 export const requestHostProject = () => send({ cmd: 'getHostProject' });
 export const setHostProject = (fields) => send({ cmd: 'setHostProject', ...fields });
