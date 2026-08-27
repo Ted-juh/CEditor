@@ -26,6 +26,10 @@ import {
   requestParameters,
   setParameter,
   resetParameter,
+  addControlPage,
+  assignControlSlot,
+  clearControlSlot,
+  setControlSlotValue,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
 import { get } from 'svelte/store';
@@ -279,4 +283,45 @@ test('mock reducer: the parameter view round-trips set and reset', () => {
 
   requestParameters('mock-part-2'); // empty part -> empty registry
   assert.equal(get(hostParameters).partId, '');
+});
+
+// --- neutral control pages -----------------------------------------------------------------------
+
+test('normalizeHostState shapes pages and slots with their resolution status', () => {
+  const shaped = normalizeHostState({ rack: { pages: [{
+    pageId: 'p1', name: 'Perf', slots: [{ slotId: 's1', assigned: true, resolved: false, rangeMax: '0.8' }],
+  }] } });
+  const slot = shaped.rack.pages[0].slots[0];
+  assert.equal(slot.assigned, true);
+  assert.equal(slot.resolved, false);
+  assert.equal(slot.rangeMax, 0.8);
+  assert.deepEqual(normalizeHostState({}).rack.pages, [], 'a Stage 1 payload has no pages and loads clean');
+});
+
+test('mock reducer: the page lifecycle — add, assign from the loaded part, drive, clear', () => {
+  hostStateStore.set(mockHostState());
+  const partId = 'mock-part-1';
+  requestParameters(partId);
+
+  addControlPage('My Page');
+  let state = get(hostStateStore);
+  assert.equal(state.rack.pages.length, 1);
+  assert.equal(state.rack.pages[0].slots.length, 8);
+  const pageId = state.rack.pages[0].pageId;
+
+  assignControlSlot(pageId, 's1', partId, 'cutoff');
+  state = get(hostStateStore);
+  assert.equal(state.rack.pages[0].slots[0].resolved, true);
+  assert.equal(state.rack.pages[0].slots[0].displayName, 'Cutoff');
+
+  // Assigning against the empty part mirrors the native refusal: nothing changes.
+  assignControlSlot(pageId, 's2', 'mock-part-2', 'cutoff');
+  assert.equal(get(hostStateStore).rack.pages[0].slots[1].assigned, false);
+
+  // The slot slider drives the bound parameter through the same mapping hardware will use.
+  setControlSlotValue(pageId, 's1', 0.9);
+  assert.equal(get(hostParameters).parameters[0].value, 0.9);
+
+  clearControlSlot(pageId, 's1');
+  assert.equal(get(hostStateStore).rack.pages[0].slots[0].assigned, false);
 });

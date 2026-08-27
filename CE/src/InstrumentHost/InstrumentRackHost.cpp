@@ -38,6 +38,47 @@ juce::String InstrumentRackHost::addPart()
     return partId;
 }
 
+juce::String InstrumentRackHost::addControlPage (const juce::String& name)
+{
+    auto page = ControlPage::create (name);
+    const auto pageId = page.pageId;
+    model.pages.add (std::move (page));
+    return pageId;
+}
+
+bool InstrumentRackHost::removeControlPage (const juce::String& pageId)
+{
+    for (int i = 0; i < model.pages.size(); ++i)
+        if (model.pages.getReference (i).pageId == pageId)
+        {
+            model.pages.remove (i);
+            return true;
+        }
+    return false;
+}
+
+bool InstrumentRackHost::renameControlPage (const juce::String& pageId, const juce::String& name)
+{
+    if (auto* page = model.findPage (pageId))
+    {
+        page->name = name;
+        return true;
+    }
+    return false;
+}
+
+bool InstrumentRackHost::setSlotBinding (const juce::String& pageId, const juce::String& slotId,
+                                         ControlBinding binding)
+{
+    auto* page = model.findPage (pageId);
+    auto* slot = page != nullptr ? page->findSlot (slotId) : nullptr;
+    if (slot == nullptr)
+        return false;
+
+    slot->binding = std::move (binding);
+    return true;
+}
+
 bool InstrumentRackHost::removePart (const juce::String& partId)
 {
     auto* lp = findLive (partId);

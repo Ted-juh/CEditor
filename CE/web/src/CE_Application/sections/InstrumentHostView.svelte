@@ -20,6 +20,7 @@
     hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
+    addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
@@ -62,6 +63,18 @@
 
   function stepFor(parameter) {
     return parameter.numSteps > 1 ? 1 / (parameter.numSteps - 1) : 0.001;
+  }
+
+  // Neutral control pages: one is selected for viewing and for the parameter view's assign
+  // action. Selection follows the list — a removed page falls back to the first remaining.
+  let selectedPageId = $state('');
+  let pages = $derived($hostState.rack.pages);
+  let selectedPage = $derived(pages.find((p) => p.pageId === selectedPageId) ?? pages[0] ?? null);
+  let firstEmptySlot = $derived(selectedPage?.slots.find((s) => !s.assigned) ?? null);
+
+  function assignToSelectedPage(parameter) {
+    if (!selectedPage || !firstEmptySlot || !focusedPart) return;
+    assignControlSlot(selectedPage.pageId, firstEmptySlot.slotId, focusedPart.partId, parameter.id);
   }
   let parts = $derived($hostState.rack.parts);
   let focusedPartId = $derived($hostState.rack.focusedPartId);
@@ -314,6 +327,12 @@
                 <span class="param-value">{parameter.text}{parameter.label ? ` ${parameter.label}` : ''}</span>
                 <button type="button" class="ghost" title="Reset to the plug-in's default"
                         onclick={() => resetParameter(focusedPart.partId, parameter.id)}>↺</button>
+                <button type="button" class="ghost" disabled={!selectedPage || !firstEmptySlot}
+                        title={selectedPage
+                                 ? (firstEmptySlot ? `Assign to ${selectedPage.name}, slot ${firstEmptySlot.slotId}`
+                                                   : 'The selected page has no empty slot')
+                                 : 'Create a control page first'}
+                        onclick={() => assignToSelectedPage(parameter)}>→</button>
               </div>
               {#if paramDiagnostics}
                 <div class="param-diag">{parameter.id} · index {parameter.index}{parameter.automatable ? '' : ' · not automatable'}{parameter.meta ? ' · meta' : ''}</div>
@@ -369,6 +388,55 @@
             <button type="button" class="ghost danger" onclick={() => removeScanPath(path)}>×</button>
           </div>
         {/each}
+      </div>
+
+      <!-- Neutral control pages (Stage 2): named slots over parameter addresses, authored
+           before any hardware exists. The sliders drive the same range/inversion mapping a
+           physical control will; an unresolved slot warns instead of moving anything. -->
+      <div class="pages" data-testid="host-pages">
+        <div class="pages-head">
+          <strong>Control pages</strong>
+          <button type="button" onclick={() => addControlPage()} data-testid="host-add-page">+ Page</button>
+        </div>
+        {#if pages.length > 0}
+          <div class="page-tabs">
+            {#each pages as page (page.pageId)}
+              <span class="page-tab" class:on={selectedPage?.pageId === page.pageId}>
+                <button type="button" class="page-name" onclick={() => (selectedPageId = page.pageId)}>
+                  {page.name}
+                </button>
+                <button type="button" class="ghost danger" title="Remove this page"
+                        onclick={() => removeControlPage(page.pageId)}>×</button>
+              </span>
+            {/each}
+          </div>
+          {#if selectedPage}
+            <div class="slot-list">
+              {#each selectedPage.slots as slot (slot.slotId)}
+                <div class="slot-row" class:unresolved={slot.assigned && !slot.resolved}>
+                  <span class="slot-id">{slot.slotId}</span>
+                  {#if slot.assigned}
+                    <span class="slot-name" title={`${slot.parameterId} · ${slot.partId}`}>
+                      {slot.displayName}<span class="slot-part"> — {slot.partName || 'missing part'}</span>
+                    </span>
+                    {#if slot.resolved}
+                      <input type="range" min="0" max="1" step="0.001" aria-label={slot.displayName}
+                             oninput={(e) => setControlSlotValue(selectedPage.pageId, slot.slotId, Number(e.currentTarget.value))} />
+                    {:else}
+                      <span class="slot-warning">unresolved — the part no longer carries this plug-in</span>
+                    {/if}
+                    <button type="button" class="ghost danger" title="Clear this slot"
+                            onclick={() => clearControlSlot(selectedPage.pageId, slot.slotId)}>×</button>
+                  {:else}
+                    <span class="slot-empty">empty — assign from the parameter list (→)</span>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
+        {:else}
+          <div class="empty-hint">No pages yet — a page holds eight control slots for hardware and macros.</div>
+        {/if}
       </div>
 
       <!-- Every module the scan touched, whatever came of it. The browser above lists
@@ -645,6 +713,28 @@
   .param-row input[type='range'] { flex: 1; min-width: 60px; }
   .param-value { flex: 0 0 84px; text-align: right; color: #9aa5b1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .param-diag { color: #66707b; font-size: 10px; margin: -2px 0 0 138px; }
+
+  .pages {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid #2c343d;
+    padding-top: 8px;
+  }
+  .pages-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .page-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .page-tab { display: inline-flex; align-items: center; gap: 2px; border: 1px solid #3b4652; border-radius: 4px; padding: 0 2px; }
+  .page-tab.on { border-color: #5b9bd5; background: #24313d; }
+  .page-name { background: none; border: none; padding: 3px 6px; }
+  .slot-list { display: flex; flex-direction: column; gap: 4px; }
+  .slot-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .slot-id { flex: 0 0 20px; color: #7d8894; font-size: 11px; }
+  .slot-name { flex: 0 0 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slot-part { color: #7d8894; font-size: 11px; }
+  .slot-row input[type='range'] { flex: 1; min-width: 60px; }
+  .slot-empty { color: #66707b; font-size: 11px; }
+  .slot-warning { flex: 1; color: #d6a3a3; font-size: 11px; }
+  .slot-row.unresolved .slot-name { color: #d6a3a3; }
 
   button {
     background: #232a31;

@@ -189,7 +189,7 @@ export function emptyHostState() {
     scanning: false,
     editorOpenPartId: '',
     audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0 },
-    rack: { performanceId: '', focusedPartId: '', parts: [] },
+    rack: { performanceId: '', focusedPartId: '', parts: [], pages: [] },
   };
 }
 
@@ -228,6 +228,24 @@ export function normalizeHostState(payload) {
     rack: {
       performanceId: String(rack.performanceId ?? ''),
       focusedPartId: String(rack.focusedPartId ?? ''),
+      pages: (Array.isArray(rack.pages) ? rack.pages : []).map((page) => ({
+        pageId: String(page?.pageId ?? ''),
+        name: String(page?.name ?? ''),
+        slots: (Array.isArray(page?.slots) ? page.slots : []).map((slot) => ({
+          slotId: String(slot?.slotId ?? ''),
+          assigned: slot?.assigned === true,
+          partId: String(slot?.partId ?? ''),
+          parameterId: String(slot?.parameterId ?? ''),
+          label: String(slot?.label ?? ''),
+          displayName: String(slot?.displayName ?? ''),
+          partName: String(slot?.partName ?? ''),
+          rangeMin: Number(slot?.rangeMin ?? 0),
+          rangeMax: Number(slot?.rangeMax ?? 1),
+          inverted: slot?.inverted === true,
+          bipolar: slot?.bipolar === true,
+          resolved: slot?.resolved === true,
+        })),
+      })),
       parts: (Array.isArray(rack.parts) ? rack.parts : []).map((part) => ({
         partId: String(part?.partId ?? ''),
         pluginCeId: String(part?.pluginCeId ?? ''),
@@ -368,6 +386,51 @@ export function applyMockCommand(state, payload) {
     if (!next.scanPaths.includes('D:\\Browsed VST3s')) next.scanPaths.push('D:\\Browsed VST3s');
     return next;
   }
+  if (cmd === 'addControlPage') {
+    const pageId = `mock-page-${Date.now()}-${next.rack.pages.length + 1}`;
+    next.rack.pages.push(normalizeHostState({ rack: { pages: [{
+      pageId,
+      name: payload.name || `Page ${next.rack.pages.length + 1}`,
+      slots: Array.from({ length: 8 }, (_, i) => ({ slotId: `s${i + 1}` })),
+    }] } }).rack.pages[0]);
+    return next;
+  }
+  if (cmd === 'removeControlPage') {
+    next.rack.pages = next.rack.pages.filter((p) => p.pageId !== payload.pageId);
+    return next;
+  }
+  if (cmd === 'renameControlPage') {
+    const page = next.rack.pages.find((p) => p.pageId === payload.pageId);
+    if (page) page.name = String(payload.name ?? page.name);
+    return next;
+  }
+  if (cmd === 'assignControlSlot' || cmd === 'clearControlSlot' || cmd === 'setControlSlotOptions') {
+    const page = next.rack.pages.find((p) => p.pageId === payload.pageId);
+    const slot = page?.slots.find((s) => s.slotId === payload.slotId);
+    if (!slot) return next;
+    if (cmd === 'clearControlSlot') {
+      Object.assign(slot, { assigned: false, partId: '', parameterId: '', label: '',
+                            displayName: '', partName: '', rangeMin: 0, rangeMax: 1,
+                            inverted: false, bipolar: false, resolved: false });
+    } else if (cmd === 'assignControlSlot') {
+      const target = part(payload.partId);
+      // Mirrors the native rule: assignment needs the live instrument.
+      if (!target?.hasInstrument) return next;
+      Object.assign(slot, {
+        assigned: true,
+        partId: payload.partId,
+        parameterId: String(payload.parameterId ?? ''),
+        displayName: String(payload.parameterId ?? '').replace(/^./, (c) => c.toUpperCase()),
+        partName: target.pluginName,
+        resolved: true,
+      });
+    } else {
+      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'label'])
+        if (payload[key] !== undefined) slot[key] = payload[key];
+      if (payload.label !== undefined && payload.label) slot.displayName = String(payload.label);
+    }
+    return next;
+  }
   if (cmd === 'removeScanPath') {
     next.scanPaths = next.scanPaths.filter((p) => p !== payload.path);
     return next;
@@ -465,6 +528,25 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'beginParameterGesture' || payload?.cmd === 'endParameterGesture') return;
+    if (payload?.cmd === 'setControlSlotValue') {
+      // Mirror the native mapping far enough for the demo: drive the parameter view when the
+      // bound part's registry is on screen.
+      const page = get(hostState).rack.pages.find((p) => p.pageId === payload.pageId);
+      const slot = page?.slots.find((s) => s.slotId === payload.slotId);
+      if (!slot?.resolved) return;
+      const raw = Math.min(1, Math.max(0, Number(payload.value ?? 0)));
+      const positioned = slot.inverted ? 1 - raw : raw;
+      const mapped = slot.rangeMin + positioned * (slot.rangeMax - slot.rangeMin);
+      hostParameters.update((registry) => {
+        if (registry.partId !== slot.partId) return registry;
+        return {
+          ...registry,
+          parameters: registry.parameters.map((d) =>
+            d.id === slot.parameterId ? { ...d, value: mapped, text: mockParamText(d, mapped) } : d),
+        };
+      });
+      return;
+    }
     hostState.set(applyMockCommand(get(hostState), payload));
     return;
   }
@@ -496,6 +578,16 @@ export const setParameter = (partId, id, value) => send({ cmd: 'setParameter', p
 export const resetParameter = (partId, id) => send({ cmd: 'resetParameter', partId, id });
 export const beginParameterGesture = (partId, id) => send({ cmd: 'beginParameterGesture', partId, id });
 export const endParameterGesture = (partId, id) => send({ cmd: 'endParameterGesture', partId, id });
+export const addControlPage = (name) => send(name ? { cmd: 'addControlPage', name } : { cmd: 'addControlPage' });
+export const removeControlPage = (pageId) => send({ cmd: 'removeControlPage', pageId });
+export const renameControlPage = (pageId, name) => send({ cmd: 'renameControlPage', pageId, name });
+export const assignControlSlot = (pageId, slotId, partId, parameterId) =>
+  send({ cmd: 'assignControlSlot', pageId, slotId, partId, parameterId });
+export const clearControlSlot = (pageId, slotId) => send({ cmd: 'clearControlSlot', pageId, slotId });
+export const setControlSlotOptions = (pageId, slotId, fields) =>
+  send({ cmd: 'setControlSlotOptions', pageId, slotId, ...fields });
+export const setControlSlotValue = (pageId, slotId, value) =>
+  send({ cmd: 'setControlSlotValue', pageId, slotId, value });
 export const requestHostProject = () => send({ cmd: 'getHostProject' });
 export const setHostProject = (fields) => send({ cmd: 'setHostProject', ...fields });
 export const buildHostProduct = () => {

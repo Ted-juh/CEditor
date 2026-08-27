@@ -65,6 +65,16 @@ public:
     bool movePart (const juce::String& partId, int newIndex);
     bool focusPart (const juce::String& partId);
 
+    // -- control pages (Stage 2) --------------------------------------------------------
+    // Model-only: pages bind control slots to parameter addresses and never touch the
+    // graph. They live on the Performance so they persist and travel with the rack.
+    juce::String addControlPage (const juce::String& name);
+    bool removeControlPage (const juce::String& pageId);
+    bool renameControlPage (const juce::String& pageId, const juce::String& name);
+    /** Writes the slot's binding (an empty binding clears the slot). */
+    bool setSlotBinding (const juce::String& pageId, const juce::String& slotId,
+                         ControlBinding binding);
+
     // -- per-part rules and mixer -------------------------------------------------------
     bool setMidiRules (const juce::String& partId, const PartMidiRules& rules);
     bool setEnabled (const juce::String& partId, bool enabled);

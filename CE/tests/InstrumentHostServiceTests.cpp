@@ -576,6 +576,126 @@ void testWrapperContext()
     }
 }
 
+// Two healthy instrument classes in two modules — for the tests that need a part to change
+// class underneath a binding.
+void seedTwoSynthCatalog (const juce::File& dataDir)
+{
+    PluginCatalog catalog;
+
+    for (const auto* name : { "Good", "Other" })
+    {
+        ModuleScanResult module;
+        module.modulePath = juce::String ("C:\\VST3\\") + name + ".vst3";
+        module.fingerprint = juce::String ("fp-") + name;
+        PluginClassRecord synth;
+        synth.ceId = juce::String ("VST3-") + juce::String (name).toLowerCase() + "-synth";
+        synth.name = juce::String (name) + " Synth";
+        synth.vendor = "Test Audio";
+        synth.isInstrument = true;
+        synth.descriptionXml = "<PLUGIN name=\"" + synth.name + "\" ceId=\"" + synth.ceId + "\"/>";
+        module.classes.add (synth);
+        catalog.commitScanResult (module);
+    }
+
+    catalog.saveTo (dataDir.getChildFile ("plugin-catalog.json"));
+}
+
+// Neutral pages: named slots over parameter addresses. What must hold is the identity story —
+// assignment captures the class the author bound against, a part that later loads a different
+// class shows unresolved and refuses writes even when the new class has a parameter with the
+// SAME id, and loading the original class back reconnects automatically.
+void testControlPages()
+{
+    std::cout << "\ncontrol pages and bindings" << std::endl;
+
+    const auto dir = freshDataDir ("pages");
+    seedTwoSynthCatalog (dir);
+    juce::String pageId, partId;
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        auto* stubGood = h.lastStub;
+
+        h.cmd ("addControlPage", { { "name", "Performance 1" } });
+        const auto pages = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {});
+        check (pages.size() == 1 && pages[0].getProperty ("slots", {}).size() == 8,
+               "a new page carries eight empty slots");
+        pageId = pages[0].getProperty ("pageId", {}).toString();
+
+        h.cmd ("assignControlSlot", { { "pageId", pageId }, { "slotId", "s1" },
+                                      { "partId", partId }, { "parameterId", "cutoff" } });
+        const auto slot = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[0]
+                              .getProperty ("slots", {})[0];
+        check ((bool) slot.getProperty ("assigned", false)
+                 && (bool) slot.getProperty ("resolved", false)
+                 && slot.getProperty ("displayName", {}).toString() == "Cutoff",
+               "an assigned slot resolves and shows the parameter's name");
+
+        h.emits.clear();
+        h.cmd ("assignControlSlot", { { "pageId", pageId }, { "slotId", "s2" },
+                                      { "partId", partId }, { "parameterId", "resonance" } });
+        check (h.emits.lastError().contains ("Unknown parameter"),
+               "assigning a parameter the registry does not hold refuses");
+
+        h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "s1" }, { "value", 0.25 } });
+        check (juce::approximatelyEqual (stubGood->cutoff->get(), 0.25f),
+               "a slot value reaches the bound parameter");
+
+        h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" },
+                                          { "rangeMin", 0.5 }, { "rangeMax", 1.0 }, { "inverted", true } });
+        h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "s1" }, { "value", 0.0 } });
+        check (juce::approximatelyEqual (stubGood->cutoff->get(), 1.0f),
+               "range and inversion map the value (0 inverted over 0.5..1 lands on 1)");
+        h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "s1" }, { "value", 1.0 } });
+        check (juce::approximatelyEqual (stubGood->cutoff->get(), 0.5f),
+               "and the other end lands on the range floor");
+
+        h.emits.clear();
+        h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "s3" }, { "value", 0.5 } });
+        check (h.emits.lastError().contains ("not assigned"), "an unassigned slot refuses values");
+    }
+
+    {
+        // The session round trip, then the retarget story.
+        Harness h (dir);
+        h.cmd ("getState");
+        auto slotOf = [&h] { return h.emits.lastState()->getProperty ("rack", {})
+                                      .getProperty ("pages", {})[0].getProperty ("slots", {})[0]; };
+        check ((bool) slotOf().getProperty ("resolved", false)
+                 && slotOf().getProperty ("displayName", {}).toString() == "Cutoff",
+               "bindings survive restart and reconnect to the same class");
+
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-other-synth" } });
+        auto* stubOther = h.lastStub;
+        check ((bool) slotOf().getProperty ("assigned", false)
+                 && ! (bool) slotOf().getProperty ("resolved", true),
+               "a part that loads a different class turns the slot unresolved, not retargeted");
+
+        const auto before = stubOther->cutoff->get();
+        h.emits.clear();
+        h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "s1" }, { "value", 0.9 } });
+        check (h.emits.lastError().contains ("unresolved"),
+               "writing through an unresolved slot refuses aloud");
+        check (juce::approximatelyEqual (stubOther->cutoff->get(), before),
+               "even though the new class has a parameter with the very same id");
+
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        check ((bool) slotOf().getProperty ("resolved", false),
+               "loading the assigned class back reconnects automatically");
+
+        h.cmd ("clearControlSlot", { { "pageId", pageId }, { "slotId", "s1" } });
+        check (! (bool) slotOf().getProperty ("assigned", true), "clearing a slot empties it");
+
+        h.cmd ("removeControlPage", { { "pageId", pageId } });
+        check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).size() == 0,
+               "removing the page removes it");
+    }
+}
+
 // The Stage 2 parameter model: one registry per loaded instrument, addressed by the plug-in's
 // own parameter IDs, with the bidirectional path — CEditor writes through the host-safe API,
 // vendor-side edits arrive as coalesced deltas through drainParameterEvents. Two instances of
@@ -932,6 +1052,7 @@ int main (int argc, char* argv[])
     testScan (stubWorker);
     testWrapperContext();
     testParameterModel();
+    testControlPages();
     testFactoryPerformance();
     testScanFolderBrowseAndModuleProjection();
     testHostProject();

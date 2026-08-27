@@ -42,12 +42,55 @@ struct RackPart
     bool editorOpen = false;
 };
 
+// A binding connects one named control slot to one parameter address (VIP-successor Stage 2,
+// baseline §18.4.3). The address keeps the class identity BESIDE the part id on purpose:
+// partId says which slot in the rack, pluginCeId says which plug-in the author assigned
+// against — so when a part later loads something else, the binding shows as unresolved
+// instead of silently driving whatever now answers to the same parameter id. Transformations
+// are only the ones CEditor already needs; conditional logic and fan-out arrive with the
+// stages that require them.
+struct ControlBinding
+{
+    juce::String partId;
+    juce::String pluginCeId;
+    juce::String parameterId;     // the plug-in's own stable parameter id — never a display name
+    juce::String label;           // display override; empty = the parameter's own name
+    float rangeMin = 0.0f;
+    float rangeMax = 1.0f;
+    bool inverted = false;
+    bool bipolar = false;
+
+    bool isEmpty() const          { return parameterId.isEmpty(); }
+};
+
+struct ControlSlot
+{
+    juce::String slotId;          // stable within its page ("s1".."s8")
+    ControlBinding binding;       // empty binding = unassigned slot
+};
+
+// The neutral page: named control slots over parameter addresses, no hardware bytes anywhere.
+// Stage 3 compiles pages for actual surfaces; until then the Web UI drives the same slots.
+struct ControlPage
+{
+    juce::String pageId;
+    juce::String name;
+    juce::Array<ControlSlot> slots;
+
+    /** Mints a page with a fresh stable id and `numSlots` empty slots ("s1".."sN"). */
+    static ControlPage create (const juce::String& name, int numSlots = 8);
+
+    ControlSlot* findSlot (const juce::String& slotId);
+    const ControlSlot* findSlot (const juce::String& slotId) const;
+};
+
 struct Performance
 {
     juce::String performanceId;
     juce::String name;
     juce::String focusedPartId;
     juce::Array<RackPart> parts;
+    juce::Array<ControlPage> pages;
 
     /** Mints a Performance with a fresh stable id. */
     static Performance create();
@@ -64,6 +107,9 @@ struct Performance
     RackPart* findPart (const juce::String& partId);
     const RackPart* findPart (const juce::String& partId) const;
     int indexOfPart (const juce::String& partId) const;
+
+    ControlPage* findPage (const juce::String& pageId);
+    const ControlPage* findPage (const juce::String& pageId) const;
 
     juce::var toVar() const;
 

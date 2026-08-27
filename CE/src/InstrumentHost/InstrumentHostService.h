@@ -48,6 +48,15 @@
 //      instrumentHostParamValues deltas whenever the owner pumps drainParameterEvents().
 //      Addresses are partId + the plug-in's own parameter ID, never display names; a wrong
 //      part or unknown ID refuses instead of writing to an arbitrary index.)
+//   addControlPage {name?} | removeControlPage {pageId} | renameControlPage {pageId,name}
+//   assignControlSlot {pageId,slotId,partId,parameterId} | clearControlSlot {pageId,slotId}
+//   setControlSlotOptions {pageId,slotId, rangeMin?,rangeMax?,inverted?,bipolar?,label?}
+//   setControlSlotValue {pageId,slotId,value}
+//     (neutral pages over parameter addresses — no hardware bytes. Assignment captures the
+//      part's class identity; a part that later loads a different class shows the slot
+//      unresolved in state rather than driving whatever answers to the same id, and
+//      setControlSlotValue refuses an unresolved slot. Values map through the binding's
+//      range/inversion so hardware and UI share one transform.)
 //
 // THE EDITOR PANE is presentation the service commands but does not own: Options::editorPane
 // carries show/hide hooks into the native PluginEditorHost (stubs in tests). The service owns
@@ -208,6 +217,10 @@ private:
     juce::AudioProcessorParameter* resolveParameter (const juce::String& partId,
                                                      const juce::String& definitionId,
                                                      const ParameterDescriptor** descriptorOut = nullptr);
+    /** A slot binding resolves only when its part still carries the class it was assigned
+        against AND that parameter exists in the live registry — anything else is unresolved,
+        shown, and refused for writes. */
+    bool bindingResolves (const ControlBinding& binding) const;
     void emitHostProject();
     void requestInstrument (const juce::String& partId, const juce::String& ceId);
     void showEditorFor (const juce::String& partId);

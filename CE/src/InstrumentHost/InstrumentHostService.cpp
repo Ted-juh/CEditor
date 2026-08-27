@@ -378,6 +378,137 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "addControlPage")
+    {
+        const auto name = payload.getProperty ("name", {}).toString().trim();
+        rack.addControlPage (name.isNotEmpty() ? name
+                                               : "Page " + juce::String (rack.getPerformance().pages.size() + 1));
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "removeControlPage" || cmd == "renameControlPage")
+    {
+        const auto pageId = payload.getProperty ("pageId", {}).toString();
+        const auto ok = cmd == "removeControlPage"
+                          ? rack.removeControlPage (pageId)
+                          : rack.renameControlPage (pageId, payload.getProperty ("name", {}).toString().trim());
+        if (! ok)
+        {
+            emitError ("Unknown control page.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "assignControlSlot")
+    {
+        const auto pageId = payload.getProperty ("pageId", {}).toString();
+        const auto slotId = payload.getProperty ("slotId", {}).toString();
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto parameterId = payload.getProperty ("parameterId", {}).toString();
+
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        if (resolveParameter (partId, parameterId) == nullptr)
+        {
+            // Assignment needs the live instrument: the registry is what proves the id and
+            // whose class identity the binding captures.
+            emitError ("Unknown parameter " + parameterId + " on that part.");
+            return;
+        }
+
+        ControlBinding binding;
+        binding.partId = partId;
+        binding.pluginCeId = part->pluginCeId;
+        binding.parameterId = parameterId;
+
+        if (! rack.setSlotBinding (pageId, slotId, std::move (binding)))
+        {
+            emitError ("Unknown control slot.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "clearControlSlot")
+    {
+        if (! rack.setSlotBinding (payload.getProperty ("pageId", {}).toString(),
+                                   payload.getProperty ("slotId", {}).toString(), {}))
+        {
+            emitError ("Unknown control slot.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setControlSlotOptions")
+    {
+        const auto pageId = payload.getProperty ("pageId", {}).toString();
+        const auto slotId = payload.getProperty ("slotId", {}).toString();
+        const auto* page = rack.getPerformance().findPage (pageId);
+        const auto* slot = page != nullptr ? page->findSlot (slotId) : nullptr;
+        if (slot == nullptr)
+        {
+            emitError ("Unknown control slot.");
+            return;
+        }
+
+        auto binding = slot->binding;   // absent fields keep their value, like setPartMixer
+        const auto* fields = payload.getDynamicObject();
+        if (fields != nullptr)
+        {
+            if (fields->hasProperty ("rangeMin")) binding.rangeMin = juce::jlimit (0.0f, 1.0f, (float) (double) payload["rangeMin"]);
+            if (fields->hasProperty ("rangeMax")) binding.rangeMax = juce::jlimit (0.0f, 1.0f, (float) (double) payload["rangeMax"]);
+            if (fields->hasProperty ("inverted")) binding.inverted = (bool) payload["inverted"];
+            if (fields->hasProperty ("bipolar"))  binding.bipolar  = (bool) payload["bipolar"];
+            if (fields->hasProperty ("label"))    binding.label    = payload["label"].toString().trim();
+        }
+
+        rack.setSlotBinding (pageId, slotId, std::move (binding));
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setControlSlotValue")
+    {
+        const auto* page = rack.getPerformance().findPage (payload.getProperty ("pageId", {}).toString());
+        const auto* slot = page != nullptr
+                             ? page->findSlot (payload.getProperty ("slotId", {}).toString())
+                             : nullptr;
+        if (slot == nullptr || slot->binding.isEmpty())
+        {
+            emitError ("That control slot is not assigned.");
+            return;
+        }
+        if (! bindingResolves (slot->binding))
+        {
+            // The unresolved case, refused rather than retargeted (baseline §18.4.7): the
+            // part no longer carries what this slot was assigned against.
+            emitError ("That control slot's binding is unresolved.");
+            return;
+        }
+
+        const auto& b = slot->binding;
+        const auto raw = juce::jlimit (0.0f, 1.0f, (float) (double) payload.getProperty ("value", 0.0));
+        const auto positioned = b.inverted ? 1.0f - raw : raw;
+        const auto mapped = b.rangeMin + positioned * (b.rangeMax - b.rangeMin);
+        resolveParameter (b.partId, b.parameterId)->setValueNotifyingHost (mapped);
+        return;
+    }
+
     if (cmd == "getHostProject")
     {
         ensureHostProject();
@@ -806,6 +937,20 @@ juce::AudioProcessorParameter* InstrumentHostService::resolveParameter (const ju
     return rack.getInstrument (partId)->getParameters()[descriptor->index];
 }
 
+bool InstrumentHostService::bindingResolves (const ControlBinding& binding) const
+{
+    if (binding.isEmpty())
+        return false;
+
+    const auto* part = rack.getPerformance().findPart (binding.partId);
+    if (part == nullptr || part->pluginCeId != binding.pluginCeId)
+        return false;
+
+    const auto it = partParameters.find (binding.partId);
+    return it != partParameters.end()
+        && it->second.inventory.find (binding.parameterId) != nullptr;
+}
+
 void InstrumentHostService::drainParameterEvents()
 {
     for (auto& [partId, part] : partParameters)
@@ -1034,10 +1179,56 @@ juce::var InstrumentHostService::buildStatePayload() const
         parts.add (juce::var (obj));
     }
 
+    juce::Array<juce::var> pages;
+    for (const auto& page : performance.pages)
+    {
+        juce::Array<juce::var> slots;
+        for (const auto& slot : page.slots)
+        {
+            const auto& b = slot.binding;
+            const auto resolved = bindingResolves (b);
+
+            // The display name resolves live so a rename inside the plug-in shows through:
+            // label override first, then the descriptor's name, then the raw id for an
+            // unresolved binding — which is exactly the diagnostic the repair needs.
+            juce::String displayName = b.label;
+            if (displayName.isEmpty() && resolved)
+                if (const auto it = partParameters.find (b.partId); it != partParameters.end())
+                    if (const auto* d = it->second.inventory.find (b.parameterId))
+                        displayName = d->name;
+            if (displayName.isEmpty())
+                displayName = b.parameterId;
+
+            const auto* part = performance.findPart (b.partId);
+
+            auto* s = new juce::DynamicObject();
+            s->setProperty ("slotId",      slot.slotId);
+            s->setProperty ("assigned",    ! b.isEmpty());
+            s->setProperty ("partId",      b.partId);
+            s->setProperty ("parameterId", b.parameterId);
+            s->setProperty ("label",       b.label);
+            s->setProperty ("displayName", b.isEmpty() ? juce::String() : displayName);
+            s->setProperty ("partName",    part != nullptr ? part->pluginName : juce::String());
+            s->setProperty ("rangeMin",    b.rangeMin);
+            s->setProperty ("rangeMax",    b.rangeMax);
+            s->setProperty ("inverted",    b.inverted);
+            s->setProperty ("bipolar",     b.bipolar);
+            s->setProperty ("resolved",    resolved);
+            slots.add (juce::var (s));
+        }
+
+        auto* pg = new juce::DynamicObject();
+        pg->setProperty ("pageId", page.pageId);
+        pg->setProperty ("name",   page.name);
+        pg->setProperty ("slots",  slots);
+        pages.add (juce::var (pg));
+    }
+
     auto* rackObj = new juce::DynamicObject();
     rackObj->setProperty ("performanceId", performance.performanceId);
     rackObj->setProperty ("focusedPartId", performance.focusedPartId);
     rackObj->setProperty ("parts", parts);
+    rackObj->setProperty ("pages", pages);
 
     auto* audio = new juce::DynamicObject();
     auto* device = deviceManager.getCurrentAudioDevice();

@@ -17,6 +17,29 @@ namespace
     }
 }
 
+ControlPage ControlPage::create (const juce::String& name, int numSlots)
+{
+    ControlPage page;
+    page.pageId = juce::Uuid().toDashedString();
+    page.name = name;
+    for (int i = 1; i <= juce::jmax (1, numSlots); ++i)
+        page.slots.add ({ "s" + juce::String (i), {} });
+    return page;
+}
+
+ControlSlot* ControlPage::findSlot (const juce::String& slotId)
+{
+    for (auto& slot : slots)
+        if (slot.slotId == slotId)
+            return &slot;
+    return nullptr;
+}
+
+const ControlSlot* ControlPage::findSlot (const juce::String& slotId) const
+{
+    return const_cast<ControlPage*> (this)->findSlot (slotId);
+}
+
 Performance Performance::create()
 {
     Performance p;
@@ -80,6 +103,19 @@ int Performance::indexOfPart (const juce::String& partId) const
     return -1;
 }
 
+ControlPage* Performance::findPage (const juce::String& pageId)
+{
+    for (auto& page : pages)
+        if (page.pageId == pageId)
+            return &page;
+    return nullptr;
+}
+
+const ControlPage* Performance::findPage (const juce::String& pageId) const
+{
+    return const_cast<Performance*> (this)->findPage (pageId);
+}
+
 juce::var Performance::toVar() const
 {
     juce::Array<juce::var> partVars;
@@ -108,11 +144,38 @@ juce::var Performance::toVar() const
         partVars.add (juce::var (p));
     }
 
+    juce::Array<juce::var> pageVars;
+    for (const auto& page : pages)
+    {
+        juce::Array<juce::var> slotVars;
+        for (const auto& slot : page.slots)
+        {
+            auto* s = new juce::DynamicObject();
+            s->setProperty ("slotId",      slot.slotId);
+            s->setProperty ("partId",      slot.binding.partId);
+            s->setProperty ("pluginCeId",  slot.binding.pluginCeId);
+            s->setProperty ("parameterId", slot.binding.parameterId);
+            s->setProperty ("label",       slot.binding.label);
+            s->setProperty ("rangeMin",    slot.binding.rangeMin);
+            s->setProperty ("rangeMax",    slot.binding.rangeMax);
+            s->setProperty ("inverted",    slot.binding.inverted);
+            s->setProperty ("bipolar",     slot.binding.bipolar);
+            slotVars.add (juce::var (s));
+        }
+
+        auto* pg = new juce::DynamicObject();
+        pg->setProperty ("pageId", page.pageId);
+        pg->setProperty ("name",   page.name);
+        pg->setProperty ("slots",  slotVars);
+        pageVars.add (juce::var (pg));
+    }
+
     auto* root = new juce::DynamicObject();
     root->setProperty ("performanceId", performanceId);
     root->setProperty ("name",          name);
     root->setProperty ("focusedPartId", focusedPartId);
     root->setProperty ("parts",         partVars);
+    root->setProperty ("pages",         pageVars);
     return juce::var (root);
 }
 
@@ -176,6 +239,47 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
 
     if (parsed.focusedPartId.isNotEmpty() && parsed.indexOfPart (parsed.focusedPartId) < 0)
         parsed.focusedPartId = {};
+
+    // Pages follow the parts' structural rules: identity damage fails the load, values clamp.
+    // An absent pages array is a Stage 1 document and loads clean — bindings simply don't
+    // exist yet.
+    if (const auto* pageArray = stored.getProperty ("pages", {}).getArray())
+    {
+        juce::StringArray seenPageIds;
+        for (const auto& pg : *pageArray)
+        {
+            ControlPage page;
+            page.pageId = pg.getProperty ("pageId", {}).toString();
+            if (page.pageId.isEmpty() || seenPageIds.contains (page.pageId))
+                return false;
+            seenPageIds.add (page.pageId);
+
+            page.name = pg.getProperty ("name", {}).toString();
+
+            juce::StringArray seenSlotIds;
+            if (const auto* slotArray = pg.getProperty ("slots", {}).getArray())
+                for (const auto& s : *slotArray)
+                {
+                    ControlSlot slot;
+                    slot.slotId = s.getProperty ("slotId", {}).toString();
+                    if (slot.slotId.isEmpty() || seenSlotIds.contains (slot.slotId))
+                        return false;
+                    seenSlotIds.add (slot.slotId);
+
+                    slot.binding.partId      = s.getProperty ("partId", {}).toString();
+                    slot.binding.pluginCeId  = s.getProperty ("pluginCeId", {}).toString();
+                    slot.binding.parameterId = s.getProperty ("parameterId", {}).toString();
+                    slot.binding.label       = s.getProperty ("label", {}).toString();
+                    slot.binding.rangeMin    = floatOf (s, "rangeMin", 0.0f, 0.0f, 1.0f);
+                    slot.binding.rangeMax    = floatOf (s, "rangeMax", 1.0f, 0.0f, 1.0f);
+                    slot.binding.inverted    = (bool) s.getProperty ("inverted", false);
+                    slot.binding.bipolar     = (bool) s.getProperty ("bipolar", false);
+                    page.slots.add (std::move (slot));
+                }
+
+            parsed.pages.add (std::move (page));
+        }
+    }
 
     out = std::move (parsed);
     return true;
