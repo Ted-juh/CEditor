@@ -33,6 +33,7 @@
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PerformancePanel from './PerformancePanel.svelte';
+  import ProductPanel from './ProductPanel.svelte';
 
   initInstrumentHostBridge();
 
@@ -46,6 +47,7 @@
   let libraryQuery = $state('');
   let libraryType = $state('');
   let performanceOpen = $state(false);
+  let productOpen = $state(false);
 
   function toggleLibrary() {
     libraryOpen = !libraryOpen;
@@ -219,6 +221,9 @@
       <button type="button" class="toggle" class:on={performanceOpen}
               onclick={() => (performanceOpen = !performanceOpen)}
               data-testid="host-performance">Performance</button>
+      <button type="button" class="toggle" class:on={productOpen}
+              onclick={() => (productOpen = !productOpen)}
+              data-testid="host-product">Product</button>
       <button type="button" class="toggle" class:on={libraryOpen} onclick={toggleLibrary}
               data-testid="host-library">Library</button>
       <button type="button" class="toggle" class:on={devicesOpen} onclick={toggleDevices}
@@ -262,6 +267,10 @@
 
   {#if performanceOpen}
     <PerformancePanel />
+  {/if}
+
+  {#if productOpen}
+    <ProductPanel />
   {/if}
 
   {#if libraryOpen}

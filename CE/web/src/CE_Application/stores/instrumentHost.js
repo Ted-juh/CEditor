@@ -275,6 +275,79 @@ export function emptyHostState() {
     rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], returns: [],
             macros: [], pages: [], masterLatencyMs: 0 },
     performance: emptyPerformance(),
+    product: emptyProduct(),
+  };
+}
+
+/** The Stage 7 block: what the DAW sees of this instance, what a restore could not resolve,
+ *  whether this platform is actually supported, who owns the hardware, and the crash evidence
+ *  §18.9.8 asks for before anyone builds active isolation. */
+export function emptyProduct() {
+  return {
+    daw: {
+      hostSync: false, followingHost: false, offlineRender: false,
+      latencySamples: 0, tailSeconds: 0, outputPairs: 1, masterLevel: 1,
+      exposedMacros: [],
+    },
+    restore: { degraded: false, missingInstruments: [], missingEffects: [], notes: [] },
+    platform: { name: '', supported: true, rows: [] },
+    hardware: { owner: 'nobody', owned: false },
+    activeHostingIncidents: [],
+    surfaceProfiles: [],
+  };
+}
+
+export function normalizeProduct(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const daw = p.daw && typeof p.daw === 'object' ? p.daw : {};
+  const restore = p.restore && typeof p.restore === 'object' ? p.restore : {};
+  const platform = p.platform && typeof p.platform === 'object' ? p.platform : {};
+  const hardware = p.hardware && typeof p.hardware === 'object' ? p.hardware : {};
+
+  return {
+    daw: {
+      hostSync: daw.hostSync === true,
+      followingHost: daw.followingHost === true,
+      offlineRender: daw.offlineRender === true,
+      latencySamples: Number(daw.latencySamples ?? 0),
+      tailSeconds: Number(daw.tailSeconds ?? 0),
+      outputPairs: Number(daw.outputPairs ?? 1),
+      masterLevel: Number(daw.masterLevel ?? 1),
+      exposedMacros: (Array.isArray(daw.exposedMacros) ? daw.exposedMacros : []).map((m) => ({
+        index: Number(m?.index ?? 0),
+        name: String(m?.name ?? ''),
+        value: Number(m?.value ?? 0),
+        bound: m?.bound === true,
+      })),
+    },
+    restore: {
+      degraded: restore.degraded === true,
+      missingInstruments: (Array.isArray(restore.missingInstruments) ? restore.missingInstruments : []).map(String),
+      missingEffects: (Array.isArray(restore.missingEffects) ? restore.missingEffects : []).map(String),
+      notes: (Array.isArray(restore.notes) ? restore.notes : []).map(String),
+    },
+    platform: {
+      name: String(platform.name ?? ''),
+      supported: platform.supported !== false,
+      rows: (Array.isArray(platform.rows) ? platform.rows : []).map((r) => ({
+        id: String(r?.id ?? ''),
+        description: String(r?.description ?? ''),
+        required: r?.required === true,
+        present: r?.present === true,
+        detail: String(r?.detail ?? ''),
+      })),
+    },
+    hardware: {
+      owner: String(hardware.owner ?? 'nobody'),
+      owned: hardware.owned === true,
+    },
+    activeHostingIncidents: (Array.isArray(p.activeHostingIncidents) ? p.activeHostingIncidents : [])
+      .map((i) => ({
+        modulePath: String(i?.modulePath ?? ''),
+        name: String(i?.name ?? ''),
+        count: Number(i?.count ?? 0),
+      })),
+    surfaceProfiles: (Array.isArray(p.surfaceProfiles) ? p.surfaceProfiles : []).map(String),
   };
 }
 
@@ -472,6 +545,7 @@ export function normalizeHostState(payload) {
       xruns: Number(p.audio?.xruns ?? 0),
     },
     performance: normalizePerformance(p.performance),
+    product: normalizeProduct(p.product),
     rack: {
       performanceId: String(rack.performanceId ?? ''),
       focusedPartId: String(rack.focusedPartId ?? ''),
@@ -541,6 +615,7 @@ export function normalizeHostState(payload) {
           gain: Number(o?.gain ?? 1),
         })),
         outputChannels: Number(part?.outputChannels ?? 0),
+        outputPair: Number(part?.outputPair ?? 0),
         latencyMs: Number(part?.latencyMs ?? 0),
         hardware: part?.hardware === true,
         midiOutputId: String(part?.midiOutputId ?? ''),
@@ -597,6 +672,28 @@ export function mockHostState() {
         { partId: 'mock-part-1', pluginCeId: 'mock-keys', pluginName: 'Stage Keys', pluginVendor: 'Mock Audio', hasInstrument: true },
         { partId: 'mock-part-2', pluginCeId: '', pluginName: '' },
       ],
+    },
+    product: {
+      daw: {
+        hostSync: false, followingHost: false, latencySamples: 0, tailSeconds: 0,
+        outputPairs: 1, masterLevel: 1,
+        exposedMacros: Array.from({ length: 16 }, (_, i) => ({
+          index: i, name: `Macro ${i + 1}`, value: 0, bound: false,
+        })),
+      },
+      restore: { degraded: false, missingInstruments: [], missingEffects: [], notes: [] },
+      platform: {
+        name: 'Browser preview',
+        supported: true,
+        rows: [
+          { id: 'data-directory', description: 'A writable per-user data directory', required: true, present: true, detail: '(mock)' },
+          { id: 'midi', description: 'A MIDI stack that enumerates', required: true, present: true, detail: '(mock)' },
+          { id: 'format-vst3', description: 'VST3 hosting', required: true, present: true, detail: '(mock)' },
+        ],
+      },
+      hardware: { owner: 'nobody', owned: false },
+      activeHostingIncidents: [],
+      surfaceProfiles: ['akai-ctrl49'],
     },
     performance: {
       transport: { tempo: 120, numerator: 4, denominator: 4, defaultQuantize: 'bar' },
@@ -1209,6 +1306,33 @@ export function applyMockCommand(state, payload) {
     if (item.sceneId) return applyMockCommand(next, { cmd: 'launchScene', sceneId: item.sceneId });
     return next;
   }
+  if (cmd === 'setMasterLevel') {
+    next.product.daw.masterLevel = Math.min(2, Math.max(0, Number(payload.level ?? 1)));
+    return next;
+  }
+  if (cmd === 'setOutputPairs') {
+    next.product.daw.outputPairs = Math.min(8, Math.max(1, Number(payload.pairs ?? 1)));
+    // The native rule, mirrored: a part routed past the new end falls back to the main pair.
+    for (const p of next.rack.parts)
+      p.outputPair = Math.min(next.product.daw.outputPairs - 1, p.outputPair);
+    return next;
+  }
+  if (cmd === 'setPartOutputPair') {
+    const target = part(payload.partId);
+    if (target)
+      target.outputPair = Math.min(next.product.daw.outputPairs - 1,
+                                   Math.max(0, Number(payload.pair ?? 0)));
+    return next;
+  }
+  if (cmd === 'claimHardwareSurface' || cmd === 'releaseHardwareSurface') {
+    const owned = cmd === 'claimHardwareSurface';
+    next.product.hardware = { owner: owned ? 'this instance' : 'nobody', owned };
+    return next;
+  }
+  if (cmd === 'clearActiveHostingIncidents') {
+    next.product.activeHostingIncidents = [];
+    return next;
+  }
   if (cmd === 'setPartArp' || cmd === 'setPartMidiFx') {
     const target = part(payload.partId);
     if (!target) return next;
@@ -1564,6 +1688,14 @@ export const setlistNext = () => send({ cmd: 'setlistNext' });
 export const setlistPrev = () => send({ cmd: 'setlistPrev' });
 export const setPartArp = (partId, fields) => send({ cmd: 'setPartArp', partId, ...fields });
 export const setPartMidiFx = (partId, fields) => send({ cmd: 'setPartMidiFx', partId, ...fields });
+
+// --- Stage 7: the mature generated product --------------------------------------------------
+export const setMasterLevel = (level) => send({ cmd: 'setMasterLevel', level });
+export const setOutputPairs = (pairs) => send({ cmd: 'setOutputPairs', pairs });
+export const setPartOutputPair = (partId, pair) => send({ cmd: 'setPartOutputPair', partId, pair });
+export const claimHardwareSurface = () => send({ cmd: 'claimHardwareSurface' });
+export const releaseHardwareSurface = () => send({ cmd: 'releaseHardwareSurface' });
+export const clearActiveHostingIncidents = () => send({ cmd: 'clearActiveHostingIncidents' });
 
 export const requestHostProject = () => send({ cmd: 'getHostProject' });
 export const setHostProject = (fields) => send({ cmd: 'setHostProject', ...fields });

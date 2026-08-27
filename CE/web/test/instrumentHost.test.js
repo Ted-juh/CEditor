@@ -38,6 +38,8 @@ import {
   setLibraryUserMetadata,
   removeLibraryRecord,
   loadLibraryRecord,
+  emptyProduct,
+  normalizeProduct,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
 import { get } from 'svelte/store';
@@ -690,4 +692,116 @@ test('mock reducer: transport, capture and the per-part event chain', () => {
   assert.equal(state.rack.parts[0].arp.enabled, true);
   assert.equal(state.rack.parts[0].arp.mode, 'up-down');
   assert.equal(state.rack.parts[0].arp.octaves, 3);
+});
+
+// --- Stage 7: the mature generated product ---------------------------------------------------
+
+test('normalizeProduct: the DAW-facing block survives a hostile payload', () => {
+  const empty = normalizeProduct(undefined);
+  assert.deepEqual(empty, emptyProduct(),
+    'nothing at all normalizes to the same shape the view starts from');
+
+  const p = normalizeProduct({
+    daw: {
+      hostSync: 1, followingHost: 'yes', offlineRender: true,
+      latencySamples: '512', tailSeconds: '2.5', outputPairs: '4', masterLevel: '0.5',
+      exposedMacros: [
+        { index: 0, name: 'Macro 1 — Filter', value: 0.25, bound: true },
+        null,
+      ],
+    },
+    restore: { degraded: true, missingInstruments: ['Analog One'], missingEffects: null,
+               notes: ['One instrument could not be found.'] },
+    platform: { name: 'Windows 11', supported: false,
+                rows: [{ id: 'midi', description: 'A MIDI stack', required: true, present: false,
+                         detail: 'no devices' }] },
+    hardware: { owner: 'another instance', owned: 0 },
+    activeHostingIncidents: [{ modulePath: 'C:\\Rusty.vst3', name: 'Rusty', count: '3' }],
+    surfaceProfiles: ['akai-ctrl49', 7],
+  });
+
+  // Booleans are strictly boolean — a truthy 1 from the bridge is not a `true` the view can
+  // pass straight back to `class:on`, and `'yes'` is a string that would light every readout.
+  assert.equal(p.daw.hostSync, false, 'a truthy non-boolean is not a boolean');
+  assert.equal(p.daw.followingHost, false);
+  assert.equal(p.daw.offlineRender, true);
+  assert.equal(p.hardware.owned, false);
+
+  assert.equal(p.daw.latencySamples, 512, 'numbers arrive as numbers');
+  assert.equal(p.daw.tailSeconds, 2.5);
+  assert.equal(p.daw.outputPairs, 4);
+  assert.equal(p.daw.masterLevel, 0.5);
+
+  assert.equal(p.daw.exposedMacros.length, 2, 'a hole in the list is still a slot');
+  assert.deepEqual(p.daw.exposedMacros[0],
+    { index: 0, name: 'Macro 1 — Filter', value: 0.25, bound: true });
+  assert.equal(p.daw.exposedMacros[1].bound, false, 'and an empty slot reads as unbound');
+
+  assert.equal(p.restore.degraded, true);
+  assert.deepEqual(p.restore.missingInstruments, ['Analog One']);
+  assert.deepEqual(p.restore.missingEffects, [], 'a null list is an empty list, not a crash');
+
+  assert.equal(p.platform.supported, false, 'unsupported is only ever an explicit false');
+  assert.equal(normalizeProduct({ platform: {} }).platform.supported, true,
+    'silence about support is not a claim of failure');
+  assert.deepEqual(p.platform.rows[0],
+    { id: 'midi', description: 'A MIDI stack', required: true, present: false, detail: 'no devices' });
+
+  assert.equal(p.hardware.owner, 'another instance');
+  assert.deepEqual(p.activeHostingIncidents,
+    [{ modulePath: 'C:\\Rusty.vst3', name: 'Rusty', count: 3 }]);
+  assert.deepEqual(p.surfaceProfiles, ['akai-ctrl49', '7']);
+});
+
+test('normalizeHostState carries the product block and the per-part output pair', () => {
+  const state = normalizeHostState({
+    product: { daw: { latencySamples: 256 }, hardware: { owner: 'this instance', owned: true } },
+    rack: { parts: [{ partId: 'p1', outputPair: 3 }, { partId: 'p2' }] },
+  });
+  assert.equal(state.product.daw.latencySamples, 256);
+  assert.equal(state.product.hardware.owned, true);
+  assert.equal(state.rack.parts[0].outputPair, 3, 'routing is part of what the view renders');
+  assert.equal(state.rack.parts[1].outputPair, 0, 'and defaults to the main pair');
+
+  assert.deepEqual(emptyHostState().product, emptyProduct(),
+    'the empty state is the same shape, so the panel renders before the first push');
+});
+
+test('mock reducer: master level, output pairs, hardware focus and the incident log', () => {
+  let state = mockHostState();
+  assert.equal(state.product.daw.outputPairs, 1);
+  assert.equal(state.product.daw.exposedMacros.length, 16,
+    'sixteen slots exist whether or not the rack has filled them');
+
+  state = applyMockCommand(state, { cmd: 'setMasterLevel', level: 5 });
+  assert.equal(state.product.daw.masterLevel, 2, 'master level clamps at the top');
+  state = applyMockCommand(state, { cmd: 'setMasterLevel', level: -1 });
+  assert.equal(state.product.daw.masterLevel, 0, 'and at the bottom');
+
+  state = applyMockCommand(state, { cmd: 'setOutputPairs', pairs: 4 });
+  state = applyMockCommand(state, { cmd: 'setPartOutputPair', partId: 'mock-part-1', pair: 3 });
+  assert.equal(state.rack.parts[0].outputPair, 3);
+
+  state = applyMockCommand(state, { cmd: 'setPartOutputPair', partId: 'mock-part-2', pair: 99 });
+  assert.equal(state.rack.parts[1].outputPair, 3, 'a pair past the end clamps to the last one');
+
+  // Narrowing the rack's outputs cannot leave a part pointing at a pair that no longer exists.
+  state = applyMockCommand(state, { cmd: 'setOutputPairs', pairs: 1 });
+  assert.equal(state.product.daw.outputPairs, 1);
+  assert.equal(state.rack.parts[0].outputPair, 0, 'a part routed past the new end falls back');
+  assert.equal(state.rack.parts[1].outputPair, 0);
+
+  state = applyMockCommand(state, { cmd: 'setOutputPairs', pairs: 99 });
+  assert.equal(state.product.daw.outputPairs, 8, 'output pairs clamp too');
+
+  state = applyMockCommand(state, { cmd: 'claimHardwareSurface' });
+  assert.deepEqual(state.product.hardware, { owner: 'this instance', owned: true });
+  state = applyMockCommand(state, { cmd: 'releaseHardwareSurface' });
+  assert.deepEqual(state.product.hardware, { owner: 'nobody', owned: false },
+    'releasing hands the surface back rather than leaving it named after us');
+
+  state.product.activeHostingIncidents = [{ modulePath: 'C:\\Rusty.vst3', name: 'Rusty', count: 2 }];
+  state = applyMockCommand(state, { cmd: 'clearActiveHostingIncidents' });
+  assert.deepEqual(state.product.activeHostingIncidents, [],
+    'the evidence log is clearable — it informs a decision, it is not a permanent accusation');
 });
