@@ -213,6 +213,184 @@ void testFingerprint()
 
     dir.deleteRecursively();
 }
+
+// --- Architecture (§17.1, §17.2) -------------------------------------------------------------
+//
+// The failure being designed against: a 32-bit plug-in in a 64-bit host is offered, fails to
+// load, and gets quarantined for being broken. It is not broken. It is the wrong shape, that
+// is readable from the file, and reading it costs nothing.
+
+/** Writes a minimal but structurally real PE header naming `machine`. Not a loadable binary —
+    the architecture check reads a header, so a header is what the test must provide. */
+void writePeHeader (const juce::File& file, juce::uint16 machine)
+{
+    juce::MemoryBlock block (256, true);
+    auto* bytes = static_cast<juce::uint8*> (block.getData());
+    bytes[0] = 'M'; bytes[1] = 'Z';
+    const juce::uint32 peOffset = 0x80;
+    for (int i = 0; i < 4; ++i) bytes[0x3C + i] = (juce::uint8) ((peOffset >> (8 * i)) & 0xff);
+    bytes[peOffset] = 'P'; bytes[peOffset + 1] = 'E';
+    bytes[peOffset + 2] = 0; bytes[peOffset + 3] = 0;
+    bytes[peOffset + 4] = (juce::uint8) (machine & 0xff);
+    bytes[peOffset + 5] = (juce::uint8) ((machine >> 8) & 0xff);
+    file.getParentDirectory().createDirectory();
+    file.replaceWithData (block.getData(), block.getSize());
+}
+
+void writeElfHeader (const juce::File& file, juce::uint16 machine)
+{
+    juce::MemoryBlock block (256, true);
+    auto* bytes = static_cast<juce::uint8*> (block.getData());
+    bytes[0] = 0x7f; bytes[1] = 'E'; bytes[2] = 'L'; bytes[3] = 'F';
+    bytes[4] = 2;   // 64-bit
+    bytes[5] = 1;   // little-endian
+    bytes[0x12] = (juce::uint8) (machine & 0xff);
+    bytes[0x13] = (juce::uint8) ((machine >> 8) & 0xff);
+    file.getParentDirectory().createDirectory();
+    file.replaceWithData (block.getData(), block.getSize());
+}
+
+/** A VST3 bundle with one slice directory per named architecture, each holding a file — an
+    empty slice directory declares nothing, which is a case the reader has to get right. */
+juce::File makeBundle (const juce::File& parent, const juce::String& name,
+                       const juce::StringArray& sliceDirectories)
+{
+    const auto bundle = parent.getChildFile (name);
+    for (const auto& slice : sliceDirectories)
+    {
+        const auto dir = bundle.getChildFile ("Contents").getChildFile (slice);
+        dir.createDirectory();
+        dir.getChildFile (name).replaceWithText ("binary");
+    }
+    return bundle;
+}
+
+void testArchitectureReading()
+{
+    auto dir = makeTempDir ("architecture");
+
+    // Bundles declare their slices by directory name, in the VST3 SDK's spelling.
+    check (PluginCatalog::architecturesOf (makeBundle (dir, "Win64.vst3", { "x86_64-win" }))
+             == juce::StringArray { "x86_64" }, "a 64-bit Windows bundle reads as x86_64");
+    check (PluginCatalog::architecturesOf (makeBundle (dir, "Win32.vst3", { "x86-win" }))
+             == juce::StringArray { "x86" }, "a 32-bit Windows bundle reads as x86");
+    check (PluginCatalog::architecturesOf (makeBundle (dir, "Arm.vst3", { "aarch64-linux" }))
+             == juce::StringArray { "arm64" }, "aarch64 and arm64 are the same architecture");
+
+    const auto fat = PluginCatalog::architecturesOf (
+        makeBundle (dir, "Fat.vst3", { "x86-win", "x86_64-win" }));
+    check (fat.size() == 2 && fat.contains ("x86") && fat.contains ("x86_64"),
+           "a bundle carrying two slices reports both");
+
+    // An empty slice directory is a declaration of nothing — a stale build leftover must not
+    // make a module look like it supports an architecture it has no binary for.
+    const auto hollow = dir.getChildFile ("Hollow.vst3");
+    hollow.getChildFile ("Contents").getChildFile ("x86-win").createDirectory();
+    check (PluginCatalog::architecturesOf (hollow).isEmpty(),
+           "an empty slice directory declares nothing");
+
+    check (PluginCatalog::architecturesOf (dir.getChildFile ("NoContents.vst3")).isEmpty(),
+           "a path that is not there reads as unknown, not as unsupported");
+
+    // Bare modules name themselves in their own header.
+    const auto pe64 = dir.getChildFile ("Bare64.vst3");
+    writePeHeader (pe64, 0x8664);
+    check (PluginCatalog::architecturesOf (pe64) == juce::StringArray { "x86_64" },
+           "a bare PE module reads its machine field");
+
+    const auto pe32 = dir.getChildFile ("Bare32.vst3");
+    writePeHeader (pe32, 0x014c);
+    check (PluginCatalog::architecturesOf (pe32) == juce::StringArray { "x86" },
+           "and a 32-bit one reads as x86 without being loaded");
+
+    const auto elf = dir.getChildFile ("Bare.so");
+    writeElfHeader (elf, 0x3e);
+    check (PluginCatalog::architecturesOf (elf) == juce::StringArray { "x86_64" },
+           "an ELF module reads its e_machine");
+
+    const auto garbage = dir.getChildFile ("Garbage.vst3");
+    garbage.replaceWithText ("this is not a binary at all");
+    check (PluginCatalog::architecturesOf (garbage).isEmpty(),
+           "an unrecognisable header reads as unknown");
+
+    // A bundle whose slice directory is unnamed (macOS spells it MacOS) falls through to the
+    // binary inside it.
+    const auto mac = dir.getChildFile ("Mac.vst3");
+    const auto macos = mac.getChildFile ("Contents").getChildFile ("MacOS");
+    macos.createDirectory();
+    writeElfHeader (macos.getChildFile ("Mac"), 0x3e);
+    check (PluginCatalog::architecturesOf (mac) == juce::StringArray { "x86_64" },
+           "an unnamed slice directory falls back to reading the binary in it");
+
+    dir.deleteRecursively();
+}
+
+void testArchitectureGating()
+{
+    auto dir = makeTempDir ("architecture-gating");
+    const auto host = PluginCatalog::hostArchitecture();
+    check (host.isNotEmpty(), "this build knows its own architecture");
+
+    const auto wrong = host == "x86" ? juce::String ("x86_64") : juce::String ("x86");
+
+    PluginCatalog catalog;
+    catalog.commitScanResult (sampleResult ("/plugins/Right.vst3"));
+    catalog.commitScanResult (sampleResult ("/plugins/Wrong.vst3"));
+    catalog.recordArchitectures ("/plugins/Right.vst3", { host });
+    catalog.recordArchitectures ("/plugins/Wrong.vst3", { wrong });
+
+    check (catalog.findModule ("/plugins/Right.vst3")->architectureSupported(),
+           "a module built for this host is supported");
+    check (! catalog.findModule ("/plugins/Wrong.vst3")->architectureSupported(),
+           "and one built for another architecture is not");
+
+    // Not quarantined. There is nothing to retry and nothing was attempted.
+    check (! catalog.findModule ("/plugins/Wrong.vst3")->quarantined,
+           "the wrong architecture is not a failure, so it does not quarantine");
+    check (catalog.findModule ("/plugins/Wrong.vst3")->failureCount == 0,
+           "and it does not count as a failure");
+
+    check (catalog.findModule ("/plugins/Wrong.vst3")->unavailableReason().contains (wrong),
+           "the reason names the architecture it was built for");
+    check (catalog.findModule ("/plugins/Right.vst3")->unavailableReason().isEmpty(),
+           "a healthy module has no reason to give");
+
+    // The browser must not offer what cannot load.
+    const auto instruments = catalog.instrumentClasses();
+    check (instruments.size() == 1, "only the loadable module reaches the instrument browser");
+    const auto effects = catalog.effectClasses();
+    check (effects.size() == 1, "and the effect browser agrees");
+
+    // And the scanner must not spend a process on it.
+    check (! catalog.needsRescan ("/plugins/Wrong.vst3", "changed-fingerprint"),
+           "a wrong-architecture module is not rescanned even when its file changes");
+    check (catalog.needsRescan ("/plugins/Right.vst3", "changed-fingerprint"),
+           "a right-architecture module still is");
+
+    // Unknown reads as supported, from either side: hiding a working plug-in because a header
+    // was unfamiliar is the worse failure.
+    catalog.commitScanResult (sampleResult ("/plugins/Unknown.vst3"));
+    check (catalog.findModule ("/plugins/Unknown.vst3")->architectureSupported(),
+           "a module whose architecture could not be read is still offered");
+
+    // First sighting of a wrong-architecture module still produces a record, so the answer to
+    // "why is my plug-in not in the list" exists somewhere.
+    catalog.recordArchitectures ("/plugins/NeverScanned.vst3", { wrong });
+    check (catalog.findModule ("/plugins/NeverScanned.vst3") != nullptr,
+           "a module rejected before its first scan is still catalogued");
+    check (catalog.findModule ("/plugins/NeverScanned.vst3")->unavailableReason().isNotEmpty(),
+           "with the reason attached");
+
+    // Round-trips, or the check runs again on every start and the reason vanishes in between.
+    const auto file = dir.getChildFile ("catalog.json");
+    check (catalog.saveTo (file), "the catalogue saves");
+    PluginCatalog reloaded;
+    check (reloaded.loadFrom (file), "and reloads");
+    check (! reloaded.findModule ("/plugins/Wrong.vst3")->architectureSupported(),
+           "the architecture survives the round trip");
+
+    dir.deleteRecursively();
+}
 } // namespace
 
 int main()
@@ -224,6 +402,8 @@ int main()
     testRescanRules();
     testMissingAndRecovery();
     testFingerprint();
+    testArchitectureReading();
+    testArchitectureGating();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;
     return failures == 0 ? 0 : 1;

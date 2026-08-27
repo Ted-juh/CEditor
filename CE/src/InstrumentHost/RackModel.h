@@ -2,6 +2,7 @@
 
 #include <juce_core/juce_core.h>
 #include "PartMidiRules.h"
+#include "SessionRecovery.h"
 #include "Performance/PatternModel.h"
 
 // RackModel — the persistent Performance → InstrumentRack → Part hierarchy (VIP-successor
@@ -38,6 +39,11 @@ struct EffectSlot
     juce::String pluginName;
     juce::String pluginVendor;
     juce::String stateBlobBase64;
+    /** A digest of the blob as it was captured (§17.3 "plug-in state hashes"). Written on
+        save, checked on load: a blob that no longer matches is reported rather than handed to
+        a plug-in as if it were sound. Empty for a state written before hashes existed, which
+        reads as "unchecked", never as "damaged". */
+    juce::String stateBlobHash;
     bool bypassed = false;
 };
 
@@ -83,6 +89,7 @@ struct RackPart
     juce::String pluginName;          // display cache; never identity
     juce::String pluginVendor;
     juce::String stateBlobBase64;     // captured processor state, or empty
+    juce::String stateBlobHash;       // digest of the above, checked on load (§17.3)
     juce::Array<EffectSlot> effects;  // the part's serial insert chain, pre-fader (Stage 5)
     juce::Array<PartSend> sends;      // post-fader taps into return chains (Stage 5)
     juce::Array<ExtraOut> extraOuts;  // explicit multi-output pairs (Stage 5)

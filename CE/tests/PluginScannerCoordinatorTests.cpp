@@ -174,6 +174,57 @@ void testDeadManMarker (const juce::File& stub)
     PluginScannerCoordinator::markerFile (markerDir).deleteFile();
 }
 
+void testArchitectureIsCheckedBeforeLaunching (const juce::File& stub)
+{
+    std::cout << "\nthe architecture check runs before the worker (§17.1)" << std::endl;
+
+    auto coordinator = makeCoordinator (stub, 1000);
+    PluginCatalog catalog;
+
+    const auto host = PluginCatalog::hostArchitecture();
+    const auto wrong = host == "x86" ? juce::String ("x86_64-win") : juce::String ("x86-win");
+    const auto right = host == "x86" ? juce::String ("x86-win")    : juce::String ("x86_64-win");
+
+    // The wrong-architecture module is deliberately named the way the stub worker recognises as
+    // "crash". If it ever reaches the worker the pass will report a failure and a quarantine —
+    // which is exactly the outcome the check exists to prevent, so the name IS the assertion.
+    // Its own directory: earlier tests in this file already made plain files with these names
+    // at the root, and a bundle cannot be created where a file already sits.
+    const auto makeBundle = [] (const juce::String& name, const juce::String& slice)
+    {
+        const auto bundle = testRoot().getChildFile ("arch-check").getChildFile (name);
+        const auto dir = bundle.getChildFile ("Contents").getChildFile (slice);
+        dir.createDirectory();
+        dir.getChildFile (name).replaceWithText ("binary");
+        return bundle.getFullPathName();
+    };
+
+    juce::StringArray paths;
+    paths.add (makeBundle ("crash.vst3", wrong));
+    paths.add (makeBundle ("Native.vst3", right));
+
+    const auto outcome = coordinator.scanModules (paths, catalog);
+
+    check (outcome.skippedUnsupported == 1, "the wrong-architecture module is skipped");
+    check (outcome.failed == 0,
+           "and never reaches the worker — a launch would have crashed and been counted");
+    check (outcome.scanned == 1, "the native module is scanned normally");
+
+    const auto* rejected = catalog.findModule (paths[0]);
+    check (rejected != nullptr, "the skipped module is still catalogued");
+    check (rejected != nullptr && ! rejected->quarantined,
+           "and is not quarantined, because nothing failed");
+    check (rejected != nullptr && rejected->unavailableReason().isNotEmpty(),
+           "the reason it is not on offer is recorded");
+    check (catalog.instrumentClasses().size() == 1,
+           "only the loadable module reaches the browser");
+
+    // Repeating the pass must reach the same conclusion rather than trying it once more.
+    const auto again = coordinator.scanModules (paths, catalog);
+    check (again.skippedUnsupported == 1 && again.failed == 0,
+           "a repeat pass reaches the same conclusion without a launch");
+}
+
 void testEnumeration()
 {
     std::cout << "\nenumerateVst3Candidates" << std::endl;
@@ -227,6 +278,7 @@ int main (int argc, char* argv[])
     testScanLoop (stub);
     testErrorQuarantineThreshold (stub);
     testDeadManMarker (stub);
+    testArchitectureIsCheckedBeforeLaunching (stub);
     testEnumeration();
 
     testRoot().deleteRecursively();

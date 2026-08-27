@@ -124,6 +124,20 @@ PluginScannerCoordinator::ScanOutcome PluginScannerCoordinator::scanModules (con
             continue;
         }
 
+        // The architecture check (§17.1) happens before the fingerprint check, because it must
+        // also run on a module that has not changed: what changed may be the host. It reads the
+        // module's own files and never loads them, so it costs a directory walk and a header.
+        const auto architectures = PluginCatalog::architecturesOf (juce::File (path));
+        catalog.recordArchitectures (path, architectures);
+
+        if (const auto* checked = catalog.findModule (path);
+            checked != nullptr && ! checked->architectureSupported())
+        {
+            ++outcome.skippedUnsupported;
+            log ("skipped, " + checked->unavailableReason() + ": " + path);
+            continue;
+        }
+
         const auto fingerprint = PluginCatalog::fingerprintFor (juce::File (path));
         if (! catalog.needsRescan (path, fingerprint))
         {

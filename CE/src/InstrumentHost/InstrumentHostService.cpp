@@ -7,6 +7,8 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
     : options (std::move (optionsToUse))
 {
     activeMarker = std::make_unique<ActiveHostingMarker> (options.dataDirectory);
+    safeMode = std::make_unique<SafeMode> (options.dataDirectory);
+    recovery = std::make_unique<SessionRecovery> (options.dataDirectory);
 
     // The pane's half of the editor-before-processor invariant: whatever path destroys an
     // instrument, its editor is torn down first, and its parameter sync stops listening
@@ -1720,6 +1722,98 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    // -- safe startup (§17.1, §18.3.3) --------------------------------------------------------
+
+    if (cmd == "setSafeMode")
+    {
+        setSafeModeLevel (SafeMode::levelFromName (payload.getProperty ("level", {}).toString()));
+        emitState();
+        return;
+    }
+
+    if (cmd == "clearSafeModeSuspect")
+    {
+        clearSafeModeSuspect (payload.getProperty ("modulePath", {}).toString());
+        emitState();
+        return;
+    }
+
+    if (cmd == "clearAllSafeModeSuspects")
+    {
+        clearAllSafeModeSuspects();
+        emitState();
+        return;
+    }
+
+    // -- session recovery (§17.3) --------------------------------------------------------------
+
+    if (cmd == "acknowledgeRecovery")
+    {
+        acknowledgeRecoveryReport();
+        emitState();
+        return;
+    }
+
+    if (cmd == "restoreLastKnownGood")
+    {
+        if (! restoreLastKnownGood())
+            emitError ("There is no known-good session to go back to yet.");
+        emitState();
+        return;
+    }
+
+    // -- support bundle (§17.7) ----------------------------------------------------------------
+
+    if (cmd == "previewSupportBundle" || cmd == "exportSupportBundle")
+    {
+        SupportBundleOptions bundleOptions;
+        bundleOptions.includeStateBlobs  = (bool) payload.getProperty ("includeStateBlobs", false);
+        bundleOptions.includeCrashStates = (bool) payload.getProperty ("includeCrashStates", true);
+        bundleOptions.includeLogs        = (bool) payload.getProperty ("includeLogs", true);
+
+        juce::Array<juce::var> rows;
+        for (const auto& entry : previewSupportBundle (bundleOptions))
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("name",        entry.name);
+            obj->setProperty ("description", entry.description);
+            obj->setProperty ("sizeBytes",   (int) entry.sizeBytes);
+            obj->setProperty ("included",    entry.included);
+            obj->setProperty ("note",        entry.note);
+            rows.add (juce::var (obj));
+        }
+
+        auto* answer = new juce::DynamicObject();
+        answer->setProperty ("entries", rows);
+        answer->setProperty ("includeStateBlobs", bundleOptions.includeStateBlobs);
+
+        if (cmd == "exportSupportBundle")
+        {
+            // The export is a second, explicit command. Previewing must never write anything —
+            // "with user review" only means something if the review happens before the file
+            // exists, and a preview that also wrote it would make the review decorative.
+            const auto path = payload.getProperty ("path", {}).toString();
+            const auto destination = path.isNotEmpty()
+                                       ? juce::File (path)
+                                       : options.dataDirectory.getChildFile (
+                                             "support-bundle-"
+                                             + juce::Time::getCurrentTime().formatted ("%Y%m%d-%H%M%S")
+                                             + ".zip");
+
+            const auto failure = writeSupportBundle (destination, bundleOptions);
+            if (failure.isNotEmpty())
+                emitError (failure);
+
+            answer->setProperty ("written", failure.isEmpty());
+            answer->setProperty ("path",    failure.isEmpty() ? destination.getFullPathName()
+                                                              : juce::String());
+        }
+
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostSupportBundle", juce::var (answer));
+        return;
+    }
+
     if (cmd == "getLibrary")
     {
         ensureLibrary();
@@ -1957,18 +2051,36 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
 
     options.dataDirectory.createDirectory();
 
+    // §17.3, before anything else touches disk: consume the risky-operation marker and, when
+    // one was there, preserve the session that was live. The first save of this run would
+    // otherwise overwrite the only copy of the state that produced the crash.
+    if (recovery != nullptr)
+        recovery->consumeAtStartup (performanceFile());
+
     {
         const std::scoped_lock lock (catalogLock);
         catalog.loadFrom (catalogFile());
 
-        // Safe startup, active side (§18.9.8): a leftover ACTIVE marker names the plug-in that
-        // was live when the process died. It is recorded as evidence rather than acted on —
-        // one crash is a crash, a pattern is what would justify isolating active processing.
+        // Safe startup, active side (§17.1, §18.3.3): a leftover ACTIVE marker names the plug-in
+        // that was live when the process died. Stage 7 recorded it as evidence for the
+        // isolation decision §18.9.8 gates. Recording is not enough on its own — a module
+        // counted and then loaded again on the very next start is a crash loop with a log
+        // file attached — so the incident also makes the module a SUSPECT, and a suspect does
+        // not load until somebody vouches for it. The evidence log is untouched by this: the
+        // count is what a decision about isolation rests on, the suspect list is what keeps
+        // the product startable in the meantime.
         if (activeMarker != nullptr)
         {
             const auto incident = activeMarker->consumePendingIncident();
             if (incident.modulePath.isNotEmpty())
+            {
                 pendingActiveIncident = incident;
+
+                if (safeMode != nullptr)
+                    safeMode->addSuspect (incident.modulePath, incident.name,
+                                          "live when the last run ended abnormally",
+                                          incident.count);
+            }
         }
 
         // Safe startup: a leftover dead-man marker names the module that was on the scanner's
@@ -2010,6 +2122,11 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
 
     if (includePerformance && performanceSource != juce::File())
     {
+        // Named, so a crash inside a vendor's setStateInformation says "restoring the session"
+        // rather than leaving the next start to guess (§17.3 step 3).
+        const SessionRecovery::ScopedOperation operation (recovery.get(), "restoreSession",
+                                                          performanceSource.getFileName());
+
         Performance restored;
         if (Performance::fromVar (juce::JSON::parse (performanceSource.loadFileAsString()), restored))
             applyPerformance (std::move (restored));
@@ -2017,8 +2134,104 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
             emitError ("The saved rack session could not be read; starting empty.");
     }
 
+    checkStateDigests();
+
+    // The rig has proved itself: it restored, everything it named resolved, nothing was
+    // refused and no stored state was damaged. THAT is a state worth being returned to — the
+    // last saved session is the one that was live at the crash, which is exactly the state
+    // under suspicion, so it cannot serve as the thing recovery goes back to.
+    //
+    // The run that FOLLOWS an interruption is excluded, and that is the point: it is restoring
+    // the very state that was live when the last one died, and promoting it here would quietly
+    // replace the offer the user is about to be shown with the thing they are being offered an
+    // escape from. A later run that starts cleanly promotes it — two clean boots is evidence,
+    // one is the state under suspicion loading once.
+    if (recovery != nullptr && options.persistSession && performanceSource == performanceFile()
+        && ! recovery->lastReport().interrupted
+        && ! lastRestoreReport().degraded() && safeModeRefusals.empty()
+        && stateDigestMismatches.isEmpty())
+        recovery->markKnownGood (performanceFile());
+
     if (options.enableAudio)
         startAudio();
+}
+
+void InstrumentHostService::checkStateDigests()
+{
+    stateDigestMismatches.clear();
+
+    const auto checkOne = [this] (const juce::String& label, const juce::String& blob,
+                                  const juce::String& storedHash)
+    {
+        // An empty hash is a state written before hashes existed. Unchecked, not damaged —
+        // calling every pre-existing session corrupt would be a false alarm at scale.
+        if (blob.isEmpty() || storedHash.isEmpty())
+            return;
+
+        if (SessionRecovery::hashState (blob) != storedHash)
+            stateDigestMismatches.add (label + "'s saved state does not match the digest stored "
+                                               "with it; it was kept and loaded anyway.");
+    };
+
+    const auto& performance = rack.getPerformance();
+
+    const auto checkChain = [&checkOne] (const juce::Array<EffectSlot>& chain)
+    {
+        for (const auto& slot : chain)
+            checkOne (slot.pluginName.isNotEmpty() ? slot.pluginName : slot.effectId,
+                      slot.stateBlobBase64, slot.stateBlobHash);
+    };
+
+    for (const auto& part : performance.parts)
+    {
+        checkOne (part.pluginName.isNotEmpty() ? part.pluginName : part.partId,
+                  part.stateBlobBase64, part.stateBlobHash);
+        checkChain (part.effects);
+    }
+
+    checkChain (performance.masterEffects);
+    for (const auto& chain : performance.returns)
+        checkChain (chain.effects);
+}
+
+SessionRecovery::Report InstrumentHostService::recoveryReport() const
+{
+    return recovery != nullptr ? recovery->lastReport() : SessionRecovery::Report();
+}
+
+void InstrumentHostService::acknowledgeRecoveryReport()
+{
+    if (recovery != nullptr)
+        recovery->acknowledgeReport();
+}
+
+bool InstrumentHostService::restoreLastKnownGood()
+{
+    if (recovery == nullptr)
+        return false;
+
+    const auto good = recovery->lastKnownGoodFile();
+    if (! good.existsAsFile())
+        return false;
+
+    Performance restored;
+    if (! Performance::fromVar (juce::JSON::parse (good.loadFileAsString()), restored))
+    {
+        emitError ("The last known good session could not be read.");
+        return false;
+    }
+
+    {
+        const SessionRecovery::ScopedOperation operation (recovery.get(), "restoreLastKnownGood",
+                                                          good.getFileName());
+        applyPerformance (std::move (restored));
+    }
+
+    // The rig on screen is now the recovered one, so the live session file must agree — a
+    // recovery the next start silently undoes is not a recovery.
+    savePerformance();
+    checkStateDigests();
+    return true;
 }
 
 void InstrumentHostService::applyPerformance (Performance&& performance)
@@ -2086,11 +2299,20 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
         {
             refusal = "Instrument not in the catalogue: " + ceId;
         }
-        else if (module->quarantined || module->missing)
+        else if (const auto why = module->unavailableReason(); why.isNotEmpty())
         {
-            refusal = (module->quarantined ? juce::String ("Module is quarantined: ")
-                                           : juce::String ("Module is missing: "))
-                      + module->path;
+            // One sentence for every reason a module cannot be offered — quarantine, absence
+            // and now the wrong architecture (§17.2). Three separate checks here would drift.
+            refusal = "Module is " + why + ": " + module->path;
+        }
+        else if (const auto blocked = safeModeRefusal (module->path); blocked.isNotEmpty())
+        {
+            // Safe startup (§17.1, §18.3.3). Recorded per module as well as spoken, so the
+            // restore report can say the part was REFUSED rather than merely missing — the
+            // difference matters: one is repaired by installing something, the other by
+            // clicking "load it anyway".
+            refusal = record->name + " was " + blocked;
+            safeModeRefusals[module->path] = blocked;
         }
         else
         {
@@ -2124,6 +2346,12 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
     if (activeMarker != nullptr)
         activeMarker->markActive (info.modulePath, info.name);
 
+    // Two markers, two questions. The active marker names WHICH module was live; this names
+    // WHAT the product was doing with it, because a crash while restoring a whole session and
+    // a crash while adding one plug-in look identical in a log and need different repairs.
+    if (recovery != nullptr)
+        recovery->beginOperation ("loadInstrument", info.name);
+
     options.instantiate (descriptionXml, options.sampleRate, options.blockSize,
         [this, aliveToken = alive, partId, generation, info, afterCommit = std::move (afterCommit)]
         (std::unique_ptr<juce::AudioProcessor> instrument, const juce::String& error)
@@ -2134,6 +2362,8 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
             // Survived construction: whatever happens next is not attributable to this load.
             if (activeMarker != nullptr)
                 activeMarker->clear();
+            if (recovery != nullptr)
+                recovery->endOperation();
 
             if (instrument == nullptr)
             {
@@ -2182,10 +2412,13 @@ void InstrumentHostService::requestEffect (const juce::String& effectId, const j
 
         if (record == nullptr || module == nullptr)
             refusal = "Effect not in the catalogue: " + ceId;
-        else if (module->quarantined || module->missing)
-            refusal = (module->quarantined ? juce::String ("Module is quarantined: ")
-                                           : juce::String ("Module is missing: "))
-                      + module->path;
+        else if (const auto why = module->unavailableReason(); why.isNotEmpty())
+            refusal = "Module is " + why + ": " + module->path;
+        else if (const auto blocked = safeModeRefusal (module->path); blocked.isNotEmpty())
+        {
+            refusal = record->name + " was " + blocked;
+            safeModeRefusals[module->path] = blocked;
+        }
         else
         {
             descriptionXml = record->descriptionXml;
@@ -2212,6 +2445,8 @@ void InstrumentHostService::requestEffect (const juce::String& effectId, const j
 
     if (activeMarker != nullptr)
         activeMarker->markActive (info.modulePath, info.name);
+    if (recovery != nullptr)
+        recovery->beginOperation ("loadEffect", info.name);
 
     options.instantiate (descriptionXml, options.sampleRate, options.blockSize,
         [this, aliveToken = alive, effectId, generation, info]
@@ -2222,6 +2457,8 @@ void InstrumentHostService::requestEffect (const juce::String& effectId, const j
 
             if (activeMarker != nullptr)
                 activeMarker->clear();
+            if (recovery != nullptr)
+                recovery->endOperation();
 
             if (effect == nullptr)
             {
@@ -2828,9 +3065,9 @@ juce::String InstrumentHostService::recordUnavailableReason (const LibraryRecord
     if (findClass (record.targetCeId, &module) == nullptr)
         return "Requires " + (record.instrument.isNotEmpty() ? record.instrument : record.targetCeId)
              + ", which is not in the catalogue.";
-    if (module != nullptr && (module->quarantined || module->missing))
-        return "Requires " + record.instrument + ", whose module is "
-             + (module->quarantined ? "quarantined." : "missing.");
+    if (module != nullptr)
+        if (const auto why = module->unavailableReason(); why.isNotEmpty())
+            return "Requires " + record.instrument + ", whose module is " + why + ".";
 
     if (record.sourceType == "vstpreset" && ! juce::File (record.sourceLocator).existsAsFile())
         return "The preset file is gone: " + record.sourceLocator;
@@ -3601,6 +3838,7 @@ void InstrumentHostService::runScanNow()
                                            + juce::String (outcome.scanned) + " scanned, "
                                            + juce::String (outcome.skippedUnchanged) + " unchanged, "
                                            + juce::String (outcome.skippedQuarantined) + " quarantined, "
+                                           + juce::String (outcome.skippedUnsupported) + " wrong architecture, "
                                            + juce::String (outcome.failed) + " failed.",
                                            true));
     // No state emit from here: this may be the scan thread, and the rack half of the state
@@ -3677,6 +3915,14 @@ juce::var InstrumentHostService::buildStatePayload() const
             obj->setProperty ("missing",           module.missing);
             obj->setProperty ("failureCount",      module.failureCount);
             obj->setProperty ("lastFailureReason", module.lastFailureReason);
+            // What the module says it is, and — when it is not on offer — the one sentence
+            // saying why. A module absent from the browser with nothing anywhere explaining
+            // its absence is the support question nobody can answer.
+            juce::Array<juce::var> architectures;
+            for (const auto& arch : module.architectures)
+                architectures.add (arch);
+            obj->setProperty ("architectures",      architectures);
+            obj->setProperty ("unavailableReason",  module.unavailableReason());
             obj->setProperty ("numClasses",        module.classes.size());
             obj->setProperty ("numInstruments",    numInstruments);
             modules.add (juce::var (obj));
@@ -3886,6 +4132,7 @@ juce::var InstrumentHostService::buildStatePayload() const
     }());
     root->setProperty ("performance", performancePayload());
     root->setProperty ("product", productPayload());
+    root->setProperty ("reliability", reliabilityPayload());
     root->setProperty ("scanning", scanBusy.load());
     root->setProperty ("editorOpenPartId", editorTargetId);
     root->setProperty ("audio", juce::var (audio));
@@ -4237,7 +4484,60 @@ InstrumentHostService::RestoreReport InstrumentHostService::lastRestoreReport() 
         restoreReport.notes.add ("The parts and slots below kept their identity and saved state — "
                                  "install what is missing and reopen to get them back.");
 
+    // Safe startup makes "missing" ambiguous, and the difference is the whole repair: a plug-in
+    // that is not installed needs installing, while one this run REFUSED needs a click. Both
+    // appear above as unresolved, because that is what the rack sees; only this note can tell
+    // them apart, so it names the modules and says which repair applies.
+    if (! safeModeRefusals.empty())
+    {
+        juce::StringArray refused;
+        for (const auto& [modulePath, reason] : safeModeRefusals)
+            refused.addIfNotAlreadyThere (juce::File (modulePath).getFileNameWithoutExtension());
+
+        restoreReport.notes.add (
+            (refused.size() == 1 ? refused[0] + " was not loaded"
+                                 : refused.joinIntoString (", ") + " were not loaded")
+            + " because safe startup is on. Nothing is missing from this machine — clear the "
+              "suspect and reopen the project to load it again.");
+    }
+
     return restoreReport;
+}
+
+SafeMode::Level InstrumentHostService::safeModeLevel() const
+{
+    return safeMode != nullptr ? safeMode->level() : SafeMode::Level::normal;
+}
+
+void InstrumentHostService::setSafeModeLevel (SafeMode::Level level)
+{
+    if (safeMode != nullptr)
+        safeMode->setLevel (level);
+}
+
+juce::Array<SafeMode::Suspect> InstrumentHostService::safeModeSuspects() const
+{
+    return safeMode != nullptr ? safeMode->suspects() : juce::Array<SafeMode::Suspect>();
+}
+
+void InstrumentHostService::clearSafeModeSuspect (const juce::String& modulePath)
+{
+    if (safeMode != nullptr)
+        safeMode->clearSuspect (modulePath);
+
+    // The refusal record is about this run and stays until a restore actually retries the
+    // module. Dropping it here would report a repair that has not happened yet.
+}
+
+void InstrumentHostService::clearAllSafeModeSuspects()
+{
+    if (safeMode != nullptr)
+        safeMode->clearAllSuspects();
+}
+
+juce::String InstrumentHostService::safeModeRefusal (const juce::String& modulePath) const
+{
+    return safeMode != nullptr ? safeMode->reasonFor (modulePath) : juce::String();
 }
 
 PlatformReport InstrumentHostService::platformReport() const
@@ -4261,6 +4561,64 @@ juce::var InstrumentHostService::packageIdentity() const
     identity->setProperty ("packageVersion", hostProject.getProperty ("version", {}).toString());
     identity->setProperty ("schemaVersion",  Performance::currentSchemaVersion);
     return juce::var (identity);
+}
+
+SupportBundleContents InstrumentHostService::supportBundleContents() const
+{
+    SupportBundleContents contents;
+
+    // The generated product's own identity, not CEditor's — a bundle from somebody's shipped
+    // instrument has to say which instrument it came from.
+    contents.productName    = hostProject.getProperty ("productName", {}).toString();
+    contents.productVersion = hostProject.getProperty ("version", {}).toString();
+    contents.buildStamp     = hostProject.getProperty ("appId", {}).toString();
+
+    contents.osDescription = juce::SystemStats::getOperatingSystemName()
+                               + " (" + juce::SystemStats::getDeviceDescription() + ")";
+    contents.architecture  = PluginCatalog::hostArchitecture();
+
+    if (auto* device = const_cast<juce::AudioDeviceManager&> (deviceManager).getCurrentAudioDevice())
+        contents.audioDevices.add ("open: " + device->getName()
+                                     + " @ " + juce::String (device->getCurrentSampleRate(), 0) + " Hz, "
+                                     + juce::String (device->getCurrentBufferSizeSamples()) + " frames");
+
+    if (auto* type = const_cast<juce::AudioDeviceManager&> (deviceManager).getCurrentDeviceTypeObject())
+        for (const auto& name : type->getDeviceNames())
+            contents.audioDevices.addIfNotAlreadyThere ("seen: " + name);
+
+    for (const auto& input : juce::MidiInput::getAvailableDevices())
+        contents.midiInputs.add (input.name);
+    for (const auto& output : juce::MidiOutput::getAvailableDevices())
+        contents.midiOutputs.add (output.name);
+
+    // Surfaces by profile. The conformance verdict travels with them, because a registry entry
+    // is not a claim that the controller works and a bundle implying otherwise would mislead
+    // whoever reads it.
+    const auto& registry = ctrl49::SurfaceProfileRegistry::instance();
+    for (const auto& id : registry.profileIds())
+        if (const auto* profile = registry.find (id))
+            contents.hardwareSurfaces.add (profile->displayName + " (" + profile->vendor + ")");
+
+    const auto conformance = registry.runConformance();
+    for (const auto& line : conformance)
+        contents.hardwareSurfaces.add ("conformance: " + line);
+    if (conformance.isEmpty() && ! contents.hardwareSurfaces.isEmpty())
+        contents.hardwareSurfaces.add ("conformance: every registered profile passed its checks.");
+
+    return contents;
+}
+
+juce::Array<SupportBundle::Entry>
+InstrumentHostService::previewSupportBundle (const SupportBundleOptions& bundleOptions) const
+{
+    return SupportBundle (options.dataDirectory, supportBundleContents()).preview (bundleOptions);
+}
+
+juce::String InstrumentHostService::writeSupportBundle (const juce::File& destination,
+                                                        const SupportBundleOptions& bundleOptions) const
+{
+    return SupportBundle (options.dataDirectory, supportBundleContents())
+             .writeTo (destination, bundleOptions);
 }
 
 bool InstrumentHostService::ownsHardwareSurface() const
@@ -4518,6 +4876,57 @@ juce::var InstrumentHostService::productPayload() const
             ids.add (id);
         return ids;
     }());
+    return juce::var (root);
+}
+
+juce::var InstrumentHostService::reliabilityPayload() const
+{
+    juce::Array<juce::var> suspects;
+    for (const auto& suspect : safeModeSuspects())
+    {
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("modulePath", suspect.modulePath);
+        obj->setProperty ("name",       suspect.name);
+        obj->setProperty ("reason",     suspect.reason);
+        obj->setProperty ("incidents",  suspect.incidents);
+        suspects.add (juce::var (obj));
+    }
+
+    auto* safe = new juce::DynamicObject();
+    safe->setProperty ("level",    SafeMode::levelName (safeModeLevel()));
+    safe->setProperty ("suspects", suspects);
+
+    // What this run actually refused, as opposed to what it would refuse. Clearing a suspect
+    // does not empty this list: the module is not loaded until a restore retries it, and a UI
+    // that cleared the row on the click would be claiming a repair that has not happened.
+    juce::Array<juce::var> refused;
+    for (const auto& [modulePath, reason] : safeModeRefusals)
+    {
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("modulePath", modulePath);
+        obj->setProperty ("name",       juce::File (modulePath).getFileNameWithoutExtension());
+        obj->setProperty ("reason",     reason);
+        refused.add (juce::var (obj));
+    }
+
+    const auto report = recoveryReport();
+    auto* recoveryObj = new juce::DynamicObject();
+    recoveryObj->setProperty ("interrupted",         report.interrupted);
+    recoveryObj->setProperty ("lastOperation",       report.lastOperation);
+    recoveryObj->setProperty ("lastOperationDetail", report.lastOperationDetail);
+    recoveryObj->setProperty ("preservedStateFile",  report.preservedStateFile);
+    recoveryObj->setProperty ("hasLastKnownGood",    report.hasLastKnownGood);
+    recoveryObj->setProperty ("lastKnownGoodAt",     report.lastKnownGoodAt);
+
+    juce::Array<juce::var> damaged;
+    for (const auto& note : stateDigestMismatches)
+        damaged.add (note);
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("safeMode",       juce::var (safe));
+    root->setProperty ("refusedThisRun", refused);
+    root->setProperty ("recovery",       juce::var (recoveryObj));
+    root->setProperty ("damagedState",   damaged);
     return juce::var (root);
 }
 

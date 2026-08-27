@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <mutex>
 #include <thread>
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -9,6 +10,9 @@
 #include "Library.h"
 #include "PlatformMatrix.h"
 #include "ActiveHostingMarker.h"
+#include "SafeMode.h"
+#include "SessionRecovery.h"
+#include "SupportBundle.h"
 #include "ControlSurface/SurfaceProfile.h"
 
 // InstrumentHostService — the instrument host behind one bridge event (VIP-successor Stage 1).
@@ -481,6 +485,47 @@ public:
         requires before anyone builds active isolation. Not isolation itself, on purpose. */
     juce::Array<ActiveHostingMarker::Incident> activeHostingIncidents() const;
 
+    // -- safe startup (§17.1, §18.3.3) --------------------------------------------------------
+    // The other half of the marker Stage 7 wrote. A plug-in that was live when the process
+    // died does not load again on the next start; the part keeps its identity and state and
+    // reports itself degraded, exactly as a missing plug-in already does.
+
+    SafeMode::Level safeModeLevel() const;
+    /** Levels are sticky. Raising to noThirdParty takes effect at the next restore; dropping
+        to normal does not resurrect the parts this run refused — reopening the project does,
+        which is the same repair a newly installed plug-in needs. */
+    void setSafeModeLevel (SafeMode::Level level);
+    juce::Array<SafeMode::Suspect> safeModeSuspects() const;
+    /** The user vouches for a module: it loads again from the next restore. */
+    void clearSafeModeSuspect (const juce::String& modulePath);
+    void clearAllSafeModeSuspects();
+    /** Why this module will not be loaded on this run, or empty when it will be. */
+    juce::String safeModeRefusal (const juce::String& modulePath) const;
+
+    // -- session recovery (§17.3) --------------------------------------------------------------
+
+    /** What the last run was doing when it stopped, and what there is to go back to. */
+    SessionRecovery::Report recoveryReport() const;
+    /** The user has read it; the standing last-known-good offer survives. */
+    void acknowledgeRecoveryReport();
+    /** Replaces the live session with the last state this product is known to have run
+        cleanly, and restores the rack from it. Returns false when there is none. */
+    bool restoreLastKnownGood();
+    /** Parts and effect slots whose stored state no longer matches the digest saved with it.
+        Never emptied by loading: a damaged blob is kept and reported, never quietly dropped. */
+    juce::StringArray damagedStateNotes() const   { return stateDigestMismatches; }
+
+    // -- support bundle (§17.7) ----------------------------------------------------------------
+
+    /** What this machine would contribute to a bundle: version, OS, architecture, the devices
+        and surfaces actually seen. Filled here because only the service knows them. */
+    SupportBundleContents supportBundleContents() const;
+    /** Exactly what would be written, before anything is. §17.7's "with user review" is this. */
+    juce::Array<SupportBundle::Entry> previewSupportBundle (const SupportBundleOptions& bundleOptions) const;
+    /** Writes the bundle. Empty on success, otherwise the reason. */
+    juce::String writeSupportBundle (const juce::File& destination,
+                                     const SupportBundleOptions& bundleOptions) const;
+
     /** Offline render/bounce (§18.9.3). A bounce must be deterministic and must not spray
         MIDI at hardware that is not part of the render, so hardware ports are released while
         it runs and re-opened when it ends. Everything else is already deterministic: the
@@ -610,6 +655,9 @@ private:
     /** The Stage 7 block: the DAW surface, the restore report, the platform matrix, the
         hardware owner and the active-hosting evidence. */
     juce::var productPayload() const;
+    /** Everything about whether this install is healthy and what it did about it when it was
+        not: safe startup and its suspects, and what this run actually refused. */
+    juce::var reliabilityPayload() const;
 
     void savePerformance();
     /** Keeps previous manifest revisions beside the session file: before an overwrite, the
@@ -622,6 +670,9 @@ private:
     juce::File catalogFile() const      { return options.dataDirectory.getChildFile ("plugin-catalog.json"); }
     juce::File performanceFile() const  { return options.dataDirectory.getChildFile ("session-performance.json"); }
     juce::File revisionsDirectory() const { return options.dataDirectory.getChildFile ("session-revisions"); }
+    /** Checks every stored state blob against the digest saved with it and fills
+        stateDigestMismatches. Reports; never repairs, and never deletes a blob. */
+    void checkStateDigests();
     juce::File scanPathsFile() const    { return options.dataDirectory.getChildFile ("scan-paths.json"); }
     juce::File hostProjectFile() const  { return options.dataDirectory.getChildFile ("host-project.json"); }
 
@@ -662,6 +713,13 @@ private:
     juce::int64 lastHardwareHeartbeat = 0;
     std::unique_ptr<ActiveHostingMarker> activeMarker;
     ActiveHostingMarker::Incident pendingActiveIncident;   // reported once, at the first state
+    std::unique_ptr<SafeMode> safeMode;
+    std::unique_ptr<SessionRecovery> recovery;
+    /** Anything whose saved state did not match the digest stored beside it, in words. */
+    juce::StringArray stateDigestMismatches;
+    /** Modules this run actually refused, with the reason, so the restore report can say what
+        happened rather than reporting them as merely missing. Keyed by module path. */
+    std::map<juce::String, juce::String> safeModeRefusals;
     // A claim is refreshed this often and considered abandoned after this long, so an
     // instance that crashed frees the surface without anyone having to clean up after it.
     static constexpr juce::int64 hardwareHeartbeatMs = 2000;

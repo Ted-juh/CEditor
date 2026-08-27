@@ -25,6 +25,21 @@
 // module is skipped by every future scan until the user clears it — never silently retried,
 // and never deleted (`missing` is a flag for the same reason: history survives an unplugged
 // drive or an uninstalled plug-in).
+//
+// ARCHITECTURE IS READ, NOT ATTEMPTED (§17.1 "Architecture check", §17.2 "Validate capability
+// and architecture records"). A 32-bit plug-in in a 64-bit host cannot load, and finding that
+// out by handing it to the scanner costs a process launch and produces a failure indis-
+// tinguishable from a broken plug-in — so the module gets quarantined for being the wrong
+// shape, which is wrong twice over. The architecture is instead read from the file: a VST3
+// bundle names its slices in directories, and a bare module names itself in its own binary
+// header. Neither needs the module loaded, so this stays in juce_core and runs everywhere.
+//
+// A wrong-architecture module is `unsupported`, which is deliberately NOT `quarantined`: it is
+// not broken and there is nothing to retry. It stays in the catalogue with its reason, it is
+// kept out of the browser (offering something that cannot load is a lie), and the reason is
+// there when somebody asks why their plug-in is not in the list. When the architecture cannot
+// be determined the module is treated as supported — silence is not evidence, and hiding a
+// working plug-in because a header was unfamiliar is the worse failure.
 
 namespace ceditor::host
 {
@@ -55,7 +70,16 @@ struct ModuleRecord
     bool quarantined = false;
     int failureCount = 0;
     juce::String lastFailureReason;
+    /** What the module's own file says it is: "x86", "x86_64", "arm64", or several of those
+        for a fat bundle. Empty means the check could not tell, which reads as supported. */
+    juce::StringArray architectures;
     juce::Array<PluginClassRecord> classes;
+
+    /** False only when the architectures are known AND this host's is not among them. */
+    bool architectureSupported() const;
+
+    /** Why the browser is not offering this module, or empty when it is. */
+    juce::String unavailableReason() const;
 };
 
 struct ModuleScanResult
@@ -112,6 +136,20 @@ public:
 
     const juce::Array<ModuleRecord>& allModules() const   { return modules; }
     int numModules() const                                { return modules.size(); }
+
+    /** Records the architectures read from a module's own files, without scanning it. Creates
+        the record if this is the first time the module has been seen, so a wrong-architecture
+        module is catalogued with its reason rather than silently skipped. */
+    void recordArchitectures (const juce::String& modulePath, const juce::StringArray& architectures);
+
+    /** The architecture slices a module declares, read from the file rather than by loading it:
+        a VST3 bundle's `Contents/<arch>-<os>` directory names, or the machine field in a bare
+        module's own binary header (PE, ELF and Mach-O are all recognised). Empty when nothing
+        recognisable was found — that is "could not tell", never "unsupported". */
+    static juce::StringArray architecturesOf (const juce::File& moduleFileOrBundle);
+
+    /** The architecture this build runs as, in the same vocabulary architecturesOf returns. */
+    static juce::String hostArchitecture();
 
     /** Change-detection stamp for a module file or bundle directory. For a directory the walk
         is recursive and sorted by relative path, so the stamp is deterministic and moves when

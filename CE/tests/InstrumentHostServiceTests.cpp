@@ -111,6 +111,14 @@ struct Emits
                 ++n;
         return n;
     }
+
+    const juce::var* last (const juce::String& name) const
+    {
+        for (auto it = entries.rbegin(); it != entries.rend(); ++it)
+            if (it->name == name)
+                return &it->payload;
+        return nullptr;
+    }
 };
 
 // A two-bus instrument for the explicit multi-output tests: the main pair holds one known
@@ -445,6 +453,444 @@ void testDeadManStartup()
     h.cmd ("clearQuarantine", { { "modulePath", "C:\\VST3\\Good.vst3" } });
     check (h.emits.lastState()->getProperty ("instruments", {}).size() == 1,
            "clearQuarantine brings them back");
+}
+
+// --- Safe startup on the active side (§17.1, §18.3.3) ----------------------------------------
+//
+// The failure being designed against is a crash loop with a log file attached: Stage 7 counted
+// the plug-in that was live when the process died and then loaded it again on the very next
+// start. The count is evidence for a decision nobody has taken yet; it does not keep the
+// product startable, and this is what does.
+
+void testSafeStartup()
+{
+    std::cout << "\nsafe startup after an abnormal termination" << std::endl;
+
+    const auto dir = freshDataDir ("safe-startup");
+    seedCatalog (dir);
+
+    // A previous run died with Good.vst3 live. That is what its marker looks like on disk.
+    ceditor::host::ActiveHostingMarker marker (dir);
+    marker.markActive ("C:\\VST3\\Good.vst3", "Good Synth");
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        const auto* state = h.emits.lastState();
+        const auto safe = state->getProperty ("reliability", {}).getProperty ("safeMode", {});
+
+        check (safe.getProperty ("level", {}).toString() == "skipSuspects",
+               "the incident puts this run into safe startup");
+        check (safe.getProperty ("suspects", {}).size() == 1,
+               "and names the plug-in that was live");
+        check (safe.getProperty ("suspects", {})[0].getProperty ("modulePath", {}).toString()
+                 == "C:\\VST3\\Good.vst3",
+               "by module, which is what a refusal can be checked against");
+
+        // Evidence and safeguard are separate records: the isolation decision §18.9.8 gates
+        // still rests on the count, and clearing one must not erase the other.
+        check (state->getProperty ("product", {}).getProperty ("activeHostingIncidents", {}).size() == 1,
+               "the evidence log still holds the incident");
+
+        // The suspect is refused, and the part keeps its identity and its place.
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+
+        check (h.instantiateCount == 0, "the suspect is never handed to the instantiator");
+
+        const auto* afterLoad = h.emits.lastState();
+        const auto part = afterLoad->getProperty ("rack", {}).getProperty ("parts", {})[0];
+        check (! (bool) part.getProperty ("hasInstrument", false), "so nothing loads");
+
+        const auto refused = afterLoad->getProperty ("reliability", {})
+                                       .getProperty ("refusedThisRun", {});
+        check (refused.size() == 1, "and the run records what it refused");
+        check (refused[0].getProperty ("reason", {}).toString().contains ("abnormally"),
+               "with a reason a person can act on");
+
+        // The distinction the restore report has to make: this is not a missing plug-in.
+        const auto notes = afterLoad->getProperty ("product", {}).getProperty ("restore", {})
+                                     .getProperty ("notes", {});
+        bool saysSafeStartup = false;
+        for (const auto& note : *notes.getArray())
+            saysSafeStartup = saysSafeStartup
+                            || note.toString().contains ("safe startup is on");
+        check (saysSafeStartup,
+               "the restore report says it was refused, not that it is missing");
+    }
+
+    // Sticky across a restart — a safe mode that quietly reset itself would turn a crash loop
+    // into a crash loop that also lies about it.
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        const auto safe = h.emits.lastState()->getProperty ("reliability", {})
+                                              .getProperty ("safeMode", {});
+        check (safe.getProperty ("level", {}).toString() == "skipSuspects",
+               "safe startup survives a restart");
+        check (safe.getProperty ("suspects", {}).size() == 1,
+               "and so does the suspect, without the incident happening twice");
+        check (safe.getProperty ("suspects", {})[0].getProperty ("incidents", {}).toString() == "1",
+               "the count is not inflated by merely restarting");
+    }
+
+    // Vouching for it: the module loads again, and with nothing left to skip the warning light
+    // goes out rather than staying on with an empty list behind it.
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("clearSafeModeSuspect", { { "modulePath", "C:\\VST3\\Good.vst3" } });
+
+        const auto safe = h.emits.lastState()->getProperty ("reliability", {})
+                                              .getProperty ("safeMode", {});
+        check (safe.getProperty ("suspects", {}).size() == 0, "clearing removes the suspect");
+        check (safe.getProperty ("level", {}).toString() == "normal",
+               "and the level drops back once there is nothing to skip");
+
+        h.cmd ("addPart");
+        h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+        check (h.instantiateCount == 1, "the vouched-for module loads normally");
+    }
+
+    // The user's own safe mode: nothing third-party at all, for when the suspect list is wrong
+    // or the damage is not attributable.
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (h.instantiateCount == 1,
+               "the saved session loads its instrument while nothing is wrong");
+        h.cmd ("setSafeMode", { { "level", "noThirdParty" } });
+    }
+
+    // The point of this level is the NEXT start: the product comes up with the rack intact and
+    // nothing third-party in it, which is what makes an install fixable when the suspect list
+    // is wrong or the damage is not attributable to one module.
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (h.instantiateCount == 0, "no third-party plug-in loads at all");
+
+        const auto* state = h.emits.lastState();
+        check (state->getProperty ("rack", {}).getProperty ("parts", {}).size() > 0,
+               "but the rack still comes up, with its parts");
+
+        const auto refused = state->getProperty ("reliability", {})
+                                   .getProperty ("refusedThisRun", {});
+        check (refused.size() == 1 && refused[0].getProperty ("reason", {}).toString()
+                                        .contains ("no third-party"),
+               "and says so rather than blaming the plug-in");
+
+        // Clearing suspects must not silently end a safe mode the user chose themselves.
+        h.cmd ("clearAllSafeModeSuspects");
+        check (h.emits.lastState()->getProperty ("reliability", {}).getProperty ("safeMode", {})
+                 .getProperty ("level", {}).toString() == "noThirdParty",
+               "clearing suspects leaves the user's own safe mode alone");
+
+        h.cmd ("setSafeMode", { { "level", "normal" } });
+        check (h.emits.lastState()->getProperty ("reliability", {}).getProperty ("safeMode", {})
+                 .getProperty ("level", {}).toString() == "normal",
+               "and the user can end it");
+    }
+
+    // Ending it does not resurrect this run's refusals — the repair is reopening the project,
+    // the same one a newly installed plug-in needs.
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (h.instantiateCount == 1, "and the next start loads normally again");
+    }
+}
+
+// --- Session recovery (§17.3) ----------------------------------------------------------------
+//
+// Two failures being designed against, and the second is the subtle one:
+//
+//   The recovery restores the crash.  The last saved session IS the state that was live when
+//                                     the process died. Going back to it is going back to the
+//                                     crash. A last-known-good is a different file on purpose.
+//   The evidence is overwritten.      The first save of the new run destroys the only copy of
+//                                     the state that produced the crash, which is the one file
+//                                     a diagnosis needs.
+
+void testSessionRecovery()
+{
+    std::cout << "\nsession recovery: last-known-good, the operation marker and state digests"
+              << std::endl;
+
+    const auto dir = freshDataDir ("recovery");
+    seedCatalog (dir);
+
+    // A clean run: load something, and let it prove itself.
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+
+        const auto recoveryBlock = h.emits.lastState()->getProperty ("reliability", {})
+                                                       .getProperty ("recovery", {});
+        check (! (bool) recoveryBlock.getProperty ("interrupted", true),
+               "a first run reports no interruption");
+        check (! ceditor::host::SessionRecovery (dir).operationMarkerFile().existsAsFile(),
+               "and leaves no operation marker behind when a load finishes");
+    }
+
+    check (! ceditor::host::SessionRecovery (dir).lastKnownGoodFile().existsAsFile(),
+           "a first run has no known-good yet — nothing has been proved to load");
+
+    // The proof is a NEW RUN restoring it cleanly. That is the only thing that establishes a
+    // state can be loaded at all, which is what "known good" has to mean; a copy taken at save
+    // time would only assert that the bytes were written.
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (h.instantiateCount == 1, "the second run restores the rig");
+    }
+
+    ceditor::host::SessionRecovery probe (dir);
+    check (probe.lastKnownGoodFile().existsAsFile(),
+           "and a restore that resolved everything becomes the last known good");
+
+    // Now the rig gets worse and the next run is interrupted mid-load. That is what a marker
+    // on disk at startup means, and what a crash leaves behind.
+    const auto goodBefore = probe.lastKnownGoodFile().loadFileAsString();
+    probe.beginOperation ("loadInstrument", "Good Synth");
+
+    // Something also edits the live session in the meantime, so preserved-versus-known-good is
+    // a real distinction rather than two copies of the same bytes.
+    {
+        auto live = juce::JSON::parse (dir.getChildFile ("session-performance.json").loadFileAsString());
+        live.getDynamicObject()->setProperty ("performanceId", "edited-after-known-good");
+        dir.getChildFile ("session-performance.json")
+           .replaceWithText (juce::JSON::toString (live));
+    }
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        const auto report = h.emits.lastState()->getProperty ("reliability", {})
+                                                .getProperty ("recovery", {});
+
+        check ((bool) report.getProperty ("interrupted", false),
+               "a marker still on disk means the last run did not finish what it started");
+        check (report.getProperty ("lastOperation", {}).toString() == "loadInstrument",
+               "and the report names the operation");
+        check (report.getProperty ("lastOperationDetail", {}).toString() == "Good Synth",
+               "and what it was working on");
+
+        const auto preserved = report.getProperty ("preservedStateFile", {}).toString();
+        check (preserved.isNotEmpty(), "the state live at the interruption is preserved");
+        check (juce::File (preserved).existsAsFile()
+                 && juce::File (preserved).loadFileAsString().contains ("edited-after-known-good"),
+               "as the state that was actually live, not as the known-good copy");
+
+        check ((bool) report.getProperty ("hasLastKnownGood", false),
+               "and there is a known-good to go back to");
+
+        // Acknowledging clears the notification, not the standing offer.
+        h.cmd ("acknowledgeRecovery");
+        const auto after = h.emits.lastState()->getProperty ("reliability", {})
+                                               .getProperty ("recovery", {});
+        check (! (bool) after.getProperty ("interrupted", true), "acknowledging clears the notice");
+        check ((bool) after.getProperty ("hasLastKnownGood", false),
+               "but the known-good offer stands — it is a state, not a message");
+
+        // This run restored the edited state cleanly, and must NOT have promoted it: it is the
+        // state that was live at the interruption, and promoting it would replace the offer
+        // with the very thing the user is being offered an escape from.
+        check (! ceditor::host::SessionRecovery (dir).lastKnownGoodFile().loadFileAsString()
+                   .contains ("edited-after-known-good"),
+               "a run that follows an interruption does not promote what it just restored");
+
+        // Going back: the recovered rig becomes the live session too, or the next start would
+        // silently undo the recovery.
+        h.cmd ("restoreLastKnownGood");
+        check (! h.emits.lastError().contains ("no known-good"), "the restore is accepted");
+        check (! dir.getChildFile ("session-performance.json").loadFileAsString()
+                   .contains ("edited-after-known-good"),
+               "and the live session is now the recovered one");
+    }
+
+    // A digest that no longer matches its blob is reported — and the blob is kept, because a
+    // state we cannot verify is still the only copy of somebody's sound.
+    {
+        const auto sessionFile = dir.getChildFile ("session-performance.json");
+        auto live = juce::JSON::parse (sessionFile.loadFileAsString());
+        if (auto* parts = live.getProperty ("parts", {}).getArray(); parts != nullptr && ! parts->isEmpty())
+        {
+            auto part = parts->getReference (0);
+            part.getDynamicObject()->setProperty ("stateBlob", "dGFtcGVyZWQ=");
+            part.getDynamicObject()->setProperty ("stateBlobHash", "deadbeef-4");
+        }
+        sessionFile.replaceWithText (juce::JSON::toString (live));
+
+        Harness h (dir);
+        h.cmd ("getState");
+        const auto damaged = h.emits.lastState()->getProperty ("reliability", {})
+                                                 .getProperty ("damagedState", {});
+        check (damaged.size() == 1, "a blob that no longer matches its digest is reported");
+        check (damaged[0].toString().contains ("kept and loaded anyway"),
+               "and is kept rather than dropped");
+
+        const auto part = h.emits.lastState()->getProperty ("rack", {})
+                                              .getProperty ("parts", {})[0];
+        check (part.getProperty ("partId", {}).toString().isNotEmpty(),
+               "the part itself survives a damaged state");
+
+        // And a rig with damaged state does not become the thing recovery goes back to.
+        check (ceditor::host::SessionRecovery (dir).lastKnownGoodFile().loadFileAsString()
+                 == goodBefore || ! juce::JSON::toString (
+                      juce::JSON::parse (ceditor::host::SessionRecovery (dir)
+                                             .lastKnownGoodFile().loadFileAsString()))
+                      .contains ("deadbeef"),
+               "a run with damaged state is not promoted to known-good");
+    }
+}
+
+// --- The support bundle (§17.7) --------------------------------------------------------------
+//
+// The failure being designed against is one sentence of the baseline's, and it is the sentence
+// that gets ignored: "Never silently include licence files, unrelated documents, account tokens
+// or complete user directories." Zipping the data directory is how a bundle ends up carrying
+// somebody's licence file, so the test that matters is that a planted one does NOT travel.
+
+void testSupportBundle()
+{
+    std::cout << "\nsupport bundle: what travels, and what must not" << std::endl;
+
+    const auto dir = freshDataDir ("support-bundle");
+    seedCatalog (dir);
+
+    // Things a data directory really does accumulate, and that a sweep would carry off.
+    dir.getChildFile ("licence.key").replaceWithText ("LICENCE-AAAA-BBBB-CCCC");
+    dir.getChildFile ("account-token.json").replaceWithText ("{\"token\":\"secret\"}");
+    dir.getChildFile ("My Notes.txt").replaceWithText ("unrelated document");
+
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+
+    // Give the part a state blob, which is the thing §17.7 says must not travel by default.
+    {
+        const auto sessionFile = dir.getChildFile ("session-performance.json");
+        auto live = juce::JSON::parse (sessionFile.loadFileAsString());
+        if (auto* parts = live.getProperty ("parts", {}).getArray(); parts != nullptr && ! parts->isEmpty())
+            parts->getReference (0).getDynamicObject()
+                ->setProperty ("stateBlob", "UFJPUFJJRVRBUlktU09VTkQ=");
+        sessionFile.replaceWithText (juce::JSON::toString (live));
+    }
+
+    h.cmd ("previewSupportBundle");
+    const auto* preview = h.emits.last ("instrumentHostSupportBundle");
+    check (preview != nullptr, "the preview answers before anything is written");
+
+    bool sawManifest = false, sawCatalogue = false, sawSession = false, sawLicence = false;
+    juce::String sessionNote;
+    if (preview != nullptr)
+        for (const auto& entry : *preview->getProperty ("entries", {}).getArray())
+        {
+            const auto name = entry.getProperty ("name", {}).toString();
+            sawManifest  = sawManifest  || name == "support-manifest.json";
+            sawCatalogue = sawCatalogue || name == "plugin-catalog.json";
+            sawLicence   = sawLicence   || name.containsIgnoreCase ("licence")
+                                        || name.containsIgnoreCase ("token")
+                                        || name.containsIgnoreCase ("Notes");
+            if (name == "session-performance.json")
+            {
+                sawSession = true;
+                sessionNote = entry.getProperty ("note", {}).toString();
+            }
+        }
+
+    check (sawManifest && sawCatalogue && sawSession,
+           "the preview names the manifest, the scan results and the session");
+    check (! sawLicence, "and never a licence file, a token or an unrelated document");
+    check (sessionNote.contains ("state blobs removed"),
+           "and says the state blobs are being removed");
+
+    check (! dir.getChildFile ("support-bundle").exists(),
+           "previewing writes nothing — the review happens before the file exists");
+
+    // Now export it, and read the zip back rather than trusting the preview.
+    const auto zip = dir.getChildFile ("bundle.zip");
+    h.cmd ("exportSupportBundle", { { "path", zip.getFullPathName() } });
+    const auto* exported = h.emits.last ("instrumentHostSupportBundle");
+    check (exported != nullptr && (bool) exported->getProperty ("written", false),
+           "the export reports success");
+    check (zip.existsAsFile() && zip.getSize() > 0, "and the bundle is on disk");
+
+    juce::ZipFile archive (zip);
+    juce::StringArray names;
+    for (int i = 0; i < archive.getNumEntries(); ++i)
+        names.add (archive.getEntry (i)->filename);
+
+    check (names.contains ("support-manifest.json"), "the bundle carries its manifest");
+    check (names.contains ("plugin-catalog.json"), "and the scan results");
+    check (names.contains ("session-performance.json"), "and the rack manifest");
+
+    bool carriesSecrets = false;
+    for (const auto& name : names)
+        carriesSecrets = carriesSecrets || name.containsIgnoreCase ("licence")
+                                        || name.containsIgnoreCase ("token")
+                                        || name.containsIgnoreCase ("Notes");
+    check (! carriesSecrets, "and nothing that was merely sitting in the same directory");
+
+    const auto readEntry = [&archive, &names] (const juce::String& name) -> juce::String
+    {
+        const auto index = names.indexOf (name);
+        if (index < 0)
+            return {};
+        std::unique_ptr<juce::InputStream> stream (archive.createStreamForEntry (index));
+        return stream != nullptr ? stream->readEntireStreamAsString() : juce::String();
+    };
+
+    const auto sessionText = readEntry ("session-performance.json");
+    check (! sessionText.contains ("UFJPUFJJRVRBUlktU09VTkQ="),
+           "the plug-in's own saved state does not travel by default");
+    check (sessionText.contains ("stateBlobBytes"),
+           "but its size does, so the manifest is still diagnostic");
+    check (sessionText.contains ("stateBlobHash"),
+           "and so does its digest, so a corruption question is answerable from the bundle");
+    check (sessionText.contains ("Good Synth"),
+           "and the identity of what was loaded is intact");
+
+    const auto manifestText = readEntry ("support-manifest.json");
+    check (manifestText.contains ("architecture"), "the manifest records this machine");
+    check (manifestText.contains ("\"stateBlobsIncluded\": false")
+             || manifestText.contains ("\"stateBlobsIncluded\":false"),
+           "and records that the blobs were left out, so absence is not mistaken for emptiness");
+
+    // Explicitly including them is allowed — §17.7 says "unless explicitly included" — and the
+    // bundle then says so about itself.
+    const auto full = dir.getChildFile ("bundle-full.zip");
+    h.cmd ("exportSupportBundle", { { "path", full.getFullPathName() },
+                                    { "includeStateBlobs", true } });
+
+    juce::ZipFile fullArchive (full);
+    juce::StringArray fullNames;
+    for (int i = 0; i < fullArchive.getNumEntries(); ++i)
+        fullNames.add (fullArchive.getEntry (i)->filename);
+
+    const auto fullIndex = fullNames.indexOf ("session-performance.json");
+    juce::String fullSession;
+    if (fullIndex >= 0)
+    {
+        std::unique_ptr<juce::InputStream> stream (fullArchive.createStreamForEntry (fullIndex));
+        if (stream != nullptr)
+            fullSession = stream->readEntireStreamAsString();
+    }
+
+    check (fullSession.contains ("UFJPUFJJRVRBUlktU09VTkQ="),
+           "an explicit choice does include the state blobs");
+
+    bool stillNoSecrets = true;
+    for (const auto& name : fullNames)
+        stillNoSecrets = stillNoSecrets && ! name.containsIgnoreCase ("licence")
+                                        && ! name.containsIgnoreCase ("token");
+    check (stillNoSecrets,
+           "and still carries nothing that was merely sitting in the same directory");
 }
 
 void testEditorPolicy()
@@ -2831,6 +3277,9 @@ int main (int argc, char* argv[])
     testUnresolvedAndFailures();
     testSupersededLoad();
     testDeadManStartup();
+    testSafeStartup();
+    testSessionRecovery();
+    testSupportBundle();
     testEditorPolicy();
     testScan (stubWorker);
     testWrapperContext();

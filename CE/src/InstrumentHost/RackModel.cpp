@@ -54,6 +54,7 @@ static juce::var effectsToVar (const juce::Array<EffectSlot>& effects)
         e->setProperty ("pluginName",       slot.pluginName);
         e->setProperty ("pluginVendor",     slot.pluginVendor);
         e->setProperty ("stateBlob",        slot.stateBlobBase64);
+        e->setProperty ("stateBlobHash",    SessionRecovery::hashState (slot.stateBlobBase64));
         e->setProperty ("bypassed",         slot.bypassed);
         out.add (juce::var (e));
     }
@@ -80,6 +81,7 @@ static bool effectsFromVar (const juce::var& stored, juce::Array<EffectSlot>& ou
         slot.pluginName       = e.getProperty ("pluginName", {}).toString();
         slot.pluginVendor     = e.getProperty ("pluginVendor", {}).toString();
         slot.stateBlobBase64  = e.getProperty ("stateBlob", {}).toString();
+        slot.stateBlobHash    = e.getProperty ("stateBlobHash", {}).toString();
         slot.bypassed         = (bool) e.getProperty ("bypassed", false);
         out.add (std::move (slot));
     }
@@ -283,6 +285,7 @@ juce::var Performance::toVar() const
         p->setProperty ("pluginName",       part.pluginName);
         p->setProperty ("pluginVendor",     part.pluginVendor);
         p->setProperty ("stateBlob",        part.stateBlobBase64);
+        p->setProperty ("stateBlobHash",    SessionRecovery::hashState (part.stateBlobBase64));
         p->setProperty ("channel",          part.midi.channel);
         p->setProperty ("keyLow",           part.midi.keyLow);
         p->setProperty ("keyHigh",          part.midi.keyHigh);
@@ -479,6 +482,7 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
         part.pluginName       = p.getProperty ("pluginName", {}).toString();
         part.pluginVendor     = p.getProperty ("pluginVendor", {}).toString();
         part.stateBlobBase64  = p.getProperty ("stateBlob", {}).toString();
+        part.stateBlobHash    = p.getProperty ("stateBlobHash", {}).toString();
 
         part.midi.channel      = intOf (p, "channel", 0, 0, 16);
         part.midi.keyLow       = intOf (p, "keyLow", 0, 0, 127);
