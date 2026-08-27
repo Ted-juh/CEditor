@@ -44,6 +44,8 @@ import {
   normalizeReliability,
   emptySupportBundle,
   normalizeSupportBundle,
+  emptyLicence,
+  normalizeLicence,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
 import { get } from 'svelte/store';
@@ -947,4 +949,81 @@ test('mock reducer: safe startup levels, vouching, and the recovery notice', () 
   state = applyMockCommand(state, { cmd: 'restoreLastKnownGood' });
   assert.deepEqual(state.reliability.damagedState, [],
     'going back to a rig that booted clears what the damaged one reported');
+});
+
+
+// --- §19 "Trust": the licence block -----------------------------------------------------------
+
+test('normalizeLicence: an unknown edition never locks the product, and it always runs', () => {
+  assert.deepEqual(normalizeLicence(undefined), emptyLicence(),
+    'nothing at all normalizes to the free edition, which is a working product');
+
+  const l = normalizeLicence({
+    edition: 'pro', editionLabel: 'Pro', state: 'updatesExpired',
+    detail: 'Licensed. Updates released after 1 January 2027 are not included.',
+    licensee: 'A Customer', orderId: 'ORD-1', updatesUntil: '2027-01-01T00:00:00.000Z',
+    updatesIncluded: false, runnable: true,
+    maxLoadedParts: 1024, loadedParts: '3',
+    seatsAllowed: '3', seatsUsed: 1, activatedHere: 1,
+    seats: [{ fingerprint: 'abcd1234', machineName: 'Studio', firstSeen: '2026-01-01T00:00:00.000Z',
+              lastSeen: '2026-02-01T00:00:00.000Z', isThisMachine: true }, null],
+    features: [{ feature: 'patternEngine', allowed: true }, { feature: 'advancedRouting' }],
+    neverGated: ['VST3 hosting', 7],
+  });
+
+  assert.equal(l.edition, 'pro');
+  assert.equal(l.state, 'updatesExpired');
+  assert.equal(l.updatesIncluded, false, 'a lapsed entitlement is reported');
+  assert.equal(l.runnable, true, 'and the application still runs');
+  assert.equal(l.loadedParts, 3, 'numbers arrive as numbers');
+  assert.equal(l.seatsAllowed, 3);
+  assert.equal(l.activatedHere, false, 'a truthy 1 is not a boolean');
+  assert.equal(l.seats.length, 2, 'a hole in the seat list is still a row');
+  assert.equal(l.seats[0].isThisMachine, true);
+  assert.equal(l.features[1].allowed, false, 'a feature with no verdict is not allowed');
+  assert.deepEqual(l.neverGated, ['VST3 hosting', '7']);
+
+  // The two readings that must fail safe, because §27 forbids the alternatives.
+  assert.equal(normalizeLicence({ edition: 'enterprise' }).edition, 'free',
+    'an edition this build does not know reads as free, not as a lockout');
+  assert.equal(normalizeLicence({ state: 'revoked' }).state, 'unlicensed',
+    'and an unknown state reads as unlicensed rather than as something the panel cannot explain');
+  assert.equal(normalizeLicence({}).runnable, true,
+    'a payload that says nothing about running means it runs');
+  assert.equal(normalizeLicence({ runnable: false }).runnable, false,
+    'only an explicit false says otherwise, and nothing native ever sends one');
+  assert.equal(normalizeLicence({}).updatesIncluded, true,
+    'and silence about updates is not a lapse');
+});
+
+test('normalizeHostState carries the licence block', () => {
+  const state = normalizeHostState({
+    licence: { edition: 'core', editionLabel: 'Core', state: 'licensed', seatsAllowed: 3 },
+  });
+  assert.equal(state.licence.edition, 'core');
+  assert.equal(state.licence.seatsAllowed, 3);
+  assert.deepEqual(emptyHostState().licence, emptyLicence(),
+    'the empty state is the same shape, so the panel renders before the first push');
+});
+
+test('mock reducer: the browser preview does not pretend to verify a licence', () => {
+  let state = mockHostState();
+  assert.equal(state.licence.edition, 'free', 'the preview is an unlicensed install');
+  assert.equal(state.licence.runnable, true, 'which runs');
+  assert.ok(state.licence.neverGated.length >= 8,
+    'and lists what no edition may withhold');
+  assert.ok(state.licence.features.every((f) => !f.allowed),
+    'with the Pro systems shown as not included');
+
+  // A signature check needs a key and crypto, and the browser preview has neither. Accepting
+  // a pasted file here would make the mock the one place in the product where an unsigned
+  // licence works — which is precisely the thing that must never be mocked.
+  state = applyMockCommand(state, { cmd: 'installLicence', text: '{"licence":{"edition":"pro"}}' });
+  assert.equal(state.licence.edition, 'free', 'a pasted licence does not upgrade the preview');
+  assert.match(state.licence.detail, /verified by the native side/,
+    'and it says why rather than failing silently');
+
+  state = applyMockCommand(state, { cmd: 'removeLicence' });
+  assert.equal(state.licence.edition, 'free', 'removing leaves it free');
+  assert.equal(state.licence.runnable, true, 'and still running');
 });

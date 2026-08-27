@@ -24,6 +24,7 @@ import {
   onInstrumentHostParamValues,
   onInstrumentHostLibrary,
   onInstrumentHostSupportBundle,
+  onInstrumentHostLicenceReceipt,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
@@ -35,6 +36,7 @@ export const hostBuild = writable(emptyHostBuild());
 export const hostParameters = writable(emptyHostParameters());
 export const hostLibrary = writable(emptyHostLibrary());
 export const hostSupportBundle = writable(emptySupportBundle());
+export const hostLicenceReceipt = writable('');
 
 // --- §17.7: the support bundle ------------------------------------------------------------------
 
@@ -303,6 +305,74 @@ export function emptyHostState() {
     performance: emptyPerformance(),
     product: emptyProduct(),
     reliability: emptyReliability(),
+    licence: emptyLicence(),
+  };
+}
+
+/** The §19 "Trust" block: which edition is in force, the licence behind it, its seats, and —
+ *  said out loud rather than inferred — that the application runs whatever the entitlement
+ *  date says (§27). */
+export function emptyLicence() {
+  return {
+    edition: 'free',
+    editionLabel: 'Free',
+    state: 'unlicensed',
+    detail: '',
+    licensee: '',
+    orderId: '',
+    updatesUntil: '',
+    updatesIncluded: true,
+    runnable: true,
+    maxLoadedParts: 1,
+    loadedParts: 0,
+    seatsAllowed: 0,
+    seatsUsed: 0,
+    activatedHere: false,
+    seats: [],
+    features: [],
+    neverGated: [],
+  };
+}
+
+export function normalizeLicence(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+
+  // An edition or state this build does not recognise reads as the safe one, exactly as the
+  // native side reads it: a licence from a future build must leave the product usable rather
+  // than showing a word the panel cannot explain.
+  const editions = ['free', 'founder', 'core', 'pro'];
+  const states = ['unlicensed', 'licensed', 'updatesExpired', 'sunsetUnlocked',
+                  'wrongProduct', 'tampered'];
+
+  return {
+    edition: editions.includes(p.edition) ? p.edition : 'free',
+    editionLabel: String(p.editionLabel ?? 'Free'),
+    state: states.includes(p.state) ? p.state : 'unlicensed',
+    detail: String(p.detail ?? ''),
+    licensee: String(p.licensee ?? ''),
+    orderId: String(p.orderId ?? ''),
+    updatesUntil: String(p.updatesUntil ?? ''),
+    updatesIncluded: p.updatesIncluded !== false,
+    // Never read from the payload as a maybe: §27 forbids an entitlement from disabling the
+    // application, so the panel treats anything but an explicit false as "it runs".
+    runnable: p.runnable !== false,
+    maxLoadedParts: Number(p.maxLoadedParts ?? 1),
+    loadedParts: Number(p.loadedParts ?? 0),
+    seatsAllowed: Number(p.seatsAllowed ?? 0),
+    seatsUsed: Number(p.seatsUsed ?? 0),
+    activatedHere: p.activatedHere === true,
+    seats: (Array.isArray(p.seats) ? p.seats : []).map((s) => ({
+      fingerprint: String(s?.fingerprint ?? ''),
+      machineName: String(s?.machineName ?? ''),
+      firstSeen: String(s?.firstSeen ?? ''),
+      lastSeen: String(s?.lastSeen ?? ''),
+      isThisMachine: s?.isThisMachine === true,
+    })),
+    features: (Array.isArray(p.features) ? p.features : []).map((f) => ({
+      feature: String(f?.feature ?? ''),
+      allowed: f?.allowed === true,
+    })),
+    neverGated: (Array.isArray(p.neverGated) ? p.neverGated : []).map(String),
   };
 }
 
@@ -628,6 +698,7 @@ export function normalizeHostState(payload) {
     performance: normalizePerformance(p.performance),
     product: normalizeProduct(p.product),
     reliability: normalizeReliability(p.reliability),
+    licence: normalizeLicence(p.licence),
     rack: {
       performanceId: String(rack.performanceId ?? ''),
       focusedPartId: String(rack.focusedPartId ?? ''),
@@ -777,6 +848,33 @@ export function mockHostState() {
       hardware: { owner: 'nobody', owned: false },
       activeHostingIncidents: [],
       surfaceProfiles: ['akai-ctrl49'],
+    },
+    licence: {
+      edition: 'free',
+      editionLabel: 'Free',
+      state: 'unlicensed',
+      detail: 'No licence installed. Everything the keyboard does works; one plug-in can be '
+            + 'loaded at a time.',
+      maxLoadedParts: 1,
+      loadedParts: 1,
+      runnable: true,
+      updatesIncluded: true,
+      features: [
+        { feature: 'patternEngine', allowed: false },
+        { feature: 'scenesAndSetlists', allowed: false },
+        { feature: 'advancedRouting', allowed: false },
+        { feature: 'advancedScripting', allowed: false },
+      ],
+      neverGated: [
+        'Full supported-hardware display communication',
+        'Normal control pages',
+        'VST3 hosting',
+        'Preset browsing',
+        'Editable mappings',
+        'Basic splits, layers and multis',
+        'Saving and recalling complete setups',
+        'Running the application at all, whatever the update entitlement says',
+      ],
     },
     reliability: {
       safeMode: { level: 'normal', suspects: [] },
@@ -1446,6 +1544,22 @@ export function applyMockCommand(state, payload) {
     if (safe.level === 'skipSuspects') safe.level = 'normal';
     return next;
   }
+  if (cmd === 'installLicence' || cmd === 'removeLicence'
+      || cmd === 'activateLicenceHere' || cmd === 'deactivateLicenceHere') {
+    // The browser preview has no public key and no crypto, so it cannot verify a licence and
+    // does not pretend to. Reporting "installed" here would make the mock the one place in the
+    // product where an unsigned file is accepted, which is exactly the wrong thing to mock.
+    if (cmd === 'removeLicence') {
+      next.licence = { ...emptyLicence(), loadedParts: next.licence.loadedParts };
+      return next;
+    }
+    next.licence = {
+      ...next.licence,
+      detail: 'Licences are verified by the native side. This browser preview has no key to '
+            + 'check one against, so nothing was installed.',
+    };
+    return next;
+  }
   if (cmd === 'acknowledgeRecovery') {
     // Clears the notice, never the standing offer — the known-good is a state, not a message.
     Object.assign(next.reliability.recovery, {
@@ -1500,6 +1614,7 @@ export function initInstrumentHostBridge() {
   onInstrumentHostParamValues((payload) => hostParameters.update((r) => applyParamValues(r, payload)));
   onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
   onInstrumentHostSupportBundle((payload) => hostSupportBundle.set(normalizeSupportBundle(payload)));
+  onInstrumentHostLicenceReceipt((payload) => hostLicenceReceipt.set(String(payload?.receipt ?? '')));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);
@@ -1832,6 +1947,11 @@ export const clearSafeModeSuspect = (modulePath) => send({ cmd: 'clearSafeModeSu
 export const clearAllSafeModeSuspects = () => send({ cmd: 'clearAllSafeModeSuspects' });
 export const acknowledgeRecovery = () => send({ cmd: 'acknowledgeRecovery' });
 export const restoreLastKnownGood = () => send({ cmd: 'restoreLastKnownGood' });
+export const installLicence = (text) => send({ cmd: 'installLicence', text });
+export const removeLicence = () => send({ cmd: 'removeLicence' });
+export const activateLicenceHere = () => send({ cmd: 'activateLicenceHere' });
+export const deactivateLicenceHere = () => send({ cmd: 'deactivateLicenceHere' });
+
 export const previewSupportBundle = (options = {}) =>
   send({ cmd: 'previewSupportBundle', ...options });
 export const exportSupportBundle = (options = {}) =>

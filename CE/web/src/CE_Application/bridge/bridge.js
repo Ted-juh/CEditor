@@ -1018,6 +1018,15 @@ export function onInstrumentHostLibrary(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** The receipt for a released activation ({ receipt }). Emitted only when a seat was actually
+    released — it is the one thing the customer needs to keep, so it travels as an event rather
+    than as a return value nobody sees. */
+export function onInstrumentHostLicenceReceipt(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostLicenceReceipt', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** The §17.7 support-bundle answer ({ entries, includeStateBlobs, written?, path? }). The same
     event carries the preview and the export, because they are the same list — the difference
     is only whether a file was written, which the payload says. */

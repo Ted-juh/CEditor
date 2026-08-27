@@ -35,6 +35,7 @@
   import PerformancePanel from './PerformancePanel.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
+  import LicencePanel from './LicencePanel.svelte';
 
   initInstrumentHostBridge();
 
@@ -50,6 +51,7 @@
   let performanceOpen = $state(false);
   let productOpen = $state(false);
   let reliabilityOpen = $state(false);
+  let licenceOpen = $state(false);
 
   function toggleLibrary() {
     libraryOpen = !libraryOpen;
@@ -236,6 +238,10 @@
                          : 'Safe startup, recovery and the support bundle'}
               onclick={() => (reliabilityOpen = !reliabilityOpen)}
               data-testid="host-reliability">Health</button>
+      <button type="button" class="toggle" class:on={licenceOpen}
+              title="What this edition includes, and what it never takes away"
+              onclick={() => (licenceOpen = !licenceOpen)}
+              data-testid="host-licence">{$hostState.licence.editionLabel}</button>
       <button type="button" class="toggle" class:on={libraryOpen} onclick={toggleLibrary}
               data-testid="host-library">Library</button>
       <button type="button" class="toggle" class:on={devicesOpen} onclick={toggleDevices}
@@ -287,6 +293,10 @@
 
   {#if reliabilityOpen}
     <ReliabilityPanel />
+  {/if}
+
+  {#if licenceOpen}
+    <LicencePanel />
   {/if}
 
   {#if libraryOpen}
