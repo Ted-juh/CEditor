@@ -125,12 +125,20 @@ bool PerformanceEngine::popEvent (OutEvent& event)
     return true;
 }
 
-void PerformanceEngine::pushEvent (OutEvent::Type type, int index, float value)
+void PerformanceEngine::armCapture (int clipIndex, int laneIndex) noexcept
+{
+    captureClip.store (clipIndex);
+    captureLane.store (laneIndex);
+}
+
+void PerformanceEngine::pushEvent (OutEvent::Type type, int index, float value, int data1, int data2)
 {
     OutEvent event;
     event.type = type;
     event.index = index;
     event.value = value;
+    event.data1 = data1;
+    event.data2 = data2;
     event.generation = songGeneration.load();
 
     const auto scope = eventFifo.write (1);
@@ -523,6 +531,53 @@ void PerformanceEngine::renderClip (int clipIndex, const CompiledSong& song,
     }
 }
 
+void PerformanceEngine::captureFrom (const juce::MidiBuffer& liveInput, const CompiledSong& song,
+                                     const Transport::BlockTime& block, int numSamples)
+{
+    juce::ignoreUnused (numSamples);
+
+    const auto clipIndex = captureClip.load();
+    const auto laneIndex = captureLane.load();
+    if (clipIndex < 0 || laneIndex < 0 || ! block.playing)
+        return;
+    if (! juce::isPositiveAndBelow (clipIndex, (int) song.clips.size()))
+        return;
+
+    const auto& clip = song.clips[(size_t) clipIndex];
+    if (! juce::isPositiveAndBelow (clip.patternIndex, (int) song.patterns.size()))
+        return;
+
+    const auto& pattern = song.patterns[(size_t) clip.patternIndex];
+    if (! juce::isPositiveAndBelow (laneIndex, (int) pattern.lanes.size()))
+        return;
+
+    const auto& lane = pattern.lanes[(size_t) laneIndex];
+    const auto& state = clips[(size_t) clipIndex];
+    if (! state.active)
+        return;
+
+    const auto stepPpq = 1.0 / (double) juce::jmax (1, lane.stepsPerBeat);
+    const auto stepCount = juce::jmax (1, lane.stepCount);
+    const auto laneLength = stepPpq * (double) stepCount;
+
+    for (const auto metadata : liveInput)
+    {
+        const auto message = metadata.getMessage();
+        if (! message.isNoteOn())
+            continue;
+
+        // Where the note landed in this lane's own grid, rounded to the nearest step: played
+        // material is quantized once, here, and the document is edited on the message thread
+        // from what this reports.
+        const auto at = block.startPpq + block.ppqPerSample * (double) metadata.samplePosition;
+        const auto local = std::fmod (juce::jmax (0.0, at - state.startPpq), laneLength);
+        const auto stepIndex = ((int) std::llround (local / stepPpq)) % stepCount;
+
+        pushEvent (OutEvent::Type::capturedNote, stepIndex, 0.0f, message.getNoteNumber(),
+                   (int) message.getVelocity());
+    }
+}
+
 void PerformanceEngine::processBlock (int numSamples, const juce::MidiBuffer& liveInput)
 {
     for (int i = 0; i < maxParts; ++i)
@@ -531,6 +586,7 @@ void PerformanceEngine::processBlock (int numSamples, const juce::MidiBuffer& li
     transport.consumeExternalClock (liveInput, currentSampleRate);
 
     const auto block = transport.advance (numSamples, currentSampleRate);
+    lastBlock = block;   // the per-part arpeggiators read this window rather than their own
     blockCounter.fetch_add (1);
 
     if (panicRequested.exchange (false))
@@ -582,6 +638,7 @@ void PerformanceEngine::processBlock (int numSamples, const juce::MidiBuffer& li
     }
 
     releaseDueNotes (block, numSamples);
+    captureFrom (liveInput, *song, block, numSamples);
 
     for (int i = 0; i < (int) song->clips.size() && i < maxClips; ++i)
     {

@@ -92,6 +92,46 @@
 //      in state — and can return audio through the interface's inputs, where it runs the
 //      part's own inserts, fader and sends. Absent config fields keep their value.)
 //
+//   -- the Stage 6 performance system (§18.8) --
+//   transportPlay | transportStop | transportContinue | setTempo {tempo}
+//   setTimeSignature {numerator,denominator} | setTransportPosition {ppq}
+//   setExternalClock {enabled}
+//     (one transport for everything: the sequencer, the arpeggiators and the hardware
+//      display all read it, and nothing else schedules musical events.)
+//   addPattern {name?} | removePattern {patternId} | renamePattern {patternId,name}
+//   setPatternOptions {patternId, swing?, seed?}
+//   addLane {patternId, type?, targetPartId?} | removeLane {patternId,laneId}
+//   setLaneOptions {patternId,laneId, name?,targetPartId?,targetId?,parameterId?,channel?,
+//     ccNumber?,drumNote?,stepCount?,stepsPerBeat?,muted?,glide?}
+//   euclidFill {patternId,laneId,pulses,rotation?} | clearLane {patternId,laneId}
+//   setStep {patternId,laneId,index, active?,note?,velocity?,value?,gate?,microtiming?,
+//     probability?,ratchets?,tie?,every?,offset?,chord?}
+//   toggleStep {patternId,laneId,index}
+//     (one Pattern object with typed lanes — note, chord, drum, cc and parameter — each with
+//      its own length and rate, which is polymeter without a special case.)
+//   addClip {patternId,name?} | removeClip {clipId}
+//   setClipOptions {clipId, name?,launchQuantize?,loop?,followClipId?,followAfterLoops?}
+//   launchClip {clipId} | stopClip {clipId} | stopAllClips
+//   armCapture {clipId,laneId} | disarmCapture
+//     (capture snaps played notes to the armed lane's grid and writes them into the pattern
+//      on this thread — the audio thread only ever reports what it heard.)
+//   addScene {name?} | removeScene {sceneId} | renameScene {sceneId,name}
+//   captureScene {sceneId} | setSceneOptions {sceneId, launchQuantize?,stopOtherClips?,tempo?}
+//   setSceneClip {sceneId,clipId,included} | launchScene {sceneId}
+//     (a scene recalls clips, slot states, macros, focus and page through the SAME rack and
+//      parameter systems built earlier — it is not a second snapshot engine. captureScene
+//      takes the current rig as the scene's content.)
+//   addSetlistItem {sceneId?,name?} | removeSetlistItem {itemId}
+//   setSetlistItem {itemId, name?,notes?,tempo?,sceneId?} | moveSetlistItem {itemId,index}
+//   setlistGo {index} | setlistNext | setlistPrev
+//     (navigation recalls the item's scene; a scene that cannot be recalled leaves the rig on
+//      the last stable item and says so rather than half-loading.)
+//   setPartArp {partId, enabled?,mode?,stepsPerBeat?,gate?,swing?,octaves?,latch?,
+//     constrainToScale?,velocityPattern?}
+//   setPartMidiFx {partId, transpose?,constrainToScale?,scaleRoot?,scaleType?,chord?,
+//     velocityFixed?,velocityScale?}
+//     (both are modes over the shared transport, applied in the part's own event chain.)
+//
 // VIRTUAL PARAMETER ADDRESSES (Stage 5). A parameterId starting with '@' resolves against
 // the rack's own state instead of a plug-in registry: "@gain" and "@pan" on any part,
 // "@send:<returnId>" for that part's send level, "@macro" with the macroId as the target id.
@@ -281,6 +321,24 @@ public:
         unresolved slot. */
     bool nudgeControlSlot (const juce::String& pageId, const juce::String& slotId, int delta);
 
+    // -- the Stage 6 performance system ------------------------------------------------------
+
+    /** Recompiles the patterns and clips and publishes them to the engine. Called after any
+        edit that changes what would play — a pattern, a clip, the part roster, or a plug-in
+        load that makes an automation target resolvable again. */
+    void recompilePerformance();
+
+    perf::PerformanceEngine& getEngine()              { return rack.getEngine(); }
+
+    /** Launches a scene by id: its clips through the engine's quantized launch, the rest of
+        it (slots, macros, focus, page, tempo) when the launch actually lands. Returns false
+        for an unknown scene. */
+    bool launchScene (const juce::String& sceneId);
+
+    /** Recalls setlist item `index`, or the next/previous one. A scene that cannot be
+        recalled leaves the rig where it was and reports why (§18.8.9). */
+    bool goToSetlistItem (int index);
+
     /** Controlling thread. Drains every part's parameter-change marks (vendor editors and
         automation report through listeners that may fire on the audio thread) and emits one
         coalesced instrumentHostParamValues per part that changed — current value and text,
@@ -386,6 +444,21 @@ private:
     const PluginClassRecord* findClass (const juce::String& ceId,
                                         const ModuleRecord** moduleOut = nullptr) const;
 
+    // -- Stage 6 internals -------------------------------------------------------------------
+    /** Pops everything the engine queued: automation values (applied through the Stage 2
+        path), scene landings, clip state changes and captured notes. Runs on the same pump as
+        drainParameterEvents. */
+    void drainEngineEvents();
+    /** Writes one automation value to its target. No gestures: automation is a continuous
+        stream, and wrapping every value would spam the host with begin/end pairs. */
+    void applyAutomationValue (const juce::String& targetId, const juce::String& parameterId,
+                               float value);
+    /** The half of a scene that is not clips — slots, macros, focus, page, tempo. */
+    void applySceneState (const perf::Scene& scene);
+    /** Fills a scene from the rig as it stands right now. */
+    void captureSceneFromRack (perf::Scene& scene);
+    juce::var performancePayload() const;
+
     void savePerformance();
     /** Keeps previous manifest revisions beside the session file: before an overwrite, the
         current file is copied into the revisions directory when the newest copy there is
@@ -419,6 +492,13 @@ private:
     // Per-part MIDI-output failures ("port is gone"), reported in state until the next
     // successful open — the §18.7.7 missing-device diagnostic.
     std::map<juce::String, juce::String> hardwareMidiErrors;
+
+    // Stage 6: the compiled song's generation, and the scene launches waiting for the engine
+    // to tell us they landed (so the non-audio half arrives at the same musical instant).
+    int songGeneration = 0;
+    int nextSceneToken = 1;
+    std::map<int, juce::String> pendingScenes;
+    juce::String captureClipId, captureLaneId;
 
     // The Stage 2 registry, per part with a live instrument: descriptors plus the RT-safe
     // change listener. Attached on every successful commit, dropped from the same rack hook

@@ -54,6 +54,8 @@ struct CompiledLane
 {
     LaneType type = LaneType::note;
     double lengthPpq = 4.0;
+    int stepCount = 16;           // kept so capture can snap a played note to this lane's grid
+    int stepsPerBeat = 4;
     bool muted = false;
     bool glide = false;
     int partIndex = -1;           // resolved rack slot for MIDI lanes; -1 = unresolved

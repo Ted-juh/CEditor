@@ -12,6 +12,12 @@ InstrumentRackHost::InstrumentRackHost()
     midiInNode   = graph.addNode (std::make_unique<IOProcessor> (IOProcessor::midiInputNode));
     audioInNode  = graph.addNode (std::make_unique<IOProcessor> (IOProcessor::audioInputNode));
     audioOutNode = graph.addNode (std::make_unique<IOProcessor> (IOProcessor::audioOutputNode));
+
+    // The engine sits between the MIDI input and every part, so the graph's own ordering
+    // makes "the engine has already run" a structural fact rather than a convention.
+    engineNode = graph.addNode (std::make_unique<PerformanceEngineProcessor> (engine));
+    graph.addConnection ({ { midiInNode->nodeID, midiChannel },
+                           { engineNode->nodeID, midiChannel } });
 }
 
 InstrumentRackHost::~InstrumentRackHost() = default;
@@ -22,6 +28,7 @@ void InstrumentRackHost::prepare (double sampleRate, int blockSize, int numInput
     currentBlockSize = blockSize;
     graph.setPlayConfigDetails (juce::jmax (0, numInputChannels), 2, sampleRate, blockSize);
     graph.prepareToPlay (sampleRate, blockSize);
+    engine.prepare (sampleRate, blockSize, perf::PerformanceEngine::maxParts);
     prepared = true;
 
     // The input IO node only knows its channels once prepared, and a hardware part's return
@@ -41,7 +48,60 @@ juce::String InstrumentRackHost::addPart()
     const auto partId = model.addPart();
     createLiveNodes (*model.findPart (partId));
     applyMixerState();
+    syncEngineBindings();
     return partId;
+}
+
+int InstrumentRackHost::partIndexFor (const juce::String& partId) const
+{
+    const auto index = model.indexOfPart (partId);
+    return index < perf::PerformanceEngine::maxParts ? index : -1;
+}
+
+void InstrumentRackHost::syncEngineBindings()
+{
+    // Slots follow document order, so reordering the rack re-binds rather than reassigning
+    // identities — the same rule movePart has always kept for nodes and state.
+    for (int i = 0; i < model.parts.size(); ++i)
+    {
+        const auto& part = model.parts.getReference (i);
+        if (auto* lp = findLive (part.partId))
+        {
+            lp->filter->setEngine (&engine, i < perf::PerformanceEngine::maxParts ? i : -1);
+            lp->filter->getMidiFx().setSettings (part.midiFx);
+            lp->filter->getArp().setSettings (part.arp);
+            lp->filter->getArp().setScaleMask (perf::scaleMask (part.midiFx.scaleType,
+                                                                part.midiFx.scaleRoot));
+            lp->filter->getArp().setConstrainToScale (part.arp.constrainToScale);
+        }
+    }
+}
+
+bool InstrumentRackHost::setPartMidiFx (const juce::String& partId,
+                                        const perf::MidiFxSettings& settings)
+{
+    auto* part = model.findPart (partId);
+    auto* lp = findLive (partId);
+    if (part == nullptr || lp == nullptr)
+        return false;
+
+    part->midiFx = settings;
+    lp->filter->getMidiFx().setSettings (settings);
+    lp->filter->getArp().setScaleMask (perf::scaleMask (settings.scaleType, settings.scaleRoot));
+    return true;
+}
+
+bool InstrumentRackHost::setPartArp (const juce::String& partId, const perf::ArpSettings& settings)
+{
+    auto* part = model.findPart (partId);
+    auto* lp = findLive (partId);
+    if (part == nullptr || lp == nullptr)
+        return false;
+
+    part->arp = settings;
+    lp->filter->getArp().setSettings (settings);
+    lp->filter->getArp().setConstrainToScale (settings.constrainToScale);
+    return true;
 }
 
 juce::Array<EffectSlot>* InstrumentRackHost::chainFor (const juce::String& chainId)
@@ -563,14 +623,21 @@ bool InstrumentRackHost::removePart (const juce::String& partId)
     live.erase (partId);
     model.removePart (partId);
     applyMixerState();
+    syncEngineBindings();   // slots follow document order, so removing one re-binds the rest
     rewireAudio();
     return true;
 }
 
 bool InstrumentRackHost::movePart (const juce::String& partId, int newIndex)
 {
-    // Presentation order only — nodes, connections and identities do not move with it.
-    return model.movePart (partId, newIndex);
+    // Presentation order only — nodes, connections and identities do not move with it. The
+    // engine's slots DO follow the order, so they are re-bound; a lane addressed at a partId
+    // still finds the same part.
+    if (! model.movePart (partId, newIndex))
+        return false;
+
+    syncEngineBindings();
+    return true;
 }
 
 bool InstrumentRackHost::focusPart (const juce::String& partId)
@@ -814,6 +881,7 @@ juce::Array<InstrumentRackHost::UnresolvedPart> InstrumentRackHost::loadModel (P
     }
 
     applyMixerState();
+    syncEngineBindings();
     rewireAudio();
     return unresolved;
 }
@@ -826,6 +894,10 @@ void InstrumentRackHost::panicPart (const juce::String& partId)
 
 void InstrumentRackHost::panicAll()
 {
+    // The engine holds notes of its own, and so do the per-part FX and arps: one panic has to
+    // reach all three or the "no orphan notes" rule is only true of the zone filter.
+    engine.panic();
+
     for (auto& [partId, lp] : live)
     {
         juce::ignoreUnused (partId);
@@ -857,7 +929,9 @@ void InstrumentRackHost::createLiveNodes (const RackPart& part)
     lp.gain = gain.get();
     lp.gainNode = graph.addNode (std::move (gain));
 
-    graph.addConnection ({ { midiInNode->nodeID, midiChannel },
+    // Live MIDI reaches a part through the engine node, never around it: one path in means
+    // the engine sees everything the rack hears (external clock included).
+    graph.addConnection ({ { engineNode->nodeID, midiChannel },
                            { lp.filterNode->nodeID, midiChannel } });
 
     applyPartToLive (part, lp);

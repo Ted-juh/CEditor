@@ -198,6 +198,9 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ValueTreeBridgeState.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+        "${CE_ROOT}/src/Performance/PatternModel.cpp"
+        "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+        "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
@@ -470,6 +473,9 @@ if(CEDITOR_BUILD_APP)
     set(CE_HOST_COMMON_SOURCES
         "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+        "${CE_ROOT}/src/Performance/PatternModel.cpp"
+        "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+        "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
@@ -903,6 +909,9 @@ if(WIN32)
         "${CE_ROOT}/src/ControlSurface/Ctrl49RackDemo.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+        "${CE_ROOT}/src/Performance/PatternModel.cpp"
+        "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+        "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
@@ -1072,6 +1081,7 @@ ce_configure_test(CEditorPluginScannerCoordinatorTests)
 # need juce_audio_processors, with the same Linux X11/ALSA dev-package story as
 # CEditorPanelParametersTests.
 add_executable(CEditorRackModelTests
+    "${CE_ROOT}/src/Performance/PatternModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
     "${CE_ROOT}/tests/RackModelTests.cpp"
 )
@@ -1113,6 +1123,9 @@ add_test(NAME PerformanceEngine COMMAND CEditorPerformanceEngineTests)
 ce_configure_test(CEditorPerformanceEngineTests)
 
 add_executable(CEditorRackHostTests
+    "${CE_ROOT}/src/Performance/PatternModel.cpp"
+    "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+    "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
     "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
     "${CE_ROOT}/tests/RackHostTests.cpp"
@@ -1130,6 +1143,9 @@ ce_configure_test(CEditorRackHostTests)
 # file so it is provable here — command dispatch, session persistence, the load transaction
 # and scan orchestration, driven with the stub instantiator and the stub scanner worker.
 add_executable(CEditorInstrumentHostServiceTests
+    "${CE_ROOT}/src/Performance/PatternModel.cpp"
+    "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+    "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
     "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
     "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
     "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"

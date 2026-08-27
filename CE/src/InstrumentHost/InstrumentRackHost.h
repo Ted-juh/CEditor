@@ -153,6 +153,22 @@ public:
     int partLatencySamples (const juce::String& partId) const;
     int masterLatencySamples() const;
 
+    // -- the performance engine (Stage 6) -----------------------------------------------
+    // One transport and one scheduler for the whole rack, living in a graph node ahead of
+    // every part's filter — so the engine has always run, and written its per-part staging,
+    // before any part reads it.
+
+    perf::PerformanceEngine& getEngine() noexcept             { return engine; }
+    const perf::PerformanceEngine& getEngine() const noexcept { return engine; }
+
+    /** The engine's slot for a partId — the index the compiler resolves lanes to. -1 for an
+        unknown part. Slots follow document order and are re-bound whenever it changes. */
+    int partIndexFor (const juce::String& partId) const;
+
+    /** Pushes a part's Stage 6 event-chain settings into its live processors. */
+    bool setPartMidiFx (const juce::String& partId, const perf::MidiFxSettings& settings);
+    bool setPartArp (const juce::String& partId, const perf::ArpSettings& settings);
+
     // -- macros (Stage 5) ---------------------------------------------------------------
     // Model-only, like pages: a macro is stored fan-out; the writes go through the service's
     // parameter path, never through the graph.
@@ -277,6 +293,9 @@ private:
     /** Keeps the auxiliary node population — send gains, return levels, extra-out gains,
         hardware MIDI senders — matched to the model, and re-applies their levels. */
     void syncAuxNodes();
+    /** Re-binds every part processor to its engine slot and re-applies its event-chain
+        settings. Called whenever the part roster or its order changes. */
+    void syncEngineBindings();
     void destroyAuxNodes (LivePart& lp);
     /** Drops every audio connection and rebuilds the whole path — per-part chains into the
         gains, sends into the return chains, returns and gains through the master chain into
@@ -285,11 +304,12 @@ private:
     void rewireAudio();
 
     Performance model;
+    perf::PerformanceEngine engine;
     std::map<juce::String, LivePart> live;
     std::map<juce::String, LiveEffect> liveEffects;   // keyed by effectId, every chain kind
     std::map<juce::String, juce::AudioProcessorGraph::Node::Ptr> returnLevelNodes;   // per returnId
     juce::AudioProcessorGraph graph;
-    juce::AudioProcessorGraph::Node::Ptr midiInNode, audioInNode, audioOutNode;
+    juce::AudioProcessorGraph::Node::Ptr midiInNode, audioInNode, audioOutNode, engineNode;
     double currentSampleRate = 44100.0;
     int currentBlockSize = 512;
     bool prepared = false;

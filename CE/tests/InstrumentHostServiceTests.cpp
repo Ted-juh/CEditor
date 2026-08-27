@@ -1563,6 +1563,306 @@ void testRevisionsAndEngine()
            "engine load reports zero while audio is off, never garbage");
 }
 
+// The Stage 6 performance system through the bridge: one transport, patterns that reach real
+// instruments, automation that lands on Stage 2 addresses, scenes that recall through the
+// rack rather than a second snapshot engine, a setlist that refuses to half-load, and capture
+// that turns played notes into steps.
+void testPerformanceSystem()
+{
+    std::cout << "\nthe performance system" << std::endl;
+
+    const auto dir = freshDataDir ("performance");
+    seedTwoSynthCatalog (dir);
+
+    juce::String patternId, laneId, clipId, sceneId, partA, partB;
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partA = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partA }, { "ceId", "VST3-good-synth" } });
+        auto* synthA = h.lastStub;
+
+        // -- the transport -----------------------------------------------------------------
+        h.cmd ("setTempo", { { "tempo", 120.0 } });
+        h.cmd ("setTimeSignature", { { "numerator", 4 }, { "denominator", 4 } });
+        const auto* state = h.emits.lastState();
+        const auto transport = state->getProperty ("performance", {}).getProperty ("transport", {});
+        check (! (bool) transport.getProperty ("playing", true)
+                 && std::abs ((double) transport.getProperty ("tempo", 0.0) - 120.0) < 1.0e-9,
+               "the transport reports itself, stopped and at tempo");
+
+        // -- a pattern that reaches a real instrument --------------------------------------
+        h.cmd ("addPattern", { { "name", "Riff" } });
+        const auto patterns = h.emits.lastState()->getProperty ("performance", {})
+                                  .getProperty ("patterns", {});
+        check (patterns.size() == 1 && patterns[0].getProperty ("lanes", {}).size() == 1,
+               "a new pattern arrives with a lane already aimed at the focused part");
+        patternId = patterns[0].getProperty ("patternId", {}).toString();
+        laneId = patterns[0].getProperty ("lanes", {})[0].getProperty ("laneId", {}).toString();
+
+        h.cmd ("setLaneOptions", { { "patternId", patternId }, { "laneId", laneId },
+                                   { "stepCount", 4 }, { "stepsPerBeat", 4 } });
+        for (int i = 0; i < 4; ++i)
+            h.cmd ("setStep", { { "patternId", patternId }, { "laneId", laneId },
+                                { "index", i }, { "active", true },
+                                { "note", 60 + i }, { "velocity", 100 } });
+
+        h.cmd ("addClip", { { "patternId", patternId } });
+        const auto clips = h.emits.lastState()->getProperty ("performance", {})
+                               .getProperty ("clips", {});
+        check (clips.size() == 1, "a clip references the pattern");
+        clipId = clips[0].getProperty ("clipId", {}).toString();
+
+        h.cmd ("setClipOptions", { { "clipId", clipId }, { "launchQuantize", "immediate" } });
+        h.cmd ("transportPlay");
+        h.cmd ("launchClip", { { "clipId", clipId } });
+
+        // 44.1k, 512-sample blocks: one beat at 120bpm is 22050 samples, so 43 blocks is one
+        // loop of four sixteenths.
+        synthA->received.clear();
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer midi;
+        for (int b = 0; b < 43; ++b)
+        {
+            buffer.clear();
+            h.service->getGraph().processBlock (buffer, midi);
+        }
+
+        int notesPlayed = 0;
+        bool sawFirst = false, sawLast = false;
+        for (const auto& message : synthA->received)
+            if (message.isNoteOn())
+            {
+                ++notesPlayed;
+                sawFirst = sawFirst || message.getNoteNumber() == 60;
+                sawLast = sawLast || message.getNoteNumber() == 63;
+            }
+        check (notesPlayed == 4 && sawFirst && sawLast,
+               "the sequence reaches the part's instrument through the graph");
+
+        const auto clipRow = h.emits.lastState()->getProperty ("performance", {})
+                                 .getProperty ("clips", {})[0];
+        juce::ignoreUnused (clipRow);
+        check (h.service->getEngine().isClipActive (0), "and the clip is running");
+
+        // -- automation on a Stage 2 address ------------------------------------------------
+        h.cmd ("addLane", { { "patternId", patternId }, { "type", "parameter" } });
+        const auto lanes = h.emits.lastState()->getProperty ("performance", {})
+                               .getProperty ("patterns", {})[0].getProperty ("lanes", {});
+        const auto autoLaneId = lanes[1].getProperty ("laneId", {}).toString();
+        h.cmd ("setLaneOptions", { { "patternId", patternId }, { "laneId", autoLaneId },
+                                   { "targetId", partA }, { "parameterId", "cutoff" },
+                                   { "stepCount", 2 }, { "stepsPerBeat", 4 } });
+        h.cmd ("setStep", { { "patternId", patternId }, { "laneId", autoLaneId },
+                            { "index", 0 }, { "active", true }, { "value", 0.9 } });
+
+        synthA->cutoff->setValueNotifyingHost (0.1f);
+        for (int b = 0; b < 43; ++b)
+        {
+            buffer.clear();
+            h.service->getGraph().processBlock (buffer, midi);
+        }
+        h.service->drainParameterEvents();
+        check (std::abs (synthA->cutoff->get() - 0.9f) < 0.01f,
+               "an automation lane writes through the Stage 2 parameter path");
+
+        // The honesty rule: a part that loads a different class unresolves the lane.
+        h.cmd ("loadInstrument", { { "partId", partA }, { "ceId", "VST3-other-synth" } });
+        const auto afterSwap = h.emits.lastState()->getProperty ("performance", {})
+                                   .getProperty ("patterns", {})[0].getProperty ("lanes", {})[1];
+        check (! (bool) afterSwap.getProperty ("resolved", true),
+               "and shows unresolved when the target no longer carries that plug-in");
+        h.cmd ("loadInstrument", { { "partId", partA }, { "ceId", "VST3-good-synth" } });
+        check ((bool) h.emits.lastState()->getProperty ("performance", {})
+                   .getProperty ("patterns", {})[0].getProperty ("lanes", {})[1]
+                   .getProperty ("resolved", false),
+               "and resolves again when the original class comes back");
+
+        // -- the arpeggiator and the MIDI FX chain ------------------------------------------
+        auto* synth = dynamic_cast<StubSynthProcessor*> (h.service->getRackHost().getInstrument (partA));
+        h.cmd ("setPartMidiFx", { { "partId", partA }, { "transpose", 12 } });
+        synth->received.clear();
+        juce::MidiBuffer played;
+        played.addEvent (juce::MidiMessage::noteOn (1, 40, (juce::uint8) 100), 0);
+        buffer.clear();
+        h.service->getGraph().processBlock (buffer, played);
+        bool sawTransposed = false;
+        for (const auto& message : synth->received)
+            sawTransposed = sawTransposed || (message.isNoteOn() && message.getNoteNumber() == 52);
+        check (sawTransposed, "the MIDI FX chain transposes what the part plays");
+        h.cmd ("setPartMidiFx", { { "partId", partA }, { "transpose", 0 } });
+
+        juce::MidiBuffer lift;
+        lift.addEvent (juce::MidiMessage::noteOff (1, 40), 0);
+        buffer.clear();
+        h.service->getGraph().processBlock (buffer, lift);
+
+        h.cmd ("setPartArp", { { "partId", partA }, { "enabled", true },
+                               { "mode", "up" }, { "stepsPerBeat", 4 }, { "latch", true } });
+        h.cmd ("stopAllClips");
+        for (int b = 0; b < 4; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+
+        synth->received.clear();
+        juce::MidiBuffer chord;
+        chord.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        chord.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 1);
+        buffer.clear();
+        h.service->getGraph().processBlock (buffer, chord);
+        for (int b = 0; b < 43; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+
+        int arpNotes = 0;
+        for (const auto& message : synth->received)
+            arpNotes += message.isNoteOn() ? 1 : 0;
+        check (arpNotes >= 3, "and the arpeggiator replays a held chord on the shared grid");
+        h.cmd ("setPartArp", { { "partId", partA }, { "enabled", false }, { "latch", false } });
+
+        // -- capture: played notes become steps ----------------------------------------------
+        h.cmd ("addPattern", { { "name", "Captured" } });
+        const auto capturePatternId = h.emits.lastState()->getProperty ("performance", {})
+                                          .getProperty ("patterns", {})[1]
+                                          .getProperty ("patternId", {}).toString();
+        const auto captureLaneId = h.emits.lastState()->getProperty ("performance", {})
+                                       .getProperty ("patterns", {})[1].getProperty ("lanes", {})[0]
+                                       .getProperty ("laneId", {}).toString();
+        h.cmd ("addClip", { { "patternId", capturePatternId } });
+        const auto captureClipId = h.emits.lastState()->getProperty ("performance", {})
+                                       .getProperty ("clips", {})[1].getProperty ("clipId", {}).toString();
+        h.cmd ("setClipOptions", { { "clipId", captureClipId }, { "launchQuantize", "immediate" } });
+        h.cmd ("launchClip", { { "clipId", captureClipId } });
+        h.cmd ("armCapture", { { "clipId", captureClipId }, { "laneId", captureLaneId } });
+        for (int b = 0; b < 2; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+
+        juce::MidiBuffer performed;
+        performed.addEvent (juce::MidiMessage::noteOn (1, 67, (juce::uint8) 111), 0);
+        buffer.clear();
+        h.service->getGraph().processBlock (buffer, performed);
+        h.service->drainParameterEvents();
+
+        const auto capturedLane = h.emits.lastState()->getProperty ("performance", {})
+                                      .getProperty ("patterns", {})[1].getProperty ("lanes", {})[0];
+        bool captured = false;
+        const auto capturedSteps = capturedLane.getProperty ("steps", {});
+        for (int i = 0; i < capturedSteps.size(); ++i)
+            captured = captured || ((bool) capturedSteps[i].getProperty ("active", false)
+                                     && (int) capturedSteps[i].getProperty ("note", 0) == 67
+                                     && (int) capturedSteps[i].getProperty ("velocity", 0) == 111);
+        check (captured, "an armed lane turns a played note into a step");
+        h.cmd ("disarmCapture");
+        h.cmd ("stopAllClips");
+
+        // -- scenes recall through the rack, not a snapshot engine ---------------------------
+        h.cmd ("addPart");
+        partB = h.partIdAt (1);
+        h.cmd ("loadInstrument", { { "partId", partB }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("addMacro", { { "name", "Sweep" } });
+        const auto macroId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0]
+                                 .getProperty ("macroId", {}).toString();
+        h.cmd ("addMacroTarget", { { "macroId", macroId }, { "targetId", partB },
+                                   { "parameterId", "cutoff" } });
+        h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.8 }, { "final", true } });
+        h.cmd ("setPartMixer", { { "partId", partB }, { "mute", true } });
+
+        h.cmd ("addScene", { { "name", "Verse" } });
+        const auto scenes = h.emits.lastState()->getProperty ("performance", {})
+                                .getProperty ("scenes", {});
+        check (scenes.size() == 1 && (int) scenes[0].getProperty ("numSlots", 0) == 2,
+               "a new scene captures the rig as it stands");
+        sceneId = scenes[0].getProperty ("sceneId", {}).toString();
+
+        // Change the rig, then recall the scene and watch it come back. The launch is
+        // quantized like a clip's, so the scene lands when the boundary arrives — the engine
+        // decides WHEN and the message thread applies the rest at that instant.
+        h.cmd ("setPartMixer", { { "partId", partB }, { "mute", false } });
+        h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.1 }, { "final", true } });
+        h.cmd ("setSceneOptions", { { "sceneId", sceneId }, { "launchQuantize", "immediate" } });
+        h.cmd ("launchScene", { { "sceneId", sceneId } });
+
+        check (! (bool) h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[1]
+                   .getProperty ("mute", false),
+               "the rig does not change the instant the button is pressed — the launch is musical");
+
+        for (int b = 0; b < 4; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+        h.service->drainParameterEvents();
+
+        const auto recalled = h.emits.lastState();
+        check ((bool) recalled->getProperty ("rack", {}).getProperty ("parts", {})[1]
+                   .getProperty ("mute", false),
+               "recalling the scene restores the mixer state through the rack");
+        check (std::abs ((float) (double) recalled->getProperty ("rack", {})
+                             .getProperty ("macros", {})[0].getProperty ("value", 0.0) - 0.8f) < 0.01f,
+               "and the macro value through the Stage 5 macro path");
+
+        // -- the setlist ---------------------------------------------------------------------
+        h.cmd ("addSetlistItem", { { "sceneId", sceneId }, { "name", "Opener" } });
+        h.cmd ("addSetlistItem", { { "sceneId", "gone-scene" }, { "name", "Broken" } });
+        h.cmd ("setlistGo", { { "index", 0 } });
+        check ((int) h.emits.lastState()->getProperty ("performance", {})
+                   .getProperty ("setlist", {}).getProperty ("currentIndex", -1) == 0,
+               "the setlist recalls its first item");
+
+        h.emits.clear();
+        h.cmd ("setlistNext");
+        check (h.emits.lastError().contains ("cannot be recalled"),
+               "an item whose scene is gone refuses out loud");
+        check ((int) h.emits.lastState()->getProperty ("performance", {})
+                   .getProperty ("setlist", {}).getProperty ("currentIndex", -1) == 0,
+               "and leaves the rig on the last item that worked");
+    }
+
+    // -- everything survives the process --------------------------------------------------
+    Harness h2 (dir);
+    h2.cmd ("getState");
+    const auto* restored = h2.emits.lastState();
+    const auto performance = restored->getProperty ("performance", {});
+
+    check (performance.getProperty ("patterns", {}).size() == 2
+             && performance.getProperty ("clips", {}).size() == 2
+             && performance.getProperty ("scenes", {}).size() == 1
+             && performance.getProperty ("setlist", {}).getProperty ("items", {}).size() == 2,
+           "patterns, clips, scenes and the setlist all come back");
+
+    const auto restoredLane = performance.getProperty ("patterns", {})[0]
+                                  .getProperty ("lanes", {})[0];
+    const auto restoredSteps = restoredLane.getProperty ("steps", {});
+    check (restoredSteps.size() == 4 && (bool) restoredSteps[0].getProperty ("active", false)
+             && (int) restoredSteps[3].getProperty ("note", 0) == 63,
+           "with every step exactly as it was written");
+
+    check (std::abs ((double) performance.getProperty ("transport", {}).getProperty ("tempo", 0.0)
+                       - 120.0) < 1.0e-9,
+           "and the transport defaults travel with the Performance");
+
+    // The restored song is compiled and ready: launching plays without another edit.
+    const auto restoredClipId = performance.getProperty ("clips", {})[0]
+                                    .getProperty ("clipId", {}).toString();
+    h2.cmd ("setClipOptions", { { "clipId", restoredClipId }, { "launchQuantize", "immediate" } });
+    h2.cmd ("transportPlay");
+    h2.cmd ("launchClip", { { "clipId", restoredClipId } });
+
+    auto* restoredSynth = dynamic_cast<StubSynthProcessor*> (
+        h2.service->getRackHost().getInstrument (h2.firstPartId()));
+    check (restoredSynth != nullptr, "the rack's instrument came back too");
+
+    if (restoredSynth != nullptr)
+    {
+        restoredSynth->received.clear();
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer midi;
+        for (int b = 0; b < 43; ++b)
+        {
+            buffer.clear();
+            h2.service->getGraph().processBlock (buffer, midi);
+        }
+
+        int notes = 0;
+        for (const auto& message : restoredSynth->received)
+            notes += message.isNoteOn() ? 1 : 0;
+        check (notes == 4, "and the restored pattern plays without another edit");
+    }
+}
+
 // The Stage 4 library: one index, explicit provenance, loading only ever through Stage 1's
 // transaction. The identity story is the heart of it — user metadata survives rescans and
 // renames, a missing source marks instead of deletes, and availability is computed live
@@ -2137,6 +2437,7 @@ int main (int argc, char* argv[])
     testAutoPagesAndSurfaceRuntime();
     testEffectsAndMacros();
     testEnrichedPerformanceRestore();
+    testPerformanceSystem();
     testSendsAndReturns();
     testMultiOutputRouting();
     testHardwareParts();

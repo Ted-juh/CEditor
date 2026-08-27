@@ -2,6 +2,9 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PartMidiFilterCore.h"
+#include "Performance/PerformanceEngine.h"
+#include "Performance/ArpEngine.h"
+#include "Performance/MidiFxChain.h"
 
 // RackProcessors — the two per-part graph nodes around an instrument (VIP-successor Stage 1).
 //
@@ -19,25 +22,78 @@
 namespace ceditor::host
 {
 
+// The head of one part's MIDI path. Stage 1 made it the zone filter; Stage 6 makes it the
+// whole per-part event chain, in the order the baseline fixes (§18.8.5):
+//
+//     live MIDI ─ zone filter ─┬─ MIDI FX ─ arpeggiator ─ instrument
+//     engine staging ──────────┘
+//
+// Sequenced events join AFTER the zone filter because they are already addressed to this
+// part — a step written for this lane must not be re-gated by a key range meant for a
+// keyboard — and BEFORE the FX and arp because a sequence should be transposable and
+// arpeggiable like anything else a part plays.
 class PartMidiFilterProcessor final : public juce::AudioProcessor
 {
 public:
     PartMidiFilterProcessor() = default;
 
     PartMidiFilterCore& getCore()                             { return core; }
+    perf::MidiFxChain& getMidiFx()                            { return midiFx; }
+    perf::ArpEngine& getArp()                                 { return arp; }
+
+    /** Where this part's sequenced events come from. Null (the default) is a part with no
+        engine behind it, which is exactly how the Stage 1 tests still drive this. */
+    void setEngine (perf::PerformanceEngine* engineToUse, int partIndexToUse) noexcept
+    {
+        engine = engineToUse;
+        partIndex = partIndexToUse;
+    }
 
     void prepareToPlay (double, int maximumExpectedSamplesPerBlock) override
     {
-        scratch.ensureSize ((size_t) juce::jmax (256, maximumExpectedSamplesPerBlock));
+        const auto size = (size_t) juce::jmax (256, maximumExpectedSamplesPerBlock * 4);
+        scratch.ensureSize (size);
+        merged.ensureSize (size);
+        afterFx.ensureSize (size);
     }
 
     void releaseResources() override {}
 
     void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi) override
     {
-        juce::ignoreUnused (audio);
+        const auto numSamples = audio.getNumSamples();
+
         core.process (midi, scratch);
-        midi.swapWith (scratch);
+
+        // The engine node runs upstream in the same graph pass, so its staging for this part
+        // is already written by the time we read it.
+        if (engine != nullptr && partIndex >= 0)
+        {
+            merged.clear();
+            merged.addEvents (scratch, 0, -1, 0);
+            merged.addEvents (engine->stagingFor (partIndex), 0, -1, 0);
+            scratch.swapWith (merged);
+        }
+
+        midiFx.process (scratch, afterFx);
+
+        if (arp.isEnabled())
+        {
+            const auto block = engine != nullptr ? engine->lastBlockTime()
+                                                 : perf::Transport::BlockTime();
+            arp.process (afterFx, scratch, block, juce::jmax (1, numSamples));
+            midi.swapWith (scratch);
+            return;
+        }
+
+        midi.swapWith (afterFx);
+    }
+
+    /** Releases everything the chain is holding — the panic path reaches all three stages. */
+    void flushEventChain (juce::MidiBuffer& out, int position)
+    {
+        midiFx.allNotesOff (out, position);
+        arp.allNotesOff (out, position);
     }
 
     const juce::String getName() const override               { return "CEditor Part MIDI Filter"; }
@@ -57,9 +113,54 @@ public:
 
 private:
     PartMidiFilterCore core;
-    juce::MidiBuffer scratch;
+    perf::MidiFxChain midiFx;
+    perf::ArpEngine arp;
+    perf::PerformanceEngine* engine = nullptr;
+    int partIndex = -1;
+    juce::MidiBuffer scratch, merged, afterFx;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PartMidiFilterProcessor)
+};
+
+// The single node that owns musical time. It sits between the MIDI input and every part's
+// filter, so the graph's own topological order guarantees the engine has run — and written
+// its per-part staging — before any part reads it. Live MIDI passes through untouched; the
+// engine's own output never travels this wire.
+class PerformanceEngineProcessor final : public juce::AudioProcessor
+{
+public:
+    explicit PerformanceEngineProcessor (perf::PerformanceEngine& engineToDrive)
+        : engine (engineToDrive)
+    {
+    }
+
+    void prepareToPlay (double, int) override {}
+    void releaseResources() override {}
+
+    void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi) override
+    {
+        engine.processBlock (juce::jmax (1, audio.getNumSamples()), midi);
+    }
+
+    const juce::String getName() const override               { return "CEditor Performance Engine"; }
+    bool acceptsMidi() const override                         { return true; }
+    bool producesMidi() const override                        { return true; }
+    bool isMidiEffect() const override                        { return true; }
+    double getTailLengthSeconds() const override              { return 0.0; }
+    juce::AudioProcessorEditor* createEditor() override       { return nullptr; }
+    bool hasEditor() const override                           { return false; }
+    int getNumPrograms() override                             { return 1; }
+    int getCurrentProgram() override                          { return 0; }
+    void setCurrentProgram (int) override                     {}
+    const juce::String getProgramName (int) override          { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+    void getStateInformation (juce::MemoryBlock&) override    {}
+    void setStateInformation (const void*, int) override      {}
+
+private:
+    perf::PerformanceEngine& engine;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PerformanceEngineProcessor)
 };
 
 // The terminal MIDI node of a hardware-instrument part (Stage 5): forwards the part's

@@ -92,12 +92,27 @@ public:
 
     struct OutEvent
     {
-        enum class Type : juce::uint8 { parameterValue = 0, sceneApplied, clipStarted, clipStopped };
+        enum class Type : juce::uint8
+        {
+            parameterValue = 0,
+            sceneApplied,
+            clipStarted,
+            clipStopped,
+            capturedNote,      // a played note, already quantized to the armed lane's grid
+        };
         Type type = Type::parameterValue;
-        int index = -1;        // parameter target index, clip index, or scene token
+        int index = -1;        // parameter target index, clip index, scene token, or step index
         float value = 0.0f;
+        int data1 = 0;         // captured note number
+        int data2 = 0;         // captured velocity
         int generation = 0;
     };
+
+    /** Arms capture into one lane of one clip's pattern (§18.8.2): live note-ons are snapped
+        to that lane's own step grid and reported through the queue, so the document is edited
+        on the message thread and the audio thread only ever observes. clipIndex < 0 disarms. */
+    void armCapture (int clipIndex, int laneIndex) noexcept;
+    bool isCapturing() const noexcept                     { return captureClip.load() >= 0; }
 
     /** Message thread: pops one queued event. Returns false when the queue is empty. */
     bool popEvent (OutEvent& event);
@@ -117,6 +132,10 @@ public:
     /** The events generated for one rack slot this block. Valid until the next processBlock;
         the part processors read it downstream in the same graph pass. */
     const juce::MidiBuffer& stagingFor (int partIndex) const noexcept;
+
+    /** The musical window of the block just processed. The per-part arpeggiators read this
+        rather than advancing a clock of their own — same window, same grid, one authority. */
+    const Transport::BlockTime& lastBlockTime() const noexcept   { return lastBlock; }
 
 private:
     struct Command
@@ -162,7 +181,9 @@ private:
                    juce::uint8 velocity, double releasePpq, int sampleOffset);
     void releaseDueNotes (const Transport::BlockTime& block, int numSamples);
     void flushNotes (int clipIndex, int sampleOffset);   // clipIndex < 0 = every note
-    void pushEvent (OutEvent::Type type, int index, float value);
+    void pushEvent (OutEvent::Type type, int index, float value, int data1 = 0, int data2 = 0);
+    void captureFrom (const juce::MidiBuffer& liveInput, const CompiledSong& song,
+                      const Transport::BlockTime& block, int numSamples);
     void reclaimRetiredSongs();
 
     Transport transport;
@@ -186,9 +207,12 @@ private:
     juce::AbstractFifo eventFifo { 1024 };
     std::array<OutEvent, 1024> eventSlots;
 
+    Transport::BlockTime lastBlock;
     double currentSampleRate = 44100.0;
     int activeParts = 0;
     std::atomic<bool> panicRequested { false };
+    std::atomic<int> captureClip { -1 };
+    std::atomic<int> captureLane { -1 };
 };
 
 } // namespace ceditor::perf

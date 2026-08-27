@@ -1020,6 +1020,641 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    // -- Stage 6: transport ----------------------------------------------------------------
+
+    if (cmd == "transportPlay" || cmd == "transportStop" || cmd == "transportContinue")
+    {
+        auto& transport = rack.getEngine().getTransport();
+        if (cmd == "transportPlay")          transport.start();
+        else if (cmd == "transportStop")     transport.stop();
+        else                                 transport.continuePlayback();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setTempo")
+    {
+        auto& performance = rack.getPerformance();
+        const auto tempo = juce::jlimit (20.0, 300.0, (double) payload.getProperty ("tempo", 120.0));
+        rack.getEngine().getTransport().setTempo (tempo);
+        const_cast<Performance&> (performance).transport.tempo = tempo;
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setTimeSignature")
+    {
+        const auto numerator = juce::jlimit (1, 32, (int) payload.getProperty ("numerator", 4));
+        const auto denominator = juce::jlimit (2, 16, (int) payload.getProperty ("denominator", 4));
+        rack.getEngine().getTransport().setTimeSignature (numerator, denominator);
+        auto& settings = const_cast<Performance&> (rack.getPerformance()).transport;
+        settings.timeSignatureNumerator = numerator;
+        settings.timeSignatureDenominator = denominator;
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setTransportPosition")
+    {
+        rack.getEngine().getTransport().setPosition ((double) payload.getProperty ("ppq", 0.0));
+        emitState();
+        return;
+    }
+
+    if (cmd == "setExternalClock")
+    {
+        const auto enabled = (bool) payload.getProperty ("enabled", false);
+        rack.getEngine().getTransport().setExternalClockEnabled (enabled);
+        const_cast<Performance&> (rack.getPerformance()).transport.externalClock = enabled;
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    // -- Stage 6: patterns, lanes and steps -------------------------------------------------
+
+    if (cmd == "addPattern")
+    {
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        const auto name = payload.getProperty ("name", {}).toString().trim();
+        auto pattern = perf::Pattern::create (name.isNotEmpty()
+                                                ? name
+                                                : "Pattern " + juce::String (performance.patterns.size() + 1));
+
+        // A pattern with no lane cannot be edited into anything, so it arrives with one
+        // aimed at the focused part — the shortest path from "new pattern" to a sound.
+        perf::Lane lane;
+        lane.laneId = juce::Uuid().toDashedString();
+        lane.name = "Notes";
+        lane.targetPartId = performance.focusedPartId;
+        lane.resizeSteps();
+        pattern.lanes.add (std::move (lane));
+
+        performance.patterns.add (std::move (pattern));
+        recompilePerformance();
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "removePattern" || cmd == "renamePattern" || cmd == "setPatternOptions")
+    {
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        const auto patternId = payload.getProperty ("patternId", {}).toString();
+        auto* pattern = performance.findPattern (patternId);
+        if (pattern == nullptr)
+        {
+            emitError ("Unknown pattern.");
+            return;
+        }
+
+        if (cmd == "removePattern")
+        {
+            // Clips that named it go with it: a clip pointing at nothing is a launch button
+            // that does nothing, which is worse than an absent button.
+            for (int i = performance.clips.size(); --i >= 0;)
+                if (performance.clips.getReference (i).patternId == patternId)
+                    performance.clips.remove (i);
+
+            for (int i = 0; i < performance.patterns.size(); ++i)
+                if (performance.patterns.getReference (i).patternId == patternId)
+                {
+                    performance.patterns.remove (i);
+                    break;
+                }
+        }
+        else if (cmd == "renamePattern")
+        {
+            pattern->name = payload.getProperty ("name", {}).toString().trim();
+        }
+        else
+        {
+            const auto* fields = payload.getDynamicObject();
+            if (fields != nullptr)
+            {
+                if (fields->hasProperty ("swing"))
+                    pattern->swing = juce::jlimit (0.0f, 0.75f, (float) (double) payload["swing"]);
+                if (fields->hasProperty ("seed"))
+                    pattern->seed = (juce::uint32) juce::jmax (1, (int) payload["seed"]);
+            }
+        }
+
+        recompilePerformance();
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "addLane" || cmd == "removeLane" || cmd == "setLaneOptions"
+        || cmd == "euclidFill" || cmd == "clearLane")
+    {
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        auto* pattern = performance.findPattern (payload.getProperty ("patternId", {}).toString());
+        if (pattern == nullptr)
+        {
+            emitError ("Unknown pattern.");
+            return;
+        }
+
+        if (cmd == "addLane")
+        {
+            perf::Lane lane;
+            lane.laneId = juce::Uuid().toDashedString();
+            lane.type = perf::laneTypeFromName (payload.getProperty ("type", "note").toString());
+            lane.name = payload.getProperty ("name", {}).toString().trim();
+            if (lane.name.isEmpty())
+                lane.name = juce::String (perf::laneTypeName (lane.type)).substring (0, 1).toUpperCase()
+                              + juce::String (perf::laneTypeName (lane.type)).substring (1);
+            lane.targetPartId = payload.getProperty ("targetPartId", performance.focusedPartId).toString();
+            lane.resizeSteps();
+            pattern->lanes.add (std::move (lane));
+        }
+        else
+        {
+            const auto laneId = payload.getProperty ("laneId", {}).toString();
+            auto* lane = pattern->findLane (laneId);
+            if (lane == nullptr)
+            {
+                emitError ("Unknown lane.");
+                return;
+            }
+
+            if (cmd == "removeLane")
+            {
+                for (int i = 0; i < pattern->lanes.size(); ++i)
+                    if (pattern->lanes.getReference (i).laneId == laneId)
+                    {
+                        pattern->lanes.remove (i);
+                        break;
+                    }
+            }
+            else if (cmd == "clearLane")
+            {
+                for (auto& step : lane->steps)
+                    step = perf::PatternStep();
+                lane->euclidPulses = 0;
+            }
+            else if (cmd == "euclidFill")
+            {
+                // A generated fill writes real steps: the user edits them afterwards and
+                // nothing downstream has to know a lane was ever generated.
+                lane->euclidPulses = juce::jlimit (0, lane->stepCount,
+                                                   (int) payload.getProperty ("pulses", 0));
+                lane->euclidRotation = (int) payload.getProperty ("rotation", 0);
+                const auto hits = perf::euclideanPattern (lane->stepCount, lane->euclidPulses,
+                                                          lane->euclidRotation);
+                for (int i = 0; i < lane->steps.size() && i < hits.size(); ++i)
+                {
+                    auto& step = lane->steps.getReference (i);
+                    step.active = hits[i];
+                    if (step.active && lane->type == perf::LaneType::note && step.note == 0)
+                        step.note = 60;
+                }
+            }
+            else
+            {
+                const auto* fields = payload.getDynamicObject();
+                if (fields != nullptr)
+                {
+                    if (fields->hasProperty ("name"))         lane->name = payload["name"].toString();
+                    if (fields->hasProperty ("targetPartId")) lane->targetPartId = payload["targetPartId"].toString();
+                    if (fields->hasProperty ("channel"))      lane->channel = juce::jlimit (1, 16, (int) payload["channel"]);
+                    if (fields->hasProperty ("ccNumber"))     lane->ccNumber = juce::jlimit (0, 127, (int) payload["ccNumber"]);
+                    if (fields->hasProperty ("drumNote"))     lane->drumNote = juce::jlimit (0, 127, (int) payload["drumNote"]);
+                    if (fields->hasProperty ("stepsPerBeat")) lane->stepsPerBeat = juce::jlimit (1, 16, (int) payload["stepsPerBeat"]);
+                    if (fields->hasProperty ("muted"))        lane->muted = (bool) payload["muted"];
+                    if (fields->hasProperty ("glide"))        lane->glide = (bool) payload["glide"];
+                    if (fields->hasProperty ("stepCount"))
+                    {
+                        lane->stepCount = juce::jlimit (1, 128, (int) payload["stepCount"]);
+                        lane->resizeSteps();
+                    }
+
+                    // An automation lane's address is captured with the class it was authored
+                    // against, exactly like a page slot or a macro target.
+                    if (fields->hasProperty ("targetId") || fields->hasProperty ("parameterId"))
+                    {
+                        const auto targetId = fields->hasProperty ("targetId")
+                                                ? payload["targetId"].toString() : lane->targetId;
+                        const auto parameterId = fields->hasProperty ("parameterId")
+                                                   ? payload["parameterId"].toString() : lane->parameterId;
+                        if (! targetParameterExists (targetId, parameterId))
+                        {
+                            emitError ("Unknown parameter " + parameterId + " on that target.");
+                            return;
+                        }
+                        lane->targetId = targetId;
+                        lane->parameterId = parameterId;
+                        lane->targetCeId = targetClassCeId (targetId);
+                    }
+                }
+            }
+        }
+
+        recompilePerformance();
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setStep" || cmd == "toggleStep")
+    {
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        auto* pattern = performance.findPattern (payload.getProperty ("patternId", {}).toString());
+        auto* lane = pattern != nullptr
+                       ? pattern->findLane (payload.getProperty ("laneId", {}).toString())
+                       : nullptr;
+        auto* step = lane != nullptr ? lane->findStep ((int) payload.getProperty ("index", -1))
+                                     : nullptr;
+        if (step == nullptr)
+        {
+            emitError ("Unknown step.");
+            return;
+        }
+
+        if (cmd == "toggleStep")
+        {
+            step->active = ! step->active;
+            if (step->active && lane->type == perf::LaneType::note && step->note == 0)
+                step->note = 60;
+        }
+        else if (const auto* fields = payload.getDynamicObject())
+        {
+            if (fields->hasProperty ("active"))      step->active = (bool) payload["active"];
+            if (fields->hasProperty ("note"))        step->note = juce::jlimit (0, 127, (int) payload["note"]);
+            if (fields->hasProperty ("velocity"))    step->velocity = juce::jlimit (1, 127, (int) payload["velocity"]);
+            if (fields->hasProperty ("value"))       step->value = juce::jlimit (0.0f, 1.0f, (float) (double) payload["value"]);
+            if (fields->hasProperty ("gate"))        step->gate = juce::jlimit (0.05f, 4.0f, (float) (double) payload["gate"]);
+            if (fields->hasProperty ("microtiming")) step->microtiming = juce::jlimit (-0.5f, 0.5f, (float) (double) payload["microtiming"]);
+            if (fields->hasProperty ("probability")) step->probability = juce::jlimit (0, 100, (int) payload["probability"]);
+            if (fields->hasProperty ("ratchets"))    step->ratchets = juce::jlimit (1, 8, (int) payload["ratchets"]);
+            if (fields->hasProperty ("tie"))         step->tie = (bool) payload["tie"];
+            if (fields->hasProperty ("every"))       step->conditionEvery = juce::jlimit (1, 16, (int) payload["every"]);
+            if (fields->hasProperty ("offset"))      step->conditionOffset = juce::jlimit (0, 15, (int) payload["offset"]);
+            if (fields->hasProperty ("chord"))
+            {
+                step->chordNotes.clear();
+                if (const auto* notes = payload["chord"].getArray())
+                    for (const auto& note : *notes)
+                        step->chordNotes.add (juce::jlimit (0, 127, (int) note));
+            }
+        }
+
+        recompilePerformance();
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    // -- Stage 6: clips ----------------------------------------------------------------------
+
+    if (cmd == "addClip")
+    {
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        const auto patternId = payload.getProperty ("patternId", {}).toString();
+        const auto* pattern = performance.findPattern (patternId);
+        if (pattern == nullptr)
+        {
+            emitError ("Unknown pattern.");
+            return;
+        }
+
+        perf::Clip clip;
+        clip.clipId = juce::Uuid().toDashedString();
+        clip.patternId = patternId;
+        clip.name = payload.getProperty ("name", {}).toString().trim();
+        if (clip.name.isEmpty())
+            clip.name = pattern->name;
+        clip.launchQuantize = performance.transport.defaultQuantize;
+        performance.clips.add (std::move (clip));
+
+        recompilePerformance();
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "removeClip" || cmd == "setClipOptions")
+    {
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        const auto clipId = payload.getProperty ("clipId", {}).toString();
+        auto* clip = performance.findClip (clipId);
+        if (clip == nullptr)
+        {
+            emitError ("Unknown clip.");
+            return;
+        }
+
+        if (cmd == "removeClip")
+        {
+            const auto index = performance.indexOfClip (clipId);
+            if (index >= 0)
+                rack.getEngine().stopClip (index, perf::Quantize::immediate);
+
+            for (auto& scene : performance.scenes)
+                scene.clipIds.removeString (clipId);
+            performance.clips.remove (index);
+        }
+        else if (const auto* fields = payload.getDynamicObject())
+        {
+            if (fields->hasProperty ("name"))   clip->name = payload["name"].toString().trim();
+            if (fields->hasProperty ("loop"))   clip->loop = (bool) payload["loop"];
+            if (fields->hasProperty ("launchQuantize"))
+                clip->launchQuantize = perf::quantizeFromName (payload["launchQuantize"].toString());
+            if (fields->hasProperty ("followClipId"))
+                clip->followClipId = payload["followClipId"].toString();
+            if (fields->hasProperty ("followAfterLoops"))
+                clip->followAfterLoops = juce::jlimit (0, 64, (int) payload["followAfterLoops"]);
+        }
+
+        recompilePerformance();
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "launchClip" || cmd == "stopClip")
+    {
+        const auto index = rack.getPerformance().indexOfClip (payload.getProperty ("clipId", {}).toString());
+        if (index < 0)
+        {
+            emitError ("Unknown clip.");
+            return;
+        }
+
+        if (cmd == "launchClip")
+            rack.getEngine().launchClip (index);
+        else
+            rack.getEngine().stopClip (index, rack.getPerformance().transport.defaultQuantize);
+
+        emitState();
+        return;
+    }
+
+    if (cmd == "stopAllClips")
+    {
+        rack.getEngine().stopAllClips (rack.getPerformance().transport.defaultQuantize);
+        emitState();
+        return;
+    }
+
+    if (cmd == "armCapture" || cmd == "disarmCapture")
+    {
+        if (cmd == "disarmCapture")
+        {
+            rack.getEngine().armCapture (-1, -1);
+            captureClipId = captureLaneId = {};
+            emitState();
+            return;
+        }
+
+        const auto clipId = payload.getProperty ("clipId", {}).toString();
+        const auto laneId = payload.getProperty ("laneId", {}).toString();
+        const auto clipIndex = rack.getPerformance().indexOfClip (clipId);
+        const auto* clip = rack.getPerformance().findClip (clipId);
+        const auto* pattern = clip != nullptr ? rack.getPerformance().findPattern (clip->patternId)
+                                              : nullptr;
+        int laneIndex = -1;
+        if (pattern != nullptr)
+            for (int i = 0; i < pattern->lanes.size(); ++i)
+                if (pattern->lanes.getReference (i).laneId == laneId)
+                    laneIndex = i;
+
+        if (clipIndex < 0 || laneIndex < 0)
+        {
+            emitError ("Unknown clip or lane.");
+            return;
+        }
+
+        rack.getEngine().armCapture (clipIndex, laneIndex);
+        captureClipId = clipId;
+        captureLaneId = laneId;
+        emitState();
+        return;
+    }
+
+    // -- Stage 6: scenes ---------------------------------------------------------------------
+
+    if (cmd == "addScene")
+    {
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        perf::Scene scene;
+        scene.sceneId = juce::Uuid().toDashedString();
+        scene.name = payload.getProperty ("name", {}).toString().trim();
+        if (scene.name.isEmpty())
+            scene.name = "Scene " + juce::String (performance.scenes.size() + 1);
+        scene.launchQuantize = performance.transport.defaultQuantize;
+        // A new scene captures the rig as it stands: the fastest honest way to make one.
+        captureSceneFromRack (scene);
+        performance.scenes.add (std::move (scene));
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "removeScene" || cmd == "renameScene" || cmd == "captureScene"
+        || cmd == "setSceneOptions" || cmd == "setSceneClip")
+    {
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        const auto sceneId = payload.getProperty ("sceneId", {}).toString();
+        auto* scene = performance.findScene (sceneId);
+        if (scene == nullptr)
+        {
+            emitError ("Unknown scene.");
+            return;
+        }
+
+        if (cmd == "removeScene")
+        {
+            for (int i = performance.setlist.items.size(); --i >= 0;)
+                if (performance.setlist.items.getReference (i).sceneId == sceneId)
+                    performance.setlist.items.remove (i);
+
+            for (int i = 0; i < performance.scenes.size(); ++i)
+                if (performance.scenes.getReference (i).sceneId == sceneId)
+                {
+                    performance.scenes.remove (i);
+                    break;
+                }
+        }
+        else if (cmd == "renameScene")
+        {
+            scene->name = payload.getProperty ("name", {}).toString().trim();
+        }
+        else if (cmd == "captureScene")
+        {
+            captureSceneFromRack (*scene);
+        }
+        else if (cmd == "setSceneClip")
+        {
+            const auto clipId = payload.getProperty ("clipId", {}).toString();
+            if ((bool) payload.getProperty ("included", true))
+                scene->clipIds.addIfNotAlreadyThere (clipId);
+            else
+                scene->clipIds.removeString (clipId);
+        }
+        else if (const auto* fields = payload.getDynamicObject())
+        {
+            if (fields->hasProperty ("launchQuantize"))
+                scene->launchQuantize = perf::quantizeFromName (payload["launchQuantize"].toString());
+            if (fields->hasProperty ("stopOtherClips"))
+                scene->stopOtherClips = (bool) payload["stopOtherClips"];
+            if (fields->hasProperty ("tempo"))
+                scene->tempo = juce::jlimit (0.0, 300.0, (double) payload["tempo"]);
+        }
+
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "launchScene")
+    {
+        if (! launchScene (payload.getProperty ("sceneId", {}).toString()))
+        {
+            emitError ("Unknown scene.");
+            return;
+        }
+        emitState();
+        return;
+    }
+
+    // -- Stage 6: the setlist ----------------------------------------------------------------
+
+    if (cmd == "addSetlistItem")
+    {
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        perf::SetlistItem item;
+        item.itemId = juce::Uuid().toDashedString();
+        item.sceneId = payload.getProperty ("sceneId", {}).toString();
+        item.name = payload.getProperty ("name", {}).toString().trim();
+        if (item.name.isEmpty())
+        {
+            const auto* scene = performance.findScene (item.sceneId);
+            item.name = scene != nullptr ? scene->name
+                                         : "Item " + juce::String (performance.setlist.items.size() + 1);
+        }
+        performance.setlist.items.add (std::move (item));
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "removeSetlistItem" || cmd == "setSetlistItem" || cmd == "moveSetlistItem")
+    {
+        auto& setlist = const_cast<Performance&> (rack.getPerformance()).setlist;
+        const auto itemId = payload.getProperty ("itemId", {}).toString();
+        int index = -1;
+        for (int i = 0; i < setlist.items.size(); ++i)
+            if (setlist.items.getReference (i).itemId == itemId)
+                index = i;
+
+        if (index < 0)
+        {
+            emitError ("Unknown setlist item.");
+            return;
+        }
+
+        if (cmd == "removeSetlistItem")
+        {
+            setlist.items.remove (index);
+            setlist.currentIndex = juce::jlimit (-1, setlist.items.size() - 1, setlist.currentIndex);
+        }
+        else if (cmd == "moveSetlistItem")
+        {
+            setlist.items.move (index, juce::jlimit (0, setlist.items.size() - 1,
+                                                     (int) payload.getProperty ("index", index)));
+        }
+        else if (const auto* fields = payload.getDynamicObject())
+        {
+            auto& item = setlist.items.getReference (index);
+            if (fields->hasProperty ("name"))    item.name = payload["name"].toString();
+            if (fields->hasProperty ("notes"))   item.notes = payload["notes"].toString();
+            if (fields->hasProperty ("sceneId")) item.sceneId = payload["sceneId"].toString();
+            if (fields->hasProperty ("tempo"))   item.tempo = juce::jlimit (0.0, 300.0, (double) payload["tempo"]);
+        }
+
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setlistGo" || cmd == "setlistNext" || cmd == "setlistPrev")
+    {
+        const auto& setlist = rack.getPerformance().setlist;
+        const auto target = cmd == "setlistGo"  ? (int) payload.getProperty ("index", 0)
+                          : cmd == "setlistNext" ? setlist.currentIndex + 1
+                                                 : setlist.currentIndex - 1;
+        if (! goToSetlistItem (target))
+        {
+            emitError ("That setlist item cannot be recalled; staying where we are.");
+            emitState();
+            return;
+        }
+        emitState();
+        return;
+    }
+
+    // -- Stage 6: per-part arp and MIDI FX ---------------------------------------------------
+
+    if (cmd == "setPartArp" || cmd == "setPartMidiFx")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+
+        const auto* fields = payload.getDynamicObject();
+
+        if (cmd == "setPartArp")
+        {
+            auto arp = part->arp;   // absent fields keep their value, like setPartMixer
+            if (fields != nullptr)
+            {
+                if (fields->hasProperty ("enabled"))      arp.enabled = (bool) payload["enabled"];
+                if (fields->hasProperty ("mode"))         arp.mode = perf::ArpSettings::modeFromName (payload["mode"].toString());
+                if (fields->hasProperty ("stepsPerBeat")) arp.stepsPerBeat = juce::jlimit (1, 16, (int) payload["stepsPerBeat"]);
+                if (fields->hasProperty ("gate"))         arp.gate = juce::jlimit (0.05f, 1.0f, (float) (double) payload["gate"]);
+                if (fields->hasProperty ("swing"))        arp.swing = juce::jlimit (0.0f, 0.75f, (float) (double) payload["swing"]);
+                if (fields->hasProperty ("octaves"))      arp.octaves = juce::jlimit (1, 4, (int) payload["octaves"]);
+                if (fields->hasProperty ("latch"))        arp.latch = (bool) payload["latch"];
+                if (fields->hasProperty ("constrainToScale")) arp.constrainToScale = (bool) payload["constrainToScale"];
+                if (fields->hasProperty ("velocityPattern"))
+                {
+                    arp.velocityPattern.clear();
+                    if (const auto* velocities = payload["velocityPattern"].getArray())
+                        for (const auto& velocity : *velocities)
+                            arp.velocityPattern.add (juce::jlimit (1, 127, (int) velocity));
+                }
+            }
+            rack.setPartArp (partId, arp);
+        }
+        else
+        {
+            auto fx = part->midiFx;
+            if (fields != nullptr)
+            {
+                if (fields->hasProperty ("transpose"))        fx.transpose = juce::jlimit (-48, 48, (int) payload["transpose"]);
+                if (fields->hasProperty ("constrainToScale")) fx.constrainToScale = (bool) payload["constrainToScale"];
+                if (fields->hasProperty ("scaleRoot"))        fx.scaleRoot = juce::jlimit (0, 11, (int) payload["scaleRoot"]);
+                if (fields->hasProperty ("scaleType"))        fx.scaleType = payload["scaleType"].toString();
+                if (fields->hasProperty ("chord"))            fx.chord = perf::MidiFxSettings::chordTypeFromName (payload["chord"].toString());
+                if (fields->hasProperty ("velocityFixed"))    fx.velocityFixed = juce::jlimit (0, 127, (int) payload["velocityFixed"]);
+                if (fields->hasProperty ("velocityScale"))    fx.velocityScale = juce::jlimit (0.1f, 2.0f, (float) (double) payload["velocityScale"]);
+            }
+            rack.setPartMidiFx (partId, fx);
+        }
+
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "getLibrary")
     {
         ensureLibrary();
@@ -1334,6 +1969,15 @@ void InstrumentHostService::applyPerformance (Performance&& performance)
 
     for (const auto& [effectId, ceId] : effectLoads)
         requestEffect (effectId, ceId);
+
+    // The Stage 6 half: transport defaults become live, and the patterns compile so the
+    // engine has something to play the moment a clip is launched.
+    auto& transport = rack.getEngine().getTransport();
+    transport.setTempo (model.transport.tempo);
+    transport.setTimeSignature (model.transport.timeSignatureNumerator,
+                                model.transport.timeSignatureDenominator);
+    transport.setExternalClockEnabled (model.transport.externalClock);
+    recompilePerformance();
 
     // Hardware parts reconnect their ports and recall their program; a port that is gone
     // shows up as the part's diagnostic, never as a silent no-op.
@@ -2432,8 +3076,237 @@ bool InstrumentHostService::bindingResolves (const ControlBinding& binding) cons
         && it->second.inventory.find (binding.parameterId) != nullptr;
 }
 
+void InstrumentHostService::recompilePerformance()
+{
+    const auto& performance = rack.getPerformance();
+
+    perf::CompileContext context;
+    context.partIndexFor = [this] (const juce::String& partId)
+    {
+        return rack.partIndexFor (partId);
+    };
+    context.parameterResolves = [this] (const juce::String& targetId, const juce::String& parameterId,
+                                        const juce::String& expectedCeId)
+    {
+        // The Stage 2 honesty rule, applied to automation: the address must exist AND the
+        // target must still carry the class the lane was authored against. A lane that fails
+        // this compiles to silence and shows unresolved — it is never retargeted by name.
+        if (! targetParameterExists (targetId, parameterId))
+            return false;
+        if (isVirtualParameterId (parameterId) || expectedCeId.isEmpty())
+            return true;
+        return targetClassCeId (targetId) == expectedCeId;
+    };
+
+    rack.getEngine().setSong (perf::compileSong (performance.patterns, performance.clips, context),
+                              ++songGeneration);
+}
+
+void InstrumentHostService::applyAutomationValue (const juce::String& targetId,
+                                                  const juce::String& parameterId, float value)
+{
+    if (isVirtualParameterId (parameterId))
+    {
+        setVirtualParameter (targetId, parameterId, value);
+        return;
+    }
+
+    // No gestures: automation is a continuous stream, and a begin/end pair around every value
+    // would tell the host a human is grabbing the control sixty times a second.
+    if (auto* parameter = resolveParameter (targetId, parameterId))
+        parameter->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, value));
+}
+
+void InstrumentHostService::applySceneState (const perf::Scene& scene)
+{
+    // Everything here goes through the systems that already own it: the rack's mixer, the
+    // Stage 5 macro path, the existing focus and page state. A scene is a set of calls, not
+    // a snapshot format (§18.8.8).
+    for (const auto& slot : scene.slots)
+    {
+        rack.setEnabled (slot.partId, slot.enabled);
+        rack.setMute (slot.partId, slot.mute);
+        if (slot.applyVolume)
+            rack.setVolume (slot.partId, slot.volume);
+    }
+
+    for (const auto& value : scene.macros)
+        if (auto* macro = rack.findMutableMacro (value.macroId))
+        {
+            macro->value = juce::jlimit (0.0f, 1.0f, value.value);
+            applyMacroValue (*macro);
+        }
+
+    if (scene.focusPartId.isNotEmpty() && rack.focusPart (scene.focusPartId))
+        showEditorFor (scene.focusPartId);
+
+    if (scene.tempo > 0.0)
+    {
+        rack.getEngine().getTransport().setTempo (scene.tempo);
+        const_cast<Performance&> (rack.getPerformance()).transport.tempo = scene.tempo;
+    }
+
+    savePerformance();
+}
+
+void InstrumentHostService::captureSceneFromRack (perf::Scene& scene)
+{
+    const auto& performance = rack.getPerformance();
+
+    scene.slots.clear();
+    for (const auto& part : performance.parts)
+        scene.slots.add ({ part.partId, part.enabled, part.mute, part.volume, true });
+
+    scene.macros.clear();
+    for (const auto& macro : performance.macros)
+        scene.macros.add ({ macro.macroId, macro.value });
+
+    scene.clipIds.clear();
+    for (int i = 0; i < performance.clips.size(); ++i)
+        if (rack.getEngine().isClipActive (i))
+            scene.clipIds.add (performance.clips.getReference (i).clipId);
+
+    scene.focusPartId = performance.focusedPartId;
+}
+
+bool InstrumentHostService::launchScene (const juce::String& sceneId)
+{
+    const auto& performance = rack.getPerformance();
+    const auto* scene = performance.findScene (sceneId);
+    if (scene == nullptr)
+        return false;
+
+    juce::Array<int> clipIndices;
+    for (const auto& clipId : scene->clipIds)
+    {
+        const auto index = performance.indexOfClip (clipId);
+        if (index >= 0)
+            clipIndices.add (index);
+    }
+
+    // The engine decides WHEN (the quantization boundary) and tells us when it landed; the
+    // rest of the scene is applied at that instant, so the whole recall is one musical event.
+    const auto token = nextSceneToken++;
+    pendingScenes[token] = sceneId;
+    rack.getEngine().launchScene (clipIndices, scene->stopOtherClips, scene->launchQuantize, token);
+
+    // A parked transport has no boundary to wait for, so the scene applies immediately —
+    // otherwise recalling a scene before pressing play would appear to do nothing.
+    if (! rack.getEngine().getTransport().isPlaying())
+    {
+        applySceneState (*scene);
+        pendingScenes.erase (token);
+    }
+
+    return true;
+}
+
+bool InstrumentHostService::goToSetlistItem (int index)
+{
+    auto& setlist = const_cast<Performance&> (rack.getPerformance()).setlist;
+    if (! juce::isPositiveAndBelow (index, setlist.items.size()))
+        return false;
+
+    const auto& item = setlist.items.getReference (index);
+    const auto previous = setlist.currentIndex;
+    setlist.currentIndex = index;
+
+    if (item.tempo > 0.0)
+    {
+        rack.getEngine().getTransport().setTempo (item.tempo);
+        const_cast<Performance&> (rack.getPerformance()).transport.tempo = item.tempo;
+    }
+
+    // A scene that will not recall leaves the rig on the last stable item rather than
+    // half-loading it (§18.8.9) — on stage, "nothing changed" beats "something changed".
+    if (item.sceneId.isNotEmpty() && ! launchScene (item.sceneId))
+    {
+        setlist.currentIndex = previous;
+        return false;
+    }
+
+    savePerformance();
+    return true;
+}
+
+void InstrumentHostService::drainEngineEvents()
+{
+    auto& engine = rack.getEngine();
+    const auto* song = engine.getSong();
+    const auto generation = engine.getGeneration();
+
+    bool stateChanged = false;
+    perf::PerformanceEngine::OutEvent event;
+
+    while (engine.popEvent (event))
+    {
+        // Anything queued before the current song was published addresses indices that no
+        // longer mean what they meant; dropping it is safer than guessing.
+        if (event.generation != generation)
+            continue;
+
+        switch (event.type)
+        {
+            case perf::PerformanceEngine::OutEvent::Type::parameterValue:
+                if (song != nullptr
+                    && juce::isPositiveAndBelow (event.index, (int) song->parameterTargets.size()))
+                {
+                    const auto& target = song->parameterTargets[(size_t) event.index];
+                    applyAutomationValue (target.targetId, target.parameterId, event.value);
+                }
+                break;
+
+            case perf::PerformanceEngine::OutEvent::Type::sceneApplied:
+            {
+                const auto it = pendingScenes.find (event.index);
+                if (it == pendingScenes.end())
+                    break;
+                if (const auto* scene = rack.getPerformance().findScene (it->second))
+                    applySceneState (*scene);
+                pendingScenes.erase (it);
+                stateChanged = true;
+                break;
+            }
+
+            case perf::PerformanceEngine::OutEvent::Type::clipStarted:
+            case perf::PerformanceEngine::OutEvent::Type::clipStopped:
+                stateChanged = true;
+                break;
+
+            case perf::PerformanceEngine::OutEvent::Type::capturedNote:
+            {
+                // Played material becomes a step, on this thread, in the document — the audio
+                // thread only ever said what it heard and where it fell (§18.8.2).
+                auto& performance = const_cast<Performance&> (rack.getPerformance());
+                auto* clip = performance.findClip (captureClipId);
+                auto* pattern = clip != nullptr ? performance.findPattern (clip->patternId) : nullptr;
+                auto* lane = pattern != nullptr ? pattern->findLane (captureLaneId) : nullptr;
+                auto* step = lane != nullptr ? lane->findStep (event.index) : nullptr;
+                if (step == nullptr)
+                    break;
+
+                step->active = true;
+                step->note = juce::jlimit (0, 127, event.data1);
+                step->velocity = juce::jlimit (1, 127, event.data2);
+                stateChanged = true;
+                break;
+            }
+        }
+    }
+
+    if (stateChanged)
+    {
+        // A captured note changed what would play, so the compiled song has to follow.
+        recompilePerformance();
+        savePerformance();
+        emitState();
+    }
+}
+
 void InstrumentHostService::drainParameterEvents()
 {
+    drainEngineEvents();
+
     for (auto& [partId, part] : partParameters)
     {
         juce::SortedSet<int> changed;
@@ -2735,6 +3608,8 @@ juce::var InstrumentHostService::buildStatePayload() const
         // parallel paths (a live rack keeps every path as fast as its plug-ins allow).
         obj->setProperty ("latencyMs", rack.partLatencySamples (part.partId)
                                          / rack.getSampleRate() * 1000.0);
+        obj->setProperty ("arp",    perf::arpToVar (part.arp));
+        obj->setProperty ("midiFx", perf::midiFxToVar (part.midiFx));
         parts.add (juce::var (obj));
     }
 
@@ -2847,10 +3722,176 @@ juce::var InstrumentHostService::buildStatePayload() const
             paths.add (p);
         return paths;
     }());
+    root->setProperty ("performance", performancePayload());
     root->setProperty ("scanning", scanBusy.load());
     root->setProperty ("editorOpenPartId", editorTargetId);
     root->setProperty ("audio", juce::var (audio));
     root->setProperty ("rack", juce::var (rackObj));
+    return juce::var (root);
+}
+
+juce::var InstrumentHostService::performancePayload() const
+{
+    const auto& performance = rack.getPerformance();
+    const auto& engine = rack.getEngine();
+    const auto& transport = engine.getTransport();
+
+    int bar = 0, beat = 0;
+    double fraction = 0.0;
+    transport.positionInBarsBeats (bar, beat, fraction);
+
+    auto* transportObj = new juce::DynamicObject();
+    transportObj->setProperty ("playing",       transport.isPlaying());
+    transportObj->setProperty ("tempo",         transport.getTempo());
+    transportObj->setProperty ("numerator",     transport.getTimeSignatureNumerator());
+    transportObj->setProperty ("denominator",   transport.getTimeSignatureDenominator());
+    transportObj->setProperty ("positionPpq",   transport.getPositionPpq());
+    transportObj->setProperty ("bar",           bar);
+    transportObj->setProperty ("beat",          beat);
+    transportObj->setProperty ("beatFraction",  fraction);
+    transportObj->setProperty ("externalClock", transport.isExternalClockEnabled());
+    transportObj->setProperty ("clockLost",     transport.hasLostExternalClock());
+    transportObj->setProperty ("defaultQuantize", perf::quantizeName (performance.transport.defaultQuantize));
+
+    juce::Array<juce::var> patterns;
+    for (const auto& pattern : performance.patterns)
+    {
+        juce::Array<juce::var> lanes;
+        for (const auto& lane : pattern.lanes)
+        {
+            juce::Array<juce::var> steps;
+            for (const auto& step : lane.steps)
+            {
+                auto* s = new juce::DynamicObject();
+                s->setProperty ("active",      step.active);
+                s->setProperty ("note",        step.note);
+                s->setProperty ("velocity",    step.velocity);
+                s->setProperty ("value",       step.value);
+                s->setProperty ("gate",        step.gate);
+                s->setProperty ("microtiming", step.microtiming);
+                s->setProperty ("probability", step.probability);
+                s->setProperty ("ratchets",    step.ratchets);
+                s->setProperty ("tie",         step.tie);
+                s->setProperty ("every",       step.conditionEvery);
+                s->setProperty ("offset",      step.conditionOffset);
+                steps.add (juce::var (s));
+            }
+
+            // An automation lane says whether its address still resolves, exactly as a page
+            // slot and a macro target do.
+            const bool isParameterLane = lane.type == perf::LaneType::parameter;
+            const bool resolved = isParameterLane
+                                    ? (targetClassCeId (lane.targetId) == lane.targetCeId
+                                        || isVirtualParameterId (lane.parameterId))
+                                      && const_cast<InstrumentHostService*> (this)
+                                           ->targetParameterExists (lane.targetId, lane.parameterId)
+                                    : rack.getPerformance().findPart (lane.targetPartId) != nullptr;
+
+            auto* l = new juce::DynamicObject();
+            l->setProperty ("laneId",       lane.laneId);
+            l->setProperty ("type",         perf::laneTypeName (lane.type));
+            l->setProperty ("name",         lane.name);
+            l->setProperty ("targetPartId", lane.targetPartId);
+            l->setProperty ("targetId",     lane.targetId);
+            l->setProperty ("parameterId",  lane.parameterId);
+            l->setProperty ("targetName",   isParameterLane ? targetDisplayName (lane.targetId)
+                                                            : targetDisplayName (lane.targetPartId));
+            l->setProperty ("resolved",     resolved);
+            l->setProperty ("channel",      lane.channel);
+            l->setProperty ("ccNumber",     lane.ccNumber);
+            l->setProperty ("drumNote",     lane.drumNote);
+            l->setProperty ("stepCount",    lane.stepCount);
+            l->setProperty ("stepsPerBeat", lane.stepsPerBeat);
+            l->setProperty ("muted",        lane.muted);
+            l->setProperty ("glide",        lane.glide);
+            l->setProperty ("euclidPulses", lane.euclidPulses);
+            l->setProperty ("steps",        steps);
+            lanes.add (juce::var (l));
+        }
+
+        auto* p = new juce::DynamicObject();
+        p->setProperty ("patternId", pattern.patternId);
+        p->setProperty ("name",      pattern.name);
+        p->setProperty ("swing",     pattern.swing);
+        p->setProperty ("lengthPpq", pattern.lengthPpq());
+        p->setProperty ("lanes",     lanes);
+        patterns.add (juce::var (p));
+    }
+
+    juce::Array<juce::var> clips;
+    for (int i = 0; i < performance.clips.size(); ++i)
+    {
+        const auto& clip = performance.clips.getReference (i);
+        auto* c = new juce::DynamicObject();
+        c->setProperty ("clipId",           clip.clipId);
+        c->setProperty ("name",             clip.name);
+        c->setProperty ("patternId",        clip.patternId);
+        c->setProperty ("launchQuantize",   perf::quantizeName (clip.launchQuantize));
+        c->setProperty ("loop",             clip.loop);
+        c->setProperty ("followClipId",     clip.followClipId);
+        c->setProperty ("followAfterLoops", clip.followAfterLoops);
+        c->setProperty ("active",           engine.isClipActive (i));
+        c->setProperty ("pending",          engine.isClipPending (i));
+        c->setProperty ("phase",            engine.clipPhase (i));
+        clips.add (juce::var (c));
+    }
+
+    juce::Array<juce::var> scenes;
+    for (const auto& scene : performance.scenes)
+    {
+        juce::Array<juce::var> clipIds;
+        for (const auto& clipId : scene.clipIds)
+            clipIds.add (clipId);
+
+        auto* s = new juce::DynamicObject();
+        s->setProperty ("sceneId",        scene.sceneId);
+        s->setProperty ("name",           scene.name);
+        s->setProperty ("clipIds",        clipIds);
+        s->setProperty ("launchQuantize", perf::quantizeName (scene.launchQuantize));
+        s->setProperty ("stopOtherClips", scene.stopOtherClips);
+        s->setProperty ("tempo",          scene.tempo);
+        s->setProperty ("numSlots",       scene.slots.size());
+        s->setProperty ("numMacros",      scene.macros.size());
+        scenes.add (juce::var (s));
+    }
+
+    juce::Array<juce::var> setlistItems;
+    for (const auto& item : performance.setlist.items)
+    {
+        const auto* scene = performance.findScene (item.sceneId);
+        auto* i = new juce::DynamicObject();
+        i->setProperty ("itemId",    item.itemId);
+        i->setProperty ("name",      item.name);
+        i->setProperty ("sceneId",   item.sceneId);
+        i->setProperty ("sceneName", scene != nullptr ? scene->name : juce::String());
+        i->setProperty ("missing",   item.sceneId.isNotEmpty() && scene == nullptr);
+        i->setProperty ("notes",     item.notes);
+        i->setProperty ("tempo",     item.tempo);
+        setlistItems.add (juce::var (i));
+    }
+
+    auto* setlistObj = new juce::DynamicObject();
+    setlistObj->setProperty ("items",        setlistItems);
+    setlistObj->setProperty ("currentIndex", performance.setlist.currentIndex);
+
+    auto* capture = new juce::DynamicObject();
+    capture->setProperty ("armed",  engine.isCapturing());
+    capture->setProperty ("clipId", captureClipId);
+    capture->setProperty ("laneId", captureLaneId);
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("transport", juce::var (transportObj));
+    root->setProperty ("patterns",  patterns);
+    root->setProperty ("clips",     clips);
+    root->setProperty ("scenes",    scenes);
+    root->setProperty ("setlist",   juce::var (setlistObj));
+    root->setProperty ("capture",   juce::var (capture));
+    root->setProperty ("scales",    [] {
+        juce::Array<juce::var> names;
+        for (const auto& name : perf::scaleNames())
+            names.add (name);
+        return names;
+    }());
     return juce::var (root);
 }
 

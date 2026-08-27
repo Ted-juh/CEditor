@@ -86,6 +86,8 @@ std::unique_ptr<CompiledSong> compileSong (const juce::Array<Pattern>& patterns,
             CompiledLane compiled;
             compiled.type = lane.type;
             compiled.lengthPpq = lane.lengthPpq();
+            compiled.stepCount = juce::jmax (1, lane.stepCount);
+            compiled.stepsPerBeat = juce::jmax (1, lane.stepsPerBeat);
             compiled.muted = lane.muted;
             compiled.glide = lane.glide;
 

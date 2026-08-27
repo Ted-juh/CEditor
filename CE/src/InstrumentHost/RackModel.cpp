@@ -208,6 +208,55 @@ const EffectSlot* Performance::findEffect (const juce::String& effectId, juce::S
     return const_cast<Performance*> (this)->findEffect (effectId, chainIdOut);
 }
 
+perf::Pattern* Performance::findPattern (const juce::String& patternId)
+{
+    for (auto& pattern : patterns)
+        if (pattern.patternId == patternId)
+            return &pattern;
+    return nullptr;
+}
+
+const perf::Pattern* Performance::findPattern (const juce::String& patternId) const
+{
+    return const_cast<Performance*> (this)->findPattern (patternId);
+}
+
+perf::Clip* Performance::findClip (const juce::String& clipId)
+{
+    for (auto& clip : clips)
+        if (clip.clipId == clipId)
+            return &clip;
+    return nullptr;
+}
+
+const perf::Clip* Performance::findClip (const juce::String& clipId) const
+{
+    return const_cast<Performance*> (this)->findClip (clipId);
+}
+
+perf::Scene* Performance::findScene (const juce::String& sceneId)
+{
+    for (auto& scene : scenes)
+        if (scene.sceneId == sceneId)
+            return &scene;
+    return nullptr;
+}
+
+const perf::Scene* Performance::findScene (const juce::String& sceneId) const
+{
+    return const_cast<Performance*> (this)->findScene (sceneId);
+}
+
+int Performance::indexOfClip (const juce::String& clipId) const
+{
+    // The engine addresses clips by index and the index IS document order, so this is the one
+    // place the two representations meet.
+    for (int i = 0; i < clips.size(); ++i)
+        if (clips.getReference (i).clipId == clipId)
+            return i;
+    return -1;
+}
+
 ControlPage* Performance::findPage (const juce::String& pageId)
 {
     for (auto& page : pages)
@@ -247,6 +296,8 @@ juce::var Performance::toVar() const
         p->setProperty ("pan",              part.pan);
         p->setProperty ("editorOpen",       part.editorOpen);
         p->setProperty ("effects",          effectsToVar (part.effects));
+        p->setProperty ("midiFx",           perf::midiFxToVar (part.midiFx));
+        p->setProperty ("arp",              perf::arpToVar (part.arp));
 
         if (! part.sends.isEmpty())
         {
@@ -357,11 +408,29 @@ juce::var Performance::toVar() const
         returnVars.add (juce::var (r));
     }
 
+    juce::Array<juce::var> patternVars;
+    for (const auto& pattern : patterns)
+        patternVars.add (perf::patternToVar (pattern));
+
+    juce::Array<juce::var> clipVars;
+    for (const auto& clip : clips)
+        clipVars.add (perf::clipToVar (clip));
+
+    juce::Array<juce::var> sceneVars;
+    for (const auto& scene : scenes)
+        sceneVars.add (perf::sceneToVar (scene));
+
+    root->setProperty ("schemaVersion", currentSchemaVersion);
     root->setProperty ("parts",         partVars);
     root->setProperty ("masterEffects", effectsToVar (masterEffects));
     root->setProperty ("returns",       returnVars);
     root->setProperty ("macros",        macroVars);
     root->setProperty ("pages",         pageVars);
+    root->setProperty ("transport",     perf::transportSettingsToVar (transport));
+    root->setProperty ("patterns",      patternVars);
+    root->setProperty ("clips",         clipVars);
+    root->setProperty ("scenes",        sceneVars);
+    root->setProperty ("setlist",       perf::setlistToVar (setlist));
     return juce::var (root);
 }
 
@@ -376,6 +445,11 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
     parsed.performanceId = stored.getProperty ("performanceId", {}).toString();
     parsed.name          = stored.getProperty ("name", {}).toString();
     parsed.focusedPartId = stored.getProperty ("focusedPartId", {}).toString();
+    // Absent = a pre-Stage-6 document. It migrates by gaining this stage's defaults, which is
+    // what every field below already does when its key is missing — the version is recorded
+    // so a future migration that needs more than defaults can tell the difference.
+    parsed.schemaVersion = juce::jlimit (1, currentSchemaVersion,
+                                         (int) stored.getProperty ("schemaVersion", 1));
 
     if (parsed.performanceId.isEmpty())
         return false;
@@ -412,6 +486,9 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
             std::swap (part.midi.keyLow, part.midi.keyHigh);
         if (part.midi.velocityLow > part.midi.velocityHigh)
             std::swap (part.midi.velocityLow, part.midi.velocityHigh);
+
+        perf::midiFxFromVar (p.getProperty ("midiFx", {}), part.midiFx);
+        perf::arpFromVar    (p.getProperty ("arp", {}), part.arp);
 
         part.enabled    = (bool) p.getProperty ("enabled", true);
         part.mute       = (bool) p.getProperty ("mute", false);
@@ -578,6 +655,52 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
             parsed.pages.add (std::move (page));
         }
     }
+
+    // The Stage 6 performance system. Identity damage fails the load the way it does for
+    // parts and pages; an absent array is a pre-Stage-6 document and loads clean.
+    perf::transportSettingsFromVar (stored.getProperty ("transport", {}), parsed.transport);
+
+    if (const auto* patternArray = stored.getProperty ("patterns", {}).getArray())
+    {
+        juce::StringArray seenPatternIds;
+        for (const auto& p : *patternArray)
+        {
+            perf::Pattern pattern;
+            if (! perf::patternFromVar (p, pattern) || seenPatternIds.contains (pattern.patternId))
+                return false;
+            seenPatternIds.add (pattern.patternId);
+            parsed.patterns.add (std::move (pattern));
+        }
+    }
+
+    if (const auto* clipArray = stored.getProperty ("clips", {}).getArray())
+    {
+        juce::StringArray seenClipIds;
+        for (const auto& c : *clipArray)
+        {
+            perf::Clip clip;
+            if (! perf::clipFromVar (c, clip) || seenClipIds.contains (clip.clipId))
+                return false;
+            seenClipIds.add (clip.clipId);
+            parsed.clips.add (std::move (clip));
+        }
+    }
+
+    if (const auto* sceneArray = stored.getProperty ("scenes", {}).getArray())
+    {
+        juce::StringArray seenSceneIds;
+        for (const auto& s : *sceneArray)
+        {
+            perf::Scene scene;
+            if (! perf::sceneFromVar (s, scene) || seenSceneIds.contains (scene.sceneId))
+                return false;
+            seenSceneIds.add (scene.sceneId);
+            parsed.scenes.add (std::move (scene));
+        }
+    }
+
+    if (! perf::setlistFromVar (stored.getProperty ("setlist", {}), parsed.setlist))
+        return false;
 
     out = std::move (parsed);
     return true;

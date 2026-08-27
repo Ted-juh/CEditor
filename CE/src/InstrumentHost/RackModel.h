@@ -2,6 +2,7 @@
 
 #include <juce_core/juce_core.h>
 #include "PartMidiRules.h"
+#include "Performance/PatternModel.h"
 
 // RackModel — the persistent Performance → InstrumentRack → Part hierarchy (VIP-successor
 // Stage 1).
@@ -81,6 +82,11 @@ struct RackPart
     juce::Array<PartSend> sends;      // post-fader taps into return chains (Stage 5)
     juce::Array<ExtraOut> extraOuts;  // explicit multi-output pairs (Stage 5)
     PartMidiRules midi;
+    // The Stage 6 event chain for this part: the MIDI FX that shape what arrives and the
+    // arpeggiator that may replay it. Both are modes over the shared transport, so they live
+    // beside the zone rules rather than in a document of their own.
+    perf::MidiFxSettings midiFx;
+    perf::ArpSettings arp;
     bool enabled = true;
     bool mute = false;
     bool solo = false;
@@ -168,14 +174,35 @@ struct Macro
 
 struct Performance
 {
+    /** The manifest's own version (Stage 6, §18.8.12). 1 is everything up to Stage 5, which
+        had no version field at all — an absent version therefore reads as 1 and migrates by
+        simply gaining the Stage 6 defaults. Written as the current version on every save. */
+    static constexpr int currentSchemaVersion = 2;
+
     juce::String performanceId;
     juce::String name;
     juce::String focusedPartId;
+    int schemaVersion = currentSchemaVersion;
     juce::Array<RackPart> parts;
     juce::Array<EffectSlot> masterEffects;   // the master insert chain (Stage 5)
     juce::Array<ReturnChain> returns;        // shared send/return chains (Stage 5)
     juce::Array<Macro> macros;
     juce::Array<ControlPage> pages;
+
+    // -- the Stage 6 performance system -------------------------------------------------
+    perf::TransportSettings transport;
+    juce::Array<perf::Pattern> patterns;
+    juce::Array<perf::Clip> clips;
+    juce::Array<perf::Scene> scenes;
+    perf::Setlist setlist;
+
+    perf::Pattern* findPattern (const juce::String& patternId);
+    const perf::Pattern* findPattern (const juce::String& patternId) const;
+    perf::Clip* findClip (const juce::String& clipId);
+    const perf::Clip* findClip (const juce::String& clipId) const;
+    perf::Scene* findScene (const juce::String& sceneId);
+    const perf::Scene* findScene (const juce::String& sceneId) const;
+    int indexOfClip (const juce::String& clipId) const;
 
     /** Mints a Performance with a fresh stable id. */
     static Performance create();
