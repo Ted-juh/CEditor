@@ -222,6 +222,10 @@ public:
         // devices (juce::MidiOutput); tests inject an id→name map and capture sinks.
         // openMidiOutput returns the sink that will receive the part's MIDI, or nullptr
         // with `errorOut` set.
+        // Approved performance events for scripts (§18.8.11): transportStarted/Stopped,
+        // clipStarted/clipStopped, sceneApplied, setlistChanged. Called on the controlling
+        // thread only — a script never runs anywhere near the scheduler.
+        std::function<void (const juce::String& event, const juce::var& payload)> scriptEvent;
         std::function<juce::StringPairArray()> listMidiOutputs;
         std::function<MidiSendProcessor::Sink (const juce::String& deviceId,
                                                juce::String& errorOut)> openMidiOutput;
@@ -338,6 +342,64 @@ public:
     /** Recalls setlist item `index`, or the next/previous one. A scene that cannot be
         recalled leaves the rig where it was and reports why (§18.8.9). */
     bool goToSetlistItem (int index);
+
+    // -- the performance surface runtime (Stage 6, §18.8.10) ---------------------------------
+    // Stage 3's rule again: the hardware driver never touches an engine object. It reads
+    // these projections and sends these movements, and both go through the same code the UI
+    // does. Polling here is deliberately the caller's business — the surface refreshes at
+    // whatever rate it can stand, entirely apart from musical scheduling.
+
+    struct SurfaceTransport
+    {
+        bool playing = false;
+        double tempo = 120.0;
+        int bar = 1;
+        int beat = 1;
+        bool externalClock = false;
+        bool clockLost = false;
+    };
+
+    struct SurfaceClip
+    {
+        juce::String clipId;
+        juce::String name;
+        bool active = false;
+        bool pending = false;
+        float phase = 0.0f;
+    };
+
+    SurfaceTransport surfaceTransport() const;
+    /** Clips in document order — which is pad order, so pad N is clip N and stays clip N. */
+    juce::Array<SurfaceClip> surfaceClips() const;
+    juce::StringArray surfaceSceneNames() const;
+
+    /** A pad press on the clip bank: launches an idle clip, stops a running one. */
+    bool surfaceClipPad (int padIndex);
+    /** A pad press on the scene bank. */
+    bool surfaceScenePad (int padIndex);
+    /** A pad press on the step bank: toggles that step of the surface-focused lane, which is
+        step triggering without a second editing model. */
+    bool surfaceStepPad (int padIndex);
+    /** Which lane the surface's encoders and step pads address. */
+    bool setSurfaceLane (const juce::String& patternId, const juce::String& laneId);
+
+    enum class SurfaceEncoder { tempo = 0, swing, gate, rate, length, probability, velocity };
+
+    /** A relative encoder movement on the performance page. Returns false when there is
+        nothing focused for that encoder to move. */
+    bool nudgePerformanceEncoder (SurfaceEncoder encoder, int delta);
+
+    // -- the scripting surface (Stage 6, §18.8.11) -------------------------------------------
+    // Scripts observe approved events and call a bounded set of actions. They never see the
+    // engine, never run on the audio thread, and cannot reach anything not named here — the
+    // baseline's "bounded APIs" made literal.
+
+    /** Runs one approved action. Returns an empty var for an unknown or refused action, so a
+        script cannot discover the rest of the command surface by probing. */
+    juce::var runScriptAction (const juce::String& action, const juce::var& payload);
+
+    /** A read-only snapshot for scripts: transport, clips, scenes and the setlist position. */
+    juce::var scriptPerformanceState() const;
 
     /** Controlling thread. Drains every part's parameter-change marks (vendor editors and
         automation report through listeners that may fire on the audio thread) and emits one
@@ -499,6 +561,14 @@ private:
     int nextSceneToken = 1;
     std::map<int, juce::String> pendingScenes;
     juce::String captureClipId, captureLaneId;
+    // What the surface's encoders and step pads address; empty = the first lane of the first
+    // pattern, so an unconfigured surface still does something sensible.
+    juce::String surfacePatternId, surfaceLaneId;
+    bool lastReportedPlaying = false;
+
+    void emitScriptEvent (const juce::String& event, const juce::var& payload) const;
+    /** The lane the surface currently addresses, or nullptr. */
+    perf::Lane* surfaceLane();
 
     // The Stage 2 registry, per part with a live instrument: descriptors plus the RT-safe
     // change listener. Attached on every successful commit, dropped from the same rack hook

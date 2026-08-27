@@ -7,6 +7,7 @@
 // encoder delta before the reducer's own bookkeeping absorbs it, and the page-changed flag.
 
 #include "ControlSurface/Ctrl49RackDisplay.h"
+#include "ControlSurface/Ctrl49PerformanceDisplay.h"
 #include "ControlSurface/Ctrl49Reducer.h"
 
 #include <cstdio>
@@ -87,6 +88,53 @@ int main()
     action = reducer.process (pad, 3);
     check (action && ! action->encoderMoved && ! action->pageChanged,
            "a pad strike is neither an encoder nor a page event");
+
+    // -- the Stage 6 performance page ------------------------------------------------------
+    // The transport line a player reads at a glance, and clip pads that show intent before
+    // the engine acts on it.
+    {
+        using namespace ceditor::ctrl49;
+
+        PerformanceTransportView transport;
+        transport.playing = true;
+        transport.tempo = 128.4;
+        transport.bar = 3;
+        transport.beat = 2;
+        check (buildPerformanceTitle (transport) == "> 3.2 128",
+               "the transport line reads run state, bar.beat and tempo");
+
+        transport.playing = false;
+        transport.externalClock = true;
+        check (buildPerformanceTitle (transport) == "# 3.2 128 EXT",
+               "external clock is shown");
+        transport.clockLost = true;
+        check (buildPerformanceTitle (transport) == "# 3.2 128 NO CLK",
+               "and a master that went quiet is named, not guessed at");
+
+        PerformanceClipViews clips {};
+        clips[0] = { "Verse", true, false, 0.5f };
+        clips[1] = { "Chorus", false, true, 0.0f };
+        clips[2] = { "Bridge", false, false, 0.0f };
+
+        const auto labels = buildPerformanceLabelPayload (transport, clips);
+        const std::string flat (labels.begin(), labels.end());
+        check (flat.find ("Verse") != std::string::npos
+                 && flat.find (">Chorus") != std::string::npos,
+               "a clip waiting for its boundary is marked on the hardware");
+
+        const auto state = buildPerformanceStatePayload (2, 0, clips);
+        check (state.size() == 22, "the state payload keeps the documented 22-byte shape");
+        check (state[0] == 2, "the page byte carries through");
+        check (state[6] == 63, "phase becomes a knob position");
+        check (state[14] == 1 && state[15] == 1 && state[16] == 0,
+               "running and pending clips light; idle ones do not");
+
+        PerformanceClipViews empty {};
+        const auto emptyState = buildPerformanceStatePayload (0, 0, empty);
+        check (emptyState.size() == 22, "an empty bank still builds a valid payload");
+        for (std::size_t i = 6; i < 22; ++i)
+            check (emptyState[i] == 0, "with nothing lit and nothing turned");
+    }
 
     std::printf (failures == 0 ? "\nALL PASSED\n" : "\nFAILURES: %d\n", failures);
     return failures == 0 ? 0 : 1;

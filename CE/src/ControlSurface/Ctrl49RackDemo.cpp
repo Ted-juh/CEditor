@@ -18,6 +18,7 @@
 
 #include "Ctrl49PrivateInput.h"
 #include "Ctrl49RackDisplay.h"
+#include "Ctrl49PerformanceDisplay.h"
 #include "Ctrl49Reducer.h"
 #include "Ctrl49Session.h"
 #include "Ctrl49WinMmOutput.h"
@@ -167,9 +168,15 @@ int wmain (int argc, wchar_t** argv)
         SetConsoleCtrlHandler (consoleHandler, TRUE);
 
         Ctrl49Reducer reducer;
-        const auto pageCount = juce::jmin (Ctrl49Reducer::kPageCount, performance.pages.size());
-        reducer.setPageCount (pageCount);
-        logLine ("Rack surface up: " + std::to_string (pageCount) + " page(s). Ctrl-C to exit.");
+        // The performance page is the last one: control pages 0..N-1, then the Stage 6 page
+        // where pads launch clips, the encoders shape the focused lane and the display reads
+        // the transport (§18.8.10).
+        const auto controlPages = juce::jmin (Ctrl49Reducer::kPageCount - 1,
+                                              performance.pages.size());
+        const auto performancePage = controlPages;
+        reducer.setPageCount (controlPages + 1);
+        logLine ("Rack surface up: " + std::to_string (controlPages)
+                   + " control page(s) + the performance page. Ctrl-C to exit.");
 
         Bytes lastLabels, lastState;
         auto lastDisplay = juce::Time::getMillisecondCounterHiRes();
@@ -188,11 +195,47 @@ int wmain (int argc, wchar_t** argv)
                 if (! action)
                     continue;
 
-                const auto& page = performance.pages.getReference (reducer.page());
-                if (action->encoderMoved)
-                    service.nudgeControlSlot (page.pageId,
-                                              "s" + juce::String (action->encoderSlot + 1),
-                                              action->encoderDelta);
+                if (reducer.page() == performancePage)
+                {
+                    // Pads are clips in bank A and scenes in bank B; the encoders are the
+                    // performance set, in the order a groove box puts them.
+                    if (action->padChanged && action->pad >= 1 && action->velocity > 0)
+                    {
+                        const auto index = action->pad - 1;
+                        if (reducer.padBank() == 1)
+                            service.surfaceScenePad (index);
+                        else
+                            service.surfaceClipPad (index);
+                    }
+
+                    if (action->encoderMoved && action->encoderSlot >= 0)
+                    {
+                        using SurfaceEncoder = ceditor::host::InstrumentHostService::SurfaceEncoder;
+                        static const SurfaceEncoder encoders[] =
+                        {
+                            SurfaceEncoder::tempo,
+                            SurfaceEncoder::swing,
+                            SurfaceEncoder::rate,
+                            SurfaceEncoder::length,
+                            SurfaceEncoder::gate,
+                            SurfaceEncoder::velocity,
+                            SurfaceEncoder::probability,
+                            SurfaceEncoder::tempo,
+                        };
+                        service.nudgePerformanceEncoder (
+                            encoders[(std::size_t) juce::jlimit (0, 7, action->encoderSlot)],
+                            action->encoderDelta);
+                    }
+                }
+                else if (controlPages > 0)
+                {
+                    const auto& page = performance.pages.getReference (reducer.page());
+                    if (action->encoderMoved)
+                        service.nudgeControlSlot (page.pageId,
+                                                  "s" + juce::String (action->encoderSlot + 1),
+                                                  action->encoderDelta);
+                }
+
                 if (! action->text.empty())
                     logLine (action->text);
             }
@@ -205,25 +248,59 @@ int wmain (int argc, wchar_t** argv)
                 lastDisplay = now;
                 service.drainParameterEvents();
 
-                const auto& page = performance.pages.getReference (reducer.page());
-                const auto slots = service.surfaceSlots (page.pageId);
-                RackSlotViews views {};
-                for (int i = 0; i < juce::jmin (8, slots.size()); ++i)
+                Bytes labels, state;
+
+                if (reducer.page() == performancePage)
                 {
-                    const auto& s = slots.getReference (i);
-                    views[(std::size_t) i] = { s.displayName.toStdString(),
-                                               (int) std::lround (s.position * 127.0f),
-                                               s.assigned, s.resolved };
+                    const auto t = service.surfaceTransport();
+                    PerformanceTransportView transport { t.playing, t.tempo, t.bar, t.beat,
+                                                         t.externalClock, t.clockLost };
+
+                    PerformanceClipViews clipViews {};
+                    if (reducer.padBank() == 1)
+                    {
+                        const auto scenes = service.surfaceSceneNames();
+                        for (int i = 0; i < juce::jmin (8, scenes.size()); ++i)
+                            clipViews[(std::size_t) i] = { scenes[i].toStdString(), false, false, 0.0f };
+                    }
+                    else
+                    {
+                        const auto clips = service.surfaceClips();
+                        for (int i = 0; i < juce::jmin (8, clips.size()); ++i)
+                        {
+                            const auto& c = clips.getReference (i);
+                            clipViews[(std::size_t) i] = { c.name.toStdString(), c.active,
+                                                           c.pending, c.phase };
+                        }
+                    }
+
+                    labels = buildPerformanceLabelPayload (transport, clipViews);
+                    state = buildPerformanceStatePayload (reducer.page(), reducer.activeSlot(),
+                                                          clipViews);
+                }
+                else if (controlPages > 0)
+                {
+                    const auto& page = performance.pages.getReference (reducer.page());
+                    const auto slots = service.surfaceSlots (page.pageId);
+                    RackSlotViews views {};
+                    for (int i = 0; i < juce::jmin (8, slots.size()); ++i)
+                    {
+                        const auto& s = slots.getReference (i);
+                        views[(std::size_t) i] = { s.displayName.toStdString(),
+                                                   (int) std::lround (s.position * 127.0f),
+                                                   s.assigned, s.resolved };
+                    }
+
+                    labels = buildRackLabelPayload (page.name.toStdString(), views);
+                    state = buildRackStatePayload (reducer.page(), reducer.activeSlot(), views);
                 }
 
-                auto labels = buildRackLabelPayload (page.name.toStdString(), views);
-                if (labels != lastLabels)
+                if (! labels.empty() && labels != lastLabels)
                 {
                     session.callLua ("set_labels", labels, false);
                     lastLabels = std::move (labels);
                 }
-                auto state = buildRackStatePayload (reducer.page(), reducer.activeSlot(), views);
-                if (state != lastState)
+                if (! state.empty() && state != lastState)
                 {
                     session.callLua ("set_values", state, true);
                     lastState = std::move (state);

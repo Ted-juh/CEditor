@@ -810,6 +810,7 @@ add_executable(CEditorCtrl49RackDisplayTests
     "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
     "${CE_ROOT}/tests/Ctrl49RackDisplayTests.cpp"
 )
 target_compile_features(CEditorCtrl49RackDisplayTests PRIVATE cxx_std_23)
@@ -903,6 +904,7 @@ if(WIN32)
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"

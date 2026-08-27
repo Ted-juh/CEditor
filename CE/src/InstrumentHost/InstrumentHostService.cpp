@@ -1377,17 +1377,22 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "launchClip" || cmd == "stopClip")
     {
-        const auto index = rack.getPerformance().indexOfClip (payload.getProperty ("clipId", {}).toString());
-        if (index < 0)
+        const auto clipId = payload.getProperty ("clipId", {}).toString();
+        const auto index = rack.getPerformance().indexOfClip (clipId);
+        const auto* clip = rack.getPerformance().findClip (clipId);
+        if (index < 0 || clip == nullptr)
         {
             emitError ("Unknown clip.");
             return;
         }
 
+        // A clip's own quantization governs BOTH its start and its stop. Mixing a clip-level
+        // launch setting with a performance-level stop setting is the kind of surprise that
+        // only shows up on stage: a clip set to launch immediately would stop at the bar.
         if (cmd == "launchClip")
             rack.getEngine().launchClip (index);
         else
-            rack.getEngine().stopClip (index, rack.getPerformance().transport.defaultQuantize);
+            rack.getEngine().stopClip (index, clip->launchQuantize);
 
         emitState();
         return;
@@ -3225,6 +3230,12 @@ bool InstrumentHostService::goToSetlistItem (int index)
         return false;
     }
 
+    auto* payload = new juce::DynamicObject();
+    payload->setProperty ("index", index);
+    payload->setProperty ("name", item.name);
+    payload->setProperty ("notes", item.notes);
+    emitScriptEvent ("setlistChanged", juce::var (payload));
+
     savePerformance();
     return true;
 }
@@ -3262,7 +3273,13 @@ void InstrumentHostService::drainEngineEvents()
                 if (it == pendingScenes.end())
                     break;
                 if (const auto* scene = rack.getPerformance().findScene (it->second))
+                {
                     applySceneState (*scene);
+                    auto* payload = new juce::DynamicObject();
+                    payload->setProperty ("sceneId", scene->sceneId);
+                    payload->setProperty ("name", scene->name);
+                    emitScriptEvent ("sceneApplied", juce::var (payload));
+                }
                 pendingScenes.erase (it);
                 stateChanged = true;
                 break;
@@ -3270,8 +3287,22 @@ void InstrumentHostService::drainEngineEvents()
 
             case perf::PerformanceEngine::OutEvent::Type::clipStarted:
             case perf::PerformanceEngine::OutEvent::Type::clipStopped:
+            {
+                // Approved script events, on the controlling thread, from what the engine
+                // reported — never from inside the scheduler (§18.8.11).
+                const auto& clips = rack.getPerformance().clips;
+                if (juce::isPositiveAndBelow (event.index, clips.size()))
+                {
+                    auto* payload = new juce::DynamicObject();
+                    payload->setProperty ("clipId", clips.getReference (event.index).clipId);
+                    payload->setProperty ("name", clips.getReference (event.index).name);
+                    emitScriptEvent (event.type == perf::PerformanceEngine::OutEvent::Type::clipStarted
+                                       ? "clipStarted" : "clipStopped",
+                                     juce::var (payload));
+                }
                 stateChanged = true;
                 break;
+            }
 
             case perf::PerformanceEngine::OutEvent::Type::capturedNote:
             {
@@ -3306,6 +3337,17 @@ void InstrumentHostService::drainEngineEvents()
 void InstrumentHostService::drainParameterEvents()
 {
     drainEngineEvents();
+
+    // The transport's own edges. The engine does not queue them (it has no reason to), so
+    // they are noticed here, at the same rate everything else is drained.
+    const auto playing = rack.getEngine().getTransport().isPlaying();
+    if (playing != lastReportedPlaying)
+    {
+        lastReportedPlaying = playing;
+        auto* payload = new juce::DynamicObject();
+        payload->setProperty ("tempo", rack.getEngine().getTransport().getTempo());
+        emitScriptEvent (playing ? "transportStarted" : "transportStopped", juce::var (payload));
+    }
 
     for (auto& [partId, part] : partParameters)
     {
@@ -3728,6 +3770,317 @@ juce::var InstrumentHostService::buildStatePayload() const
     root->setProperty ("audio", juce::var (audio));
     root->setProperty ("rack", juce::var (rackObj));
     return juce::var (root);
+}
+
+// -- the performance surface runtime (Stage 6, §18.8.10) -------------------------------------
+
+InstrumentHostService::SurfaceTransport InstrumentHostService::surfaceTransport() const
+{
+    const auto& transport = rack.getEngine().getTransport();
+
+    SurfaceTransport view;
+    view.playing = transport.isPlaying();
+    view.tempo = transport.getTempo();
+    double fraction = 0.0;
+    transport.positionInBarsBeats (view.bar, view.beat, fraction);
+    view.externalClock = transport.isExternalClockEnabled();
+    view.clockLost = transport.hasLostExternalClock();
+    return view;
+}
+
+juce::Array<InstrumentHostService::SurfaceClip> InstrumentHostService::surfaceClips() const
+{
+    juce::Array<SurfaceClip> views;
+    const auto& performance = rack.getPerformance();
+    const auto& engine = rack.getEngine();
+
+    for (int i = 0; i < performance.clips.size(); ++i)
+    {
+        const auto& clip = performance.clips.getReference (i);
+        views.add ({ clip.clipId, clip.name, engine.isClipActive (i), engine.isClipPending (i),
+                     engine.clipPhase (i) });
+    }
+
+    return views;
+}
+
+juce::StringArray InstrumentHostService::surfaceSceneNames() const
+{
+    juce::StringArray names;
+    for (const auto& scene : rack.getPerformance().scenes)
+        names.add (scene.name);
+    return names;
+}
+
+bool InstrumentHostService::surfaceClipPad (int padIndex)
+{
+    const auto& performance = rack.getPerformance();
+    if (! juce::isPositiveAndBelow (padIndex, performance.clips.size()))
+        return false;
+
+    // The pad is a toggle, and it goes through the same quantized launch the UI uses — the
+    // driver decides nothing about timing, and the clip's own quantization governs its stop
+    // exactly as it governs its start.
+    if (rack.getEngine().isClipActive (padIndex))
+        rack.getEngine().stopClip (padIndex, performance.clips.getReference (padIndex).launchQuantize);
+    else
+        rack.getEngine().launchClip (padIndex);
+
+    return true;
+}
+
+bool InstrumentHostService::surfaceScenePad (int padIndex)
+{
+    const auto& scenes = rack.getPerformance().scenes;
+    if (! juce::isPositiveAndBelow (padIndex, scenes.size()))
+        return false;
+
+    return launchScene (scenes.getReference (padIndex).sceneId);
+}
+
+perf::Lane* InstrumentHostService::surfaceLane()
+{
+    auto& performance = const_cast<Performance&> (rack.getPerformance());
+
+    auto* pattern = surfacePatternId.isNotEmpty() ? performance.findPattern (surfacePatternId)
+                                                  : (performance.patterns.isEmpty()
+                                                       ? nullptr
+                                                       : &performance.patterns.getReference (0));
+    if (pattern == nullptr)
+        return nullptr;
+
+    if (surfaceLaneId.isNotEmpty())
+        if (auto* lane = pattern->findLane (surfaceLaneId))
+            return lane;
+
+    return pattern->lanes.isEmpty() ? nullptr : &pattern->lanes.getReference (0);
+}
+
+bool InstrumentHostService::setSurfaceLane (const juce::String& patternId, const juce::String& laneId)
+{
+    const auto& performance = rack.getPerformance();
+    const auto* pattern = performance.findPattern (patternId);
+    if (pattern == nullptr || pattern->findLane (laneId) == nullptr)
+        return false;
+
+    surfacePatternId = patternId;
+    surfaceLaneId = laneId;
+    return true;
+}
+
+bool InstrumentHostService::surfaceStepPad (int padIndex)
+{
+    auto* lane = surfaceLane();
+    auto* step = lane != nullptr ? lane->findStep (padIndex) : nullptr;
+    if (step == nullptr)
+        return false;
+
+    step->active = ! step->active;
+    if (step->active && lane->type == perf::LaneType::note && step->note == 0)
+        step->note = 60;
+
+    recompilePerformance();
+    savePerformance();
+    emitState();
+    return true;
+}
+
+bool InstrumentHostService::nudgePerformanceEncoder (SurfaceEncoder encoder, int delta)
+{
+    // Relative movement, like Stage 3's slot nudge: there is no absolute knob position to
+    // jump to, which is what keeps a page or Performance change from snapping a value.
+    const auto amount = (float) delta / 127.0f;
+
+    if (encoder == SurfaceEncoder::tempo)
+    {
+        auto& transport = rack.getEngine().getTransport();
+        const auto tempo = juce::jlimit (20.0, 300.0, transport.getTempo() + (double) delta);
+        transport.setTempo (tempo);
+        const_cast<Performance&> (rack.getPerformance()).transport.tempo = tempo;
+        savePerformance();
+        emitState();
+        return true;
+    }
+
+    auto* lane = surfaceLane();
+    if (lane == nullptr)
+        return false;
+
+    auto& performance = const_cast<Performance&> (rack.getPerformance());
+    auto* pattern = surfacePatternId.isNotEmpty() ? performance.findPattern (surfacePatternId)
+                                                  : &performance.patterns.getReference (0);
+
+    switch (encoder)
+    {
+        case SurfaceEncoder::swing:
+            if (pattern != nullptr)
+                pattern->swing = juce::jlimit (0.0f, 0.75f, pattern->swing + amount);
+            break;
+
+        case SurfaceEncoder::rate:
+        {
+            // Rate steps through the musically useful divisions rather than every integer.
+            static const int rates[] = { 1, 2, 3, 4, 6, 8, 12, 16 };
+            int index = 3;
+            for (int i = 0; i < (int) std::size (rates); ++i)
+                if (rates[i] == lane->stepsPerBeat)
+                    index = i;
+            index = juce::jlimit (0, (int) std::size (rates) - 1, index + (delta > 0 ? 1 : -1));
+            lane->stepsPerBeat = rates[index];
+            break;
+        }
+
+        case SurfaceEncoder::length:
+            lane->stepCount = juce::jlimit (1, 128, lane->stepCount + (delta > 0 ? 1 : -1));
+            lane->resizeSteps();
+            break;
+
+        case SurfaceEncoder::gate:
+        case SurfaceEncoder::probability:
+        case SurfaceEncoder::velocity:
+            // These are per step, so they move every ACTIVE step of the focused lane
+            // together: one encoder, the whole lane, which is what a groove box does.
+            for (auto& step : lane->steps)
+            {
+                if (! step.active)
+                    continue;
+                if (encoder == SurfaceEncoder::gate)
+                    step.gate = juce::jlimit (0.05f, 4.0f, step.gate + amount);
+                else if (encoder == SurfaceEncoder::probability)
+                    step.probability = juce::jlimit (0, 100, step.probability + delta);
+                else
+                    step.velocity = juce::jlimit (1, 127, step.velocity + delta);
+            }
+            break;
+
+        case SurfaceEncoder::tempo:
+            break;   // handled above
+    }
+
+    recompilePerformance();
+    savePerformance();
+    emitState();
+    return true;
+}
+
+// -- the scripting surface (Stage 6, §18.8.11) ------------------------------------------------
+
+void InstrumentHostService::emitScriptEvent (const juce::String& event, const juce::var& payload) const
+{
+    if (options.scriptEvent != nullptr)
+        options.scriptEvent (event, payload);
+}
+
+juce::var InstrumentHostService::scriptPerformanceState() const
+{
+    const auto transport = surfaceTransport();
+
+    auto* transportObj = new juce::DynamicObject();
+    transportObj->setProperty ("playing", transport.playing);
+    transportObj->setProperty ("tempo",   transport.tempo);
+    transportObj->setProperty ("bar",     transport.bar);
+    transportObj->setProperty ("beat",    transport.beat);
+
+    juce::Array<juce::var> clips;
+    for (const auto& clip : surfaceClips())
+    {
+        auto* c = new juce::DynamicObject();
+        c->setProperty ("clipId", clip.clipId);
+        c->setProperty ("name",   clip.name);
+        c->setProperty ("active", clip.active);
+        c->setProperty ("pending", clip.pending);
+        clips.add (juce::var (c));
+    }
+
+    juce::Array<juce::var> scenes;
+    for (const auto& scene : rack.getPerformance().scenes)
+    {
+        auto* s = new juce::DynamicObject();
+        s->setProperty ("sceneId", scene.sceneId);
+        s->setProperty ("name",    scene.name);
+        scenes.add (juce::var (s));
+    }
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("transport", juce::var (transportObj));
+    root->setProperty ("clips",     clips);
+    root->setProperty ("scenes",    scenes);
+    root->setProperty ("setlistIndex", rack.getPerformance().setlist.currentIndex);
+    return juce::var (root);
+}
+
+juce::var InstrumentHostService::runScriptAction (const juce::String& action, const juce::var& payload)
+{
+    // A closed list. Anything not named here returns nothing at all, so a script cannot probe
+    // its way into the rest of the command surface (§18.8.11's "bounded APIs").
+    static const char* allowed[] =
+    {
+        "transport.play", "transport.stop", "transport.continue", "transport.setTempo",
+        "clip.launch", "clip.stop", "clip.stopAll",
+        "scene.launch",
+        "setlist.next", "setlist.previous", "setlist.go",
+        "performance.state",
+        "panic",
+    };
+
+    bool known = false;
+    for (const auto* name : allowed)
+        known = known || action == name;
+    if (! known)
+        return {};
+
+    if (action == "performance.state")
+        return scriptPerformanceState();
+
+    if (action == "transport.play")        { rack.getEngine().getTransport().start(); }
+    else if (action == "transport.stop")   { rack.getEngine().getTransport().stop(); }
+    else if (action == "transport.continue") { rack.getEngine().getTransport().continuePlayback(); }
+    else if (action == "transport.setTempo")
+    {
+        const auto tempo = juce::jlimit (20.0, 300.0, (double) payload.getProperty ("tempo", 120.0));
+        rack.getEngine().getTransport().setTempo (tempo);
+        const_cast<Performance&> (rack.getPerformance()).transport.tempo = tempo;
+        savePerformance();
+    }
+    else if (action == "clip.launch" || action == "clip.stop")
+    {
+        const auto clipId = payload.getProperty ("clipId", {}).toString();
+        const auto index = rack.getPerformance().indexOfClip (clipId);
+        const auto* clip = rack.getPerformance().findClip (clipId);
+        if (index < 0 || clip == nullptr)
+            return {};
+        if (action == "clip.launch")
+            rack.getEngine().launchClip (index);
+        else
+            rack.getEngine().stopClip (index, clip->launchQuantize);
+    }
+    else if (action == "clip.stopAll")
+    {
+        rack.getEngine().stopAllClips (rack.getPerformance().transport.defaultQuantize);
+    }
+    else if (action == "scene.launch")
+    {
+        if (! launchScene (payload.getProperty ("sceneId", {}).toString()))
+            return {};
+    }
+    else if (action == "setlist.next" || action == "setlist.previous" || action == "setlist.go")
+    {
+        const auto current = rack.getPerformance().setlist.currentIndex;
+        const auto index = action == "setlist.go" ? (int) payload.getProperty ("index", 0)
+                         : action == "setlist.next" ? current + 1 : current - 1;
+        if (! goToSetlistItem (index))
+            return {};
+    }
+    else if (action == "panic")
+    {
+        rack.panicAll();
+    }
+
+    emitState();
+
+    auto* ok = new juce::DynamicObject();
+    ok->setProperty ("ok", true);
+    return juce::var (ok);
 }
 
 juce::var InstrumentHostService::performancePayload() const

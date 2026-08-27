@@ -1863,6 +1863,152 @@ void testPerformanceSystem()
     }
 }
 
+// The Stage 6 surface runtime and scripting surface (§18.8.10, §18.8.11): a hardware driver
+// that never touches an engine object, and a script API that is a closed list rather than a
+// door into the rest of the command surface.
+void testPerformanceSurfaceAndScripting()
+{
+    std::cout << "\nthe performance surface and the script API" << std::endl;
+
+    const auto dir = freshDataDir ("surface6");
+    seedTwoSynthCatalog (dir);
+
+    std::vector<std::pair<juce::String, juce::var>> scriptEvents;
+    Harness h (dir, {}, [&scriptEvents] (InstrumentHostService::Options& options)
+    {
+        options.scriptEvent = [&scriptEvents] (const juce::String& event, const juce::var& payload)
+        {
+            scriptEvents.push_back ({ event, payload });
+        };
+    });
+
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("addPattern", { { "name", "Riff" } });
+
+    const auto patternId = h.emits.lastState()->getProperty ("performance", {})
+                               .getProperty ("patterns", {})[0].getProperty ("patternId", {}).toString();
+    const auto laneId = h.emits.lastState()->getProperty ("performance", {})
+                            .getProperty ("patterns", {})[0].getProperty ("lanes", {})[0]
+                            .getProperty ("laneId", {}).toString();
+    h.cmd ("addClip", { { "patternId", patternId } });
+    const auto clipId = h.emits.lastState()->getProperty ("performance", {})
+                            .getProperty ("clips", {})[0].getProperty ("clipId", {}).toString();
+    h.cmd ("setClipOptions", { { "clipId", clipId }, { "launchQuantize", "immediate" } });
+
+    // -- the surface projections -------------------------------------------------------------
+    auto transport = h.service->surfaceTransport();
+    check (! transport.playing && transport.bar == 1 && transport.beat == 1,
+           "the surface reads the transport, it does not keep one");
+
+    auto clips = h.service->surfaceClips();
+    check (clips.size() == 1 && clips[0].name == "Riff" && ! clips[0].active,
+           "clips project in document order, which is pad order");
+
+    // -- pads go through the same quantized launch the UI uses -------------------------------
+    h.cmd ("transportPlay");
+    check (h.service->surfaceClipPad (0), "a clip pad is accepted");
+
+    juce::AudioBuffer<float> buffer (2, 512);
+    juce::MidiBuffer midi;
+    for (int b = 0; b < 4; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+    h.service->drainParameterEvents();
+
+    clips = h.service->surfaceClips();
+    check (clips[0].active, "and the clip is running");
+    check (! h.service->surfaceClipPad (9), "a pad with no clip behind it refuses");
+
+    check (h.service->surfaceClipPad (0), "pressing the same pad again is accepted");
+    for (int b = 0; b < 4; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+    h.service->drainParameterEvents();
+    check (! h.service->surfaceClips()[0].active, "and stops the clip — the pad is a toggle");
+
+    // -- step pads and encoders edit the focused lane ------------------------------------------
+    check (h.service->setSurfaceLane (patternId, laneId), "the surface can focus a lane");
+    check (! h.service->setSurfaceLane (patternId, "no-such-lane"), "and refuses one that is gone");
+
+    check (h.service->surfaceStepPad (2), "a step pad toggles its step");
+    const auto steps = h.emits.lastState()->getProperty ("performance", {})
+                           .getProperty ("patterns", {})[0].getProperty ("lanes", {})[0]
+                           .getProperty ("steps", {});
+    check ((bool) steps[2].getProperty ("active", false), "which shows in the document");
+
+    const auto tempoBefore = h.service->surfaceTransport().tempo;
+    check (h.service->nudgePerformanceEncoder (InstrumentHostService::SurfaceEncoder::tempo, 4),
+           "the tempo encoder moves");
+    check (std::abs (h.service->surfaceTransport().tempo - (tempoBefore + 4.0)) < 0.001,
+           "relatively, like every other encoder in this app");
+
+    h.service->nudgePerformanceEncoder (InstrumentHostService::SurfaceEncoder::rate, 1);
+    check ((int) h.emits.lastState()->getProperty ("performance", {})
+               .getProperty ("patterns", {})[0].getProperty ("lanes", {})[0]
+               .getProperty ("stepsPerBeat", 0) == 6,
+           "the rate encoder steps through the musical divisions, not every integer");
+
+    h.service->nudgePerformanceEncoder (InstrumentHostService::SurfaceEncoder::velocity, 10);
+    const auto nudged = h.emits.lastState()->getProperty ("performance", {})
+                            .getProperty ("patterns", {})[0].getProperty ("lanes", {})[0]
+                            .getProperty ("steps", {});
+    check ((int) nudged[2].getProperty ("velocity", 0) == 110,
+           "and the velocity encoder moves every active step of the focused lane together");
+
+    // -- the script surface is a closed list ---------------------------------------------------
+    check (! h.service->runScriptAction ("rack.removePart", { }).isObject(),
+           "an action that is not on the list returns nothing at all");
+    check (! h.service->runScriptAction ("loadInstrument", { }).isObject(),
+           "including real commands that simply are not exposed to scripts");
+
+    const auto state = h.service->runScriptAction ("performance.state", {});
+    check (state.getProperty ("clips", {}).size() == 1
+             && state.getProperty ("transport", {}).hasProperty ("tempo"),
+           "the state action answers with the bounded snapshot");
+
+    auto* launchArgs = new juce::DynamicObject();
+    launchArgs->setProperty ("clipId", clipId);
+    check (h.service->runScriptAction ("clip.launch", juce::var (launchArgs)).isObject(),
+           "a script may launch a clip it names");
+    for (int b = 0; b < 4; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+    h.service->drainParameterEvents();
+    check (h.service->surfaceClips()[0].active, "and it runs");
+
+    auto* badArgs = new juce::DynamicObject();
+    badArgs->setProperty ("clipId", "no-such-clip");
+    check (! h.service->runScriptAction ("clip.launch", juce::var (badArgs)).isObject(),
+           "but a clip that does not exist is refused rather than guessed at");
+
+    // -- approved events reach the script host -------------------------------------------------
+    bool sawStart = false, sawClipStarted = false;
+    for (const auto& [event, payload] : scriptEvents)
+    {
+        sawStart = sawStart || event == "transportStarted";
+        sawClipStarted = sawClipStarted
+                           || (event == "clipStarted"
+                                && payload.getProperty ("clipId", {}).toString() == clipId);
+    }
+    check (sawStart, "scripts hear the transport start");
+    check (sawClipStarted, "and hear a clip start, named, from the controlling thread");
+
+    h.cmd ("addScene", { { "name", "Verse" } });
+    const auto sceneId = h.emits.lastState()->getProperty ("performance", {})
+                             .getProperty ("scenes", {})[0].getProperty ("sceneId", {}).toString();
+    h.cmd ("setSceneOptions", { { "sceneId", sceneId }, { "launchQuantize", "immediate" } });
+    check (h.service->surfaceScenePad (0), "a scene pad launches its scene");
+    for (int b = 0; b < 4; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+    h.service->drainParameterEvents();
+
+    bool sawScene = false;
+    for (const auto& [event, payload] : scriptEvents)
+        sawScene = sawScene || (event == "sceneApplied"
+                                 && payload.getProperty ("name", {}).toString() == "Verse");
+    check (sawScene, "and scripts hear the scene land, at the moment it landed");
+
+    check (h.service->surfaceSceneNames().size() == 1
+             && h.service->surfaceSceneNames()[0] == "Verse",
+           "scene names project for the surface's own display");
+}
+
 // The Stage 4 library: one index, explicit provenance, loading only ever through Stage 1's
 // transaction. The identity story is the heart of it — user metadata survives rescans and
 // renames, a missing source marks instead of deletes, and availability is computed live
@@ -2438,6 +2584,7 @@ int main (int argc, char* argv[])
     testEffectsAndMacros();
     testEnrichedPerformanceRestore();
     testPerformanceSystem();
+    testPerformanceSurfaceAndScripting();
     testSendsAndReturns();
     testMultiOutputRouting();
     testHardwareParts();
