@@ -155,7 +155,7 @@
       {/if}
 
       {#if unavailableModules.length > 0}
-        <div class="matrix" data-testid="reliability-unavailable">
+        <div class="matrix tight" data-testid="reliability-unavailable">
           {#each unavailableModules as module (module.path)}
             <div class="matrix-row">
               <span class="label">{module.path.split(/[\\/]/).pop()}</span>
@@ -290,6 +290,10 @@
   .suspect-name { color: #d6dbe0; font-size: 12px; }
 
   .matrix { display: flex; flex-direction: column; gap: 3px; }
+  /* The bundle list wants its sizes in a right-hand column; a reason wants to sit next to the
+     name it explains, or a wide panel strands it half a screen away from what it is about. */
+  .matrix.tight .matrix-row .label { flex: 0 1 auto; }
+  .matrix.tight .detail { max-width: none; white-space: normal; }
   .matrix-row { display: flex; align-items: baseline; gap: 8px; font-size: 12px; min-width: 0; }
   .matrix-row .label { flex: 1; color: #d6dbe0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .matrix-row.absent .label { color: #66707b; }

@@ -972,7 +972,9 @@
         <div class="modules" data-testid="host-modules">
           <strong>Scanned modules</strong>
           {#each $hostState.modules as module (module.path)}
-            <div class="module-row" class:trouble={module.quarantined || module.failureCount > 0 || module.missing}
+            <div class="module-row"
+                 class:trouble={module.quarantined || module.failureCount > 0 || module.missing
+                                || module.unavailableReason}
                  title={module.path}>
               <div class="module-id">
                 <span class="module-name">{module.path.split('\\').pop().split('/').pop()}</span>
@@ -981,6 +983,12 @@
                     quarantined — {module.lastFailureReason || 'failed to scan'}
                   {:else if module.missing}
                     missing — the file is gone from where it was scanned
+                  {:else if module.unavailableReason}
+                    <!-- The wrong architecture, mostly. Without this branch it fell through to
+                         "no instruments", which reads as a plug-in with nothing in it rather
+                         than one this machine cannot load — the exact confusion the native
+                         check exists to end. -->
+                    {module.unavailableReason}
                   {:else if module.failureCount > 0}
                     scan failed — {module.lastFailureReason || 'no reason reported'}
                   {:else if module.numInstruments === 0}
