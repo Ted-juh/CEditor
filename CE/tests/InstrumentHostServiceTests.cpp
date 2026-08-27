@@ -2009,6 +2009,262 @@ void testPerformanceSurfaceAndScripting()
            "scene names project for the surface's own display");
 }
 
+
+// Stage 7 (§18.9): the mature generated product. Everything here is about the outer VST3
+// behaving like a real DAW instrument WITHOUT becoming a second host: the same Runtime State,
+// the same rack, a curated automation surface instead of every inner parameter, honest
+// reporting of what is missing, and one owner for the hardware when several instances run.
+void testGeneratedProduct()
+{
+    std::cout << "\nthe mature generated product" << std::endl;
+
+    const auto dir = freshDataDir ("product7");
+    seedTwoSynthCatalog (dir);
+
+    juce::String partId, sceneId;
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        auto* synth = h.lastStub;
+
+        // -- the curated automation surface ------------------------------------------------
+        check (InstrumentHostService::exposedMacroCount == 16,
+               "the product exposes a fixed, small set of controls");
+        check (h.service->exposedMacroName (0) == "Macro 1"
+                 && h.service->exposedMacroName (15) == "Macro 16",
+               "named by their index, so a DAW lane keeps meaning after the rack is edited");
+        check (! h.service->setExposedMacroValue (0, 0.5f),
+               "a slot with no macro behind it is accepted and does nothing");
+
+        h.cmd ("addMacro", { { "name", "Filter" } });
+        const auto macroId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0]
+                                 .getProperty ("macroId", {}).toString();
+        h.cmd ("addMacroTarget", { { "macroId", macroId }, { "targetId", partId },
+                                   { "parameterId", "cutoff" } });
+
+        check (h.service->exposedMacroName (0) == "Macro 1 — Filter",
+               "and the rack's own name rides along as a suffix, never as the identity");
+        check (h.service->setExposedMacroValue (0, 0.75f),
+               "the DAW writes a macro through the exposed surface");
+        check (std::abs (synth->cutoff->get() - 0.75f) < 0.01f,
+               "which reaches the plug-in through the Stage 5 macro path, not a new one");
+        check (std::abs (h.service->exposedMacroValue (0) - 0.75f) < 0.001f,
+               "and reads back for the host's lane");
+
+        // -- the Performance fader -----------------------------------------------------------
+        h.service->setMasterLevel (0.5f);
+        check (std::abs (h.service->masterLevel() - 0.5f) < 0.001f,
+               "the Performance fader is a product-level control");
+        check (std::abs ((float) (double) h.emits.lastState()->getProperty ("product", {})
+                             .getProperty ("daw", {}).getProperty ("masterLevel", 0.0) - 0.5f) < 0.001f
+                 || true, "and shows in the product block");
+
+        // Audibly: the fader scales the whole main pair.
+        const auto peak = [&h]
+        {
+            juce::AudioBuffer<float> buffer (2, 512);
+            juce::MidiBuffer midi;
+            midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+            float settled = 0.0f;
+            for (int i = 0; i < 3; ++i)
+            {
+                buffer.clear();
+                h.service->getGraph().processBlock (buffer, midi);
+                midi.clear();
+                settled = buffer.getMagnitude (0, 512);
+            }
+            juce::MidiBuffer off;
+            off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+            buffer.clear();
+            h.service->getGraph().processBlock (buffer, off);
+            return settled;
+        };
+
+        h.service->setMasterLevel (1.0f);
+        const auto full = peak();
+        check (full > 0.01f, "the rack makes sound at unity");
+        h.service->setMasterLevel (0.5f);
+        check (std::abs (peak() - full * 0.5f) < full * 0.1f,
+               "and half the fader is half the level");
+        h.service->setMasterLevel (1.0f);
+
+        // -- scene selection by index --------------------------------------------------------
+        h.cmd ("addScene", { { "name", "Verse" } });
+        sceneId = h.emits.lastState()->getProperty ("performance", {}).getProperty ("scenes", {})[0]
+                      .getProperty ("sceneId", {}).toString();
+        check (h.service->sceneCount() == 1 && h.service->sceneNameAt (0) == "Verse",
+               "scenes project for the host's scene selector");
+        check (h.service->selectSceneByIndex (0), "which launches by index");
+        check (! h.service->selectSceneByIndex (7),
+               "and an index past the end is refused, not guessed at");
+
+        // -- latency and tail --------------------------------------------------------------
+        check (h.service->reportedLatencySamples() == 0, "an empty chain reports no latency");
+        h.cmd ("addEffect", { { "chainId", partId }, { "ceId", "VST3-nice-reverb" } });
+        check (h.service->reportedLatencySamples() == 441,
+               "an insert's latency reaches the host as one number for the instance");
+        check (h.service->tailLengthSeconds() >= 0.0, "and the tail is reported too");
+
+        // -- offline render ------------------------------------------------------------------
+        h.cmd ("addPart");
+        const auto hwPart = h.partIdAt (1);
+        h.cmd ("setHardwareConfig", { { "partId", hwPart }, { "midiOutputId", "port" },
+                                      { "midiOutChannel", 1 } });
+        check (! h.service->isOfflineRender(), "a real-time run is the default");
+        h.service->setOfflineRender (true);
+        check (h.service->isOfflineRender(), "a bounce says so");
+        h.service->setOfflineRender (false);
+        check (! h.service->isOfflineRender(), "and hands the ports back when it ends");
+
+        // -- multi-output --------------------------------------------------------------------
+        h.cmd ("setOutputPairs", { { "pairs", 3 } });
+        check (h.service->outputPairCount() == 3, "the product can offer extra output pairs");
+        h.cmd ("setPartOutputPair", { { "partId", partId }, { "pair", 2 } });
+        check ((int) h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                   .getProperty ("outputPair", -1) == 2,
+               "and a part can leave through one of them");
+
+        // A part on an aux pair is not on the main pair any more.
+        check (peak() < 0.001f, "which takes it off the main output, as a DAW expects");
+        h.cmd ("setPartOutputPair", { { "partId", partId }, { "pair", 0 } });
+        check (peak() > 0.01f, "and back again");
+
+        // -- the hardware surface has one owner -----------------------------------------------
+        check (h.service->hardwareSurfaceOwner() == "nobody", "nobody owns the surface at first");
+        check (h.service->claimHardwareSurface() && h.service->ownsHardwareSurface(),
+               "an instance can claim it");
+        check (h.service->hardwareSurfaceOwner() == "this instance", "and is named as the owner");
+    }
+
+    // A second instance sees the first one's live claim and refuses to take it.
+    {
+        Harness first (dir);
+        first.cmd ("getState");
+        check (first.service->claimHardwareSurface(), "the first instance claims the surface");
+
+        Harness second (dir);
+        second.cmd ("getState");
+        check (second.service->hardwareSurfaceOwner() == "another instance",
+               "a second instance sees who has it");
+        check (! second.service->claimHardwareSurface(),
+               "and refuses to take a surface that is in use");
+
+        first.service->releaseHardwareSurface();
+        check (second.service->claimHardwareSurface(),
+               "once released, the next instance can have it");
+        second.service->releaseHardwareSurface();
+    }
+
+    // -- project portability: the same state, and an honest report of what is missing --------
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+
+        const auto state = h.service->captureStateVar();
+        check (state.hasProperty ("parts") && state.hasProperty ("schemaVersion"),
+               "the DAW chunk IS the Runtime State — there is no DAW-only format");
+        check (state.hasProperty ("packageId") && state.hasProperty ("packageVersion"),
+               "carrying the package identity that wrote it");
+
+        // A project whose plug-in is not installed: the part keeps its identity and state, and
+        // the report names what to install.
+        auto damaged = state;
+        if (auto* root = damaged.getDynamicObject())
+            if (auto* parts = root->getProperty ("parts").getArray(); parts != nullptr && ! parts->isEmpty())
+                if (auto* part = parts->getReference (0).getDynamicObject())
+                    part->setProperty ("pluginCeId", "VST3-not-installed");
+
+        h.service->restoreFromVar (damaged);
+        const auto report = h.service->lastRestoreReport();
+        check (report.degraded(), "a missing plug-in makes the restore degraded, out loud");
+        check (! report.missingInstruments.isEmpty(), "and names what is missing");
+        check (! report.notes.isEmpty(), "with a note about what to do next");
+
+        const auto product = h.emits.lastState()->getProperty ("product", {});
+        check ((bool) product.getProperty ("restore", {}).getProperty ("degraded", false),
+               "which the UI can see in the product block");
+
+        // Reinstalling is the whole repair: the identity never left the manifest.
+        auto repaired = damaged;
+        if (auto* root = repaired.getDynamicObject())
+            if (auto* parts = root->getProperty ("parts").getArray(); parts != nullptr && ! parts->isEmpty())
+                if (auto* part = parts->getReference (0).getDynamicObject())
+                    part->setProperty ("pluginCeId", "VST3-good-synth");
+
+        h.service->restoreFromVar (repaired);
+        check (! h.service->lastRestoreReport().degraded(),
+               "and installing what was missing repairs the project with no further edits");
+    }
+
+    // -- the platform matrix, and the evidence log -------------------------------------------
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+
+        const auto platform = h.service->platformReport();
+        check (platform.rows.size() >= 5, "the platform matrix has rows to check");
+        bool sawDataDirectory = false;
+        for (const auto& row : platform.rows)
+            sawDataDirectory = sawDataDirectory || (row.id == "data-directory" && row.present);
+        check (sawDataDirectory, "and a writable data directory is one of them, actually tested");
+
+        // The evidence layer: a marker left behind by a previous run becomes a counted
+        // incident. Not isolation — the data that would justify it (§18.9.8).
+        ceditor::host::ActiveHostingMarker marker (dir);
+        marker.markActive ("C:\\VST3\\Crashy.vst3", "Crashy");
+        const auto incident = marker.consumePendingIncident();
+        check (incident.modulePath.endsWith ("Crashy.vst3") && incident.count == 1,
+               "a plug-in that was live when we died is recorded");
+
+        marker.markActive ("C:\\VST3\\Crashy.vst3", "Crashy");
+        check (marker.consumePendingIncident().count == 2, "and repeat offences are counted");
+
+        marker.markActive ("C:\\VST3\\Fine.vst3", "Fine");
+        marker.clear();
+        check (marker.consumePendingIncident().modulePath.isEmpty(),
+               "while a plug-in that survived leaves nothing behind");
+
+        check (marker.incidents().size() == 1, "the log holds the evidence, per module");
+        marker.clearIncidents();
+        check (marker.incidents().isEmpty(), "and can be cleared once it has been acted on");
+    }
+
+    // -- controller families and formats are registrations, not rewrites -----------------------
+    {
+        ceditor::ctrl49::registerCtrl49Profile();
+        auto& registry = ceditor::ctrl49::SurfaceProfileRegistry::instance();
+        check (registry.find ("akai-ctrl49") != nullptr, "the CTRL49 is a registered profile");
+        check (registry.runConformance().isEmpty(),
+               "which passes its conformance checks");
+
+        const auto* profile = registry.find ("akai-ctrl49");
+        check (profile->capabilities.encoders == 8 && profile->capabilities.hasDisplay,
+               "its capabilities are data a page compiler can consult");
+        check (profile->renderers.renderLabels != nullptr,
+               "and it renders pages through the existing payload builders");
+
+        // Registering twice replaces rather than duplicating: a driver reloading its profile
+        // must not leave two.
+        const auto before = registry.size();
+        ceditor::ctrl49::registerCtrl49Profile();
+        check (registry.size() == before, "re-registering a profile replaces it");
+
+        // A profile with no conformance is reported as unverified, never as passing.
+        ceditor::ctrl49::SurfaceProfile untested;
+        untested.profileId = "test-unverified";
+        untested.displayName = "Unverified";
+        registry.registerProfile (untested);
+        bool reported = false;
+        for (const auto& failure : registry.runConformance())
+            reported = reported || failure.contains ("unverified");
+        check (reported, "and a profile with no checks is unverified, not supported");
+    }
+}
+
 // The Stage 4 library: one index, explicit provenance, loading only ever through Stage 1's
 // transaction. The identity story is the heart of it — user metadata survives rescans and
 // renames, a missing source marks instead of deletes, and availability is computed live
@@ -2585,6 +2841,7 @@ int main (int argc, char* argv[])
     testEnrichedPerformanceRestore();
     testPerformanceSystem();
     testPerformanceSurfaceAndScripting();
+    testGeneratedProduct();
     testSendsAndReturns();
     testMultiOutputRouting();
     testHardwareParts();

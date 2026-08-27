@@ -14,6 +14,7 @@ namespace
         obj->setProperty ("version",        c.version);
         obj->setProperty ("category",       c.category);
         obj->setProperty ("isInstrument",   c.isInstrument);
+        obj->setProperty ("formatName",     c.formatName);
         obj->setProperty ("descriptionXml", c.descriptionXml);
         return juce::var (obj);
     }
@@ -27,6 +28,8 @@ namespace
         c.version        = v.getProperty ("version", {}).toString();
         c.category       = v.getProperty ("category", {}).toString();
         c.isInstrument   = (bool) v.getProperty ("isInstrument", false);
+        // Absent = a catalogue written before formats were named, and everything in one is VST3.
+        c.formatName     = v.getProperty ("formatName", "VST3").toString();
         c.descriptionXml = v.getProperty ("descriptionXml", {}).toString();
         return c;
     }

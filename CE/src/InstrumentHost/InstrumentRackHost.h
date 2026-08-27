@@ -147,6 +147,20 @@ public:
         the part is not hardware or nothing is configured. */
     bool sendHardwareProgram (const juce::String& partId);
 
+    // -- master level and output pairs (Stage 7) ----------------------------------------
+    /** The Performance-wide fader, 0..2 linear. The one control the generated product hands
+        a DAW beside its macros, and the fader the standalone always lacked. */
+    bool setMasterLevel (float level);
+    /** How many stereo pairs the rack renders. Pair 0 runs the master chain; the rest leave
+        unprocessed, the way every multi-output instrument works. */
+    bool setOutputPairs (int pairs);
+    /** Routes a part to an output pair; 0 is the main pair. */
+    bool setPartOutputPair (const juce::String& partId, int pair);
+
+    /** The tail the rack's loaded processors ask for, in seconds — reported to the DAW so a
+        bounce does not cut a reverb off (§18.9.3). */
+    double tailLengthSeconds() const;
+
     // -- latency reporting (Stage 5) ----------------------------------------------------
     // The graph does not compensate parallel paths (a live rack keeps every path as fast as
     // its plug-ins allow); these make the cost visible instead of pretended away.
@@ -290,6 +304,8 @@ private:
         channels, a multi-output instrument's extra pair. */
     void connectAudioPair (juce::AudioProcessorGraph::Node* from, int firstChannel, bool stereo,
                            juce::AudioProcessorGraph::Node* to);
+    /** A stereo hop into one output pair of the graph's output node (Stage 7 multi-out). */
+    void connectAudioToOutputPair (juce::AudioProcessorGraph::Node* from, int pair);
     /** Keeps the auxiliary node population — send gains, return levels, extra-out gains,
         hardware MIDI senders — matched to the model, and re-applies their levels. */
     void syncAuxNodes();
@@ -310,6 +326,7 @@ private:
     std::map<juce::String, juce::AudioProcessorGraph::Node::Ptr> returnLevelNodes;   // per returnId
     juce::AudioProcessorGraph graph;
     juce::AudioProcessorGraph::Node::Ptr midiInNode, audioInNode, audioOutNode, engineNode;
+    juce::AudioProcessorGraph::Node::Ptr masterGainNode;   // the Performance fader (Stage 7)
     double currentSampleRate = 44100.0;
     int currentBlockSize = 512;
     bool prepared = false;

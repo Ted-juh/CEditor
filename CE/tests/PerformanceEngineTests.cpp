@@ -227,6 +227,58 @@ void testExternalClock()
            "leaving external mode clears the diagnostic");
 }
 
+// Stage 7 (§18.9.3): the DAW is a third clock SOURCE, not a second clock. The transport
+// follows the host's playhead the way it follows a MIDI master — so a loop jump, a locate and
+// a tempo ramp all land where the DAW says, and the sequencer, the arps and the hardware
+// display keep agreeing with each other.
+void testHostSync()
+{
+    std::cout << "\ntransport: following a DAW playhead" << std::endl;
+
+    Transport transport;
+    transport.setHostSyncEnabled (true);
+    check (! transport.hasHostPosition(),
+           "a DAW that never reports a position leaves the transport on its own clock");
+
+    // A host that is stopped at bar 2 (ppq 4) with its own tempo and signature.
+    transport.applyHostPosition (140.0, 3, 4, 4.0, false);
+    auto block = transport.advance (blockSize, sampleRate);
+    check (transport.hasHostPosition() && ! block.playing,
+           "the host's stopped playhead stops the transport");
+    check (std::abs (transport.getTempo() - 140.0) < 1.0e-9
+             && transport.getTimeSignatureNumerator() == 3,
+           "and its tempo and signature are adopted");
+    check (std::abs (block.startPpq - 4.0) < 1.0e-9, "at the host's position");
+
+    // Rolling: the position comes from the host every block, never integrated here.
+    transport.applyHostPosition (140.0, 3, 4, 4.0, true);
+    block = transport.advance (blockSize, sampleRate);
+    check (block.playing && std::abs (block.startPpq - 4.0) < 1.0e-9, "rolling from there");
+
+    transport.applyHostPosition (140.0, 3, 4, 4.5, true);
+    block = transport.advance (blockSize, sampleRate);
+    check (std::abs (block.startPpq - 4.5) < 1.0e-9,
+           "the next block starts where the host says, not where we would have integrated to");
+
+    // A loop jump backwards is a jump, and the scheduler is told so it can release notes.
+    transport.applyHostPosition (140.0, 3, 4, 0.0, true);
+    transport.advance (blockSize, sampleRate);
+    check (transport.consumeJumped(), "a host locate reports as a jump");
+
+    // Local transport control is refused while the DAW owns it: its play button is the one.
+    transport.stop();
+    transport.applyHostPosition (140.0, 3, 4, 1.0, true);
+    block = transport.advance (blockSize, sampleRate);
+    check (block.playing, "a local stop cannot stop a transport the host is driving");
+
+    // Leaving host sync hands the clock back.
+    transport.setHostSyncEnabled (false);
+    check (! transport.hasHostPosition(), "and leaving host sync releases it");
+    transport.stop();
+    block = transport.advance (blockSize, sampleRate);
+    check (! block.playing, "after which local control works again");
+}
+
 void testCompileAndPlay()
 {
     std::cout << "\npatterns: compile, schedule, release" << std::endl;
@@ -935,6 +987,7 @@ int main()
 
     testTransport();
     testExternalClock();
+    testHostSync();
     testCompileAndPlay();
     testSwingRatchetsTiesMicrotiming();
     testProbabilityAndConditions();

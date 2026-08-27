@@ -73,6 +73,11 @@ struct ExtraOut
 struct RackPart
 {
     juce::String partId;
+    /** Which stereo output pair this part leaves through (Stage 7, §18.9.3). 0 is the main
+        pair, which is the only one that runs the master chain — every multi-output instrument
+        works this way, and a DAW project that routes a part to its own channel expects it to
+        arrive unprocessed by the master bus. */
+    int outputPair = 0;
     juce::String pluginCeId;          // empty = empty/unresolved part
     juce::String pluginModulePath;
     juce::String pluginName;          // display cache; never identity
@@ -190,6 +195,14 @@ struct Performance
     juce::Array<ControlPage> pages;
 
     // -- the Stage 6 performance system -------------------------------------------------
+    /** Master level, 0..2 linear (Stage 7): the one Performance-wide control the generated
+        product exposes to DAW automation beside its macros, and the fader the standalone
+        always lacked. */
+    float masterLevel = 1.0f;
+    /** How many stereo output pairs the product offers. 1 is the plain stereo instrument;
+        more declares aux buses on the outer VST3 (§18.9.3, "multi-output where justified"). */
+    int outputPairs = 1;
+
     perf::TransportSettings transport;
     juce::Array<perf::Pattern> patterns;
     juce::Array<perf::Clip> clips;

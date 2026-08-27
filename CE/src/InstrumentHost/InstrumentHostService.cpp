@@ -6,6 +6,8 @@ namespace ceditor::host
 InstrumentHostService::InstrumentHostService (Options optionsToUse)
     : options (std::move (optionsToUse))
 {
+    activeMarker = std::make_unique<ActiveHostingMarker> (options.dataDirectory);
+
     // The pane's half of the editor-before-processor invariant: whatever path destroys an
     // instrument, its editor is torn down first, and its parameter sync stops listening
     // first too. Replacement re-shows and re-attaches afterwards (see the commit callback
@@ -20,6 +22,9 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
 
 InstrumentHostService::~InstrumentHostService()
 {
+    // Hand the hardware back on the way out: a claim outliving its owner is what the heartbeat
+    // timeout exists to recover from, not the normal path.
+    releaseHardwareSurface();
     stopAudio();
     *alive = false;
     stopRequested.store (true);
@@ -1660,6 +1665,61 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    // -- Stage 7: the mature generated product ------------------------------------------------
+
+    if (cmd == "setMasterLevel")
+    {
+        rack.setMasterLevel ((float) (double) payload.getProperty ("level", 1.0));
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setOutputPairs")
+    {
+        rack.setOutputPairs ((int) payload.getProperty ("pairs", 1));
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setPartOutputPair")
+    {
+        if (! rack.setPartOutputPair (payload.getProperty ("partId", {}).toString(),
+                                      (int) payload.getProperty ("pair", 0)))
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "claimHardwareSurface" || cmd == "releaseHardwareSurface")
+    {
+        if (cmd == "releaseHardwareSurface")
+        {
+            releaseHardwareSurface();
+        }
+        else if (! claimHardwareSurface())
+        {
+            emitError ("Another instance is using the hardware surface.");
+            emitState();
+            return;
+        }
+        emitState();
+        return;
+    }
+
+    if (cmd == "clearActiveHostingIncidents")
+    {
+        if (activeMarker != nullptr)
+            activeMarker->clearIncidents();
+        emitState();
+        return;
+    }
+
     if (cmd == "getLibrary")
     {
         ensureLibrary();
@@ -1901,6 +1961,16 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
         const std::scoped_lock lock (catalogLock);
         catalog.loadFrom (catalogFile());
 
+        // Safe startup, active side (§18.9.8): a leftover ACTIVE marker names the plug-in that
+        // was live when the process died. It is recorded as evidence rather than acted on —
+        // one crash is a crash, a pattern is what would justify isolating active processing.
+        if (activeMarker != nullptr)
+        {
+            const auto incident = activeMarker->consumePendingIncident();
+            if (incident.modulePath.isNotEmpty())
+                pendingActiveIncident = incident;
+        }
+
         // Safe startup: a leftover dead-man marker names the module that was on the scanner's
         // plate when something died abnormally. Quarantine it before anything loads.
         const auto suspect = PluginScannerCoordinator::pendingMarkerModule (options.dataDirectory);
@@ -2051,12 +2121,19 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
 
     // The callback can arrive after this service is gone (an async load racing shutdown);
     // the alive token is the same pattern ValueTreeBridge documents for its update check.
+    if (activeMarker != nullptr)
+        activeMarker->markActive (info.modulePath, info.name);
+
     options.instantiate (descriptionXml, options.sampleRate, options.blockSize,
         [this, aliveToken = alive, partId, generation, info, afterCommit = std::move (afterCommit)]
         (std::unique_ptr<juce::AudioProcessor> instrument, const juce::String& error)
         {
             if (! aliveToken->load())
                 return;
+
+            // Survived construction: whatever happens next is not attributable to this load.
+            if (activeMarker != nullptr)
+                activeMarker->clear();
 
             if (instrument == nullptr)
             {
@@ -2133,12 +2210,18 @@ void InstrumentHostService::requestEffect (const juce::String& effectId, const j
         return;
     }
 
+    if (activeMarker != nullptr)
+        activeMarker->markActive (info.modulePath, info.name);
+
     options.instantiate (descriptionXml, options.sampleRate, options.blockSize,
         [this, aliveToken = alive, effectId, generation, info]
         (std::unique_ptr<juce::AudioProcessor> effect, const juce::String& error)
         {
             if (! aliveToken->load())
                 return;
+
+            if (activeMarker != nullptr)
+                activeMarker->clear();
 
             if (effect == nullptr)
             {
@@ -2484,7 +2567,20 @@ void InstrumentHostService::releaseRuntime()
 
 juce::var InstrumentHostService::captureStateVar()
 {
-    return rack.captureState().toVar();
+    // The SAME Runtime State the standalone's session file holds — §18.9.4 forbids a DAW-only
+    // Performance format — with the package identity added as extra root properties that an
+    // older parser simply ignores.
+    auto state = rack.captureState().toVar();
+
+    const_cast<InstrumentHostService*> (this)->ensureHostProject();
+    if (auto* root = state.getDynamicObject())
+    {
+        const auto identity = packageIdentity();
+        for (const auto* key : { "packageId", "packageName", "packageVersion" })
+            root->setProperty (key, identity.getProperty (key, {}));
+    }
+
+    return state;
 }
 
 void InstrumentHostService::restoreFromVar (const juce::var& state)
@@ -2502,6 +2598,13 @@ void InstrumentHostService::restoreFromVar (const juce::var& state)
         emitError ("The saved host state could not be read; keeping the current rack.");
         return;
     }
+
+    // A state written by a newer schema than this build understands still loads — every field
+    // it does not know is simply absent — but the fact is said out loud rather than hidden.
+    if ((int) state.getProperty ("schemaVersion", 1) > Performance::currentSchemaVersion)
+        emitError ("This project was saved by a newer version of "
+                   + state.getProperty ("packageName", "the product").toString()
+                   + "; anything it added is not in this build.");
 
     applyPerformance (std::move (restored));
     savePerformance();
@@ -2955,6 +3058,7 @@ void InstrumentHostService::loadRackRecord (const LibraryRecord& record)
     if (const auto reason = recordUnavailableReason (record); reason.isNotEmpty())
         emitError ("Degraded restore of " + record.name + " — " + reason);
 
+
     applyPerformance (std::move (restored));
     savePerformance();
     emitState();
@@ -3338,6 +3442,21 @@ void InstrumentHostService::drainParameterEvents()
 {
     drainEngineEvents();
 
+    // The hardware claim is a heartbeat, not a lock: an instance that dies stops writing and
+    // the next one takes over after the timeout instead of finding a surface owned by a ghost.
+    if (holdsHardwareSurface)
+    {
+        const auto now = juce::Time::currentTimeMillis();
+        if (now - lastHardwareHeartbeat > hardwareHeartbeatMs)
+        {
+            lastHardwareHeartbeat = now;
+            auto* claim = new juce::DynamicObject();
+            claim->setProperty ("instanceId", instanceId);
+            claim->setProperty ("heartbeat", now);
+            hardwareOwnerFile().replaceWithText (juce::JSON::toString (juce::var (claim)));
+        }
+    }
+
     // The transport's own edges. The engine does not queue them (it has no reason to), so
     // they are noticed here, at the same rate everything else is drained.
     const auto playing = rack.getEngine().getTransport().isPlaying();
@@ -3629,6 +3748,7 @@ juce::var InstrumentHostService::buildStatePayload() const
         }
         obj->setProperty ("extraOuts", extraOuts);
         obj->setProperty ("outputChannels", rack.instrumentOutputChannels (part.partId));
+        obj->setProperty ("outputPair",     part.outputPair);
 
         obj->setProperty ("hardware", part.hardware);
         if (part.hardware)
@@ -3765,6 +3885,7 @@ juce::var InstrumentHostService::buildStatePayload() const
         return paths;
     }());
     root->setProperty ("performance", performancePayload());
+    root->setProperty ("product", productPayload());
     root->setProperty ("scanning", scanBusy.load());
     root->setProperty ("editorOpenPartId", editorTargetId);
     root->setProperty ("audio", juce::var (audio));
@@ -4081,6 +4202,323 @@ juce::var InstrumentHostService::runScriptAction (const juce::String& action, co
     auto* ok = new juce::DynamicObject();
     ok->setProperty ("ok", true);
     return juce::var (ok);
+}
+
+// -- project portability, recovery and instance arbitration (Stage 7) -------------------------
+
+InstrumentHostService::RestoreReport InstrumentHostService::lastRestoreReport() const
+{
+    RestoreReport restoreReport;
+    const auto& performance = rack.getPerformance();
+
+    for (const auto& part : performance.parts)
+    {
+        if (part.hardware || part.pluginCeId.isEmpty() || rack.partHasInstrument (part.partId))
+            continue;
+        restoreReport.missingInstruments.addIfNotAlreadyThere (
+            part.pluginName.isNotEmpty() ? part.pluginName : part.pluginCeId);
+    }
+
+    const auto noteMissingEffects = [this, &restoreReport] (const juce::Array<EffectSlot>& chain)
+    {
+        for (const auto& slot : chain)
+            if (slot.pluginCeId.isNotEmpty() && ! rack.effectHasProcessor (slot.effectId))
+                restoreReport.missingEffects.addIfNotAlreadyThere (
+                    slot.pluginName.isNotEmpty() ? slot.pluginName : slot.pluginCeId);
+    };
+
+    for (const auto& part : performance.parts)
+        noteMissingEffects (part.effects);
+    noteMissingEffects (performance.masterEffects);
+    for (const auto& chain : performance.returns)
+        noteMissingEffects (chain.effects);
+
+    if (restoreReport.degraded())
+        restoreReport.notes.add ("The parts and slots below kept their identity and saved state — "
+                                 "install what is missing and reopen to get them back.");
+
+    return restoreReport;
+}
+
+PlatformReport InstrumentHostService::platformReport() const
+{
+    return checkPlatformSupport (options.dataDirectory);
+}
+
+juce::Array<ActiveHostingMarker::Incident> InstrumentHostService::activeHostingIncidents() const
+{
+    return activeMarker != nullptr ? activeMarker->incidents()
+                                   : juce::Array<ActiveHostingMarker::Incident>();
+}
+
+juce::var InstrumentHostService::packageIdentity() const
+{
+    // Which product, and which revision of it, wrote this state. A project that travels to
+    // another machine can then say "this was made by X 1.2" rather than failing mutely.
+    auto* identity = new juce::DynamicObject();
+    identity->setProperty ("packageId",      hostProject.getProperty ("appId", {}).toString());
+    identity->setProperty ("packageName",    hostProject.getProperty ("productName", {}).toString());
+    identity->setProperty ("packageVersion", hostProject.getProperty ("version", {}).toString());
+    identity->setProperty ("schemaVersion",  Performance::currentSchemaVersion);
+    return juce::var (identity);
+}
+
+bool InstrumentHostService::ownsHardwareSurface() const
+{
+    return holdsHardwareSurface;
+}
+
+juce::String InstrumentHostService::hardwareSurfaceOwner() const
+{
+    if (holdsHardwareSurface)
+        return "this instance";
+
+    const auto stored = juce::JSON::parse (hardwareOwnerFile().loadFileAsString());
+    const auto owner = stored.getProperty ("instanceId", {}).toString();
+    if (owner.isEmpty())
+        return "nobody";
+
+    // A stale claim is nobody's: an instance that crashed must not hold the surface forever.
+    const auto stamp = (juce::int64) stored.getProperty ("heartbeat", 0);
+    const auto age = juce::Time::currentTimeMillis() - stamp;
+    return age > hardwareClaimTimeoutMs ? "nobody" : "another instance";
+}
+
+bool InstrumentHostService::claimHardwareSurface()
+{
+    if (holdsHardwareSurface)
+        return true;
+
+    if (hardwareSurfaceOwner() == "another instance")
+        return false;
+
+    options.dataDirectory.createDirectory();
+    auto* claim = new juce::DynamicObject();
+    claim->setProperty ("instanceId", instanceId);
+    claim->setProperty ("heartbeat", juce::Time::currentTimeMillis());
+    hardwareOwnerFile().replaceWithText (juce::JSON::toString (juce::var (claim)));
+
+    holdsHardwareSurface = true;
+    return true;
+}
+
+void InstrumentHostService::releaseHardwareSurface()
+{
+    if (! holdsHardwareSurface)
+        return;
+
+    holdsHardwareSurface = false;
+
+    // Only clear the file if it is still OURS: an instance that took over in the meantime
+    // must not have its claim deleted by the one it replaced.
+    const auto stored = juce::JSON::parse (hardwareOwnerFile().loadFileAsString());
+    if (stored.getProperty ("instanceId", {}).toString() == instanceId)
+        hardwareOwnerFile().deleteFile();
+}
+
+// -- the generated product's DAW surface (Stage 7) --------------------------------------------
+
+float InstrumentHostService::exposedMacroValue (int index) const
+{
+    const auto& macros = rack.getPerformance().macros;
+    return juce::isPositiveAndBelow (index, macros.size()) ? macros.getReference (index).value
+                                                            : 0.0f;
+}
+
+bool InstrumentHostService::setExposedMacroValue (int index, float value)
+{
+    const auto& macros = rack.getPerformance().macros;
+    if (! juce::isPositiveAndBelow (index, macros.size()))
+        return false;   // the parameter exists, the macro does not: accepted, does nothing
+
+    auto* macro = rack.findMutableMacro (macros.getReference (index).macroId);
+    if (macro == nullptr)
+        return false;
+
+    macro->value = juce::jlimit (0.0f, 1.0f, value);
+    applyMacroValue (*macro);
+    return true;
+}
+
+juce::String InstrumentHostService::exposedMacroName (int index) const
+{
+    const auto& macros = rack.getPerformance().macros;
+    // The NAME is stable too: "Macro 3" is parameter 3 forever, and the rack's own name for
+    // it rides along only as a suffix a host may or may not show.
+    const auto base = "Macro " + juce::String (index + 1);
+    if (! juce::isPositiveAndBelow (index, macros.size()))
+        return base;
+
+    const auto& name = macros.getReference (index).name;
+    return name.isEmpty() ? base : base + " — " + name;
+}
+
+int InstrumentHostService::sceneCount() const
+{
+    return rack.getPerformance().scenes.size();
+}
+
+juce::String InstrumentHostService::sceneNameAt (int index) const
+{
+    const auto& scenes = rack.getPerformance().scenes;
+    return juce::isPositiveAndBelow (index, scenes.size()) ? scenes.getReference (index).name
+                                                            : juce::String();
+}
+
+int InstrumentHostService::selectedSceneIndex() const
+{
+    return lastSelectedScene;
+}
+
+bool InstrumentHostService::selectSceneByIndex (int index)
+{
+    const auto& scenes = rack.getPerformance().scenes;
+    if (! juce::isPositiveAndBelow (index, scenes.size()))
+    {
+        lastSelectedScene = -1;
+        return false;
+    }
+
+    lastSelectedScene = index;
+    return launchScene (scenes.getReference (index).sceneId);
+}
+
+float InstrumentHostService::masterLevel() const
+{
+    return rack.getPerformance().masterLevel;
+}
+
+void InstrumentHostService::setMasterLevel (float level)
+{
+    rack.setMasterLevel (level);
+}
+
+int InstrumentHostService::reportedLatencySamples() const
+{
+    // The DAW compensates one number for the whole instance, so it has to be the worst path
+    // through the rack: the slowest part chain, plus whatever the master chain adds after it.
+    int worst = 0;
+    for (const auto& part : rack.getPerformance().parts)
+        worst = juce::jmax (worst, rack.partLatencySamples (part.partId));
+    return worst + rack.masterLatencySamples();
+}
+
+double InstrumentHostService::tailLengthSeconds() const
+{
+    return rack.tailLengthSeconds();
+}
+
+int InstrumentHostService::outputPairCount() const
+{
+    return rack.getPerformance().outputPairs;
+}
+
+void InstrumentHostService::setOfflineRender (bool offline)
+{
+    if (offline == offlineRender)
+        return;
+
+    offlineRender = offline;
+
+    // A bounce renders faster than real time and must not push notes at hardware that is not
+    // part of it; the ports come back when the render ends.
+    for (const auto& part : rack.getPerformance().parts)
+    {
+        if (! part.hardware)
+            continue;
+
+        if (offline)
+            rack.setHardwareMidiSink (part.partId, {});
+        else
+            openHardwareMidi (part.partId);
+    }
+}
+
+juce::var InstrumentHostService::productPayload() const
+{
+    // Everything Stage 7 added, in one block: what the DAW sees, what this instance owns,
+    // whether the platform actually supports us, and the evidence log §18.9.8 asks for.
+    const auto& performance = rack.getPerformance();
+    const auto& transport = rack.getEngine().getTransport();
+
+    auto* daw = new juce::DynamicObject();
+    daw->setProperty ("hostSync",        transport.isHostSyncEnabled());
+    daw->setProperty ("followingHost",   transport.hasHostPosition());
+    daw->setProperty ("offlineRender",   offlineRender);
+    daw->setProperty ("latencySamples",  reportedLatencySamples());
+    daw->setProperty ("tailSeconds",     tailLengthSeconds());
+    daw->setProperty ("outputPairs",     performance.outputPairs);
+    daw->setProperty ("masterLevel",     performance.masterLevel);
+
+    juce::Array<juce::var> exposed;
+    for (int i = 0; i < exposedMacroCount; ++i)
+    {
+        auto* row = new juce::DynamicObject();
+        row->setProperty ("index", i);
+        row->setProperty ("name",  exposedMacroName (i));
+        row->setProperty ("value", exposedMacroValue (i));
+        row->setProperty ("bound", i < performance.macros.size());
+        exposed.add (juce::var (row));
+    }
+    daw->setProperty ("exposedMacros", exposed);
+
+    const auto report = lastRestoreReport();
+    juce::Array<juce::var> missingInstruments, missingEffects, notes;
+    for (const auto& name : report.missingInstruments) missingInstruments.add (name);
+    for (const auto& name : report.missingEffects)     missingEffects.add (name);
+    for (const auto& note : report.notes)              notes.add (note);
+
+    auto* restore = new juce::DynamicObject();
+    restore->setProperty ("degraded",           report.degraded());
+    restore->setProperty ("missingInstruments", missingInstruments);
+    restore->setProperty ("missingEffects",     missingEffects);
+    restore->setProperty ("notes",              notes);
+
+    const auto platform = platformReport();
+    juce::Array<juce::var> rows;
+    for (const auto& row : platform.rows)
+    {
+        auto* r = new juce::DynamicObject();
+        r->setProperty ("id",          row.id);
+        r->setProperty ("description", row.description);
+        r->setProperty ("required",    row.required);
+        r->setProperty ("present",     row.present);
+        r->setProperty ("detail",      row.detail);
+        rows.add (juce::var (r));
+    }
+
+    auto* platformObj = new juce::DynamicObject();
+    platformObj->setProperty ("name",      platform.platformName);
+    platformObj->setProperty ("supported", platform.supported());
+    platformObj->setProperty ("rows",      rows);
+
+    juce::Array<juce::var> incidents;
+    for (const auto& incident : activeHostingIncidents())
+    {
+        auto* i = new juce::DynamicObject();
+        i->setProperty ("modulePath", incident.modulePath);
+        i->setProperty ("name",       incident.name);
+        i->setProperty ("count",      incident.count);
+        incidents.add (juce::var (i));
+    }
+
+    auto* hardware = new juce::DynamicObject();
+    hardware->setProperty ("owner",    hardwareSurfaceOwner());
+    hardware->setProperty ("owned",    ownsHardwareSurface());
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("daw",       juce::var (daw));
+    root->setProperty ("restore",   juce::var (restore));
+    root->setProperty ("platform",  juce::var (platformObj));
+    root->setProperty ("hardware",  juce::var (hardware));
+    root->setProperty ("activeHostingIncidents", incidents);
+    root->setProperty ("surfaceProfiles", [] {
+        juce::Array<juce::var> ids;
+        for (const auto& id : ctrl49::SurfaceProfileRegistry::instance().profileIds())
+            ids.add (id);
+        return ids;
+    }());
+    return juce::var (root);
 }
 
 juce::var InstrumentHostService::performancePayload() const

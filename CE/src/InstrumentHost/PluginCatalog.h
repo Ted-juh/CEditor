@@ -37,6 +37,12 @@ struct PluginClassRecord
     juce::String version;
     juce::String category;
     bool isInstrument = false;
+    /** Which plug-in format this class came from (Stage 7, §18.9.6). "VST3" today; the field
+        exists so a second format is a REGISTRATION rather than a rewrite — the catalogue, the
+        library, the parameter model, the editor host and the state path all key off the same
+        record, and none of them care which format produced it. An absent value reads as VST3,
+        which is what every pre-Stage-7 catalogue on disk contains. */
+    juce::String formatName { "VST3" };
     juce::String descriptionXml;   // lossless JUCE PluginDescription XML, opaque at this layer
 };
 

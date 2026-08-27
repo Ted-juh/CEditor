@@ -28,6 +28,14 @@
 // position follows the tick count rather than free-running. Because a stopped or unplugged
 // master is silence rather than an error, clock loss has a defined fallback (§18.8.13): after
 // `clockTimeoutMs` without a tick the transport stops itself and says why.
+//
+// DAW HOST SYNC (Stage 7, §18.9.3) is the third source, and deliberately the SAME contract:
+// the outer VST3 reads its AudioPlayHead once per block and hands the host's tempo, signature,
+// position and play state to applyHostPosition(); the transport then follows that position
+// instead of integrating its own, exactly as it follows a MIDI master's tick count. There is
+// still one transport — a source selector, not a second clock — which is what keeps Stage 6's
+// sequencer, arpeggiators and hardware display agreeing about where bar three is whether the
+// clock came from inside, from a cable, or from Cubase.
 
 namespace ceditor::perf
 {
@@ -141,6 +149,51 @@ public:
         positionRequested.store (true);
     }
 
+    // -- DAW host sync (Stage 7) ---------------------------------------------------------
+
+    /** Turns host sync on. While on, the transport follows whatever applyHostPosition()
+        reports and refuses local start/stop — the DAW's play button is the play button. */
+    void setHostSyncEnabled (bool shouldFollowHost) noexcept
+    {
+        hostSync.store (shouldFollowHost);
+        if (! shouldFollowHost)
+            haveHostPosition.store (false);
+    }
+
+    bool isHostSyncEnabled() const noexcept         { return hostSync.load(); }
+    /** True once the host has actually reported a position — a DAW that exposes no playhead
+        leaves this false, and the transport keeps running on its own rather than freezing. */
+    bool hasHostPosition() const noexcept           { return haveHostPosition.load(); }
+
+    /** Audio thread, once per block, BEFORE advance(). Everything the host knows: its tempo,
+        its signature, where its playhead is in quarter notes, and whether it is rolling. */
+    void applyHostPosition (double tempo, int numerator, int denominator, double ppqPosition,
+                            bool hostIsPlaying) noexcept
+    {
+        if (! hostSync.load())
+            return;
+
+        haveHostPosition.store (true);
+
+        if (tempo > 0.0)
+            tempoBpm.store (juce::jlimit (20.0, 300.0, tempo));
+        if (numerator > 0 && denominator > 0)
+            setTimeSignature (numerator, denominator);
+
+        // The host's position is the position. Following it rather than integrating our own
+        // is what makes a loop jump, a locate or a tempo ramp land in the right place — the
+        // same reason external clock follows its tick count.
+        const auto position = juce::jmax (0.0, ppqPosition);
+        if (std::abs (position - positionPpq.load()) > 1.0e-9)
+        {
+            positionPpq.store (position);
+            if (hostIsPlaying)
+                hostJumped.store (true);
+        }
+
+        hostPlaying.store (hostIsPlaying);
+    }
+
     void setExternalClockEnabled (bool shouldSlave) noexcept
     {
         externalClock.store (shouldSlave);
@@ -194,11 +247,24 @@ public:
         }
 
         const bool wasPlaying = playing.load();
+        const bool followingHost = hostSync.load() && haveHostPosition.load();
 
-        if (stopRequested.exchange (false))
+        if (followingHost)
+        {
+            // The DAW's play button is the play button: local requests are consumed so they
+            // cannot fire later, but they do not move a transport the host owns.
+            startRequested.store (false);
+            stopRequested.store (false);
+            continueRequested.store (false);
+            playing.store (hostPlaying.load());
+            if (hostJumped.exchange (false))
+                jumped.store (true);
+        }
+
+        if (! followingHost && stopRequested.exchange (false))
             playing.store (false);
 
-        if (startRequested.exchange (false))
+        if (! followingHost && startRequested.exchange (false))
         {
             // "Start" rewinds, "continue" does not — the MIDI verbs, kept apart because a
             // player pressing start expects the top of the pattern.
@@ -236,7 +302,9 @@ public:
         block.endPpq = nowPlaying ? block.startPpq + block.ppqPerSample * (double) numSamples
                                   : block.startPpq;
 
-        if (nowPlaying)
+        // Under host sync the next block's start comes from the host, not from here: writing
+        // an integrated position would fight the playhead and drift against it.
+        if (nowPlaying && ! followingHost)
             positionPpq.store (block.endPpq);
 
         return block;
@@ -358,6 +426,10 @@ private:
     std::atomic<bool> positionRequested { false };
     std::atomic<bool> jumped { false };
     std::atomic<bool> externalClock { false };
+    std::atomic<bool> hostSync { false };
+    std::atomic<bool> haveHostPosition { false };
+    std::atomic<bool> hostPlaying { false };
+    std::atomic<bool> hostJumped { false };
     std::atomic<bool> haveClock { false };
     std::atomic<bool> externalClockLost { false };
     std::atomic<juce::int64> clockSampleCounter { 0 };

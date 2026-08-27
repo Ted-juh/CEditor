@@ -18,6 +18,11 @@ InstrumentRackHost::InstrumentRackHost()
     engineNode = graph.addNode (std::make_unique<PerformanceEngineProcessor> (engine));
     graph.addConnection ({ { midiInNode->nodeID, midiChannel },
                            { engineNode->nodeID, midiChannel } });
+
+    // The Performance fader sits at the very end of the main pair, after the master chain:
+    // it is the product's level, not another insert, so nothing on the master bus can be
+    // driven by it and it cannot be bypassed by an effect that is.
+    masterGainNode = graph.addNode (std::make_unique<GainPanProcessor>());
 }
 
 InstrumentRackHost::~InstrumentRackHost() = default;
@@ -26,7 +31,8 @@ void InstrumentRackHost::prepare (double sampleRate, int blockSize, int numInput
 {
     currentSampleRate = sampleRate;
     currentBlockSize = blockSize;
-    graph.setPlayConfigDetails (juce::jmax (0, numInputChannels), 2, sampleRate, blockSize);
+    graph.setPlayConfigDetails (juce::jmax (0, numInputChannels),
+                                juce::jlimit (2, 16, model.outputPairs * 2), sampleRate, blockSize);
     graph.prepareToPlay (sampleRate, blockSize);
     engine.prepare (sampleRate, blockSize, perf::PerformanceEngine::maxParts);
     prepared = true;
@@ -178,6 +184,60 @@ bool InstrumentRackHost::moveEffectSlot (const juce::String& effectId, int newIn
 
     rewireAudio();
     return true;
+}
+
+bool InstrumentRackHost::setMasterLevel (float level)
+{
+    model.masterLevel = juce::jlimit (0.0f, 2.0f, level);
+    if (masterGainNode != nullptr)
+        static_cast<GainPanProcessor*> (masterGainNode->getProcessor())
+            ->setVolumePan (model.masterLevel, 0.0f, true);
+    return true;
+}
+
+bool InstrumentRackHost::setOutputPairs (int pairs)
+{
+    model.outputPairs = juce::jlimit (1, 8, pairs);
+    // Parts routed past the new end fall back to the main pair rather than silently vanishing
+    // into a bus that no longer exists.
+    for (auto& part : model.parts)
+        part.outputPair = juce::jlimit (0, model.outputPairs - 1, part.outputPair);
+    rewireAudio();
+    return true;
+}
+
+bool InstrumentRackHost::setPartOutputPair (const juce::String& partId, int pair)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+
+    part->outputPair = juce::jlimit (0, model.outputPairs - 1, pair);
+    rewireAudio();
+    return true;
+}
+
+double InstrumentRackHost::tailLengthSeconds() const
+{
+    // The longest tail anything in the rack claims: a DAW bounce has to keep rendering that
+    // long after the last note or it truncates the reverb it can hear.
+    double longest = 0.0;
+
+    for (const auto& [partId, lp] : live)
+    {
+        juce::ignoreUnused (partId);
+        if (lp.instrumentNode != nullptr)
+            longest = juce::jmax (longest, lp.instrumentNode->getProcessor()->getTailLengthSeconds());
+    }
+
+    for (const auto& [effectId, effect] : liveEffects)
+    {
+        juce::ignoreUnused (effectId);
+        if (effect.node != nullptr)
+            longest = juce::jmax (longest, effect.node->getProcessor()->getTailLengthSeconds());
+    }
+
+    return longest;
 }
 
 bool InstrumentRackHost::setEffectBypassed (const juce::String& effectId, bool bypassed)
@@ -970,6 +1030,19 @@ void InstrumentRackHost::connectAudioPair (juce::AudioProcessorGraph::Node* from
     }
 }
 
+void InstrumentRackHost::connectAudioToOutputPair (juce::AudioProcessorGraph::Node* from, int pair)
+{
+    // The output IO node reports its channels only once the graph is prepared, so the pair
+    // count comes from the model rather than from the node — the same reason connectAudio
+    // pins the output at stereo.
+    const auto first = juce::jlimit (0, 14, pair * 2);
+    const auto outs = juce::jmax (1, from->getProcessor()->getTotalNumOutputChannels());
+    const auto sourceRight = outs >= 2 ? 1 : 0;
+
+    graph.addConnection ({ { from->nodeID, 0 },           { audioOutNode->nodeID, first } });
+    graph.addConnection ({ { from->nodeID, sourceRight }, { audioOutNode->nodeID, first + 1 } });
+}
+
 void InstrumentRackHost::destroyAuxNodes (LivePart& lp)
 {
     for (auto& [returnId, node] : lp.sendNodes)
@@ -1105,7 +1178,11 @@ void InstrumentRackHost::rewireAudio()
             it != liveEffects.end() && it->second.node != nullptr)
             masterNodes.add (it->second.node.get());
 
-    auto* masterSink = masterNodes.isEmpty() ? audioOutNode.get() : masterNodes.getFirst();
+    // The master chain runs into the Performance fader, and the fader is pair 0's output.
+    // Parts routed to another pair skip both, which is what "multi-output" means to a DAW.
+    static_cast<GainPanProcessor*> (masterGainNode->getProcessor())
+        ->setVolumePan (model.masterLevel, 0.0f, true);
+    auto* masterSink = masterNodes.isEmpty() ? masterGainNode.get() : masterNodes.getFirst();
 
     // Return chains: sends sum into the chain's head (its first loaded effect, else its
     // level gain), run the effects in order, and the level gain rejoins the master path.
@@ -1180,7 +1257,13 @@ void InstrumentRackHost::rewireAudio()
                 connectAudio (inserts.getLast(), lp.gainNode.get());
         }
 
-        connectAudio (lp.gainNode.get(), masterSink);
+        // Pair 0 is the master path; any other pair leaves straight through the output node,
+        // unprocessed by the master chain and untouched by the Performance fader.
+        const auto pair = juce::jlimit (0, juce::jmax (0, model.outputPairs - 1), part->outputPair);
+        if (pair == 0)
+            connectAudio (lp.gainNode.get(), masterSink);
+        else
+            connectAudioToOutputPair (lp.gainNode.get(), pair);
 
         // Post-fader sends: the part's gain output, scaled per send, into each return head.
         for (const auto& send : part->sends)
@@ -1209,11 +1292,12 @@ void InstrumentRackHost::rewireAudio()
         }
     }
 
-    // Master serial hops, tail to the output.
+    // Master serial hops, tail into the fader, fader into output pair 0.
     for (int i = 0; i + 1 < masterNodes.size(); ++i)
         connectAudio (masterNodes[i], masterNodes[i + 1]);
     if (! masterNodes.isEmpty())
-        connectAudio (masterNodes.getLast(), audioOutNode.get());
+        connectAudio (masterNodes.getLast(), masterGainNode.get());
+    connectAudioToOutputPair (masterGainNode.get(), 0);
 }
 
 void InstrumentRackHost::applyPartToLive (const RackPart& part, LivePart& lp)

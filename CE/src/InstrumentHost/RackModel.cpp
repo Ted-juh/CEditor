@@ -295,6 +295,7 @@ juce::var Performance::toVar() const
         p->setProperty ("volume",           part.volume);
         p->setProperty ("pan",              part.pan);
         p->setProperty ("editorOpen",       part.editorOpen);
+        p->setProperty ("outputPair",       part.outputPair);
         p->setProperty ("effects",          effectsToVar (part.effects));
         p->setProperty ("midiFx",           perf::midiFxToVar (part.midiFx));
         p->setProperty ("arp",              perf::arpToVar (part.arp));
@@ -421,6 +422,8 @@ juce::var Performance::toVar() const
         sceneVars.add (perf::sceneToVar (scene));
 
     root->setProperty ("schemaVersion", currentSchemaVersion);
+    root->setProperty ("masterLevel",   masterLevel);
+    root->setProperty ("outputPairs",   outputPairs);
     root->setProperty ("parts",         partVars);
     root->setProperty ("masterEffects", effectsToVar (masterEffects));
     root->setProperty ("returns",       returnVars);
@@ -450,6 +453,8 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
     // so a future migration that needs more than defaults can tell the difference.
     parsed.schemaVersion = juce::jlimit (1, currentSchemaVersion,
                                          (int) stored.getProperty ("schemaVersion", 1));
+    parsed.masterLevel = floatOf (stored, "masterLevel", 1.0f, 0.0f, 2.0f);
+    parsed.outputPairs = intOf (stored, "outputPairs", 1, 1, 8);
 
     if (parsed.performanceId.isEmpty())
         return false;
@@ -496,6 +501,7 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
         part.volume     = floatOf (p, "volume", 1.0f, 0.0f, 2.0f);
         part.pan        = floatOf (p, "pan", 0.0f, -1.0f, 1.0f);
         part.editorOpen = (bool) p.getProperty ("editorOpen", false);
+        part.outputPair = intOf (p, "outputPair", 0, 0, 7);
 
         // Explicit multi-output pairs: a clamped pair index, duplicates dropped — a damaged
         // route is a nit, not a reason to refuse the rig.

@@ -7,6 +7,9 @@
 #include "InstrumentRackHost.h"
 #include "ParameterModel.h"
 #include "Library.h"
+#include "PlatformMatrix.h"
+#include "ActiveHostingMarker.h"
+#include "ControlSurface/SurfaceProfile.h"
 
 // InstrumentHostService — the instrument host behind one bridge event (VIP-successor Stage 1).
 //
@@ -401,6 +404,90 @@ public:
     /** A read-only snapshot for scripts: transport, clips, scenes and the setlist position. */
     juce::var scriptPerformanceState() const;
 
+    // -- the generated product's DAW surface (Stage 7, §18.9.3) ------------------------------
+    // The curated automation set, deliberately small and deliberately INDEX-STABLE: macro
+    // slot N is DAW parameter N whether or not a macro exists there yet, so a project's
+    // automation lane still means the same thing after the rack is edited. Exposing every
+    // inner plug-in parameter instead would make a DAW project unmanageable and would break
+    // the moment an instrument was swapped — which is exactly what the baseline forbids.
+
+    static constexpr int exposedMacroCount = 16;
+
+    float exposedMacroValue (int index) const;
+    /** Writes one exposed macro through the Stage 5 macro path (its targets, its ranges).
+        An index with no macro behind it is accepted and does nothing — the parameter still
+        exists, because a stable surface is the point. */
+    bool setExposedMacroValue (int index, float value);
+    juce::String exposedMacroName (int index) const;
+
+    int sceneCount() const;
+    juce::String sceneNameAt (int index) const;
+    /** Launches scene `index`; -1 (or an unknown index) is "no scene", not an error. */
+    bool selectSceneByIndex (int index);
+    int selectedSceneIndex() const;
+
+    float masterLevel() const;
+    void setMasterLevel (float level);
+
+    /** What the DAW should be told about this instance: the worst-case chain latency in
+        samples, and the longest tail anything loaded claims. */
+    int reportedLatencySamples() const;
+    double tailLengthSeconds() const;
+
+    /** How many stereo output buses the product renders (§18.9.3 multi-output). */
+    int outputPairCount() const;
+
+    // -- project portability and recovery (Stage 7, §18.9.4) ---------------------------------
+    // A DAW instance uses the SAME Runtime State schema as the standalone — there is no
+    // DAW-only Performance format — and carries the identity and compatibility data a project
+    // needs to be reopened somewhere else and either work or say exactly why not.
+
+    /** What a restore could not resolve, kept until the next successful one. A project opened
+        on a machine missing a plug-in reports it here rather than quietly dropping the part:
+        the identity and state blob stay in the manifest, so installing the plug-in and
+        reopening the project is the whole repair (§18.9.3 "missing-content recovery"). */
+    struct RestoreReport
+    {
+        juce::StringArray missingInstruments;   // display names, or ceIds when that is all we have
+        juce::StringArray missingEffects;
+        juce::StringArray notes;                // anything else worth saying out loud
+        bool degraded() const { return ! missingInstruments.isEmpty() || ! missingEffects.isEmpty(); }
+    };
+
+    /** Computed live from what the rack could and could not resolve — always current, and
+        therefore never a stale claim about a repair that has since happened. */
+    RestoreReport lastRestoreReport() const;
+
+    // -- multi-instance arbitration (Stage 7, §18.9.3) ---------------------------------------
+    // Several outer-VST3 instances (and the standalone) share one per-user data directory, so
+    // two things need an owner: the hardware surface, which is a physical device only one
+    // instance can drive, and the catalogue, which is a file two scanners must not interleave.
+
+    /** True when this instance currently owns the hardware surface. */
+    bool ownsHardwareSurface() const;
+    /** Claims the surface for this instance, taking it from an instance whose heartbeat has
+        gone stale. Returns false when another live instance holds it. */
+    bool claimHardwareSurface();
+    void releaseHardwareSurface();
+    /** A human-readable owner for the UI ("this instance", "another instance", "nobody"). */
+    juce::String hardwareSurfaceOwner() const;
+
+    // -- platform support and active-hosting evidence (Stage 7, §18.9.7, §18.9.8) -------------
+
+    /** The compatibility matrix, run on this machine. "It compiles" is not support. */
+    PlatformReport platformReport() const;
+
+    /** Incidents where a plug-in was live when the process died — the field data §18.9.8
+        requires before anyone builds active isolation. Not isolation itself, on purpose. */
+    juce::Array<ActiveHostingMarker::Incident> activeHostingIncidents() const;
+
+    /** Offline render/bounce (§18.9.3). A bounce must be deterministic and must not spray
+        MIDI at hardware that is not part of the render, so hardware ports are released while
+        it runs and re-opened when it ends. Everything else is already deterministic: the
+        engine's randomness is seeded. */
+    void setOfflineRender (bool offline);
+    bool isOfflineRender() const                       { return offlineRender; }
+
     /** Controlling thread. Drains every part's parameter-change marks (vendor editors and
         automation report through listeners that may fire on the audio thread) and emits one
         coalesced instrumentHostParamValues per part that changed — current value and text,
@@ -520,6 +607,9 @@ private:
     /** Fills a scene from the rig as it stands right now. */
     void captureSceneFromRack (perf::Scene& scene);
     juce::var performancePayload() const;
+    /** The Stage 7 block: the DAW surface, the restore report, the platform matrix, the
+        hardware owner and the active-hosting evidence. */
+    juce::var productPayload() const;
 
     void savePerformance();
     /** Keeps previous manifest revisions beside the session file: before an overwrite, the
@@ -565,6 +655,22 @@ private:
     // pattern, so an unconfigured surface still does something sensible.
     juce::String surfacePatternId, surfaceLaneId;
     bool lastReportedPlaying = false;
+    bool offlineRender = false;
+    int lastSelectedScene = -1;
+    juce::String instanceId { juce::Uuid().toDashedString() };
+    bool holdsHardwareSurface = false;
+    juce::int64 lastHardwareHeartbeat = 0;
+    std::unique_ptr<ActiveHostingMarker> activeMarker;
+    ActiveHostingMarker::Incident pendingActiveIncident;   // reported once, at the first state
+    // A claim is refreshed this often and considered abandoned after this long, so an
+    // instance that crashed frees the surface without anyone having to clean up after it.
+    static constexpr juce::int64 hardwareHeartbeatMs = 2000;
+    static constexpr juce::int64 hardwareClaimTimeoutMs = 8000;
+
+    juce::File hardwareOwnerFile() const { return options.dataDirectory.getChildFile ("hardware-owner.json"); }
+    /** The package identity a saved state carries, so a project reopened elsewhere can say
+        which product and revision wrote it (§18.9.4). */
+    juce::var packageIdentity() const;
 
     void emitScriptEvent (const juce::String& event, const juce::var& payload) const;
     /** The lane the surface currently addresses, or nullptr. */
