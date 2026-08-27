@@ -440,6 +440,43 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "generateControlPages")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto it = partParameters.find (partId);
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (it == partParameters.end() || part == nullptr)
+        {
+            emitError ("That part has no instrument loaded.");
+            return;
+        }
+
+        // Regeneration replaces exactly this part's generated pages; user-authored pages
+        // and other parts' generated pages are never touched (baseline §18.5.7).
+        for (int i = rack.getPerformance().pages.size(); --i >= 0;)
+        {
+            const auto& page = rack.getPerformance().pages.getReference (i);
+            if (page.generated && page.generatedForPartId == partId)
+                rack.removeControlPage (page.pageId);
+        }
+
+        auto generated = generateControlPages (partId, part->pluginCeId,
+                                               part->pluginName, it->second.inventory);
+        if (generated.isEmpty())
+        {
+            emitError ("This instrument exposes nothing suitable for automatic pages.");
+            emitState();
+            return;
+        }
+
+        for (auto& page : generated)
+            rack.adoptControlPage (std::move (page));
+
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "clearControlSlot")
     {
         if (! rack.setSlotBinding (payload.getProperty ("pageId", {}).toString(),
@@ -937,6 +974,83 @@ juce::AudioProcessorParameter* InstrumentHostService::resolveParameter (const ju
     return rack.getInstrument (partId)->getParameters()[descriptor->index];
 }
 
+juce::String InstrumentHostService::slotDisplayName (const ControlBinding& binding, bool resolved) const
+{
+    if (binding.label.isNotEmpty())
+        return binding.label;
+
+    if (resolved)
+        if (const auto it = partParameters.find (binding.partId); it != partParameters.end())
+            if (const auto* d = it->second.inventory.find (binding.parameterId))
+                return d->name;
+
+    return binding.parameterId;
+}
+
+float InstrumentHostService::slotPositionFor (const ControlBinding& binding, float parameterValue)
+{
+    const auto span = binding.rangeMax - binding.rangeMin;
+    const auto positioned = span > 0.0f
+                              ? juce::jlimit (0.0f, 1.0f, (parameterValue - binding.rangeMin) / span)
+                              : 0.0f;
+    return binding.inverted ? 1.0f - positioned : positioned;
+}
+
+juce::Array<InstrumentHostService::SurfaceSlot> InstrumentHostService::surfaceSlots (const juce::String& pageId) const
+{
+    juce::Array<SurfaceSlot> out;
+    const auto* page = rack.getPerformance().findPage (pageId);
+    if (page == nullptr)
+        return out;
+
+    auto* self = const_cast<InstrumentHostService*> (this);
+    for (const auto& slot : page->slots)
+    {
+        const auto& b = slot.binding;
+        SurfaceSlot view;
+        view.slotId = slot.slotId;
+        view.assigned = ! b.isEmpty();
+        view.resolved = bindingResolves (b);
+        view.displayName = view.assigned ? slotDisplayName (b, view.resolved) : juce::String();
+
+        if (view.resolved)
+            if (auto* parameter = self->resolveParameter (b.partId, b.parameterId))
+            {
+                view.valueText = parameter->getCurrentValueAsText();
+                view.position = slotPositionFor (b, parameter->getValue());
+            }
+
+        out.add (std::move (view));
+    }
+
+    return out;
+}
+
+bool InstrumentHostService::nudgeControlSlot (const juce::String& pageId, const juce::String& slotId,
+                                              int delta)
+{
+    const auto* page = rack.getPerformance().findPage (pageId);
+    const auto* slot = page != nullptr ? page->findSlot (slotId) : nullptr;
+    if (slot == nullptr || slot->binding.isEmpty() || ! bindingResolves (slot->binding))
+        return false;
+
+    const auto& b = slot->binding;
+    auto* parameter = resolveParameter (b.partId, b.parameterId);
+    if (parameter == nullptr)
+        return false;
+
+    const auto position = juce::jlimit (0.0f, 1.0f,
+                                        slotPositionFor (b, parameter->getValue())
+                                          + (float) delta / 127.0f);
+    const auto positioned = b.inverted ? 1.0f - position : position;
+    const auto mapped = b.rangeMin + positioned * (b.rangeMax - b.rangeMin);
+
+    parameter->beginChangeGesture();
+    parameter->setValueNotifyingHost (mapped);
+    parameter->endChangeGesture();
+    return true;
+}
+
 bool InstrumentHostService::bindingResolves (const ControlBinding& binding) const
 {
     if (binding.isEmpty())
@@ -1187,18 +1301,9 @@ juce::var InstrumentHostService::buildStatePayload() const
         {
             const auto& b = slot.binding;
             const auto resolved = bindingResolves (b);
-
-            // The display name resolves live so a rename inside the plug-in shows through:
-            // label override first, then the descriptor's name, then the raw id for an
-            // unresolved binding — which is exactly the diagnostic the repair needs.
-            juce::String displayName = b.label;
-            if (displayName.isEmpty() && resolved)
-                if (const auto it = partParameters.find (b.partId); it != partParameters.end())
-                    if (const auto* d = it->second.inventory.find (b.parameterId))
-                        displayName = d->name;
-            if (displayName.isEmpty())
-                displayName = b.parameterId;
-
+            // Resolved live so a rename inside the plug-in shows through; the raw id for an
+            // unresolved binding is exactly the diagnostic the repair needs.
+            const auto displayName = slotDisplayName (b, resolved);
             const auto* part = performance.findPart (b.partId);
 
             auto* s = new juce::DynamicObject();
@@ -1220,6 +1325,7 @@ juce::var InstrumentHostService::buildStatePayload() const
         auto* pg = new juce::DynamicObject();
         pg->setProperty ("pageId", page.pageId);
         pg->setProperty ("name",   page.name);
+        pg->setProperty ("generated", page.generated);
         pg->setProperty ("slots",  slots);
         pages.add (juce::var (pg));
     }

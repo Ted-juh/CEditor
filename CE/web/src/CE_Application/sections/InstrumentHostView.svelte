@@ -21,6 +21,7 @@
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
     addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
+    generateControlPages,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
@@ -396,14 +397,23 @@
       <div class="pages" data-testid="host-pages">
         <div class="pages-head">
           <strong>Control pages</strong>
-          <button type="button" onclick={() => addControlPage()} data-testid="host-add-page">+ Page</button>
+          <span class="pages-actions">
+            <button type="button" disabled={!focusedPart?.hasInstrument}
+                    title={focusedPart?.hasInstrument
+                             ? `Generate pages from ${partTitle(focusedPart)}'s parameters (replaces its earlier auto pages)`
+                             : 'Focus a part with an instrument first'}
+                    onclick={() => generateControlPages(focusedPart.partId)}
+                    data-testid="host-auto-pages">Auto pages</button>
+            <button type="button" onclick={() => addControlPage()} data-testid="host-add-page">+ Page</button>
+          </span>
         </div>
         {#if pages.length > 0}
           <div class="page-tabs">
             {#each pages as page (page.pageId)}
               <span class="page-tab" class:on={selectedPage?.pageId === page.pageId}>
-                <button type="button" class="page-name" onclick={() => (selectedPageId = page.pageId)}>
-                  {page.name}
+                <button type="button" class="page-name" onclick={() => (selectedPageId = page.pageId)}
+                        title={page.generated ? 'Generated — regenerating replaces this page' : undefined}>
+                  {page.name}{#if page.generated}<span class="page-auto"> · auto</span>{/if}
                 </button>
                 <button type="button" class="ghost danger" title="Remove this page"
                         onclick={() => removeControlPage(page.pageId)}>×</button>
@@ -722,6 +732,8 @@
     padding-top: 8px;
   }
   .pages-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .pages-actions { display: flex; gap: 6px; }
+  .page-auto { color: #7d8894; font-size: 10px; }
   .page-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
   .page-tab { display: inline-flex; align-items: center; gap: 2px; border: 1px solid #3b4652; border-radius: 4px; padding: 0 2px; }
   .page-tab.on { border-color: #5b9bd5; background: #24313d; }

@@ -69,6 +69,8 @@ public:
     // Model-only: pages bind control slots to parameter addresses and never touch the
     // graph. They live on the Performance so they persist and travel with the rack.
     juce::String addControlPage (const juce::String& name);
+    /** Adopts a fully built page (the automatic generator's output) as-is. */
+    void adoptControlPage (ControlPage page)      { model.pages.add (std::move (page)); }
     bool removeControlPage (const juce::String& pageId);
     bool renameControlPage (const juce::String& pageId, const juce::String& name);
     /** Writes the slot's binding (an empty binding clears the slot). */

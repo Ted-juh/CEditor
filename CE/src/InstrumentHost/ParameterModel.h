@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "RackModel.h"
 
 // ParameterModel — the one authoritative parameter layer (VIP-successor Stage 2).
 //
@@ -59,6 +60,20 @@ struct ParameterInventory
 
 /** Walks a live processor's host-visible parameters into descriptors. */
 ParameterInventory describeParameters (juce::AudioProcessor& processor);
+
+/** The automatic first pass (baseline §18.5.7): a useful initial set of pages straight from
+    the registry, before anyone authors anything. Includes clearly named, automatable
+    parameters; excludes meta parameters and anything whose id needed a fallback or a
+    collision suffix (the "#" cases — a page slot deserves a real identity). The plug-in's
+    own group hierarchy survives: one run of pages per group in first-appearance order,
+    chunked by `slotsPerPage`, named after the group. Pages come back marked generated and
+    stamped with the part whose registry produced them, so regeneration replaces exactly
+    these and never a user-authored page. */
+juce::Array<ControlPage> generateControlPages (const juce::String& partId,
+                                               const juce::String& pluginCeId,
+                                               const juce::String& pluginName,
+                                               const ParameterInventory& inventory,
+                                               int slotsPerPage = 8);
 
 class PartParameterSync final : private juce::AudioProcessorListener
 {

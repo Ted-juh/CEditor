@@ -72,4 +72,65 @@ ParameterInventory describeParameters (juce::AudioProcessor& processor)
     return inventory;
 }
 
+juce::Array<ControlPage> generateControlPages (const juce::String& partId,
+                                               const juce::String& pluginCeId,
+                                               const juce::String& pluginName,
+                                               const ParameterInventory& inventory,
+                                               int slotsPerPage)
+{
+    slotsPerPage = juce::jmax (1, slotsPerPage);
+
+    // Candidates in registry order, bucketed by group in first-appearance order. Excluded:
+    // non-automatable parameters (meters and read-only displays present themselves this
+    // way), meta parameters (a plug-in's own macro layer — controlling the macro's targets
+    // through the macro AND directly invites fights), and any id carrying "#" — the
+    // fallback and collision cases, whose identity is too weak to put on a control page.
+    juce::StringArray groupOrder;
+    std::map<juce::String, juce::Array<const ParameterDescriptor*>> byGroup;
+    for (const auto& d : inventory.descriptors)
+    {
+        if (! d.automatable || d.metaParameter || d.name.trim().isEmpty()
+            || d.definitionId.containsChar ('#'))
+            continue;
+
+        if (! groupOrder.contains (d.group))
+            groupOrder.add (d.group);
+        byGroup[d.group].add (&d);
+    }
+
+    juce::Array<ControlPage> pages;
+    for (const auto& group : groupOrder)
+    {
+        const auto& members = byGroup[group];
+        const auto chunks = (members.size() + slotsPerPage - 1) / slotsPerPage;
+        for (int chunk = 0; chunk < chunks; ++chunk)
+        {
+            auto page = ControlPage::create ({}, slotsPerPage);
+            const auto base = group.isNotEmpty() ? group
+                                                 : (pluginName.isNotEmpty() ? pluginName
+                                                                            : juce::String ("Main"));
+            page.name = chunks > 1 ? base + " " + juce::String (chunk + 1) : base;
+            page.generated = true;
+            page.generatedForPartId = partId;
+
+            for (int i = 0; i < slotsPerPage; ++i)
+            {
+                const auto index = chunk * slotsPerPage + i;
+                if (index >= members.size())
+                    break;
+
+                ControlBinding binding;
+                binding.partId = partId;
+                binding.pluginCeId = pluginCeId;
+                binding.parameterId = members[index]->definitionId;
+                page.slots.getReference (i).binding = std::move (binding);
+            }
+
+            pages.add (std::move (page));
+        }
+    }
+
+    return pages;
+}
+
 } // namespace ceditor::host

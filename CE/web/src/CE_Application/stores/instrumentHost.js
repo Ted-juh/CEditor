@@ -231,6 +231,8 @@ export function normalizeHostState(payload) {
       pages: (Array.isArray(rack.pages) ? rack.pages : []).map((page) => ({
         pageId: String(page?.pageId ?? ''),
         name: String(page?.name ?? ''),
+        generated: page?.generated === true,
+        generatedForPartId: String(page?.generatedForPartId ?? ''),
         slots: (Array.isArray(page?.slots) ? page.slots : []).map((slot) => ({
           slotId: String(slot?.slotId ?? ''),
           assigned: slot?.assigned === true,
@@ -397,6 +399,28 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'removeControlPage') {
     next.rack.pages = next.rack.pages.filter((p) => p.pageId !== payload.pageId);
+    return next;
+  }
+  if (cmd === 'generateControlPages') {
+    const target = part(payload.partId);
+    if (!target?.hasInstrument) return next;
+    // Mirrors the native rule: replace this part's generated pages, keep everything else.
+    next.rack.pages = next.rack.pages.filter((p) => !(p.generated && p.generatedForPartId === payload.partId));
+    const page = normalizeHostState({ rack: { pages: [{
+      pageId: `mock-auto-${payload.partId}`,
+      name: target.pluginName || 'Auto',
+      generated: true,
+      slots: Array.from({ length: 8 }, (_, i) => {
+        const params = ['cutoff', 'wave', 'drive'];
+        return i < params.length
+          ? { slotId: `s${i + 1}`, assigned: true, partId: payload.partId, parameterId: params[i],
+              displayName: params[i].replace(/^./, (c) => c.toUpperCase()),
+              partName: target.pluginName, resolved: true }
+          : { slotId: `s${i + 1}` };
+      }),
+    }] } }).rack.pages[0];
+    page.generatedForPartId = payload.partId;
+    next.rack.pages.push(page);
     return next;
   }
   if (cmd === 'renameControlPage') {
@@ -579,6 +603,7 @@ export const resetParameter = (partId, id) => send({ cmd: 'resetParameter', part
 export const beginParameterGesture = (partId, id) => send({ cmd: 'beginParameterGesture', partId, id });
 export const endParameterGesture = (partId, id) => send({ cmd: 'endParameterGesture', partId, id });
 export const addControlPage = (name) => send(name ? { cmd: 'addControlPage', name } : { cmd: 'addControlPage' });
+export const generateControlPages = (partId) => send({ cmd: 'generateControlPages', partId });
 export const removeControlPage = (pageId) => send({ cmd: 'removeControlPage', pageId });
 export const renameControlPage = (pageId, name) => send({ cmd: 'renameControlPage', pageId, name });
 export const assignControlSlot = (pageId, slotId, partId, parameterId) =>

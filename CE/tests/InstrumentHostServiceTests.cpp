@@ -815,6 +815,130 @@ void testParameterModel()
     check (sorted.size() == ids.size(), "no two parameters share one address");
 }
 
+// Stage 3's host-side half: the automatic first-pass pages and the surface runtime API.
+// The generator's rules run pure over a crafted inventory; the service level proves that
+// regeneration replaces only its own pages, and that a hardware-style relative nudge moves
+// through the same binding mapping and refusals as every other write path.
+void testAutoPagesAndSurfaceRuntime()
+{
+    std::cout << "\nauto pages and the surface runtime" << std::endl;
+
+    // The generator, pure: groups chunk in first-appearance order; weak identities and
+    // non-automatable/meta parameters stay off the pages.
+    {
+        ceditor::host::ParameterInventory inventory;
+        const auto add = [&inventory] (const char* id, const char* name, const char* group,
+                                       bool automatable = true, bool meta = false)
+        {
+            ceditor::host::ParameterDescriptor d;
+            d.definitionId = id;
+            d.index = inventory.descriptors.size();
+            d.name = name;
+            d.group = group;
+            d.automatable = automatable;
+            d.metaParameter = meta;
+            inventory.descriptors.add (d);
+        };
+
+        for (int i = 1; i <= 10; ++i)
+            add (("f" + juce::String (i)).toRawUTF8(),
+                 ("Filter " + juce::String (i)).toRawUTF8(), "Filter");
+        add ("meter", "Out Meter", "Filter", false);          // meter-shaped: not automatable
+        add ("macro1", "Macro 1", "Filter", true, true);      // the plug-in's own macro layer
+        add ("#5", "Nameless", "Filter");                     // fallback identity
+        add ("dup#7", "Dup", "Filter");                       // collision suffix
+        add ("mix", "Mix", "");                               // ungrouped
+
+        const auto pages = ceditor::host::generateControlPages ("part-1", "class-1", "Big Synth",
+                                                                inventory);
+        check (pages.size() == 3, "ten grouped + one ungrouped candidate make three pages");
+        check (pages[0].name == "Filter 1" && pages[1].name == "Filter 2",
+               "a chunked group numbers its pages");
+        check (pages[2].name == "Big Synth", "ungrouped parameters page under the plug-in's name");
+        check (pages[0].slots.size() == 8 && ! pages[0].slots[7].binding.isEmpty()
+                 && pages[1].slots[1].binding.parameterId == "f10"
+                 && pages[1].slots[2].binding.isEmpty(),
+               "slots fill in registry order and stop where the group ends");
+        check (pages[0].generated && pages[0].generatedForPartId == "part-1",
+               "generated pages say so and name their part");
+
+        bool excludedLeaked = false;
+        for (const auto& page : pages)
+            for (const auto& slot : page.slots)
+                if (slot.binding.parameterId == "meter" || slot.binding.parameterId == "macro1"
+                    || slot.binding.parameterId.containsChar ('#'))
+                    excludedLeaked = true;
+        check (! excludedLeaked, "meters, metas and weak identities stay off the pages");
+    }
+
+    const auto dir = freshDataDir ("surface");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* stub = h.lastStub;
+
+    h.cmd ("addControlPage", { { "name", "My Page" } });
+    h.cmd ("generateControlPages", { { "partId", partId } });
+    h.cmd ("generateControlPages", { { "partId", partId } });   // regenerate: replaces, never stacks
+    const auto pages = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {});
+    check (pages.size() == 2, "regeneration replaces its own pages and keeps the user page");
+    check (! (bool) pages[0].getProperty ("generated", true)
+             && (bool) pages[1].getProperty ("generated", false),
+           "and the state payload says which is which");
+    check (pages[1].getProperty ("name", {}).toString() == "Good Synth",
+           "the stub's ungrouped parameters page under the plug-in's name");
+    const auto generatedPageId = pages[1].getProperty ("pageId", {}).toString();
+
+    // The surface projection: names, the plug-in's own value text, and the slot position.
+    auto slots = h.service->surfaceSlots (generatedPageId);
+    check (slots.size() == 8 && slots[0].displayName == "Cutoff" && slots[0].resolved
+             && slots[0].valueText.isNotEmpty()
+             && juce::approximatelyEqual (slots[0].position, 0.5f),
+           "surfaceSlots projects display name, formatted value and position");
+    check (! slots[3].assigned, "empty slots present as empty, not as zeros to draw");
+
+    // The relative nudge: gesture-wrapped, clamped, jump-free by construction.
+    check (h.service->nudgeControlSlot (generatedPageId, "s1", 64), "a nudge on a resolved slot lands");
+    check (juce::approximatelyEqual (stub->cutoff->get(), 1.0f), "and clamps at the top");
+    h.service->nudgeControlSlot (generatedPageId, "s1", -127);
+    check (juce::approximatelyEqual (stub->cutoff->get(), 0.0f), "a full turn down reaches the floor");
+    h.emits.clear();
+    h.service->drainParameterEvents();
+    bool sawGesturePair = false;
+    for (const auto& e : h.emits.entries)
+        if (e.name == "instrumentHostParamValues")
+            sawGesturePair = e.payload.getProperty ("gestures", {}).size() >= 2;
+    check (sawGesturePair, "nudges ride inside begin/end gestures for later automation");
+
+    // Range + inversion run through the same transform as the UI slider.
+    h.cmd ("setControlSlotOptions", { { "pageId", generatedPageId }, { "slotId", "s1" },
+                                      { "rangeMin", 0.5 }, { "rangeMax", 1.0 }, { "inverted", true } });
+    stub->cutoff->setValueNotifyingHost (1.0f);
+    slots = h.service->surfaceSlots (generatedPageId);
+    check (juce::approximatelyEqual (slots[0].position, 0.0f),
+           "an inverted slot shows the mapped position, not the raw value");
+    h.service->nudgeControlSlot (generatedPageId, "s1", 127);
+    check (juce::approximatelyEqual (stub->cutoff->get(), 0.5f),
+           "and a nudge up moves the parameter down through the inversion");
+
+    // Unresolved refuses on the surface exactly like everywhere else.
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-other-synth" } });
+    auto* other = h.lastStub;
+    const auto before = other->cutoff->get();
+    slots = h.service->surfaceSlots (generatedPageId);
+    check (slots[0].assigned && ! slots[0].resolved, "the projection shows unresolved honestly");
+    check (! h.service->nudgeControlSlot (generatedPageId, "s1", 64)
+             && juce::approximatelyEqual (other->cutoff->get(), before),
+           "and a nudge through an unresolved slot moves nothing");
+
+    h.emits.clear();
+    h.cmd ("generateControlPages", { { "partId", "no-such-part" } });
+    check (h.emits.lastError().contains ("no instrument"), "generating for an empty part refuses");
+}
+
 // The factory Performance: the authored rack ships beside the generated binaries, and a
 // product boots as that rack — until something newer exists. The standalone's own session
 // outranks it; the outer VST3's DAW chunk replaces it without ever booting it first.
@@ -1053,6 +1177,7 @@ int main (int argc, char* argv[])
     testWrapperContext();
     testParameterModel();
     testControlPages();
+    testAutoPagesAndSurfaceRuntime();
     testFactoryPerformance();
     testScanFolderBrowseAndModuleProjection();
     testHostProject();

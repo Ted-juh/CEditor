@@ -76,6 +76,11 @@ struct ControlPage
     juce::String pageId;
     juce::String name;
     juce::Array<ControlSlot> slots;
+    // Generated pages (Stage 3's automatic first pass) are marked so regeneration can
+    // replace them without ever touching a user-authored page — and marked with WHOSE
+    // registry produced them, so regenerating one part leaves another part's pages alone.
+    bool generated = false;
+    juce::String generatedForPartId;
 
     /** Mints a page with a fresh stable id and `numSlots` empty slots ("s1".."sN"). */
     static ControlPage create (const juce::String& name, int numSlots = 8);

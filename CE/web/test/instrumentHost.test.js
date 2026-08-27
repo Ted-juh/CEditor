@@ -325,3 +325,18 @@ test('mock reducer: the page lifecycle — add, assign from the loaded part, dri
   clearControlSlot(pageId, 's1');
   assert.equal(get(hostStateStore).rack.pages[0].slots[0].assigned, false);
 });
+
+test('mock reducer: auto pages generate from the loaded part and regenerate in place', () => {
+  hostStateStore.set(mockHostState());
+  let state = applyMockCommand(get(hostStateStore), { cmd: 'generateControlPages', partId: 'mock-part-1' });
+  state = applyMockCommand(state, { cmd: 'addControlPage', name: 'Mine' });
+  state = applyMockCommand(state, { cmd: 'generateControlPages', partId: 'mock-part-1' });
+  assert.equal(state.rack.pages.length, 2, 'regeneration replaced its own page, kept the user page');
+  const auto = state.rack.pages.find((p) => p.generated);
+  assert.equal(auto.name, 'Stage Keys');
+  assert.equal(auto.slots[0].displayName, 'Cutoff');
+  assert.equal(auto.slots[3].assigned, false);
+
+  const unchanged = applyMockCommand(state, { cmd: 'generateControlPages', partId: 'mock-part-2' });
+  assert.equal(unchanged.rack.pages.length, 2, 'an empty part generates nothing');
+});

@@ -49,6 +49,8 @@
 //      Addresses are partId + the plug-in's own parameter ID, never display names; a wrong
 //      part or unknown ID refuses instead of writing to an arbitrary index.)
 //   addControlPage {name?} | removeControlPage {pageId} | renameControlPage {pageId,name}
+//   generateControlPages {partId}   (the automatic first pass over the part's registry;
+//     replaces only that part's previously generated pages, never a user-authored one)
 //   assignControlSlot {pageId,slotId,partId,parameterId} | clearControlSlot {pageId,slotId}
 //   setControlSlotOptions {pageId,slotId, rangeMin?,rangeMax?,inverted?,bipolar?,label?}
 //   setControlSlotValue {pageId,slotId,value}
@@ -192,6 +194,33 @@ public:
         and survived. */
     void reassertEditorPane();
 
+    // -- surface runtime API (Stage 3) ------------------------------------------------------
+    // What a hardware bridge needs from the parameter model and nothing else: a display
+    // projection per page, and a relative nudge per slot. The driver never touches plug-in
+    // objects (baseline §18.5.1) — it consumes these views and emits normalized movements,
+    // and both sides go through the same binding resolution as every other path, so an
+    // unresolved slot renders as such and refuses to move anything.
+
+    struct SurfaceSlot
+    {
+        juce::String slotId;
+        juce::String displayName;   // label override, else the parameter's live name, else the id
+        juce::String valueText;     // the plug-in's own formatted value — never a second numeric guess
+        float position = 0.0f;      // 0..1 slot position, the binding's range/inversion inverse-mapped
+        bool assigned = false;
+        bool resolved = false;
+    };
+
+    /** The display projection for one page — empty for an unknown pageId. */
+    juce::Array<SurfaceSlot> surfaceSlots (const juce::String& pageId) const;
+
+    /** Relative encoder movement: moves the slot's position by delta/127 through the
+        binding's range and inversion, wrapped in a begin/end gesture. Relative behavior is
+        what makes page and Performance changes jump-free — there is no stale absolute
+        position to snap to. Returns false, moving nothing, for an unknown, unassigned or
+        unresolved slot. */
+    bool nudgeControlSlot (const juce::String& pageId, const juce::String& slotId, int delta);
+
     /** Controlling thread. Drains every part's parameter-change marks (vendor editors and
         automation report through listeners that may fire on the audio thread) and emits one
         coalesced instrumentHostParamValues per part that changed — current value and text,
@@ -221,6 +250,9 @@ private:
         against AND that parameter exists in the live registry — anything else is unresolved,
         shown, and refused for writes. */
     bool bindingResolves (const ControlBinding& binding) const;
+    juce::String slotDisplayName (const ControlBinding& binding, bool resolved) const;
+    /** The parameter's current value inverse-mapped into the slot's 0..1 position. */
+    static float slotPositionFor (const ControlBinding& binding, float parameterValue);
     void emitHostProject();
     void requestInstrument (const juce::String& partId, const juce::String& ceId);
     void showEditorFor (const juce::String& partId);

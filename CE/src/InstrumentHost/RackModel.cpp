@@ -166,6 +166,8 @@ juce::var Performance::toVar() const
         auto* pg = new juce::DynamicObject();
         pg->setProperty ("pageId", page.pageId);
         pg->setProperty ("name",   page.name);
+        pg->setProperty ("generated", page.generated);
+        pg->setProperty ("generatedForPartId", page.generatedForPartId);
         pg->setProperty ("slots",  slotVars);
         pageVars.add (juce::var (pg));
     }
@@ -255,6 +257,8 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
             seenPageIds.add (page.pageId);
 
             page.name = pg.getProperty ("name", {}).toString();
+            page.generated = (bool) pg.getProperty ("generated", false);
+            page.generatedForPartId = pg.getProperty ("generatedForPartId", {}).toString();
 
             juce::StringArray seenSlotIds;
             if (const auto* slotArray = pg.getProperty ("slots", {}).getArray())
