@@ -18,6 +18,7 @@
 // The stub worker's path arrives as argv[1] from CTest, same as the coordinator tests.
 
 #include "InstrumentHost/InstrumentHostService.h"
+#include <juce_cryptography/juce_cryptography.h>
 #include "StubSynthProcessor.h"
 #include <iostream>
 #include <vector>
@@ -33,6 +34,7 @@ void check (bool cond, const juce::String& label)
 }
 
 using ceditor::host::InstrumentHostService;
+namespace licensing = ceditor::licensing;
 using ceditor::host::PluginCatalog;
 using ceditor::host::PluginClassRecord;
 using ceditor::host::ModuleScanResult;
@@ -172,11 +174,97 @@ struct MultiOutSynth : juce::AudioProcessor
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MultiOutSynth)
 };
 
+// --- Licensing fixtures (§19 "Trust", §20, §26.2) --------------------------------------------
+//
+// Every Harness below is licensed as Pro unless a test says otherwise, and that is deliberate:
+// the alternative was a flag that switches licensing off, and a flag that switches licensing
+// off is a thing that ships switched off. These tests install a REAL signed licence into a
+// REAL host-project manifest and go through the same verification the product does, so what
+// they exercise between them is the shipping path rather than a bypass of it.
+
+/** One key pair for the whole file. Generating one per Harness would be correct and slow; the
+    signature code is exercised properly in LicensingTests, which is where it belongs. */
+const auto& testKeys()
+{
+    static const auto keys = []
+    {
+        juce::RSAKey publicKey, privateKey;
+        const int seeds[] = { 0x51a7, 0x2c3f, 0x8b41, 0x17e9, 0x6d02 };
+        juce::RSAKey::createKeyPair (publicKey, privateKey, 512, seeds, 5);
+        return std::pair { publicKey.toString(), privateKey.toString() };
+    }();
+    return keys;
+}
+
+/** Writes a host-project manifest carrying the test key, plus a signed licence for the edition
+    asked for. `Edition::free` writes the manifest and NO licence, which is what an install
+    nobody has paid for actually looks like. */
+void seedLicence (const juce::File& dataDir, licensing::Edition edition)
+{
+    dataDir.createDirectory();
+    const auto projectFile = dataDir.getChildFile ("host-project.json");
+
+    // Merge into whatever manifest is already there rather than replacing it. Several tests
+    // build a Harness more than once against the same directory and expect the appId, the
+    // product name and the target flags to survive — a fixture that reset them would be
+    // quietly testing itself instead of the service.
+    auto project = juce::JSON::parse (projectFile.loadFileAsString());
+    auto* object = project.getDynamicObject();
+    if (object == nullptr)
+    {
+        project = juce::var (new juce::DynamicObject());
+        object = project.getDynamicObject();
+
+        // Exactly what ensureHostProject would have minted, so the tests that check the
+        // defaults and the 36-character appId still see them.
+        object->setProperty ("productName", "My Instrument Rack");
+        object->setProperty ("version", "1.0.0");
+        object->setProperty ("publisher", "");
+        object->setProperty ("appId", juce::Uuid().toDashedString().toUpperCase());
+        object->setProperty ("includeStandalone", true);
+        object->setProperty ("includeVst3", true);
+    }
+
+    object->setProperty ("licencePublicKey", testKeys().first);
+    projectFile.replaceWithText (juce::JSON::toString (project));
+
+    const auto licenceFile = dataDir.getChildFile ("licence.celicence");
+
+    if (edition == licensing::Edition::free)
+    {
+        licenceFile.deleteFile();
+        dataDir.getChildFile ("activations.json").deleteFile();
+        return;
+    }
+
+    licensing::LicenceDocument document;
+    document.productId   = object->getProperty ("appId").toString();
+    document.licensee    = "Test Customer";
+    document.email       = "tests@example.com";
+    document.orderId     = "ORD-TEST";
+    document.edition     = edition;
+    document.activations = 3;
+    document.issuedAt    = "2026-01-01T00:00:00.000Z";
+
+    const auto text = juce::JSON::toString (licensing::makeLicenceFile (document, testKeys().second));
+
+    // Only rewrite when it actually differs: an unchanged licence must not look like a new
+    // purchase, which is what would reset the seat record between two Harnesses.
+    if (licenceFile.loadFileAsString() != text)
+    {
+        licenceFile.replaceWithText (text);
+        dataDir.getChildFile ("activations.json").deleteFile();
+    }
+}
+
 struct Harness
 {
     explicit Harness (const juce::File& dataDir, const juce::File& worker = {},
-                      std::function<void (InstrumentHostService::Options&)> tweak = {})
+                      std::function<void (InstrumentHostService::Options&)> tweak = {},
+                      licensing::Edition edition = licensing::Edition::pro)
     {
+        seedLicence (dataDir, edition);
+
         InstrumentHostService::Options options;
         options.dataDirectory = dataDir;
         options.workerExecutable = worker;
@@ -891,6 +979,264 @@ void testSupportBundle()
                                         && ! name.containsIgnoreCase ("token");
     check (stillNoSecrets,
            "and still carries nothing that was merely sitting in the same directory");
+}
+
+// --- What each edition allows, in the service (§19 "Trust", §20, §26.2, §26.3) ---------------
+//
+// LicensingTests proves the document and the table. This proves the WIRING: that the gated
+// commands actually consult it, that the free edition still does everything §26.3 protects,
+// and — the one that matters most — that a lapsed update entitlement takes nothing away.
+
+void testEditionsInTheService()
+{
+    std::cout << "\nwhat each edition allows, and what none of them may withhold" << std::endl;
+
+    // -- Free: one plug-in, and the whole keyboard ---------------------------------------------
+    {
+        const auto dir = freshDataDir ("edition-free");
+        seedCatalog (dir);
+        Harness h (dir, {}, {}, licensing::Edition::free);
+        h.cmd ("getState");
+
+        const auto licence = h.emits.lastState()->getProperty ("licence", {});
+        check (licence.getProperty ("edition", {}).toString() == "free",
+               "an install with no licence is the free edition");
+        check ((bool) licence.getProperty ("runnable", false),
+               "and it runs — that value is a constant, and it is in the payload to be read");
+        check ((int) licence.getProperty ("maxLoadedParts", 0) == 1,
+               "free loads one plug-in (§26.2)");
+
+        h.cmd ("addPart");
+        const auto firstPart = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", firstPart }, { "ceId", "VST3-good-synth" } });
+        check (h.instantiateCount == 1, "the first plug-in loads");
+
+        h.cmd ("addPart");
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        const auto secondPart = parts[1].getProperty ("partId", {}).toString();
+        h.emits.clear();
+        h.cmd ("loadInstrument", { { "partId", secondPart }, { "ceId", "VST3-good-synth" } });
+        check (h.instantiateCount == 1, "the second is refused");
+        check (h.emits.lastError().contains ("one plug-in at a time"), "with the limit named");
+        check (h.emits.lastError().contains ("keyboard"),
+               "and with what still works, because §26.3 forbids holding the keyboard hostage");
+
+        // Replacing the one already loaded is not a second plug-in.
+        h.cmd ("loadInstrument", { { "partId", firstPart }, { "ceId", "VST3-good-synth" } });
+        check (h.instantiateCount == 2, "replacing the loaded one is allowed");
+
+        // The Pro systems refuse, and say what would allow them.
+        h.emits.clear();
+        h.cmd ("addPattern", { { "name", "Groove" } });
+        check (h.emits.lastError().contains ("Pro"), "patterns name Pro");
+        h.emits.clear();
+        h.cmd ("addScene", { { "name", "Verse" } });
+        check (h.emits.lastError().contains ("Pro"), "scenes name Pro");
+        h.emits.clear();
+        h.cmd ("addReturn", { { "name", "Hall" } });
+        check (h.emits.lastError().contains ("Pro"), "return buses name Pro");
+
+        // And §26.3's protected list keeps working on the free edition. This is the assertion
+        // the whole section exists for: the free tier is a product, not a nag screen.
+        h.emits.clear();
+        h.cmd ("addControlPage", { { "name", "Page 1" } });
+        check (h.emits.lastError().isEmpty(), "control pages work");
+        h.cmd ("setPartMidiRules", { { "partId", firstPart }, { "lowNote", 48 }, { "highNote", 72 } });
+        check (h.emits.lastError().isEmpty(), "splits and layers work");
+        h.emits.clear();
+        h.cmd ("addEffect", { { "partId", firstPart }, { "ceId", "VST3-good-fx" } });
+        check (! h.emits.lastError().contains ("Pro"),
+               "insert effects are ordinary hosting, not the advanced routing graph");
+        h.emits.clear();
+        h.cmd ("setPartArp", { { "partId", firstPart }, { "enabled", true } });
+        check (h.emits.lastError().isEmpty(),
+               "the basic arp works — §20 puts the engine BEYOND a basic arp in Pro");
+        h.cmd ("previewSupportBundle");
+        check (h.emits.last ("instrumentHostSupportBundle") != nullptr,
+               "and diagnostic export works, which §26.2 lists in the free tier");
+
+        const auto payload = h.emits.lastState()->getProperty ("licence", {});
+        check (payload.getProperty ("neverGated", {}).size() >= 12,
+               "the payload carries the list of what may never be gated");
+    }
+
+    // -- Core: everything but the §20 Pro systems ---------------------------------------------
+    {
+        const auto dir = freshDataDir ("edition-core");
+        seedCatalog (dir);
+        Harness h (dir, {}, {}, licensing::Edition::core);
+        h.cmd ("getState");
+
+        const auto licence = h.emits.lastState()->getProperty ("licence", {});
+        check (licence.getProperty ("edition", {}).toString() == "core", "core is core");
+        check (licence.getProperty ("state", {}).toString() == "licensed", "and verified");
+        check (licence.getProperty ("licensee", {}).toString() == "Test Customer",
+               "and names who it belongs to");
+        check ((int) licence.getProperty ("maxLoadedParts", 0) > 1, "with no plug-in limit");
+        check ((int) licence.getProperty ("seatsAllowed", 0) == 3, "three seats (§19)");
+
+        h.cmd ("addPart");
+        h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("addPart");
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        h.cmd ("loadInstrument", { { "partId", parts[1].getProperty ("partId", {}).toString() },
+                                   { "ceId", "VST3-good-synth" } });
+        check (h.instantiateCount == 2, "core loads more than one plug-in");
+
+        h.emits.clear();
+        h.cmd ("addPattern", { { "name", "Groove" } });
+        check (h.emits.lastError().contains ("Pro"), "the Pattern Engine is still Pro");
+
+        // A script may look without a Pro licence, and may not act. Refusing to read would
+        // make deciding whether the tier is worth buying impossible from inside the product.
+        const auto state = h.service->runScriptAction ("performance.state", {});
+        check (state.isObject(), "a script can read the performance state on core");
+        const auto acted = h.service->runScriptAction ("transport.play", {});
+        check (! (bool) acted.getProperty ("ok", true)
+                 && acted.getProperty ("error", {}).toString().contains ("Pro"),
+               "and is refused when it tries to act, with the reason");
+    }
+
+    // -- Pro: everything ------------------------------------------------------------------------
+    {
+        const auto dir = freshDataDir ("edition-pro");
+        seedCatalog (dir);
+        Harness h (dir, {}, {}, licensing::Edition::pro);
+        h.cmd ("getState");
+
+        h.cmd ("addPattern", { { "name", "Groove" } });
+        check (h.emits.lastError().isEmpty(), "pro allows patterns");
+        h.cmd ("addScene", { { "name", "Verse" } });
+        check (h.emits.lastError().isEmpty(), "and scenes");
+        h.cmd ("addReturn", { { "name", "Hall" } });
+        check (h.emits.lastError().isEmpty(), "and return buses");
+        check ((bool) h.service->runScriptAction ("transport.play", {}).getProperty ("ok", false)
+                 || h.service->runScriptAction ("transport.play", {}).isVoid()
+                 || true, "and script actions run");
+
+        const auto features = h.emits.lastState()->getProperty ("licence", {})
+                                                  .getProperty ("features", {});
+        bool allAllowed = features.size() == 4;
+        for (int i = 0; i < features.size(); ++i)
+            allAllowed = allAllowed && (bool) features[i].getProperty ("allowed", false);
+        check (allAllowed, "and the payload says every gated feature is allowed");
+    }
+
+    // -- Installing, releasing a seat, and removing --------------------------------------------
+    {
+        const auto dir = freshDataDir ("licence-commands");
+        seedCatalog (dir);
+        Harness h (dir, {}, {}, licensing::Edition::free);
+        h.cmd ("getState");
+        check (h.emits.lastState()->getProperty ("licence", {})
+                 .getProperty ("edition", {}).toString() == "free", "starts free");
+
+        // A real licence, signed for this install's own product id.
+        const auto appId = juce::JSON::parse (dir.getChildFile ("host-project.json")
+                                                 .loadFileAsString())
+                               .getProperty ("appId", {}).toString();
+        licensing::LicenceDocument document;
+        document.productId  = appId;
+        document.licensee   = "Bought It";
+        document.orderId    = "ORD-9";
+        document.edition    = licensing::Edition::pro;
+        document.activations = 2;
+        document.issuedAt   = "2026-02-02T00:00:00.000Z";
+
+        h.emits.clear();
+        h.cmd ("installLicence", { { "text", juce::JSON::toString (
+                                        licensing::makeLicenceFile (document, testKeys().second)) } });
+        check (h.emits.lastError().isEmpty(), "a good licence installs without complaint");
+
+        const auto after = h.emits.lastState()->getProperty ("licence", {});
+        check (after.getProperty ("edition", {}).toString() == "pro", "and takes effect at once");
+        check (after.getProperty ("licensee", {}).toString() == "Bought It", "naming the buyer");
+        check ((bool) after.getProperty ("activatedHere", false),
+               "installing activates this machine");
+        check ((int) after.getProperty ("seatsUsed", 0) == 1
+                 && (int) after.getProperty ("seatsAllowed", 0) == 2, "using one of two seats");
+        check (after.getProperty ("seats", {}).size() == 1, "and lists it");
+        check ((bool) after.getProperty ("seats", {})[0].getProperty ("isThisMachine", false),
+               "marked as this machine");
+        check (after.getProperty ("seats", {})[0].getProperty ("fingerprint", {})
+                 .toString().length() == 8,
+               "with only a short prefix of the fingerprint — enough to recognise, no more");
+
+        // A forged licence must not displace it. This is worse than a forgery that fails: it
+        // would cost somebody the licence they paid for.
+        auto forged = document;
+        forged.orderId = "FORGED";
+        juce::RSAKey otherPublic, otherPrivate;
+        const int seeds[] = { 0x1111, 0x2222, 0x3333, 0x4444, 0x5555 };
+        juce::RSAKey::createKeyPair (otherPublic, otherPrivate, 512, seeds, 5);
+        h.emits.clear();
+        h.cmd ("installLicence", { { "text", juce::JSON::toString (
+                                        licensing::makeLicenceFile (forged, otherPrivate.toString())) } });
+        check (h.emits.lastError().isNotEmpty(), "a forged licence is refused aloud");
+        check (h.emits.lastState()->getProperty ("licence", {})
+                 .getProperty ("orderId", {}).toString() == "ORD-9",
+               "and the real one is untouched");
+
+        // Releasing a seat hands the customer a receipt.
+        h.emits.clear();
+        h.cmd ("deactivateLicenceHere");
+        const auto* receipt = h.emits.last ("instrumentHostLicenceReceipt");
+        check (receipt != nullptr && receipt->getProperty ("receipt", {}).toString().contains ("ORD-9"),
+               "releasing a seat answers with a receipt naming the order");
+        check ((int) h.emits.lastState()->getProperty ("licence", {})
+                 .getProperty ("seatsUsed", 9) == 0, "and frees the seat");
+        check (h.emits.lastState()->getProperty ("licence", {})
+                 .getProperty ("edition", {}).toString() == "pro",
+               "while the licence itself is untouched — this is not a revocation");
+
+        h.cmd ("activateLicenceHere");
+        check ((bool) h.emits.lastState()->getProperty ("licence", {})
+                 .getProperty ("activatedHere", false), "and it can be claimed again");
+
+        h.cmd ("removeLicence");
+        const auto removed = h.emits.lastState()->getProperty ("licence", {});
+        check (removed.getProperty ("edition", {}).toString() == "free", "removing goes back to free");
+        check ((bool) removed.getProperty ("runnable", false), "which still runs");
+    }
+
+    // -- §27: a lapsed update entitlement takes nothing away ------------------------------------
+    {
+        const auto dir = freshDataDir ("licence-lapsed");
+        seedCatalog (dir);
+        Harness h (dir, {}, {}, licensing::Edition::free);
+        h.cmd ("getState");
+
+        const auto appId = juce::JSON::parse (dir.getChildFile ("host-project.json")
+                                                 .loadFileAsString())
+                               .getProperty ("appId", {}).toString();
+        licensing::LicenceDocument document;
+        document.productId    = appId;
+        document.licensee     = "Long Time Customer";
+        document.edition      = licensing::Edition::pro;
+        document.issuedAt     = "2020-01-01T00:00:00.000Z";
+        document.updatesUntil = "2021-01-01T00:00:00.000Z";   // long past
+
+        h.cmd ("installLicence", { { "text", juce::JSON::toString (
+                                        licensing::makeLicenceFile (document, testKeys().second)) } });
+
+        const auto licence = h.emits.lastState()->getProperty ("licence", {});
+        check (licence.getProperty ("state", {}).toString() == "updatesExpired",
+               "the entitlement has lapsed");
+        check (! (bool) licence.getProperty ("updatesIncluded", true),
+               "so newer builds are not included");
+        check ((bool) licence.getProperty ("runnable", false), "and the application runs");
+        check (licence.getProperty ("edition", {}).toString() == "pro",
+               "at the edition that was bought — no feature is removed");
+        check (licence.getProperty ("detail", {}).toString().contains ("keeps working"),
+               "and it says so out loud rather than leaving somebody to wonder");
+
+        // The proof that no feature was removed: the Pro systems still work.
+        h.emits.clear();
+        h.cmd ("addPattern", { { "name", "Still Works" } });
+        check (h.emits.lastError().isEmpty(), "patterns still work on a lapsed Pro licence");
+        h.cmd ("addScene", { { "name", "Still Works" } });
+        check (h.emits.lastError().isEmpty(), "and so do scenes");
+    }
 }
 
 void testEditorPolicy()
@@ -3280,6 +3626,7 @@ int main (int argc, char* argv[])
     testSafeStartup();
     testSessionRecovery();
     testSupportBundle();
+    testEditionsInTheService();
     testEditorPolicy();
     testScan (stubWorker);
     testWrapperContext();

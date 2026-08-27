@@ -874,6 +874,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "addReturn")
     {
+        if (! requireFeature (licensing::Feature::advancedRouting))
+            return;
+
         const auto name = payload.getProperty ("name", {}).toString().trim();
         rack.addReturn (name.isNotEmpty() ? name
                                           : "Return " + juce::String (rack.getPerformance().returns.size() + 1));
@@ -936,6 +939,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "setExtraOut")
     {
+        if (! requireFeature (licensing::Feature::advancedRouting))
+            return;
+
         if (! rack.setExtraOut (payload.getProperty ("partId", {}).toString(),
                                 (int) payload.getProperty ("pairIndex", 0),
                                 (float) (double) payload.getProperty ("gain", 1.0)))
@@ -1084,6 +1090,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "addPattern")
     {
+        if (! requireFeature (licensing::Feature::patternEngine))
+            return;
+
         auto& performance = const_cast<Performance&> (rack.getPerformance());
         const auto name = payload.getProperty ("name", {}).toString().trim();
         auto pattern = perf::Pattern::create (name.isNotEmpty()
@@ -1319,6 +1328,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "addClip")
     {
+        if (! requireFeature (licensing::Feature::patternEngine))
+            return;
+
         auto& performance = const_cast<Performance&> (rack.getPerformance());
         const auto patternId = payload.getProperty ("patternId", {}).toString();
         const auto* pattern = performance.findPattern (patternId);
@@ -1451,6 +1463,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "addScene")
     {
+        if (! requireFeature (licensing::Feature::scenesAndSetlists))
+            return;
+
         auto& performance = const_cast<Performance&> (rack.getPerformance());
         perf::Scene scene;
         scene.sceneId = juce::Uuid().toDashedString();
@@ -1537,6 +1552,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "addSetlistItem")
     {
+        if (! requireFeature (licensing::Feature::scenesAndSetlists))
+            return;
+
         auto& performance = const_cast<Performance&> (rack.getPerformance());
         perf::SetlistItem item;
         item.itemId = juce::Uuid().toDashedString();
@@ -1758,6 +1776,63 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         if (! restoreLastKnownGood())
             emitError ("There is no known-good session to go back to yet.");
+        emitState();
+        return;
+    }
+
+    // -- licensing (§19 "Trust") ---------------------------------------------------------------
+
+    if (cmd == "getLicence")
+    {
+        emitState();
+        return;
+    }
+
+    if (cmd == "installLicence")
+    {
+        // Either the text of the file, or a path to it. A path is what a file picker gives;
+        // the text is what a paste box gives, and somebody with a licence in an email should
+        // not have to save it first.
+        auto text = payload.getProperty ("text", {}).toString();
+        if (text.isEmpty())
+        {
+            const auto path = payload.getProperty ("path", {}).toString();
+            if (path.isNotEmpty())
+                text = juce::File (path).loadFileAsString();
+        }
+
+        if (const auto failure = installLicence (text); failure.isNotEmpty())
+            emitError (failure);
+
+        emitState();
+        return;
+    }
+
+    if (cmd == "removeLicence")
+    {
+        removeLicence();
+        emitState();
+        return;
+    }
+
+    if (cmd == "activateLicenceHere")
+    {
+        if (const auto failure = activateLicenceHere(); failure.isNotEmpty())
+            emitError (failure);
+        emitState();
+        return;
+    }
+
+    if (cmd == "deactivateLicenceHere")
+    {
+        // The receipt is spoken rather than merely returned: it is the one thing the customer
+        // needs to keep, and a value nobody shows them is a value they do not have.
+        if (const auto receipt = deactivateLicenceHere(); receipt.isNotEmpty())
+            if (options.emit != nullptr)
+                options.emit ("instrumentHostLicenceReceipt",
+                              [&receipt] { auto* obj = new juce::DynamicObject();
+                                           obj->setProperty ("receipt", receipt);
+                                           return juce::var (obj); }());
         emitState();
         return;
     }
@@ -2313,6 +2388,19 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
             // clicking "load it anyway".
             refusal = record->name + " was " + blocked;
             safeModeRefusals[module->path] = blocked;
+        }
+        else if (const auto allowed = entitlements();
+                 ! rack.partHasInstrument (partId) && loadedPartCount() >= allowed.maxLoadedParts)
+        {
+            // §26.2's free tier loads "one plug-in". Replacing the one already loaded is not
+            // an extra plug-in and is deliberately allowed — the free edition is a product
+            // somebody uses, not a demonstration they get one shot at.
+            refusal = allowed.maxLoadedParts == 1
+                        ? "The " + allowed.label() + " edition loads one plug-in at a time. "
+                          "Replace the one already loaded, or unload it first — the keyboard, "
+                          "the pages and the mappings all keep working."
+                        : "The " + allowed.label() + " edition loads "
+                            + juce::String (allowed.maxLoadedParts) + " plug-ins at a time.";
         }
         else
         {
@@ -3870,7 +3958,7 @@ void InstrumentHostService::emitError (const juce::String& message)
     }
 }
 
-juce::var InstrumentHostService::buildStatePayload() const
+juce::var InstrumentHostService::buildStatePayload()
 {
     juce::Array<juce::var> instruments;
     juce::Array<juce::var> effectClasses;
@@ -4133,6 +4221,7 @@ juce::var InstrumentHostService::buildStatePayload() const
     root->setProperty ("performance", performancePayload());
     root->setProperty ("product", productPayload());
     root->setProperty ("reliability", reliabilityPayload());
+    root->setProperty ("licence", licencePayload());
     root->setProperty ("scanning", scanBusy.load());
     root->setProperty ("editorOpenPartId", editorTargetId);
     root->setProperty ("audio", juce::var (audio));
@@ -4396,6 +4485,20 @@ juce::var InstrumentHostService::runScriptAction (const juce::String& action, co
         known = known || action == name;
     if (! known)
         return {};
+
+    // §20 puts "advanced scripting and package development" in Pro. Reading the performance
+    // state is deliberately NOT gated: a script that can only look is how somebody decides
+    // whether the tier is worth buying, and §26.3's rule against disabling half the keyboard
+    // reads the same way here — the refusal is on acting, not on knowing.
+    if (action != "performance.state"
+        && ! entitlements().allows (licensing::Feature::advancedScripting))
+    {
+        auto* refused = new juce::DynamicObject();
+        refused->setProperty ("ok", false);
+        refused->setProperty ("error", licensing::featureRefusal (
+            licensing::Feature::advancedScripting, entitlements().edition));
+        return juce::var (refused);
+    }
 
     if (action == "performance.state")
         return scriptPerformanceState();
@@ -4927,6 +5030,157 @@ juce::var InstrumentHostService::reliabilityPayload() const
     root->setProperty ("refusedThisRun", refused);
     root->setProperty ("recovery",       juce::var (recoveryObj));
     root->setProperty ("damagedState",   damaged);
+    return juce::var (root);
+}
+
+// -- licensing (§19 "Trust", §20, §26.2, §27) -------------------------------------------------
+
+void InstrumentHostService::ensureLicence()
+{
+    if (licence != nullptr)
+        return;
+
+    ensureHostProject();
+
+    // The vendor's public key travels in the Host Project manifest, so a generated instrument
+    // verifies licences issued for ITSELF and not for some other product built from the same
+    // editor. A manifest with no key produces a store that can verify nothing and says so —
+    // which is the honest outcome for a build nobody has set up to be sold.
+    licence = std::make_unique<licensing::LicenceStore> (
+        options.dataDirectory,
+        hostProject.getProperty ("licencePublicKey", {}).toString(),
+        hostProject.getProperty ("appId", {}).toString());
+}
+
+licensing::LicenceStatus InstrumentHostService::licenceStatus()
+{
+    ensureLicence();
+    return licence->status();
+}
+
+licensing::Entitlements InstrumentHostService::entitlements()
+{
+    ensureLicence();
+    return licence->entitlements();
+}
+
+juce::String InstrumentHostService::installLicence (const juce::String& licenceFileText)
+{
+    ensureLicence();
+    return licence->install (licenceFileText);
+}
+
+void InstrumentHostService::removeLicence()
+{
+    ensureLicence();
+    licence->remove();
+}
+
+juce::String InstrumentHostService::activateLicenceHere()
+{
+    ensureLicence();
+    return licence->activateHere();
+}
+
+juce::String InstrumentHostService::deactivateLicenceHere()
+{
+    ensureLicence();
+    return licence->deactivateHere();
+}
+
+juce::Array<licensing::LicenceStore::Activation> InstrumentHostService::licenceActivations()
+{
+    ensureLicence();
+    return licence->activations();
+}
+
+bool InstrumentHostService::requireFeature (licensing::Feature feature)
+{
+    const auto allowed = entitlements();
+    if (allowed.allows (feature))
+        return true;
+
+    emitError (licensing::featureRefusal (feature, allowed.edition));
+    return false;
+}
+
+int InstrumentHostService::loadedPartCount() const
+{
+    int loaded = 0;
+    for (const auto& part : rack.getPerformance().parts)
+        if (rack.partHasInstrument (part.partId))
+            ++loaded;
+    return loaded;
+}
+
+juce::var InstrumentHostService::licencePayload()
+{
+    ensureLicence();
+
+    const auto status = licence->status();
+    const auto allowed = licence->entitlements();
+
+    juce::Array<juce::var> seats;
+    for (const auto& activation : licence->activations())
+    {
+        auto* obj = new juce::DynamicObject();
+        // The fingerprint is a digest already; only its head is shown, because a person
+        // identifying their own machine needs a few characters, not all of them.
+        obj->setProperty ("fingerprint",   activation.fingerprint.substring (0, 8));
+        obj->setProperty ("machineName",   activation.machineName);
+        obj->setProperty ("firstSeen",     activation.firstSeen);
+        obj->setProperty ("lastSeen",      activation.lastSeen);
+        obj->setProperty ("isThisMachine", activation.isThisMachine);
+        seats.add (juce::var (obj));
+    }
+
+    juce::Array<juce::var> gated;
+    for (auto feature : { licensing::Feature::patternEngine, licensing::Feature::scenesAndSetlists,
+                          licensing::Feature::advancedRouting, licensing::Feature::advancedScripting })
+    {
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("feature", licensing::featureName (feature));
+        obj->setProperty ("allowed", allowed.allows (feature));
+        gated.add (juce::var (obj));
+    }
+
+    juce::Array<juce::var> unconditional;
+    for (const auto& capability : licensing::neverGated())
+        unconditional.add (capability);
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("edition",        licensing::editionName (allowed.edition));
+    root->setProperty ("editionLabel",   allowed.label());
+    root->setProperty ("state",          [&status]() -> juce::String
+    {
+        switch (status.state)
+        {
+            case licensing::LicenceStatus::State::licensed:       return "licensed";
+            case licensing::LicenceStatus::State::updatesExpired: return "updatesExpired";
+            case licensing::LicenceStatus::State::sunsetUnlocked: return "sunsetUnlocked";
+            case licensing::LicenceStatus::State::wrongProduct:   return "wrongProduct";
+            case licensing::LicenceStatus::State::tampered:       return "tampered";
+            case licensing::LicenceStatus::State::unlicensed:     break;
+        }
+        return "unlicensed";
+    }());
+    root->setProperty ("detail",         status.detail);
+    root->setProperty ("licensee",       status.verified() ? status.document.licensee : juce::String());
+    root->setProperty ("orderId",        status.verified() ? status.document.orderId : juce::String());
+    root->setProperty ("updatesUntil",   status.verified() ? status.document.updatesUntil : juce::String());
+    root->setProperty ("updatesIncluded", status.updatesIncluded());
+    // A constant, and it is in the payload precisely so the panel can state it: §27 says an
+    // expired entitlement must never disable the application, and a person looking at a lapsed
+    // licence deserves to read that rather than infer it.
+    root->setProperty ("runnable",       licensing::LicenceStatus::runnable());
+    root->setProperty ("maxLoadedParts", allowed.maxLoadedParts);
+    root->setProperty ("loadedParts",    loadedPartCount());
+    root->setProperty ("seatsAllowed",   licence->seatsAllowed());
+    root->setProperty ("seatsUsed",      licence->seatsUsed());
+    root->setProperty ("activatedHere",  licence->activatedHere());
+    root->setProperty ("seats",          seats);
+    root->setProperty ("features",       gated);
+    root->setProperty ("neverGated",     unconditional);
     return juce::var (root);
 }
 

@@ -206,6 +206,9 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
+        "${CE_ROOT}/src/Licensing/Licence.cpp"
+        "${CE_ROOT}/src/Licensing/Entitlements.cpp"
+        "${CE_ROOT}/src/Licensing/LicenceStore.cpp"
         "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
@@ -236,6 +239,7 @@ if(CEDITOR_BUILD_APP)
 
     target_link_libraries(CEditor PRIVATE
         juce::juce_core
+        juce::juce_cryptography
         juce::juce_audio_basics
         juce::juce_audio_devices
         juce::juce_audio_processors
@@ -426,6 +430,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_audio_utils
         juce::juce_audio_devices
         juce::juce_core
+        juce::juce_cryptography
         juce::juce_midi_ci
         juce::juce_data_structures
         juce::juce_events
@@ -487,6 +492,9 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
+        "${CE_ROOT}/src/Licensing/Licence.cpp"
+        "${CE_ROOT}/src/Licensing/Entitlements.cpp"
+        "${CE_ROOT}/src/Licensing/LicenceStore.cpp"
         "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
@@ -931,6 +939,9 @@ if(WIN32)
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
+        "${CE_ROOT}/src/Licensing/Licence.cpp"
+        "${CE_ROOT}/src/Licensing/Entitlements.cpp"
+        "${CE_ROOT}/src/Licensing/LicenceStore.cpp"
         "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
@@ -944,7 +955,7 @@ if(WIN32)
         JUCE_STANDALONE_APPLICATION=1
     )
     target_include_directories(Ctrl49RackDemo PRIVATE "${CE_ROOT}/src")
-    target_link_libraries(Ctrl49RackDemo PRIVATE winmm juce::juce_audio_utils)
+    target_link_libraries(Ctrl49RackDemo PRIVATE juce::juce_cryptography winmm juce::juce_audio_utils)
 
     add_executable(Ctrl49BridgeDemo
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
@@ -1072,6 +1083,33 @@ target_link_libraries(CEditorPluginCatalogTests PRIVATE juce::juce_core)
 add_test(NAME PluginCatalog COMMAND CEditorPluginCatalogTests)
 ce_configure_test(CEditorPluginCatalogTests)
 
+# The licence document, its signature and the edition table (§19 "Trust", §20, §26.2, §27).
+# juce_cryptography is the only module beyond juce_core: RSAKey and SHA256, the two primitives
+# an offline signature check needs. No network, and nothing to link that could introduce one.
+add_executable(CEditorLicensingTests
+    "${CE_ROOT}/src/Licensing/Licence.cpp"
+    "${CE_ROOT}/src/Licensing/Entitlements.cpp"
+    "${CE_ROOT}/src/Licensing/LicenceStore.cpp"
+    "${CE_ROOT}/tests/LicensingTests.cpp"
+)
+target_compile_features(CEditorLicensingTests PRIVATE cxx_std_23)
+target_include_directories(CEditorLicensingTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorLicensingTests PRIVATE juce::juce_core juce::juce_cryptography)
+add_test(NAME Licensing COMMAND CEditorLicensingTests)
+ce_configure_test(CEditorLicensingTests)
+
+# The vendor's side of the licence system: generate a key pair, sign a licence, sign the sunset
+# unlock, verify what came out. A licensing system with no way to issue a licence is not one.
+# Not installed and not shipped — this is an operator tool, built on demand.
+add_executable(CEditorLicenceTool EXCLUDE_FROM_ALL
+    "${CE_ROOT}/src/Licensing/Licence.cpp"
+    "${CE_ROOT}/tools/LicenceToolMain.cpp"
+)
+target_compile_features(CEditorLicenceTool PRIVATE cxx_std_23)
+target_include_directories(CEditorLicenceTool PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorLicenceTool PRIVATE juce::juce_core juce::juce_cryptography)
+ce_configure_test(CEditorLicenceTool)
+
 # The stub is deliberately JUCE-free (pure std): it stands in for the worker in tests, and a
 # stub that could itself drag in module dependencies would defeat the point of having one.
 add_executable(CEditorScannerStub
@@ -1170,6 +1208,9 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
     "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
     "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
+    "${CE_ROOT}/src/Licensing/Licence.cpp"
+    "${CE_ROOT}/src/Licensing/Entitlements.cpp"
+    "${CE_ROOT}/src/Licensing/LicenceStore.cpp"
     "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
@@ -1182,6 +1223,7 @@ target_compile_features(CEditorInstrumentHostServiceTests PRIVATE cxx_std_23)
 target_include_directories(CEditorInstrumentHostServiceTests PRIVATE "${CE_ROOT}/src")
 target_link_libraries(CEditorInstrumentHostServiceTests PRIVATE
     juce::juce_core
+    juce::juce_cryptography
     juce::juce_audio_utils   # AudioProcessorPlayer for the service's preview audio engine
 )
 add_test(NAME InstrumentHostService

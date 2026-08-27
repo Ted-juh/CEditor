@@ -13,6 +13,7 @@
 #include "SafeMode.h"
 #include "SessionRecovery.h"
 #include "SupportBundle.h"
+#include "Licensing/LicenceStore.h"
 #include "ControlSurface/SurfaceProfile.h"
 
 // InstrumentHostService — the instrument host behind one bridge event (VIP-successor Stage 1).
@@ -515,6 +516,23 @@ public:
         Never emptied by loading: a damaged blob is kept and reported, never quietly dropped. */
     juce::StringArray damagedStateNotes() const   { return stateDigestMismatches; }
 
+    // -- licensing (§19 "Trust", §20, §26.2, §27) ----------------------------------------------
+    // The public key and the product id come from the Host Project manifest, so a generated
+    // instrument carries its own — one build's licence is not another's.
+
+    licensing::LicenceStatus licenceStatus();
+    licensing::Entitlements entitlements();
+    /** Installs a licence from the text of a licence file. Empty on success, else the reason. */
+    juce::String installLicence (const juce::String& licenceFileText);
+    void removeLicence();
+    juce::String activateLicenceHere();
+    juce::String deactivateLicenceHere();
+    juce::Array<licensing::LicenceStore::Activation> licenceActivations();
+
+    /** True when the edition allows it. When it does not, emits the refusal — one sentence
+        naming what would allow it and what still works — so no caller has to compose one. */
+    bool requireFeature (licensing::Feature feature);
+
     // -- support bundle (§17.7) ----------------------------------------------------------------
 
     /** What this machine would contribute to a bundle: version, OS, architecture, the devices
@@ -548,7 +566,10 @@ private:
 
     void emitState();
     void emitError (const juce::String& message);
-    juce::var buildStatePayload() const;
+    /** Not const, and that is the licence block's doing: the licence store is built on first
+        need because its public key lives in the Host Project, which is itself loaded lazily.
+        Its one caller, emitState, is not const either. */
+    juce::var buildStatePayload();
     static juce::var scanProgressPayload (const juce::String& line, bool done);
 
     /** Runs the load transaction for a part: begin ticket, instantiate, commit; on success
@@ -658,6 +679,9 @@ private:
     /** Everything about whether this install is healthy and what it did about it when it was
         not: safe startup and its suspects, and what this run actually refused. */
     juce::var reliabilityPayload() const;
+    /** The edition, the licence behind it, its seats, and what is gated. Never a nag: the
+        panel reads this to say what somebody has, not to interrupt them. */
+    juce::var licencePayload();
 
     void savePerformance();
     /** Keeps previous manifest revisions beside the session file: before an overwrite, the
@@ -715,6 +739,12 @@ private:
     ActiveHostingMarker::Incident pendingActiveIncident;   // reported once, at the first state
     std::unique_ptr<SafeMode> safeMode;
     std::unique_ptr<SessionRecovery> recovery;
+    std::unique_ptr<licensing::LicenceStore> licence;
+    /** Constructs the store on first need, because the public key lives in the Host Project
+        and that manifest is itself loaded lazily. */
+    void ensureLicence();
+    /** How many parts currently hold a plug-in — what §26.2's free-tier limit counts. */
+    int loadedPartCount() const;
     /** Anything whose saved state did not match the digest stored beside it, in words. */
     juce::StringArray stateDigestMismatches;
     /** Modules this run actually refused, with the reason, so the restore report can say what

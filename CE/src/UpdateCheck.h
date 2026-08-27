@@ -137,6 +137,37 @@ inline UpdateCheckResult readLatestRelease (const juce::var& reply, const juce::
     return result;
 }
 
+/**
+ * Whether a release that has been found is included in what somebody bought (§27).
+ *
+ * The model is "perpetual licence, all 1.x updates included, optional paid major upgrade", and
+ * the sentence that governs the implementation is: *"Expired update entitlement must never
+ * disable the installed application."* So this is ADVISORY and nothing more. It decides one
+ * word in one line of text — "included" or "a paid upgrade" — and there is no path from here
+ * to disabling anything, refusing to run, or removing a feature.
+ *
+ * A release published on or before `updatesUntil` is included. An empty or unreadable
+ * `updatesUntil` means no limit, deliberately in that direction: a typo in a licence must not
+ * take something away from somebody who paid for it. An unreadable publication date is also
+ * included, for the same reason — the failure is ours, not theirs.
+ */
+inline bool updateIsIncluded (const juce::String& releasePublishedAt,
+                              const juce::String& updatesUntil)
+{
+    if (updatesUntil.isEmpty())
+        return true;
+
+    const auto until = juce::Time::fromISO8601 (updatesUntil);
+    if (until.toMilliseconds() <= 0)
+        return true;
+
+    const auto published = juce::Time::fromISO8601 (releasePublishedAt);
+    if (published.toMilliseconds() <= 0)
+        return true;
+
+    return published <= until;
+}
+
 /** When the setting is off, only an explicit request may check. The rule, in one place. */
 inline bool updateCheckIsAllowed (bool settingEnabled, bool userAsked)
 {
