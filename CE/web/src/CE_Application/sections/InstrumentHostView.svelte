@@ -24,6 +24,8 @@
     generateControlPages,
     hostLibrary, requestLibrary, scanLibrary, browseLibraryPath, removeLibraryPath,
     saveUserPreset, saveRackToLibrary, setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
+    addEffect, removeEffect, setEffectBypassed, openEffectEditor,
+    addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
@@ -69,14 +71,39 @@
     groupHeader: p.group && (i === 0 || visibleParameters[i - 1].group !== p.group) ? p.group : '',
   })));
 
-  // The registry follows the focused part: ask when a loaded part takes focus, clear when
-  // focus lands somewhere without an instrument. Load state matters too — the same part
-  // gains a registry the moment its instrument commits.
+  // The parameter view's target: the focused part by default, or an effect the user asked
+  // to inspect (its "P" button). Only a focus CHANGE or the target vanishing resets it —
+  // every state push re-derives the part objects, and resetting on mere identity churn
+  // would knock an effect inspection back to the part on any unrelated mutation.
+  let paramTargetId = $state('');
+  let lastFocusedPartId = $state('');
+  let allEffects = $derived([
+    ...$hostState.rack.masterEffects,
+    ...$hostState.rack.parts.flatMap((p) => p.effects),
+  ]);
   $effect(() => {
-    const partId = focusedPart?.hasInstrument ? focusedPart.partId : '';
-    if (partId) requestParameters(partId);
+    const focusedLoaded = focusedPart?.hasInstrument ? focusedPart.partId : '';
+    const targetStillExists = paramTargetId
+      && (paramTargetId === focusedLoaded
+          || allEffects.some((e) => e.effectId === paramTargetId && e.hasProcessor));
+    if (focusedPartId !== lastFocusedPartId || !targetStillExists) {
+      lastFocusedPartId = focusedPartId;
+      paramTargetId = focusedLoaded;
+    }
+  });
+  $effect(() => {
+    if (paramTargetId) requestParameters(paramTargetId);
     else hostParameters.set(emptyHostParameters());
   });
+  let paramTargetName = $derived.by(() => {
+    if (!paramTargetId) return '';
+    if (focusedPart?.partId === paramTargetId) return partTitle(focusedPart);
+    return allEffects.find((e) => e.effectId === paramTargetId)?.pluginName ?? '';
+  });
+
+  let selectedMacroId = $state('');
+  let selectedMacro = $derived(
+    $hostState.rack.macros.find((m) => m.macroId === selectedMacroId) ?? $hostState.rack.macros[0] ?? null);
 
   function stepFor(parameter) {
     return parameter.numSteps > 1 ? 1 / (parameter.numSteps - 1) : 0.001;
@@ -90,8 +117,8 @@
   let firstEmptySlot = $derived(selectedPage?.slots.find((s) => !s.assigned) ?? null);
 
   function assignToSelectedPage(parameter) {
-    if (!selectedPage || !firstEmptySlot || !focusedPart) return;
-    assignControlSlot(selectedPage.pageId, firstEmptySlot.slotId, focusedPart.partId, parameter.id);
+    if (!selectedPage || !firstEmptySlot || !paramTargetId) return;
+    assignControlSlot(selectedPage.pageId, firstEmptySlot.slotId, paramTargetId, parameter.id);
   }
   let parts = $derived($hostState.rack.parts);
   let focusedPartId = $derived($hostState.rack.focusedPartId);
@@ -389,12 +416,84 @@
         </div>
       {/if}
 
+      {#snippet effectChain(chain, chainId, title)}
+        <div class="fx-chain" data-testid={chainId === 'master' ? 'host-master-fx' : 'host-part-fx'}>
+          <div class="fx-head">
+            <strong>{title}</strong>
+            <select value="" aria-label={`Add an effect to ${title}`}
+                    onchange={(e) => { if (e.currentTarget.value) addEffect(chainId, e.currentTarget.value); e.currentTarget.value = ''; }}>
+              <option value="" disabled>+ Add effect…</option>
+              {#each $hostState.effectClasses as effectClass (effectClass.ceId)}
+                <option value={effectClass.ceId}>{effectClass.name} — {effectClass.vendor}</option>
+              {/each}
+            </select>
+          </div>
+          {#each chain as effect (effect.effectId)}
+            <div class="fx-row" class:bypassed={effect.bypassed} class:unresolved={effect.unresolved}>
+              <span class="fx-name" title={effect.pluginVendor}>
+                {effect.pluginName || 'Loading…'}{#if effect.unresolved} (missing){/if}
+              </span>
+              <PropertyToggle compact label="Byp" value={effect.bypassed} ariaLabel={`Bypass ${effect.pluginName}`}
+                              onchange={(on) => setEffectBypassed(effect.effectId, on)} />
+              <button type="button" class="toggle" disabled={!effect.hasProcessor}
+                      class:on={$hostState.editorOpenPartId === effect.effectId}
+                      title="Show the effect's own interface"
+                      onclick={() => openEffectEditor(effect.effectId)}>Editor</button>
+              <button type="button" class="toggle" disabled={!effect.hasProcessor}
+                      class:on={paramTargetId === effect.effectId}
+                      title="Inspect this effect's parameters"
+                      onclick={() => (paramTargetId = effect.effectId)}>P</button>
+              <button type="button" class="ghost danger" title="Remove this effect"
+                      onclick={() => removeEffect(effect.effectId)}>×</button>
+            </div>
+          {/each}
+        </div>
+      {/snippet}
+
+      {#if focusedPart}
+        {@render effectChain(focusedPart.effects, focusedPart.partId, `Inserts — ${partTitle(focusedPart)}`)}
+      {/if}
+      {@render effectChain($hostState.rack.masterEffects, 'master', 'Master effects')}
+
+      <!-- Stage 5 macros: one value fanning across parts and effects, always through the
+           central parameter path. Select a macro, then add targets from the parameter view. -->
+      <div class="macros" data-testid="host-macros">
+        <div class="fx-head">
+          <strong>Macros</strong>
+          <button type="button" onclick={() => addMacro()} data-testid="host-add-macro">+ Macro</button>
+        </div>
+        {#each $hostState.rack.macros as macro (macro.macroId)}
+          <div class="macro-row" class:on={selectedMacro?.macroId === macro.macroId}>
+            <button type="button" class="ghost macro-name" title="Select for target assignment"
+                    onclick={() => (selectedMacroId = macro.macroId)}>{macro.name}</button>
+            <input type="range" min="0" max="1" step="0.001" value={macro.value} aria-label={macro.name}
+                   oninput={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value))}
+                   onchange={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value), true)} />
+            <button type="button" class="ghost danger" title="Remove this macro"
+                    onclick={() => removeMacro(macro.macroId)}>×</button>
+          </div>
+          {#if macro.targets.length > 0}
+            <div class="macro-targets">
+              {#each macro.targets as target (target.targetId + target.parameterId)}
+                <span class="macro-target" class:unresolved={!target.resolved}
+                      title={target.resolved ? `${target.displayName} on ${target.targetName}`
+                                             : 'unresolved — the target no longer carries this plug-in'}>
+                  {target.displayName}{target.inverted ? ' ⇄' : ''} — {target.targetName || 'missing'}
+                  <button type="button" class="ghost danger"
+                          onclick={() => removeMacroTarget(macro.macroId, target.targetId, target.parameterId)}>×</button>
+                </span>
+              {/each}
+            </div>
+          {/if}
+        {/each}
+      </div>
+
       <!-- The Stage 2 generic parameter view: the common, inspectable control surface the
            vendor editor is not — and the same registry hardware pages and macros will use. -->
-      {#if focusedPart?.hasInstrument && $hostParameters.partId === focusedPart.partId}
+      {#if paramTargetId && $hostParameters.partId === paramTargetId}
         <div class="param-view" data-testid="host-parameters">
           <div class="param-head">
-            <strong>Parameters — {partTitle(focusedPart)}</strong>
+            <strong>Parameters — {paramTargetName}</strong>
             <input type="search" placeholder="Search parameters…" bind:value={paramSearch} />
             <button type="button" class="toggle" class:on={paramDiagnostics}
                     title="Show native IDs and indices"
@@ -419,23 +518,26 @@
                 <span class="param-name" title={parameter.name}>{parameter.name}</span>
                 {#if parameter.boolean}
                   <PropertyToggle compact value={parameter.value >= 0.5} ariaLabel={parameter.name}
-                                  onchange={(on) => setParameter(focusedPart.partId, parameter.id, on ? 1 : 0)} />
+                                  onchange={(on) => setParameter(paramTargetId, parameter.id, on ? 1 : 0)} />
                 {:else}
                   <input type="range" min="0" max="1" step={stepFor(parameter)} value={parameter.value}
                          aria-label={parameter.name}
-                         onpointerdown={() => beginParameterGesture(focusedPart.partId, parameter.id)}
-                         onpointerup={() => endParameterGesture(focusedPart.partId, parameter.id)}
-                         oninput={(e) => setParameter(focusedPart.partId, parameter.id, Number(e.currentTarget.value))} />
+                         onpointerdown={() => beginParameterGesture(paramTargetId, parameter.id)}
+                         onpointerup={() => endParameterGesture(paramTargetId, parameter.id)}
+                         oninput={(e) => setParameter(paramTargetId, parameter.id, Number(e.currentTarget.value))} />
                 {/if}
                 <span class="param-value">{parameter.text}{parameter.label ? ` ${parameter.label}` : ''}</span>
                 <button type="button" class="ghost" title="Reset to the plug-in's default"
-                        onclick={() => resetParameter(focusedPart.partId, parameter.id)}>↺</button>
+                        onclick={() => resetParameter(paramTargetId, parameter.id)}>↺</button>
                 <button type="button" class="ghost" disabled={!selectedPage || !firstEmptySlot}
                         title={selectedPage
                                  ? (firstEmptySlot ? `Assign to ${selectedPage.name}, slot ${firstEmptySlot.slotId}`
                                                    : 'The selected page has no empty slot')
                                  : 'Create a control page first'}
                         onclick={() => assignToSelectedPage(parameter)}>→</button>
+                <button type="button" class="ghost" disabled={!selectedMacro}
+                        title={selectedMacro ? `Add to macro ${selectedMacro.name}` : 'Create a macro first'}
+                        onclick={() => selectedMacro && addMacroTarget(selectedMacro.macroId, paramTargetId, parameter.id)}>M+</button>
               </div>
               {#if paramDiagnostics}
                 <div class="param-diag">{parameter.id} · index {parameter.index}{parameter.automatable ? '' : ' · not automatable'}{parameter.meta ? ' · meta' : ''}</div>
@@ -852,6 +954,35 @@
   .param-row input[type='range'] { flex: 1; min-width: 60px; }
   .param-value { flex: 0 0 84px; text-align: right; color: #9aa5b1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .param-diag { color: #66707b; font-size: 10px; margin: -2px 0 0 138px; }
+
+  .fx-chain, .macros {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid #2c343d;
+    padding-top: 8px;
+  }
+  .fx-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .fx-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .fx-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fx-row.bypassed .fx-name { color: #7d8894; text-decoration: line-through; }
+  .fx-row.unresolved .fx-name { color: #d6a3a3; }
+  .macro-row { display: flex; align-items: center; gap: 8px; }
+  .macro-row.on .macro-name { color: #d6dbe0; border-color: #5b9bd5; }
+  .macro-name { font-size: 12px; }
+  .macro-row input[type='range'] { flex: 1; min-width: 60px; }
+  .macro-targets { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; }
+  .macro-target {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    border: 1px solid #3b4652;
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-size: 11px;
+    color: #9aa5b1;
+  }
+  .macro-target.unresolved { color: #d6a3a3; border-color: #7a4a4a; }
 
   .pages {
     display: flex;

@@ -255,14 +255,25 @@ export function mockAudioDevices() {
 export function emptyHostState() {
   return {
     instruments: [],
+    effectClasses: [],
     modules: [],
     scanPaths: [],
     scanning: false,
     editorOpenPartId: '',
     audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0 },
-    rack: { performanceId: '', focusedPartId: '', parts: [], pages: [] },
+    rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], macros: [], pages: [] },
   };
 }
+
+const normalizeEffectSlot = (e) => ({
+  effectId: String(e?.effectId ?? ''),
+  pluginCeId: String(e?.pluginCeId ?? ''),
+  pluginName: String(e?.pluginName ?? ''),
+  pluginVendor: String(e?.pluginVendor ?? ''),
+  bypassed: e?.bypassed === true,
+  hasProcessor: e?.hasProcessor === true,
+  unresolved: e?.unresolved === true,
+});
 
 /** Shapes whatever arrived into the exact structure the view renders — absent fields become
  *  defaults rather than undefined holes. */
@@ -272,6 +283,12 @@ export function normalizeHostState(payload) {
 
   return {
     instruments: (Array.isArray(p.instruments) ? p.instruments : []).map((i) => ({
+      ceId: String(i?.ceId ?? ''),
+      name: String(i?.name ?? ''),
+      vendor: String(i?.vendor ?? ''),
+      version: String(i?.version ?? ''),
+    })),
+    effectClasses: (Array.isArray(p.effectClasses) ? p.effectClasses : []).map((i) => ({
       ceId: String(i?.ceId ?? ''),
       name: String(i?.name ?? ''),
       vendor: String(i?.vendor ?? ''),
@@ -299,6 +316,22 @@ export function normalizeHostState(payload) {
     rack: {
       performanceId: String(rack.performanceId ?? ''),
       focusedPartId: String(rack.focusedPartId ?? ''),
+      masterEffects: (Array.isArray(rack.masterEffects) ? rack.masterEffects : []).map(normalizeEffectSlot),
+      macros: (Array.isArray(rack.macros) ? rack.macros : []).map((m) => ({
+        macroId: String(m?.macroId ?? ''),
+        name: String(m?.name ?? ''),
+        value: Number(m?.value ?? 0),
+        targets: (Array.isArray(m?.targets) ? m.targets : []).map((t) => ({
+          targetId: String(t?.targetId ?? ''),
+          parameterId: String(t?.parameterId ?? ''),
+          targetName: String(t?.targetName ?? ''),
+          displayName: String(t?.displayName ?? ''),
+          rangeMin: Number(t?.rangeMin ?? 0),
+          rangeMax: Number(t?.rangeMax ?? 1),
+          inverted: t?.inverted === true,
+          resolved: t?.resolved === true,
+        })),
+      })),
       pages: (Array.isArray(rack.pages) ? rack.pages : []).map((page) => ({
         pageId: String(page?.pageId ?? ''),
         name: String(page?.name ?? ''),
@@ -332,6 +365,7 @@ export function normalizeHostState(payload) {
         velocityLow: Number(part?.velocityLow ?? 1),
         velocityHigh: Number(part?.velocityHigh ?? 127),
         transpose: Number(part?.transpose ?? 0),
+        effects: (Array.isArray(part?.effects) ? part.effects : []).map(normalizeEffectSlot),
         enabled: part?.enabled !== false,
         mute: part?.mute === true,
         solo: part?.solo === true,
@@ -358,6 +392,10 @@ export function mockHostState() {
       { ceId: 'mock-analog', name: 'Analog One', vendor: 'Mock Audio', version: '1.4' },
       { ceId: 'mock-keys', name: 'Stage Keys', vendor: 'Mock Audio', version: '2.0' },
       { ceId: 'mock-strings', name: 'String Machine', vendor: 'Tape Labs', version: '1.1' },
+    ],
+    effectClasses: [
+      { ceId: 'mock-reverb', name: 'Sweet Reverb', vendor: 'Mock Audio', version: '1.0' },
+      { ceId: 'mock-comp', name: 'Big Comp', vendor: 'Tape Labs', version: '2.2' },
     ],
     modules: [
       { path: 'C:\\Program Files\\Common Files\\VST3\\MockAudio.vst3', numClasses: 2, numInstruments: 2 },
@@ -457,6 +495,72 @@ export function applyMockCommand(state, payload) {
   if (cmd === 'browseScanPath') {
     // No native dialog in a plain browser; stand in with a fixed choice so the flow demos.
     if (!next.scanPaths.includes('D:\\Browsed VST3s')) next.scanPaths.push('D:\\Browsed VST3s');
+    return next;
+  }
+  if (cmd === 'addEffect') {
+    const effectClass = next.effectClasses.find((c) => c.ceId === payload.ceId);
+    if (!effectClass) return next;
+    const slot = normalizeHostState({ rack: { masterEffects: [{
+      effectId: `mock-fx-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      pluginCeId: effectClass.ceId, pluginName: effectClass.name, pluginVendor: effectClass.vendor,
+      hasProcessor: true,
+    }] } }).rack.masterEffects[0];
+    if (payload.chainId === 'master') next.rack.masterEffects.push(slot);
+    else part(payload.chainId)?.effects.push(slot);
+    return next;
+  }
+  if (cmd === 'removeEffect' || cmd === 'setEffectBypassed' || cmd === 'moveEffect') {
+    const chains = [next.rack.masterEffects, ...next.rack.parts.map((p) => p.effects)];
+    for (const chain of chains) {
+      const index = chain.findIndex((e) => e.effectId === payload.effectId);
+      if (index < 0) continue;
+      if (cmd === 'removeEffect') chain.splice(index, 1);
+      else if (cmd === 'setEffectBypassed') chain[index].bypassed = payload.bypassed === true;
+      else chain.splice(Math.max(0, Math.min(chain.length - 1, Number(payload.index ?? 0))), 0,
+                        ...chain.splice(index, 1));
+      break;
+    }
+    return next;
+  }
+  if (cmd === 'addMacro') {
+    next.rack.macros.push(normalizeHostState({ rack: { macros: [{
+      macroId: `mock-macro-${Date.now()}-${next.rack.macros.length + 1}`,
+      name: payload.name || `Macro ${next.rack.macros.length + 1}`,
+    }] } }).rack.macros[0]);
+    return next;
+  }
+  if (cmd === 'removeMacro') {
+    next.rack.macros = next.rack.macros.filter((m) => m.macroId !== payload.macroId);
+    return next;
+  }
+  if (cmd === 'renameMacro') {
+    const macro = next.rack.macros.find((m) => m.macroId === payload.macroId);
+    if (macro) macro.name = String(payload.name ?? macro.name);
+    return next;
+  }
+  if (cmd === 'setMacroValue') {
+    const macro = next.rack.macros.find((m) => m.macroId === payload.macroId);
+    if (macro) macro.value = Math.min(1, Math.max(0, Number(payload.value ?? 0)));
+    return next;
+  }
+  if (cmd === 'addMacroTarget' || cmd === 'removeMacroTarget') {
+    const macro = next.rack.macros.find((m) => m.macroId === payload.macroId);
+    if (!macro) return next;
+    if (cmd === 'removeMacroTarget') {
+      macro.targets = macro.targets.filter(
+        (t) => !(t.targetId === payload.targetId && t.parameterId === payload.parameterId));
+    } else if (!macro.targets.some((t) => t.targetId === payload.targetId && t.parameterId === payload.parameterId)) {
+      macro.targets.push({
+        targetId: String(payload.targetId ?? ''),
+        parameterId: String(payload.parameterId ?? ''),
+        targetName: part(payload.targetId)?.pluginName
+          ?? [...next.rack.masterEffects, ...next.rack.parts.flatMap((p) => p.effects)]
+               .find((e) => e.effectId === payload.targetId)?.pluginName
+          ?? '',
+        displayName: String(payload.parameterId ?? '').replace(/^./, (c) => c.toUpperCase()),
+        rangeMin: 0, rangeMax: 1, inverted: false, resolved: true,
+      });
+    }
     return next;
   }
   if (cmd === 'addControlPage') {
@@ -603,8 +707,18 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'getParameters') {
-      const part = get(hostState).rack.parts.find((p) => p.partId === payload.partId);
-      hostParameters.set(part?.hasInstrument ? mockHostParameters(payload.partId) : emptyHostParameters());
+      const state = get(hostState);
+      const part = state.rack.parts.find((p) => p.partId === payload.partId);
+      if (part?.hasInstrument) {
+        hostParameters.set(mockHostParameters(payload.partId));
+        return;
+      }
+      const effect = [...state.rack.masterEffects, ...state.rack.parts.flatMap((p) => p.effects)]
+        .find((e) => e.effectId === payload.partId);
+      hostParameters.set(effect?.hasProcessor
+        ? normalizeHostParameters({ partId: payload.partId, parameters: [
+            { id: 'wet', index: 0, name: 'Wet', value: 1, text: '1.00', defaultValue: 1 }] })
+        : emptyHostParameters());
       return;
     }
     if (payload?.cmd === 'setParameter' || payload?.cmd === 'resetParameter') {
@@ -730,6 +844,20 @@ export const setParameter = (partId, id, value) => send({ cmd: 'setParameter', p
 export const resetParameter = (partId, id) => send({ cmd: 'resetParameter', partId, id });
 export const beginParameterGesture = (partId, id) => send({ cmd: 'beginParameterGesture', partId, id });
 export const endParameterGesture = (partId, id) => send({ cmd: 'endParameterGesture', partId, id });
+export const addEffect = (chainId, ceId) => send({ cmd: 'addEffect', chainId, ceId });
+export const removeEffect = (effectId) => send({ cmd: 'removeEffect', effectId });
+export const moveEffect = (effectId, index) => send({ cmd: 'moveEffect', effectId, index });
+export const setEffectBypassed = (effectId, bypassed) => send({ cmd: 'setEffectBypassed', effectId, bypassed });
+export const openEffectEditor = (effectId) => send({ cmd: 'openEffectEditor', effectId });
+export const addMacro = (name) => send(name ? { cmd: 'addMacro', name } : { cmd: 'addMacro' });
+export const removeMacro = (macroId) => send({ cmd: 'removeMacro', macroId });
+export const renameMacro = (macroId, name) => send({ cmd: 'renameMacro', macroId, name });
+export const setMacroValue = (macroId, value, final = false) =>
+  send({ cmd: 'setMacroValue', macroId, value, final });
+export const addMacroTarget = (macroId, targetId, parameterId) =>
+  send({ cmd: 'addMacroTarget', macroId, targetId, parameterId });
+export const removeMacroTarget = (macroId, targetId, parameterId) =>
+  send({ cmd: 'removeMacroTarget', macroId, targetId, parameterId });
 export const addControlPage = (name) => send(name ? { cmd: 'addControlPage', name } : { cmd: 'addControlPage' });
 export const generateControlPages = (partId) => send({ cmd: 'generateControlPages', partId });
 export const removeControlPage = (pageId) => send({ cmd: 'removeControlPage', pageId });

@@ -392,3 +392,56 @@ test('mock reducer: the library round trip — search, capture, favourite, load-
   assert.equal(get(hostLibrary).records.some((r) => r.recordId === 'lib-1'), true,
     'factory records refuse removal in the mock too');
 });
+
+// --- Stage 5: effect chains and macros -----------------------------------------------------------
+
+test('normalizeHostState shapes effect chains and macros', () => {
+  const shaped = normalizeHostState({
+    effectClasses: [{ ceId: 'fx-1', name: 'Verb' }],
+    rack: {
+      parts: [{ partId: 'p1', effects: [{ effectId: 'e1', pluginName: 'Verb', bypassed: 1 }] }],
+      masterEffects: [{ effectId: 'e2', hasProcessor: true }],
+      macros: [{ macroId: 'm1', name: 'Bright', value: '0.5',
+                 targets: [{ targetId: 'p1', parameterId: 'cutoff', resolved: true }] }],
+    },
+  });
+  assert.equal(shaped.effectClasses[0].name, 'Verb');
+  assert.equal(shaped.rack.parts[0].effects[0].bypassed, false, 'truthy is not true');
+  assert.equal(shaped.rack.masterEffects[0].hasProcessor, true);
+  assert.equal(shaped.rack.macros[0].value, 0.5);
+  assert.equal(shaped.rack.macros[0].targets[0].resolved, true);
+  assert.deepEqual(normalizeHostState({}).rack.masterEffects, [], 'older payloads load clean');
+});
+
+test('mock reducer: the effect chain lifecycle on part and master', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'addEffect', chainId: 'mock-part-1', ceId: 'mock-reverb' });
+  state = applyMockCommand(state, { cmd: 'addEffect', chainId: 'master', ceId: 'mock-comp' });
+  assert.equal(state.rack.parts[0].effects[0].pluginName, 'Sweet Reverb');
+  assert.equal(state.rack.masterEffects[0].pluginName, 'Big Comp');
+
+  const effectId = state.rack.parts[0].effects[0].effectId;
+  state = applyMockCommand(state, { cmd: 'setEffectBypassed', effectId, bypassed: true });
+  assert.equal(state.rack.parts[0].effects[0].bypassed, true);
+  state = applyMockCommand(state, { cmd: 'removeEffect', effectId });
+  assert.equal(state.rack.parts[0].effects.length, 0);
+  assert.equal(state.rack.masterEffects.length, 1, 'the other chain is untouched');
+});
+
+test('mock reducer: macros collect targets and hold their value', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'addMacro', name: 'Bright' });
+  const macroId = state.rack.macros[0].macroId;
+  state = applyMockCommand(state, { cmd: 'addMacroTarget', macroId, targetId: 'mock-part-1', parameterId: 'cutoff' });
+  state = applyMockCommand(state, { cmd: 'addMacroTarget', macroId, targetId: 'mock-part-1', parameterId: 'cutoff' });
+  assert.equal(state.rack.macros[0].targets.length, 1, 'duplicate targets collapse');
+  assert.equal(state.rack.macros[0].targets[0].displayName, 'Cutoff');
+
+  state = applyMockCommand(state, { cmd: 'setMacroValue', macroId, value: 1.7 });
+  assert.equal(state.rack.macros[0].value, 1, 'values clamp to 0..1');
+
+  state = applyMockCommand(state, { cmd: 'removeMacroTarget', macroId, targetId: 'mock-part-1', parameterId: 'cutoff' });
+  assert.equal(state.rack.macros[0].targets.length, 0);
+  state = applyMockCommand(state, { cmd: 'removeMacro', macroId });
+  assert.equal(state.rack.macros.length, 0);
+});
