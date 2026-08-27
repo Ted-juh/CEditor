@@ -159,5 +159,9 @@ private:
     // Active Host Project build (tools/scripts/build-host-product.mjs as a child process), held
     // as its Timer base for the same reason as buildJob above.
     std::unique_ptr<juce::Timer> hostBuildJob;
+    // UI-rate pump for the instrument host's parameter deltas (vendor-editor edits arrive on
+    // audio-thread listeners and are drained to the WebView from here). Same Timer-base
+    // ownership pattern as the jobs above; started with the service, never before.
+    std::unique_ptr<juce::Timer> instrumentParamPump;
     void ensureInstrumentHost();
 };

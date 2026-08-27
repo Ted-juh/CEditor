@@ -1795,6 +1795,18 @@ void ValueTreeBridge::ensureInstrumentHost()
     };
 
     instrumentHost = std::make_unique<ceditor::host::InstrumentHostService> (std::move (options));
+
+    // Vendor-editor edits land on audio-thread listeners inside the service; this drains the
+    // coalesced marks to the WebView at UI rate. Cheap when idle (an empty drain is a few
+    // atomic reads per loaded part), so it simply runs for the service's lifetime.
+    struct ParamPump final : juce::Timer
+    {
+        explicit ParamPump (ceditor::host::InstrumentHostService& serviceToPump)
+            : service (serviceToPump) { startTimerHz (30); }
+        void timerCallback() override { service.drainParameterEvents(); }
+        ceditor::host::InstrumentHostService& service;
+    };
+    instrumentParamPump = std::make_unique<ParamPump> (*instrumentHost);
 }
 
 void ValueTreeBridge::requestInstrumentEditorClose()

@@ -8,7 +8,8 @@ namespace ceditor::host
 // The DAW-owned window: host.html in a WebView plus the native editor pane, wired to the
 // processor's long-lived service for exactly as long as this component exists. All the state
 // lives in the service; this class only attaches presentation and detaches it again.
-class HostPluginEditor final : public juce::AudioProcessorEditor
+class HostPluginEditor final : public juce::AudioProcessorEditor,
+                               private juce::Timer
 {
 public:
     explicit HostPluginEditor (HostPluginProcessor& processorToUse)
@@ -59,10 +60,15 @@ public:
 
         // The DAW reopened the window; which part's editor was open survived in the service.
         owner.getService().reassertEditorPane();
+
+        // Parameter deltas only matter while something is looking; the pump lives and dies
+        // with this window.
+        startTimerHz (30);
     }
 
     ~HostPluginEditor() override
     {
+        stopTimer();
         // Detach before members die: the service keeps its editor intent, but its hooks must
         // stop pointing at a pane that is about to go. The pane's own destructor then
         // destroys any hosted editor — before its processor, which lives on in the service.
@@ -93,6 +99,8 @@ public:
     }
 
 private:
+    void timerCallback() override { owner.getService().drainParameterEvents(); }
+
     HostPluginProcessor& owner;
     std::unique_ptr<juce::WebBrowserComponent> webView;
     juce::Label statusLabel;   // only ever visible when WebView2 could not start

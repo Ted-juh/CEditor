@@ -22,7 +22,8 @@
 namespace ceditor::host
 {
 
-class HostRuntimeShell final : public juce::Component
+class HostRuntimeShell final : public juce::Component,
+                               private juce::Timer
 {
 public:
     HostRuntimeShell();
@@ -31,6 +32,9 @@ public:
     void resized() override;
 
 private:
+    // The UI-rate pump for parameter deltas: vendor edits land on audio-thread listeners in
+    // the service, and this drains them to the runtime page.
+    void timerCallback() override;
     void emitToWebView (const juce::String& eventName, const juce::var& payload);
 
     juce::AudioPluginFormatManager formatManager;

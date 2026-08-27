@@ -7,10 +7,12 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
     : options (std::move (optionsToUse))
 {
     // The pane's half of the editor-before-processor invariant: whatever path destroys an
-    // instrument, its editor is torn down first. Replacement re-shows afterwards (see the
-    // commit callback in requestInstrument).
+    // instrument, its editor is torn down first, and its parameter sync stops listening
+    // first too. Replacement re-shows and re-attaches afterwards (see the commit callback
+    // in requestInstrument).
     rack.onInstrumentWillBeRemoved = [this] (const juce::String& partId, juce::AudioProcessor&)
     {
+        partParameters.erase (partId);
         if (partId == editorPartId)
             hideEditor();
     };
@@ -304,6 +306,78 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "getParameters")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto it = partParameters.find (partId);
+        if (it == partParameters.end())
+        {
+            emitError ("That part has no instrument loaded.");
+            return;
+        }
+
+        const auto& processorParams = rack.getInstrument (partId)->getParameters();
+        juce::Array<juce::var> parameters;
+        for (const auto& d : it->second.inventory.descriptors)
+        {
+            auto* parameter = processorParams[d.index];
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("id",           d.definitionId);
+            obj->setProperty ("index",        d.index);
+            obj->setProperty ("name",         d.name);
+            obj->setProperty ("label",        d.label);
+            obj->setProperty ("group",        d.group);
+            obj->setProperty ("value",        parameter->getValue());
+            obj->setProperty ("text",         parameter->getCurrentValueAsText());
+            obj->setProperty ("defaultValue", d.defaultValue);
+            obj->setProperty ("numSteps",     d.numSteps);
+            obj->setProperty ("discrete",     d.discrete);
+            obj->setProperty ("boolean",      d.boolean);
+            obj->setProperty ("automatable",  d.automatable);
+            obj->setProperty ("meta",         d.metaParameter);
+            parameters.add (juce::var (obj));
+        }
+
+        juce::Array<juce::var> warnings;
+        for (const auto& w : it->second.inventory.warnings)
+            warnings.add (w);
+
+        auto* root = new juce::DynamicObject();
+        root->setProperty ("partId", partId);
+        root->setProperty ("parameters", parameters);
+        root->setProperty ("warnings", warnings);
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostParameters", juce::var (root));
+        return;
+    }
+
+    if (cmd == "setParameter" || cmd == "resetParameter"
+        || cmd == "beginParameterGesture" || cmd == "endParameterGesture")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto id = payload.getProperty ("id", {}).toString();
+
+        auto* parameter = resolveParameter (partId, id);
+        if (parameter == nullptr)
+        {
+            // A stale binding or a wrong-instance command is refused, never routed to some
+            // other parameter index (baseline §18.4.5).
+            emitError ("Unknown parameter " + id + " on that part.");
+            return;
+        }
+
+        if (cmd == "setParameter")
+            parameter->setValueNotifyingHost (
+                juce::jlimit (0.0f, 1.0f, (float) (double) payload.getProperty ("value", 0.0)));
+        else if (cmd == "resetParameter")
+            parameter->setValueNotifyingHost (parameter->getDefaultValue());
+        else if (cmd == "beginParameterGesture")
+            parameter->beginChangeGesture();
+        else
+            parameter->endChangeGesture();
+        return;
+    }
+
     if (cmd == "getHostProject")
     {
         ensureHostProject();
@@ -516,6 +590,8 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
                 return;
             }
 
+            attachParameters (partId);
+
             if (editorWasHere)
                 showEditorFor (partId);
 
@@ -699,6 +775,92 @@ void InstrumentHostService::restoreFromVar (const juce::var& state)
 
     savePerformance();
     emitState();
+}
+
+void InstrumentHostService::attachParameters (const juce::String& partId)
+{
+    auto* instrument = rack.getInstrument (partId);
+    if (instrument == nullptr)
+        return;
+
+    PartParameters entry;
+    entry.inventory = describeParameters (*instrument);
+    entry.sync = std::make_unique<PartParameterSync> (partId, *instrument);
+    partParameters[partId] = std::move (entry);
+}
+
+juce::AudioProcessorParameter* InstrumentHostService::resolveParameter (const juce::String& partId,
+                                                                        const juce::String& definitionId,
+                                                                        const ParameterDescriptor** descriptorOut)
+{
+    const auto it = partParameters.find (partId);
+    if (it == partParameters.end())
+        return nullptr;
+
+    const auto* descriptor = it->second.inventory.find (definitionId);
+    if (descriptor == nullptr)
+        return nullptr;
+
+    if (descriptorOut != nullptr)
+        *descriptorOut = descriptor;
+    return rack.getInstrument (partId)->getParameters()[descriptor->index];
+}
+
+void InstrumentHostService::drainParameterEvents()
+{
+    for (auto& [partId, part] : partParameters)
+    {
+        juce::SortedSet<int> changed;
+        juce::Array<PartParameterSync::Gesture> gestures;
+        if (! part.sync->drain (changed, gestures))
+            continue;
+
+        const auto& processorParams = rack.getInstrument (partId)->getParameters();
+        const auto idFor = [&part] (int index) -> juce::String
+        {
+            for (const auto& d : part.inventory.descriptors)
+                if (d.index == index)
+                    return d.definitionId;
+            return {};
+        };
+
+        juce::Array<juce::var> changes;
+        for (const auto index : changed)
+        {
+            auto* parameter = processorParams[index];
+            const auto id = idFor (index);
+            if (parameter == nullptr || id.isEmpty())
+                continue;
+
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("id",    id);
+            obj->setProperty ("value", parameter->getValue());
+            obj->setProperty ("text",  parameter->getCurrentValueAsText());
+            changes.add (juce::var (obj));
+        }
+
+        juce::Array<juce::var> gestureEvents;
+        for (const auto& gesture : gestures)
+        {
+            const auto id = idFor (gesture.index);
+            if (id.isEmpty())
+                continue;
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("id",    id);
+            obj->setProperty ("phase", gesture.begin ? "begin" : "end");
+            gestureEvents.add (juce::var (obj));
+        }
+
+        if (changes.isEmpty() && gestureEvents.isEmpty())
+            continue;
+
+        auto* root = new juce::DynamicObject();
+        root->setProperty ("partId",   partId);
+        root->setProperty ("changes",  changes);
+        root->setProperty ("gestures", gestureEvents);
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostParamValues", juce::var (root));
+    }
 }
 
 void InstrumentHostService::setEditorPaneHooks (EditorPaneHooks hooks)

@@ -14,13 +14,20 @@
 namespace ceditor::test
 {
 
-struct StubSynthProcessor final : juce::AudioProcessor
+struct StubSynthProcessor : juce::AudioProcessor
 {
     explicit StubSynthProcessor (float ampToUse = 0.25f)
         : juce::AudioProcessor (BusesProperties()
                                     .withOutput ("Out", juce::AudioChannelSet::stereo(), true)),
           amp (ampToUse)
     {
+        // Three host-visible parameters, one per shape the Stage 2 registry classifies —
+        // continuous, discrete choice, boolean — with real paramIDs the way hosted VST3
+        // parameters carry them (AudioProcessorParameterWithID).
+        addParameter (cutoff = new juce::AudioParameterFloat ({ "cutoff", 1 }, "Cutoff", 0.0f, 1.0f, 0.5f));
+        addParameter (wave = new juce::AudioParameterChoice ({ "wave", 1 }, "Wave",
+                                                             { "Saw", "Square", "Sine" }, 0));
+        addParameter (drive = new juce::AudioParameterBool ({ "drive", 1 }, "Drive", false));
     }
 
     void prepareToPlay (double sampleRate, int) override   { preparedRate = sampleRate; }
@@ -80,6 +87,9 @@ struct StubSynthProcessor final : juce::AudioProcessor
     }
 
     float amp;
+    juce::AudioParameterFloat* cutoff = nullptr;   // owned by the AudioProcessor base
+    juce::AudioParameterChoice* wave = nullptr;
+    juce::AudioParameterBool* drive = nullptr;
     int patch = 0;
     int activeNotes = 0;
     double preparedRate = 0.0;

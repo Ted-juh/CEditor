@@ -5,6 +5,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "PluginScannerCoordinator.h"
 #include "InstrumentRackHost.h"
+#include "ParameterModel.h"
 
 // InstrumentHostService — the instrument host behind one bridge event (VIP-successor Stage 1).
 //
@@ -40,6 +41,13 @@
 //     (both project commands answer with instrumentHostProject; the appId is minted once and
 //      never writable from the page — installer identity survives every rename. Building goes
 //      through Options::runBuild; without the hook the command refuses aloud.)
+//   getParameters {partId} | setParameter {partId,id,value} | resetParameter {partId,id}
+//   beginParameterGesture {partId,id} | endParameterGesture {partId,id}
+//     (the Stage 2 parameter model: getParameters answers with instrumentHostParameters —
+//      the part's full registry with live values; vendor-editor edits arrive as coalesced
+//      instrumentHostParamValues deltas whenever the owner pumps drainParameterEvents().
+//      Addresses are partId + the plug-in's own parameter ID, never display names; a wrong
+//      part or unknown ID refuses instead of writing to an arbitrary index.)
 //
 // THE EDITOR PANE is presentation the service commands but does not own: Options::editorPane
 // carries show/hide hooks into the native PluginEditorHost (stubs in tests). The service owns
@@ -175,6 +183,13 @@ public:
         and survived. */
     void reassertEditorPane();
 
+    /** Controlling thread. Drains every part's parameter-change marks (vendor editors and
+        automation report through listeners that may fire on the audio thread) and emits one
+        coalesced instrumentHostParamValues per part that changed — current value and text,
+        read now, not whatever the callback once saw. The owner pumps this from a UI-rate
+        timer; tests call it directly. */
+    void drainParameterEvents();
+
 private:
     struct ClassInfoForCommit
     {
@@ -189,6 +204,10 @@ private:
     void runScanNow();
     void restoreSessionImpl (bool includePerformance);
     void ensureHostProject();
+    void attachParameters (const juce::String& partId);
+    juce::AudioProcessorParameter* resolveParameter (const juce::String& partId,
+                                                     const juce::String& definitionId,
+                                                     const ParameterDescriptor** descriptorOut = nullptr);
     void emitHostProject();
     void requestInstrument (const juce::String& partId, const juce::String& ceId);
     void showEditorFor (const juce::String& partId);
@@ -222,6 +241,16 @@ private:
     bool sessionRestored = false;
     juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask
     bool hostProjectLoaded = false;
+
+    // The Stage 2 registry, per part with a live instrument: descriptors plus the RT-safe
+    // change listener. Attached on every successful commit, dropped from the same rack hook
+    // that hides the editor — the sync must stop listening before its processor dies.
+    struct PartParameters
+    {
+        ParameterInventory inventory;
+        std::unique_ptr<PartParameterSync> sync;
+    };
+    std::map<juce::String, PartParameters> partParameters;
 
     // Declared after the rack so destruction stops them first; stopAudio() in the destructor
     // detaches the callbacks before the graph they drive goes down.

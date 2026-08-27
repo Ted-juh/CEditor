@@ -576,6 +576,125 @@ void testWrapperContext()
     }
 }
 
+// The Stage 2 parameter model: one registry per loaded instrument, addressed by the plug-in's
+// own parameter IDs, with the bidirectional path — CEditor writes through the host-safe API,
+// vendor-side edits arrive as coalesced deltas through drainParameterEvents. Two instances of
+// one class must stay distinct, and a stale address must refuse rather than hit index zero.
+void testParameterModel()
+{
+    std::cout << "\nparameter model" << std::endl;
+
+    const auto dir = freshDataDir ("params");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("addPart");
+    const auto partA = h.partIdAt (0), partB = h.partIdAt (1);
+    h.cmd ("loadInstrument", { { "partId", partA }, { "ceId", "VST3-good-synth" } });
+    auto* stubA = h.lastStub;
+    h.cmd ("loadInstrument", { { "partId", partB }, { "ceId", "VST3-good-synth" } });
+    auto* stubB = h.lastStub;
+
+    h.emits.clear();
+    h.cmd ("getParameters", { { "partId", partA } });
+    const auto& reply = h.emits.entries.back();
+    check (reply.name == "instrumentHostParameters"
+             && reply.payload.getProperty ("partId", {}).toString() == partA,
+           "getParameters answers with the part's registry");
+    const auto params = reply.payload.getProperty ("parameters", {});
+    check (params.size() == 3, "every host-visible parameter is listed");
+    check (params[0].getProperty ("id", {}).toString() == "cutoff"
+             && ! (bool) params[0].getProperty ("discrete", true),
+           "the plug-in's own paramID is the address, continuous classified");
+    check (params[1].getProperty ("id", {}).toString() == "wave"
+             && (bool) params[1].getProperty ("discrete", false)
+             && (int) params[1].getProperty ("numSteps", 0) == 3,
+           "a choice parameter reads as discrete with its step count");
+    check (params[2].getProperty ("id", {}).toString() == "drive"
+             && (bool) params[2].getProperty ("boolean", false),
+           "a boolean parameter says so");
+    check (params[0].getProperty ("text", {}).toString().isNotEmpty(),
+           "and values arrive formatted");
+
+    h.cmd ("setParameter", { { "partId", partA }, { "id", "cutoff" }, { "value", 0.8 } });
+    check (juce::approximatelyEqual (stubA->cutoff->get(), 0.8f),
+           "setParameter reaches the processor through the host-safe API");
+    check (juce::approximatelyEqual (stubB->cutoff->get(), 0.5f),
+           "and the other instance of the same class is untouched");
+
+    // The vendor's editor half: a processor-side edit is only marks until the pump drains.
+    h.emits.clear();
+    stubB->cutoff->setValueNotifyingHost (0.25f);
+    h.service->drainParameterEvents();
+    bool sawDelta = false;
+    for (const auto& e : h.emits.entries)
+        if (e.name == "instrumentHostParamValues"
+            && e.payload.getProperty ("partId", {}).toString() == partB)
+            for (const auto& change : *e.payload.getProperty ("changes", {}).getArray())
+                if (change.getProperty ("id", {}).toString() == "cutoff"
+                    && juce::approximatelyEqual ((float) (double) change.getProperty ("value", 0.0), 0.25f))
+                    sawDelta = true;
+    check (sawDelta, "a vendor-side edit drains as a coalesced delta for its part");
+
+    h.emits.clear();
+    h.service->drainParameterEvents();
+    check (h.emits.count ("instrumentHostParamValues") == 0, "a quiet drain emits nothing");
+
+    h.cmd ("beginParameterGesture", { { "partId", partA }, { "id", "cutoff" } });
+    h.cmd ("endParameterGesture", { { "partId", partA }, { "id", "cutoff" } });
+    h.emits.clear();
+    h.service->drainParameterEvents();
+    bool sawGestures = false;
+    for (const auto& e : h.emits.entries)
+        if (e.name == "instrumentHostParamValues")
+        {
+            const auto gestures = e.payload.getProperty ("gestures", {});
+            sawGestures = gestures.size() == 2
+                            && gestures[0].getProperty ("phase", {}).toString() == "begin"
+                            && gestures[1].getProperty ("phase", {}).toString() == "end";
+        }
+    check (sawGestures, "gesture boundaries ride along in order");
+
+    h.cmd ("resetParameter", { { "partId", partA }, { "id", "cutoff" } });
+    check (juce::approximatelyEqual (stubA->cutoff->get(), 0.5f), "resetParameter restores the default");
+
+    h.emits.clear();
+    h.cmd ("setParameter", { { "partId", partA }, { "id", "no-such-param" }, { "value", 1.0 } });
+    check (h.emits.lastError().contains ("Unknown parameter"),
+           "a stale address refuses instead of writing to an arbitrary index");
+    check (juce::approximatelyEqual (stubA->cutoff->get(), 0.5f)
+             && ! stubA->drive->get(),
+           "and nothing moved");
+
+    h.cmd ("unloadInstrument", { { "partId", partB } });
+    h.emits.clear();
+    h.cmd ("getParameters", { { "partId", partB } });
+    check (h.emits.lastError().contains ("no instrument"), "an unloaded part has no registry");
+    h.service->drainParameterEvents();   // and draining after the detach must not crash
+
+    // Duplicate parameter IDs get unique addresses and a recorded warning, not silence.
+    struct DupParamSynth : StubSynthProcessor
+    {
+        DupParamSynth()
+        {
+            addParameter (new juce::AudioParameterFloat ({ "dup", 1 }, "Dup A", 0.0f, 1.0f, 0.0f));
+            addParameter (new juce::AudioParameterFloat ({ "dup", 1 }, "Dup B", 0.0f, 1.0f, 0.0f));
+        }
+    };
+    DupParamSynth duplicated;
+    const auto inventory = ceditor::host::describeParameters (duplicated);
+    check (! inventory.warnings.isEmpty(), "duplicate parameter IDs are warned about");
+    juce::StringArray ids;
+    for (const auto& d : inventory.descriptors)
+        ids.add (d.definitionId);
+    check (ids.size() == 5 && ! ids.contains (juce::String()),
+           "and every parameter still gets a unique, non-empty address");
+    juce::StringArray sorted = ids;
+    sorted.removeDuplicates (false);
+    check (sorted.size() == ids.size(), "no two parameters share one address");
+}
+
 // The factory Performance: the authored rack ships beside the generated binaries, and a
 // product boots as that rack — until something newer exists. The standalone's own session
 // outranks it; the outer VST3's DAW chunk replaces it without ever booting it first.
@@ -812,6 +931,7 @@ int main (int argc, char* argv[])
     testEditorPolicy();
     testScan (stubWorker);
     testWrapperContext();
+    testParameterModel();
     testFactoryPerformance();
     testScanFolderBrowseAndModuleProjection();
     testHostProject();

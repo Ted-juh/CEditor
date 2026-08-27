@@ -91,14 +91,22 @@ HostRuntimeShell::HostRuntimeShell()
     }
 
     setSize (1100, 700);
+    startTimerHz (30);
 }
 
 HostRuntimeShell::~HostRuntimeShell()
 {
+    stopTimer();
     // The pane member is destroyed before the service either way; unhooking first just makes
     // sure nothing the service does during its own teardown reaches a half-dead pane.
     if (service != nullptr)
         service->setEditorPaneHooks ({});
+}
+
+void HostRuntimeShell::timerCallback()
+{
+    if (service != nullptr)
+        service->drainParameterEvents();
 }
 
 void HostRuntimeShell::emitToWebView (const juce::String& eventName, const juce::var& payload)
