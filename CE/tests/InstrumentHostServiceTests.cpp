@@ -141,6 +141,13 @@ struct Harness
                 callback (nullptr, "stub refused");
                 return;
             }
+            if (descriptionXml.contains ("Reverb"))
+            {
+                auto fx = std::make_unique<ceditor::test::StubEffectProcessor>();
+                lastEffectStub = fx.get();
+                callback (std::move (fx), {});
+                return;
+            }
             auto stub = std::make_unique<StubSynthProcessor>();
             lastStub = stub.get();
             callback (std::move (stub), {});
@@ -205,6 +212,7 @@ struct Harness
     double lastSampleRate = 0.0;
     int instantiateCount = 0;
     StubSynthProcessor* lastStub = nullptr;
+    ceditor::test::StubEffectProcessor* lastEffectStub = nullptr;
     bool failInstantiation = false;
     bool deferCallbacks = false;
     bool captureScanBody = false;
@@ -597,6 +605,19 @@ void seedTwoSynthCatalog (const juce::File& dataDir)
         catalog.commitScanResult (module);
     }
 
+    // One effect class beside them — the Stage 5 chains need something non-instrument.
+    ModuleScanResult fx;
+    fx.modulePath = "C:\\VST3\\FX.vst3";
+    fx.fingerprint = "fp-fx";
+    PluginClassRecord reverb;
+    reverb.ceId = "VST3-nice-reverb";
+    reverb.name = "Nice Reverb";
+    reverb.vendor = "Test Audio";
+    reverb.isInstrument = false;
+    reverb.descriptionXml = "<PLUGIN name=\"Nice Reverb\" ceId=\"VST3-nice-reverb\"/>";
+    fx.classes.add (reverb);
+    catalog.commitScanResult (fx);
+
     catalog.saveTo (dataDir.getChildFile ("plugin-catalog.json"));
 }
 
@@ -813,6 +834,177 @@ void testParameterModel()
     juce::StringArray sorted = ids;
     sorted.removeDuplicates (false);
     check (sorted.size() == ids.size(), "no two parameters share one address");
+}
+
+// Stage 5: insert chains, the master chain, and macros — all in the one graph and the one
+// parameter path. The stub effect halves the signal, so presence, order, bypass and removal
+// are amplitude ratios; identities, registries and editors follow the instrument rules.
+void testEffectsAndMacros()
+{
+    std::cout << "\neffects and macros" << std::endl;
+
+    const auto dir = freshDataDir ("effects");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* synth = h.lastStub;
+
+    const auto peak = [&h]
+    {
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer midi;
+        midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        float highest = 0.0f;
+        for (int i = 0; i < 3; ++i)
+        {
+            buffer.clear();
+            h.service->getGraph().processBlock (buffer, midi);
+            midi.clear();
+            highest = juce::jmax (highest, buffer.getMagnitude (0, 512));
+        }
+        juce::MidiBuffer off;
+        off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+        buffer.clear();
+        h.service->getGraph().processBlock (buffer, off);
+        return highest;
+    };
+    const auto roughly = [] (float value, float expected)
+    {
+        return std::abs (value - expected) <= expected * 0.05f + 1.0e-6f;
+    };
+
+    const auto* state = h.emits.lastState();
+    check (state->getProperty ("effectClasses", {}).size() == 1
+             && state->getProperty ("effectClasses", {})[0].getProperty ("name", {}).toString()
+                    == "Nice Reverb",
+           "the effect picker's projection lists the non-instrument class");
+    check (state->getProperty ("instruments", {}).size() == 2,
+           "and the instrument browser still does not");
+
+    const auto baseline = peak();
+    check (baseline > 0.01f, "the dry part makes sound to begin with");
+
+    // The insert chain: audibly in the path, ordered, bypassable, removable.
+    h.cmd ("addEffect", { { "chainId", partId }, { "ceId", "VST3-nice-reverb" } });
+    state = h.emits.lastState();
+    const auto partEffects = state->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                                 .getProperty ("effects", {});
+    check (partEffects.size() == 1
+             && (bool) partEffects[0].getProperty ("hasProcessor", false)
+             && partEffects[0].getProperty ("pluginName", {}).toString() == "Nice Reverb",
+           "an added insert commits into the part's chain");
+    const auto insertId = partEffects[0].getProperty ("effectId", {}).toString();
+    auto* insertFx = h.lastEffectStub;
+    check (roughly (peak(), baseline * 0.5f), "and the signal now runs through it");
+
+    h.cmd ("addEffect", { { "chainId", "master" }, { "ceId", "VST3-nice-reverb" } });
+    state = h.emits.lastState();
+    check (state->getProperty ("rack", {}).getProperty ("masterEffects", {}).size() == 1,
+           "the master chain takes effects too");
+    check (roughly (peak(), baseline * 0.25f), "and every part runs through the master chain");
+
+    h.cmd ("setEffectBypassed", { { "effectId", insertId }, { "bypassed", true } });
+    check (roughly (peak(), baseline * 0.5f), "a bypassed insert passes through");
+    h.cmd ("setEffectBypassed", { { "effectId", insertId }, { "bypassed", false } });
+    check (roughly (peak(), baseline * 0.25f), "and comes back");
+
+    // The effect is a first-class parameter target: registry, direct writes, page slots.
+    h.emits.clear();
+    h.cmd ("getParameters", { { "partId", insertId } });
+    const auto& registry = h.emits.entries.back();
+    check (registry.name == "instrumentHostParameters"
+             && registry.payload.getProperty ("parameters", {})[0].getProperty ("id", {}).toString() == "wet",
+           "an effect registers in the same parameter model");
+    h.cmd ("setParameter", { { "partId", insertId }, { "id", "wet" }, { "value", 0.3 } });
+    check (juce::approximatelyEqual (insertFx->wet->get(), 0.3f),
+           "setParameter reaches the effect");
+
+    h.cmd ("addControlPage", { { "name", "Mix" } });
+    const auto pageId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[0]
+                            .getProperty ("pageId", {}).toString();
+    h.cmd ("assignControlSlot", { { "pageId", pageId }, { "slotId", "s1" },
+                                  { "partId", insertId }, { "parameterId", "wet" } });
+    h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "s1" }, { "value", 0.9 } });
+    check (juce::approximatelyEqual (insertFx->wet->get(), 0.9f),
+           "a page slot drives an effect parameter like any other");
+
+    // The editor pane hosts effects through the same policy.
+    h.cmd ("openEffectEditor", { { "effectId", insertId } });
+    check (! h.paneLog.empty() && h.paneLog.back() == "show:" + insertId + ":Nice Reverb",
+           "the effect's editor shows in the shared pane");
+    h.lastEffectStub->tone = 7;   // the master effect (latest instantiated) carries state
+    h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 1.0 } });   // persists everything
+
+    h.cmd ("removeEffect", { { "effectId", insertId } });
+    check (h.paneLog.back() == "hide", "removing the shown effect hides its editor first");
+    check (roughly (peak(), baseline * 0.5f), "and the chain heals around the gap");
+    h.emits.clear();
+    h.cmd ("getParameters", { { "partId", insertId } });
+    check (h.emits.lastError().isNotEmpty(), "its registry died with it");
+
+    // Macros: one value fanning across two instances through the central path.
+    h.cmd ("addPart");
+    const auto partB = h.partIdAt (1);
+    h.cmd ("loadInstrument", { { "partId", partB }, { "ceId", "VST3-good-synth" } });
+    auto* synthB = h.lastStub;
+
+    h.cmd ("addMacro", { { "name", "Brightness" } });
+    const auto macroId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0]
+                             .getProperty ("macroId", {}).toString();
+    h.cmd ("addMacroTarget", { { "macroId", macroId }, { "targetId", partId }, { "parameterId", "cutoff" } });
+    h.cmd ("addMacroTarget", { { "macroId", macroId }, { "targetId", partB }, { "parameterId", "cutoff" } });
+    h.cmd ("setMacroTargetOptions", { { "macroId", macroId }, { "targetId", partB },
+                                      { "parameterId", "cutoff" }, { "inverted", true } });
+
+    h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.25 }, { "final", true } });
+    check (juce::approximatelyEqual (synth->cutoff->get(), 0.25f)
+             && juce::approximatelyEqual (synthB->cutoff->get(), 0.75f),
+           "one macro moves several instances, each through its own mapping");
+
+    h.cmd ("loadInstrument", { { "partId", partB }, { "ceId", "VST3-other-synth" } });
+    auto* otherB = h.lastStub;
+    const auto macroRow = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0];
+    check ((bool) macroRow.getProperty ("targets", {})[0].getProperty ("resolved", false)
+             && ! (bool) macroRow.getProperty ("targets", {})[1].getProperty ("resolved", true),
+           "a retargeted part turns its macro target unresolved, not silently rerouted");
+    const auto before = otherB->cutoff->get();
+    h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 1.0 }, { "final", true } });
+    check (juce::approximatelyEqual (synth->cutoff->get(), 1.0f)
+             && juce::approximatelyEqual (otherB->cutoff->get(), before),
+           "the macro keeps driving resolved targets and skips the unresolved one");
+}
+
+// The enriched Performance round trip: chains, bypass flags, effect state and macros come
+// back through the same session path everything else uses.
+void testEnrichedPerformanceRestore()
+{
+    std::cout << "\nenriched performance restore" << std::endl;
+
+    // Continues the previous test's session — the same directory WITHOUT the fresh wipe.
+    const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                         .getChildFile ("ceditor-host-service-tests").getChildFile ("effects");
+    Harness h (dir);
+    h.cmd ("getState");
+
+    const auto* state = h.emits.lastState();
+    const auto part = state->getProperty ("rack", {}).getProperty ("parts", {})[0];
+    check (state->getProperty ("rack", {}).getProperty ("masterEffects", {}).size() == 1
+             && (bool) state->getProperty ("rack", {}).getProperty ("masterEffects", {})[0]
+                    .getProperty ("hasProcessor", false),
+           "the master chain restores with its processor");
+    check (part.getProperty ("effects", {}).size() == 0,
+           "and the removed insert stays removed");
+    check (h.lastEffectStub != nullptr && h.lastEffectStub->tone == 7,
+           "effect state rides the manifest like instrument state");
+
+    const auto macros = state->getProperty ("rack", {}).getProperty ("macros", {});
+    check (macros.size() == 1
+             && macros[0].getProperty ("targets", {}).size() == 2
+             && juce::approximatelyEqual ((float) (double) macros[0].getProperty ("value", 0.0), 1.0f),
+           "macros restore with their targets and value");
 }
 
 // The Stage 4 library: one index, explicit provenance, loading only ever through Stage 1's
@@ -1387,6 +1579,8 @@ int main (int argc, char* argv[])
     testParameterModel();
     testControlPages();
     testAutoPagesAndSurfaceRuntime();
+    testEffectsAndMacros();
+    testEnrichedPerformanceRestore();
     testLibrary();
     testFactoryPerformance();
     testScanFolderBrowseAndModuleProjection();

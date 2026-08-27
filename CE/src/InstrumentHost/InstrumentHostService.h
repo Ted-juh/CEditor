@@ -62,6 +62,20 @@
 //      through Options::applyVstPreset after the normal commit; a rack record restores
 //      through the same path the session file uses, degraded-but-loud when classes are
 //      missing. Vendor rescans never touch favourites, notes or captured records.)
+//   addEffect {chainId,ceId} | removeEffect {effectId} | moveEffect {effectId,index}
+//   setEffectBypassed {effectId,bypassed} | openEffectEditor {effectId}
+//     (Stage 5 insert chains: chainId is a partId or "master". Effects load through the same
+//      prime/begin/commit transaction as instruments, show in the same editor pane, register
+//      in the same parameter model — their targetId is the effectId wherever a partId is
+//      accepted: getParameters, setParameter, page-slot and macro assignment.)
+//   addMacro {name?} | removeMacro {macroId} | renameMacro {macroId,name}
+//   setMacroValue {macroId,value,final?} | addMacroTarget {macroId,targetId,parameterId}
+//   removeMacroTarget {macroId,targetId,parameterId}
+//   setMacroTargetOptions {macroId,targetId,parameterId, rangeMin?,rangeMax?,inverted?}
+//     (a macro fans one 0..1 value into several parameter addresses through the SAME write
+//      path as everything else — mapped per target, gesture-wrapped, unresolved targets
+//      skipped and shown. `final:true` persists and re-announces state; drags without it
+//      stay cheap.)
 //   assignControlSlot {pageId,slotId,partId,parameterId} | clearControlSlot {pageId,slotId}
 //   setControlSlotOptions {pageId,slotId, rangeMin?,rangeMax?,inverted?,bipolar?,label?}
 //   setControlSlotValue {pageId,slotId,value}
@@ -273,6 +287,16 @@ private:
     void loadRackRecord (const LibraryRecord& record);
     void attachParameters (const juce::String& partId);
     void applyPerformance (Performance&& performance);
+    /** Mirrors requestInstrument for an effect slot, through the rack's effect transaction. */
+    void requestEffect (const juce::String& effectId, const juce::String& ceId);
+    /** The live processor behind any target id — a part's instrument or an effect. */
+    juce::AudioProcessor* targetProcessor (const juce::String& targetId) const;
+    /** The class identity any target currently carries (for binding capture/resolution). */
+    juce::String targetClassCeId (const juce::String& targetId) const;
+    juce::String targetDisplayName (const juce::String& targetId) const;
+    void showEditorForEffect (const juce::String& effectId);
+    /** Applies one macro's value to every resolved target through the parameter path. */
+    void applyMacroValue (const Macro& macro);
     juce::AudioProcessorParameter* resolveParameter (const juce::String& partId,
                                                      const juce::String& definitionId,
                                                      const ParameterDescriptor** descriptorOut = nullptr);
@@ -313,7 +337,7 @@ private:
     mutable std::mutex catalogLock;
     InstrumentRackHost rack;
     juce::StringArray userScanPaths;
-    juce::String editorPartId;      // the part whose editor the pane is showing, or empty
+    juce::String editorTargetId;      // the part whose editor the pane is showing, or empty
     bool sessionRestored = false;
     juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask
     bool hostProjectLoaded = false;

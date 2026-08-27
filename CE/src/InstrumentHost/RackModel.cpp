@@ -40,6 +40,52 @@ const ControlSlot* ControlPage::findSlot (const juce::String& slotId) const
     return const_cast<ControlPage*> (this)->findSlot (slotId);
 }
 
+// Effect chains serialize identically wherever they hang (a part or the master path), so the
+// shape lives in one pair of helpers.
+static juce::var effectsToVar (const juce::Array<EffectSlot>& effects)
+{
+    juce::Array<juce::var> out;
+    for (const auto& slot : effects)
+    {
+        auto* e = new juce::DynamicObject();
+        e->setProperty ("effectId",         slot.effectId);
+        e->setProperty ("pluginCeId",       slot.pluginCeId);
+        e->setProperty ("pluginModulePath", slot.pluginModulePath);
+        e->setProperty ("pluginName",       slot.pluginName);
+        e->setProperty ("pluginVendor",     slot.pluginVendor);
+        e->setProperty ("stateBlob",        slot.stateBlobBase64);
+        e->setProperty ("bypassed",         slot.bypassed);
+        out.add (juce::var (e));
+    }
+    return out;
+}
+
+static bool effectsFromVar (const juce::var& stored, juce::Array<EffectSlot>& out,
+                            juce::StringArray& seenEffectIds)
+{
+    const auto* array = stored.getArray();
+    if (array == nullptr)
+        return true;   // absent = an older document, loads clean
+
+    for (const auto& e : *array)
+    {
+        EffectSlot slot;
+        slot.effectId = e.getProperty ("effectId", {}).toString();
+        if (slot.effectId.isEmpty() || seenEffectIds.contains (slot.effectId))
+            return false;
+        seenEffectIds.add (slot.effectId);
+
+        slot.pluginCeId       = e.getProperty ("pluginCeId", {}).toString();
+        slot.pluginModulePath = e.getProperty ("pluginModulePath", {}).toString();
+        slot.pluginName       = e.getProperty ("pluginName", {}).toString();
+        slot.pluginVendor     = e.getProperty ("pluginVendor", {}).toString();
+        slot.stateBlobBase64  = e.getProperty ("stateBlob", {}).toString();
+        slot.bypassed         = (bool) e.getProperty ("bypassed", false);
+        out.add (std::move (slot));
+    }
+    return true;
+}
+
 Performance Performance::create()
 {
     Performance p;
@@ -103,6 +149,44 @@ int Performance::indexOfPart (const juce::String& partId) const
     return -1;
 }
 
+Macro* Performance::findMacro (const juce::String& macroId)
+{
+    for (auto& macro : macros)
+        if (macro.macroId == macroId)
+            return &macro;
+    return nullptr;
+}
+
+const Macro* Performance::findMacro (const juce::String& macroId) const
+{
+    return const_cast<Performance*> (this)->findMacro (macroId);
+}
+
+EffectSlot* Performance::findEffect (const juce::String& effectId, juce::String* chainIdOut)
+{
+    for (auto& part : parts)
+        for (auto& slot : part.effects)
+            if (slot.effectId == effectId)
+            {
+                if (chainIdOut != nullptr) *chainIdOut = part.partId;
+                return &slot;
+            }
+
+    for (auto& slot : masterEffects)
+        if (slot.effectId == effectId)
+        {
+            if (chainIdOut != nullptr) *chainIdOut = "master";
+            return &slot;
+        }
+
+    return nullptr;
+}
+
+const EffectSlot* Performance::findEffect (const juce::String& effectId, juce::String* chainIdOut) const
+{
+    return const_cast<Performance*> (this)->findEffect (effectId, chainIdOut);
+}
+
 ControlPage* Performance::findPage (const juce::String& pageId)
 {
     for (auto& page : pages)
@@ -141,6 +225,7 @@ juce::var Performance::toVar() const
         p->setProperty ("volume",           part.volume);
         p->setProperty ("pan",              part.pan);
         p->setProperty ("editorOpen",       part.editorOpen);
+        p->setProperty ("effects",          effectsToVar (part.effects));
         partVars.add (juce::var (p));
     }
 
@@ -172,11 +257,37 @@ juce::var Performance::toVar() const
         pageVars.add (juce::var (pg));
     }
 
+    juce::Array<juce::var> macroVars;
+    for (const auto& macro : macros)
+    {
+        juce::Array<juce::var> targetVars;
+        for (const auto& target : macro.targets)
+        {
+            auto* t = new juce::DynamicObject();
+            t->setProperty ("targetId",    target.partId);
+            t->setProperty ("pluginCeId",  target.pluginCeId);
+            t->setProperty ("parameterId", target.parameterId);
+            t->setProperty ("rangeMin",    target.rangeMin);
+            t->setProperty ("rangeMax",    target.rangeMax);
+            t->setProperty ("inverted",    target.inverted);
+            targetVars.add (juce::var (t));
+        }
+
+        auto* m = new juce::DynamicObject();
+        m->setProperty ("macroId", macro.macroId);
+        m->setProperty ("name",    macro.name);
+        m->setProperty ("value",   macro.value);
+        m->setProperty ("targets", targetVars);
+        macroVars.add (juce::var (m));
+    }
+
     auto* root = new juce::DynamicObject();
     root->setProperty ("performanceId", performanceId);
     root->setProperty ("name",          name);
     root->setProperty ("focusedPartId", focusedPartId);
     root->setProperty ("parts",         partVars);
+    root->setProperty ("masterEffects", effectsToVar (masterEffects));
+    root->setProperty ("macros",        macroVars);
     root->setProperty ("pages",         pageVars);
     return juce::var (root);
 }
@@ -237,6 +348,47 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
         part.editorOpen = (bool) p.getProperty ("editorOpen", false);
 
         parsed.parts.add (std::move (part));
+    }
+
+    // Effect identities follow the part rules: empty or duplicated ids (across every chain)
+    // fail the load; an absent array is a pre-Stage-5 document and loads clean.
+    juce::StringArray seenEffectIds;
+    for (int i = 0; i < parsed.parts.size(); ++i)
+        if (! effectsFromVar ((*partArray)[i].getProperty ("effects", {}),
+                              parsed.parts.getReference (i).effects, seenEffectIds))
+            return false;
+    if (! effectsFromVar (stored.getProperty ("masterEffects", {}), parsed.masterEffects, seenEffectIds))
+        return false;
+
+    if (const auto* macroArray = stored.getProperty ("macros", {}).getArray())
+    {
+        juce::StringArray seenMacroIds;
+        for (const auto& m : *macroArray)
+        {
+            Macro macro;
+            macro.macroId = m.getProperty ("macroId", {}).toString();
+            if (macro.macroId.isEmpty() || seenMacroIds.contains (macro.macroId))
+                return false;
+            seenMacroIds.add (macro.macroId);
+
+            macro.name  = m.getProperty ("name", {}).toString();
+            macro.value = floatOf (m, "value", 0.0f, 0.0f, 1.0f);
+
+            if (const auto* targetArray = m.getProperty ("targets", {}).getArray())
+                for (const auto& t : *targetArray)
+                {
+                    ControlBinding target;
+                    target.partId      = t.getProperty ("targetId", {}).toString();
+                    target.pluginCeId  = t.getProperty ("pluginCeId", {}).toString();
+                    target.parameterId = t.getProperty ("parameterId", {}).toString();
+                    target.rangeMin    = floatOf (t, "rangeMin", 0.0f, 0.0f, 1.0f);
+                    target.rangeMax    = floatOf (t, "rangeMax", 1.0f, 0.0f, 1.0f);
+                    target.inverted    = (bool) t.getProperty ("inverted", false);
+                    macro.targets.add (std::move (target));
+                }
+
+            parsed.macros.add (std::move (macro));
+        }
     }
 
     if (parsed.focusedPartId.isNotEmpty() && parsed.indexOfPart (parsed.focusedPartId) < 0)

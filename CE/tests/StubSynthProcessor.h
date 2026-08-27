@@ -101,4 +101,64 @@ struct StubSynthProcessor : juce::AudioProcessor
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StubSynthProcessor)
 };
 
+// StubEffectProcessor — the test insert effect (Stage 5): stereo in/out, multiplies the
+// signal by a fixed factor so chain order and presence become amplitude assertions, one
+// parameter for registry/binding coverage, one int of state for capture round trips.
+struct StubEffectProcessor : juce::AudioProcessor
+{
+    explicit StubEffectProcessor (float factorToUse = 0.5f)
+        : juce::AudioProcessor (BusesProperties()
+                                    .withInput ("In", juce::AudioChannelSet::stereo(), true)
+                                    .withOutput ("Out", juce::AudioChannelSet::stereo(), true)),
+          factor (factorToUse)
+    {
+        addParameter (wet = new juce::AudioParameterFloat ({ "wet", 1 }, "Wet", 0.0f, 1.0f, 1.0f));
+    }
+
+    void prepareToPlay (double, int) override {}
+    void releaseResources() override {}
+
+    void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer&) override
+    {
+        audio.applyGain (factor);
+    }
+
+    void getStateInformation (juce::MemoryBlock& dest) override
+    {
+        juce::MemoryOutputStream stream (dest, false);
+        stream.writeInt (tone);
+    }
+
+    void setStateInformation (const void* data, int size) override
+    {
+        if (size >= 4)
+            tone = juce::MemoryInputStream (data, (size_t) size, false).readInt();
+    }
+
+    const juce::String getName() const override               { return "Stub Effect"; }
+    bool acceptsMidi() const override                         { return false; }
+    bool producesMidi() const override                        { return false; }
+    double getTailLengthSeconds() const override              { return 0.0; }
+    juce::AudioProcessorEditor* createEditor() override       { return nullptr; }
+    bool hasEditor() const override                           { return false; }
+    int getNumPrograms() override                             { return 1; }
+    int getCurrentProgram() override                          { return 0; }
+    void setCurrentProgram (int) override                     {}
+    const juce::String getProgramName (int) override          { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+
+    ~StubEffectProcessor() override
+    {
+        if (destroyedFlag != nullptr)
+            *destroyedFlag = true;
+    }
+
+    float factor;
+    juce::AudioParameterFloat* wet = nullptr;
+    int tone = 0;
+    std::shared_ptr<bool> destroyedFlag;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StubEffectProcessor)
+};
+
 } // namespace ceditor::test

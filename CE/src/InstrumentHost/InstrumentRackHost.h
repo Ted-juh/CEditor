@@ -65,6 +65,39 @@ public:
     bool movePart (const juce::String& partId, int newIndex);
     bool focusPart (const juce::String& partId);
 
+    // -- insert-effect chains (Stage 5) -------------------------------------------------
+    // Serial pre-fader inserts per part (instrument → fx… → gain) and a master chain (every
+    // part's gain → mfx… → output), all in the ONE graph Stage 1 built. Effects follow the
+    // instrument's rules exactly: minted stable ids, the same prime/begin/commit load
+    // transaction with generation tickets, blob restore on identity match, and the
+    // will-be-removed hook fired (with the effectId) before any live node dies.
+
+    static constexpr const char* masterChainId = "master";
+
+    /** Appends an empty slot to a part's chain or (chainId=="master") the master chain and
+        returns its minted effectId — empty for an unknown chain. */
+    juce::String addEffectSlot (const juce::String& chainId);
+    bool removeEffectSlot (const juce::String& effectId);
+    /** Reorders within its own chain; identities and nodes stay put. */
+    bool moveEffectSlot (const juce::String& effectId, int newIndex);
+    bool setEffectBypassed (const juce::String& effectId, bool bypassed);
+    /** Document-only identity/state priming, like primePartState. */
+    bool primeEffectSlot (const juce::String& effectId, const ClassInfo& info,
+                          const juce::String& stateBlobBase64);
+    int  beginEffectLoad (const juce::String& effectId);
+    bool commitEffectLoad (const juce::String& effectId, int generation,
+                           std::unique_ptr<juce::AudioProcessor> effect, const ClassInfo& info);
+    juce::AudioProcessor* getEffect (const juce::String& effectId) const;
+    bool effectHasProcessor (const juce::String& effectId) const;
+
+    // -- macros (Stage 5) ---------------------------------------------------------------
+    // Model-only, like pages: a macro is stored fan-out; the writes go through the service's
+    // parameter path, never through the graph.
+    juce::String addMacro (const juce::String& name);
+    bool removeMacro (const juce::String& macroId);
+    /** Mutable access for the service's target edits; nullptr for an unknown macro. */
+    Macro* findMutableMacro (const juce::String& macroId)   { return model.findMacro (macroId); }
+
     // -- control pages (Stage 2) --------------------------------------------------------
     // Model-only: pages bind control slots to parameter addresses and never touch the
     // graph. They live on the Performance so they persist and travel with the rack.
@@ -150,17 +183,32 @@ private:
         int loadGeneration = 0;
     };
 
+    struct LiveEffect
+    {
+        juce::AudioProcessorGraph::Node::Ptr node;   // null while loading or unresolved
+        int loadGeneration = 0;
+    };
+
     LivePart* findLive (const juce::String& partId);
     const LivePart* findLive (const juce::String& partId) const;
     void notifyInstrumentWillBeRemoved (const juce::String& partId, const LivePart& lp);
+    void destroyEffectNode (const juce::String& effectId);
     void createLiveNodes (const RackPart& part);
-    void connectInstrument (LivePart& live);
     void applyPartToLive (const RackPart& part, LivePart& live);
     void applyMixerState();
     void refreshStateBlob (RackPart& part);
+    void refreshEffectBlobs (juce::Array<EffectSlot>& effects);
+    /** Stereo-adapting hop: mono fans out, stereo folds into mono, sums where several
+        sources meet one input. */
+    void connectAudio (juce::AudioProcessorGraph::Node* from, juce::AudioProcessorGraph::Node* to);
+    /** Drops every audio connection and rebuilds the whole path — per-part chains into the
+        gains, gains through the master chain into the output. All the audio topology in one
+        place, so an edit anywhere cannot leave a stale wire somewhere else. */
+    void rewireAudio();
 
     Performance model;
     std::map<juce::String, LivePart> live;
+    std::map<juce::String, LiveEffect> liveEffects;   // keyed by effectId, both chains
     juce::AudioProcessorGraph graph;
     juce::AudioProcessorGraph::Node::Ptr midiInNode, audioOutNode;
     double currentSampleRate = 44100.0;

@@ -38,6 +38,169 @@ juce::String InstrumentRackHost::addPart()
     return partId;
 }
 
+juce::String InstrumentRackHost::addEffectSlot (const juce::String& chainId)
+{
+    juce::Array<EffectSlot>* chain = nullptr;
+    if (chainId == masterChainId)
+        chain = &model.masterEffects;
+    else if (auto* part = model.findPart (chainId))
+        chain = &part->effects;
+
+    if (chain == nullptr)
+        return {};
+
+    EffectSlot slot;
+    slot.effectId = juce::Uuid().toDashedString();
+    const auto effectId = slot.effectId;
+    chain->add (std::move (slot));
+    return effectId;
+}
+
+void InstrumentRackHost::destroyEffectNode (const juce::String& effectId)
+{
+    if (const auto it = liveEffects.find (effectId); it != liveEffects.end())
+    {
+        if (it->second.node != nullptr)
+        {
+            if (onInstrumentWillBeRemoved != nullptr)
+                onInstrumentWillBeRemoved (effectId, *it->second.node->getProcessor());
+            graph.removeNode (it->second.node->nodeID);
+        }
+        liveEffects.erase (it);
+    }
+}
+
+bool InstrumentRackHost::removeEffectSlot (const juce::String& effectId)
+{
+    juce::String chainId;
+    if (model.findEffect (effectId, &chainId) == nullptr)
+        return false;
+
+    destroyEffectNode (effectId);
+
+    auto& chain = chainId == masterChainId ? model.masterEffects
+                                           : model.findPart (chainId)->effects;
+    for (int i = 0; i < chain.size(); ++i)
+        if (chain.getReference (i).effectId == effectId)
+        {
+            chain.remove (i);
+            break;
+        }
+
+    rewireAudio();
+    return true;
+}
+
+bool InstrumentRackHost::moveEffectSlot (const juce::String& effectId, int newIndex)
+{
+    juce::String chainId;
+    if (model.findEffect (effectId, &chainId) == nullptr)
+        return false;
+
+    auto& chain = chainId == masterChainId ? model.masterEffects
+                                           : model.findPart (chainId)->effects;
+    for (int i = 0; i < chain.size(); ++i)
+        if (chain.getReference (i).effectId == effectId)
+        {
+            chain.move (i, juce::jlimit (0, chain.size() - 1, newIndex));
+            break;
+        }
+
+    rewireAudio();
+    return true;
+}
+
+bool InstrumentRackHost::setEffectBypassed (const juce::String& effectId, bool bypassed)
+{
+    auto* slot = model.findEffect (effectId);
+    if (slot == nullptr)
+        return false;
+
+    slot->bypassed = bypassed;
+    if (const auto it = liveEffects.find (effectId); it != liveEffects.end()
+                                                     && it->second.node != nullptr)
+        it->second.node->setBypassed (bypassed);
+    return true;
+}
+
+bool InstrumentRackHost::primeEffectSlot (const juce::String& effectId, const ClassInfo& info,
+                                          const juce::String& stateBlobBase64)
+{
+    auto* slot = model.findEffect (effectId);
+    if (slot == nullptr)
+        return false;
+
+    slot->pluginCeId       = info.ceId;
+    slot->pluginModulePath = info.modulePath;
+    slot->pluginName       = info.name;
+    slot->pluginVendor     = info.vendor;
+    slot->stateBlobBase64  = stateBlobBase64;
+    return true;
+}
+
+int InstrumentRackHost::beginEffectLoad (const juce::String& effectId)
+{
+    if (model.findEffect (effectId) == nullptr)
+        return 0;
+    return ++liveEffects[effectId].loadGeneration;
+}
+
+bool InstrumentRackHost::commitEffectLoad (const juce::String& effectId, int generation,
+                                           std::unique_ptr<juce::AudioProcessor> effect,
+                                           const ClassInfo& info)
+{
+    auto* slot = model.findEffect (effectId);
+    const auto it = liveEffects.find (effectId);
+    if (slot == nullptr || it == liveEffects.end() || effect == nullptr)
+        return false;
+    if (generation == 0 || generation != it->second.loadGeneration)
+        return false;
+
+    // Same restore rule as instruments: state only re-enters the same class identity.
+    if (info.ceId == slot->pluginCeId && slot->stateBlobBase64.isNotEmpty())
+    {
+        juce::MemoryOutputStream decoded;
+        if (juce::Base64::convertFromBase64 (decoded, slot->stateBlobBase64))
+            effect->setStateInformation (decoded.getData(), (int) decoded.getDataSize());
+    }
+    else if (info.ceId != slot->pluginCeId)
+    {
+        slot->stateBlobBase64 = {};
+    }
+
+    if (it->second.node != nullptr)
+    {
+        if (onInstrumentWillBeRemoved != nullptr)
+            onInstrumentWillBeRemoved (effectId, *it->second.node->getProcessor());
+        graph.removeNode (it->second.node->nodeID);
+    }
+
+    it->second.node = graph.addNode (std::move (effect));
+    if (it->second.node == nullptr)
+        return false;
+    it->second.node->setBypassed (slot->bypassed);
+
+    slot->pluginCeId       = info.ceId;
+    slot->pluginModulePath = info.modulePath;
+    slot->pluginName       = info.name;
+    slot->pluginVendor     = info.vendor;
+
+    rewireAudio();
+    return true;
+}
+
+juce::AudioProcessor* InstrumentRackHost::getEffect (const juce::String& effectId) const
+{
+    const auto it = liveEffects.find (effectId);
+    return it != liveEffects.end() && it->second.node != nullptr ? it->second.node->getProcessor()
+                                                                 : nullptr;
+}
+
+bool InstrumentRackHost::effectHasProcessor (const juce::String& effectId) const
+{
+    return getEffect (effectId) != nullptr;
+}
+
 bool InstrumentRackHost::primePartState (const juce::String& partId, const ClassInfo& info,
                                          const juce::String& stateBlobBase64)
 {
@@ -51,6 +214,27 @@ bool InstrumentRackHost::primePartState (const juce::String& partId, const Class
     part->pluginVendor     = info.vendor;
     part->stateBlobBase64  = stateBlobBase64;
     return true;
+}
+
+juce::String InstrumentRackHost::addMacro (const juce::String& name)
+{
+    Macro macro;
+    macro.macroId = juce::Uuid().toDashedString();
+    macro.name = name;
+    const auto macroId = macro.macroId;
+    model.macros.add (std::move (macro));
+    return macroId;
+}
+
+bool InstrumentRackHost::removeMacro (const juce::String& macroId)
+{
+    for (int i = 0; i < model.macros.size(); ++i)
+        if (model.macros.getReference (i).macroId == macroId)
+        {
+            model.macros.remove (i);
+            return true;
+        }
+    return false;
 }
 
 juce::String InstrumentRackHost::addControlPage (const juce::String& name)
@@ -109,12 +293,19 @@ bool InstrumentRackHost::removePart (const juce::String& partId)
         notifyInstrumentWillBeRemoved (partId, *lp);
         graph.removeNode (lp->instrumentNode->nodeID);
     }
+
+    // The part's inserts die with it, each announced first (editor and registry teardown).
+    if (const auto* part = model.findPart (partId))
+        for (const auto& slot : juce::Array<EffectSlot> (part->effects))
+            destroyEffectNode (slot.effectId);
+
     graph.removeNode (lp->filterNode->nodeID);
     graph.removeNode (lp->gainNode->nodeID);
 
     live.erase (partId);
     model.removePart (partId);
     applyMixerState();
+    rewireAudio();
     return true;
 }
 
@@ -264,7 +455,7 @@ bool InstrumentRackHost::commitLoad (const juce::String& partId, int generation,
     if (lp->instrumentNode == nullptr)
         return false;
 
-    connectInstrument (*lp);
+    rewireAudio();
 
     part->pluginCeId       = info.ceId;
     part->pluginModulePath = info.modulePath;
@@ -285,6 +476,7 @@ bool InstrumentRackHost::unloadInstrument (const juce::String& partId)
     notifyInstrumentWillBeRemoved (partId, *lp);
     graph.removeNode (lp->instrumentNode->nodeID);
     lp->instrumentNode = nullptr;
+    rewireAudio();   // the part's chain idles until an instrument feeds it again
     return true;
 }
 
@@ -304,8 +496,23 @@ juce::AudioProcessor* InstrumentRackHost::getInstrument (const juce::String& par
 Performance InstrumentRackHost::captureState()
 {
     for (auto& part : model.parts)
+    {
         refreshStateBlob (part);
+        refreshEffectBlobs (part.effects);
+    }
+    refreshEffectBlobs (model.masterEffects);
     return model;
+}
+
+void InstrumentRackHost::refreshEffectBlobs (juce::Array<EffectSlot>& effects)
+{
+    for (auto& slot : effects)
+        if (auto* processor = getEffect (slot.effectId))
+        {
+            juce::MemoryBlock state;
+            processor->getStateInformation (state);
+            slot.stateBlobBase64 = juce::Base64::toBase64 (state.getData(), state.getSize());
+        }
 }
 
 juce::Array<InstrumentRackHost::UnresolvedPart> InstrumentRackHost::loadModel (Performance performance)
@@ -322,6 +529,10 @@ juce::Array<InstrumentRackHost::UnresolvedPart> InstrumentRackHost::loadModel (P
     }
     live.clear();
 
+    // Every live insert dies with the old rack, announced like the instruments.
+    while (! liveEffects.empty())
+        destroyEffectNode (liveEffects.begin()->first);
+
     model = std::move (performance);
 
     juce::Array<UnresolvedPart> unresolved;
@@ -333,6 +544,7 @@ juce::Array<InstrumentRackHost::UnresolvedPart> InstrumentRackHost::loadModel (P
     }
 
     applyMixerState();
+    rewireAudio();
     return unresolved;
 }
 
@@ -377,31 +589,88 @@ void InstrumentRackHost::createLiveNodes (const RackPart& part)
 
     graph.addConnection ({ { midiInNode->nodeID, midiChannel },
                            { lp.filterNode->nodeID, midiChannel } });
-    graph.addConnection ({ { lp.gainNode->nodeID, 0 }, { audioOutNode->nodeID, 0 } });
-    graph.addConnection ({ { lp.gainNode->nodeID, 1 }, { audioOutNode->nodeID, 1 } });
 
     applyPartToLive (part, lp);
     live[part.partId] = lp;
+    rewireAudio();
 }
 
-void InstrumentRackHost::connectInstrument (LivePart& lp)
+void InstrumentRackHost::connectAudio (juce::AudioProcessorGraph::Node* from,
+                                       juce::AudioProcessorGraph::Node* to)
 {
-    graph.addConnection ({ { lp.filterNode->nodeID, midiChannel },
-                           { lp.instrumentNode->nodeID, midiChannel } });
+    // One stereo pair remains the rack's currency: a mono source feeds both sides, a mono
+    // destination sums both sides, several sources into one destination sum on its inputs.
+    // The output IO node reports its channels only once the graph is prepared, and the rack
+    // is always stereo out — so it is pinned rather than asked.
+    const auto outs = juce::jmax (1, from->getProcessor()->getTotalNumOutputChannels());
+    const auto ins  = to == audioOutNode.get()
+                        ? 2
+                        : juce::jmax (1, to->getProcessor()->getTotalNumInputChannels());
+    const auto sourceRight = outs >= 2 ? 1 : 0;
 
-    // One stereo pair in Stage 1 (explicit multi-output routing is Stage 5); a mono
-    // instrument feeds both sides.
-    const auto outs = lp.instrumentNode->getProcessor()->getTotalNumOutputChannels();
-    if (outs >= 2)
+    if (ins >= 2)
     {
-        graph.addConnection ({ { lp.instrumentNode->nodeID, 0 }, { lp.gainNode->nodeID, 0 } });
-        graph.addConnection ({ { lp.instrumentNode->nodeID, 1 }, { lp.gainNode->nodeID, 1 } });
+        graph.addConnection ({ { from->nodeID, 0 },           { to->nodeID, 0 } });
+        graph.addConnection ({ { from->nodeID, sourceRight }, { to->nodeID, 1 } });
     }
-    else if (outs == 1)
+    else
     {
-        graph.addConnection ({ { lp.instrumentNode->nodeID, 0 }, { lp.gainNode->nodeID, 0 } });
-        graph.addConnection ({ { lp.instrumentNode->nodeID, 0 }, { lp.gainNode->nodeID, 1 } });
+        graph.addConnection ({ { from->nodeID, 0 }, { to->nodeID, 0 } });
+        if (sourceRight != 0)
+            graph.addConnection ({ { from->nodeID, sourceRight }, { to->nodeID, 0 } });
     }
+}
+
+void InstrumentRackHost::rewireAudio()
+{
+    // Every audio connection in this graph belongs to the one path this rebuilds (MIDI wires
+    // ride the dedicated channel index), so drop-and-rebuild keeps the whole topology in one
+    // readable place instead of tracking edits wire by wire.
+    for (const auto& connection : graph.getConnections())
+        if (connection.source.channelIndex != midiChannel)
+            graph.removeConnection (connection);
+
+    // Per part: instrument → its loaded inserts, in slot order → the part's gain. A part
+    // with no instrument leaves its chain idle rather than wiring effects to nothing.
+    for (auto& [partId, lp] : live)
+    {
+        const auto* part = model.findPart (partId);
+        auto* upstream = lp.instrumentNode.get();
+        if (part == nullptr || upstream == nullptr)
+            continue;
+
+        graph.addConnection ({ { lp.filterNode->nodeID, midiChannel },
+                               { lp.instrumentNode->nodeID, midiChannel } });
+
+        for (const auto& slot : part->effects)
+            if (const auto it = liveEffects.find (slot.effectId);
+                it != liveEffects.end() && it->second.node != nullptr)
+            {
+                connectAudio (upstream, it->second.node.get());
+                upstream = it->second.node.get();
+            }
+
+        connectAudio (upstream, lp.gainNode.get());
+    }
+
+    // Master: every gain into the chain head (summing there), serial hops, tail to the
+    // output — or straight to the output while the master chain is empty or unloaded.
+    juce::Array<juce::AudioProcessorGraph::Node*> masterNodes;
+    for (const auto& slot : model.masterEffects)
+        if (const auto it = liveEffects.find (slot.effectId);
+            it != liveEffects.end() && it->second.node != nullptr)
+            masterNodes.add (it->second.node.get());
+
+    auto* sink = masterNodes.isEmpty() ? audioOutNode.get() : masterNodes.getFirst();
+    for (auto& [partId, lp] : live)
+    {
+        juce::ignoreUnused (partId);
+        connectAudio (lp.gainNode.get(), sink);
+    }
+    for (int i = 0; i + 1 < masterNodes.size(); ++i)
+        connectAudio (masterNodes[i], masterNodes[i + 1]);
+    if (! masterNodes.isEmpty())
+        connectAudio (masterNodes.getLast(), audioOutNode.get());
 }
 
 void InstrumentRackHost::applyPartToLive (const RackPart& part, LivePart& lp)

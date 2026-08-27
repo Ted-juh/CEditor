@@ -13,7 +13,7 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
     rack.onInstrumentWillBeRemoved = [this] (const juce::String& partId, juce::AudioProcessor&)
     {
         partParameters.erase (partId);
-        if (partId == editorPartId)
+        if (partId == editorTargetId)
             hideEditor();
     };
 }
@@ -154,8 +154,11 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         }
 
         // The editor follows the focused part (baseline §8.6.9): showEditorFor hides the
-        // pane when the newly focused part has nothing to show.
-        if (editorPartId.isNotEmpty() && editorPartId != partId)
+        // pane when the newly focused part has nothing to show. An EFFECT editor stays put —
+        // the focus model distinguishes focused part from focused processor (§18.7.8), and
+        // yanking an effect editor away on part focus would fight the mixing workflow.
+        if (editorTargetId.isNotEmpty() && editorTargetId != partId
+            && rack.getPerformance().findPart (editorTargetId) != nullptr)
             showEditorFor (partId);
 
         savePerformance();
@@ -316,7 +319,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
-        const auto& processorParams = rack.getInstrument (partId)->getParameters();
+        const auto& processorParams = targetProcessor (partId)->getParameters();
         juce::Array<juce::var> parameters;
         for (const auto& d : it->second.inventory.descriptors)
         {
@@ -408,26 +411,20 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         const auto pageId = payload.getProperty ("pageId", {}).toString();
         const auto slotId = payload.getProperty ("slotId", {}).toString();
-        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto partId = payload.getProperty ("partId", {}).toString();   // any target id
         const auto parameterId = payload.getProperty ("parameterId", {}).toString();
 
-        const auto* part = rack.getPerformance().findPart (partId);
-        if (part == nullptr)
-        {
-            emitError ("Unknown rack part.");
-            return;
-        }
         if (resolveParameter (partId, parameterId) == nullptr)
         {
-            // Assignment needs the live instrument: the registry is what proves the id and
-            // whose class identity the binding captures.
-            emitError ("Unknown parameter " + parameterId + " on that part.");
+            // Assignment needs the live processor: the registry is what proves the id and
+            // whose class identity the binding captures. Parts and effects alike.
+            emitError ("Unknown parameter " + parameterId + " on that target.");
             return;
         }
 
         ControlBinding binding;
         binding.partId = partId;
-        binding.pluginCeId = part->pluginCeId;
+        binding.pluginCeId = targetClassCeId (partId);
         binding.parameterId = parameterId;
 
         if (! rack.setSlotBinding (pageId, slotId, std::move (binding)))
@@ -601,6 +598,193 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         }
 
         options.runBuild (hostProject, payload.getProperty ("outputDirectory", {}).toString());
+        return;
+    }
+
+    if (cmd == "addEffect")
+    {
+        const auto chainId = payload.getProperty ("chainId", {}).toString();
+        const auto ceId = payload.getProperty ("ceId", {}).toString();
+
+        const auto effectId = rack.addEffectSlot (chainId);
+        if (effectId.isEmpty())
+        {
+            emitError ("Unknown effect chain.");
+            return;
+        }
+
+        requestEffect (effectId, ceId);
+        return;
+    }
+
+    if (cmd == "removeEffect")
+    {
+        if (! rack.removeEffectSlot (payload.getProperty ("effectId", {}).toString()))
+        {
+            emitError ("Unknown effect.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "moveEffect")
+    {
+        if (! rack.moveEffectSlot (payload.getProperty ("effectId", {}).toString(),
+                                   (int) payload.getProperty ("index", 0)))
+        {
+            emitError ("Unknown effect.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setEffectBypassed")
+    {
+        if (! rack.setEffectBypassed (payload.getProperty ("effectId", {}).toString(),
+                                      (bool) payload.getProperty ("bypassed", false)))
+        {
+            emitError ("Unknown effect.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "openEffectEditor")
+    {
+        const auto effectId = payload.getProperty ("effectId", {}).toString();
+        if (rack.getEffect (effectId) == nullptr)
+        {
+            emitError ("That effect is not loaded.");
+            return;
+        }
+
+        showEditorForEffect (effectId);
+        emitState();
+        return;
+    }
+
+    if (cmd == "addMacro")
+    {
+        const auto name = payload.getProperty ("name", {}).toString().trim();
+        rack.addMacro (name.isNotEmpty() ? name
+                                         : "Macro " + juce::String (rack.getPerformance().macros.size() + 1));
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "removeMacro")
+    {
+        if (! rack.removeMacro (payload.getProperty ("macroId", {}).toString()))
+        {
+            emitError ("Unknown macro.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "renameMacro")
+    {
+        auto* macro = rack.findMutableMacro (payload.getProperty ("macroId", {}).toString());
+        if (macro == nullptr)
+        {
+            emitError ("Unknown macro.");
+            return;
+        }
+        macro->name = payload.getProperty ("name", {}).toString().trim();
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setMacroValue")
+    {
+        auto* macro = rack.findMutableMacro (payload.getProperty ("macroId", {}).toString());
+        if (macro == nullptr)
+        {
+            emitError ("Unknown macro.");
+            return;
+        }
+
+        macro->value = juce::jlimit (0.0f, 1.0f, (float) (double) payload.getProperty ("value", 0.0));
+        applyMacroValue (*macro);
+
+        // Drags stay cheap: targets move now, persistence and the state re-announcement ride
+        // the change-end (`final:true`) — or whatever mutation saves next.
+        if ((bool) payload.getProperty ("final", false))
+        {
+            savePerformance();
+            emitState();
+        }
+        return;
+    }
+
+    if (cmd == "addMacroTarget" || cmd == "removeMacroTarget" || cmd == "setMacroTargetOptions")
+    {
+        auto* macro = rack.findMutableMacro (payload.getProperty ("macroId", {}).toString());
+        if (macro == nullptr)
+        {
+            emitError ("Unknown macro.");
+            return;
+        }
+
+        const auto targetId = payload.getProperty ("targetId", {}).toString();
+        const auto parameterId = payload.getProperty ("parameterId", {}).toString();
+
+        if (cmd == "addMacroTarget")
+        {
+            if (resolveParameter (targetId, parameterId) == nullptr)
+            {
+                emitError ("Unknown parameter " + parameterId + " on that target.");
+                return;
+            }
+
+            ControlBinding target;
+            target.partId = targetId;
+            target.pluginCeId = targetClassCeId (targetId);
+            target.parameterId = parameterId;
+            bool exists = false;
+            for (const auto& t : macro->targets)
+                exists = exists || (t.partId == targetId && t.parameterId == parameterId);
+            if (! exists)
+                macro->targets.add (std::move (target));
+        }
+        else
+        {
+            for (int i = macro->targets.size(); --i >= 0;)
+            {
+                auto& target = macro->targets.getReference (i);
+                if (target.partId != targetId || target.parameterId != parameterId)
+                    continue;
+
+                if (cmd == "removeMacroTarget")
+                {
+                    macro->targets.remove (i);
+                }
+                else
+                {
+                    const auto* fields = payload.getDynamicObject();
+                    if (fields != nullptr)
+                    {
+                        if (fields->hasProperty ("rangeMin")) target.rangeMin = juce::jlimit (0.0f, 1.0f, (float) (double) payload["rangeMin"]);
+                        if (fields->hasProperty ("rangeMax")) target.rangeMax = juce::jlimit (0.0f, 1.0f, (float) (double) payload["rangeMax"]);
+                        if (fields->hasProperty ("inverted")) target.inverted = (bool) payload["inverted"];
+                    }
+                }
+                break;
+            }
+        }
+
+        savePerformance();
+        emitState();
         return;
     }
 
@@ -899,6 +1083,21 @@ void InstrumentHostService::applyPerformance (Performance&& performance)
 {
     for (const auto& unresolved : rack.loadModel (std::move (performance)))
         requestInstrument (unresolved.partId, unresolved.ceId);
+
+    // The Stage 5 halves of the manifest load through their own transaction; a class that
+    // fails to resolve leaves its slot unresolved-and-repairable, same as an instrument.
+    const auto& model = rack.getPerformance();
+    juce::Array<std::pair<juce::String, juce::String>> effectLoads;
+    for (const auto& part : model.parts)
+        for (const auto& slot : part.effects)
+            if (slot.pluginCeId.isNotEmpty())
+                effectLoads.add ({ slot.effectId, slot.pluginCeId });
+    for (const auto& slot : model.masterEffects)
+        if (slot.pluginCeId.isNotEmpty())
+            effectLoads.add ({ slot.effectId, slot.pluginCeId });
+
+    for (const auto& [effectId, ceId] : effectLoads)
+        requestEffect (effectId, ceId);
 }
 
 void InstrumentHostService::requestInstrument (const juce::String& partId, const juce::String& ceId,
@@ -970,7 +1169,7 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
 
             // The replacement will tear down the old editor through the rack hook; remember
             // whether the pane was on this part so it can come straight back on the new one.
-            const bool editorWasHere = (editorPartId == partId);
+            const bool editorWasHere = (editorTargetId == partId);
 
             if (! rack.commitLoad (partId, generation, std::move (instrument),
                                    { info.ceId, info.modulePath, info.name, info.vendor }))
@@ -995,6 +1194,143 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
         });
 }
 
+void InstrumentHostService::requestEffect (const juce::String& effectId, const juce::String& ceId)
+{
+    juce::String descriptionXml, refusal;
+    ClassInfoForCommit info;
+
+    {
+        const std::scoped_lock lock (catalogLock);
+        const ModuleRecord* module = nullptr;
+        const auto* record = findClass (ceId, &module);
+
+        if (record == nullptr || module == nullptr)
+            refusal = "Effect not in the catalogue: " + ceId;
+        else if (module->quarantined || module->missing)
+            refusal = (module->quarantined ? juce::String ("Module is quarantined: ")
+                                           : juce::String ("Module is missing: "))
+                      + module->path;
+        else
+        {
+            descriptionXml = record->descriptionXml;
+            info = { record->ceId, module->path, record->name, record->vendor };
+        }
+    }
+
+    if (refusal.isNotEmpty())
+    {
+        emitError (refusal);
+        emitState();
+        return;
+    }
+
+    rack.primeEffectSlot (effectId, { info.ceId, info.modulePath, info.name, info.vendor },
+                          rack.getPerformance().findEffect (effectId)->stateBlobBase64);
+
+    const auto generation = rack.beginEffectLoad (effectId);
+    if (generation == 0 || options.instantiate == nullptr)
+    {
+        emitError (generation == 0 ? "Unknown effect." : "No instrument instantiator is configured.");
+        return;
+    }
+
+    options.instantiate (descriptionXml, options.sampleRate, options.blockSize,
+        [this, aliveToken = alive, effectId, generation, info]
+        (std::unique_ptr<juce::AudioProcessor> effect, const juce::String& error)
+        {
+            if (! aliveToken->load())
+                return;
+
+            if (effect == nullptr)
+            {
+                emitError ("Could not load " + info.name
+                           + (error.isNotEmpty() ? ": " + error : juce::String()));
+                emitState();
+                return;
+            }
+
+            const bool editorWasHere = (editorTargetId == effectId);
+
+            if (! rack.commitEffectLoad (effectId, generation, std::move (effect),
+                                         { info.ceId, info.modulePath, info.name, info.vendor }))
+            {
+                emitState();   // superseded or the slot left — the ticket's designed refusal
+                return;
+            }
+
+            attachParameters (effectId);
+
+            if (editorWasHere)
+                showEditorForEffect (effectId);
+
+            savePerformance();
+            emitState();
+        });
+}
+
+juce::AudioProcessor* InstrumentHostService::targetProcessor (const juce::String& targetId) const
+{
+    if (auto* instrument = rack.getInstrument (targetId))
+        return instrument;
+    return rack.getEffect (targetId);
+}
+
+juce::String InstrumentHostService::targetClassCeId (const juce::String& targetId) const
+{
+    if (const auto* part = rack.getPerformance().findPart (targetId))
+        return part->pluginCeId;
+    if (const auto* slot = rack.getPerformance().findEffect (targetId))
+        return slot->pluginCeId;
+    return {};
+}
+
+juce::String InstrumentHostService::targetDisplayName (const juce::String& targetId) const
+{
+    if (const auto* part = rack.getPerformance().findPart (targetId))
+        return part->pluginName;
+    if (const auto* slot = rack.getPerformance().findEffect (targetId))
+        return slot->pluginName;
+    return {};
+}
+
+void InstrumentHostService::showEditorForEffect (const juce::String& effectId)
+{
+    auto* effect = rack.getEffect (effectId);
+    const auto* slot = rack.getPerformance().findEffect (effectId);
+    if (effect == nullptr || slot == nullptr)
+    {
+        hideEditor();
+        return;
+    }
+
+    editorTargetId = effectId;
+    if (options.editorPane.show != nullptr)
+        options.editorPane.show (effectId, *effect,
+                                 slot->pluginName.isNotEmpty() ? slot->pluginName
+                                                               : juce::String ("Effect"));
+}
+
+void InstrumentHostService::applyMacroValue (const Macro& macro)
+{
+    // The same mapped write the page slots use — every fan-out target through the central
+    // parameter path, unresolved ones skipped (and shown as such in state).
+    for (const auto& target : macro.targets)
+    {
+        if (! bindingResolves (target))
+            continue;
+
+        auto* parameter = resolveParameter (target.partId, target.parameterId);
+        if (parameter == nullptr)
+            continue;
+
+        const auto positioned = target.inverted ? 1.0f - macro.value : macro.value;
+        const auto mapped = target.rangeMin + positioned * (target.rangeMax - target.rangeMin);
+        parameter->beginChangeGesture();
+        parameter->setValueNotifyingHost (mapped);
+        parameter->endChangeGesture();
+    }
+}
+
 void InstrumentHostService::showEditorFor (const juce::String& partId)
 {
     const auto* part = rack.getPerformance().findPart (partId);
@@ -1006,7 +1342,7 @@ void InstrumentHostService::showEditorFor (const juce::String& partId)
         return;
     }
 
-    editorPartId = partId;
+    editorTargetId = partId;
     if (options.editorPane.show != nullptr)
         options.editorPane.show (partId, *instrument,
                                  part->pluginName.isNotEmpty() ? part->pluginName
@@ -1015,10 +1351,10 @@ void InstrumentHostService::showEditorFor (const juce::String& partId)
 
 void InstrumentHostService::hideEditor()
 {
-    if (editorPartId.isEmpty())
+    if (editorTargetId.isEmpty())
         return;
 
-    editorPartId = {};
+    editorTargetId = {};
     if (options.editorPane.hide != nullptr)
         options.editorPane.hide();
 }
@@ -1172,13 +1508,13 @@ void InstrumentHostService::restoreFromVar (const juce::var& state)
 
 void InstrumentHostService::attachParameters (const juce::String& partId)
 {
-    auto* instrument = rack.getInstrument (partId);
-    if (instrument == nullptr)
+    auto* processor = targetProcessor (partId);   // a part's instrument or an effect
+    if (processor == nullptr)
         return;
 
     PartParameters entry;
-    entry.inventory = describeParameters (*instrument);
-    entry.sync = std::make_unique<PartParameterSync> (partId, *instrument);
+    entry.inventory = describeParameters (*processor);
+    entry.sync = std::make_unique<PartParameterSync> (partId, *processor);
     partParameters[partId] = std::move (entry);
 }
 
@@ -1196,7 +1532,9 @@ juce::AudioProcessorParameter* InstrumentHostService::resolveParameter (const ju
 
     if (descriptorOut != nullptr)
         *descriptorOut = descriptor;
-    return rack.getInstrument (partId)->getParameters()[descriptor->index];
+
+    auto* processor = targetProcessor (partId);
+    return processor != nullptr ? processor->getParameters()[descriptor->index] : nullptr;
 }
 
 void InstrumentHostService::ensureLibrary()
@@ -1563,8 +1901,10 @@ bool InstrumentHostService::bindingResolves (const ControlBinding& binding) cons
     if (binding.isEmpty())
         return false;
 
-    const auto* part = rack.getPerformance().findPart (binding.partId);
-    if (part == nullptr || part->pluginCeId != binding.pluginCeId)
+    // The target may be a rack part or an effect slot; either way the class it CURRENTLY
+    // carries must still be the one the binding was assigned against.
+    const auto currentClass = targetClassCeId (binding.partId);
+    if (currentClass.isEmpty() || currentClass != binding.pluginCeId)
         return false;
 
     const auto it = partParameters.find (binding.partId);
@@ -1581,7 +1921,11 @@ void InstrumentHostService::drainParameterEvents()
         if (! part.sync->drain (changed, gestures))
             continue;
 
-        const auto& processorParams = rack.getInstrument (partId)->getParameters();
+        auto* processor = targetProcessor (partId);
+        if (processor == nullptr)
+            continue;
+
+        const auto& processorParams = processor->getParameters();
         const auto idFor = [&part] (int index) -> juce::String
         {
             for (const auto& d : part.inventory.descriptors)
@@ -1636,8 +1980,8 @@ void InstrumentHostService::setEditorPaneHooks (EditorPaneHooks hooks)
 
 void InstrumentHostService::reassertEditorPane()
 {
-    if (editorPartId.isNotEmpty())
-        showEditorFor (editorPartId);
+    if (editorTargetId.isNotEmpty())
+        showEditorFor (editorTargetId);
 }
 
 const PluginClassRecord* InstrumentHostService::findClass (const juce::String& ceId,
@@ -1737,6 +2081,7 @@ void InstrumentHostService::emitError (const juce::String& message)
 juce::var InstrumentHostService::buildStatePayload() const
 {
     juce::Array<juce::var> instruments;
+    juce::Array<juce::var> effectClasses;
     juce::Array<juce::var> modules;
 
     {
@@ -1750,6 +2095,16 @@ juce::var InstrumentHostService::buildStatePayload() const
             obj->setProperty ("vendor",  record.vendor);
             obj->setProperty ("version", record.version);
             instruments.add (juce::var (obj));
+        }
+
+        for (const auto& record : catalog.effectClasses())
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("ceId",    record.ceId);
+            obj->setProperty ("name",    record.name);
+            obj->setProperty ("vendor",  record.vendor);
+            obj->setProperty ("version", record.version);
+            effectClasses.add (juce::var (obj));
         }
 
         for (const auto& module : catalog.allModules())
@@ -1775,10 +2130,31 @@ juce::var InstrumentHostService::buildStatePayload() const
     }
 
     const auto& performance = rack.getPerformance();
+
+    const auto effectsProjection = [this] (const juce::Array<EffectSlot>& chain)
+    {
+        juce::Array<juce::var> out;
+        for (const auto& slot : chain)
+        {
+            auto* e = new juce::DynamicObject();
+            e->setProperty ("effectId",     slot.effectId);
+            e->setProperty ("pluginCeId",   slot.pluginCeId);
+            e->setProperty ("pluginName",   slot.pluginName);
+            e->setProperty ("pluginVendor", slot.pluginVendor);
+            e->setProperty ("bypassed",     slot.bypassed);
+            e->setProperty ("hasProcessor", rack.effectHasProcessor (slot.effectId));
+            e->setProperty ("unresolved",   slot.pluginCeId.isNotEmpty()
+                                              && ! rack.effectHasProcessor (slot.effectId));
+            out.add (juce::var (e));
+        }
+        return out;
+    };
+
     juce::Array<juce::var> parts;
     for (const auto& part : performance.parts)
     {
         auto* obj = new juce::DynamicObject();
+        obj->setProperty ("effects", effectsProjection (part.effects));
         obj->setProperty ("partId",        part.partId);
         obj->setProperty ("pluginCeId",    part.pluginCeId);
         obj->setProperty ("pluginName",    part.pluginName);
@@ -1811,7 +2187,6 @@ juce::var InstrumentHostService::buildStatePayload() const
             // Resolved live so a rename inside the plug-in shows through; the raw id for an
             // unresolved binding is exactly the diagnostic the repair needs.
             const auto displayName = slotDisplayName (b, resolved);
-            const auto* part = performance.findPart (b.partId);
 
             auto* s = new juce::DynamicObject();
             s->setProperty ("slotId",      slot.slotId);
@@ -1820,7 +2195,7 @@ juce::var InstrumentHostService::buildStatePayload() const
             s->setProperty ("parameterId", b.parameterId);
             s->setProperty ("label",       b.label);
             s->setProperty ("displayName", b.isEmpty() ? juce::String() : displayName);
-            s->setProperty ("partName",    part != nullptr ? part->pluginName : juce::String());
+            s->setProperty ("partName",    targetDisplayName (b.partId));
             s->setProperty ("rangeMin",    b.rangeMin);
             s->setProperty ("rangeMax",    b.rangeMax);
             s->setProperty ("inverted",    b.inverted);
@@ -1837,10 +2212,38 @@ juce::var InstrumentHostService::buildStatePayload() const
         pages.add (juce::var (pg));
     }
 
+    juce::Array<juce::var> macros;
+    for (const auto& macro : performance.macros)
+    {
+        juce::Array<juce::var> targets;
+        for (const auto& target : macro.targets)
+        {
+            auto* t = new juce::DynamicObject();
+            t->setProperty ("targetId",    target.partId);
+            t->setProperty ("parameterId", target.parameterId);
+            t->setProperty ("targetName",  targetDisplayName (target.partId));
+            t->setProperty ("displayName", slotDisplayName (target, bindingResolves (target)));
+            t->setProperty ("rangeMin",    target.rangeMin);
+            t->setProperty ("rangeMax",    target.rangeMax);
+            t->setProperty ("inverted",    target.inverted);
+            t->setProperty ("resolved",    bindingResolves (target));
+            targets.add (juce::var (t));
+        }
+
+        auto* m = new juce::DynamicObject();
+        m->setProperty ("macroId", macro.macroId);
+        m->setProperty ("name",    macro.name);
+        m->setProperty ("value",   macro.value);
+        m->setProperty ("targets", targets);
+        macros.add (juce::var (m));
+    }
+
     auto* rackObj = new juce::DynamicObject();
     rackObj->setProperty ("performanceId", performance.performanceId);
     rackObj->setProperty ("focusedPartId", performance.focusedPartId);
     rackObj->setProperty ("parts", parts);
+    rackObj->setProperty ("masterEffects", effectsProjection (performance.masterEffects));
+    rackObj->setProperty ("macros", macros);
     rackObj->setProperty ("pages", pages);
 
     auto* audio = new juce::DynamicObject();
@@ -1853,6 +2256,7 @@ juce::var InstrumentHostService::buildStatePayload() const
 
     auto* root = new juce::DynamicObject();
     root->setProperty ("instruments", instruments);
+    root->setProperty ("effectClasses", effectClasses);
     root->setProperty ("modules", modules);
     root->setProperty ("scanPaths", [this]
     {
@@ -1862,7 +2266,7 @@ juce::var InstrumentHostService::buildStatePayload() const
         return paths;
     }());
     root->setProperty ("scanning", scanBusy.load());
-    root->setProperty ("editorOpenPartId", editorPartId);
+    root->setProperty ("editorOpenPartId", editorTargetId);
     root->setProperty ("audio", juce::var (audio));
     root->setProperty ("rack", juce::var (rackObj));
     return juce::var (root);

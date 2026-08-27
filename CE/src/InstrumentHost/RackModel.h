@@ -25,6 +25,21 @@
 namespace ceditor::host
 {
 
+// One VST3 effect in an insert chain (VIP-successor Stage 5). The same identity rules as a
+// part's instrument: effectId is minted once and stable, pluginCeId is the catalogue's class
+// identity, and an empty pluginCeId means an empty or unresolved slot whose state blob is
+// kept for repair, never deleted.
+struct EffectSlot
+{
+    juce::String effectId;
+    juce::String pluginCeId;
+    juce::String pluginModulePath;
+    juce::String pluginName;
+    juce::String pluginVendor;
+    juce::String stateBlobBase64;
+    bool bypassed = false;
+};
+
 struct RackPart
 {
     juce::String partId;
@@ -33,6 +48,7 @@ struct RackPart
     juce::String pluginName;          // display cache; never identity
     juce::String pluginVendor;
     juce::String stateBlobBase64;     // captured processor state, or empty
+    juce::Array<EffectSlot> effects;  // the part's serial insert chain, pre-fader (Stage 5)
     PartMidiRules midi;
     bool enabled = true;
     bool mute = false;
@@ -41,6 +57,7 @@ struct RackPart
     float pan = 0.0f;                 // -1..+1
     bool editorOpen = false;
 };
+
 
 // A binding connects one named control slot to one parameter address (VIP-successor Stage 2,
 // baseline §18.4.3). The address keeps the class identity BESIDE the part id on purpose:
@@ -89,12 +106,27 @@ struct ControlPage
     const ControlSlot* findSlot (const juce::String& slotId) const;
 };
 
+// A Performance macro (Stage 5, baseline §18.7.8): one 0..1 control fanning into several
+// parameter addresses. Targets reuse ControlBinding — the address, range, inversion and the
+// class-identity honesty are exactly the page-slot story, and a macro must never bypass the
+// central parameter path any more than a hardware knob may. (A target's partId field holds
+// any target id: a rack part's or an effect slot's.)
+struct Macro
+{
+    juce::String macroId;
+    juce::String name;
+    float value = 0.0f;
+    juce::Array<ControlBinding> targets;
+};
+
 struct Performance
 {
     juce::String performanceId;
     juce::String name;
     juce::String focusedPartId;
     juce::Array<RackPart> parts;
+    juce::Array<EffectSlot> masterEffects;   // the master insert chain (Stage 5)
+    juce::Array<Macro> macros;
     juce::Array<ControlPage> pages;
 
     /** Mints a Performance with a fresh stable id. */
@@ -115,6 +147,13 @@ struct Performance
 
     ControlPage* findPage (const juce::String& pageId);
     const ControlPage* findPage (const juce::String& pageId) const;
+
+    Macro* findMacro (const juce::String& macroId);
+    const Macro* findMacro (const juce::String& macroId) const;
+
+    /** The slot and (via chainIdOut) whose chain holds it — a partId, or "master". */
+    EffectSlot* findEffect (const juce::String& effectId, juce::String* chainIdOut = nullptr);
+    const EffectSlot* findEffect (const juce::String& effectId, juce::String* chainIdOut = nullptr) const;
 
     juce::var toVar() const;
 

@@ -218,6 +218,23 @@ juce::Array<PluginClassRecord> PluginCatalog::instrumentClasses() const
     return out;
 }
 
+juce::Array<PluginClassRecord> PluginCatalog::effectClasses() const
+{
+    juce::Array<PluginClassRecord> out;
+
+    for (const auto& rec : modules)
+    {
+        if (rec.missing || rec.quarantined)
+            continue;
+
+        for (const auto& c : rec.classes)
+            if (! c.isInstrument)
+                out.add (c);
+    }
+
+    return out;
+}
+
 juce::String PluginCatalog::fingerprintFor (const juce::File& moduleFileOrBundle)
 {
     juce::String accumulated;

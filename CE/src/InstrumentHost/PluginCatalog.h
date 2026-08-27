@@ -100,6 +100,9 @@ public:
     /** Every instrument class from modules that are present and not quarantined — the default
         browser projection. */
     juce::Array<PluginClassRecord> instrumentClasses() const;
+    /** The non-instrument classes of healthy modules — the effect picker's projection
+        (Stage 5), same health rules as the instrument browser's. */
+    juce::Array<PluginClassRecord> effectClasses() const;
 
     const juce::Array<ModuleRecord>& allModules() const   { return modules; }
     int numModules() const                                { return modules.size(); }
