@@ -961,7 +961,24 @@ export function applyMockCommand(state, payload) {
     return next;
   }
   if (cmd === 'loadInstrument') {
-    const target = part(payload.partId);
+    let target = part(payload.partId);
+    // The native rule, mirrored: no part named means "into a new part", so the first click an
+    // empty rack sees actually does something. An explicit unknown id is still a stale UI.
+    if (!target && !payload.partId) {
+      target = {
+        partId: `mock-part-${next.rack.parts.length + 1}`,
+        pluginCeId: '', pluginName: '', pluginVendor: '', hasInstrument: false,
+        unresolved: false, outputPair: 0,
+        enabled: true, mute: false, solo: false, volume: 1, pan: 0,
+        midi: { channel: 0, lowNote: 0, highNote: 127, lowVelocity: 1, highVelocity: 127, transpose: 0 },
+        midiFx: { transpose: 0, constrainToScale: false, scaleType: 'major', scaleRoot: 0,
+                  chordMode: 'off', velocityScale: 1, fixedVelocity: 0 },
+        arp: { enabled: false, mode: 'up', rate: 4, gate: 0.8, octaves: 1, swing: 0, latch: false },
+        effects: [], sends: [], extraOuts: [],
+      };
+      next.rack.parts.push(target);
+      next.rack.focusedPartId = target.partId;
+    }
     const instrument = next.instruments.find((i) => i.ceId === payload.ceId);
     if (target && instrument) {
       target.pluginCeId = instrument.ceId;
@@ -1496,6 +1513,10 @@ export function applyMockCommand(state, payload) {
     if (item.sceneId) return applyMockCommand(next, { cmd: 'launchScene', sceneId: item.sceneId });
     return next;
   }
+  if (cmd === 'hostNote') {
+    // Nothing to hear in a browser — the mock accepts the note so the keys still light.
+    return next;
+  }
   if (cmd === 'setMasterLevel') {
     next.product.daw.masterLevel = Math.min(2, Math.max(0, Number(payload.level ?? 1)));
     return next;
@@ -1956,6 +1977,11 @@ export const previewSupportBundle = (options = {}) =>
   send({ cmd: 'previewSupportBundle', ...options });
 export const exportSupportBundle = (options = {}) =>
   send({ cmd: 'exportSupportBundle', ...options });
+
+/** The on-screen keyboard. One command both ways: on=true is note-on with the velocity the
+ *  key position gave, on=false is the release. Goes through the same native path as hardware
+ *  MIDI, so the browser preview can only acknowledge it. */
+export const hostNote = (note, velocity, on) => send({ cmd: 'hostNote', note, velocity, on });
 
 export const requestHostProject = () => send({ cmd: 'getHostProject' });
 export const setHostProject = (fields) => send({ cmd: 'setHostProject', ...fields });

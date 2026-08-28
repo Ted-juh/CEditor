@@ -1027,3 +1027,28 @@ test('mock reducer: the browser preview does not pretend to verify a licence', (
   assert.equal(state.licence.edition, 'free', 'removing leaves it free');
   assert.equal(state.licence.runnable, true, 'and still running');
 });
+
+
+test('mock reducer: load with no part creates the part it loads into', () => {
+  let state = mockHostState();
+  const before = state.rack.parts.length;
+
+  // The first click an empty rack sees is Load on an instrument. The native side creates and
+  // focuses a part for it; the mock mirrors that so the browser preview behaves like the app.
+  state = applyMockCommand(state, { cmd: 'loadInstrument', ceId: 'mock-analog', partId: '' });
+  assert.equal(state.rack.parts.length, before + 1, 'a part is created');
+  const created = state.rack.parts[state.rack.parts.length - 1];
+  assert.equal(created.hasInstrument, true, 'holding the instrument');
+  assert.equal(created.pluginName, 'Analog One');
+  assert.equal(state.rack.focusedPartId, created.partId, 'and focused');
+
+  // A stale explicit id is still a no-op, not a new part: that is a UI out of date.
+  const parts = state.rack.parts.length;
+  state = applyMockCommand(state, { cmd: 'loadInstrument', ceId: 'mock-analog', partId: 'gone' });
+  assert.equal(state.rack.parts.length, parts, 'an unknown explicit part creates nothing');
+
+  // The keyboard's command is accepted quietly — a browser has nothing to sound.
+  const untouched = JSON.stringify(state.rack.parts);
+  state = applyMockCommand(state, { cmd: 'hostNote', note: 60, velocity: 100, on: true });
+  assert.equal(JSON.stringify(state.rack.parts), untouched, 'a note leaves the rack alone');
+});

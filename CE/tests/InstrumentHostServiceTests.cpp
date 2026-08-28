@@ -1316,6 +1316,45 @@ void testTwinPresetsKeepTheirOwnRecords()
            "while the missing twin stays itself");
 }
 
+// The first click an empty rack sees is Load on an instrument, and the on-screen keyboard is
+// how a rack gets auditioned without hardware. Both found by the owner actually using the
+// program: Load silently required a part nobody had been told to add, and there was no way to
+// play a note at all without a MIDI keyboard plugged in.
+void testFirstClickAndTheOnScreenKeyboard()
+{
+    std::cout << "\nthe first click, and the on-screen keyboard" << std::endl;
+
+    const auto dir = freshDataDir ("first-click");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+
+    // Load with no part: the part is created, focused and loaded — one click, like it reads.
+    h.cmd ("loadInstrument", { { "ceId", "VST3-good-synth" } });
+    check (h.instantiateCount == 1, "load with no part named instantiates");
+    const auto* state = h.emits.lastState();
+    const auto parts = state->getProperty ("rack", {}).getProperty ("parts", {});
+    check (parts.size() == 1, "into a part it created itself");
+    check ((bool) parts[0].getProperty ("hasInstrument", false), "which holds the instrument");
+    check (state->getProperty ("rack", {}).getProperty ("focusedPartId", {}).toString()
+             == parts[0].getProperty ("partId", {}).toString(),
+           "and is focused, so the parameter view follows");
+
+    // A stale id is still an error — that is a UI out of date, not an intention.
+    h.emits.clear();
+    h.cmd ("loadInstrument", { { "partId", "gone" }, { "ceId", "VST3-good-synth" } });
+    check (h.emits.lastError().contains ("Unknown rack part"),
+           "an explicit unknown part still refuses");
+
+    // The keyboard with audio off says why nothing will sound, rather than swallowing the
+    // note. The audible half of the path is the same collector hardware MIDI feeds, which
+    // only a machine with a sound device can prove.
+    h.emits.clear();
+    h.cmd ("hostNote", { { "note", 60 }, { "velocity", 100 }, { "on", true } });
+    check (h.emits.lastError().contains ("Audio is off"),
+           "a note with audio off refuses aloud");
+}
+
 void testEditorPolicy()
 {
     std::cout << "\neditor pane policy" << std::endl;
@@ -3741,6 +3780,7 @@ int main (int argc, char* argv[])
     std::cout << "InstrumentHostService tests" << std::endl;
 
     testCommandFlow();
+    testFirstClickAndTheOnScreenKeyboard();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();
     testSupersededLoad();

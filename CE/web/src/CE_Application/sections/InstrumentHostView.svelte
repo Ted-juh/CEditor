@@ -36,6 +36,7 @@
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
+  import HostKeyboard from './HostKeyboard.svelte';
 
   initInstrumentHostBridge();
 
@@ -298,6 +299,8 @@
   {#if licenceOpen}
     <LicencePanel />
   {/if}
+
+  <HostKeyboard />
 
   {#if libraryOpen}
     <div class="library-panel" data-testid="host-library-panel" aria-label="Library">
@@ -884,7 +887,7 @@
             </div>
             <button type="button" disabled={!focusedPart}
                     title={focusedPart ? `Load into ${partTitle(focusedPart)}` : 'Add and focus a rack part first'}
-                    onclick={() => focusedPart && loadInstrument(focusedPart.partId, instrument.ceId)}>
+                    onclick={() => loadInstrument(focusedPart?.partId ?? '', instrument.ceId)}>
               Load
             </button>
           </div>

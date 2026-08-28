@@ -202,6 +202,30 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "hostNote")
+    {
+        // The on-screen keyboard. Deliberately the SAME entry hardware MIDI uses — the
+        // player's collector, ahead of the graph — so zones, splits, the event chain and the
+        // arp all apply, and what you audition is what a keyboard would play. A note with
+        // audio off would vanish silently, so it refuses aloud instead.
+        if (! audioRunning)
+        {
+            emitError ("Audio is off, so there is nothing to hear. Open Audio & MIDI and "
+                       "pick an output device.");
+            return;
+        }
+
+        const auto note = juce::jlimit (0, 127, (int) payload.getProperty ("note", 60));
+        const auto velocity = juce::jlimit (1, 127, (int) payload.getProperty ("velocity", 100));
+        const bool on = (bool) payload.getProperty ("on", true);
+
+        auto message = on ? juce::MidiMessage::noteOn (1, note, (juce::uint8) velocity)
+                          : juce::MidiMessage::noteOff (1, note);
+        message.setTimeStamp (juce::Time::getMillisecondCounterHiRes() * 0.001);
+        player.getMidiMessageCollector().addMessageToQueue (message);
+        return;
+    }
+
     if (cmd == "openEditor")
     {
         const auto partId = payload.getProperty ("partId", {}).toString();
@@ -279,8 +303,18 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "loadInstrument")
     {
-        const auto partId = payload.getProperty ("partId", {}).toString();
+        auto partId = payload.getProperty ("partId", {}).toString();
         const auto ceId = payload.getProperty ("ceId", {}).toString();
+
+        // No part named means "into a new part". The first thing anyone does with an empty
+        // rack is click Load on an instrument, and the old contract made that click silently
+        // do nothing until a part existed — a hidden prerequisite nobody asked for. An
+        // explicit-but-unknown id is still an error: that is a stale UI, not an intention.
+        if (partId.isEmpty())
+        {
+            partId = rack.addPart();
+            rack.focusPart (partId);
+        }
 
         const auto* part = rack.getPerformance().findPart (partId);
         if (part == nullptr)
