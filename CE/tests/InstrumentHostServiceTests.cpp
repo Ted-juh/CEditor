@@ -1336,10 +1336,32 @@ void testScan (const juce::File& stubWorker)
     check (last.name == "instrumentHostScanProgress"
              && (bool) last.payload.getProperty ("done", false),
            "and its final progress event says done");
+    const auto lastScanLine = last.payload.getProperty ("line", {}).toString();
 
     h.cmd ("getState");
     const auto* state = h.emits.lastState();
-    check (state != nullptr && state->getProperty ("instruments", {}).size() == 1,
+    const auto instrumentCount = state != nullptr ? state->getProperty ("instruments", {}).size() : -1;
+
+    // Print the count and the scan summary when this fails. It failed once for a reason no
+    // amount of staring at "FAIL" could reveal — the scan was reaching outside the fixtures —
+    // and a bare boolean cost a round trip to a machine on the other side of the world to
+    // diagnose. A failure that names the number it got is a failure somebody can act on.
+    if (instrumentCount != 1)
+    {
+        std::cout << "        expected 1 instrument, got " << instrumentCount << std::endl;
+        std::cout << "        scan said: " << lastScanLine.toStdString() << std::endl;
+        if (state != nullptr)
+            for (const auto& module : *state->getProperty ("modules", {}).getArray())
+                std::cout << "        module: " << module.getProperty ("path", {}).toString()
+                          << "  classes=" << (int) module.getProperty ("numClasses", 0)
+                          << " instruments=" << (int) module.getProperty ("numInstruments", 0)
+                          << (module.getProperty ("unavailableReason", {}).toString().isNotEmpty()
+                                ? "  (" + module.getProperty ("unavailableReason", {}).toString() + ")"
+                                : juce::String())
+                          << std::endl;
+    }
+
+    check (instrumentCount == 1,
            "the stub module's instrument class arrives in the catalogue");
 
     // Busy guard: hold the scan body un-run and ask again.
