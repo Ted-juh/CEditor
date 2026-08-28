@@ -41,8 +41,24 @@ bool Library::removeRecord (const juce::String& recordId)
 
 void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<LibraryRecord> scanned)
 {
-    // Two-pass identity match: content first (a renamed file keeps its fingerprint), then
-    // location (an edited file keeps its path). Anything unmatched is genuinely new.
+    // Three-pass identity match, and the first pass is what keeps twins honest. Two files
+    // with identical bytes have identical fingerprints — not a corner case: a user who copies
+    // a preset into a second folder has made one — and a fingerprint-first claim then hands
+    // whichever record the filesystem happens to list first to whichever file arrives first.
+    // That is how a rescan on NTFS stole a missing record's identity while the same code
+    // passed on ext4: the outcome depended on directory enumeration order (§18.6.6 — identity
+    // is fingerprint AND source, never either alone).
+    //
+    //   1. Same content at its own path — a file that has not moved claims itself.
+    //   2. Same content elsewhere      — a renamed or moved file keeps its record, preferring
+    //                                    a record that was PRESENT until now: after pass 1,
+    //                                    an unclaimed present record is one whose file
+    //                                    vanished in this very scan, which is exactly what a
+    //                                    rename looks like. A long-missing twin is the rename
+    //                                    candidate of last resort, not the first.
+    //   3. Same path, changed content  — an edited file keeps its record.
+    //
+    // Anything unmatched is genuinely new.
     juce::Array<LibraryRecord*> existing;
     for (auto& record : records)
         if (record.sourceType == sourceType)
@@ -71,9 +87,23 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
         return false;
     };
 
-    juce::Array<LibraryRecord> fresh;
+    // Pass 1 runs over EVERY incoming file before pass 2 sees any of them, deliberately:
+    // per-file cascading would let an early arrival take a later file's record by fingerprint
+    // before that file had the chance to claim itself by path.
+    juce::Array<LibraryRecord*> pending;
     for (auto& incoming : scanned)
+        if (! claim (incoming, [&] (const LibraryRecord& r) { return r.fingerprint == incoming.fingerprint
+                                                                  && r.sourceLocator.isNotEmpty()
+                                                                  && r.sourceLocator == incoming.sourceLocator; }))
+            pending.add (&incoming);
+
+    juce::Array<LibraryRecord> fresh;
+    for (auto* incomingPtr : pending)
     {
+        auto& incoming = *incomingPtr;
+        if (claim (incoming, [&] (const LibraryRecord& r) { return r.fingerprint == incoming.fingerprint
+                                                                 && ! r.missing; }))
+            continue;
         if (claim (incoming, [&] (const LibraryRecord& r) { return r.fingerprint == incoming.fingerprint; }))
             continue;
         if (claim (incoming, [&] (const LibraryRecord& r) { return r.sourceLocator.isNotEmpty()

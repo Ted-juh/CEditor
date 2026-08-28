@@ -1245,6 +1245,77 @@ void testEditionsInTheService()
     }
 }
 
+// --- Twin files must not steal each other's records -------------------------------------------
+//
+// Found on the owner's Windows machine, where it produced a duplicated record and a stolen
+// identity, and invisible on Linux for the worst possible reason: it depended on directory
+// enumeration order. Two preset files with identical bytes have identical fingerprints, and
+// mergeVendorScan claimed by fingerprint FIRST — so which record an incoming file claimed was
+// decided by whichever the filesystem listed first. NTFS lists alphabetically, ext4 does not,
+// and the test suite passed here while the same code stole a record there.
+//
+// Identical twins are not a fixture accident to paper over: a user who copies a preset into a
+// second folder has made one. §18.6.6 says identity uses fingerprints AND source identity, so
+// the claim must prefer "same content at its own path" before treating a fingerprint match as
+// a rename. This drives mergeVendorScan directly — no directory involved, so the order is
+// whatever the test says it is, on every OS.
+
+void testTwinPresetsKeepTheirOwnRecords()
+{
+    std::cout << "\ntwin files with identical fingerprints (§18.6.6)" << std::endl;
+
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+
+    const auto make = [] (const juce::String& name, const juce::String& path)
+    {
+        LibraryRecord record;
+        record.type = "preset";
+        record.sourceType = "vstpreset";
+        record.factory = true;
+        record.name = name;
+        record.sourceLocator = path;
+        record.fingerprint = "twin-fp";   // identical on purpose: identical bytes
+        return record;
+    };
+
+    Library library;
+    const auto lostId = library.addCapturedRecord (make ("Lost", "C:\\presets\\a\\Lost.vstpreset"));
+    const auto warmId = library.addCapturedRecord (make ("Warm Pad", "C:\\presets\\b\\Warm Pad.vstpreset"));
+
+    // The Windows ordering: the surviving file arrives while the record whose file is GONE
+    // sits first in the array. A fingerprint-first claim hands Warm's identity to Lost.
+    {
+        juce::Array<LibraryRecord> scanned;
+        scanned.add (make ("Warm Pad", "C:\\presets\\b\\Warm Pad.vstpreset"));
+        library.mergeVendorScan ("vstpreset", std::move (scanned));
+    }
+
+    const auto* lost = library.find (lostId);
+    const auto* warm = library.find (warmId);
+    check (lost != nullptr && warm != nullptr, "both records still exist");
+    check (warm != nullptr && ! warm->missing && warm->name == "Warm Pad",
+           "the file that is still at its own path keeps its own record");
+    check (lost != nullptr && lost->missing && lost->name == "Lost",
+           "and the record whose file is gone goes missing under its own name, "
+           "not somebody else's");
+
+    // A rename among twins still tracks: the moved file's old locator matches nothing, so the
+    // fingerprint pass may claim any remaining twin — but never one whose file just claimed
+    // itself by path.
+    {
+        juce::Array<LibraryRecord> scanned;
+        scanned.add (make ("Warm Pad (renamed)", "C:\\presets\\b\\Warm Pad (renamed).vstpreset"));
+        library.mergeVendorScan ("vstpreset", std::move (scanned));
+    }
+    const auto* renamed = library.find (warmId);
+    check (renamed != nullptr && ! renamed->missing
+             && renamed->name == "Warm Pad (renamed)",
+           "a renamed twin still keeps its record through the fingerprint");
+    check (library.find (lostId) != nullptr && library.find (lostId)->missing,
+           "while the missing twin stays itself");
+}
+
 void testEditorPolicy()
 {
     std::cout << "\neditor pane policy" << std::endl;
@@ -3695,6 +3766,7 @@ int main (int argc, char* argv[])
     testVirtualAddressesAndMacroSlots();
     testRevisionsAndEngine();
     testLibrary();
+    testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();
     testScanFolderBrowseAndModuleProjection();
     testHostProject();
