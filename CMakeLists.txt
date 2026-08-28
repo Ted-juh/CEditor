@@ -541,6 +541,11 @@ if(CEDITOR_BUILD_APP)
 
     target_link_libraries(CEHostStandalone PRIVATE
         juce::juce_core
+        # The licence check (Licensing/*.cpp in the shared host sources above) uses RSAKey and
+        # SHA256. Missed when juce_cryptography was linked into the other four targets that
+        # compile those sources, and invisible from Linux: both host targets are Windows-only,
+        # so the first linker to see them was the owner's. LNK2019 on RSAKey was the symptom.
+        juce::juce_cryptography
         juce::juce_audio_basics
         juce::juce_audio_devices
         juce::juce_audio_processors
@@ -591,6 +596,11 @@ if(CEDITOR_BUILD_APP)
 
     target_link_libraries(CEHostVST3 PRIVATE
         juce::juce_core
+        # The licence check (Licensing/*.cpp in the shared host sources above) uses RSAKey and
+        # SHA256. Missed when juce_cryptography was linked into the other four targets that
+        # compile those sources, and invisible from Linux: both host targets are Windows-only,
+        # so the first linker to see them was the owner's. LNK2019 on RSAKey was the symptom.
+        juce::juce_cryptography
         juce::juce_audio_basics
         juce::juce_audio_devices
         juce::juce_audio_processors
