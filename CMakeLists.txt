@@ -234,6 +234,14 @@ if(CEDITOR_BUILD_APP)
 
     target_include_directories(CEditor PRIVATE
         "${WEBVIEW2_INCLUDE}"
+        # CE/src on the include path, like every other target here. It was missing, and it went
+        # unnoticed for as long as it did because the .cpp files at the ROOT of CE/src resolve
+        # "InstrumentHost/Foo.h" relative to themselves and never needed it. The moment a header
+        # INSIDE a subdirectory reached across to another one — RackModel.h asking for
+        # "Performance/PatternModel.h" — that fallback stopped applying and the app target would
+        # not compile at all. Fifteen such includes exist across ControlSurface, DeviceProfile,
+        # Export, InstrumentHost, Licensing, Performance and Scripting.
+        "${CE_ROOT}/src"
         "${CMAKE_BINARY_DIR}/BinaryData"
     )
 
