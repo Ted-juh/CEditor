@@ -3285,8 +3285,31 @@ void testLibrary()
         // Search narrows by text, filter narrows by type.
         h.emits.clear();
         h.cmd ("getLibrary", { { "query", "warm" } });
-        check (h.emits.entries.back().payload.getProperty ("records", {}).size() == 2,
-               "search matches names case-insensitively");
+        const auto warmMatches = h.emits.entries.back().payload.getProperty ("records", {});
+
+        // Dump the state when this fails: it failed once on a machine this container is not,
+        // and "FAIL" alone forced a guessing game. Show what matched, then everything the
+        // library holds, so the difference names itself.
+        if (warmMatches.size() != 2)
+        {
+            std::cout << "        expected 2 matches for \"warm\", got "
+                      << warmMatches.size() << std::endl;
+            for (const auto& r : *warmMatches.getArray())
+                std::cout << "        matched: \"" << r.getProperty ("name", {}).toString()
+                          << "\"" << std::endl;
+            h.emits.clear();
+            h.cmd ("getLibrary");
+            for (const auto& r : *h.emits.entries.back().payload
+                                     .getProperty ("records", {}).getArray())
+                std::cout << "        record: \"" << r.getProperty ("name", {}).toString()
+                          << "\"  type=" << r.getProperty ("type", {}).toString()
+                          << " sourceType=" << r.getProperty ("sourceType", {}).toString()
+                          << " missing=" << ((bool) r.getProperty ("missing", false) ? 1 : 0)
+                          << " instrument=\"" << r.getProperty ("instrument", {}).toString()
+                          << "\"" << std::endl;
+        }
+
+        check (warmMatches.size() == 2, "search matches names case-insensitively");
         h.emits.clear();
         h.cmd ("getLibrary", { { "type", "rack" } });
         check (h.emits.entries.back().payload.getProperty ("records", {}).size() == 0,
