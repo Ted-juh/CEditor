@@ -3,6 +3,7 @@
 // The header only forward-declares the instrument-host types, but this file defines
 // ~ValueTreeBridge, and destroying the unique_ptr members needs them complete here.
 #include "InstrumentHost/InstrumentHostService.h"
+#include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include <cmath>

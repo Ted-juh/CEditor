@@ -13,7 +13,7 @@
    */
   import {
     hostState,
-    hostMidiActivity, hostScanLog, hostLastError, hostAudioDevices, initInstrumentHostBridge,
+    hostMidiActivity, hostSurface, hostScanLog, hostLastError, hostAudioDevices, initInstrumentHostBridge,
     filterInstruments, scanForInstruments, addScanPath, browseScanPath, removeScanPath, clearQuarantine,
     addRackPart, removeRackPart, focusRackPart, loadInstrument, unloadInstrument,
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor,
@@ -294,6 +294,23 @@
             {input.name}
           </span>
         {/each}
+      </div>
+      <div class="device-midi">
+        <span class="device-midi-title">Control surface</span>
+        <span class="device-midi-row surface-row" data-testid="host-surface-status">
+          <span class="surface-dot {$hostSurface.state}"></span>
+          {#if $hostSurface.state === 'connected'}
+            {$hostSurface.device || 'CTRL49'} connected
+          {:else if $hostSurface.state === 'connecting'}
+            Starting the CTRL49 display…
+          {:else if $hostSurface.state === 'heldElsewhere'}
+            CTRL49 is in use by another instance
+          {:else if $hostSurface.state === 'failed'}
+            CTRL49 failed{$hostSurface.detail ? ` — ${$hostSurface.detail}` : ''}
+          {:else}
+            Looking for a CTRL49 — plug it in and it connects by itself
+          {/if}
+        </span>
       </div>
     </div>
   {/if}
@@ -1089,6 +1106,13 @@
   }
 
   .device-midi-title { color: #9aa5b1; font-size: 11px; }
+  .surface-row { color: #9aa5b1; font-size: 11px; align-items: center; }
+  .surface-dot { width: 7px; height: 7px; border-radius: 50%; background: #5c6672;
+                 display: inline-block; flex: 0 0 auto; }
+  .surface-dot.connected { background: #35c46f; }
+  .surface-dot.connecting { background: #d9a13c; }
+  .surface-dot.heldElsewhere { background: #d9a13c; }
+  .surface-dot.failed { background: #e05656; }
   .device-midi-empty { color: #7d8894; font-size: 12px; }
   .device-midi-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #d6dbe0; }
 

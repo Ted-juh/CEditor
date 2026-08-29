@@ -19,6 +19,8 @@
 // callAsync check a SafePointer to this component, so a straggler after death is a no-op
 // rather than a crash.
 
+namespace ceditor::ctrl49 { class Ctrl49SurfaceBroker; }
+
 namespace ceditor::host
 {
 
@@ -40,6 +42,11 @@ private:
     juce::AudioPluginFormatManager formatManager;
     std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<InstrumentHostService> service;
+    // The CTRL49 broker — the generated product is where the hardware matters most, so the
+    // surface comes alive at launch, not on demand. Declared after the service (destroyed
+    // first: its teardown releases the hardware claim through the service) and ticked from
+    // timerCallback() beside the parameter drain.
+    std::unique_ptr<ctrl49::Ctrl49SurfaceBroker> surfaceBroker;
     std::unique_ptr<juce::WebBrowserComponent> webView;
     juce::Label statusLabel;   // only ever visible when WebView2 could not start
     PluginEditorHost editorPane;

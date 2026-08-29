@@ -149,6 +149,28 @@ endif()
 
 # ------------------------------------------------------------------ the app, the player, the VST
 # Everything from here to the tests needs WebView2 and a native juceaide. See CEDITOR_BUILD_APP.
+
+# CTRL49 embedded assets (Lua pages, knob filmstrip, defaults) — generated once and
+# compiled into every target that talks to the hardware: the bridge exe AND, since the
+# broker moved the surface into the product, the editor and both host targets.
+set(CTRL49_EMBED_OUT "${CMAKE_BINARY_DIR}/generated/Ctrl49EmbeddedAssets.cpp")
+add_custom_command(
+    OUTPUT "${CTRL49_EMBED_OUT}"
+    COMMAND ${CMAKE_COMMAND}
+        -DROOT=${CMAKE_SOURCE_DIR}
+        -DOUT=${CTRL49_EMBED_OUT}
+        -P ${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake
+    DEPENDS
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_MultiKnob.lua"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_PresetList.lua"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/bridge-default.assignment.json"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/gaia-patches.presetbank.json"
+        "${CMAKE_SOURCE_DIR}/CE/profiles/test/roland-gaia.ceditor-device.json"
+    COMMENT "Embedding CTRL49 bridge assets"
+)
+
 if(CEDITOR_BUILD_APP)
     # --- WebView2 SDK (from NuGet package in CE/thirdparty/) ---
     set(WEBVIEW2_DIR "${CE_ROOT}/thirdparty/webview2/build/native")
@@ -212,6 +234,11 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
+        "${CTRL49_EMBED_OUT}"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
@@ -506,6 +533,11 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
+        "${CTRL49_EMBED_OUT}"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
@@ -849,6 +881,7 @@ add_executable(CEditorCtrl49RackDisplayTests
     "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
     "${CE_ROOT}/tests/Ctrl49RackDisplayTests.cpp"
 )
 target_compile_features(CEditorCtrl49RackDisplayTests PRIVATE cxx_std_23)
@@ -944,6 +977,8 @@ if(WIN32)
         "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49RackDemo.cpp"
@@ -1035,23 +1070,7 @@ if(WIN32)
     # CTRL49 Bridge — the self-contained product exe: knobs mode (default) + --presets, all
     # assets (Lua pages, filmstrip, default assignment/bank, GAIA profile) embedded at build
     # time by tools/ctrl49/embed_assets.cmake. No files needed beside the exe.
-    set(CTRL49_EMBED_OUT "${CMAKE_BINARY_DIR}/generated/Ctrl49EmbeddedAssets.cpp")
-    add_custom_command(
-        OUTPUT "${CTRL49_EMBED_OUT}"
-        COMMAND ${CMAKE_COMMAND}
-            -DROOT=${CMAKE_SOURCE_DIR}
-            -DOUT=${CTRL49_EMBED_OUT}
-            -P ${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake
-        DEPENDS
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake"
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_MultiKnob.lua"
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_PresetList.lua"
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/bridge-default.assignment.json"
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/gaia-patches.presetbank.json"
-            "${CMAKE_SOURCE_DIR}/CE/profiles/test/roland-gaia.ceditor-device.json"
-        COMMENT "Embedding CTRL49 bridge assets"
-    )
+    # (moved: the embed block now lives before the app targets, which also consume it)
     add_executable(Ctrl49Bridge
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
@@ -1232,6 +1251,10 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
     "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"

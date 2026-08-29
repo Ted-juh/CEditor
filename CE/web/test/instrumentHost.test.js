@@ -44,6 +44,7 @@ import {
   normalizeReliability,
   emptySupportBundle,
   normalizeSupportBundle,
+  normalizeHostSurface,
   emptyLicence,
   normalizeLicence,
 } from '../src/CE_Application/stores/instrumentHost.js';
@@ -1072,4 +1073,21 @@ test('hostMidiActivity: every arrival bumps seq so identical notes still flash',
   assert.equal(activity.device, 'Test Keys');
   value = activity;
   assert.ok(value.text.includes('C4'));
+});
+
+test('normalizeHostSurface shapes broker payloads and fails safe on garbage', () => {
+  // The broker's own vocabulary passes through untouched.
+  assert.deepEqual(
+    normalizeHostSurface({ state: 'connected', detail: 'ready', device: 'CTRL49 USB' }),
+    { state: 'connected', detail: 'ready', device: 'CTRL49 USB' });
+  assert.deepEqual(
+    normalizeHostSurface({ state: 'heldElsewhere', detail: '', device: '' }),
+    { state: 'heldElsewhere', detail: '', device: '' });
+
+  // Anything else — unknown states, missing fields, non-objects — lands on searching,
+  // because a status row must never be the thing that crashes the devices panel.
+  assert.equal(normalizeHostSurface({ state: 'exploded' }).state, 'searching');
+  assert.deepEqual(normalizeHostSurface(null), { state: 'searching', detail: '', device: '' });
+  assert.deepEqual(normalizeHostSurface('nonsense'), { state: 'searching', detail: '', device: '' });
+  assert.equal(normalizeHostSurface({ detail: 7, device: 9 }).detail, '7');
 });

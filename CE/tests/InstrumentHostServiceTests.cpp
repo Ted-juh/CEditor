@@ -19,6 +19,7 @@
 
 #include "InstrumentHost/InstrumentHostService.h"
 #include <juce_cryptography/juce_cryptography.h>
+#include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "StubSynthProcessor.h"
 #include <iostream>
 #include <vector>
@@ -1377,6 +1378,175 @@ void testFirstClickAndTheOnScreenKeyboard()
     h.service->drainParameterEvents();
     check (h.emits.last ("instrumentHostMidiActivity") == nullptr,
            "clock does not light it — housekeeping proves nothing about the keys");
+}
+
+// --- The CTRL49 broker: the hardware path, in the application --------------------------------
+//
+// Found by the owner asking why the product's defining feature did nothing: every hardware
+// piece was built and tested, and nothing in the app ever CONSTRUCTED them — the keyboard
+// worked only in demo executables. The broker is that missing owner, and these tests drive
+// its whole life cycle through fake transports: discovery, the Stage 7 claim, refusal while
+// another instance holds the surface, startup, knob-to-service, display diffing, loss and
+// reconnect. The one thing they cannot prove is the cable, which is what the owner's CTRL49
+// is for.
+
+struct FakeSurface
+{
+    struct Output final : ceditor::ctrl49::IControllerOutput
+    {
+        explicit Output (FakeSurface& ownerToUse) : owner (ownerToUse) {}
+        void sendSysEx (const ceditor::ctrl49::Bytes& frame) override
+        {
+            const std::scoped_lock lock (owner.lock);
+            owner.frames.push_back (frame);
+        }
+        FakeSurface& owner;
+    };
+
+    std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> makeEndpoints()
+    {
+        running.store (true);
+        auto endpoints = std::make_unique<ceditor::ctrl49::Ctrl49SurfaceEndpoints>();
+        endpoints->output = std::make_unique<Output> (*this);
+        endpoints->dequeueInput = [this]() -> std::optional<ceditor::ctrl49::Bytes>
+        {
+            const std::scoped_lock scoped (lock);
+            if (input.empty()) return std::nullopt;
+            auto next = std::move (input.front());
+            input.erase (input.begin());
+            return next;
+        };
+        endpoints->inputRunning = [this] { return running.load(); };
+        endpoints->inputFailure = [this] { return running.load() ? std::string() : std::string ("unplugged"); };
+        endpoints->closeInput = [this] { running.store (false); };
+        endpoints->description = "Fake CTRL49";
+        return endpoints;
+    }
+
+    void feed (std::uint8_t a, std::uint8_t b, std::uint8_t c)
+    {
+        const std::scoped_lock scoped (lock);
+        input.push_back ({ a, b, c });
+    }
+
+    int frameCount()
+    {
+        const std::scoped_lock scoped (lock);
+        return (int) frames.size();
+    }
+
+    std::mutex lock;
+    std::vector<ceditor::ctrl49::Bytes> frames;
+    std::vector<ceditor::ctrl49::Bytes> input;
+    std::atomic<bool> running { false };
+};
+
+void testCtrl49Broker()
+{
+    std::cout << "\nthe CTRL49 broker: the hardware path in the app, not in a demo" << std::endl;
+
+    using ceditor::ctrl49::Ctrl49SurfaceBroker;
+
+    const auto dir = freshDataDir ("surface-broker");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+
+    FakeSurface fake;
+    double fakeNow = 0.0;
+    int discoveries = 0;
+    bool devicePresent = true;
+
+    Ctrl49SurfaceBroker::Options options;
+    options.discover = [&]() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints>
+    {
+        ++discoveries;
+        return devicePresent ? fake.makeEndpoints() : nullptr;
+    };
+    options.emit = [&h] (const juce::String& name, const juce::var& payload)
+    {
+        h.emits.entries.push_back ({ name, payload });
+    };
+    options.pageLua = { 't', 'e', 's', 't' };
+    options.sessionSleep = [] (int) {};
+    options.loadingMilliseconds = 0;
+    options.now = [&fakeNow] { return fakeNow; };
+    options.searchIntervalMs = 10.0;
+    options.heldRetryMs = 10.0;
+    options.displayIntervalMs = 100.0;
+
+    Ctrl49SurfaceBroker broker (*h.service, options);
+
+    // The worker threads are real; pump until a state lands or patience runs out.
+    const auto pumpUntil = [&] (Ctrl49SurfaceBroker::State wanted) -> bool
+    {
+        for (int i = 0; i < 400; ++i)
+        {
+            fakeNow += 20.0;
+            broker.tick();
+            if (broker.state() == wanted)
+                return true;
+            std::this_thread::sleep_for (std::chrono::milliseconds (2));
+        }
+        return false;
+    };
+
+    check (pumpUntil (Ctrl49SurfaceBroker::State::connected), "the broker finds and starts the surface");
+    check (h.service->ownsHardwareSurface(), "and holds the Stage 7 claim while it drives");
+    const auto startupFrames = fake.frameCount();
+    check (startupFrames > 0, "the startup sequence reached the device");
+
+    // A knob turn lands in the service. With no control pages the reducer sits on the
+    // performance page, where encoder 1 is tempo — the demo's own mapping.
+    const auto tempoBefore = h.service->surfaceTransport().tempo;
+    fake.feed (0xB0, 0x0B, 0x01);
+    broker.tick();
+    check (h.service->surfaceTransport().tempo > tempoBefore,
+           "a knob turn reaches the service's surface API");
+
+    // The 10 Hz display refresh: bytes travel when due, and only when something changed.
+    fakeNow += 150.0;
+    broker.tick();
+    const auto afterFirstPaint = fake.frameCount();
+    check (afterFirstPaint > startupFrames, "the display paints on the refresh cadence");
+    fakeNow += 150.0;
+    broker.tick();
+    check (fake.frameCount() == afterFirstPaint,
+           "and an unchanged display sends nothing — only bytes that changed travel");
+
+    // Loss (§17.4): stop sending immediately, release the claim, go back to searching.
+    fake.running.store (false);
+    broker.tick();
+    check (broker.state() == Ctrl49SurfaceBroker::State::searching,
+           "losing the device returns the broker to searching");
+    check (! h.service->ownsHardwareSurface(),
+           "and releases the claim so another instance could take over");
+
+    // Reconnect: the device comes back, a fresh session starts from scratch.
+    check (pumpUntil (Ctrl49SurfaceBroker::State::connected), "the device returning reconnects");
+    check (h.service->ownsHardwareSurface(), "with the claim re-taken");
+    check (discoveries >= 2, "through a fresh discovery, not a stale handle");
+
+    // Another instance holding the surface: the broker must refuse to drive, aloud.
+    {
+        fake.running.store (false);
+        broker.tick();   // back to searching, claim released
+
+        Harness other (dir);
+        other.cmd ("getState");
+        check (other.service->claimHardwareSurface(), "a second instance takes the surface");
+
+        const auto framesBefore = fake.frameCount();
+        devicePresent = true;
+        check (pumpUntil (Ctrl49SurfaceBroker::State::heldElsewhere),
+               "the broker sees the surface is taken and stands down");
+        check (fake.frameCount() == framesBefore,
+               "without sending the device a single frame");
+
+        other.service->releaseHardwareSurface();
+        check (pumpUntil (Ctrl49SurfaceBroker::State::connected),
+               "and takes over once the other instance lets go");
+    }
 }
 
 void testEditorPolicy()
@@ -3805,6 +3975,7 @@ int main (int argc, char* argv[])
 
     testCommandFlow();
     testFirstClickAndTheOnScreenKeyboard();
+    testCtrl49Broker();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();
     testSupersededLoad();

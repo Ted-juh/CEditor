@@ -4,6 +4,9 @@
 #include "InstrumentHost/InstrumentHostService.h"
 #include "InstrumentHost/PluginInstantiator.h"
 #include "InstrumentHost/PluginEditorHost.h"
+#include "ControlSurface/Ctrl49SurfaceBroker.h"
+#include "ControlSurface/Ctrl49WindowsEndpoints.h"
+#include "ControlSurface/Ctrl49EmbeddedAssets.h"
 #include "UpdateCheck.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -1797,17 +1800,47 @@ void ValueTreeBridge::ensureInstrumentHost()
 
     instrumentHost = std::make_unique<ceditor::host::InstrumentHostService> (std::move (options));
 
+    // The CTRL49 comes alive with the service: discovery and the paced startup sequence run
+    // on the broker's own worker, every service touch happens in tick() below. On a machine
+    // without the hardware (or off Windows) the discover hook returns null forever and the
+    // broker idles in `searching` — no cost beyond one poll every two seconds.
+    {
+        namespace surface = ceditor::ctrl49;
+        surface::Ctrl49SurfaceBroker::Options surfaceOptions;
+        surfaceOptions.discover = &surface::discoverCtrl49WindowsEndpoints;
+        // Same marshal-and-guard as the service's emit above, same documented raw `this`.
+        surfaceOptions.emit = [this] (const juce::String& eventName, const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, eventName, payload]()
+            {
+                if (browser != nullptr)
+                    browser->emitEventIfBrowserIsVisible (eventName, payload);
+            });
+        };
+        surfaceOptions.pageLua.assign (surface::assets::kKnobPageLua,
+                                       surface::assets::kKnobPageLua + surface::assets::kKnobPageLuaSize);
+        surfaceOptions.pngAssets.push_back ({ 0x0200,
+            surface::Bytes (surface::assets::kKnobStripPng,
+                            surface::assets::kKnobStripPng + surface::assets::kKnobStripPngSize) });
+        instrumentSurfaceBroker = std::make_unique<surface::Ctrl49SurfaceBroker> (*instrumentHost,
+                                                                                  std::move (surfaceOptions));
+    }
+
     // Vendor-editor edits land on audio-thread listeners inside the service; this drains the
-    // coalesced marks to the WebView at UI rate. Cheap when idle (an empty drain is a few
-    // atomic reads per loaded part), so it simply runs for the service's lifetime.
+    // coalesced marks to the WebView at UI rate, and gives the surface broker its controlling-
+    // thread tick in the same breath. Cheap when idle (an empty drain is a few atomic reads
+    // per loaded part; an idle broker tick is a clock read), so it simply runs for the
+    // service's lifetime.
     struct ParamPump final : juce::Timer
     {
-        explicit ParamPump (ceditor::host::InstrumentHostService& serviceToPump)
-            : service (serviceToPump) { startTimerHz (30); }
-        void timerCallback() override { service.drainParameterEvents(); }
+        ParamPump (ceditor::host::InstrumentHostService& serviceToPump,
+                   ceditor::ctrl49::Ctrl49SurfaceBroker& brokerToTick)
+            : service (serviceToPump), broker (brokerToTick) { startTimerHz (30); }
+        void timerCallback() override { service.drainParameterEvents(); broker.tick(); }
         ceditor::host::InstrumentHostService& service;
+        ceditor::ctrl49::Ctrl49SurfaceBroker& broker;
     };
-    instrumentParamPump = std::make_unique<ParamPump> (*instrumentHost);
+    instrumentParamPump = std::make_unique<ParamPump> (*instrumentHost, *instrumentSurfaceBroker);
 }
 
 void ValueTreeBridge::requestInstrumentEditorClose()

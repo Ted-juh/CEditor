@@ -26,6 +26,7 @@ import {
   onInstrumentHostSupportBundle,
   onInstrumentHostLicenceReceipt,
   onInstrumentHostMidiActivity,
+  onInstrumentHostSurface,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
@@ -41,6 +42,20 @@ export const hostLicenceReceipt = writable('');
 /** The latest MIDI message seen on any enabled input, with a monotonically increasing `seq`
  *  so the view can flash on every arrival even when two identical notes repeat. */
 export const hostMidiActivity = writable({ device: '', text: '', seq: 0 });
+// The CTRL49 hardware surface as the broker reports it: searching (no device), connecting,
+// connected, heldElsewhere (another instance owns it), failed. Fail-safe like every other
+// host store — a malformed payload lands on 'searching', never a crash.
+export const hostSurface = writable({ state: 'searching', detail: '', device: '' });
+
+export function normalizeHostSurface(payload) {
+  const known = ['searching', 'heldElsewhere', 'connecting', 'connected', 'failed'];
+  const state = String(payload?.state ?? '');
+  return {
+    state: known.includes(state) ? state : 'searching',
+    detail: String(payload?.detail ?? ''),
+    device: String(payload?.device ?? ''),
+  };
+}
 
 // --- §17.7: the support bundle ------------------------------------------------------------------
 
@@ -1645,6 +1660,7 @@ export function initInstrumentHostBridge() {
     text: String(payload?.text ?? ''),
     seq: a.seq + 1,
   })));
+  onInstrumentHostSurface((payload) => hostSurface.set(normalizeHostSurface(payload)));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);
