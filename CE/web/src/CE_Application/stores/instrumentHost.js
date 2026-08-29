@@ -1874,6 +1874,19 @@ function send(payload) {
         added.pluginVendor = record.manufacturer;
         added.hasInstrument = true;
         hostState.set(next);
+        return;
+      }
+      if (record.type === 'preset') {
+        // The focused load's visible half is the preset cursor moving on the part.
+        hostState.update((st) => {
+          const target = st.rack.parts.find(
+            (p) => p.partId === (payload.partId || st.rack.focusedPartId));
+          if (target?.hasInstrument) {
+            target.presetRecordId = record.recordId;
+            target.presetName = record.name;
+          }
+          return { ...st };
+        });
       }
       return;
     }

@@ -23,6 +23,7 @@
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
     addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
+    hostNote,
     walkPartPreset,
     generateControlPages,
     hostLibrary, requestLibrary, scanLibrary, browseLibraryPath, removeLibraryPath,
@@ -52,6 +53,9 @@
   let paramSearch = $state('');
   let paramDiagnostics = $state(false);
   let libraryOpen = $state(false);
+  // Audition: when on, one click on a library row loads the sound into the focused part AND
+  // plays a short note through the host, so browsing with the mouse is browsing with ears.
+  let auditionOn = $state(false);
   let libraryQuery = $state('');
   let libraryType = $state('');
   let performanceOpen = $state(false);
@@ -59,6 +63,25 @@
   let productOpen = $state(false);
   let reliabilityOpen = $state(false);
   let licenceOpen = $state(false);
+
+  function playAuditionNote() {
+    // A note the focused part will actually voice: the centre of its key zone, clamped —
+    // middle C is no use to a bass split that ends at B2.
+    const part = focusedPart;
+    const note = part ? Math.round((part.keyLow + part.keyHigh) / 2) : 60;
+    hostNote(note, 100, true);
+    setTimeout(() => hostNote(note, 0, false), 600);
+  }
+
+  function clickLibraryRow(record) {
+    if (record.type === 'rack' || !record.available) return;
+    // One click, loaded: into the focused part, or as the first part of an empty rack.
+    loadLibraryRecord(record.recordId, focusedPart ? 'focused' : 'add');
+    // The common browse case (same plug-in, next sound) applies synchronously, so a short
+    // beat later the note plays the NEW sound. A cross-class load may still be
+    // instantiating — the note then auditions nothing, which is harmless and honest.
+    if (auditionOn) setTimeout(playAuditionNote, 250);
+  }
 
   function toggleLibrary() {
     libraryOpen = !libraryOpen;
@@ -356,6 +379,9 @@
                     onclick={() => setLibraryFilter(libraryQuery, value)}>{label}</button>
           {/each}
         </span>
+        <button type="button" class="toggle" class:on={auditionOn} data-testid="host-audition"
+                title="When on, clicking a sound loads it into the focused part and plays a short note"
+                onclick={() => (auditionOn = !auditionOn)}>♪ Audition</button>
         <button type="button" onclick={() => scanLibrary()} data-testid="host-scan-library">Scan presets</button>
         <button type="button" onclick={() => browseLibraryPath()}>Add folder…</button>
         <span class="library-counts">{$hostLibrary.counts.presets} presets · {$hostLibrary.counts.racks} racks</span>
@@ -397,7 +423,13 @@
                     onclick={() => setLibraryUserMetadata(record.recordId, { favourite: !record.favourite })}>
               {record.favourite ? '★' : '☆'}
             </button>
-            <div class="library-id">
+            <div class="library-id" class:clickable={record.type !== 'rack' && record.available}
+                 role="button" tabindex="-1" data-testid="library-row-body"
+                 title={record.type === 'rack' ? undefined
+                        : auditionOn ? 'Click: load into the focused part and audition'
+                                     : 'Click: load into the focused part'}
+                 onclick={() => clickLibraryRow(record)}
+                 onkeydown={(e) => e.key === 'Enter' && clickLibraryRow(record)}>
               <span class="library-name">{record.name}</span>
               <span class="library-detail">
                 {record.type === 'rack' ? 'Rack'
@@ -1221,6 +1253,8 @@
   .library-row { display: flex; align-items: center; gap: 8px; }
   .library-id { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .library-name { font-weight: 600; font-size: 12px; }
+  .library-id.clickable { cursor: pointer; }
+  .library-id.clickable:hover .library-name { color: #7fb4e0; }
   .library-detail { color: #7d8894; font-size: 11px; }
   .library-reason { color: #d6a3a3; font-size: 11px; }
   .library-row.unavailable .library-name { color: #8a939d; }
