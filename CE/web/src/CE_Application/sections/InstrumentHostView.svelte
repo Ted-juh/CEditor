@@ -37,6 +37,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PerformancePanel from './PerformancePanel.svelte';
   import HostMixerPanel from './HostMixerPanel.svelte';
+  import HostSplitEditor from './HostSplitEditor.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
@@ -529,6 +530,13 @@
           </div>
         </div>
       {/each}
+
+      {#if parts.length > 0}
+        <!-- Splits and layers as a picture: every part's key range on one keyboard, edges
+             draggable. The numeric zone fields below stay — the picture and the digits
+             drive the same command. -->
+        <HostSplitEditor />
+      {/if}
 
       {#if focusedPart}
         <div class="midi-zone">
