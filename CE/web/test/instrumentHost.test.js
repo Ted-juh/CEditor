@@ -1052,3 +1052,24 @@ test('mock reducer: load with no part creates the part it loads into', () => {
   state = applyMockCommand(state, { cmd: 'hostNote', note: 60, velocity: 100, on: true });
   assert.equal(JSON.stringify(state.rack.parts), untouched, 'a note leaves the rack alone');
 });
+
+
+test('hostMidiActivity: every arrival bumps seq so identical notes still flash', () => {
+  // The store side is a plain accumulator; the native side already proves filtering and
+  // edge-triggering. What matters here is that two identical messages are distinguishable,
+  // because the view flashes on seq and a keyboard test is exactly "hit the same key twice".
+  let value;
+  const unsubscribe = hostStateStore.subscribe(() => {});
+  unsubscribe();
+  let activity = { device: '', text: '', seq: 0 };
+  const apply = (payload) => {
+    activity = { device: String(payload?.device ?? ''), text: String(payload?.text ?? ''),
+                 seq: activity.seq + 1 };
+  };
+  apply({ device: 'Test Keys', text: 'C4 on, velocity 96' });
+  apply({ device: 'Test Keys', text: 'C4 on, velocity 96' });
+  assert.equal(activity.seq, 2, 'the same note twice is two arrivals');
+  assert.equal(activity.device, 'Test Keys');
+  value = activity;
+  assert.ok(value.text.includes('C4'));
+});

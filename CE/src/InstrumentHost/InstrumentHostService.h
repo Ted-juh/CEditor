@@ -556,6 +556,13 @@ public:
     void setOfflineRender (bool offline);
     bool isOfflineRender() const                       { return offlineRender; }
 
+    /** MIDI arriving from any enabled input, noted for the activity readout (§26.2's "test
+        keys" — a person plugging a keyboard in needs to SEE notes arrive before anything is
+        loaded to play them). Called from the MIDI thread by the observer below; tests call it
+        directly, which is the whole reason it is public. Only channel voice messages are
+        noted — clock and active-sensing would light the indicator continuously. */
+    void noteMidiActivity (const juce::String& deviceName, const juce::MidiMessage& message);
+
     /** Controlling thread. Drains every part's parameter-change marks (vendor editors and
         automation report through listeners that may fire on the audio thread) and emits one
         coalesced instrumentHostParamValues per part that changed — current value and text,
@@ -783,6 +790,24 @@ private:
     // detaches the callbacks before the graph they drive goes down.
     juce::AudioDeviceManager deviceManager;
     juce::AudioProcessorPlayer player;
+
+    /** Forwards incoming MIDI to noteMidiActivity beside the player's own callback — an
+        observer, not a second consumer: nothing here reaches the graph. */
+    struct MidiActivityObserver : juce::MidiInputCallback
+    {
+        explicit MidiActivityObserver (InstrumentHostService& ownerToUse) : owner (ownerToUse) {}
+        void handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message) override
+        {
+            owner.noteMidiActivity (source != nullptr ? source->getName() : juce::String(), message);
+        }
+        InstrumentHostService& owner;
+    };
+    MidiActivityObserver midiObserver { *this };
+    // Written on the MIDI thread, drained on the controlling thread; the mutex spans a few
+    // string copies, far from any audio path.
+    std::mutex midiActivityLock;
+    juce::String midiActivityDevice, midiActivityText;
+    juce::int64 midiActivitySeq = 0, midiActivityEmittedSeq = 0;
     bool audioRunning = false;
 
     // Cleared in the destructor so an asynchronous instantiate callback that outlives this

@@ -12,7 +12,8 @@
    * the vendor UI does not show yet.
    */
   import {
-    hostState, hostScanLog, hostLastError, hostAudioDevices, initInstrumentHostBridge,
+    hostState,
+    hostMidiActivity, hostScanLog, hostLastError, hostAudioDevices, initInstrumentHostBridge,
     filterInstruments, scanForInstruments, addScanPath, browseScanPath, removeScanPath, clearQuarantine,
     addRackPart, removeRackPart, focusRackPart, loadInstrument, unloadInstrument,
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor,
@@ -269,7 +270,20 @@
         </select>
       </label>
       <div class="device-midi">
-        <span class="device-midi-title">MIDI inputs</span>
+        <span class="device-midi-title">MIDI inputs
+          <!-- The "is it even plugged in" answer: the latest message from any enabled input,
+               flashing on arrival. Keyed on seq so two identical notes still both flash. -->
+          {#if $hostMidiActivity.seq > 0}
+            {#key $hostMidiActivity.seq}
+              <span class="midi-activity" data-testid="host-midi-activity">
+                <span class="midi-dot"></span>
+                {$hostMidiActivity.text}{$hostMidiActivity.device ? ` · ${$hostMidiActivity.device}` : ''}
+              </span>
+            {/key}
+          {:else}
+            <span class="midi-activity quiet">play a key to test — the last message shows here</span>
+          {/if}
+        </span>
         {#if $hostAudioDevices.midiInputs.length === 0}
           <span class="device-midi-empty">None found.</span>
         {/if}
@@ -1051,6 +1065,29 @@
   }
   .device-output { display: flex; flex-direction: column; gap: 4px; color: #9aa5b1; font-size: 11px; min-width: 260px; }
   .device-midi { display: flex; flex-direction: column; gap: 4px; }
+  .midi-activity {
+    margin-left: 10px;
+    color: #9fd6a3;
+    font-size: 11px;
+    font-weight: normal;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+  .midi-activity.quiet { color: #66707b; }
+  .midi-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #9fd6a3;
+    margin-right: 5px;
+    animation: midi-flash 0.6s ease-out forwards;
+  }
+  @keyframes midi-flash {
+    from { box-shadow: 0 0 6px 2px #9fd6a366; }
+    to { box-shadow: none; opacity: 0.55; }
+  }
+
   .device-midi-title { color: #9aa5b1; font-size: 11px; }
   .device-midi-empty { color: #7d8894; font-size: 12px; }
   .device-midi-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #d6dbe0; }

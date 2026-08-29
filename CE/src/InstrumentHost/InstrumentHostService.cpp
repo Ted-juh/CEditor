@@ -2723,6 +2723,7 @@ void InstrumentHostService::startAudio()
     player.setProcessor (&rack.getGraph());
     deviceManager.addAudioCallback (&player);
     deviceManager.addMidiInputDeviceCallback ({}, &player);
+    deviceManager.addMidiInputDeviceCallback ({}, &midiObserver);
     for (const auto& input : juce::MidiInput::getAvailableDevices())
         deviceManager.setMidiInputDeviceEnabled (input.identifier, true);
 
@@ -2857,6 +2858,7 @@ void InstrumentHostService::stopAudio()
     if (! audioRunning)
         return;
 
+    deviceManager.removeMidiInputDeviceCallback ({}, &midiObserver);
     deviceManager.removeMidiInputDeviceCallback ({}, &player);
     deviceManager.removeAudioCallback (&player);
     player.setProcessor (nullptr);
@@ -3797,9 +3799,55 @@ void InstrumentHostService::drainEngineEvents()
     }
 }
 
+void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
+                                              const juce::MidiMessage& message)
+{
+    // Clock, active sensing and sysex housekeeping would light the indicator continuously and
+    // prove nothing about the keys. Channel voice messages are what a person is testing.
+    if (! (message.isNoteOnOrOff() || message.isController() || message.isPitchWheel()
+           || message.isAftertouch() || message.isChannelPressure() || message.isProgramChange()))
+        return;
+
+    const auto text = message.isNoteOn()
+        ? juce::MidiMessage::getMidiNoteName (message.getNoteNumber(), true, true, 4)
+            + " on, velocity " + juce::String (message.getVelocity())
+        : message.isNoteOff()
+            ? juce::MidiMessage::getMidiNoteName (message.getNoteNumber(), true, true, 4) + " off"
+            : message.getDescription();
+
+    const std::scoped_lock lock (midiActivityLock);
+    midiActivityDevice = deviceName;
+    midiActivityText = text;
+    ++midiActivitySeq;
+}
+
 void InstrumentHostService::drainParameterEvents()
 {
     drainEngineEvents();
+
+    // The MIDI activity readout: at most one event per drain, carrying the latest message —
+    // a UI light needs "something arrived, this is what", not a message log.
+    {
+        juce::String device, text;
+        bool changed = false;
+        {
+            const std::scoped_lock lock (midiActivityLock);
+            if (midiActivitySeq != midiActivityEmittedSeq)
+            {
+                midiActivityEmittedSeq = midiActivitySeq;
+                device = midiActivityDevice;
+                text = midiActivityText;
+                changed = true;
+            }
+        }
+        if (changed && options.emit != nullptr)
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("device", device);
+            obj->setProperty ("text", text);
+            options.emit ("instrumentHostMidiActivity", juce::var (obj));
+        }
+    }
 
     // The hardware claim is a heartbeat, not a lock: an instance that dies stops writing and
     // the next one takes over after the timeout instead of finding a surface owned by a ghost.

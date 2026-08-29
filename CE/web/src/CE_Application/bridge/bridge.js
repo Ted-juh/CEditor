@@ -1018,6 +1018,14 @@ export function onInstrumentHostLibrary(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** MIDI arriving from any enabled input ({ device, text }) — at most one per UI tick,
+    carrying the latest message. The Audio & MIDI panel's "is it even plugged in" answer. */
+export function onInstrumentHostMidiActivity(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostMidiActivity', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** The receipt for a released activation ({ receipt }). Emitted only when a seat was actually
     released — it is the one thing the customer needs to keep, so it travels as an event rather
     than as a return value nobody sees. */

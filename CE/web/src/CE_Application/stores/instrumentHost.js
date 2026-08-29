@@ -25,6 +25,7 @@ import {
   onInstrumentHostLibrary,
   onInstrumentHostSupportBundle,
   onInstrumentHostLicenceReceipt,
+  onInstrumentHostMidiActivity,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
@@ -37,6 +38,9 @@ export const hostParameters = writable(emptyHostParameters());
 export const hostLibrary = writable(emptyHostLibrary());
 export const hostSupportBundle = writable(emptySupportBundle());
 export const hostLicenceReceipt = writable('');
+/** The latest MIDI message seen on any enabled input, with a monotonically increasing `seq`
+ *  so the view can flash on every arrival even when two identical notes repeat. */
+export const hostMidiActivity = writable({ device: '', text: '', seq: 0 });
 
 // --- §17.7: the support bundle ------------------------------------------------------------------
 
@@ -1636,6 +1640,11 @@ export function initInstrumentHostBridge() {
   onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
   onInstrumentHostSupportBundle((payload) => hostSupportBundle.set(normalizeSupportBundle(payload)));
   onInstrumentHostLicenceReceipt((payload) => hostLicenceReceipt.set(String(payload?.receipt ?? '')));
+  onInstrumentHostMidiActivity((payload) => hostMidiActivity.update((a) => ({
+    device: String(payload?.device ?? ''),
+    text: String(payload?.text ?? ''),
+    seq: a.seq + 1,
+  })));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);

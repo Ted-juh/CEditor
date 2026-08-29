@@ -1353,6 +1353,30 @@ void testFirstClickAndTheOnScreenKeyboard()
     h.cmd ("hostNote", { { "note", 60 }, { "velocity", 100 }, { "on", true } });
     check (h.emits.lastError().contains ("Audio is off"),
            "a note with audio off refuses aloud");
+
+    // The MIDI activity readout: a person testing a keyboard needs to SEE notes arrive before
+    // anything is loaded to play them. Driven directly — the observer's only job is to call
+    // this with the source's name.
+    h.emits.clear();
+    h.service->noteMidiActivity ("Test Keys", juce::MidiMessage::noteOn (1, 60, (juce::uint8) 96));
+    h.service->drainParameterEvents();
+    const auto* activity = h.emits.last ("instrumentHostMidiActivity");
+    check (activity != nullptr, "incoming MIDI reaches the activity readout");
+    check (activity != nullptr && activity->getProperty ("device", {}).toString() == "Test Keys",
+           "naming the device it came from");
+    check (activity != nullptr && activity->getProperty ("text", {}).toString().contains ("C4")
+             && activity->getProperty ("text", {}).toString().contains ("96"),
+           "and the note and velocity, so 'is it even plugged in' has a visible answer");
+
+    h.emits.clear();
+    h.service->drainParameterEvents();
+    check (h.emits.last ("instrumentHostMidiActivity") == nullptr,
+           "quiet inputs emit nothing — the light is edge-triggered, not a heartbeat");
+
+    h.service->noteMidiActivity ("Test Keys", juce::MidiMessage::midiClock());
+    h.service->drainParameterEvents();
+    check (h.emits.last ("instrumentHostMidiActivity") == nullptr,
+           "clock does not light it — housekeeping proves nothing about the keys");
 }
 
 void testEditorPolicy()
