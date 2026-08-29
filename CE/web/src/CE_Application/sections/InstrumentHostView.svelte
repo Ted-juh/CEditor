@@ -36,6 +36,7 @@
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PerformancePanel from './PerformancePanel.svelte';
+  import HostMixerPanel from './HostMixerPanel.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
@@ -53,6 +54,7 @@
   let libraryQuery = $state('');
   let libraryType = $state('');
   let performanceOpen = $state(false);
+  let mixerOpen = $state(false);
   let productOpen = $state(false);
   let reliabilityOpen = $state(false);
   let licenceOpen = $state(false);
@@ -229,6 +231,9 @@
       <button type="button" class="toggle" class:on={performanceOpen}
               onclick={() => (performanceOpen = !performanceOpen)}
               data-testid="host-performance">Performance</button>
+      <button type="button" class="toggle" class:on={mixerOpen}
+              onclick={() => (mixerOpen = !mixerOpen)}
+              data-testid="host-mixer-toggle">Mixer</button>
       <button type="button" class="toggle" class:on={productOpen}
               onclick={() => (productOpen = !productOpen)}
               data-testid="host-product">Product</button>
@@ -319,6 +324,10 @@
 
   {#if performanceOpen}
     <PerformancePanel />
+  {/if}
+
+  {#if mixerOpen}
+    <HostMixerPanel />
   {/if}
 
   {#if productOpen}
