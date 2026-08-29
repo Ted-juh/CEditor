@@ -202,6 +202,8 @@ public:
     /** Writes the slot's binding (an empty binding clears the slot). */
     bool setSlotBinding (const juce::String& pageId, const juce::String& slotId,
                          ControlBinding binding);
+    /** Binds or clears the slot's learned MIDI controller. cc -1 clears; channel 0 = any. */
+    bool setSlotMidi (const juce::String& pageId, const juce::String& slotId, int cc, int channel);
 
     // -- per-part rules and mixer -------------------------------------------------------
     bool setMidiRules (const juce::String& partId, const PartMidiRules& rules);

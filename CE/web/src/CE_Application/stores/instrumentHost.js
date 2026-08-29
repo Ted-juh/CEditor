@@ -27,6 +27,7 @@ import {
   onInstrumentHostLicenceReceipt,
   onInstrumentHostMidiActivity,
   onInstrumentHostSurface,
+  onInstrumentHostMidiLearn,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
@@ -46,6 +47,18 @@ export const hostMidiActivity = writable({ device: '', text: '', seq: 0 });
 // connected, heldElsewhere (another instance owns it), failed. Fail-safe like every other
 // host store — a malformed payload lands on 'searching', never a crash.
 export const hostSurface = writable({ state: 'searching', detail: '', device: '' });
+
+// MIDI learn: which slot is armed and listening right now. The bind itself lands in the
+// state (each slot's midiCc/midiChannel); this store only tracks the transient arming.
+export const hostMidiLearn = writable({ armed: false, pageId: '', slotId: '' });
+
+export function normalizeMidiLearn(payload) {
+  return {
+    armed: payload?.armed === true,
+    pageId: String(payload?.pageId ?? ''),
+    slotId: String(payload?.slotId ?? ''),
+  };
+}
 
 export function normalizeHostSurface(payload) {
   const known = ['searching', 'heldElsewhere', 'connecting', 'connected', 'failed'];
@@ -762,6 +775,8 @@ export function normalizeHostState(payload) {
           inverted: slot?.inverted === true,
           bipolar: slot?.bipolar === true,
           resolved: slot?.resolved === true,
+          midiCc: Number.isInteger(slot?.midiCc) ? Math.max(-1, Math.min(127, slot.midiCc)) : -1,
+          midiChannel: Number.isInteger(slot?.midiChannel) ? Math.max(0, Math.min(16, slot.midiChannel)) : 0,
         })),
       })),
       parts: (Array.isArray(rack.parts) ? rack.parts : []).map((part) => ({
@@ -1252,6 +1267,24 @@ export function applyMockCommand(state, payload) {
     }
     return next;
   }
+  if (cmd === 'learnControlSlotMidi' || cmd === 'clearControlSlotMidi') {
+    const page = next.rack.pages.find((p) => p.pageId === payload.pageId);
+    const slot = page?.slots.find((s) => s.slotId === payload.slotId);
+    if (!slot) return next;
+    if (cmd === 'clearControlSlotMidi') {
+      Object.assign(slot, { midiCc: -1, midiChannel: 0 });
+    } else {
+      // No hardware in the browser, so the mock 'hears' a knob at once: CC 20+slot on
+      // channel 1, stealing it from any slot that already had it — the native rule.
+      const index = page.slots.indexOf(slot);
+      const cc = 20 + index;
+      for (const p of next.rack.pages)
+        for (const other of p.slots)
+          if (other.midiCc === cc && other.midiChannel === 1) Object.assign(other, { midiCc: -1, midiChannel: 0 });
+      Object.assign(slot, { midiCc: cc, midiChannel: 1 });
+    }
+    return next;
+  }
   if (cmd === 'removeScanPath') {
     next.scanPaths = next.scanPaths.filter((p) => p !== payload.path);
     return next;
@@ -1661,6 +1694,7 @@ export function initInstrumentHostBridge() {
     seq: a.seq + 1,
   })));
   onInstrumentHostSurface((payload) => hostSurface.set(normalizeHostSurface(payload)));
+  onInstrumentHostMidiLearn((payload) => hostMidiLearn.set(normalizeMidiLearn(payload)));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);
@@ -1915,6 +1949,20 @@ export const setControlSlotOptions = (pageId, slotId, fields) =>
   send({ cmd: 'setControlSlotOptions', pageId, slotId, ...fields });
 export const setControlSlotValue = (pageId, slotId, value) =>
   send({ cmd: 'setControlSlotValue', pageId, slotId, value });
+export const learnControlSlotMidi = (pageId, slotId) => {
+  if (!isJuceAvailable()) {
+    // The mock binds instantly (no hardware to wait for), so arming never sticks.
+    hostMidiLearn.set({ armed: false, pageId: '', slotId: '' });
+  } else {
+    hostMidiLearn.set({ armed: true, pageId, slotId });
+  }
+  send({ cmd: 'learnControlSlotMidi', pageId, slotId });
+};
+export const cancelMidiLearn = () => {
+  hostMidiLearn.set({ armed: false, pageId: '', slotId: '' });
+  send({ cmd: 'cancelMidiLearn' });
+};
+export const clearControlSlotMidi = (pageId, slotId) => send({ cmd: 'clearControlSlotMidi', pageId, slotId });
 export const requestLibrary = (query = '', type = '') => send({ cmd: 'getLibrary', query, type });
 export const scanLibrary = () => send({ cmd: 'scanLibrary' });
 export const browseLibraryPath = () => send({ cmd: 'browseLibraryPath' });

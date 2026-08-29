@@ -361,6 +361,8 @@ juce::var Performance::toVar() const
             s->setProperty ("rangeMax",    slot.binding.rangeMax);
             s->setProperty ("inverted",    slot.binding.inverted);
             s->setProperty ("bipolar",     slot.binding.bipolar);
+            s->setProperty ("midiCc",      slot.midiCc);
+            s->setProperty ("midiChannel", slot.midiChannel);
             slotVars.add (juce::var (s));
         }
 
@@ -659,6 +661,8 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                     slot.binding.rangeMax    = floatOf (s, "rangeMax", 1.0f, 0.0f, 1.0f);
                     slot.binding.inverted    = (bool) s.getProperty ("inverted", false);
                     slot.binding.bipolar     = (bool) s.getProperty ("bipolar", false);
+                    slot.midiCc      = juce::jlimit (-1, 127, (int) s.getProperty ("midiCc", -1));
+                    slot.midiChannel = juce::jlimit (0, 16, (int) s.getProperty ("midiChannel", 0));
                     page.slots.add (std::move (slot));
                 }
 

@@ -1914,6 +1914,148 @@ void testControlPages()
 // own parameter IDs, with the bidirectional path — CEditor writes through the host-safe API,
 // vendor-side edits arrive as coalesced deltas through drainParameterEvents. Two instances of
 // one class must stay distinct, and a stale address must refuse rather than hit index zero.
+// MIDI learn: arm a slot, move a control on the keyboard, and the controller is bound —
+// then every later movement of that controller drives the slot's parameter through the same
+// central write path the on-screen knob uses. Learn stores the concrete channel it heard,
+// takes a controller away from any slot that already had it (one knob, one slot), and the
+// binding is part of the Performance manifest, so it survives a restart.
+void testMidiLearn()
+{
+    std::cout << "\nMIDI learn for control slots" << std::endl;
+
+    const auto dir = freshDataDir ("midilearn");
+    seedTwoSynthCatalog (dir);
+    juce::String pageId, partId;
+
+    auto cc = [] (int channel, int controller, int value)
+    { return juce::MidiMessage::controllerEvent (channel, controller, value); };
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        auto* stub = h.lastStub;
+
+        h.cmd ("addControlPage", { { "name", "Live" } });
+        pageId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[0]
+                     .getProperty ("pageId", {}).toString();
+        h.cmd ("assignControlSlot", { { "pageId", pageId }, { "slotId", "s1" },
+                                      { "partId", partId }, { "parameterId", "cutoff" } });
+
+        auto slotOf = [&h] (int index) { return h.emits.lastState()->getProperty ("rack", {})
+                                                  .getProperty ("pages", {})[0]
+                                                  .getProperty ("slots", {})[index]; };
+
+        // Arming announces itself, and an unknown slot refuses.
+        h.emits.clear();
+        h.cmd ("learnControlSlotMidi", { { "pageId", pageId }, { "slotId", "s9" } });
+        check (h.emits.lastError().contains ("Unknown control slot"),
+               "arming a slot that does not exist refuses aloud");
+        h.cmd ("learnControlSlotMidi", { { "pageId", pageId }, { "slotId", "s1" } });
+        const auto* armed = h.emits.last ("instrumentHostMidiLearn");
+        check (armed != nullptr && (bool) armed->getProperty ("armed", false)
+                 && armed->getProperty ("slotId", {}).toString() == "s1",
+               "arming a real slot announces which slot is listening");
+
+        // The first controller heard binds — and its value lands immediately.
+        h.emits.clear();
+        h.service->noteMidiActivity ("Test Keys", cc (1, 21, 100));
+        h.service->drainParameterEvents();
+        const auto* bound = h.emits.last ("instrumentHostMidiLearn");
+        check (bound != nullptr && ! (bool) bound->getProperty ("armed", true)
+                 && (int) bound->getProperty ("cc", -1) == 21
+                 && (int) bound->getProperty ("channel", 0) == 1,
+               "the first movement binds its controller and channel");
+        check ((int) slotOf (0).getProperty ("midiCc", -1) == 21
+                 && (int) slotOf (0).getProperty ("midiChannel", 0) == 1,
+               "the binding shows in the state the UI renders");
+        // Within the parameter's own step: the stub's float parameter quantizes to 0.01, so
+        // asking for 100/127 lands on 0.79 — the parameter's answer, not the write path's.
+        check (juce::approximatelyEqual (stub->cutoff->get(), 100.0f / 127.0f,
+                                         juce::absoluteTolerance (0.01f)),
+               "and the movement that bound it already drives the parameter");
+
+        // Later movements drive the slot; the wrong channel does not.
+        h.service->noteMidiActivity ("Test Keys", cc (1, 21, 0));
+        h.service->drainParameterEvents();
+        check (juce::approximatelyEqual (stub->cutoff->get(), 0.0f),
+               "a later movement of the learned controller moves the parameter");
+        h.service->noteMidiActivity ("Test Keys", cc (2, 21, 127));
+        h.service->drainParameterEvents();
+        check (juce::approximatelyEqual (stub->cutoff->get(), 0.0f),
+               "the same controller on another channel is a different knob and moves nothing");
+
+        // Learning the same controller on another slot takes it away from the first.
+        h.cmd ("learnControlSlotMidi", { { "pageId", pageId }, { "slotId", "s2" } });
+        h.service->noteMidiActivity ("Test Keys", cc (1, 21, 64));
+        h.service->drainParameterEvents();
+        check ((int) slotOf (1).getProperty ("midiCc", -1) == 21
+                 && (int) slotOf (0).getProperty ("midiCc", 0) == -1,
+               "one controller drives one slot — learning it elsewhere moves it");
+        h.service->noteMidiActivity ("Test Keys", cc (1, 21, 127));
+        h.service->drainParameterEvents();
+        check (juce::approximatelyEqual (stub->cutoff->get(), 0.0f),
+               "the stolen-from slot no longer follows the controller");
+
+        // Cancel disarms without binding; queued movements from before arming never bind.
+        h.cmd ("learnControlSlotMidi", { { "pageId", pageId }, { "slotId", "s1" } });
+        h.emits.clear();
+        h.cmd ("cancelMidiLearn");
+        const auto* cancelled = h.emits.last ("instrumentHostMidiLearn");
+        check (cancelled != nullptr && ! (bool) cancelled->getProperty ("armed", true),
+               "cancelling announces the disarm");
+        h.service->noteMidiActivity ("Test Keys", cc (1, 22, 5));
+        h.service->drainParameterEvents();
+        h.cmd ("getState");   // nothing bound, so nothing announced — ask for the state
+        check ((int) slotOf (0).getProperty ("midiCc", 0) == -1,
+               "a movement after cancel binds nothing");
+
+        // Clearing removes the binding out loud in the state.
+        h.cmd ("clearControlSlotMidi", { { "pageId", pageId }, { "slotId", "s2" } });
+        check ((int) slotOf (1).getProperty ("midiCc", 0) == -1, "clear unbinds the slot");
+
+        // Bind once more, on a different channel, for the restart half below.
+        h.cmd ("learnControlSlotMidi", { { "pageId", pageId }, { "slotId", "s1" } });
+        h.service->noteMidiActivity ("Test Keys", cc (3, 30, 64));
+        h.service->drainParameterEvents();
+        check ((int) slotOf (0).getProperty ("midiCc", -1) == 30
+                 && (int) slotOf (0).getProperty ("midiChannel", 0) == 3,
+               "the channel it was learned on is part of the binding");
+    }
+
+    {
+        // The binding is manifest state: a fresh service on the same session has it, and the
+        // controller drives the reloaded instrument with no ceremony.
+        Harness h (dir);
+        h.cmd ("getState");
+        const auto slot = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[0]
+                              .getProperty ("slots", {})[0];
+        check ((int) slot.getProperty ("midiCc", -1) == 30
+                 && (int) slot.getProperty ("midiChannel", 0) == 3,
+               "a learned binding survives restart");
+
+        auto* stub = h.lastStub;
+        h.service->noteMidiActivity ("Test Keys", cc (3, 30, 127));
+        h.service->drainParameterEvents();
+        check (stub != nullptr && juce::approximatelyEqual (stub->cutoff->get(), 1.0f),
+               "and still drives the parameter after the reload");
+
+        // Arm, then take the page away before anything moves: the drain disarms out loud
+        // instead of binding into a hole.
+        h.cmd ("learnControlSlotMidi", { { "pageId", pageId }, { "slotId", "s1" } });
+        h.cmd ("removeControlPage", { { "pageId", pageId } });
+        h.emits.clear();
+        h.service->noteMidiActivity ("Test Keys", cc (1, 40, 10));
+        h.service->drainParameterEvents();
+        const auto* orphan = h.emits.last ("instrumentHostMidiLearn");
+        check (orphan != nullptr && ! (bool) orphan->getProperty ("armed", true)
+                 && orphan->getProperty ("slotId", {}).toString().isEmpty(),
+               "an armed slot whose page was removed disarms instead of binding");
+    }
+}
+
 void testParameterModel()
 {
     std::cout << "\nparameter model" << std::endl;
@@ -3975,6 +4117,7 @@ int main (int argc, char* argv[])
 
     testCommandFlow();
     testFirstClickAndTheOnScreenKeyboard();
+    testMidiLearn();
     testCtrl49Broker();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();

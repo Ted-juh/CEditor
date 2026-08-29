@@ -808,6 +808,19 @@ private:
     std::mutex midiActivityLock;
     juce::String midiActivityDevice, midiActivityText;
     juce::int64 midiActivitySeq = 0, midiActivityEmittedSeq = 0;
+
+    // Controller changes captured by the same observer, coalesced per (channel, cc) so a
+    // knob sweep costs one entry however fast it turns. Guarded by midiActivityLock; drained
+    // on the controlling thread, where MIDI learn and the bound-slot writes actually happen.
+    struct PendingCc { int channel = 0; int cc = 0; int value = 0; };
+    std::vector<PendingCc> pendingCcs;
+
+    // MIDI-learn armed target — controlling thread only, like every other piece of service
+    // state. Empty page id = not armed.
+    juce::String midiLearnPageId, midiLearnSlotId;
+    void drainControllerEvents();
+    void emitMidiLearn (bool armed, const juce::String& pageId, const juce::String& slotId,
+                        int cc, int channel);
     bool audioRunning = false;
 
     // Cleared in the destructor so an asynchronous instantiate callback that outlives this

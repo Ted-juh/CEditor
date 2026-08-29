@@ -22,6 +22,7 @@
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
     addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
+    hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
     generateControlPages,
     hostLibrary, requestLibrary, scanLibrary, browseLibraryPath, removeLibraryPath,
     saveUserPreset, saveRackToLibrary, setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
@@ -990,6 +991,27 @@
                   {:else}
                     <span class="slot-empty">empty — assign from the parameter list (→)</span>
                   {/if}
+                  <!-- MIDI learn: click, wiggle a control on the keyboard, and the slot follows
+                       it from then on. Works on an empty slot too — bind the knob first,
+                       assign the parameter after. -->
+                  {#if $hostMidiLearn.armed && $hostMidiLearn.pageId === selectedPage.pageId
+                        && $hostMidiLearn.slotId === slot.slotId}
+                    <button type="button" class="ghost midi-learn armed" data-testid="midi-learn-armed"
+                            title="Move a control on your MIDI keyboard — or click to cancel"
+                            onclick={() => cancelMidiLearn()}>listening…</button>
+                  {:else}
+                    {#if slot.midiCc >= 0}
+                      <span class="midi-cc"
+                            title={`This slot follows CC ${slot.midiCc}${slot.midiChannel ? ` on channel ${slot.midiChannel}` : ' on any channel'}`}>
+                        CC {slot.midiCc}{slot.midiChannel ? ` · ch ${slot.midiChannel}` : ''}
+                        <button type="button" class="ghost danger" title="Remove the MIDI binding"
+                                onclick={() => clearControlSlotMidi(selectedPage.pageId, slot.slotId)}>×</button>
+                      </span>
+                    {/if}
+                    <button type="button" class="ghost midi-learn"
+                            title="Bind a hardware control: click, then move a knob or fader on your MIDI keyboard"
+                            onclick={() => learnControlSlotMidi(selectedPage.pageId, slot.slotId)}>learn</button>
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -1419,6 +1441,11 @@
   .slot-empty { color: #66707b; font-size: 11px; }
   .slot-warning { flex: 1; color: #d6a3a3; font-size: 11px; }
   .slot-row.unresolved .slot-name { color: #d6a3a3; }
+  .midi-learn { font-size: 10px; color: #9aa5b1; }
+  .midi-learn.armed { color: #d9a13c; border-color: #d9a13c; animation: midi-learn-pulse 1s ease-in-out infinite; }
+  @keyframes midi-learn-pulse { 50% { opacity: 0.45; } }
+  .midi-cc { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: #7fb4e0;
+             background: #22303c; border-radius: 3px; padding: 1px 4px; white-space: nowrap; }
 
   button {
     background: #232a31;

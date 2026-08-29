@@ -1,5 +1,7 @@
 #include "InstrumentHostService.h"
 
+#include <utility>
+
 namespace ceditor::host
 {
 
@@ -651,6 +653,48 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             savePerformance();
             emitState();
         }
+        return;
+    }
+
+    if (cmd == "learnControlSlotMidi")
+    {
+        const auto pageId = payload.getProperty ("pageId", {}).toString();
+        const auto slotId = payload.getProperty ("slotId", {}).toString();
+        const auto* page = rack.getPerformance().findPage (pageId);
+        if (page == nullptr || page->findSlot (slotId) == nullptr)
+        {
+            emitError ("Unknown control slot.");
+            return;
+        }
+
+        midiLearnPageId = pageId;
+        midiLearnSlotId = slotId;
+        {   // Armed means the NEXT movement binds — not one still queued from before the click.
+            const std::scoped_lock lock (midiActivityLock);
+            pendingCcs.clear();
+        }
+        emitMidiLearn (true, pageId, slotId, -1, 0);
+        return;
+    }
+
+    if (cmd == "cancelMidiLearn")
+    {
+        midiLearnPageId.clear();
+        midiLearnSlotId.clear();
+        emitMidiLearn (false, {}, {}, -1, 0);
+        return;
+    }
+
+    if (cmd == "clearControlSlotMidi")
+    {
+        if (! rack.setSlotMidi (payload.getProperty ("pageId", {}).toString(),
+                                payload.getProperty ("slotId", {}).toString(), -1, 0))
+        {
+            emitError ("Unknown control slot.");
+            return;
+        }
+        savePerformance();
+        emitState();
         return;
     }
 
@@ -3819,6 +3863,105 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     midiActivityDevice = deviceName;
     midiActivityText = text;
     ++midiActivitySeq;
+
+    // Controller changes additionally feed MIDI learn and the learned-slot writes, which
+    // happen on the controlling thread — this only queues. Coalesced per (channel, cc):
+    // a knob sweep between drains is one entry carrying its latest value, and the arrival
+    // order of DISTINCT controllers is kept, because learn binds the first one heard.
+    if (message.isController())
+    {
+        const PendingCc event { message.getChannel(), message.getControllerNumber(),
+                                message.getControllerValue() };
+        for (auto& queued : pendingCcs)
+            if (queued.channel == event.channel && queued.cc == event.cc)
+            {
+                queued.value = event.value;
+                return;
+            }
+        if (pendingCcs.size() < 64)
+            pendingCcs.push_back (event);
+    }
+}
+
+void InstrumentHostService::emitMidiLearn (bool armed, const juce::String& pageId,
+                                           const juce::String& slotId, int cc, int channel)
+{
+    if (options.emit == nullptr)
+        return;
+
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("armed",   armed);
+    obj->setProperty ("pageId",  pageId);
+    obj->setProperty ("slotId",  slotId);
+    obj->setProperty ("cc",      cc);
+    obj->setProperty ("channel", channel);
+    options.emit ("instrumentHostMidiLearn", juce::var (obj));
+}
+
+void InstrumentHostService::drainControllerEvents()
+{
+    std::vector<PendingCc> events;
+    {
+        const std::scoped_lock lock (midiActivityLock);
+        events.swap (pendingCcs);
+    }
+    if (events.empty())
+        return;
+
+    // Learn first: the armed slot takes the first controller heard since arming.
+    if (midiLearnPageId.isNotEmpty())
+    {
+        const auto pageId = std::exchange (midiLearnPageId, {});
+        const auto slotId = std::exchange (midiLearnSlotId, {});
+        const auto& first = events.front();
+
+        // One controller drives one slot: learning a controller that is already bound
+        // elsewhere moves it, because two slots silently riding one knob is a support call.
+        for (const auto& page : rack.getPerformance().pages)
+            for (const auto& other : page.slots)
+                if (other.midiCc == first.cc && other.midiChannel == first.channel
+                      && ! (page.pageId == pageId && other.slotId == slotId))
+                    rack.setSlotMidi (page.pageId, other.slotId, -1, 0);
+
+        if (rack.setSlotMidi (pageId, slotId, first.cc, first.channel))
+        {
+            savePerformance();
+            emitState();
+            emitMidiLearn (false, pageId, slotId, first.cc, first.channel);
+        }
+        else
+        {
+            // The slot vanished while armed (its page was removed): disarm out loud.
+            emitMidiLearn (false, {}, {}, -1, 0);
+        }
+    }
+
+    // Every event lands on every slot bound to it — absolute position, the controller value
+    // scaling the slot's mapped range exactly as the on-screen knob does. The freshly
+    // learned slot is caught here too, so the knob takes effect the moment it binds.
+    bool virtualWritten = false;
+    for (const auto& event : events)
+        for (const auto& page : rack.getPerformance().pages)
+            for (const auto& slot : page.slots)
+            {
+                if (slot.midiCc != event.cc)
+                    continue;
+                if (slot.midiChannel != 0 && slot.midiChannel != event.channel)
+                    continue;
+                if (slot.binding.isEmpty() || ! bindingResolves (slot.binding))
+                    continue;
+
+                writeMappedBinding (slot.binding, (float) event.value / 127.0f);
+                virtualWritten = virtualWritten || isVirtualParameterId (slot.binding.parameterId);
+            }
+
+    // A virtual write changed the manifest (fader, send, macro): one save and one announce
+    // per drain however many controllers moved — the contract the CTRL49 encoders set.
+    if (virtualWritten)
+    {
+        savePerformance();
+        emitState();
+    }
 }
 
 void InstrumentHostService::drainParameterEvents()
@@ -3848,6 +3991,8 @@ void InstrumentHostService::drainParameterEvents()
             options.emit ("instrumentHostMidiActivity", juce::var (obj));
         }
     }
+
+    drainControllerEvents();
 
     // The hardware claim is a heartbeat, not a lock: an instance that dies stops writing and
     // the next one takes over after the timeout instead of finding a surface owned by a ghost.
@@ -4218,6 +4363,8 @@ juce::var InstrumentHostService::buildStatePayload()
             s->setProperty ("inverted",    b.inverted);
             s->setProperty ("bipolar",     b.bipolar);
             s->setProperty ("resolved",    resolved);
+            s->setProperty ("midiCc",      slot.midiCc);
+            s->setProperty ("midiChannel", slot.midiChannel);
             slots.add (juce::var (s));
         }
 

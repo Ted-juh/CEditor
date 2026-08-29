@@ -149,6 +149,14 @@ struct ControlSlot
 {
     juce::String slotId;          // stable within its page ("s1".."s8")
     ControlBinding binding;       // empty binding = unassigned slot
+
+    // MIDI learn: a controller number bound to this slot drives it from any enabled MIDI
+    // input, absolute 0..127 onto the slot's mapped range. Learn always stores the concrete
+    // channel it heard (1..16) so two keyboards on different channels stay two controllers;
+    // 0 means any channel and exists for hand-edited manifests. -1 = unbound. Older
+    // manifests simply lack the fields and read back unbound — no schema bump needed.
+    int midiCc = -1;
+    int midiChannel = 0;
 };
 
 // The neutral page: named control slots over parameter addresses, no hardware bytes anywhere.

@@ -45,6 +45,7 @@ import {
   emptySupportBundle,
   normalizeSupportBundle,
   normalizeHostSurface,
+  normalizeMidiLearn,
   emptyLicence,
   normalizeLicence,
 } from '../src/CE_Application/stores/instrumentHost.js';
@@ -1090,4 +1091,52 @@ test('normalizeHostSurface shapes broker payloads and fails safe on garbage', ()
   assert.deepEqual(normalizeHostSurface(null), { state: 'searching', detail: '', device: '' });
   assert.deepEqual(normalizeHostSurface('nonsense'), { state: 'searching', detail: '', device: '' });
   assert.equal(normalizeHostSurface({ detail: 7, device: 9 }).detail, '7');
+});
+
+test('slots normalize their MIDI-learn binding and default to unbound', () => {
+  const shaped = normalizeHostState({ rack: { pages: [{ pageId: 'p', slots: [
+    { slotId: 's1', midiCc: 21, midiChannel: 1 },
+    { slotId: 's2' },
+    { slotId: 's3', midiCc: 900, midiChannel: -4 },
+  ] }] } });
+  const [a, b, c] = shaped.rack.pages[0].slots;
+  assert.equal(a.midiCc, 21);
+  assert.equal(a.midiChannel, 1);
+  assert.equal(b.midiCc, -1, 'an absent binding reads unbound');
+  assert.equal(b.midiChannel, 0);
+  assert.equal(c.midiCc, 127, 'garbage clamps instead of crashing');
+  assert.equal(c.midiChannel, 0);
+});
+
+test('normalizeMidiLearn shapes the arming event and fails safe', () => {
+  assert.deepEqual(normalizeMidiLearn({ armed: true, pageId: 'p', slotId: 's1' }),
+                   { armed: true, pageId: 'p', slotId: 's1' });
+  assert.deepEqual(normalizeMidiLearn(null), { armed: false, pageId: '', slotId: '' });
+  assert.deepEqual(normalizeMidiLearn({ armed: 'yes' }), { armed: false, pageId: '', slotId: '' });
+});
+
+test('mock reducer: MIDI learn binds a controller, steals it on re-learn, clear unbinds', () => {
+  let state = normalizeHostState({});
+  state = applyMockCommand(state, { cmd: 'addControlPage', name: 'Live' });
+  const pageId = state.rack.pages[0].pageId;
+
+  state = applyMockCommand(state, { cmd: 'learnControlSlotMidi', pageId, slotId: 's1' });
+  assert.equal(state.rack.pages[0].slots[0].midiCc, 20, 'the mock hears a knob at once');
+  assert.equal(state.rack.pages[0].slots[0].midiChannel, 1);
+
+  // Learning the same controller on another slot moves it — one knob, one slot. The mock
+  // derives its CC from the slot index, so drive s2 to CC 20 by hand first to exercise it.
+  state.rack.pages[0].slots[1].midiCc = 20;
+  state.rack.pages[0].slots[1].midiChannel = 1;
+  state = applyMockCommand(state, { cmd: 'learnControlSlotMidi', pageId, slotId: 's1' });
+  assert.equal(state.rack.pages[0].slots[0].midiCc, 20);
+  assert.equal(state.rack.pages[0].slots[1].midiCc, -1, 'the previous holder is unbound');
+
+  // Clearing the slot's PARAMETER leaves the hardware binding — they are separate stories.
+  state = applyMockCommand(state, { cmd: 'clearControlSlot', pageId, slotId: 's1' });
+  assert.equal(state.rack.pages[0].slots[0].midiCc, 20, 'parameter clear keeps the knob');
+
+  state = applyMockCommand(state, { cmd: 'clearControlSlotMidi', pageId, slotId: 's1' });
+  assert.equal(state.rack.pages[0].slots[0].midiCc, -1, 'MIDI clear unbinds it');
+  assert.equal(state.rack.pages[0].slots[0].midiChannel, 0);
 });

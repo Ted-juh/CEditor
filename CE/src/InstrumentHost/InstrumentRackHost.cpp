@@ -655,6 +655,19 @@ bool InstrumentRackHost::setSlotBinding (const juce::String& pageId, const juce:
     return true;
 }
 
+bool InstrumentRackHost::setSlotMidi (const juce::String& pageId, const juce::String& slotId,
+                                      int cc, int channel)
+{
+    auto* page = model.findPage (pageId);
+    auto* slot = page != nullptr ? page->findSlot (slotId) : nullptr;
+    if (slot == nullptr)
+        return false;
+
+    slot->midiCc = juce::jlimit (-1, 127, cc);
+    slot->midiChannel = juce::jlimit (0, 16, channel);
+    return true;
+}
+
 bool InstrumentRackHost::removePart (const juce::String& partId)
 {
     auto* lp = findLive (partId);
