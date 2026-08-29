@@ -655,6 +655,18 @@ bool InstrumentRackHost::setSlotBinding (const juce::String& pageId, const juce:
     return true;
 }
 
+bool InstrumentRackHost::setPartLastPreset (const juce::String& partId, const juce::String& recordId,
+                                            const juce::String& name)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+
+    part->lastPresetRecordId = recordId;
+    part->lastPresetName = name;
+    return true;
+}
+
 bool InstrumentRackHost::setSlotMidi (const juce::String& pageId, const juce::String& slotId,
                                       int cc, int channel)
 {

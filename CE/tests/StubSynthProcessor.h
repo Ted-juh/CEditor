@@ -21,6 +21,7 @@ struct StubSynthProcessor : juce::AudioProcessor
                                     .withOutput ("Out", juce::AudioChannelSet::stereo(), true)),
           amp (ampToUse)
     {
+        programs = factoryPrograms;
         // Three host-visible parameters, one per shape the Stage 2 registry classifies —
         // continuous, discrete choice, boolean — with real paramIDs the way hosted VST3
         // parameters carry them (AudioProcessorParameterWithID).
@@ -74,10 +75,25 @@ struct StubSynthProcessor : juce::AudioProcessor
     double getTailLengthSeconds() const override              { return 0.0; }
     juce::AudioProcessorEditor* createEditor() override       { return nullptr; }
     bool hasEditor() const override                           { return false; }
-    int getNumPrograms() override                             { return 1; }
-    int getCurrentProgram() override                          { return 0; }
-    void setCurrentProgram (int) override                     {}
-    const juce::String getProgramName (int) override          { return {}; }
+    // Program-list support, opt-in per test: set `factoryPrograms` BEFORE instantiation and
+    // every stub built from then on exposes them, the way a plug-in with an IUnitInfo
+    // program list surfaces through JUCE's program API. Empty (the default) reports the
+    // API's mandatory single program, which the ingestion correctly reads as "no list" —
+    // so the suites that never mention programs keep the library exactly as it was.
+    int getNumPrograms() override    { return juce::jmax (1, (int) programs.size()); }
+    int getCurrentProgram() override { return currentProgram; }
+    void setCurrentProgram (int index) override
+    {
+        if (index < 0 || index >= (int) programs.size())
+            return;
+        currentProgram = index;
+        *cutoff = programs[(size_t) index].second;   // a program is a sound: it moves state
+    }
+    const juce::String getProgramName (int index) override
+    {
+        return index >= 0 && index < (int) programs.size() ? programs[(size_t) index].first
+                                                           : juce::String();
+    }
     void changeProgramName (int, const juce::String&) override {}
 
     ~StubSynthProcessor() override
@@ -91,6 +107,9 @@ struct StubSynthProcessor : juce::AudioProcessor
     juce::AudioParameterChoice* wave = nullptr;
     juce::AudioParameterBool* drive = nullptr;
     int patch = 0;
+    static inline std::vector<std::pair<juce::String, float>> factoryPrograms;
+    std::vector<std::pair<juce::String, float>> programs;
+    int currentProgram = 0;
     int activeNotes = 0;
     double preparedRate = 0.0;
     std::vector<juce::MidiMessage> received;   // test instrumentation, not RT-safe, fine here

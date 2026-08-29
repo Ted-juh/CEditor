@@ -1,5 +1,6 @@
 #include "InstrumentHostService.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace ceditor::host
@@ -330,6 +331,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
+        // A plain instrument load starts from the plug-in's own default, so the preset
+        // cursor clears — the walk starts at the top, and no stale name is displayed.
+        rack.setPartLastPreset (partId, {}, {});
         requestInstrument (partId, ceId);
         return;
     }
@@ -2188,6 +2192,73 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "walkPartPreset")
+    {
+        // Prev/next preset on a part, VIP's front-panel walk: every library preset for the
+        // part's plug-in class, in one predictable order — the factory program list by its
+        // own indexes, then vendor .vstpreset files by name, then captured user state by
+        // name — wrapping at the ends. The cursor is wherever the last preset load landed,
+        // whichever source it came from.
+        ensureLibrary();
+        auto partId = payload.getProperty ("partId", {}).toString();
+        if (partId.isEmpty())
+            partId = rack.getPerformance().focusedPartId;
+
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        if (part->pluginCeId.isEmpty() || part->hardware)
+        {
+            emitError ("Load an instrument on this part first — presets walk what is loaded.");
+            return;
+        }
+
+        juce::Array<const LibraryRecord*> candidates;
+        for (const auto& record : library.allRecords())
+            if (record.type == "preset" && ! record.missing
+                && record.targetCeId == part->pluginCeId)
+                candidates.add (&record);
+
+        const auto rankOf = [] (const LibraryRecord& r)
+        { return r.sourceType == "programList" ? 0 : r.sourceType == "vstpreset" ? 1 : 2; };
+        const auto indexOf = [] (const LibraryRecord& r)
+        { return r.sourceLocator.fromLastOccurrenceOf ("/", false, false).getIntValue(); };
+        std::sort (candidates.begin(), candidates.end(),
+                   [&] (const LibraryRecord* a, const LibraryRecord* b)
+                   {
+                       if (rankOf (*a) != rankOf (*b)) return rankOf (*a) < rankOf (*b);
+                       if (rankOf (*a) == 0 && indexOf (*a) != indexOf (*b))
+                           return indexOf (*a) < indexOf (*b);
+                       const auto byName = a->name.compareIgnoreCase (b->name);
+                       if (byName != 0) return byName < 0;
+                       return a->recordId < b->recordId;
+                   });
+
+        if (candidates.isEmpty())
+        {
+            emitError ("No presets in the library for " + part->pluginName
+                       + " — its factory sounds may only live in its own browser.");
+            return;
+        }
+
+        const auto delta = (int) payload.getProperty ("delta", 1) < 0 ? -1 : 1;
+        int position = -1;
+        for (int i = 0; i < candidates.size(); ++i)
+            if (candidates[i]->recordId == part->lastPresetRecordId)
+                { position = i; break; }
+
+        // No cursor yet (or its record is gone): next starts at the top, prev at the end.
+        const auto next = position < 0
+                            ? (delta > 0 ? 0 : candidates.size() - 1)
+                            : (position + delta + candidates.size()) % candidates.size();
+
+        loadPresetRecord (*candidates[next], partId);
+        return;
+    }
+
     emitError ("Unknown instrument-host command: " + cmd);
 }
 
@@ -2557,6 +2628,7 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
                     afterCommit (*committed);
 
             attachParameters (partId);
+            ingestProgramList (partId);
 
             if (editorWasHere)
                 showEditorFor (partId);
@@ -3256,6 +3328,7 @@ void InstrumentHostService::emitLibrary (const juce::String& query, const juce::
         r->setProperty ("recordId",     record->recordId);
         r->setProperty ("type",         record->type);
         r->setProperty ("sourceType",   record->sourceType);
+        r->setProperty ("targetCeId",   record->targetCeId);
         r->setProperty ("name",         record->name);
         r->setProperty ("manufacturer", record->manufacturer);
         r->setProperty ("instrument",   record->instrument);
@@ -3374,6 +3447,49 @@ void InstrumentHostService::scanVstPresets()
     library.mergeVendorScan ("vstpreset", std::move (scanned));
 }
 
+void InstrumentHostService::ingestProgramList (const juce::String& partId)
+{
+    // Layer B of the layered preset engine (baseline §6.2): a plug-in that exposes its
+    // factory programs through the program-list interface gets them into the ONE library,
+    // beside .vstpreset files and captured state, the moment it is live — no separate scan.
+    // JUCE surfaces IUnitInfo program lists through the standard program API, and the API's
+    // mandatory single program is not a list, so below two programs there is nothing to say.
+    const auto* part = rack.getPerformance().findPart (partId);
+    auto* instrument = rack.getInstrument (partId);
+    if (part == nullptr || instrument == nullptr || part->pluginCeId.isEmpty())
+        return;
+
+    const auto count = instrument->getNumPrograms();
+    if (count <= 1)
+        return;
+
+    ensureLibrary();
+    const auto scope = "program://" + part->pluginCeId + "/";
+    juce::Array<LibraryRecord> scanned;
+    for (int i = 0; i < count; ++i)
+    {
+        LibraryRecord record;
+        record.type = "preset";
+        record.sourceType = "programList";
+        record.factory = true;
+        record.sourceLocator = scope + juce::String (i);
+        const auto reported = instrument->getProgramName (i);
+        record.name = reported.isNotEmpty() ? reported : "Program " + juce::String (i + 1);
+        record.instrument = part->pluginName;
+        record.manufacturer = part->pluginVendor;
+        record.targetCeId = part->pluginCeId;
+        // Index and name together: a reordered or renamed factory list reads as changed
+        // content, and the scoped merge then keeps ids where the identity really held.
+        record.fingerprint = juce::String::toHexString (
+            (record.sourceLocator + "|" + record.name).hashCode64());
+        scanned.add (std::move (record));
+    }
+
+    // Scoped to this class so refreshing one plug-in's list never marks another's missing.
+    library.mergeVendorScan ("programList", std::move (scanned), scope);
+    library.saveTo (libraryFile());
+}
+
 void InstrumentHostService::loadPresetRecord (const LibraryRecord& record, const juce::String& partId)
 {
     const auto* part = rack.getPerformance().findPart (partId);
@@ -3406,6 +3522,19 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record, const
             if (! applyVendorPreset (*instrument))
                 return;
         }
+        else if (record.sourceType == "programList")
+        {
+            const auto index = record.sourceLocator.fromLastOccurrenceOf ("/", false, false)
+                                     .getIntValue();
+            if (index < 0 || index >= instrument->getNumPrograms())
+            {
+                // The plug-in changed its list since ingestion; a stale index must refuse,
+                // not select whatever now sits at that position.
+                emitError ("The plug-in no longer has this program: " + record.name);
+                return;
+            }
+            instrument->setCurrentProgram (index);
+        }
         else
         {
             juce::MemoryOutputStream decoded;
@@ -3417,6 +3546,8 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record, const
             instrument->setStateInformation (decoded.getData(), (int) decoded.getDataSize());
         }
 
+        // The part's place in the walk moves only once the preset actually applied.
+        rack.setPartLastPreset (partId, record.recordId, record.name);
         savePerformance();
         emitState();
         return;
@@ -3440,11 +3571,23 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record, const
 
     rack.primePartState (partId, info,
                          record.sourceType == "userState" ? record.stateBlobBase64 : juce::String());
+    rack.setPartLastPreset (partId, record.recordId, record.name);
 
     if (record.sourceType == "vstpreset")
         requestInstrument (partId, record.targetCeId,
                            [applyVendorPreset] (juce::AudioProcessor& instrument)
                            { applyVendorPreset (instrument); });
+    else if (record.sourceType == "programList")
+        requestInstrument (partId, record.targetCeId,
+                           [this, index = record.sourceLocator.fromLastOccurrenceOf ("/", false, false)
+                                        .getIntValue(),
+                            name = record.name] (juce::AudioProcessor& instrument)
+                           {
+                               if (index >= 0 && index < instrument.getNumPrograms())
+                                   instrument.setCurrentProgram (index);
+                               else
+                                   emitError ("The plug-in no longer has this program: " + name);
+                           });
     else
         requestInstrument (partId, record.targetCeId);
 }
@@ -4276,6 +4419,8 @@ juce::var InstrumentHostService::buildStatePayload()
         obj->setProperty ("pluginCeId",    part.pluginCeId);
         obj->setProperty ("pluginName",    part.pluginName);
         obj->setProperty ("pluginVendor",  part.pluginVendor);
+        obj->setProperty ("presetRecordId", part.lastPresetRecordId);
+        obj->setProperty ("presetName",     part.lastPresetName);
         obj->setProperty ("hasInstrument", rack.partHasInstrument (part.partId));
         obj->setProperty ("unresolved",    part.pluginCeId.isNotEmpty()
                                              && ! rack.partHasInstrument (part.partId));

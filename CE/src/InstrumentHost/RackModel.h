@@ -105,6 +105,11 @@ struct RackPart
     float volume = 1.0f;              // linear gain, 0..2
     float pan = 0.0f;                 // -1..+1
     bool editorOpen = false;
+    // The part's place in the preset walk: the library record last applied to it, plus the
+    // name as a display cache (never identity — the record can be renamed or gone, and the
+    // cache still truthfully names the sound that was loaded). Empty until a preset loads.
+    juce::String lastPresetRecordId;
+    juce::String lastPresetName;
 
     // Hardware-instrument parts (Stage 5, baseline §18.7.6): the part is an external synth
     // reached over MIDI, optionally returning audio through the interface's inputs. It reuses

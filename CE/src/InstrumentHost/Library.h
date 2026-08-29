@@ -69,8 +69,12 @@ public:
         matches — same fingerprint, or same sourceLocator when the content changed — keep the
         existing record's id and user block and refresh the vendor-derived fields. Vendor
         records of this sourceType that the scan no longer found are marked missing, never
-        deleted; a record that reappears clears the flag. Captured records are untouched. */
-    void mergeVendorScan (const juce::String& sourceType, juce::Array<LibraryRecord> scanned);
+        deleted; a record that reappears clears the flag. Captured records are untouched.
+        A non-empty locatorScope confines the whole merge — matching and missing-marking —
+        to records whose sourceLocator starts with it, so one plug-in's program list can be
+        refreshed without another plug-in's list being declared missing. */
+    void mergeVendorScan (const juce::String& sourceType, juce::Array<LibraryRecord> scanned,
+                          const juce::String& locatorScope = {});
 
     /** Updates only the user block of a record. */
     bool setUserMetadata (const juce::String& recordId, const LibraryRecord::UserMetadata& user);

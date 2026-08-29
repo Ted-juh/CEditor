@@ -1140,3 +1140,26 @@ test('mock reducer: MIDI learn binds a controller, steals it on re-learn, clear 
   assert.equal(state.rack.pages[0].slots[0].midiCc, -1, 'MIDI clear unbinds it');
   assert.equal(state.rack.pages[0].slots[0].midiChannel, 0);
 });
+
+test('parts normalize their preset cursor and the mock walk cycles with wrap', () => {
+  const shaped = normalizeHostState({ rack: { parts: [
+    { partId: 'p1', presetRecordId: 'r1', presetName: 'Bright' }, { partId: 'p2' },
+  ] } });
+  assert.equal(shaped.rack.parts[0].presetName, 'Bright');
+  assert.equal(shaped.rack.parts[1].presetName, '', 'no preset reads as empty, not undefined');
+
+  let state = mockHostState();
+  const empty = state.rack.parts[1].partId;   // the empty mock part
+  state = applyMockCommand(state, { cmd: 'walkPartPreset', partId: empty, delta: 1 });
+  assert.equal(state.rack.parts[1].presetName, '', 'a part without an instrument does not walk');
+
+  state = applyMockCommand(state, { cmd: 'loadInstrument', partId: empty, ceId: 'mock-analog' });
+  const partOf = (st) => st.rack.parts.find((p) => p.partId === empty);
+  state = applyMockCommand(state, { cmd: 'walkPartPreset', partId: empty, delta: 1 });
+  assert.equal(partOf(state).presetName, 'Init', 'the first step lands on the first sound');
+  state = applyMockCommand(state, { cmd: 'walkPartPreset', partId: empty, delta: 1 });
+  assert.equal(partOf(state).presetName, 'Bright');
+  state = applyMockCommand(state, { cmd: 'walkPartPreset', partId: empty, delta: -1 });
+  state = applyMockCommand(state, { cmd: 'walkPartPreset', partId: empty, delta: -1 });
+  assert.equal(partOf(state).presetName, 'Dark', 'prev from the top wraps to the end');
+});

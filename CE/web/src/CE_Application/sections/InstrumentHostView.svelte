@@ -23,6 +23,7 @@
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
     addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
+    walkPartPreset,
     generateControlPages,
     hostLibrary, requestLibrary, scanLibrary, browseLibraryPath, removeLibraryPath,
     saveUserPreset, saveRackToLibrary, setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
@@ -477,6 +478,21 @@
             <span class="part-name">{partTitle(part)}</span>
             <span class="part-vendor">{part.pluginVendor}</span>
           </button>
+          {#if part.hasInstrument && !part.hardware}
+            <!-- The VIP front-panel walk: every library preset for this plug-in — factory
+                 program list, vendor files, captured state — in one order, wrapping. -->
+            <span class="preset-walk" data-testid="part-preset-walk">
+              <button type="button" class="ghost" title="Previous preset"
+                      onclick={() => walkPartPreset(part.partId, -1)}>‹</button>
+              <span class="preset-name" title={part.presetName
+                      ? `Loaded preset: ${part.presetName}`
+                      : 'No preset loaded yet — walk or pick one from the library'}>
+                {part.presetName || '— no preset —'}
+              </span>
+              <button type="button" class="ghost" title="Next preset"
+                      onclick={() => walkPartPreset(part.partId, 1)}>›</button>
+            </span>
+          {/if}
           <div class="part-controls">
             <button type="button" class="toggle" class:on={part.enabled} title="Part enabled (off panics its notes)"
                     onclick={() => setPartMixer(part.partId, { enabled: !part.enabled })}>On</button>
@@ -1268,6 +1284,10 @@
     font: inherit;
   }
   .part-name { font-weight: 600; }
+  .preset-walk { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px; }
+  .preset-walk .ghost { padding: 0 6px; font-size: 13px; line-height: 1.2; }
+  .preset-name { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                 font-size: 11px; color: #9aa5b1; }
   .part-vendor { color: #7d8894; }
 
   .part-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

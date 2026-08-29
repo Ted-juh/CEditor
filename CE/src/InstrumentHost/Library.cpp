@@ -39,7 +39,8 @@ bool Library::removeRecord (const juce::String& recordId)
     return false;
 }
 
-void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<LibraryRecord> scanned)
+void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<LibraryRecord> scanned,
+                               const juce::String& locatorScope)
 {
     // Three-pass identity match, and the first pass is what keeps twins honest. Two files
     // with identical bytes have identical fingerprints — not a corner case: a user who copies
@@ -61,7 +62,8 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
     // Anything unmatched is genuinely new.
     juce::Array<LibraryRecord*> existing;
     for (auto& record : records)
-        if (record.sourceType == sourceType)
+        if (record.sourceType == sourceType
+            && (locatorScope.isEmpty() || record.sourceLocator.startsWith (locatorScope)))
             existing.add (&record);
 
     juce::Array<bool> matched;

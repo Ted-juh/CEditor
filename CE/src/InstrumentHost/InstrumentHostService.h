@@ -600,6 +600,9 @@ private:
         catalogLock itself): empty = loadable, else the actionable reason. */
     juce::String recordUnavailableReason (const LibraryRecord& record) const;
     void loadPresetRecord (const LibraryRecord& record, const juce::String& partId);
+    /** Layer B of the preset engine: enumerates the live instrument's program list into
+        the library as vendor records, scoped to its class. No-op below two programs. */
+    void ingestProgramList (const juce::String& partId);
     void loadRackRecord (const LibraryRecord& record);
     void attachParameters (const juce::String& partId);
     void applyPerformance (Performance&& performance);

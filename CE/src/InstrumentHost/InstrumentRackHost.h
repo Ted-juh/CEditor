@@ -204,6 +204,9 @@ public:
                          ControlBinding binding);
     /** Binds or clears the slot's learned MIDI controller. cc -1 clears; channel 0 = any. */
     bool setSlotMidi (const juce::String& pageId, const juce::String& slotId, int cc, int channel);
+    /** Records the part's place in the preset walk (empty strings clear it). */
+    bool setPartLastPreset (const juce::String& partId, const juce::String& recordId,
+                            const juce::String& name);
 
     // -- per-part rules and mixer -------------------------------------------------------
     bool setMidiRules (const juce::String& partId, const PartMidiRules& rules);

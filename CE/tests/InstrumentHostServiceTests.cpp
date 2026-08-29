@@ -2056,6 +2056,146 @@ void testMidiLearn()
     }
 }
 
+// Layer B of the preset engine plus the walk: a plug-in exposing factory programs gets them
+// into the ONE library at load, scoped to its class; prev/next then walks everything the
+// library holds for the loaded class — programs by index, vendor files, captured state —
+// wrapping at the ends, with a cursor that survives restart because it lives on the part.
+void testPresetWalking()
+{
+    std::cout << "\nprogram lists and preset walking" << std::endl;
+
+    const auto dir = freshDataDir ("walk");
+    seedTwoSynthCatalog (dir);
+    juce::String partId, brightId;
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = {
+        { "Init", 0.50f }, { "Bright", 0.90f }, { "Dark", 0.10f } };
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        auto* stub = h.lastStub;
+
+        // Ingestion happened at load, with no scan pressed.
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        auto records = [&h] { return h.emits.last ("instrumentHostLibrary")
+                                       ->getProperty ("records", {}); };
+        check (records().size() == 3, "loading the instrument put its three programs in the library");
+        check (records()[0].getProperty ("sourceType", {}).toString() == "programList"
+                 && (bool) records()[0].getProperty ("factory", false),
+               "as vendor program-list records");
+        juce::StringArray names;
+        for (const auto& r : *records().getArray())
+        {
+            names.add (r.getProperty ("name", {}).toString());
+            if (r.getProperty ("name", {}).toString() == "Bright")
+                brightId = r.getProperty ("recordId", {}).toString();
+        }
+        check (names.contains ("Init") && names.contains ("Bright") && names.contains ("Dark"),
+               "named by the plug-in's own program names");
+
+        // A captured user preset joins the same walk, after the factory list.
+        h.cmd ("saveUserPreset", { { "partId", partId }, { "name", "My Patch" } });
+
+        auto presetName = [&h] { return h.emits.lastState()->getProperty ("rack", {})
+                                          .getProperty ("parts", {})[0]
+                                          .getProperty ("presetName", {}).toString(); };
+
+        h.cmd ("walkPartPreset", { { "partId", partId } });
+        check (presetName() == "Init" && juce::approximatelyEqual (stub->cutoff->get(), 0.50f),
+               "the first step lands on the first program and applies it");
+        h.cmd ("walkPartPreset", { { "partId", partId } });
+        check (presetName() == "Bright" && juce::approximatelyEqual (stub->cutoff->get(), 0.90f)
+                 && stub->currentProgram == 1,
+               "next walks to the next program through the plug-in's own selection");
+        h.cmd ("walkPartPreset", { { "partId", partId }, { "delta", -1 } });
+        check (presetName() == "Init", "prev walks back");
+        h.cmd ("walkPartPreset", { { "partId", partId }, { "delta", -1 } });
+        check (presetName() == "My Patch", "prev from the top wraps to the last (the user capture)");
+        h.cmd ("walkPartPreset", { { "partId", partId } });
+        check (presetName() == "Init", "and next from the end wraps to the top");
+
+        // A favourite put on a program survives the re-ingestion a reload brings.
+        h.cmd ("setLibraryUserMetadata", { { "recordId", brightId }, { "favourite", true } });
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        bool brightKept = false;
+        for (const auto& r : *records().getArray())
+            if (r.getProperty ("recordId", {}).toString() == brightId)
+                brightKept = (bool) r.getProperty ("favourite", false);
+        check (brightKept, "re-ingestion keeps the record's id and the favourite on it");
+        h.cmd ("getState");
+        check (presetName().isEmpty(), "a plain instrument load cleared the preset cursor");
+
+        // Guard rails: walking needs a loaded part.
+        h.emits.clear();
+        h.cmd ("walkPartPreset", { { "partId", "nope" } });
+        check (h.emits.lastError().contains ("Unknown rack part"), "an unknown part refuses");
+    }
+
+    // A second class's list lives beside the first: refreshing one never marks the other's.
+    ceditor::test::StubSynthProcessor::factoryPrograms = {
+        { "PadA", 0.30f }, { "PadB", 0.70f } };
+    {
+        Harness h (dir);
+        h.cmd ("getState");   // session restore reloads good-synth -> re-ingests as 2 programs
+        h.cmd ("addPart");
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        const auto part2 = parts[parts.size() - 1].getProperty ("partId", {}).toString();
+        h.cmd ("loadInstrument", { { "partId", part2 }, { "ceId", "VST3-other-synth" } });
+
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        const auto records = h.emits.last ("instrumentHostLibrary")->getProperty ("records", {});
+        int goodPresent = 0, goodMissing = 0, otherPresent = 0;
+        for (const auto& r : *records.getArray())
+        {
+            if (r.getProperty ("sourceType", {}).toString() != "programList")
+                continue;
+            const auto target = r.getProperty ("targetCeId", {}).toString();
+            const auto missing = (bool) r.getProperty ("missing", false);
+            if (target == "VST3-good-synth") (missing ? goodMissing : goodPresent)++;
+            if (target == "VST3-other-synth" && ! missing) otherPresent++;
+        }
+        check (goodPresent == 2 && goodMissing >= 1,
+               "a shrunken program list keeps the shape: two live, the vanished one marked, not deleted");
+        check (otherPresent == 2, "and the other class's list is untouched by that refresh");
+    }
+
+    // The cursor is manifest state: a restart resumes the walk where it stood.
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        const auto part1 = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
+        // The last load in part 1's session was a plain instrument load, which cleared it —
+        // so walk once, restart, and check the NAME travels.
+        h.cmd ("walkPartPreset", { { "partId", partId } });
+        const auto walked = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                                .getProperty ("presetName", {}).toString();
+        check (walked == "PadA", "the walk runs over the refreshed program list");
+    }
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                   .getProperty ("presetName", {}).toString() == "PadA",
+               "the preset cursor survives restart with the part");
+        auto* stub = h.lastStub;
+        (void) stub;
+        h.cmd ("walkPartPreset", { { "partId", partId } });
+        check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                   .getProperty ("presetName", {}).toString() == "PadB",
+               "and next resumes from it instead of starting over");
+    }
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = {};
+}
+
 void testParameterModel()
 {
     std::cout << "\nparameter model" << std::endl;
@@ -4118,6 +4258,7 @@ int main (int argc, char* argv[])
     testCommandFlow();
     testFirstClickAndTheOnScreenKeyboard();
     testMidiLearn();
+    testPresetWalking();
     testCtrl49Broker();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();

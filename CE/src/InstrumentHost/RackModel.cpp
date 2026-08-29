@@ -298,6 +298,8 @@ juce::var Performance::toVar() const
         p->setProperty ("volume",           part.volume);
         p->setProperty ("pan",              part.pan);
         p->setProperty ("editorOpen",       part.editorOpen);
+        p->setProperty ("lastPresetRecordId", part.lastPresetRecordId);
+        p->setProperty ("lastPresetName",     part.lastPresetName);
         p->setProperty ("outputPair",       part.outputPair);
         p->setProperty ("effects",          effectsToVar (part.effects));
         p->setProperty ("midiFx",           perf::midiFxToVar (part.midiFx));
@@ -507,6 +509,8 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
         part.volume     = floatOf (p, "volume", 1.0f, 0.0f, 2.0f);
         part.pan        = floatOf (p, "pan", 0.0f, -1.0f, 1.0f);
         part.editorOpen = (bool) p.getProperty ("editorOpen", false);
+        part.lastPresetRecordId = p.getProperty ("lastPresetRecordId", {}).toString();
+        part.lastPresetName     = p.getProperty ("lastPresetName", {}).toString();
         part.outputPair = intOf (p, "outputPair", 0, 0, 7);
 
         // Explicit multi-output pairs: a clamped pair index, duplicates dropped — a damaged

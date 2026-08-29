@@ -113,6 +113,7 @@ export function normalizeHostLibrary(payload) {
       recordId: String(r?.recordId ?? ''),
       type: String(r?.type ?? ''),
       sourceType: String(r?.sourceType ?? ''),
+      targetCeId: String(r?.targetCeId ?? ''),
       name: String(r?.name ?? ''),
       manufacturer: String(r?.manufacturer ?? ''),
       instrument: String(r?.instrument ?? ''),
@@ -784,6 +785,8 @@ export function normalizeHostState(payload) {
         pluginCeId: String(part?.pluginCeId ?? ''),
         pluginName: String(part?.pluginName ?? ''),
         pluginVendor: String(part?.pluginVendor ?? ''),
+        presetRecordId: String(part?.presetRecordId ?? ''),
+        presetName: String(part?.presetName ?? ''),
         hasInstrument: part?.hasInstrument === true,
         unresolved: part?.unresolved === true,
         channel: Number(part?.channel ?? 0),
@@ -1283,6 +1286,20 @@ export function applyMockCommand(state, payload) {
           if (other.midiCc === cc && other.midiChannel === 1) Object.assign(other, { midiCc: -1, midiChannel: 0 });
       Object.assign(slot, { midiCc: cc, midiChannel: 1 });
     }
+    return next;
+  }
+  if (cmd === 'walkPartPreset') {
+    const target = part(payload.partId || next.rack.focusedPartId);
+    if (!target?.hasInstrument) return next;
+    // The browser has no real library to walk, so the mock cycles a fixed factory list —
+    // enough to demo the cursor, the wrap, and the name in the part header.
+    const sounds = ['Init', 'Bright', 'Dark'];
+    const position = sounds.indexOf(target.presetName);
+    const delta = Number(payload.delta) < 0 ? -1 : 1;
+    const nextIndex = position < 0 ? (delta > 0 ? 0 : sounds.length - 1)
+                                   : (position + delta + sounds.length) % sounds.length;
+    target.presetName = sounds[nextIndex];
+    target.presetRecordId = `mock-preset-${nextIndex}`;
     return next;
   }
   if (cmd === 'removeScanPath') {
@@ -1963,6 +1980,7 @@ export const cancelMidiLearn = () => {
   send({ cmd: 'cancelMidiLearn' });
 };
 export const clearControlSlotMidi = (pageId, slotId) => send({ cmd: 'clearControlSlotMidi', pageId, slotId });
+export const walkPartPreset = (partId, delta = 1) => send({ cmd: 'walkPartPreset', partId, delta });
 export const requestLibrary = (query = '', type = '') => send({ cmd: 'getLibrary', query, type });
 export const scanLibrary = () => send({ cmd: 'scanLibrary' });
 export const browseLibraryPath = () => send({ cmd: 'browseLibraryPath' });
