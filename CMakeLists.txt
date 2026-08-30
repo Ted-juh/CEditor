@@ -238,6 +238,8 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
         "${CTRL49_EMBED_OUT}"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
@@ -274,6 +276,7 @@ if(CEDITOR_BUILD_APP)
     )
 
     target_link_libraries(CEditor PRIVATE
+        $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
         juce::juce_cryptography
         juce::juce_audio_basics
@@ -538,6 +541,8 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
         "${CTRL49_EMBED_OUT}"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
@@ -574,6 +579,7 @@ if(CEDITOR_BUILD_APP)
     )
 
     target_link_libraries(CEHostStandalone PRIVATE
+        $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
         # The licence check (Licensing/*.cpp in the shared host sources above) uses RSAKey and
         # SHA256. Missed when juce_cryptography was linked into the other four targets that
@@ -629,6 +635,7 @@ if(CEDITOR_BUILD_APP)
     )
 
     target_link_libraries(CEHostVST3 PRIVATE
+        $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
         # The licence check (Licensing/*.cpp in the shared host sources above) uses RSAKey and
         # SHA256. Missed when juce_cryptography was linked into the other four targets that
@@ -1257,6 +1264,8 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
     "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"
@@ -1268,6 +1277,11 @@ target_link_libraries(CEditorInstrumentHostServiceTests PRIVATE
     juce::juce_core
     juce::juce_cryptography
     juce::juce_audio_utils   # AudioProcessorPlayer for the service's preview audio engine
+    # The CTRL49 Windows transports (WinMmOutput/PrivateInput) ride along with the broker's
+    # endpoint factory in every target that compiles it; on Windows they need the multimedia
+    # library. Found by the owner's linker: LNK2019 on Ctrl49PrivateInput — the factory's
+    # real body only exists on Windows, so no Linux build could ever hit these symbols.
+    $<$<PLATFORM_ID:Windows>:winmm>
 )
 add_test(NAME InstrumentHostService
          COMMAND CEditorInstrumentHostServiceTests $<TARGET_FILE:CEditorScannerStub>)
