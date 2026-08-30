@@ -1182,6 +1182,17 @@ test('arp velocity patterns keep rests and the mock merges them', () => {
   state = applyMockCommand(state, { cmd: 'setPartArp', partId, velocityPattern: [] });
   assert.deepEqual(state.rack.parts.find((p) => p.partId === partId).arp.velocityPattern, [],
     'clearing back to as-played is a plain empty array');
+
+  // The drawn melody: degrees with rests survive normalization and the mock merge alike.
+  const drawn = normalizeHostState({ rack: { parts: [
+    { partId: 'p1', arp: { mode: 'pattern', degreePattern: [0, -1, 2, 7] } },
+  ] } });
+  assert.deepEqual(drawn.rack.parts[0].arp.degreePattern, [0, -1, 2, 7]);
+  state = applyMockCommand(state, { cmd: 'setPartArp', partId, mode: 'pattern',
+                                    degreePattern: [1, -1, 3] });
+  const arp = state.rack.parts.find((p) => p.partId === partId).arp;
+  assert.equal(arp.mode, 'pattern');
+  assert.deepEqual(arp.degreePattern, [1, -1, 3], 'the melody lands rests and all');
 });
 
 test('parameterControlKind puts each parameter shape on the right control', () => {

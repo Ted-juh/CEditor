@@ -621,6 +621,7 @@ const normalizeArp = (a) => ({
   latch: a?.latch === true,
   constrainToScale: a?.constrainToScale === true,
   velocityPattern: (Array.isArray(a?.velocityPattern) ? a.velocityPattern : []).map(Number),
+  degreePattern: (Array.isArray(a?.degreePattern) ? a.degreePattern : []).map(Number),
 });
 
 const normalizeMidiFx = (f) => ({

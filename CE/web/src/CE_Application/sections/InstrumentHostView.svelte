@@ -117,6 +117,71 @@
     setPartArp(focusedPart.partId, { velocityPattern: next });
   }
 
+  // --- the note grid (pattern mode): X is the step, Y is WHICH held note plays -----------
+  // Rows are chord degrees — bottom row is the lowest note you are holding, upward through
+  // the held chord and its octave extension. A cell click places the note, clicking the
+  // placed cell again rests the step, dragging paints. -1 in the model is a rest.
+  const NOTE_ROWS = 8;
+  let noteDraft = $state(null);
+  let noteGridEl = $state(null);
+  let noteDragging = $state(false);
+  let notePainting = $state(false);
+  let notePattern = $derived(noteDraft ?? focusedPart?.arp.degreePattern ?? []);
+
+  function noteCellFromEvent(event) {
+    const rect = noteGridEl.getBoundingClientRect();
+    const count = Math.max(1, notePattern.length || 16);
+    const step = Math.max(0, Math.min(count - 1,
+      Math.floor(((event.clientX - rect.left) / rect.width) * count)));
+    const row = Math.max(0, Math.min(NOTE_ROWS - 1,
+      NOTE_ROWS - 1 - Math.floor(((event.clientY - rect.top) / rect.height) * NOTE_ROWS)));
+    return { step, row };
+  }
+
+  function noteGridDown(event) {
+    if (!focusedPart) return;
+    event.preventDefault();
+    noteDraft = notePattern.length > 0 ? [...notePattern] : Array.from({ length: 16 }, () => -1);
+    noteDragging = true;
+    noteGridEl.setPointerCapture?.(event.pointerId);
+    const { step, row } = noteCellFromEvent(event);
+    if (noteDraft[step] === row) {
+      noteDraft[step] = -1;      // the placed note, clicked again, is a rest
+      notePainting = false;
+    } else {
+      noteDraft[step] = row;
+      notePainting = true;
+    }
+  }
+
+  function noteGridMove(event) {
+    if (!noteDragging || !notePainting || noteDraft === null) return;
+    const { step, row } = noteCellFromEvent(event);
+    noteDraft[step] = row;
+  }
+
+  function noteGridUp() {
+    if (!noteDragging) return;
+    noteDragging = false;
+    if (noteDraft !== null && focusedPart)
+      setPartArp(focusedPart.partId, { degreePattern: [...noteDraft] });
+    noteDraft = null;
+  }
+
+  function resizeNotePattern(length) {
+    if (!focusedPart) return;
+    // One length for melody and dynamics together — new steps arrive as rests at full
+    // velocity, so extending never changes what already plays.
+    const degrees = focusedPart.arp.degreePattern;
+    const velocities = focusedPart.arp.velocityPattern;
+    setPartArp(focusedPart.partId, {
+      degreePattern: Array.from({ length }, (_, i) => degrees[i] ?? -1),
+      velocityPattern: velocities.length > 0
+        ? Array.from({ length }, (_, i) => velocities[i] ?? 100)
+        : [],
+    });
+  }
+
   function playAuditionNote() {
     // A note the focused part will actually voice: the centre of its key zone, clamped —
     // middle C is no use to a bass split that ends at B2.
@@ -781,7 +846,7 @@
                             onchange={(on) => setPartArp(focusedPart.partId, { enabled: on })} />
             <select value={focusedPart.arp.mode} aria-label="Arpeggiator mode"
                     onchange={(e) => setPartArp(focusedPart.partId, { mode: e.currentTarget.value })}>
-              {#each ['up', 'down', 'up-down', 'down-up', 'order', 'random', 'chord'] as mode (mode)}
+              {#each ['up', 'down', 'up-down', 'down-up', 'order', 'random', 'chord', 'pattern'] as mode (mode)}
                 <option value={mode}>{mode}</option>
               {/each}
             </select>
@@ -810,6 +875,43 @@
             <PropertyToggle compact label="Latch" value={focusedPart.arp.latch} ariaLabel="Latch the held chord"
                             onchange={(on) => setPartArp(focusedPart.partId, { latch: on })} />
           </div>
+          {#if focusedPart.arp.enabled && focusedPart.arp.mode === 'pattern'}
+            <!-- Pattern mode: draw the MELODY. Each column is a step; the row you light is
+                 which of your held notes plays there (bottom = lowest, octaves upward);
+                 an unlit column is a rest. The engine walks nothing — it plays this. -->
+            <div class="arp-grid-row">
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div class="arp-note-grid" class:ghost={notePattern.length === 0}
+                   data-testid="arp-note-grid" bind:this={noteGridEl}
+                   onpointerdown={noteGridDown} onpointermove={noteGridMove}
+                   onpointerup={noteGridUp} onpointercancel={noteGridUp}>
+                {#each (notePattern.length > 0 ? notePattern : Array.from({ length: 16 }, () => -1)) as degree, i (i)}
+                  <div class="note-col"
+                       class:playing={notePattern.length > 0
+                                      && $hostArpStep[focusedPart.partId] === i}>
+                    {#each Array.from({ length: NOTE_ROWS }, (_, r) => NOTE_ROWS - 1 - r) as row (row)}
+                      <div class="note-cell" class:on={degree === row}
+                           class:octave={row >= 4 && degree !== row}></div>
+                    {/each}
+                  </div>
+                {/each}
+              </div>
+              <div class="arp-grid-side">
+                {#if notePattern.length > 0}
+                  <select value={notePattern.length} aria-label="Melody length"
+                          onchange={(e) => resizeNotePattern(Number(e.currentTarget.value))}>
+                    {#each [4, 8, 12, 16, 24, 32] as length (length)}
+                      <option value={length}>{length} steps</option>
+                    {/each}
+                  </select>
+                  <button type="button" class="ghost" title="Clear the melody (an empty drawing walks up)"
+                          onclick={() => setPartArp(focusedPart.partId, { degreePattern: [] })}>clear</button>
+                {:else}
+                  <span class="arp-hint">draw the melody — a row is a note of your held chord, bottom = lowest</span>
+                {/if}
+              </div>
+            </div>
+          {/if}
           {#if focusedPart.arp.enabled}
             <!-- The drawable half of the arp: one bar per step, height is velocity, a bar
                  dragged to the floor is a rest the engine skips. Empty pattern = the arp
@@ -1703,6 +1805,16 @@
   .page-name { background: none; border: none; padding: 3px 6px; }
   .slot-list { display: flex; flex-direction: column; gap: 4px; }
   .arp-grid-row { display: flex; gap: 8px; align-items: stretch; margin-top: 6px; }
+  .arp-note-grid { flex: 1; display: flex; gap: 1px; height: 112px; background: #10161c;
+                   border: 1px solid #232c36; border-radius: 4px; padding: 2px;
+                   cursor: crosshair; touch-action: none; }
+  .arp-note-grid.ghost { opacity: 0.45; }
+  .note-col { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 4px; }
+  .note-col.playing { background: #24384c; border-radius: 1px; }
+  .note-cell { flex: 1; background: #161e27; border-radius: 1px; }
+  .note-cell.octave { background: #131a22; }
+  .note-cell.on { background: #4aa88c; }
+  .note-col.playing .note-cell.on { background: #7fd4b8; }
   .arp-grid { flex: 1; display: flex; gap: 1px; height: 72px; background: #10161c;
               border: 1px solid #232c36; border-radius: 4px; padding: 2px;
               cursor: crosshair; touch-action: none; }

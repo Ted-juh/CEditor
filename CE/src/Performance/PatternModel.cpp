@@ -69,14 +69,15 @@ const char* ArpSettings::modeName (Mode mode) noexcept
         case Mode::downUp: return "down-up";
         case Mode::order:  return "order";
         case Mode::random: return "random";
-        case Mode::chord:  return "chord";
+        case Mode::chord:   return "chord";
+        case Mode::pattern: return "pattern";
     }
     return "up";
 }
 
 ArpSettings::Mode ArpSettings::modeFromName (const juce::String& name) noexcept
 {
-    for (int i = 0; i <= (int) Mode::chord; ++i)
+    for (int i = 0; i <= (int) Mode::pattern; ++i)
         if (name == modeName ((Mode) i))
             return (Mode) i;
     return Mode::up;
@@ -549,6 +550,10 @@ juce::var arpToVar (const ArpSettings& arp)
     for (const auto velocity : arp.velocityPattern)
         velocities.add (velocity);
 
+    juce::Array<juce::var> degrees;
+    for (const auto degree : arp.degreePattern)
+        degrees.add (degree);
+
     auto* a = new juce::DynamicObject();
     a->setProperty ("enabled",           arp.enabled);
     a->setProperty ("mode",              ArpSettings::modeName (arp.mode));
@@ -559,6 +564,7 @@ juce::var arpToVar (const ArpSettings& arp)
     a->setProperty ("latch",             arp.latch);
     a->setProperty ("constrainToScale",  arp.constrainToScale);
     a->setProperty ("velocityPattern",   velocities);
+    a->setProperty ("degreePattern",     degrees);
     return juce::var (a);
 }
 
@@ -580,6 +586,10 @@ void arpFromVar (const juce::var& stored, ArpSettings& out)
     if (const auto* velocities = stored.getProperty ("velocityPattern", {}).getArray())
         for (const auto& velocity : *velocities)
             out.velocityPattern.add (juce::jlimit (0, 127, (int) velocity));
+
+    if (const auto* degrees = stored.getProperty ("degreePattern", {}).getArray())
+        for (const auto& degree : *degrees)
+            out.degreePattern.add (juce::jlimit (-1, 63, (int) degree));
 }
 
 juce::var midiFxToVar (const MidiFxSettings& fx)

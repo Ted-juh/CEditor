@@ -55,6 +55,12 @@ public:
             velocities[(size_t) i].store ((juce::uint8) juce::jlimit (0, 127,
                                                                        settings.velocityPattern[i]));
         velocityCount.store (count);
+
+        // The drawn melody (Mode::pattern): per step, a degree into the held pool, -1 rest.
+        const auto drawn = juce::jmin (maxPatternSteps, settings.degreePattern.size());
+        for (int i = 0; i < drawn; ++i)
+            degrees[(size_t) i].store (juce::jlimit (-1, 63, settings.degreePattern[i]));
+        degreeCount.store (drawn);
     }
 
     /** The scale the arp folds its notes into when the part asks it to; 0x0fff = chromatic. */
@@ -252,6 +258,7 @@ private:
         switch ((ArpSettings::Mode) mode.load())
         {
             case ArpSettings::Mode::up:
+            case ArpSettings::Mode::pattern:   // an empty drawing falls back to the up walk
                 index = step % total;
                 break;
 
@@ -323,18 +330,50 @@ private:
         if (sequenceOrigin == noOrigin)
             sequenceOrigin = step;
 
+        const bool patternMode = (ArpSettings::Mode) mode.load() == ArpSettings::Mode::pattern
+                                   && degreeCount.load() > 0;
+
         juce::uint8 velocity = 100;
         bool chordAll = false;
-        const auto note = noteForStep (step - sequenceOrigin, velocity, chordAll);
-        if (note < 0)
-            return;
+        int note = -1;
+
+        if (patternMode)
+        {
+            // The drawn melody: this step's degree indexes the same pitch-sorted,
+            // octave-extended pool the walk modes read — degree 0 is the lowest held note,
+            // past the pool clamps to the top, and -1 is a drawn rest.
+            const auto count = heldCount;
+            const auto total = count * octaves.load();
+            if (count <= 0 || total <= 0)
+                return;
+
+            const auto position = stepCounter % degreeCount.load();
+            const auto degree = (int) degrees[(size_t) position].load();
+            livePatternStep.store (position);
+            if (degree < 0)
+            {
+                ++stepCounter;
+                return;
+            }
+
+            const auto index = juce::jlimit (0, total - 1, degree);
+            velocity = held[(size_t) (index % count)].velocity;
+            note = held[(size_t) (index % count)].note + (index / count) * 12;
+        }
+        else
+        {
+            note = noteForStep (step - sequenceOrigin, velocity, chordAll);
+            if (note < 0)
+                return;
+        }
 
         const auto patternCount = velocityCount.load();
         if (patternCount > 0)
         {
             const auto patternIndex = stepCounter % patternCount;
             const auto patternVelocity = velocities[(size_t) patternIndex].load();
-            livePatternStep.store (patternIndex);
+            if (! patternMode)   // the playhead follows whichever grid is being drawn
+                livePatternStep.store (patternIndex);
             ++stepCounter;
             if (patternVelocity == 0)
                 return;   // a rest: the grid advances, nothing sounds
@@ -453,6 +492,8 @@ private:
     std::atomic<juce::uint16> mask { 0x0fff };
     std::array<std::atomic<juce::uint8>, maxPatternSteps> velocities {};
     std::atomic<int> velocityCount { 0 };
+    std::array<std::atomic<int>, maxPatternSteps> degrees {};
+    std::atomic<int> degreeCount { 0 };
     std::atomic<int> livePatternStep { -1 };
 };
 

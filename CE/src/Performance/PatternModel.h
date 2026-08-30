@@ -166,7 +166,7 @@ struct Setlist
     second clock: rate is in steps per beat, exactly like a lane's. */
 struct ArpSettings
 {
-    enum class Mode { up = 0, down, upDown, downUp, order, random, chord };
+    enum class Mode { up = 0, down, upDown, downUp, order, random, chord, pattern };
 
     bool enabled = false;
     Mode mode = Mode::up;
@@ -176,6 +176,11 @@ struct ArpSettings
     int octaves = 1;                // 1..4
     bool latch = false;             // held after release until the next fresh chord
     juce::Array<int> velocityPattern;   // accents, cycled; empty = play what was played
+    // The drawn melody for Mode::pattern: per step, WHICH note of the held pool plays —
+    // a degree index into the pitch-sorted held chord extended across `octaves` (0 = the
+    // lowest held note, 3 = the fourth, and past the pool it clamps to the top). -1 is a
+    // rest. Ignored by every other mode; the walk modes stay exactly what they were.
+    juce::Array<int> degreePattern;
     bool constrainToScale = false;
 
     static const char* modeName (Mode mode) noexcept;

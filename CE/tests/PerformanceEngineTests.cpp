@@ -897,6 +897,53 @@ void testArpeggiator()
             allDistinct = velocitiesHeard[i] == 40 + (int) i;
         check (allDistinct, "in order, one velocity per step, none truncated at eight");
     }
+
+    {
+        // --- pattern mode: the DRAWN melody ---------------------------------------------
+        // Each step names which note of the held pool plays (0 = lowest, octave-extended),
+        // -1 rests, and a degree past the pool clamps to the top instead of wrapping into
+        // a different note than the one drawn.
+        ArpEngine melodic;
+        ArpSettings drawnSettings;
+        drawnSettings.enabled = true;
+        drawnSettings.mode = ArpSettings::Mode::pattern;
+        drawnSettings.stepsPerBeat = 4;
+        drawnSettings.gate = 0.5f;
+        drawnSettings.octaves = 2;
+        drawnSettings.degreePattern = { 0, 2, 1, -1, 3, 9 };   // C E4? -> see asserts below
+        melodic.setSettings (drawnSettings);
+
+        Transport clock;
+        clock.setTempo (120.0);
+        clock.start();
+
+        juce::MidiBuffer hold, stepped;
+        hold.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        hold.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 0);
+        hold.addEvent (juce::MidiMessage::noteOn (1, 67, (juce::uint8) 100), 0);
+
+        std::vector<int> played;
+        for (int b = 0; b < 140; ++b)   // six sixteenth steps and change
+        {
+            const auto block = clock.advance (blockSize, sampleRate);
+            melodic.process (b == 0 ? hold : juce::MidiBuffer(), stepped, block, blockSize);
+            for (const auto metadata : stepped)
+                if (metadata.getMessage().isNoteOn())
+                    played.push_back (metadata.getMessage().getNoteNumber());
+        }
+
+        // Pool over two octaves: 60 64 67 72 76 79. Drawn: 0->60, 2->67, 1->64, rest,
+        // 3->72 (the octave row), 9 clamps to the pool top 79.
+        check (played.size() == 5, "six drawn steps with one rest sound five notes");
+        check (played.size() >= 3 && played[0] == 60 && played[1] == 67 && played[2] == 64,
+               "the drawn degrees play the drawn notes, not a walk");
+        check (played.size() >= 4 && played[3] == 72,
+               "a degree above the held count reaches the octave extension");
+        check (played.size() >= 5 && played[4] == 79,
+               "a degree past the whole pool clamps to the top");
+        check (melodic.patternStep() >= 0 && melodic.patternStep() < 6,
+               "the playhead reports the drawn grid's position");
+    }
 }
 
 void testMidiFxChain()
@@ -1038,11 +1085,18 @@ void testScalesAndSerialization()
     arp.octaves = 3;
     arp.velocityPattern.add (127);
     arp.velocityPattern.add (80);
+    arp.mode = ArpSettings::Mode::pattern;
+    arp.degreePattern.add (0);
+    arp.degreePattern.add (-1);
+    arp.degreePattern.add (5);
     ArpSettings restoredArp;
     arpFromVar (arpToVar (arp), restoredArp);
-    check (restoredArp.enabled && restoredArp.mode == ArpSettings::Mode::upDown
+    check (restoredArp.enabled && restoredArp.mode == ArpSettings::Mode::pattern
              && restoredArp.octaves == 3 && restoredArp.velocityPattern.size() == 2,
-           "arp settings round trip, accents included");
+           "arp settings round trip, accents and the drawn mode included");
+    check (restoredArp.degreePattern.size() == 3 && restoredArp.degreePattern[1] == -1
+             && restoredArp.degreePattern[2] == 5,
+           "the drawn melody survives the trip, rests included");
 
     MidiFxSettings fx;
     fx.transpose = -7;

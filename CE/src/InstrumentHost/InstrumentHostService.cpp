@@ -1854,6 +1854,18 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                             arp.velocityPattern.add (juce::jlimit (0, 127, (int) velocity));
                         }
                 }
+                if (fields->hasProperty ("degreePattern"))
+                {
+                    arp.degreePattern.clear();
+                    if (const auto* degrees = payload["degreePattern"].getArray())
+                        for (const auto& degree : *degrees)
+                        {
+                            if (arp.degreePattern.size() >= perf::ArpEngine::maxPatternSteps)
+                                break;
+                            // -1 is a drawn rest; anything else picks a held-pool degree.
+                            arp.degreePattern.add (juce::jlimit (-1, 63, (int) degree));
+                        }
+                }
             }
             rack.setPartArp (partId, arp);
         }
