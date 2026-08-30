@@ -20,7 +20,7 @@
     requestAudioDevices, setAudioDevice, setMidiInputEnabled,
     hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
-    parameterControlKind, setParameterText,
+    parameterControlKind, setParameterText, groupParameters, assignedParameterIds, quickLearnParameter,
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
     addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
@@ -158,13 +158,26 @@
   }
 
   let instruments = $derived(filterInstruments($hostState.instruments, search));
-  let visibleParameters = $derived(filterParameters($hostParameters.parameters, paramSearch));
-  // Group headers derive from the registry order so a plug-in's own hierarchy shows once,
-  // above its first parameter, rather than being re-sorted out of recognition.
-  let groupedParameters = $derived(visibleParameters.map((p, i) => ({
-    ...p,
-    groupHeader: p.group && (i === 0 || visibleParameters[i - 1].group !== p.group) ? p.group : '',
-  })));
+  let assignedIds = $derived(assignedParameterIds($hostState, paramTargetId));
+  let paramAssignedOnly = $state(false);
+  let visibleParameters = $derived(
+    filterParameters($hostParameters.parameters, paramSearch)
+      .filter((p) => !paramAssignedOnly || assignedIds.has(p.id)));
+  // The plug-in's own hierarchy, folded: groups collapse so four hundred parameters read as
+  // a dozen headings. A search or an active filter opens everything — hiding a match inside
+  // a closed group is worse than a long list — and a single-group registry never collapses,
+  // because a closed list with one heading is just an empty panel with extra steps.
+  let parameterGroups = $derived(groupParameters(visibleParameters));
+  let openGroups = $state({});
+  let groupsForcedOpen = $derived(
+    paramSearch.trim() !== '' || paramAssignedOnly || parameterGroups.length <= 1);
+  // The parameter the armed learn slot points at, so its ⚡ can show as listening.
+  let armedParameterId = $derived.by(() => {
+    if (!$hostMidiLearn.armed) return '';
+    const slot = $hostState.rack.pages.find((p) => p.pageId === $hostMidiLearn.pageId)
+      ?.slots.find((sl) => sl.slotId === $hostMidiLearn.slotId);
+    return slot && slot.partId === paramTargetId ? slot.parameterId : '';
+  });
 
   // The parameter view's target: the focused part by default, or an effect the user asked
   // to inspect (its "P" button). Only a focus CHANGE or the target vanishing resets it —
@@ -1016,6 +1029,10 @@
           <div class="param-head">
             <strong>Parameters — {paramTargetName}</strong>
             <input type="search" placeholder="Search parameters…" bind:value={paramSearch} />
+            <button type="button" class="toggle" class:on={paramAssignedOnly}
+                    title="Only parameters already on a knob slot or macro"
+                    data-testid="param-assigned-filter"
+                    onclick={() => (paramAssignedOnly = !paramAssignedOnly)}>assigned</button>
             <button type="button" class="toggle" class:on={paramDiagnostics}
                     title="Show native IDs and indices"
                     onclick={() => (paramDiagnostics = !paramDiagnostics)}>ID</button>
@@ -1023,7 +1040,7 @@
           {#each $hostParameters.warnings as warning (warning)}
             <div class="param-warning">{warning}</div>
           {/each}
-          {#if groupedParameters.length === 0}
+          {#if visibleParameters.length === 0}
             <div class="empty-hint">
               {$hostParameters.parameters.length === 0
                 ? 'This instrument exposes no host-visible parameters.'
@@ -1031,11 +1048,20 @@
             </div>
           {/if}
           <div class="param-list">
-            {#each groupedParameters as parameter (parameter.id)}
-              {#if parameter.groupHeader}
-                <div class="param-group">{parameter.groupHeader}</div>
+            {#each parameterGroups as group (group.name)}
+              {#if parameterGroups.length > 1}
+                <button type="button" class="param-group"
+                        aria-expanded={groupsForcedOpen || openGroups[group.name] === true}
+                        onclick={() => (openGroups[group.name] = !openGroups[group.name])}>
+                  <span class="param-group-arrow">{groupsForcedOpen || openGroups[group.name] ? '▾' : '▸'}</span>
+                  {group.name}
+                  <span class="param-group-count">{group.parameters.length}{
+                    group.parameters.some((p) => assignedIds.has(p.id)) ? ' · assigned' : ''}</span>
+                </button>
               {/if}
-              <div class="param-row">
+              {#if groupsForcedOpen || openGroups[group.name] || parameterGroups.length <= 1}
+              {#each group.parameters as parameter (parameter.id)}
+              <div class="param-row" class:assigned={assignedIds.has(parameter.id)}>
                 <span class="param-name" title={parameter.name}>{parameter.name}</span>
                 {#if parameterControlKind(parameter) === 'toggle'}
                   <PropertyToggle compact value={parameter.value >= 0.5} ariaLabel={parameter.name}
@@ -1094,9 +1120,16 @@
                 <button type="button" class="ghost" disabled={!selectedMacro}
                         title={selectedMacro ? `Add to macro ${selectedMacro.name}` : 'Create a macro first'}
                         onclick={() => selectedMacro && addMacroTarget(selectedMacro.macroId, paramTargetId, parameter.id)}>M+</button>
+                <button type="button" class="ghost quick-learn"
+                        class:armed={armedParameterId === parameter.id}
+                        data-testid="param-quick-learn"
+                        title="Put this on a knob: click, then move a control on your MIDI keyboard"
+                        onclick={() => quickLearnParameter(paramTargetId, parameter.id)}>⚡</button>
               </div>
               {#if paramDiagnostics}
                 <div class="param-diag">{parameter.id} · index {parameter.index}{parameter.automatable ? '' : ' · not automatable'}{parameter.meta ? ' · meta' : ''}</div>
+              {/if}
+              {/each}
               {/if}
             {/each}
           </div>
@@ -1569,7 +1602,10 @@
     font-size: 11px;
   }
   .param-list { overflow-y: auto; max-height: 260px; display: flex; flex-direction: column; gap: 4px; }
-  .param-group { color: #7d8894; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; }
+  .param-group { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
+                 background: #161e27; border: 1px solid #232c36; border-radius: 4px;
+                 color: #9aa5b1; font-size: 11px; font-weight: 600; padding: 4px 8px;
+                 cursor: pointer; }
   .param-row { display: flex; align-items: center; gap: 8px; }
   .param-segments { display: inline-flex; gap: 2px; flex: 1; min-width: 0; }
   .param-segments button { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
@@ -1581,6 +1617,11 @@
   .param-stepper button { font-size: 12px; padding: 0 8px; background: #1c2630; color: #9aa5b1;
                           border: 1px solid #2c3742; border-radius: 3px; cursor: pointer; }
   .param-stepper button:disabled { opacity: 0.35; cursor: default; }
+  .param-group-arrow { color: #66707b; }
+  .param-group-count { margin-left: auto; color: #66707b; font-weight: 400; }
+  .param-row.assigned .param-name { color: #7fb4e0; }
+  .quick-learn.armed { color: #d9a13c; border-color: #d9a13c;
+                       animation: midi-learn-pulse 1s ease-in-out infinite; }
   .param-value { cursor: text; }
   .param-edit { width: 90px; font-size: 11px; background: #10161c; color: #d6dbe0;
                 border: 1px solid #3d81c4; border-radius: 3px; padding: 1px 4px; }

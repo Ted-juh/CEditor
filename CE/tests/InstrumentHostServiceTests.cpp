@@ -2054,6 +2054,50 @@ void testMidiLearn()
                  && orphan->getProperty ("slotId", {}).toString().isEmpty(),
                "an armed slot whose page was removed disarms instead of binding");
     }
+
+    {
+        // Quick learn: parameter -> slot -> armed, one command — including minting the page
+        // when there is nowhere to put it.
+        const auto quickDir = freshDataDir ("quicklearn");
+        seedTwoSynthCatalog (quickDir);
+        Harness h (quickDir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto quickPart = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", quickPart }, { "ceId", "VST3-good-synth" } });
+        auto* stub = h.lastStub;
+
+        h.emits.clear();
+        h.cmd ("quickLearnParameter", { { "partId", quickPart }, { "parameterId", "nope" } });
+        check (h.emits.lastError().contains ("Unknown parameter"),
+               "quick learn refuses a parameter the registry does not hold");
+
+        h.cmd ("quickLearnParameter", { { "partId", quickPart }, { "parameterId", "cutoff" } });
+        const auto pages = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {});
+        check (pages.size() == 1 && pages[0].getProperty ("name", {}).toString() == "MIDI",
+               "with no pages anywhere, quick learn mints one");
+        const auto slot = pages[0].getProperty ("slots", {})[0];
+        check (slot.getProperty ("parameterId", {}).toString() == "cutoff"
+                 && (bool) slot.getProperty ("resolved", false),
+               "and the parameter sits assigned in its first slot");
+        const auto* armed = h.emits.last ("instrumentHostMidiLearn");
+        check (armed != nullptr && (bool) armed->getProperty ("armed", false),
+               "armed and listening in the same gesture");
+
+        h.service->noteMidiActivity ("Test Keys", cc (1, 33, 110));
+        h.service->drainParameterEvents();
+        check (juce::approximatelyEqual (stub->cutoff->get(), 110.0f / 127.0f,
+                                         juce::absoluteTolerance (0.01f)),
+               "the wiggled knob drives the parameter from then on");
+
+        // A second quick learn takes the next empty slot of the existing page.
+        h.cmd ("quickLearnParameter", { { "partId", quickPart }, { "parameterId", "wave" } });
+        const auto after = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {});
+        check (after.size() == 1
+                 && after[0].getProperty ("slots", {})[1].getProperty ("parameterId", {})
+                        .toString() == "wave",
+               "a second quick learn reuses the page's next empty slot");
+    }
 }
 
 // Layer B of the preset engine plus the walk: a plug-in exposing factory programs gets them

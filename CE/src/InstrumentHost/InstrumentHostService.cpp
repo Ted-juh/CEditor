@@ -602,6 +602,58 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "quickLearnParameter")
+    {
+        // The two-click knob: find this parameter a slot (first empty anywhere, or a fresh
+        // "MIDI" page when every slot is taken), bind it, and arm MIDI learn on that slot —
+        // one gesture from "I found the parameter" to "wiggle the knob you want". Atomic
+        // here because the web cannot chain create-assign-arm across async state pushes.
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto parameterId = payload.getProperty ("parameterId", {}).toString();
+
+        if (! targetParameterExists (partId, parameterId))
+        {
+            emitError ("Unknown parameter " + parameterId + " on that target.");
+            return;
+        }
+
+        juce::String pageId, slotId;
+        for (const auto& page : rack.getPerformance().pages)
+        {
+            for (const auto& slot : page.slots)
+                if (slot.binding.isEmpty())
+                {
+                    pageId = page.pageId;
+                    slotId = slot.slotId;
+                    break;
+                }
+            if (slotId.isNotEmpty())
+                break;
+        }
+        if (slotId.isEmpty())
+        {
+            pageId = rack.addControlPage ("MIDI");
+            slotId = "s1";
+        }
+
+        ControlBinding binding;
+        binding.partId = partId;
+        binding.pluginCeId = targetClassCeId (partId);
+        binding.parameterId = parameterId;
+        rack.setSlotBinding (pageId, slotId, std::move (binding));
+
+        midiLearnPageId = pageId;
+        midiLearnSlotId = slotId;
+        {   // Armed means the NEXT movement binds, same as the slot row's own learn.
+            const std::scoped_lock lock (midiActivityLock);
+            pendingCcs.clear();
+        }
+        savePerformance();
+        emitState();
+        emitMidiLearn (true, pageId, slotId, -1, 0);
+        return;
+    }
+
     if (cmd == "generateControlPages")
     {
         const auto partId = payload.getProperty ("partId", {}).toString();

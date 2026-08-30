@@ -47,6 +47,8 @@ import {
   normalizeHostSurface,
   normalizeMidiLearn,
   parameterControlKind,
+  groupParameters,
+  assignedParameterIds,
   emptyLicence,
   normalizeLicence,
 } from '../src/CE_Application/stores/instrumentHost.js';
@@ -1202,4 +1204,44 @@ test('valueTexts normalize and the mock parses typed text by name and number', (
   ] });
   assert.deepEqual(shaped.parameters[0].valueTexts, ['Saw', 'Square', 'Sine']);
   assert.deepEqual(shaped.parameters[1].valueTexts, [], 'absent reads as empty, not undefined');
+});
+
+test('groupParameters folds registry order into named groups with an orphan bucket', () => {
+  const groups = groupParameters([
+    { id: 'a', group: 'Filter' }, { id: 'b', group: 'Filter' },
+    { id: 'c', group: '' }, { id: 'd', group: 'Osc' },
+  ]);
+  assert.deepEqual(groups.map((g) => g.name), ['Filter', 'General', 'Osc']);
+  assert.equal(groups[0].parameters.length, 2);
+  assert.equal(groups[1].parameters[0].id, 'c', 'ungrouped rows land in General, never vanish');
+  assert.deepEqual(groupParameters(null), [], 'garbage folds to nothing');
+});
+
+test('assignedParameterIds reads slots and macros for one target only', () => {
+  const state = normalizeHostState({ rack: {
+    pages: [{ pageId: 'p', slots: [
+      { slotId: 's1', assigned: true, partId: 'part-a', parameterId: 'cutoff' },
+      { slotId: 's2', assigned: true, partId: 'part-b', parameterId: 'wave' },
+      { slotId: 's3' },
+    ] }],
+    macros: [{ macroId: 'm', targets: [{ targetId: 'part-a', parameterId: 'drive' }] }],
+  } });
+  const ids = assignedParameterIds(state, 'part-a');
+  assert.deepEqual([...ids].sort(), ['cutoff', 'drive']);
+  assert.equal(assignedParameterIds(state, 'part-c').size, 0);
+  assert.equal(assignedParameterIds(null, 'part-a').size, 0, 'garbage reads as nothing assigned');
+});
+
+test('mock quick learn mints a page, assigns, and binds a knob at once', () => {
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'quickLearnParameter', partId, parameterId: 'cutoff' });
+  const page = state.rack.pages.at(-1);
+  assert.equal(page.name, 'MIDI', 'no empty slot anywhere means a fresh page');
+  assert.equal(page.slots[0].parameterId, 'cutoff');
+  assert.equal(page.slots[0].midiCc, 20, 'and the mock hears a knob immediately');
+
+  state = applyMockCommand(state, { cmd: 'quickLearnParameter', partId, parameterId: 'wave' });
+  assert.equal(state.rack.pages.at(-1).slots[1].parameterId, 'wave',
+    'the next quick learn takes the next empty slot, not a second page');
 });

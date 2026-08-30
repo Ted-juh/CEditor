@@ -249,6 +249,32 @@ export function parameterControlKind(parameter) {
   return 'slider';
 }
 
+/** Registry rows folded into their plug-in-declared groups, order preserved. Ungrouped
+ *  rows share one 'General' bucket so a collapsed list never hides orphans invisibly. */
+export function groupParameters(parameters) {
+  const groups = [];
+  for (const parameter of Array.isArray(parameters) ? parameters : []) {
+    const name = parameter.group || 'General';
+    let group = groups.find((g) => g.name === name);
+    if (!group) groups.push((group = { name, parameters: [] }));
+    group.parameters.push(parameter);
+  }
+  return groups;
+}
+
+/** Every parameterId of this target that some control slot or macro drives — the
+ *  "assigned" filter's ground truth, read from the same state the panels render. */
+export function assignedParameterIds(state, targetId) {
+  const ids = new Set();
+  for (const page of state?.rack?.pages ?? [])
+    for (const slot of page.slots)
+      if (slot.assigned && slot.partId === targetId) ids.add(slot.parameterId);
+  for (const macro of state?.rack?.macros ?? [])
+    for (const target of macro.targets)
+      if (target.targetId === targetId) ids.add(target.parameterId);
+  return ids;
+}
+
 /** Applies one instrumentHostParamValues delta to the registry snapshot the view renders.
  *  A delta for a different part leaves the snapshot untouched — the native side speaks per
  *  part, and the view holds the focused part's registry only. */
@@ -1290,6 +1316,29 @@ export function applyMockCommand(state, payload) {
     }
     return next;
   }
+  if (cmd === 'quickLearnParameter') {
+    const target = part(payload.partId);
+    if (!target) return next;
+    // Find the first empty slot anywhere; mint a MIDI page when there is none — then the
+    // mock 'hears' a knob at once, like its slot-row learn does. The page-add returns a
+    // NEW state, so everything after works on whichever state actually holds the page.
+    let working = next;
+    let page = working.rack.pages.find((p) => p.slots.some((s) => !s.assigned));
+    if (!page) {
+      working = applyMockCommand(working, { cmd: 'addControlPage', name: 'MIDI' });
+      page = working.rack.pages.at(-1);
+    }
+    const slot = page.slots.find((s) => !s.assigned);
+    const index = page.slots.indexOf(slot);
+    Object.assign(slot, {
+      assigned: true, partId: payload.partId,
+      parameterId: String(payload.parameterId ?? ''),
+      displayName: mockBindingName(payload.parameterId, working.rack),
+      partName: target.pluginName || '', resolved: true,
+      midiCc: 20 + index, midiChannel: 1,
+    });
+    return working;
+  }
   if (cmd === 'learnControlSlotMidi' || cmd === 'clearControlSlotMidi') {
     const page = next.rack.pages.find((p) => p.pageId === payload.pageId);
     const slot = page?.slots.find((s) => s.slotId === payload.slotId);
@@ -1984,6 +2033,8 @@ export const setMidiInputEnabled = (id, enabled) => send({ cmd: 'setMidiInputEna
 export const requestParameters = (partId) => send({ cmd: 'getParameters', partId });
 export const setParameter = (partId, id, value) => send({ cmd: 'setParameter', partId, id, value });
 export const setParameterText = (partId, id, text) => send({ cmd: 'setParameterText', partId, id, text });
+export const quickLearnParameter = (partId, parameterId) =>
+  send({ cmd: 'quickLearnParameter', partId, parameterId });
 export const resetParameter = (partId, id) => send({ cmd: 'resetParameter', partId, id });
 export const beginParameterGesture = (partId, id) => send({ cmd: 'beginParameterGesture', partId, id });
 export const endParameterGesture = (partId, id) => send({ cmd: 'endParameterGesture', partId, id });
