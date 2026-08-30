@@ -5748,6 +5748,13 @@ juce::var InstrumentHostService::performancePayload() const
                 s->setProperty ("probability", step.probability);
                 s->setProperty ("ratchets",    step.ratchets);
                 s->setProperty ("tie",         step.tie);
+                if (! step.chordNotes.isEmpty())
+                {
+                    juce::Array<juce::var> chordNotes;
+                    for (const auto note : step.chordNotes)
+                        chordNotes.add (note);
+                    s->setProperty ("chordNotes", chordNotes);
+                }
                 s->setProperty ("every",       step.conditionEvery);
                 s->setProperty ("offset",      step.conditionOffset);
                 steps.add (juce::var (s));

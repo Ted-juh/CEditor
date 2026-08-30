@@ -51,6 +51,132 @@
     return `${names[((note % 12) + 12) % 12]}${Math.floor(note / 12) - 1}`;
   };
 
+  // --- the piano roll (note and chord lanes) -------------------------------------------
+  // Pitch was a number you typed per step; now it is a row you click. Two octaves are
+  // visible per lane, shifted with the octave buttons; the window opens where the lane's
+  // notes already live. Note lanes are monophonic — clicking another row MOVES the step's
+  // note; clicking the lit cell rests the step; dragging paints. Chord lanes stack: each
+  // click toggles that pitch in the step's chord.
+  const ROLL_ROWS = 25;
+  const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
+  let rollBase = $state({});
+  let rollDrag = $state(null);   // { laneId, painting, lastIndex }
+
+  function stepPitches(lane, step) {
+    if (!step.active) return [];
+    return lane.type === 'chord' && step.chordNotes.length > 0 ? step.chordNotes : [step.note];
+  }
+
+  function rollBaseFor(lane) {
+    if (rollBase[lane.laneId] !== undefined) return rollBase[lane.laneId];
+    const notes = lane.steps.flatMap((step) => stepPitches(lane, step));
+    const low = notes.length > 0 ? Math.min(...notes) : 48;   // an empty lane opens at C2
+    return Math.max(0, Math.min(127 - ROLL_ROWS + 1, Math.floor(low / 12) * 12));
+  }
+
+  function shiftRoll(lane, octaves) {
+    rollBase[lane.laneId] = Math.max(0, Math.min(127 - ROLL_ROWS + 1,
+      rollBaseFor(lane) + octaves * 12));
+  }
+
+  function rollCellFromEvent(lane, event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const index = Math.max(0, Math.min(lane.stepCount - 1,
+      Math.floor(((event.clientX - rect.left) / rect.width) * lane.stepCount)));
+    const row = Math.max(0, Math.min(ROLL_ROWS - 1,
+      ROLL_ROWS - 1 - Math.floor(((event.clientY - rect.top) / rect.height) * ROLL_ROWS)));
+    return { index, note: rollBaseFor(lane) + row };
+  }
+
+  function rollDown(lane, event) {
+    if (event.button === 2) return;   // right-click keeps its meaning: select the step
+    event.preventDefault();
+    selectedLaneId = lane.laneId;
+    const { index, note } = rollCellFromEvent(lane, event);
+    selectedStepIndex = index;
+    const step = lane.steps[index];
+
+    if (lane.type === 'chord') {
+      const chord = stepPitches(lane, step);
+      const nextChord = chord.includes(note)
+        ? chord.filter((n) => n !== note)
+        : [...chord, note].sort((a, b) => a - b);
+      setStep(selectedPattern.patternId, lane.laneId, index,
+              { active: nextChord.length > 0, chord: nextChord });
+      return;   // chords are click-built, not painted
+    }
+
+    if (step.active && step.note === note) {
+      setStep(selectedPattern.patternId, lane.laneId, index, { active: false });
+      rollDrag = { laneId: lane.laneId, painting: false, lastIndex: index };
+    } else {
+      setStep(selectedPattern.patternId, lane.laneId, index, { active: true, note });
+      rollDrag = { laneId: lane.laneId, painting: true, lastIndex: index };
+    }
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function rollMove(lane, event) {
+    if (!rollDrag?.painting || rollDrag.laneId !== lane.laneId) return;
+    const { index, note } = rollCellFromEvent(lane, event);
+    if (index === rollDrag.lastIndex && lane.steps[index]?.active
+        && lane.steps[index]?.note === note) return;
+    rollDrag = { ...rollDrag, lastIndex: index };
+    setStep(selectedPattern.patternId, lane.laneId, index, { active: true, note });
+  }
+
+  const rollUp = () => (rollDrag = null);
+
+  // Velocity bars for the selected note/chord/drum lane, and value bars for cc/parameter
+  // lanes: same bar-per-step gesture the arp grid uses.
+  let barDrag = $state(null);   // { laneId, field, lastIndex }
+
+  function barFromEvent(lane, event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const index = Math.max(0, Math.min(lane.stepCount - 1,
+      Math.floor(((event.clientX - rect.left) / rect.width) * lane.stepCount)));
+    const height = Math.max(0, Math.min(1, 1 - (event.clientY - rect.top) / rect.height));
+    return { index, height };
+  }
+
+  function barDown(lane, field, event) {
+    event.preventDefault();
+    barDrag = { laneId: lane.laneId, field, lastIndex: -1 };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    barApply(lane, field, event);
+  }
+
+  function barApply(lane, field, event) {
+    const { index, height } = barFromEvent(lane, event);
+    const step = lane.steps[index];
+    if (field === 'velocity') {
+      if (!step?.active) return;   // velocity without a note is noise
+      setStep(selectedPattern.patternId, lane.laneId, index,
+              { velocity: Math.max(1, Math.round(height * 127)) });
+    } else {
+      setStep(selectedPattern.patternId, lane.laneId, index,
+              { active: true, value: Math.round(height * 100) / 100 });
+    }
+  }
+
+  function barMove(lane, field, event) {
+    if (!barDrag || barDrag.laneId !== lane.laneId || barDrag.field !== field) return;
+    barApply(lane, field, event);
+  }
+
+  const barUp = () => (barDrag = null);
+
+  // The playhead column, coarse on purpose: the clip's engine-reported phase mapped onto
+  // this lane's own loop (lanes are polymetric, so each maps separately).
+  function playingColumn(lane) {
+    const clip = clipForSelectedPattern;
+    if (!clip?.active || !selectedPattern || !(selectedPattern.lengthPpq > 0)) return -1;
+    const laneBeats = lane.stepCount / Math.max(1, lane.stepsPerBeat);
+    if (!(laneBeats > 0)) return -1;
+    const beatsIn = (clip.phase * selectedPattern.lengthPpq) % laneBeats;
+    return Math.floor((beatsIn / laneBeats) * lane.stepCount) % lane.stepCount;
+  }
+
   function laneLabel(lane) {
     if (lane.type === 'parameter')
       return `${lane.name || 'Automation'} — ${lane.parameterId || 'unassigned'}`;
@@ -144,24 +270,126 @@
                         onclick={() => removeLane(selectedPattern.patternId, lane.laneId)}>×</button>
               </div>
 
-              <div class="step-grid" style={`--steps: ${lane.stepCount}`}>
-                {#each lane.steps as step, index (index)}
-                  <button type="button" class="step"
-                          class:active={step.active}
-                          class:tie={step.tie}
-                          class:beat={index % lane.stepsPerBeat === 0}
-                          class:selected={selectedLane?.laneId === lane.laneId && selectedStepIndex === index}
-                          title={step.active ? `${stepValueLabel(lane, step)} · vel ${step.velocity} · ${step.probability}%` : `step ${index + 1}`}
-                          onclick={() => {
-                            selectedLaneId = lane.laneId;
-                            selectedStepIndex = index;
-                            toggleStep(selectedPattern.patternId, lane.laneId, index);
-                          }}
-                          oncontextmenu={(e) => { e.preventDefault(); selectedLaneId = lane.laneId; selectedStepIndex = index; }}>
-                    {#if step.active}<span class="step-mark">{step.ratchets > 1 ? step.ratchets : ''}</span>{/if}
-                  </button>
-                {/each}
-              </div>
+              {#if lane.type === 'note' || lane.type === 'chord'}
+                <!-- The roll: rows are pitches, click places the note there, the lit cell
+                     clicked again rests the step, dragging paints. Chord lanes stack
+                     pitches per column instead of moving one. -->
+                <div class="roll-wrap">
+                  <div class="roll-ruler">
+                    {#each Array.from({ length: ROLL_ROWS }, (_, r) => rollBaseFor(lane) + ROLL_ROWS - 1 - r) as rowNote (rowNote)}
+                      <span class="ruler-cell" class:black={BLACK_KEYS.has(rowNote % 12)}>
+                        {rowNote % 12 === 0 ? noteName(rowNote) : ''}</span>
+                    {/each}
+                  </div>
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <div class="piano-roll" data-testid={`piano-roll-${lane.laneId}`}
+                       onpointerdown={(e) => rollDown(lane, e)}
+                       onpointermove={(e) => rollMove(lane, e)}
+                       onpointerup={rollUp} onpointercancel={rollUp}
+                       oncontextmenu={(e) => {
+                         e.preventDefault();
+                         selectedLaneId = lane.laneId;
+                         selectedStepIndex = rollCellFromEvent(lane, e).index;
+                       }}>
+                    {#each lane.steps as step, index (index)}
+                      <div class="roll-col" class:beat={index % lane.stepsPerBeat === 0}
+                           class:playing={playingColumn(lane) === index}
+                           class:selected={selectedLane?.laneId === lane.laneId && selectedStepIndex === index}>
+                        {#each Array.from({ length: ROLL_ROWS }, (_, r) => rollBaseFor(lane) + ROLL_ROWS - 1 - r) as rowNote (rowNote)}
+                          <div class="roll-cell"
+                               class:black={BLACK_KEYS.has(rowNote % 12)}
+                               class:on={stepPitches(lane, step).includes(rowNote)}
+                               class:tie={step.tie && stepPitches(lane, step).includes(rowNote)}></div>
+                        {/each}
+                      </div>
+                    {/each}
+                  </div>
+                  <div class="roll-side">
+                    <button type="button" class="ghost" title="One octave up"
+                            onclick={() => shiftRoll(lane, 1)}>▲</button>
+                    <button type="button" class="ghost" title="One octave down"
+                            onclick={() => shiftRoll(lane, -1)}>▼</button>
+                  </div>
+                </div>
+                {#if selectedLane?.laneId === lane.laneId}
+                  <!-- Dynamics under the melody, exactly the arp's gesture. -->
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <div class="bar-lane" data-testid={`velocity-lane-${lane.laneId}`}
+                       title="Velocity per step — drag"
+                       onpointerdown={(e) => barDown(lane, 'velocity', e)}
+                       onpointermove={(e) => barMove(lane, 'velocity', e)}
+                       onpointerup={barUp} onpointercancel={barUp}>
+                    {#each lane.steps as step, index (index)}
+                      <div class="bar-col" class:idle={!step.active}
+                           class:playing={playingColumn(lane) === index}>
+                        {#if step.active}
+                          <div class="bar-fill" style={`height: ${Math.max(step.velocity / 127 * 100, 4)}%`}></div>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+              {:else if lane.type === 'cc' || lane.type === 'parameter'}
+                <!-- A value curve is bars, not a slider hidden behind each step. Dragging a
+                     column writes and activates it; the step options still deactivate. -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div class="bar-lane tall" data-testid={`value-lane-${lane.laneId}`}
+                     title="Value per step — drag"
+                     onpointerdown={(e) => barDown(lane, 'value', e)}
+                     onpointermove={(e) => barMove(lane, 'value', e)}
+                     onpointerup={barUp} onpointercancel={barUp}
+                     oncontextmenu={(e) => {
+                       e.preventDefault();
+                       selectedLaneId = lane.laneId;
+                       selectedStepIndex = barFromEvent(lane, e).index;
+                     }}>
+                  {#each lane.steps as step, index (index)}
+                    <div class="bar-col" class:idle={!step.active}
+                         class:beat={index % lane.stepsPerBeat === 0}
+                         class:playing={playingColumn(lane) === index}>
+                      {#if step.active}
+                        <div class="bar-fill value" style={`height: ${Math.max(step.value * 100, 3)}%`}></div>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <div class="step-grid" style={`--steps: ${lane.stepCount}`}>
+                  {#each lane.steps as step, index (index)}
+                    <button type="button" class="step"
+                            class:active={step.active}
+                            class:tie={step.tie}
+                            class:beat={index % lane.stepsPerBeat === 0}
+                            class:selected={selectedLane?.laneId === lane.laneId && selectedStepIndex === index}
+                            title={step.active ? `${stepValueLabel(lane, step)} · vel ${step.velocity} · ${step.probability}%` : `step ${index + 1}`}
+                            onclick={() => {
+                              selectedLaneId = lane.laneId;
+                              selectedStepIndex = index;
+                              toggleStep(selectedPattern.patternId, lane.laneId, index);
+                            }}
+                            oncontextmenu={(e) => { e.preventDefault(); selectedLaneId = lane.laneId; selectedStepIndex = index; }}>
+                      {#if step.active}<span class="step-mark">{step.ratchets > 1 ? step.ratchets : ''}</span>{/if}
+                    </button>
+                  {/each}
+                </div>
+                {#if selectedLane?.laneId === lane.laneId && lane.type === 'drum'}
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <div class="bar-lane" data-testid={`velocity-lane-${lane.laneId}`}
+                       title="Velocity per step — drag"
+                       onpointerdown={(e) => barDown(lane, 'velocity', e)}
+                       onpointermove={(e) => barMove(lane, 'velocity', e)}
+                       onpointerup={barUp} onpointercancel={barUp}>
+                    {#each lane.steps as step, index (index)}
+                      <div class="bar-col" class:idle={!step.active}
+                           class:playing={playingColumn(lane) === index}>
+                        {#if step.active}
+                          <div class="bar-fill" style={`height: ${Math.max(step.velocity / 127 * 100, 4)}%`}></div>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+              {/if}
             </div>
           {/each}
 
@@ -451,6 +679,34 @@
   .lane-target { flex: 1; color: #7d8894; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lane.unresolved .lane-target { color: #d6a3a3; }
 
+  .roll-wrap { display: flex; gap: 3px; align-items: stretch; }
+  .roll-ruler { display: flex; flex-direction: column; width: 26px; flex: 0 0 auto; }
+  .ruler-cell { flex: 1; font-size: 7px; color: #66707b; line-height: 1;
+                display: flex; align-items: center; }
+  .ruler-cell.black { background: #12171d; }
+  .piano-roll { flex: 1; display: flex; gap: 1px; height: 150px; background: #10161c;
+                border: 1px solid #232c36; border-radius: 4px; padding: 2px;
+                cursor: crosshair; touch-action: none; }
+  .roll-col { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 4px; }
+  .roll-col.beat { border-left: 1px solid #232c36; }
+  .roll-col.playing { background: #24384c; border-radius: 1px; }
+  .roll-col.selected { outline: 1px solid #3d81c4; outline-offset: -1px; }
+  .roll-cell { flex: 1; background: #161e27; border-radius: 1px; }
+  .roll-cell.black { background: #131a22; }
+  .roll-cell.on { background: #3d81c4; }
+  .roll-cell.on.tie { background: #7fb4e0; }
+  .roll-col.playing .roll-cell.on { background: #9cd0f7; }
+  .roll-side { display: flex; flex-direction: column; gap: 2px; justify-content: center; }
+  .bar-lane { display: flex; gap: 1px; height: 34px; margin-top: 3px; background: #10161c;
+              border: 1px solid #232c36; border-radius: 4px; padding: 2px;
+              cursor: crosshair; touch-action: none; }
+  .bar-lane.tall { height: 72px; }
+  .bar-col { flex: 1; display: flex; align-items: flex-end; background: #161e27;
+             border-radius: 1px; min-width: 4px; }
+  .bar-col.idle { opacity: 0.35; }
+  .bar-col.playing { background: #24384c; }
+  .bar-fill { width: 100%; background: #4aa88c; border-radius: 1px 1px 0 0; }
+  .bar-fill.value { background: #b4854a; }
   .step-grid {
     display: grid;
     grid-template-columns: repeat(var(--steps), minmax(0, 1fr));

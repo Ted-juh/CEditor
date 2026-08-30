@@ -1261,3 +1261,20 @@ test('mock quick learn mints a page, assigns, and binds a knob at once', () => {
   assert.equal(state.rack.pages.at(-1).slots[1].parameterId, 'wave',
     'the next quick learn takes the next empty slot, not a second page');
 });
+
+test('steps carry chord notes: normalized in, mock-merged back', () => {
+  const shaped = normalizeHostState({ performance: { patterns: [{ patternId: 'p', lanes: [{
+    laneId: 'l', type: 'chord', stepCount: 2, stepsPerBeat: 4,
+    steps: [{ active: true, chordNotes: [60, 64, 67] }, {}],
+  }] }] } });
+  assert.deepEqual(shaped.performance.patterns[0].lanes[0].steps[0].chordNotes, [60, 64, 67]);
+  assert.deepEqual(shaped.performance.patterns[0].lanes[0].steps[1].chordNotes, [],
+    'absent chords read as empty, never undefined');
+
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'setStep', patternId: 'mock-pattern-1',
+    laneId: 'mock-lane-1', index: 1, active: true, chord: [48, 55] });
+  const step = state.performance.patterns[0].lanes[0].steps[1];
+  assert.equal(step.active, true);
+  assert.deepEqual(step.chordNotes, [48, 55], 'the drawn stack lands in the model');
+});

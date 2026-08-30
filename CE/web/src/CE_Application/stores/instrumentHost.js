@@ -609,6 +609,7 @@ const normalizeStep = (s) => ({
   tie: s?.tie === true,
   every: Number(s?.every ?? 1),
   offset: Number(s?.offset ?? 0),
+  chordNotes: (Array.isArray(s?.chordNotes) ? s.chordNotes : []).map(Number),
 });
 
 const normalizeArp = (a) => ({
@@ -1514,6 +1515,7 @@ export function applyMockCommand(state, payload) {
       if (payload[key] !== undefined) step[key] = Number(payload[key]);
     for (const key of ['active', 'tie'])
       if (payload[key] !== undefined) step[key] = payload[key] === true;
+    if (Array.isArray(payload.chord)) step.chordNotes = payload.chord.map(Number);
     return next;
   }
   if (cmd === 'addClip') {
