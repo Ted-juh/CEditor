@@ -151,7 +151,7 @@ int wmain (int argc, wchar_t** argv)
         {
             logLine ("CTRL49 USB output port not found. Available ports:");
             for (const auto& name : Ctrl49WinMmOutput::listOutputPortNames())
-                logLine ("    " + std::string (name.begin(), name.end()));
+                logLine ("    " + juce::String (name.c_str()).toStdString());   // proper narrowing, not per-wchar truncation
             return 3;
         }
         Ctrl49WinMmOutput output (*ctrlPortId);

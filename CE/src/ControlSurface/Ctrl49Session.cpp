@@ -24,7 +24,16 @@ std::vector<Ctrl49Session::TimedFrame>
 Ctrl49Session::buildStartupSequence (const Bytes& rawLua, const std::vector<PngAsset>& assets)
 {
     const ObjectKey key { kObjectTypeLua, kLuaObjectId };
-    const std::vector<Bytes> objectFrames = buildObjectUpload (key, rawLua);
+
+    // The Lua object needs the same NUL terminator the PNGs get — the device reads the
+    // source as a C string, and an unterminated upload runs on into whatever RAM follows,
+    // which surfaces on the hardware as "Lua Main Body Error" over garbage tokens. Owned
+    // HERE, idempotently, because the one caller that appended it itself (the bridge exe)
+    // worked and every caller that trusted the parameter comment did not.
+    Bytes terminated = rawLua;
+    if (terminated.empty() || terminated.back() != 0x00)
+        terminated.push_back (0x00);
+    const std::vector<Bytes> objectFrames = buildObjectUpload (key, terminated);
 
     // PNG assets: raw file bytes + one NUL terminator, per the object convention.
     std::vector<std::vector<Bytes>> assetFrames;

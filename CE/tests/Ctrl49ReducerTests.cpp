@@ -98,10 +98,25 @@ int main()
     std::cout << "\nCtrl49 session sequence test\n----------------------------\n";
 
     {   // --- startup sequence shape ----------------------------------------------------------------
-        // A 3,406-byte page (3,405 + NUL) uploads as 9 object frames. The startup sequence
-        // interleaves setup around them; verify the object frames and key milestones land.
-        Bytes rawLua (3406, static_cast<std::uint8_t> ('-'));
+        // A 3,405-byte source uploads as 3,406 bytes (the session appends the NUL) in
+        // 9 object frames. The startup sequence interleaves setup around them; verify the
+        // object frames and key milestones land.
+        Bytes rawLua (3405, static_cast<std::uint8_t> ('-'));
         const auto seq = Ctrl49Session::buildStartupSequence (rawLua);
+
+        // The terminator is the session's job now — the hardware found the one caller that
+        // trusted the old comment: an unterminated page reads on into device RAM and dies
+        // as "Lua Main Body Error". Identical sequences with and without a caller NUL is
+        // the proof nobody can get this wrong from either side any more.
+        Bytes preTerminated = rawLua;
+        preTerminated.push_back (0x00);
+        {
+            const auto again = Ctrl49Session::buildStartupSequence (preTerminated);
+            bool identical = again.size() == seq.size();
+            for (std::size_t i = 0; identical && i < seq.size(); ++i)
+                identical = again[i].frame == seq[i].frame;
+            check (identical, "caller-terminated and plain source upload identically");
+        }
 
         auto isFrame = [] (const Bytes& f, std::uint8_t type, std::uint8_t cmd)
         { return f.size() >= 8 && f[6] == type && f[7] == cmd; };
