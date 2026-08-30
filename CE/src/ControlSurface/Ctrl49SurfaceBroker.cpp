@@ -388,7 +388,7 @@ void Ctrl49SurfaceBroker::refreshDisplay()
         }
 
         labels = buildPerformanceLabelPayload (transport, clipViews);
-        state = buildPerformanceStatePayload (reducer.page(), reducer.activeSlot(), clipViews);
+        state = buildPerformanceStatePayload (reducer.activeSlot(), clipViews);
     }
     else if (controlPages > 0)
     {
@@ -404,7 +404,7 @@ void Ctrl49SurfaceBroker::refreshDisplay()
         }
 
         labels = buildRackLabelPayload (page.name.toStdString(), views);
-        state = buildRackStatePayload (reducer.page(), reducer.activeSlot(), views);
+        state = buildRackStatePayload (reducer.activeSlot(), views);
     }
 
     // Only bytes that changed travel — the display link is slow and redraws flicker.

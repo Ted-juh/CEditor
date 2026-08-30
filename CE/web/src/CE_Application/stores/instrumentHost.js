@@ -1059,7 +1059,11 @@ export function applyMockCommand(state, payload) {
     return next;
   }
   if (cmd === 'floatEditor') {
-    if (part(payload.partId)?.hasInstrument) {
+    const effectTargets = [...next.rack.masterEffects,
+                           ...next.rack.parts.flatMap((p) => p.effects),
+                           ...next.rack.returns.flatMap((r) => r.effects)];
+    const isLiveEffect = effectTargets.some((e) => e.effectId === payload.partId && e.hasProcessor);
+    if (part(payload.partId)?.hasInstrument || isLiveEffect) {
       if (next.editorOpenPartId === payload.partId) next.editorOpenPartId = '';
       if (!next.floatingEditorPartIds.includes(payload.partId))
         next.floatingEditorPartIds = [...next.floatingEditorPartIds, payload.partId];

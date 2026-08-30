@@ -1301,6 +1301,13 @@ test('floating editors: several at once, dock steals back, mock mirrors the poli
   state = applyMockCommand(state, { cmd: 'closeEditorWindow', partId: b });
   assert.deepEqual(state.floatingEditorPartIds, [a], 'a window close closes only its window');
 
+  // Inserts float too: a live effect id passes the mock's gate like a loaded part does.
+  state = applyMockCommand(normalizeHostState({ rack: {
+    parts: [{ partId: 'p1', hasInstrument: true,
+              effects: [{ effectId: 'fx1', hasProcessor: true }] }],
+  } }), { cmd: 'floatEditor', partId: 'fx1' });
+  assert.deepEqual(state.floatingEditorPartIds, ['fx1']);
+
   const shaped = normalizeHostState({ floatingEditorPartIds: ['x', 'y'] });
   assert.deepEqual(shaped.floatingEditorPartIds, ['x', 'y']);
   assert.deepEqual(normalizeHostState({}).floatingEditorPartIds, [],

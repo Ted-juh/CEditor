@@ -26,21 +26,25 @@ Bytes buildRackLabelPayload (const std::string& title, const RackSlotViews& slot
 {
     Bytes out;
     appendString (out, title);
+    // An unresolved binding is marked in its label — the knob page has no switch row, so
+    // the flag the old 22-byte payload carried moves to where this page can show it.
     for (const auto& slot : slots)
-        appendString (out, slot.assigned ? slot.label : std::string());
+        appendString (out, ! slot.assigned ? std::string()
+                          : slot.resolved  ? slot.label
+                                           : "!" + slot.label);
     return out;
 }
 
-Bytes buildRackStatePayload (int page, int activeSlot, const RackSlotViews& slots)
+Bytes buildRackStatePayload (int activeSlot, const RackSlotViews& slots)
 {
-    Bytes result (22, 0);
-    result[0] = static_cast<std::uint8_t> (clamp127 (page));
-    result[1] = static_cast<std::uint8_t> (clamp127 (activeSlot));
-    for (std::size_t slot = 0; slot < slots.size(); ++slot)
-    {
-        result[6 + slot]  = static_cast<std::uint8_t> (clamp127 (slots[slot].position));
-        result[14 + slot] = slots[slot].assigned && ! slots[slot].resolved ? 1 : 0;
-    }
+    // Exactly what CEditor_MultiKnob.lua's set_values reads: 9 bytes, [activeSlot][v0..v7].
+    // The first hardware run of the broker found the old 22-byte set_state layout here —
+    // the BRIDGE page's format — which put the active slot on knob 1 and every value six
+    // knobs late. The page's contract is the contract; this builder now speaks it.
+    Bytes result (9, 0);
+    result[0] = static_cast<std::uint8_t> (clamp127 (activeSlot));
+    for (std::size_t slot = 0; slot < slots.size() && slot < 8; ++slot)
+        result[1 + slot] = static_cast<std::uint8_t> (clamp127 (slots[slot].position));
     return result;
 }
 

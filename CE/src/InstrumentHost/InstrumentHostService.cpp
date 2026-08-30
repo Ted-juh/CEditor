@@ -265,28 +265,41 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "floatEditor")
     {
-        // The part's editor in its own window, beside however many others: the docked pane
-        // was policy, not a limit. A processor carries one live editor, so floating a part
-        // that is docked moves it out of the pane first.
-        const auto partId = payload.getProperty ("partId", {}).toString();
-        auto* instrument = rack.getInstrument (partId);
-        if (rack.getPerformance().findPart (partId) == nullptr || instrument == nullptr)
+        // Any editor in its own window, beside however many others: the docked pane was
+        // policy, not a limit. The target is a part's instrument OR an insert effect — the
+        // same either-or the pane serves; the owner's first session found the effects half
+        // missing. A processor carries one live editor, so floating what is docked moves
+        // it out of the pane first.
+        const auto targetId = payload.getProperty ("partId", {}).toString();
+
+        juce::AudioProcessor* processor = rack.getInstrument (targetId);
+        juce::String title;
+        if (processor != nullptr)
         {
-            emitError ("That part has no instrument loaded.");
+            const auto* part = rack.getPerformance().findPart (targetId);
+            title = part != nullptr && part->pluginName.isNotEmpty() ? part->pluginName
+                                                                     : juce::String ("Instrument");
+        }
+        else if (auto* effect = rack.getEffect (targetId))
+        {
+            processor = effect;
+            const auto* slot = rack.getPerformance().findEffect (targetId);
+            title = slot != nullptr && slot->pluginName.isNotEmpty() ? slot->pluginName
+                                                                     : juce::String ("Effect");
+        }
+
+        if (processor == nullptr)
+        {
+            emitError ("Nothing is loaded there to show.");
             return;
         }
 
-        if (partId == editorTargetId)
+        if (targetId == editorTargetId)
             hideEditor();
 
-        floatingEditorIds.addIfNotAlreadyThere (partId);
+        floatingEditorIds.addIfNotAlreadyThere (targetId);
         if (options.editorWindows.show != nullptr)
-        {
-            const auto* part = rack.getPerformance().findPart (partId);
-            options.editorWindows.show (partId, *instrument,
-                                        part->pluginName.isNotEmpty() ? part->pluginName
-                                                                      : juce::String ("Instrument"));
-        }
+            options.editorWindows.show (targetId, *processor, title);
         emitState();
         return;
     }

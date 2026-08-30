@@ -58,6 +58,6 @@ Bytes buildPerformanceLabelPayload (const PerformanceTransportView& transport,
 /** The 22-byte set_values state: phase per clip in the value bytes, and a switch flag per
     clip — lit for running, and also for pending, so a pad that has been pressed reads as
     armed rather than dead. */
-Bytes buildPerformanceStatePayload (int page, int activeClip, const PerformanceClipViews& clips);
+Bytes buildPerformanceStatePayload (int activeClip, const PerformanceClipViews& clips);
 
 } // namespace ceditor::ctrl49

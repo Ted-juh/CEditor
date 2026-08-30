@@ -59,24 +59,27 @@ Bytes buildPerformanceLabelPayload (const PerformanceTransportView& transport,
             appendString (out, std::string());
             continue;
         }
-        appendString (out, clip.pending ? ">" + clip.name : clip.name);
+        appendString (out, clip.pending ? ">" + clip.name
+                          : clip.active ? "*" + clip.name
+                                        : clip.name);
     }
 
     return out;
 }
 
-Bytes buildPerformanceStatePayload (int page, int activeClip, const PerformanceClipViews& clips)
+Bytes buildPerformanceStatePayload (int activeClip, const PerformanceClipViews& clips)
 {
-    Bytes result (22, 0);
-    result[0] = static_cast<std::uint8_t> (clamp127 (page));
-    result[1] = static_cast<std::uint8_t> (clamp127 (activeClip));
+    // The knob page's 9-byte contract, same as the rack payload: [active][eight knobs].
+    // Clip phases are the knobs; running/pending state moved into the labels ("*"/">"),
+    // where this page can actually show it.
+    Bytes result (9, 0);
+    result[0] = static_cast<std::uint8_t> (clamp127 (activeClip));
 
-    for (std::size_t clip = 0; clip < clips.size(); ++clip)
+    for (std::size_t clip = 0; clip < clips.size() && clip < 8; ++clip)
     {
         const auto phase = clips[clip].phase < 0.0f ? 0.0f
                             : (clips[clip].phase > 1.0f ? 1.0f : clips[clip].phase);
-        result[6 + clip] = static_cast<std::uint8_t> (clamp127 (static_cast<int> (phase * 127.0f)));
-        result[14 + clip] = clips[clip].active || clips[clip].pending ? 1 : 0;
+        result[1 + clip] = static_cast<std::uint8_t> (clamp127 (static_cast<int> (phase * 127.0f)));
     }
 
     return result;

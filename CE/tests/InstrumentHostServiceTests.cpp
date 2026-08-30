@@ -2393,8 +2393,29 @@ void testFloatingEditors()
     // A part with nothing loaded refuses to float, out loud.
     h.emits.clear();
     h.cmd ("floatEditor", { { "partId", partA } });
-    check (h.emits.lastError().contains ("no instrument"),
+    check (h.emits.lastError().contains ("loaded"),
            "floating an empty part refuses aloud");
+
+    // Inserts float exactly like instruments — the owner's first session found this half
+    // missing: the pane served effects, the pop-out refused them.
+    h.cmd ("loadInstrument", { { "partId", partB }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("addEffect", { { "chainId", partB }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("getState");
+    const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+    juce::String effectId;
+    for (int i = 0; i < parts.size(); ++i)
+        if (parts[i].getProperty ("partId", {}).toString() == partB
+            && parts[i].getProperty ("effects", {}).size() > 0)
+            effectId = parts[i].getProperty ("effects", {})[0].getProperty ("effectId", {}).toString();
+    check (effectId.isNotEmpty(), "the insert landed on the part");
+
+    h.cmd ("floatEditor", { { "partId", effectId } });
+    check (h.openWindows.contains (effectId), "an insert effect floats in its own window");
+    check (h.emits.lastState()->getProperty ("floatingEditorPartIds", {}).size() >= 1,
+           "and the state lists it like any other floating editor");
+    h.cmd ("removeEffect", { { "effectId", effectId } });
+    check (! h.openWindows.contains (effectId),
+           "removing the insert closes its window before the processor dies");
 }
 
 void testParameterModel()

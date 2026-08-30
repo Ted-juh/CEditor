@@ -795,6 +795,13 @@
                       class:on={$hostState.editorOpenPartId === effect.effectId}
                       title="Show the effect's own interface"
                       onclick={() => openEffectEditor(effect.effectId)}>Editor</button>
+              <button type="button" class="toggle"
+                      class:on={$hostState.floatingEditorPartIds.includes(effect.effectId)}
+                      disabled={!effect.hasProcessor}
+                      title="Pop this effect's interface out into its own window"
+                      onclick={() => ($hostState.floatingEditorPartIds.includes(effect.effectId)
+                                        ? closeEditorWindow(effect.effectId)
+                                        : floatEditor(effect.effectId))}>⧉</button>
               <button type="button" class="toggle" disabled={!effect.hasProcessor}
                       class:on={paramTargetId === effect.effectId}
                       title="Inspect this effect's parameters"

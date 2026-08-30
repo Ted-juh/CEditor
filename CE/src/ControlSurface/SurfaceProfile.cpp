@@ -94,7 +94,7 @@ void registerCtrl49Profile()
             clips[(std::size_t) i] = { i < labels.size() ? labels[i].toStdString() : std::string(),
                                        i < lit.size() && lit[i], false,
                                        i < values.size() ? values[i] : 0.0f };
-        return buildPerformanceStatePayload (0, 0, clips);
+        return buildPerformanceStatePayload (0, clips);
     };
 
     // Conformance is about the payloads this profile promises to build, which is exactly what
@@ -110,17 +110,26 @@ void registerCtrl49Profile()
         if (labels.empty() || labels[0] != 4)
             failures.add ("label payload does not start with the title length");
 
-        const auto state = buildRackStatePayload (0, 0, views);
-        if (state.size() != 22)
-            failures.add ("state payload is not the documented 22 bytes");
-        if (state.size() == 22 && state[6] != 64)
+        // The knob page's contract: nine bytes, [activeSlot][v0..v7] — what
+        // CEditor_MultiKnob.lua's set_values actually reads on the device.
+        const auto state = buildRackStatePayload (0, views);
+        if (state.size() != 9)
+            failures.add ("state payload is not the knob page's nine bytes");
+        if (state.size() == 9 && state[1] != 64)
             failures.add ("knob position did not reach its value byte");
 
         PerformanceClipViews clips {};
         clips[0] = { "Verse", true, false, 1.0f };
-        const auto performance = buildPerformanceStatePayload (0, 0, clips);
-        if (performance.size() != 22 || performance[14] != 1)
-            failures.add ("performance payload does not light a running clip");
+        const auto performance = buildPerformanceStatePayload (0, clips);
+        if (performance.size() != 9 || performance[1] != 127)
+            failures.add ("performance payload does not carry the running clip's phase");
+        PerformanceTransportView transportView {};
+        const auto performanceLabels = buildPerformanceLabelPayload (transportView, clips);
+        // Past the title: the first clip label must carry the running mark the state
+        // bytes no longer have room for.
+        if (performanceLabels.size() < 3
+            || performanceLabels[(std::size_t) performanceLabels[0] + 2] != (std::uint8_t) '*')
+            failures.add ("a running clip is not marked in its label");
 
         return failures;
     };

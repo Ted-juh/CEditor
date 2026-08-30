@@ -52,16 +52,23 @@ int main()
     check (capped[2] == 255, "a runaway label caps at the length byte's reach");
 
     // --- the 22-byte state -------------------------------------------------------------
-    slots[1].resolved = false;   // assigned but unresolved: the switch flag must light
+    slots[1].resolved = false;   // assigned but unresolved: the label must say so
     slots[0].position = 200;     // out of range: clamps, never wraps
-    const auto state = buildRackStatePayload (2, 1, slots);
-    check (state.size() == 22, "the state payload keeps the proven shape");
-    check (state[0] == 2 && state[1] == 1, "page and active slot lead");
-    check (state[6] == 127 && state[7] == 0, "positions land in the value bytes, clamped");
-    check (state[14] == 0 && state[15] == 1 && state[16] == 0,
-           "the switch flags mark exactly the assigned-but-unresolved slots");
-    check (state[3] == 0 && state[4] == 0 && state[5] == 0,
-           "pad, velocity and division stay zero — the rack page does not use them");
+    // The knob page's contract, pinned against CEditor_MultiKnob.lua's set_values: nine
+    // bytes, [activeSlot][v0..v7]. The first hardware run found the old 22-byte set_state
+    // shape here — the BRIDGE page's format — which put the active slot on knob 1 and
+    // every value six knobs late. This test now speaks for the page that actually renders.
+    const auto state = buildRackStatePayload (1, slots);
+    check (state.size() == 9, "the state payload is the knob page's nine bytes");
+    check (state[0] == 1, "the active slot leads");
+    check (state[1] == 127 && state[2] == 0, "positions follow immediately, clamped");
+
+    const auto marked = buildRackLabelPayload ("t", slots);
+    // [1]['t'][len]... — slot 2's label (index 1) carries the unresolved mark.
+    std::size_t cursor = 2;                              // past title len+body
+    const auto len0 = marked[cursor]; cursor += 1 + std::size_t (len0);   // slot 1
+    check (marked[cursor] >= 1 && marked[cursor + 1] == '!',
+           "an unresolved binding is marked in its label — the page has no switch row");
 
     // --- the reducer's normalized events -----------------------------------------------
     Ctrl49Reducer reducer;
@@ -122,18 +129,15 @@ int main()
                  && flat.find (">Chorus") != std::string::npos,
                "a clip waiting for its boundary is marked on the hardware");
 
-        const auto state = buildPerformanceStatePayload (2, 0, clips);
-        check (state.size() == 22, "the state payload keeps the documented 22-byte shape");
-        check (state[0] == 2, "the page byte carries through");
-        check (state[6] == 63, "phase becomes a knob position");
-        check (state[14] == 1 && state[15] == 1 && state[16] == 0,
-               "running and pending clips light; idle ones do not");
+        const auto state = buildPerformanceStatePayload (0, clips);
+        check (state.size() == 9, "the state payload is the knob page's nine bytes");
+        check (state[1] == 63, "phase becomes a knob position, right after the active byte");
 
         PerformanceClipViews empty {};
-        const auto emptyState = buildPerformanceStatePayload (0, 0, empty);
-        check (emptyState.size() == 22, "an empty bank still builds a valid payload");
-        for (std::size_t i = 6; i < 22; ++i)
-            check (emptyState[i] == 0, "with nothing lit and nothing turned");
+        const auto emptyState = buildPerformanceStatePayload (0, empty);
+        check (emptyState.size() == 9, "an empty bank still builds a valid payload");
+        for (std::size_t i = 1; i < 9; ++i)
+            check (emptyState[i] == 0, "with nothing turning");
     }
 
     std::printf (failures == 0 ? "\nALL PASSED\n" : "\nFAILURES: %d\n", failures);

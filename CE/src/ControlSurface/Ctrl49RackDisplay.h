@@ -39,6 +39,6 @@ Bytes buildRackLabelPayload (const std::string& title, const RackSlotViews& slot
     [page][activeSlot][padBank][lastPad][lastVelocity][division][values x8][switches x8].
     Values come from the slot positions; the switch flags light unresolved-but-assigned
     slots. The pad/velocity/division bytes are zeroed — the rack page does not use them. */
-Bytes buildRackStatePayload (int page, int activeSlot, const RackSlotViews& slots);
+Bytes buildRackStatePayload (int activeSlot, const RackSlotViews& slots);
 
 } // namespace ceditor::ctrl49

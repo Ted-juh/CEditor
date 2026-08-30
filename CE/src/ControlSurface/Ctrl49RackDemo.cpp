@@ -275,7 +275,7 @@ int wmain (int argc, wchar_t** argv)
                     }
 
                     labels = buildPerformanceLabelPayload (transport, clipViews);
-                    state = buildPerformanceStatePayload (reducer.page(), reducer.activeSlot(),
+                    state = buildPerformanceStatePayload (reducer.activeSlot(),
                                                           clipViews);
                 }
                 else if (controlPages > 0)
@@ -292,7 +292,7 @@ int wmain (int argc, wchar_t** argv)
                     }
 
                     labels = buildRackLabelPayload (page.name.toStdString(), views);
-                    state = buildRackStatePayload (reducer.page(), reducer.activeSlot(), views);
+                    state = buildRackStatePayload (reducer.activeSlot(), views);
                 }
 
                 if (! labels.empty() && labels != lastLabels)
