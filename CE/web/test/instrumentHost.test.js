@@ -1278,3 +1278,31 @@ test('steps carry chord notes: normalized in, mock-merged back', () => {
   assert.equal(step.active, true);
   assert.deepEqual(step.chordNotes, [48, 55], 'the drawn stack lands in the model');
 });
+
+test('floating editors: several at once, dock steals back, mock mirrors the policy', () => {
+  let state = mockHostState();
+  const a = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'loadInstrument', partId: state.rack.parts[1].partId, ceId: 'mock-analog' });
+  const b = state.rack.parts[1].partId;
+
+  state = applyMockCommand(state, { cmd: 'floatEditor', partId: a });
+  state = applyMockCommand(state, { cmd: 'floatEditor', partId: b });
+  assert.deepEqual([...state.floatingEditorPartIds].sort(), [a, b].sort(),
+    'two parts float at the same time — the whole point');
+
+  state = applyMockCommand(state, { cmd: 'openEditor', partId: a });
+  assert.equal(state.editorOpenPartId, a);
+  assert.deepEqual(state.floatingEditorPartIds, [b],
+    'docking a floating part pulls its one editor back in');
+
+  state = applyMockCommand(state, { cmd: 'floatEditor', partId: a });
+  assert.equal(state.editorOpenPartId, '', 'floating the docked part empties the pane');
+
+  state = applyMockCommand(state, { cmd: 'closeEditorWindow', partId: b });
+  assert.deepEqual(state.floatingEditorPartIds, [a], 'a window close closes only its window');
+
+  const shaped = normalizeHostState({ floatingEditorPartIds: ['x', 'y'] });
+  assert.deepEqual(shaped.floatingEditorPartIds, ['x', 'y']);
+  assert.deepEqual(normalizeHostState({}).floatingEditorPartIds, [],
+    'absent reads as an empty set, never undefined');
+});

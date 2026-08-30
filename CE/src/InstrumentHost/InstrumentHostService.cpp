@@ -22,11 +22,19 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
         partParameters.erase (partId);
         if (partId == editorTargetId)
             hideEditor();
+        if (floatingEditorIds.contains (partId))
+        {
+            floatingEditorIds.removeString (partId);
+            if (options.editorWindows.close != nullptr)
+                options.editorWindows.close (partId);
+        }
     };
 }
 
 InstrumentHostService::~InstrumentHostService()
 {
+    if (options.editorWindows.closeAll != nullptr)
+        options.editorWindows.closeAll();
     // Hand the hardware back on the way out: a claim outliving its owner is what the heartbeat
     // timeout exists to recover from, not the normal path.
     releaseHardwareSurface();
@@ -251,6 +259,46 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "closeEditor")
     {
         hideEditor();
+        emitState();
+        return;
+    }
+
+    if (cmd == "floatEditor")
+    {
+        // The part's editor in its own window, beside however many others: the docked pane
+        // was policy, not a limit. A processor carries one live editor, so floating a part
+        // that is docked moves it out of the pane first.
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        auto* instrument = rack.getInstrument (partId);
+        if (rack.getPerformance().findPart (partId) == nullptr || instrument == nullptr)
+        {
+            emitError ("That part has no instrument loaded.");
+            return;
+        }
+
+        if (partId == editorTargetId)
+            hideEditor();
+
+        floatingEditorIds.addIfNotAlreadyThere (partId);
+        if (options.editorWindows.show != nullptr)
+        {
+            const auto* part = rack.getPerformance().findPart (partId);
+            options.editorWindows.show (partId, *instrument,
+                                        part->pluginName.isNotEmpty() ? part->pluginName
+                                                                      : juce::String ("Instrument"));
+        }
+        emitState();
+        return;
+    }
+
+    if (cmd == "closeEditorWindow")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        if (! floatingEditorIds.contains (partId))
+            return;
+        floatingEditorIds.removeString (partId);
+        if (options.editorWindows.close != nullptr)
+            options.editorWindows.close (partId);
         emitState();
         return;
     }
@@ -2917,6 +2965,14 @@ void InstrumentHostService::showEditorFor (const juce::String& partId)
         return;
     }
 
+    // Docking a floating part moves the one editor back in; its window closes first.
+    if (floatingEditorIds.contains (partId))
+    {
+        floatingEditorIds.removeString (partId);
+        if (options.editorWindows.close != nullptr)
+            options.editorWindows.close (partId);
+    }
+
     editorTargetId = partId;
     if (options.editorPane.show != nullptr)
         options.editorPane.show (partId, *instrument,
@@ -4746,6 +4802,12 @@ juce::var InstrumentHostService::buildStatePayload()
     root->setProperty ("licence", licencePayload());
     root->setProperty ("scanning", scanBusy.load());
     root->setProperty ("editorOpenPartId", editorTargetId);
+    {
+        juce::Array<juce::var> floating;
+        for (const auto& partId : floatingEditorIds)
+            floating.add (partId);
+        root->setProperty ("floatingEditorPartIds", floating);
+    }
     root->setProperty ("audio", juce::var (audio));
     root->setProperty ("rack", juce::var (rackObj));
     return juce::var (root);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "HostRuntimeShared.h"
+#include "FloatingEditorWindows.h"
 #include "PluginEditorHost.h"
 
 // HostRuntimeShell — the generated standalone's whole window content (VIP-successor Stage 1).
@@ -42,6 +43,9 @@ private:
     juce::AudioPluginFormatManager formatManager;
     std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<InstrumentHostService> service;
+    // Floating vendor-editor windows — declared after the service so they are destroyed
+    // first, before the rack tears the processors down (same contract as the pane's).
+    FloatingEditorWindows editorWindows;
     // The CTRL49 broker — the generated product is where the hardware matters most, so the
     // surface comes alive at launch, not on demand. Declared after the service (destroyed
     // first: its teardown releases the hardware claim through the service) and ticked from

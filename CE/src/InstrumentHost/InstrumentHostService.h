@@ -204,6 +204,17 @@ public:
         std::function<void()> hide;
     };
 
+    /** Floating editor windows — any number at once, owned by the app like the pane is.
+        The service only decides WHICH parts float; the windows themselves live behind
+        these hooks so the service stays headless and testable. */
+    struct EditorWindowHooks
+    {
+        std::function<void (const juce::String& partId, juce::AudioProcessor& processor,
+                            const juce::String& title)> show;
+        std::function<void (const juce::String& partId)> close;
+        std::function<void()> closeAll;
+    };
+
     struct Options
     {
         juce::File dataDirectory;
@@ -238,6 +249,7 @@ public:
         std::function<MidiSendProcessor::Sink (const juce::String& deviceId,
                                                juce::String& errorOut)> openMidiOutput;
         EditorPaneHooks editorPane;
+        EditorWindowHooks editorWindows;
         // The Host Project's authored rack, shipped beside the generated binaries. Loaded
         // when nothing newer exists: the standalone uses it until the user has a session of
         // their own; the outer VST3 uses it for a fresh instance until the DAW hands over a
@@ -725,6 +737,7 @@ private:
     InstrumentRackHost rack;
     juce::StringArray userScanPaths;
     juce::String editorTargetId;      // the part whose editor the pane is showing, or empty
+    juce::StringArray floatingEditorIds;   // parts whose editors float in their own windows
     bool sessionRestored = false;
     juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask
     bool hostProjectLoaded = false;

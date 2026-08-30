@@ -6,7 +6,7 @@
 
 class AppSettings;
 namespace juce { class AudioPluginFormatManager; }
-namespace ceditor::host { class InstrumentHostService; class PluginEditorHost; }
+namespace ceditor::host { class InstrumentHostService; class PluginEditorHost; class FloatingEditorWindows; }
 namespace ceditor::ctrl49 { class Ctrl49SurfaceBroker; }
 
 /**
@@ -160,6 +160,10 @@ private:
     // Active Host Project build (tools/scripts/build-host-product.mjs as a child process), held
     // as its Timer base for the same reason as buildJob above.
     std::unique_ptr<juce::Timer> hostBuildJob;
+    // Floating vendor-editor windows, any number at once beside the docked pane. Created
+    // with the service; declared after it so every window (and the editor inside it) is
+    // destroyed before the rack destroys the processors they watch.
+    std::unique_ptr<ceditor::host::FloatingEditorWindows> instrumentEditorWindows;
     // The CTRL49 as a resident front end (VIP-successor task: the hardware works in the
     // product, not just in demo executables). Created with the service, ticked from the
     // pump below. Declaration order is the destruction contract: after the service, so the

@@ -243,6 +243,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
+        "${CE_ROOT}/src/InstrumentHost/FloatingEditorWindows.cpp"
     )
 
     target_compile_definitions(CEditor PRIVATE
@@ -542,6 +543,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
+        "${CE_ROOT}/src/InstrumentHost/FloatingEditorWindows.cpp"
     )
 
     juce_add_gui_app(CEHostStandalone

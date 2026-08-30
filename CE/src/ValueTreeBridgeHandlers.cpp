@@ -4,6 +4,7 @@
 #include "InstrumentHost/InstrumentHostService.h"
 #include "InstrumentHost/PluginInstantiator.h"
 #include "InstrumentHost/PluginEditorHost.h"
+#include "InstrumentHost/FloatingEditorWindows.h"
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "ControlSurface/Ctrl49WindowsEndpoints.h"
 #include "ControlSurface/Ctrl49EmbeddedAssets.h"
@@ -1730,6 +1731,25 @@ void ValueTreeBridge::ensureInstrumentHost()
             editorPane->hide();
     };
 
+    // Floating windows beside the pane. Built here so the hooks below capture a live
+    // manager; declared AFTER the service member, so every window — and the editor inside
+    // it — is destroyed before the rack destroys the processors they watch.
+    instrumentEditorWindows = std::make_unique<ceditor::host::FloatingEditorWindows>();
+    options.editorWindows.show = [this] (const juce::String& partId,
+                                         juce::AudioProcessor& processor,
+                                         const juce::String& title)
+    {
+        instrumentEditorWindows->show (partId, processor, title);
+    };
+    options.editorWindows.close = [this] (const juce::String& partId)
+    {
+        instrumentEditorWindows->close (partId);
+    };
+    options.editorWindows.closeAll = [this]
+    {
+        instrumentEditorWindows->closeAll();
+    };
+
     options.enableAudio = true;
 
     // The scan-folder browse dialog. Reuses the bridge's chooser member the way every other
@@ -1799,6 +1819,16 @@ void ValueTreeBridge::ensureInstrumentHost()
     };
 
     instrumentHost = std::make_unique<ceditor::host::InstrumentHostService> (std::move (options));
+
+    // The window's X goes through the service, exactly like the pane's close button — the
+    // WebView's toggles stay the truth about what is open.
+    instrumentEditorWindows->onCloseRequested = [this] (const juce::String& partId)
+    {
+        auto* payload = new juce::DynamicObject();
+        payload->setProperty ("cmd", "closeEditorWindow");
+        payload->setProperty ("partId", partId);
+        instrumentHost->handleCommand (juce::var (payload));
+    };
 
     // The CTRL49 comes alive with the service: discovery and the paced startup sequence run
     // on the broker's own worker, every service touch happens in tick() below. On a machine

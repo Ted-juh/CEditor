@@ -41,6 +41,15 @@ HostRuntimeShell::HostRuntimeShell()
     };
     options.editorPane.hide = [this] { editorPane.hide(); };
 
+    options.editorWindows.show = [this] (const juce::String& partId,
+                                         juce::AudioProcessor& processor,
+                                         const juce::String& title)
+    {
+        editorWindows.show (partId, processor, title);
+    };
+    options.editorWindows.close = [this] (const juce::String& partId) { editorWindows.close (partId); };
+    options.editorWindows.closeAll = [this] { editorWindows.closeAll(); };
+
     options.pickDirectory = [this] (std::function<void (const juce::String&)> done)
     {
         fileChooser = std::make_unique<juce::FileChooser> (
@@ -87,6 +96,15 @@ HostRuntimeShell::HostRuntimeShell()
         surfaceBroker = std::make_unique<surface::Ctrl49SurfaceBroker> (*service,
                                                                         std::move (surfaceOptions));
     }
+
+    // A floating window's X routes through the service like the pane's close button does.
+    editorWindows.onCloseRequested = [this] (const juce::String& partId)
+    {
+        auto* payload = new juce::DynamicObject();
+        payload->setProperty ("cmd", "closeEditorWindow");
+        payload->setProperty ("partId", partId);
+        service->handleCommand (juce::var (payload));
+    };
 
     // The pane's close button goes through the service, same as the editor's preview — the
     // WebView's state stays authoritative instead of the pane closing behind its back.

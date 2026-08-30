@@ -330,6 +330,22 @@ struct Harness
             paneLog.push_back ("hide");
             lastShownProcessor = nullptr;
         };
+        options.editorWindows.show = [this] (const juce::String& partId,
+                                             juce::AudioProcessor&, const juce::String& title)
+        {
+            windowLog.push_back ("show:" + partId + ":" + title);
+            openWindows.addIfNotAlreadyThere (partId);
+        };
+        options.editorWindows.close = [this] (const juce::String& partId)
+        {
+            windowLog.push_back ("close:" + partId);
+            openWindows.removeString (partId);
+        };
+        options.editorWindows.closeAll = [this]
+        {
+            windowLog.push_back ("closeAll");
+            openWindows.clear();
+        };
         if (tweak != nullptr)
             tweak (options);
         service = std::make_unique<InstrumentHostService> (options);
@@ -367,6 +383,8 @@ struct Harness
     Emits emits;
     std::vector<juce::String> paneLog;
     juce::AudioProcessor* lastShownProcessor = nullptr;
+    std::vector<juce::String> windowLog;
+    juce::StringArray openWindows;
     juce::String lastDescriptionXml;
     double lastSampleRate = 0.0;
     int instantiateCount = 0;
@@ -2238,6 +2256,65 @@ void testPresetWalking()
     }
 
     ceditor::test::StubSynthProcessor::factoryPrograms = {};
+}
+
+// Floating editor windows: several vendor GUIs at once. The docked pane's one-at-a-time
+// rule was policy, and this pins the new policy: parts float independently, docking a
+// floating part pulls its one editor back in, every teardown path closes the window first,
+// and the state event lists the floating set so the UI's toggles stay the truth.
+void testFloatingEditors()
+{
+    std::cout << "\nfloating editor windows" << std::endl;
+
+    const auto dir = freshDataDir ("floats");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("addPart");
+    const auto partA = h.partIdAt (0), partB = h.partIdAt (1);
+    h.cmd ("loadInstrument", { { "partId", partA }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("loadInstrument", { { "partId", partB }, { "ceId", "VST3-other-synth" } });
+
+    auto floating = [&h] { return h.emits.lastState()->getProperty ("floatingEditorPartIds", {}); };
+
+    // Two parts, two windows, at the same time — the ask itself.
+    h.cmd ("floatEditor", { { "partId", partA } });
+    h.cmd ("floatEditor", { { "partId", partB } });
+    check (h.openWindows.size() == 2
+             && h.openWindows.contains (partA) && h.openWindows.contains (partB),
+           "two parts float in their own windows at once");
+    check (floating().size() == 2, "and the state names both, for the UI's toggles");
+
+    // The window's X routes through the service; the state follows.
+    h.cmd ("closeEditorWindow", { { "partId", partB } });
+    check (h.openWindows.size() == 1 && ! h.openWindows.contains (partB),
+           "closing a window closes exactly that window");
+    check (floating().size() == 1, "and leaves the state telling the truth");
+
+    // One processor, one editor: docking a floating part pulls it out of its window.
+    h.cmd ("openEditor", { { "partId", partA } });
+    check (h.openWindows.isEmpty(), "docking a floating part closes its window first");
+    check (! h.paneLog.empty() && h.paneLog.back().startsWith ("show:" + partA),
+           "and the pane shows it");
+
+    // And floating the docked part empties the pane the same way.
+    h.cmd ("floatEditor", { { "partId", partA } });
+    check (h.paneLog.back() == "hide" || h.openWindows.contains (partA),
+           "floating the docked part moves the editor out of the pane");
+    check (h.emits.lastState()->getProperty ("editorOpenPartId", {}).toString().isEmpty(),
+           "the pane's state clears when its editor floats away");
+
+    // Unloading closes the part's window before the processor dies.
+    h.cmd ("unloadInstrument", { { "partId", partA } });
+    check (h.openWindows.isEmpty(), "unloading a part closes its floating window");
+    check (floating().size() == 0, "and removes it from the floating set");
+
+    // A part with nothing loaded refuses to float, out loud.
+    h.emits.clear();
+    h.cmd ("floatEditor", { { "partId", partA } });
+    check (h.emits.lastError().contains ("no instrument"),
+           "floating an empty part refuses aloud");
 }
 
 void testParameterModel()
@@ -4322,6 +4399,7 @@ int main (int argc, char* argv[])
     testFirstClickAndTheOnScreenKeyboard();
     testMidiLearn();
     testPresetWalking();
+    testFloatingEditors();
     testCtrl49Broker();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();

@@ -16,7 +16,7 @@
     hostMidiActivity, hostSurface, hostScanLog, hostLastError, hostAudioDevices, initInstrumentHostBridge,
     filterInstruments, scanForInstruments, addScanPath, browseScanPath, removeScanPath, clearQuarantine,
     addRackPart, removeRackPart, focusRackPart, loadInstrument, unloadInstrument,
-    setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor,
+    setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor, floatEditor, closeEditorWindow,
     requestAudioDevices, setAudioDevice, setMidiInputEnabled,
     hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
@@ -708,6 +708,13 @@
               <button type="button" class="toggle" class:on={$hostState.editorOpenPartId === part.partId}
                       title="Show the plug-in's own interface in the native pane"
                       onclick={() => toggleEditor(part)}>Editor</button>
+              <button type="button" class="toggle"
+                      class:on={$hostState.floatingEditorPartIds.includes(part.partId)}
+                      data-testid="part-float-editor"
+                      title="Pop the plug-in's interface out into its own window — several parts can float at once"
+                      onclick={() => ($hostState.floatingEditorPartIds.includes(part.partId)
+                                        ? closeEditorWindow(part.partId)
+                                        : floatEditor(part.partId))}>⧉</button>
               <button type="button" class="ghost" title="Unload the instrument, keep the part"
                       onclick={() => unloadInstrument(part.partId)}>Unload</button>
             {/if}

@@ -377,6 +377,7 @@ export function emptyHostState() {
     scanPaths: [],
     scanning: false,
     editorOpenPartId: '',
+    floatingEditorPartIds: [],
     audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0,
              inputChannels: 0, cpu: 0, xruns: 0 },
     rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], returns: [],
@@ -767,6 +768,7 @@ export function normalizeHostState(payload) {
     scanPaths: (Array.isArray(p.scanPaths) ? p.scanPaths : []).map(String),
     scanning: p.scanning === true,
     editorOpenPartId: String(p.editorOpenPartId ?? ''),
+    floatingEditorPartIds: (Array.isArray(p.floatingEditorPartIds) ? p.floatingEditorPartIds : []).map(String),
     audio: {
       enabled: p.audio?.enabled === true,
       running: p.audio?.running === true,
@@ -1039,7 +1041,23 @@ export function applyMockCommand(state, payload) {
     return next;
   }
   if (cmd === 'openEditor') {
-    if (part(payload.partId)?.hasInstrument) next.editorOpenPartId = payload.partId;
+    if (part(payload.partId)?.hasInstrument) {
+      next.editorOpenPartId = payload.partId;
+      // One editor per processor: docking pulls a floating part back in.
+      next.floatingEditorPartIds = next.floatingEditorPartIds.filter((id) => id !== payload.partId);
+    }
+    return next;
+  }
+  if (cmd === 'floatEditor') {
+    if (part(payload.partId)?.hasInstrument) {
+      if (next.editorOpenPartId === payload.partId) next.editorOpenPartId = '';
+      if (!next.floatingEditorPartIds.includes(payload.partId))
+        next.floatingEditorPartIds = [...next.floatingEditorPartIds, payload.partId];
+    }
+    return next;
+  }
+  if (cmd === 'closeEditorWindow') {
+    next.floatingEditorPartIds = next.floatingEditorPartIds.filter((id) => id !== payload.partId);
     return next;
   }
   if (cmd === 'closeEditor') {
@@ -2031,6 +2049,8 @@ export const setPartMidiRules = (partId, fields) => send({ cmd: 'setPartMidiRule
 export const hostPanic = (partId) => send(partId ? { cmd: 'panic', partId } : { cmd: 'panic' });
 export const openEditor = (partId) => send({ cmd: 'openEditor', partId });
 export const closeEditor = () => send({ cmd: 'closeEditor' });
+export const floatEditor = (partId) => send({ cmd: 'floatEditor', partId });
+export const closeEditorWindow = (partId) => send({ cmd: 'closeEditorWindow', partId });
 export const requestAudioDevices = () => send({ cmd: 'getAudioDevices' });
 export const setAudioDevice = (name) => send({ cmd: 'setAudioDevice', name });
 export const setMidiInputEnabled = (id, enabled) => send({ cmd: 'setMidiInputEnabled', id, enabled });
