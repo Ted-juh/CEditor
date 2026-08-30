@@ -890,40 +890,68 @@
             </label>
           </div>
 
-          <div class="arp-row">
-            <PropertyToggle compact label="Arp" value={focusedPart.arp.enabled} ariaLabel="Arpeggiator"
+        </div>
+
+        <!-- The arpeggiator gets its own titled section. It used to be an unnamed row of
+             widgets at the foot of the event chain — a dim toggle, two bare sliders, three
+             unlabelled selects — and the owner's verdict on it was "where did the
+             arpeggiator go?", which is the only review a hidden feature ever needs. It is
+             still a mode over the shared transport (that is why it sits beside the MIDI FX
+             rather than in a panel of its own), it just says its own name now. -->
+        <div class="arpeggiator" data-testid="host-arpeggiator">
+          <div class="fx-head">
+            <strong>Arpeggiator — {partTitle(focusedPart)}</strong>
+            <PropertyToggle compact label={focusedPart.arp.enabled ? 'On' : 'Off'}
+                            value={focusedPart.arp.enabled} ariaLabel="Arpeggiator"
                             onchange={(on) => setPartArp(focusedPart.partId, { enabled: on })} />
-            <select value={focusedPart.arp.mode} aria-label="Arpeggiator mode"
-                    onchange={(e) => setPartArp(focusedPart.partId, { mode: e.currentTarget.value })}>
-              {#each ['up', 'down', 'up-down', 'down-up', 'order', 'random', 'chord', 'pattern'] as mode (mode)}
-                <option value={mode}>{mode}</option>
-              {/each}
-            </select>
-            <select value={focusedPart.arp.stepsPerBeat} aria-label="Arpeggiator rate"
-                    onchange={(e) => setPartArp(focusedPart.partId, { stepsPerBeat: Number(e.currentTarget.value) })}>
-              {#each [1, 2, 3, 4, 6, 8, 12, 16] as rate (rate)}
-                <option value={rate}>{rate}/beat</option>
-              {/each}
-            </select>
-            <label class="mini" title="Gate">
+          </div>
+          <div class="zone-grid">
+            <label>Mode
+              <select value={focusedPart.arp.mode} aria-label="Arpeggiator mode"
+                      onchange={(e) => setPartArp(focusedPart.partId, { mode: e.currentTarget.value })}>
+                {#each ['up', 'down', 'up-down', 'down-up', 'order', 'random', 'chord', 'pattern'] as mode (mode)}
+                  <option value={mode}>{mode}</option>
+                {/each}
+              </select>
+            </label>
+            <label>Rate
+              <select value={focusedPart.arp.stepsPerBeat} aria-label="Arpeggiator rate"
+                      onchange={(e) => setPartArp(focusedPart.partId, { stepsPerBeat: Number(e.currentTarget.value) })}>
+                {#each [1, 2, 3, 4, 6, 8, 12, 16] as rate (rate)}
+                  <option value={rate}>{rate}/beat</option>
+                {/each}
+              </select>
+            </label>
+            <label>Octaves
+              <select value={focusedPart.arp.octaves} aria-label="Arpeggiator octaves"
+                      onchange={(e) => setPartArp(focusedPart.partId, { octaves: Number(e.currentTarget.value) })}>
+                {#each [1, 2, 3, 4] as octaves (octaves)}
+                  <option value={octaves}>{octaves} octave{octaves === 1 ? '' : 's'}</option>
+                {/each}
+              </select>
+            </label>
+            <!-- Sliders say what they are worth: a bare handle is a value nobody can read
+                 back, let alone dial in twice. -->
+            <label>Gate — {Math.round(focusedPart.arp.gate * 100)}%
               <input type="range" min="0.05" max="1" step="0.05" value={focusedPart.arp.gate}
                      aria-label="Arpeggiator gate"
-                     onchange={(e) => setPartArp(focusedPart.partId, { gate: Number(e.currentTarget.value) })} />
+                     oninput={(e) => setPartArp(focusedPart.partId, { gate: Number(e.currentTarget.value) })} />
             </label>
-            <label class="mini" title="Swing">
+            <label>Swing — {Math.round(focusedPart.arp.swing * 100)}%
               <input type="range" min="0" max="0.75" step="0.01" value={focusedPart.arp.swing}
                      aria-label="Arpeggiator swing"
-                     onchange={(e) => setPartArp(focusedPart.partId, { swing: Number(e.currentTarget.value) })} />
+                     oninput={(e) => setPartArp(focusedPart.partId, { swing: Number(e.currentTarget.value) })} />
             </label>
-            <select value={focusedPart.arp.octaves} aria-label="Arpeggiator octaves"
-                    onchange={(e) => setPartArp(focusedPart.partId, { octaves: Number(e.currentTarget.value) })}>
-              {#each [1, 2, 3, 4] as octaves (octaves)}
-                <option value={octaves}>{octaves} oct</option>
-              {/each}
-            </select>
-            <PropertyToggle compact label="Latch" value={focusedPart.arp.latch} ariaLabel="Latch the held chord"
-                            onchange={(on) => setPartArp(focusedPart.partId, { latch: on })} />
+            <label>Latch
+              <PropertyToggle compact label={focusedPart.arp.latch ? 'Held' : 'Off'}
+                              value={focusedPart.arp.latch} ariaLabel="Latch the held chord"
+                              onchange={(on) => setPartArp(focusedPart.partId, { latch: on })} />
+            </label>
           </div>
+          {#if !focusedPart.arp.enabled}
+            <span class="arp-hint">switch it on to play — the walk modes need no setup, and
+              "pattern" opens a grid where you draw the notes yourself</span>
+          {/if}
           {#if focusedPart.arp.enabled && focusedPart.arp.mode === 'pattern'}
             <!-- Pattern mode: draw the MELODY. Each column is a step; the row you light is
                  which of your held notes plays there (bottom = lowest, octaves upward);
@@ -1809,8 +1837,10 @@
   }
   button.toggle.warn { color: #e4b3b3; border-color: #7a4a4a; }
   .arp-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .arpeggiator .zone-grid label { justify-content: flex-start; }
+  .arpeggiator .zone-grid input[type='range'] { margin-top: 4px; }
 
-  .fx-chain, .macros, .sends, .outputs, .returns, .hw-config, .event-chain {
+  .fx-chain, .macros, .sends, .outputs, .returns, .hw-config, .event-chain, .arpeggiator {
     display: flex;
     flex-direction: column;
     gap: 6px;
