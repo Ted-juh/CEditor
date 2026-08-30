@@ -1854,6 +1854,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                             arp.velocityPattern.add (juce::jlimit (0, 127, (int) velocity));
                         }
                 }
+                if (fields->hasProperty ("patternSemitones"))
+                    arp.patternSemitones = (bool) payload["patternSemitones"];
                 if (fields->hasProperty ("degreePattern"))
                 {
                     arp.degreePattern.clear();

@@ -121,7 +121,9 @@
   // Rows are chord degrees — bottom row is the lowest note you are holding, upward through
   // the held chord and its octave extension. A cell click places the note, clicking the
   // placed cell again rests the step, dragging paints. -1 in the model is a rest.
-  const NOTE_ROWS = 8;
+  // Degree rows re-voice with the held chord (8 rows); semitone rows are offsets around
+  // the ground note, an octave each way (25 rows, row 12 = the ground itself).
+  let noteRows = $derived(focusedPart?.arp.patternSemitones ? 25 : 8);
   let noteDraft = $state(null);
   let noteGridEl = $state(null);
   let noteDragging = $state(false);
@@ -133,8 +135,8 @@
     const count = Math.max(1, notePattern.length || 16);
     const step = Math.max(0, Math.min(count - 1,
       Math.floor(((event.clientX - rect.left) / rect.width) * count)));
-    const row = Math.max(0, Math.min(NOTE_ROWS - 1,
-      NOTE_ROWS - 1 - Math.floor(((event.clientY - rect.top) / rect.height) * NOTE_ROWS)));
+    const row = Math.max(0, Math.min(noteRows - 1,
+      noteRows - 1 - Math.floor(((event.clientY - rect.top) / rect.height) * noteRows)));
     return { step, row };
   }
 
@@ -889,9 +891,11 @@
                   <div class="note-col"
                        class:playing={notePattern.length > 0
                                       && $hostArpStep[focusedPart.partId] === i}>
-                    {#each Array.from({ length: NOTE_ROWS }, (_, r) => NOTE_ROWS - 1 - r) as row (row)}
+                    {#each Array.from({ length: noteRows }, (_, r) => noteRows - 1 - r) as row (row)}
                       <div class="note-cell" class:on={degree === row}
-                           class:octave={row >= 4 && degree !== row}></div>
+                           class:octave={!focusedPart.arp.patternSemitones && row >= 4 && degree !== row}
+                           class:ground={focusedPart.arp.patternSemitones && row === 12 && degree !== row}
+                           class:octline={focusedPart.arp.patternSemitones && (row === 0 || row === 24) && degree !== row}></div>
                     {/each}
                   </div>
                 {/each}
@@ -907,8 +911,22 @@
                   <button type="button" class="ghost" title="Clear the melody (an empty drawing walks up)"
                           onclick={() => setPartArp(focusedPart.partId, { degreePattern: [] })}>clear</button>
                 {:else}
-                  <span class="arp-hint">draw the melody — a row is a note of your held chord, bottom = lowest</span>
+                  <span class="arp-hint">{focusedPart.arp.patternSemitones
+                    ? 'draw the riff — rows are semitones around your lowest key, middle row = that key'
+                    : 'draw the melody — a row is a note of your held chord, bottom = lowest'}</span>
                 {/if}
+                <!-- What a row MEANS: chord = the Nth held note (re-voices with what you
+                     hold); free = a semitone offset from your lowest key (the riff
+                     transposes with one finger and may leave the chord). -->
+                <span class="row-mode" role="group" aria-label="Row meaning">
+                  <button type="button" class:on={!focusedPart.arp.patternSemitones}
+                          title="Rows are chord degrees — the drawing re-voices with what you hold"
+                          onclick={() => setPartArp(focusedPart.partId, { patternSemitones: false })}>chord</button>
+                  <button type="button" class:on={focusedPart.arp.patternSemitones}
+                          data-testid="arp-rows-free"
+                          title="Rows are semitones around your lowest key — the drawing transposes with one finger"
+                          onclick={() => setPartArp(focusedPart.partId, { patternSemitones: true })}>free</button>
+                </span>
               </div>
             </div>
           {/if}
@@ -1805,7 +1823,7 @@
   .page-name { background: none; border: none; padding: 3px 6px; }
   .slot-list { display: flex; flex-direction: column; gap: 4px; }
   .arp-grid-row { display: flex; gap: 8px; align-items: stretch; margin-top: 6px; }
-  .arp-note-grid { flex: 1; display: flex; gap: 1px; height: 112px; background: #10161c;
+  .arp-note-grid { flex: 1; display: flex; gap: 1px; height: 150px; background: #10161c;
                    border: 1px solid #232c36; border-radius: 4px; padding: 2px;
                    cursor: crosshair; touch-action: none; }
   .arp-note-grid.ghost { opacity: 0.45; }
@@ -1815,6 +1833,12 @@
   .note-cell.octave { background: #131a22; }
   .note-cell.on { background: #4aa88c; }
   .note-col.playing .note-cell.on { background: #7fd4b8; }
+  .note-cell.ground { background: #1f2a36; }
+  .note-cell.octline { background: #1a222c; }
+  .row-mode { display: flex; gap: 2px; }
+  .row-mode button { flex: 1; font-size: 10px; padding: 2px 4px; background: #1c2630;
+                     color: #9aa5b1; border: 1px solid #2c3742; border-radius: 3px; cursor: pointer; }
+  .row-mode button.on { background: #2c6ca8; color: #fff; border-color: #2c6ca8; }
   .arp-grid { flex: 1; display: flex; gap: 1px; height: 72px; background: #10161c;
               border: 1px solid #232c36; border-radius: 4px; padding: 2px;
               cursor: crosshair; touch-action: none; }

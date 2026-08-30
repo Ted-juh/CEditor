@@ -56,11 +56,13 @@ public:
                                                                        settings.velocityPattern[i]));
         velocityCount.store (count);
 
-        // The drawn melody (Mode::pattern): per step, a degree into the held pool, -1 rest.
+        // The drawn melody (Mode::pattern): per step, a grid row into the held pool or an
+        // offset row around the ground note (patternSemitones decides), -1 rest.
         const auto drawn = juce::jmin (maxPatternSteps, settings.degreePattern.size());
         for (int i = 0; i < drawn; ++i)
             degrees[(size_t) i].store (juce::jlimit (-1, 63, settings.degreePattern[i]));
         degreeCount.store (drawn);
+        semitoneRows.store (settings.patternSemitones);
     }
 
     /** The scale the arp folds its notes into when the part asks it to; 0x0fff = chromatic. */
@@ -356,9 +358,21 @@ private:
                 return;
             }
 
-            const auto index = juce::jlimit (0, total - 1, degree);
-            velocity = held[(size_t) (index % count)].velocity;
-            note = held[(size_t) (index % count)].note + (index / count) * 12;
+            if (semitoneRows.load())
+            {
+                // Free mode: the row is an offset around the GROUND note — the lowest held
+                // key, since the held set is pitch-sorted. Row 12 is the ground itself, so
+                // the drawing spans an octave down to an octave up and transposes with the
+                // finger. Octaves are the drawing's own business here.
+                velocity = held[0].velocity;
+                note = juce::jlimit (0, 127, held[0].note + (degree - 12));
+            }
+            else
+            {
+                const auto index = juce::jlimit (0, total - 1, degree);
+                velocity = held[(size_t) (index % count)].velocity;
+                note = held[(size_t) (index % count)].note + (index / count) * 12;
+            }
         }
         else
         {
@@ -494,6 +508,7 @@ private:
     std::atomic<int> velocityCount { 0 };
     std::array<std::atomic<int>, maxPatternSteps> degrees {};
     std::atomic<int> degreeCount { 0 };
+    std::atomic<bool> semitoneRows { false };
     std::atomic<int> livePatternStep { -1 };
 };
 

@@ -1193,6 +1193,11 @@ test('arp velocity patterns keep rests and the mock merges them', () => {
   const arp = state.rack.parts.find((p) => p.partId === partId).arp;
   assert.equal(arp.mode, 'pattern');
   assert.deepEqual(arp.degreePattern, [1, -1, 3], 'the melody lands rests and all');
+
+  // The row meaning travels too: free (semitone) rows against the ground note.
+  assert.equal(arp.patternSemitones, false, 'chord rows are the default');
+  state = applyMockCommand(state, { cmd: 'setPartArp', partId, patternSemitones: true });
+  assert.equal(state.rack.parts.find((p) => p.partId === partId).arp.patternSemitones, true);
 });
 
 test('parameterControlKind puts each parameter shape on the right control', () => {

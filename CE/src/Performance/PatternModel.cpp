@@ -565,6 +565,7 @@ juce::var arpToVar (const ArpSettings& arp)
     a->setProperty ("constrainToScale",  arp.constrainToScale);
     a->setProperty ("velocityPattern",   velocities);
     a->setProperty ("degreePattern",     degrees);
+    a->setProperty ("patternSemitones",  arp.patternSemitones);
     return juce::var (a);
 }
 
@@ -590,6 +591,7 @@ void arpFromVar (const juce::var& stored, ArpSettings& out)
     if (const auto* degrees = stored.getProperty ("degreePattern", {}).getArray())
         for (const auto& degree : *degrees)
             out.degreePattern.add (juce::jlimit (-1, 63, (int) degree));
+    out.patternSemitones = (bool) stored.getProperty ("patternSemitones", false);
 }
 
 juce::var midiFxToVar (const MidiFxSettings& fx)

@@ -176,11 +176,15 @@ struct ArpSettings
     int octaves = 1;                // 1..4
     bool latch = false;             // held after release until the next fresh chord
     juce::Array<int> velocityPattern;   // accents, cycled; empty = play what was played
-    // The drawn melody for Mode::pattern: per step, WHICH note of the held pool plays —
-    // a degree index into the pitch-sorted held chord extended across `octaves` (0 = the
-    // lowest held note, 3 = the fourth, and past the pool it clamps to the top). -1 is a
-    // rest. Ignored by every other mode; the walk modes stay exactly what they were.
+    // The drawn melody for Mode::pattern: per step, a GRID ROW or -1 for a rest. What a
+    // row means is patternSemitones' choice. Degrees (false): the row indexes the
+    // pitch-sorted held chord extended across `octaves` — 0 is the lowest held note, past
+    // the pool clamps to the top; the drawing re-voices with whatever chord is held.
+    // Semitones (true): the row is an offset from the GROUND note (the lowest held key),
+    // row 12 = the ground itself, spanning -12..+12 — the drawing transposes chromatically
+    // with one finger and can hold notes the chord does not. Ignored by the walk modes.
     juce::Array<int> degreePattern;
+    bool patternSemitones = false;
     bool constrainToScale = false;
 
     static const char* modeName (Mode mode) noexcept;

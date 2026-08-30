@@ -944,6 +944,54 @@ void testArpeggiator()
         check (melodic.patternStep() >= 0 && melodic.patternStep() < 6,
                "the playhead reports the drawn grid's position");
     }
+
+    {
+        // --- semitone rows: the FREE drawing --------------------------------------------
+        // Rows are offsets around the ground note (the lowest held key, row 12 = ground),
+        // so one finger transposes the whole riff chromatically — and the riff may hold
+        // notes the chord does not, which the degree grid cannot.
+        ArpEngine free;
+        ArpSettings freeSettings;
+        freeSettings.enabled = true;
+        freeSettings.mode = ArpSettings::Mode::pattern;
+        freeSettings.patternSemitones = true;
+        freeSettings.stepsPerBeat = 4;
+        freeSettings.gate = 0.5f;
+        freeSettings.degreePattern = { 12, 19, 24, -1, 10 };   // ground, +7, +12, rest, -2
+        free.setSettings (freeSettings);
+
+        auto runHolding = [&] (int ground)
+        {
+            Transport clock;
+            clock.setTempo (120.0);
+            clock.start();
+            juce::MidiBuffer hold, stepped;
+            hold.addEvent (juce::MidiMessage::noteOn (1, ground, (juce::uint8) 100), 0);
+            std::vector<int> played;
+            for (int b = 0; b < 116; ++b)   // five sixteenth steps
+            {
+                const auto block = clock.advance (blockSize, sampleRate);
+                free.process (b == 0 ? hold : juce::MidiBuffer(), stepped, block, blockSize);
+                for (const auto metadata : stepped)
+                    if (metadata.getMessage().isNoteOn())
+                        played.push_back (metadata.getMessage().getNoteNumber());
+            }
+            juce::MidiBuffer lift, flush;
+            lift.addEvent (juce::MidiMessage::noteOff (1, ground), 0);
+            free.process (lift, flush, clock.advance (blockSize, sampleRate), blockSize);
+            return played;
+        };
+
+        const auto fromC = runHolding (60);
+        check (fromC.size() == 4, "five drawn steps with one rest sound four notes");
+        check (fromC.size() >= 4 && fromC[0] == 60 && fromC[1] == 67 && fromC[2] == 72
+                 && fromC[3] == 58,
+               "rows play as offsets: ground, a fifth up, an octave up, a tone below");
+
+        const auto fromF = runHolding (65);
+        check (fromF.size() >= 3 && fromF[0] == 65 && fromF[1] == 72 && fromF[2] == 77,
+               "and the same drawing transposes with the finger — that is the point");
+    }
 }
 
 void testMidiFxChain()
@@ -1089,6 +1137,7 @@ void testScalesAndSerialization()
     arp.degreePattern.add (0);
     arp.degreePattern.add (-1);
     arp.degreePattern.add (5);
+    arp.patternSemitones = true;
     ArpSettings restoredArp;
     arpFromVar (arpToVar (arp), restoredArp);
     check (restoredArp.enabled && restoredArp.mode == ArpSettings::Mode::pattern
@@ -1097,6 +1146,7 @@ void testScalesAndSerialization()
     check (restoredArp.degreePattern.size() == 3 && restoredArp.degreePattern[1] == -1
              && restoredArp.degreePattern[2] == 5,
            "the drawn melody survives the trip, rests included");
+    check (restoredArp.patternSemitones, "and remembers whether rows are degrees or semitones");
 
     MidiFxSettings fx;
     fx.transpose = -7;
