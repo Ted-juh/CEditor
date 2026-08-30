@@ -579,7 +579,7 @@ void arpFromVar (const juce::var& stored, ArpSettings& out)
 
     if (const auto* velocities = stored.getProperty ("velocityPattern", {}).getArray())
         for (const auto& velocity : *velocities)
-            out.velocityPattern.add (juce::jlimit (1, 127, (int) velocity));
+            out.velocityPattern.add (juce::jlimit (0, 127, (int) velocity));
 }
 
 juce::var midiFxToVar (const MidiFxSettings& fx)

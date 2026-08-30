@@ -821,6 +821,9 @@ private:
     // MIDI-learn armed target — controlling thread only, like every other piece of service
     // state. Empty page id = not armed.
     juce::String midiLearnPageId, midiLearnSlotId;
+
+    // Last arp playhead step announced per part, so the drain only speaks on change.
+    std::map<juce::String, int> lastArpStepByPart;
     void drainControllerEvents();
     void emitMidiLearn (bool armed, const juce::String& pageId, const juce::String& slotId,
                         int cc, int channel);

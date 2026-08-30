@@ -1038,6 +1038,12 @@ export function onInstrumentHostMidiLearn(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+export function onInstrumentHostArpStep(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostArpStep', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** The receipt for a released activation ({ receipt }). Emitted only when a seat was actually
     released — it is the one thing the customer needs to keep, so it travels as an event rather
     than as a return value nobody sees. */

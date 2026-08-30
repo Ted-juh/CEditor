@@ -820,6 +820,83 @@ void testArpeggiator()
             ons += metadata.getMessage().isNoteOn() ? 1 : 0;
     }
     check (ons >= 3, "latched, the arp keeps running after the key comes up");
+
+    // --- the drawable pattern: rests, long patterns, and the playhead -----------------------
+    // Velocity 0 is a rest — the grid advances, nothing sounds — and the pattern may now be
+    // up to 32 steps, both of which the step-grid UI depends on.
+    {
+        ArpEngine drawn;
+        ArpSettings drawnSettings;
+        drawnSettings.enabled = true;
+        drawnSettings.mode = ArpSettings::Mode::up;
+        drawnSettings.stepsPerBeat = 4;
+        drawnSettings.gate = 0.5f;
+        drawnSettings.velocityPattern = { 100, 0, 90, 0 };   // sound, rest, sound, rest
+        drawn.setSettings (drawnSettings);
+        check (drawn.patternStep() == -1, "idle, the playhead reports nowhere");
+
+        Transport clock;
+        clock.setTempo (120.0);
+        clock.start();
+
+        juce::MidiBuffer hold, stepped;
+        hold.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+
+        std::vector<int> velocitiesHeard;
+        for (int b = 0; b < 186; ++b)   // two beats = eight sixteenth steps
+        {
+            const auto block = clock.advance (blockSize, sampleRate);
+            drawn.process (b == 0 ? hold : juce::MidiBuffer(), stepped, block, blockSize);
+            for (const auto metadata : stepped)
+                if (metadata.getMessage().isNoteOn())
+                    velocitiesHeard.push_back (metadata.getMessage().getVelocity());
+        }
+        check (velocitiesHeard.size() == 4,
+               "eight steps of a sound-rest pattern sound exactly four times");
+        check (velocitiesHeard.size() >= 2
+                 && velocitiesHeard[0] == 100 && velocitiesHeard[1] == 90,
+               "each sounding step carries its own drawn velocity");
+        check (drawn.patternStep() >= 0 && drawn.patternStep() < 4,
+               "the playhead reports a live pattern position while held");
+
+        juce::MidiBuffer flush;
+        drawn.allNotesOff (flush, 0);
+        check (drawn.patternStep() == -1, "and reports nowhere again once silenced");
+    }
+
+    {
+        // Twelve distinct velocities, all used: the old eight-step cap is really gone.
+        ArpEngine wide;
+        ArpSettings wideSettings;
+        wideSettings.enabled = true;
+        wideSettings.stepsPerBeat = 4;
+        wideSettings.velocityPattern.clear();
+        for (int i = 0; i < 12; ++i)
+            wideSettings.velocityPattern.add (40 + i);
+        wide.setSettings (wideSettings);
+
+        Transport clock;
+        clock.setTempo (120.0);
+        clock.start();
+
+        juce::MidiBuffer hold, stepped;
+        hold.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+
+        std::vector<int> velocitiesHeard;
+        for (int b = 0; b < 279; ++b)   // three beats = twelve sixteenth steps
+        {
+            const auto block = clock.advance (blockSize, sampleRate);
+            wide.process (b == 0 ? hold : juce::MidiBuffer(), stepped, block, blockSize);
+            for (const auto metadata : stepped)
+                if (metadata.getMessage().isNoteOn())
+                    velocitiesHeard.push_back (metadata.getMessage().getVelocity());
+        }
+        check (velocitiesHeard.size() == 12, "a twelve-step pattern cycles all twelve steps");
+        bool allDistinct = velocitiesHeard.size() == 12;
+        for (size_t i = 0; allDistinct && i < velocitiesHeard.size(); ++i)
+            allDistinct = velocitiesHeard[i] == 40 + (int) i;
+        check (allDistinct, "in order, one velocity per step, none truncated at eight");
+    }
 }
 
 void testMidiFxChain()

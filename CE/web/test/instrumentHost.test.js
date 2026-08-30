@@ -1163,3 +1163,20 @@ test('parts normalize their preset cursor and the mock walk cycles with wrap', (
   state = applyMockCommand(state, { cmd: 'walkPartPreset', partId: empty, delta: -1 });
   assert.equal(partOf(state).presetName, 'Dark', 'prev from the top wraps to the end');
 });
+
+test('arp velocity patterns keep rests and the mock merges them', () => {
+  const shaped = normalizeHostState({ rack: { parts: [
+    { partId: 'p1', arp: { enabled: true, velocityPattern: [100, 0, 90] } },
+  ] } });
+  assert.deepEqual(shaped.rack.parts[0].arp.velocityPattern, [100, 0, 90],
+    'zero survives normalization — a rest is a value, not garbage');
+
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'setPartArp', partId, velocityPattern: [64, 0, 127, 0] });
+  assert.deepEqual(state.rack.parts.find((p) => p.partId === partId).arp.velocityPattern,
+    [64, 0, 127, 0], 'the mock reducer keeps the drawn pattern, rests included');
+  state = applyMockCommand(state, { cmd: 'setPartArp', partId, velocityPattern: [] });
+  assert.deepEqual(state.rack.parts.find((p) => p.partId === partId).arp.velocityPattern, [],
+    'clearing back to as-played is a plain empty array');
+});

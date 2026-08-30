@@ -1741,7 +1741,12 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                     arp.velocityPattern.clear();
                     if (const auto* velocities = payload["velocityPattern"].getArray())
                         for (const auto& velocity : *velocities)
-                            arp.velocityPattern.add (juce::jlimit (1, 127, (int) velocity));
+                        {
+                            if (arp.velocityPattern.size() >= perf::ArpEngine::maxPatternSteps)
+                                break;
+                            // 0 is a rest, drawable from the grid; the engine skips it.
+                            arp.velocityPattern.add (juce::jlimit (0, 127, (int) velocity));
+                        }
                 }
             }
             rack.setPartArp (partId, arp);
@@ -4136,6 +4141,27 @@ void InstrumentHostService::drainParameterEvents()
     }
 
     drainControllerEvents();
+
+    // The arp playhead: one tiny event whenever a part's live pattern step moved, nothing
+    // while everything is idle. The UI only lights a column — timing stays the engine's,
+    // never the WebView's (§18.8.13).
+    if (options.emit != nullptr)
+        for (const auto& part : rack.getPerformance().parts)
+        {
+            if (! part.arp.enabled || part.arp.velocityPattern.isEmpty())
+                continue;
+
+            const auto step = rack.arpLiveStep (part.partId);
+            auto& last = lastArpStepByPart[part.partId];
+            if (step == last)
+                continue;
+            last = step;
+
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("partId", part.partId);
+            obj->setProperty ("step", step);
+            options.emit ("instrumentHostArpStep", juce::var (obj));
+        }
 
     // The hardware claim is a heartbeat, not a lock: an instance that dies stops writing and
     // the next one takes over after the timeout instead of finding a surface owned by a ghost.

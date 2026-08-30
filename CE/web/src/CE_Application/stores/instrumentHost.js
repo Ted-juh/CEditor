@@ -28,6 +28,7 @@ import {
   onInstrumentHostMidiActivity,
   onInstrumentHostSurface,
   onInstrumentHostMidiLearn,
+  onInstrumentHostArpStep,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
@@ -51,6 +52,10 @@ export const hostSurface = writable({ state: 'searching', detail: '', device: ''
 // MIDI learn: which slot is armed and listening right now. The bind itself lands in the
 // state (each slot's midiCc/midiChannel); this store only tracks the transient arming.
 export const hostMidiLearn = writable({ armed: false, pageId: '', slotId: '' });
+
+// The arp playhead per part: partId -> live pattern step (-1 while idle). Fed by tiny
+// change-driven events from the engine; the grid only lights the column it names.
+export const hostArpStep = writable({});
 
 export function normalizeMidiLearn(payload) {
   return {
@@ -1712,6 +1717,10 @@ export function initInstrumentHostBridge() {
   })));
   onInstrumentHostSurface((payload) => hostSurface.set(normalizeHostSurface(payload)));
   onInstrumentHostMidiLearn((payload) => hostMidiLearn.set(normalizeMidiLearn(payload)));
+  onInstrumentHostArpStep((payload) => hostArpStep.update((steps) => ({
+    ...steps,
+    [String(payload?.partId ?? '')]: Number.isInteger(payload?.step) ? payload.step : -1,
+  })));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);

@@ -97,6 +97,12 @@ bool InstrumentRackHost::setPartMidiFx (const juce::String& partId,
     return true;
 }
 
+int InstrumentRackHost::arpLiveStep (const juce::String& partId) const
+{
+    const auto* lp = findLive (partId);
+    return lp != nullptr ? lp->filter->getArp().patternStep() : -1;
+}
+
 bool InstrumentRackHost::setPartArp (const juce::String& partId, const perf::ArpSettings& settings)
 {
     auto* part = model.findPart (partId);

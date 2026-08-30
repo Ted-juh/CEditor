@@ -36,6 +36,7 @@ class ArpEngine
 public:
     static constexpr int maxHeld = 16;
     static constexpr int maxSounding = 32;
+    static constexpr int maxPatternSteps = 32;
 
     void setSettings (const ArpSettings& settings) noexcept
     {
@@ -47,9 +48,11 @@ public:
         octaves.store (juce::jlimit (1, 4, settings.octaves));
         latch.store (settings.latch);
 
-        const auto count = juce::jmin (8, settings.velocityPattern.size());
+        // Velocity 0 is a REST — the step passes on the grid and nothing sounds — which is
+        // what turns the accent list into a drawable pattern rather than a loudness curve.
+        const auto count = juce::jmin (maxPatternSteps, settings.velocityPattern.size());
         for (int i = 0; i < count; ++i)
-            velocities[(size_t) i].store ((juce::uint8) juce::jlimit (1, 127,
+            velocities[(size_t) i].store ((juce::uint8) juce::jlimit (0, 127,
                                                                        settings.velocityPattern[i]));
         velocityCount.store (count);
     }
@@ -59,6 +62,10 @@ public:
     void setConstrainToScale (bool shouldConstrain) noexcept { constrain.store (shouldConstrain); }
 
     bool isEnabled() const noexcept                     { return enabled.load(); }
+
+    /** The pattern step that last sounded (0-based), for the UI playhead; -1 while the arp
+        is idle, disabled, or running without a drawn pattern. Any thread. */
+    int patternStep() const noexcept                    { return livePatternStep.load(); }
 
     /** Audio thread. Consumes note-ons/offs from `in` into the held set and writes the arp's
         own notes to `out`; non-note messages pass through. When the arp is off this is a
@@ -76,6 +83,7 @@ public:
                 releaseAll (out, 0);
             heldCount = 0;
             releasedAll = true;
+            livePatternStep.store (-1);
             out.addEvents (in, 0, -1, 0);
             localPpq = block.playing ? block.endPpq : localPpq;
             return;
@@ -103,7 +111,10 @@ public:
         releaseDue (out, startPpq, endPpq, block, numSamples);
 
         if (heldCount == 0)
+        {
+            livePatternStep.store (-1);
             return;
+        }
 
         const auto stepPpq = 1.0 / (double) stepsPerBeat.load();
         const auto swingAmount = (double) swing.load();
@@ -140,6 +151,7 @@ public:
         releaseAll (out, position);
         heldCount = 0;
         releasedAll = true;
+        livePatternStep.store (-1);
     }
 
 private:
@@ -319,8 +331,19 @@ private:
 
         const auto patternCount = velocityCount.load();
         if (patternCount > 0)
-            velocity = velocities[(size_t) (stepCounter % patternCount)].load();
-        ++stepCounter;
+        {
+            const auto patternIndex = stepCounter % patternCount;
+            const auto patternVelocity = velocities[(size_t) patternIndex].load();
+            livePatternStep.store (patternIndex);
+            ++stepCounter;
+            if (patternVelocity == 0)
+                return;   // a rest: the grid advances, nothing sounds
+            velocity = patternVelocity;
+        }
+        else
+        {
+            ++stepCounter;
+        }
 
         const auto scale = constrain.load() ? mask.load() : (juce::uint16) 0x0fff;
 
@@ -428,8 +451,9 @@ private:
     std::atomic<bool> latch { false };
     std::atomic<bool> constrain { false };
     std::atomic<juce::uint16> mask { 0x0fff };
-    std::array<std::atomic<juce::uint8>, 8> velocities {};
+    std::array<std::atomic<juce::uint8>, maxPatternSteps> velocities {};
     std::atomic<int> velocityCount { 0 };
+    std::atomic<int> livePatternStep { -1 };
 };
 
 } // namespace ceditor::perf

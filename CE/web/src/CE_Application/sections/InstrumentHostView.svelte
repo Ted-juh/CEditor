@@ -23,6 +23,7 @@
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
     addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
+    hostArpStep,
     hostNote,
     walkPartPreset,
     generateControlPages,
@@ -63,6 +64,57 @@
   let productOpen = $state(false);
   let reliabilityOpen = $state(false);
   let licenceOpen = $state(false);
+
+  // --- the arp step grid -------------------------------------------------------------
+  // Draft while dragging, committed on release: one setPartArp per gesture, not per pixel.
+  let arpDraft = $state(null);
+  let arpGridEl = $state(null);
+  let arpDragging = $state(false);
+  let arpPattern = $derived(arpDraft ?? focusedPart?.arp.velocityPattern ?? []);
+
+  function arpCellFromEvent(event) {
+    const rect = arpGridEl.getBoundingClientRect();
+    const count = Math.max(1, arpPattern.length);
+    const step = Math.max(0, Math.min(count - 1,
+      Math.floor(((event.clientX - rect.left) / rect.width) * count)));
+    // Top = 127; the bottom edge snaps to 0, which IS the rest — no separate gesture.
+    // The snap zone is real (a few percent), because nobody can hit a one-pixel floor.
+    const raw = Math.max(0, Math.min(127,
+      Math.round((1 - (event.clientY - rect.top) / rect.height) * 127)));
+    return { step, velocity: raw < 7 ? 0 : raw };
+  }
+
+  function arpGridDown(event) {
+    if (!focusedPart) return;
+    event.preventDefault();
+    // First touch of an empty grid materializes the drawable pattern.
+    arpDraft = arpPattern.length > 0 ? [...arpPattern] : Array.from({ length: 16 }, () => 100);
+    arpDragging = true;
+    arpGridEl.setPointerCapture?.(event.pointerId);
+    const { step, velocity } = arpCellFromEvent(event);
+    arpDraft[step] = velocity;
+  }
+
+  function arpGridMove(event) {
+    if (!arpDragging || arpDraft === null) return;
+    const { step, velocity } = arpCellFromEvent(event);
+    arpDraft[step] = velocity;
+  }
+
+  function arpGridUp() {
+    if (!arpDragging) return;
+    arpDragging = false;
+    if (arpDraft !== null && focusedPart)
+      setPartArp(focusedPart.partId, { velocityPattern: [...arpDraft] });
+    arpDraft = null;
+  }
+
+  function resizeArpPattern(length) {
+    if (!focusedPart) return;
+    const current = focusedPart.arp.velocityPattern;
+    const next = Array.from({ length }, (_, i) => current[i] ?? 100);
+    setPartArp(focusedPart.partId, { velocityPattern: next });
+  }
 
   function playAuditionNote() {
     // A note the focused part will actually voice: the centre of its key zone, clamped —
@@ -723,6 +775,41 @@
             <PropertyToggle compact label="Latch" value={focusedPart.arp.latch} ariaLabel="Latch the held chord"
                             onchange={(on) => setPartArp(focusedPart.partId, { latch: on })} />
           </div>
+          {#if focusedPart.arp.enabled}
+            <!-- The drawable half of the arp: one bar per step, height is velocity, a bar
+                 dragged to the floor is a rest the engine skips. Empty pattern = the arp
+                 plays what was played; the first touch draws it into existence. -->
+            <div class="arp-grid-row">
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div class="arp-grid" class:ghost={arpPattern.length === 0}
+                   data-testid="arp-grid" bind:this={arpGridEl}
+                   onpointerdown={arpGridDown} onpointermove={arpGridMove}
+                   onpointerup={arpGridUp} onpointercancel={arpGridUp}>
+                {#each (arpPattern.length > 0 ? arpPattern : Array.from({ length: 16 }, () => 100)) as velocity, i (i)}
+                  <div class="arp-col"
+                       class:playing={arpPattern.length > 0
+                                      && $hostArpStep[focusedPart.partId] === i}
+                       class:rest={arpPattern.length > 0 && velocity === 0}>
+                    <div class="arp-bar" style={`height: ${Math.max(velocity / 127 * 100, velocity === 0 ? 0 : 4)}%`}></div>
+                  </div>
+                {/each}
+              </div>
+              <div class="arp-grid-side">
+                {#if arpPattern.length > 0}
+                  <select value={arpPattern.length} aria-label="Pattern length"
+                          onchange={(e) => resizeArpPattern(Number(e.currentTarget.value))}>
+                    {#each [4, 8, 12, 16, 24, 32] as length (length)}
+                      <option value={length}>{length} steps</option>
+                    {/each}
+                  </select>
+                  <button type="button" class="ghost" title="Back to playing held velocities as played"
+                          onclick={() => setPartArp(focusedPart.partId, { velocityPattern: [] })}>as played</button>
+                {:else}
+                  <span class="arp-hint">as played — draw on the grid to shape it</span>
+                {/if}
+              </div>
+            </div>
+          {/if}
         </div>
       {/if}
 
@@ -1504,6 +1591,19 @@
   .page-tab.on { border-color: #5b9bd5; background: #24313d; }
   .page-name { background: none; border: none; padding: 3px 6px; }
   .slot-list { display: flex; flex-direction: column; gap: 4px; }
+  .arp-grid-row { display: flex; gap: 8px; align-items: stretch; margin-top: 6px; }
+  .arp-grid { flex: 1; display: flex; gap: 1px; height: 72px; background: #10161c;
+              border: 1px solid #232c36; border-radius: 4px; padding: 2px;
+              cursor: crosshair; touch-action: none; }
+  .arp-grid.ghost { opacity: 0.45; }
+  .arp-col { flex: 1; display: flex; align-items: flex-end; background: #161e27;
+             border-radius: 1px; min-width: 4px; }
+  .arp-col.playing { background: #24384c; }
+  .arp-col.rest { background: #12181f; }
+  .arp-bar { width: 100%; background: #3d81c4; border-radius: 1px 1px 0 0; }
+  .arp-col.playing .arp-bar { background: #7fb4e0; }
+  .arp-grid-side { display: flex; flex-direction: column; gap: 4px; justify-content: flex-start; }
+  .arp-hint { color: #66707b; font-size: 10px; max-width: 110px; }
   .slot-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
   .slot-id { flex: 0 0 20px; color: #7d8894; font-size: 11px; }
   .slot-name { flex: 0 0 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
