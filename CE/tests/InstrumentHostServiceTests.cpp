@@ -2242,6 +2242,25 @@ void testParameterModel()
     h.cmd ("setParameter", { { "partId", partA }, { "id", "cutoff" }, { "value", 0.8 } });
     check (juce::approximatelyEqual (stubA->cutoff->get(), 0.8f),
            "setParameter reaches the processor through the host-safe API");
+
+    // The small discrete set carries every position's label — the segmented control's data.
+    check (params[1].getProperty ("valueTexts", {}).size() == 3
+             && params[1].getProperty ("valueTexts", {})[2].toString() == "Sine",
+           "a small discrete parameter lists its value texts");
+    check (! params[0].hasProperty ("valueTexts"),
+           "a continuous parameter does not — the payload stays lean");
+
+    // Typed entry: the plug-in parses its own text, numbers and names alike.
+    h.cmd ("setParameterText", { { "partId", partA }, { "id", "cutoff" }, { "text", "0.25" } });
+    check (juce::approximatelyEqual (stubA->cutoff->get(), 0.25f),
+           "a typed number lands on the parameter");
+    h.cmd ("setParameterText", { { "partId", partA }, { "id", "wave" }, { "text", "Sine" } });
+    check (stubA->wave->getIndex() == 2,
+           "a typed choice NAME selects that choice — the plug-in did the parsing");
+    h.emits.clear();
+    h.cmd ("setParameterText", { { "partId", partA }, { "id", "@gain" }, { "text", "abc" } });
+    check (h.emits.lastError().contains ("Not a number"),
+           "a virtual address refuses text that is not a number");
     check (juce::approximatelyEqual (stubB->cutoff->get(), 0.5f),
            "and the other instance of the same class is untouched");
 

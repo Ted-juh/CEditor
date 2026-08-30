@@ -20,6 +20,7 @@
     requestAudioDevices, setAudioDevice, setMidiInputEnabled,
     hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
+    parameterControlKind, setParameterText,
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
     addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
@@ -211,6 +212,27 @@
 
   function stepFor(parameter) {
     return parameter.numSteps > 1 ? 1 / (parameter.numSteps - 1) : 0.001;
+  }
+
+  // Typed entry: double-click the value, type what the plug-in itself would print.
+  let editingParamId = $state(null);
+  let editingParamText = $state('');
+  function beginParamEdit(parameter) {
+    editingParamId = parameter.id;
+    editingParamText = parameter.text;
+  }
+  function commitParamEdit(parameter) {
+    if (editingParamId !== parameter.id) return;
+    setParameterText(paramTargetId, parameter.id, editingParamText);
+    editingParamId = null;
+  }
+  function stepIndexOf(parameter) {
+    return Math.round(parameter.value * Math.max(1, parameter.numSteps - 1));
+  }
+  function nudgeParameterStep(parameter, delta) {
+    const steps = parameter.numSteps;
+    const index = Math.max(0, Math.min(steps - 1, stepIndexOf(parameter) + delta));
+    setParameter(paramTargetId, parameter.id, steps > 1 ? index / (steps - 1) : 0);
   }
 
   // Neutral control pages: one is selected for viewing and for the parameter view's assign
@@ -1015,9 +1037,29 @@
               {/if}
               <div class="param-row">
                 <span class="param-name" title={parameter.name}>{parameter.name}</span>
-                {#if parameter.boolean}
+                {#if parameterControlKind(parameter) === 'toggle'}
                   <PropertyToggle compact value={parameter.value >= 0.5} ariaLabel={parameter.name}
                                   onchange={(on) => setParameter(paramTargetId, parameter.id, on ? 1 : 0)} />
+                {:else if parameterControlKind(parameter) === 'segments'}
+                  <!-- Every value is one button — no slider travel, no dead zones. -->
+                  <span class="param-segments" role="group" aria-label={parameter.name}>
+                    {#each parameter.valueTexts as choice, i (i)}
+                      <button type="button" class:on={stepIndexOf(parameter) === i} title={choice}
+                              onclick={() => setParameter(paramTargetId, parameter.id,
+                                                          i / (parameter.numSteps - 1))}>{choice}</button>
+                    {/each}
+                  </span>
+                {:else if parameterControlKind(parameter) === 'stepper'}
+                  <!-- A countable set steps exactly; the value text between the arrows IS
+                       the control, so what you read is what is selected. -->
+                  <span class="param-stepper">
+                    <button type="button" aria-label={`${parameter.name} previous value`}
+                            disabled={stepIndexOf(parameter) <= 0}
+                            onclick={() => nudgeParameterStep(parameter, -1)}>‹</button>
+                    <button type="button" aria-label={`${parameter.name} next value`}
+                            disabled={stepIndexOf(parameter) >= parameter.numSteps - 1}
+                            onclick={() => nudgeParameterStep(parameter, 1)}>›</button>
+                  </span>
                 {:else}
                   <input type="range" min="0" max="1" step={stepFor(parameter)} value={parameter.value}
                          aria-label={parameter.name}
@@ -1025,7 +1067,22 @@
                          onpointerup={() => endParameterGesture(paramTargetId, parameter.id)}
                          oninput={(e) => setParameter(paramTargetId, parameter.id, Number(e.currentTarget.value))} />
                 {/if}
-                <span class="param-value">{parameter.text}{parameter.label ? ` ${parameter.label}` : ''}</span>
+                {#if editingParamId === parameter.id}
+                  <!-- svelte-ignore a11y_autofocus -->
+                  <input class="param-edit" type="text" bind:value={editingParamText} autofocus
+                         aria-label={`Type a value for ${parameter.name}`}
+                         onkeydown={(e) => {
+                           if (e.key === 'Enter') commitParamEdit(parameter);
+                           if (e.key === 'Escape') editingParamId = null;
+                         }}
+                         onblur={() => (editingParamId = null)} />
+                {:else}
+                  <span class="param-value" role="button" tabindex="-1"
+                        title="Double-click to type a value"
+                        ondblclick={() => beginParamEdit(parameter)}
+                        onkeydown={(e) => e.key === 'Enter' && beginParamEdit(parameter)}>
+                    {parameter.text}{parameter.label ? ` ${parameter.label}` : ''}</span>
+                {/if}
                 <button type="button" class="ghost" title="Reset to the plug-in's default"
                         onclick={() => resetParameter(paramTargetId, parameter.id)}>↺</button>
                 <button type="button" class="ghost" disabled={!selectedPage || !firstEmptySlot}
@@ -1514,6 +1571,19 @@
   .param-list { overflow-y: auto; max-height: 260px; display: flex; flex-direction: column; gap: 4px; }
   .param-group { color: #7d8894; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; }
   .param-row { display: flex; align-items: center; gap: 8px; }
+  .param-segments { display: inline-flex; gap: 2px; flex: 1; min-width: 0; }
+  .param-segments button { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+                           white-space: nowrap; font-size: 10px; padding: 2px 4px;
+                           background: #1c2630; color: #9aa5b1; border: 1px solid #2c3742;
+                           border-radius: 3px; cursor: pointer; }
+  .param-segments button.on { background: #2c6ca8; color: #fff; border-color: #2c6ca8; }
+  .param-stepper { display: inline-flex; gap: 2px; }
+  .param-stepper button { font-size: 12px; padding: 0 8px; background: #1c2630; color: #9aa5b1;
+                          border: 1px solid #2c3742; border-radius: 3px; cursor: pointer; }
+  .param-stepper button:disabled { opacity: 0.35; cursor: default; }
+  .param-value { cursor: text; }
+  .param-edit { width: 90px; font-size: 11px; background: #10161c; color: #d6dbe0;
+                border: 1px solid #3d81c4; border-radius: 3px; padding: 1px 4px; }
   .param-name { flex: 0 0 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
   .param-row input[type='range'] { flex: 1; min-width: 60px; }
   .param-value { flex: 0 0 84px; text-align: right; color: #9aa5b1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

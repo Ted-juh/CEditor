@@ -391,6 +391,17 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 obj->setProperty ("defaultValue", d.defaultValue);
                 obj->setProperty ("numSteps",     d.numSteps);
                 obj->setProperty ("discrete",     d.discrete);
+                // For a small discrete set, the label of every position — what turns 0/1/2
+                // into Saw/Square/Sine on a segmented control. Larger sets keep the payload
+                // lean and step through texts live instead.
+                if (d.discrete && d.numSteps > 1 && d.numSteps <= 16)
+                {
+                    juce::Array<juce::var> texts;
+                    for (int stepIndex = 0; stepIndex < d.numSteps; ++stepIndex)
+                        texts.add (parameter->getText (
+                            (float) stepIndex / (float) (d.numSteps - 1), 64));
+                    obj->setProperty ("valueTexts", texts);
+                }
                 obj->setProperty ("boolean",      d.boolean);
                 obj->setProperty ("automatable",  d.automatable);
                 obj->setProperty ("meta",         d.metaParameter);
@@ -488,6 +499,49 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             parameter->beginChangeGesture();
         else
             parameter->endChangeGesture();
+        return;
+    }
+
+    if (cmd == "setParameterText")
+    {
+        // Typed entry: "440", "-12 dB", "Sine" — the PLUG-IN parses its own text, because
+        // only it knows what its numbers mean. getValueForText is part of the parameter
+        // contract; a parameter that cannot parse simply lands where it lands, exactly as
+        // it would in any DAW's typed-entry field.
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto id = payload.getProperty ("id", {}).toString();
+        const auto text = payload.getProperty ("text", {}).toString().trim();
+
+        if (isVirtualParameterId (id))
+        {
+            // Virtual addresses are plain 0..1 numbers; parse locally and refuse nonsense.
+            if (! virtualParameterExists (partId, id))
+            {
+                emitError ("Unknown parameter " + id + " on that part.");
+                return;
+            }
+            if (! text.containsAnyOf ("0123456789"))
+            {
+                emitError ("Not a number: " + text);
+                return;
+            }
+            setVirtualParameter (partId, id, juce::jlimit (0.0f, 1.0f, text.getFloatValue()));
+            savePerformance();
+            emitState();
+            return;
+        }
+
+        auto* parameter = resolveParameter (partId, id);
+        if (parameter == nullptr)
+        {
+            emitError ("Unknown parameter " + id + " on that part.");
+            return;
+        }
+
+        parameter->beginChangeGesture();
+        parameter->setValueNotifyingHost (
+            juce::jlimit (0.0f, 1.0f, parameter->getValueForText (text)));
+        parameter->endChangeGesture();
         return;
     }
 

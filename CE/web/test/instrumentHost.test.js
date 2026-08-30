@@ -46,6 +46,7 @@ import {
   normalizeSupportBundle,
   normalizeHostSurface,
   normalizeMidiLearn,
+  parameterControlKind,
   emptyLicence,
   normalizeLicence,
 } from '../src/CE_Application/stores/instrumentHost.js';
@@ -1179,4 +1180,26 @@ test('arp velocity patterns keep rests and the mock merges them', () => {
   state = applyMockCommand(state, { cmd: 'setPartArp', partId, velocityPattern: [] });
   assert.deepEqual(state.rack.parts.find((p) => p.partId === partId).arp.velocityPattern, [],
     'clearing back to as-played is a plain empty array');
+});
+
+test('parameterControlKind puts each parameter shape on the right control', () => {
+  assert.equal(parameterControlKind({ boolean: true }), 'toggle');
+  assert.equal(parameterControlKind(
+    { discrete: true, numSteps: 3, valueTexts: ['Saw', 'Square', 'Sine'] }), 'segments');
+  assert.equal(parameterControlKind({ discrete: true, numSteps: 3, valueTexts: [] }), 'stepper',
+    'few values without labels still step exactly instead of sliding');
+  assert.equal(parameterControlKind({ discrete: true, numSteps: 32, valueTexts: [] }), 'stepper');
+  assert.equal(parameterControlKind({ discrete: true, numSteps: 128 }), 'slider',
+    'a hundred steps is effectively continuous');
+  assert.equal(parameterControlKind({ discrete: false, numSteps: 0 }), 'slider');
+  assert.equal(parameterControlKind(null), 'slider', 'garbage falls back to the safe default');
+});
+
+test('valueTexts normalize and the mock parses typed text by name and number', () => {
+  const shaped = normalizeHostParameters({ parameters: [
+    { id: 'wave', discrete: true, numSteps: 3, valueTexts: ['Saw', 'Square', 'Sine'] },
+    { id: 'cutoff' },
+  ] });
+  assert.deepEqual(shaped.parameters[0].valueTexts, ['Saw', 'Square', 'Sine']);
+  assert.deepEqual(shaped.parameters[1].valueTexts, [], 'absent reads as empty, not undefined');
 });

@@ -226,12 +226,27 @@ export function normalizeHostParameters(payload) {
       defaultValue: Number(d?.defaultValue ?? 0),
       numSteps: Number(d?.numSteps ?? 0),
       discrete: d?.discrete === true,
+      valueTexts: (Array.isArray(d?.valueTexts) ? d.valueTexts : []).map(String),
       boolean: d?.boolean === true,
       automatable: d?.automatable !== false,
       meta: d?.meta === true,
     })),
     warnings: (Array.isArray(p.warnings) ? p.warnings : []).map(String),
   };
+}
+
+/** Which control a parameter deserves. The registry already classifies every parameter —
+ *  rendering them all as one continuous slider is what made a three-value switch mostly
+ *  dead travel. Booleans toggle; a labelled handful gets segments; a countable set gets a
+ *  stepper that snaps exactly; only the genuinely continuous get the slider. */
+export function parameterControlKind(parameter) {
+  if (parameter?.boolean) return 'toggle';
+  const steps = Number(parameter?.numSteps ?? 0);
+  if (parameter?.discrete && steps >= 2) {
+    if (steps <= 6 && (parameter.valueTexts?.length ?? 0) === steps) return 'segments';
+    if (steps <= 64) return 'stepper';
+  }
+  return 'slider';
 }
 
 /** Applies one instrumentHostParamValues delta to the registry snapshot the view renders.
@@ -275,7 +290,7 @@ export function mockHostParameters(partId) {
     partId,
     parameters: [
       { id: 'cutoff', index: 0, name: 'Cutoff', group: 'Filter', value: 0.5, text: '0.50', defaultValue: 0.5 },
-      { id: 'wave', index: 1, name: 'Wave', group: 'Oscillator', value: 0, text: 'Saw', defaultValue: 0, numSteps: 3, discrete: true },
+      { id: 'wave', index: 1, name: 'Wave', group: 'Oscillator', value: 0, text: 'Saw', defaultValue: 0, numSteps: 3, discrete: true, valueTexts: ['Saw', 'Square', 'Sine'] },
       { id: 'drive', index: 2, name: 'Drive', value: 0, text: 'Off', defaultValue: 0, numSteps: 2, discrete: true, boolean: true },
     ],
   });
@@ -1800,6 +1815,26 @@ function send(payload) {
         : emptyHostParameters());
       return;
     }
+    if (payload?.cmd === 'setParameterText') {
+      hostParameters.update((registry) => {
+        if (registry.partId !== payload.partId) return registry;
+        return {
+          ...registry,
+          parameters: registry.parameters.map((d) => {
+            if (d.id !== payload.id) return d;
+            // The native side lets the plug-in parse; the mock does the two obvious reads —
+            // a value-text by name, else a plain number over the normalized range.
+            const byName = d.valueTexts.findIndex(
+              (t) => t.toLowerCase() === String(payload.text ?? '').trim().toLowerCase());
+            const value = byName >= 0 && d.numSteps > 1
+              ? byName / (d.numSteps - 1)
+              : Math.min(1, Math.max(0, Number.parseFloat(payload.text) || 0));
+            return { ...d, value, text: mockParamText(d, value) };
+          }),
+        };
+      });
+      return;
+    }
     if (payload?.cmd === 'setParameter' || payload?.cmd === 'resetParameter') {
       hostParameters.update((registry) => {
         if (registry.partId !== payload.partId) return registry;
@@ -1948,6 +1983,7 @@ export const setAudioDevice = (name) => send({ cmd: 'setAudioDevice', name });
 export const setMidiInputEnabled = (id, enabled) => send({ cmd: 'setMidiInputEnabled', id, enabled });
 export const requestParameters = (partId) => send({ cmd: 'getParameters', partId });
 export const setParameter = (partId, id, value) => send({ cmd: 'setParameter', partId, id, value });
+export const setParameterText = (partId, id, text) => send({ cmd: 'setParameterText', partId, id, text });
 export const resetParameter = (partId, id) => send({ cmd: 'resetParameter', partId, id });
 export const beginParameterGesture = (partId, id) => send({ cmd: 'beginParameterGesture', partId, id });
 export const endParameterGesture = (partId, id) => send({ cmd: 'endParameterGesture', partId, id });
