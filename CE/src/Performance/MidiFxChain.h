@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
+#include <array>
 #include <atomic>
 #include "PatternModel.h"
 
@@ -28,6 +29,8 @@ namespace ceditor::perf
 class MidiFxChain
 {
 public:
+    static constexpr int maxVoices = 6;
+
     void setSettings (const MidiFxSettings& settings) noexcept
     {
         transpose.store (juce::jlimit (-48, 48, settings.transpose));
@@ -37,6 +40,24 @@ public:
         mask.store (settings.constrainToScale
                       ? scaleMask (settings.scaleType, settings.scaleRoot)
                       : (juce::uint16) 0x0fff);
+        // Diatonic stacking needs the REAL scale even when constrain is off — a chromatic
+        // mask would stack minor thirds and call them chords.
+        diatonicMask.store (scaleMask (settings.scaleType, settings.scaleRoot));
+
+        // The learned per-key map: offsets stored +64 so 0 can mean "unused"; a key's
+        // count of 0 means unmapped and the note passes through plain in keyChords mode.
+        for (int key = 0; key < 128; ++key)
+            customCount[(size_t) key].store (0);
+        for (const auto& keyChord : settings.keyChords)
+        {
+            if (! juce::isPositiveAndBelow (keyChord.key, 128))
+                continue;
+            const auto count = juce::jmin (maxVoices, keyChord.offsets.size());
+            for (int i = 0; i < count; ++i)
+                customOffsets[(size_t) keyChord.key][(size_t) i].store (
+                    (juce::uint8) (juce::jlimit (-60, 60, keyChord.offsets[i]) + 64));
+            customCount[(size_t) keyChord.key].store ((juce::uint8) count);
+        }
     }
 
     /** True when nothing in the chain would change a note — the caller can skip the copy. */
@@ -82,8 +103,8 @@ public:
                 // before the table forgets it.
                 releaseTracked (channel, sourceNote, out, position);
 
-                int notes[4];
-                const auto count = chordNotes (chord, root, scale, notes);
+                int notes[maxVoices];
+                const auto count = chordNotes (chord, root, scale, diatonicMask.load(), notes);
                 for (int i = 0; i < count; ++i)
                 {
                     out.addEvent (juce::MidiMessage::noteOn (channel, notes[i],
@@ -119,9 +140,23 @@ public:
     }
 
 private:
-    /** The notes one incoming note produces. `out` must hold at least four. */
-    static int chordNotes (MidiFxSettings::ChordType type, int root, juce::uint16 scale,
-                           int (&out)[4]) noexcept
+    /** Moves a note up `steps` scale tones within `mask`. The diatonic walk. */
+    static int scaleStepsUp (int note, int steps, juce::uint16 mask) noexcept
+    {
+        auto n = note;
+        for (int s = 0; s < steps; ++s)
+            for (int i = 1; i <= 12; ++i)
+                if (n + i <= 127 && (mask & (juce::uint16) (1 << ((n + i) % 12))) != 0)
+                {
+                    n += i;
+                    break;
+                }
+        return n;
+    }
+
+    /** The notes one incoming note produces. `out` must hold maxVoices. */
+    int chordNotes (MidiFxSettings::ChordType type, int root, juce::uint16 scale,
+                    juce::uint16 diatonic, int (&out)[maxVoices]) const noexcept
     {
         const auto add = [&scale] (int note) { return constrainNoteToScale (juce::jlimit (0, 127, note), scale); };
 
@@ -150,6 +185,52 @@ private:
             case MidiFxSettings::ChordType::octaveDouble:
                 out[0] = root; out[1] = juce::jlimit (0, 127, root + 12);
                 return 2;
+
+            case MidiFxSettings::ChordType::diatonic:
+            case MidiFxSettings::ChordType::diatonicSeventh:
+            {
+                // Stacked scale thirds: the chord OF this degree — C major's D plays D-F-A,
+                // its B plays B-D-F — which is what one-finger harmony means. Over a
+                // chromatic scale (none selected) the stack degenerates, so fall back to
+                // the plain shapes rather than emit diminished mush.
+                if (diatonic == (juce::uint16) 0x0fff)
+                {
+                    out[0] = root; out[1] = add (root + 4); out[2] = add (root + 7);
+                    if (type == MidiFxSettings::ChordType::diatonicSeventh)
+                    {
+                        out[3] = add (root + 10);
+                        return 4;
+                    }
+                    return 3;
+                }
+
+                const auto degreeRoot = constrainNoteToScale (root, diatonic);
+                out[0] = degreeRoot;
+                out[1] = scaleStepsUp (degreeRoot, 2, diatonic);
+                out[2] = scaleStepsUp (degreeRoot, 4, diatonic);
+                if (type == MidiFxSettings::ChordType::diatonicSeventh)
+                {
+                    out[3] = scaleStepsUp (degreeRoot, 6, diatonic);
+                    return 4;
+                }
+                return 3;
+            }
+
+            case MidiFxSettings::ChordType::keyChords:
+            {
+                // The learned map: a mapped key plays exactly what was captured for it,
+                // an unmapped key passes through plain — per-key chord sets, VIP-style.
+                const auto count = (int) customCount[(size_t) juce::jlimit (0, 127, root)].load();
+                if (count == 0)
+                {
+                    out[0] = root;
+                    return 1;
+                }
+                for (int i = 0; i < count; ++i)
+                    out[i] = juce::jlimit (0, 127,
+                        root + (int) customOffsets[(size_t) root][(size_t) i].load() - 64);
+                return count;
+            }
         }
 
         out[0] = root;
@@ -159,7 +240,7 @@ private:
     void track (int channel, int sourceNote, int voice, int emittedNote) noexcept
     {
         if (channel < 1 || channel > 16 || ! juce::isPositiveAndBelow (sourceNote, 128)
-            || ! juce::isPositiveAndBelow (voice, 4))
+            || ! juce::isPositiveAndBelow (voice, maxVoices))
             return;
         emitted[(size_t) (channel - 1)][(size_t) sourceNote][(size_t) voice] =
             (juce::uint8) (emittedNote + 1);
@@ -180,14 +261,17 @@ private:
         }
     }
 
-    // (channel, source note) -> up to four emitted notes + 1; 0 = not sounding.
-    juce::uint8 emitted[16][128][4] = {};
+    // (channel, source note) -> up to maxVoices emitted notes + 1; 0 = not sounding.
+    juce::uint8 emitted[16][128][maxVoices] = {};
 
     std::atomic<int> transpose { 0 };
     std::atomic<int> chordType { 0 };
     std::atomic<int> velocityFixed { 0 };
     std::atomic<float> velocityScale { 1.0f };
     std::atomic<juce::uint16> mask { 0x0fff };
+    std::atomic<juce::uint16> diatonicMask { 0x0fff };
+    std::array<std::array<std::atomic<juce::uint8>, 6>, 128> customOffsets {};
+    std::array<std::atomic<juce::uint8>, 128> customCount {};
 };
 
 } // namespace ceditor::perf

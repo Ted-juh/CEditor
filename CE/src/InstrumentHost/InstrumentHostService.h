@@ -837,6 +837,24 @@ private:
 
     // Last arp playhead step announced per part, so the drain only speaks on change.
     std::map<juce::String, int> lastArpStepByPart;
+
+    // Chord learn (the chorder's capture). Armed state lives on the controlling thread;
+    // the observer only queues raw note on/offs — gated by the atomic so the audio path
+    // pays nothing while nobody is learning.
+    struct ChordLearn
+    {
+        bool armed = false;
+        juce::String partId;
+        int key = -1;                  // -1 until the target key was tapped
+        juce::Array<int> groupNotes;   // the notes of the group currently held
+        int downCount = 0;
+    };
+    ChordLearn chordLearn;
+    std::atomic<bool> chordLearnListening { false };
+    struct PendingNoteEvent { int note = 0; bool on = false; };
+    std::vector<PendingNoteEvent> pendingChordNotes;
+    void drainChordLearn();
+    void emitChordLearn (bool armed, const juce::String& stage, int key, int chordSize);
     void drainControllerEvents();
     void emitMidiLearn (bool armed, const juce::String& pageId, const juce::String& slotId,
                         int cc, int channel);

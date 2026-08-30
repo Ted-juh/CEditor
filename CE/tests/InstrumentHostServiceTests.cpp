@@ -2262,6 +2262,86 @@ void testPresetWalking()
 // rule was policy, and this pins the new policy: parts float independently, docking a
 // floating part pulls its one editor back in, every teardown path closes the window first,
 // and the state event lists the floating set so the UI's toggles stay the truth.
+// The chorder's learn flow: arm, tap the target key, play the chord, released = captured.
+// Grouping is "pressed together until released together", the same way a person plays a
+// chord; the capture lands in the part's MIDI FX and persists with the Performance.
+void testChordLearn()
+{
+    std::cout << "\nchord learn (the chorder's capture)" << std::endl;
+
+    const auto dir = freshDataDir ("chorder");
+    seedTwoSynthCatalog (dir);
+    juce::String partId;
+
+    auto on  = [] (int note) { return juce::MidiMessage::noteOn (1, note, (juce::uint8) 100); };
+    auto off = [] (int note) { return juce::MidiMessage::noteOff (1, note); };
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("setPartMidiFx", { { "partId", partId }, { "chord", "custom keys" } });
+
+        h.emits.clear();
+        h.cmd ("learnKeyChord", { { "partId", partId } });
+        const auto* armed = h.emits.last ("instrumentHostChordLearn");
+        check (armed != nullptr && (bool) armed->getProperty ("armed", false)
+                 && armed->getProperty ("stage", {}).toString() == "key",
+               "arming asks for the target key first");
+
+        // Playing a whole chord as the FIRST group refuses and stays armed.
+        h.emits.clear();
+        for (const auto note : { 60, 64 }) h.service->noteMidiActivity ("Keys", on (note));
+        for (const auto note : { 60, 64 }) h.service->noteMidiActivity ("Keys", off (note));
+        h.service->drainParameterEvents();
+        check (h.emits.lastError().contains ("TARGET key alone"),
+               "a chord where the key should be refuses aloud and keeps listening");
+
+        // The real flow: tap D3, then play C-E-G together.
+        h.emits.clear();
+        h.service->noteMidiActivity ("Keys", on (62));
+        h.service->noteMidiActivity ("Keys", off (62));
+        h.service->drainParameterEvents();
+        const auto* stage = h.emits.last ("instrumentHostChordLearn");
+        check (stage != nullptr && stage->getProperty ("stage", {}).toString() == "chord"
+                 && (int) stage->getProperty ("key", -1) == 62,
+               "the tapped key is taken and the chord is asked for");
+
+        for (const auto note : { 60, 64, 67 }) h.service->noteMidiActivity ("Keys", on (note));
+        for (const auto note : { 67, 60, 64 }) h.service->noteMidiActivity ("Keys", off (note));
+        h.service->drainParameterEvents();
+        const auto* done = h.emits.last ("instrumentHostChordLearn");
+        check (done != nullptr && ! (bool) done->getProperty ("armed", true)
+                 && (int) done->getProperty ("key", -1) == 62
+                 && (int) done->getProperty ("size", 0) == 3,
+               "releasing the chord completes the capture");
+
+        const auto fx = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                            .getProperty ("midiFx", {});
+        const auto chords = fx.getProperty ("keyChords", {});
+        check (chords.size() == 1 && (int) chords[0].getProperty ("key", -1) == 62,
+               "the capture sits in the part's MIDI FX");
+        const auto offsets = chords[0].getProperty ("offsets", {});
+        check (offsets.size() == 3 && (int) offsets[0] == -2 && (int) offsets[1] == 2
+                 && (int) offsets[2] == 5,
+               "stored as offsets from the target key, sorted");
+    }
+
+    {
+        // Manifest state: a fresh service still knows the chord; clearing removes it.
+        Harness h (dir);
+        h.cmd ("getState");
+        auto chordsOf = [&h] { return h.emits.lastState()->getProperty ("rack", {})
+                                        .getProperty ("parts", {})[0]
+                                        .getProperty ("midiFx", {}).getProperty ("keyChords", {}); };
+        check (chordsOf().size() == 1, "the learned chord survives restart with the part");
+        h.cmd ("clearKeyChord", { { "partId", partId }, { "key", 62 } });
+        check (chordsOf().size() == 0, "and clearing takes exactly it away");
+    }
+}
+
 void testFloatingEditors()
 {
     std::cout << "\nfloating editor windows" << std::endl;
@@ -4400,6 +4480,7 @@ int main (int argc, char* argv[])
     testMidiLearn();
     testPresetWalking();
     testFloatingEditors();
+    testChordLearn();
     testCtrl49Broker();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();

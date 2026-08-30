@@ -1306,3 +1306,22 @@ test('floating editors: several at once, dock steals back, mock mirrors the poli
   assert.deepEqual(normalizeHostState({}).floatingEditorPartIds, [],
     'absent reads as an empty set, never undefined');
 });
+
+test('the chorder: key maps normalize, and the mock learns and clears', () => {
+  const shaped = normalizeHostState({ rack: { parts: [
+    { partId: 'p1', midiFx: { chord: 'custom keys',
+      keyChords: [{ key: 62, offsets: [-2, 2, 5] }] } },
+  ] } });
+  assert.equal(shaped.rack.parts[0].midiFx.chord, 'custom keys');
+  assert.deepEqual(shaped.rack.parts[0].midiFx.keyChords, [{ key: 62, offsets: [-2, 2, 5] }]);
+  assert.deepEqual(normalizeHostState({}).rack.parts, [], 'nothing crashes on nothing');
+
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'learnKeyChord', partId });
+  const learned = state.rack.parts[0].midiFx.keyChords;
+  assert.deepEqual(learned, [{ key: 60, offsets: [0, 4, 7] }],
+    'the mock hears a triad onto middle C at once');
+  state = applyMockCommand(state, { cmd: 'clearKeyChord', partId, key: 60 });
+  assert.deepEqual(state.rack.parts[0].midiFx.keyChords, [], 'clear takes it away');
+});

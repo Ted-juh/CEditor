@@ -29,6 +29,7 @@ import {
   onInstrumentHostSurface,
   onInstrumentHostMidiLearn,
   onInstrumentHostArpStep,
+  onInstrumentHostChordLearn,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
@@ -56,6 +57,11 @@ export const hostMidiLearn = writable({ armed: false, pageId: '', slotId: '' });
 // The arp playhead per part: partId -> live pattern step (-1 while idle). Fed by tiny
 // change-driven events from the engine; the grid only lights the column it names.
 export const hostArpStep = writable({});
+
+// The chorder's capture: which part is listening and what it wants next (the target key,
+// then the chord). Driven by instrumentHostChordLearn events; the map itself lands in the
+// part's midiFx via the state.
+export const hostChordLearn = writable({ armed: false, partId: '', stage: '', key: -1 });
 
 export function normalizeMidiLearn(payload) {
   return {
@@ -635,6 +641,10 @@ const normalizeMidiFx = (f) => ({
   chord: String(f?.chord ?? 'off'),
   velocityFixed: Number(f?.velocityFixed ?? 0),
   velocityScale: Number(f?.velocityScale ?? 1),
+  keyChords: (Array.isArray(f?.keyChords) ? f.keyChords : []).map((kc) => ({
+    key: Number(kc?.key ?? 60),
+    offsets: (Array.isArray(kc?.offsets) ? kc.offsets : []).map(Number),
+  })),
 });
 
 export function normalizePerformance(payload) {
@@ -1378,6 +1388,23 @@ export function applyMockCommand(state, payload) {
     }
     return next;
   }
+  if (cmd === 'learnKeyChord') {
+    // No keys to hear in the browser: the mock captures a C-major triad onto middle C at
+    // once, enough to demo the map, the badge, and the clear.
+    const target = part(payload.partId);
+    if (!target) return next;
+    target.midiFx.keyChords = [
+      ...target.midiFx.keyChords.filter((kc) => kc.key !== 60),
+      { key: 60, offsets: [0, 4, 7] },
+    ];
+    return next;
+  }
+  if (cmd === 'clearKeyChord') {
+    const target = part(payload.partId);
+    if (!target) return next;
+    target.midiFx.keyChords = target.midiFx.keyChords.filter((kc) => kc.key !== Number(payload.key));
+    return next;
+  }
   if (cmd === 'walkPartPreset') {
     const target = part(payload.partId || next.rack.focusedPartId);
     if (!target?.hasInstrument) return next;
@@ -1807,6 +1834,12 @@ export function initInstrumentHostBridge() {
     ...steps,
     [String(payload?.partId ?? '')]: Number.isInteger(payload?.step) ? payload.step : -1,
   })));
+  onInstrumentHostChordLearn((payload) => hostChordLearn.set({
+    armed: payload?.armed === true,
+    partId: String(payload?.partId ?? ''),
+    stage: String(payload?.stage ?? ''),
+    key: Number.isInteger(payload?.key) ? payload.key : -1,
+  }));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);
@@ -2114,6 +2147,9 @@ export const cancelMidiLearn = () => {
 };
 export const clearControlSlotMidi = (pageId, slotId) => send({ cmd: 'clearControlSlotMidi', pageId, slotId });
 export const walkPartPreset = (partId, delta = 1) => send({ cmd: 'walkPartPreset', partId, delta });
+export const learnKeyChord = (partId) => send({ cmd: 'learnKeyChord', partId });
+export const cancelKeyChordLearn = () => send({ cmd: 'cancelKeyChordLearn' });
+export const clearKeyChord = (partId, key) => send({ cmd: 'clearKeyChord', partId, key });
 export const requestLibrary = (query = '', type = '') => send({ cmd: 'getLibrary', query, type });
 export const scanLibrary = () => send({ cmd: 'scanLibrary' });
 export const browseLibraryPath = () => send({ cmd: 'browseLibraryPath' });

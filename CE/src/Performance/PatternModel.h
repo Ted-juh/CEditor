@@ -196,13 +196,24 @@ struct ArpSettings
     path; four named, bounded operations. */
 struct MidiFxSettings
 {
-    enum class ChordType { off = 0, powerFifth, triad, triadFirstInversion, seventh, octaveDouble };
+    enum class ChordType { off = 0, powerFifth, triad, triadFirstInversion, seventh,
+                           octaveDouble, diatonic, diatonicSeventh, keyChords };
+
+    /** One learned chord: pressing `key` plays key+each offset (offset 0 = the key itself).
+        Captured by the learn flow — arm, tap the target key, play the chord — and only in
+        effect while the chord type is keyChords; unmapped keys then pass through plain. */
+    struct KeyChord
+    {
+        int key = 60;
+        juce::Array<int> offsets;
+    };
 
     int transpose = 0;              // semitones, -48..48
     bool constrainToScale = false;
     int scaleRoot = 0;              // 0..11, C..B
     juce::String scaleType = "major";
     ChordType chord = ChordType::off;
+    juce::Array<KeyChord> keyChords;
     int velocityFixed = 0;          // 0 = keep played velocity, else 1..127
     float velocityScale = 1.0f;     // 0.1..2.0 applied before the fixed override
 

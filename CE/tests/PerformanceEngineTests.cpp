@@ -1065,6 +1065,72 @@ void testMidiFxChain()
     in.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 20), 0);
     chain.process (in, out);
     check (firstMessage (out).getVelocity() == 90, "a fixed velocity overrides the scale");
+
+    {
+        // --- the chorder's diatonic half: one finger, the chord OF that degree ----------
+        MidiFxChain diatonicChain;
+        MidiFxSettings diatonicSettings;
+        diatonicSettings.scaleType = "major";
+        diatonicSettings.scaleRoot = 0;
+        diatonicSettings.chord = MidiFxSettings::ChordType::diatonic;
+        diatonicChain.setSettings (diatonicSettings);
+
+        auto notesFor = [] (MidiFxChain& fx, int key)
+        {
+            juce::MidiBuffer press, result;
+            press.addEvent (juce::MidiMessage::noteOn (1, key, (juce::uint8) 100), 0);
+            fx.process (press, result);
+            std::vector<int> notes;
+            for (const auto metadata : result)
+                if (metadata.getMessage().isNoteOn())
+                    notes.push_back (metadata.getMessage().getNoteNumber());
+            juce::MidiBuffer lift, flush;
+            lift.addEvent (juce::MidiMessage::noteOff (1, key), 0);
+            fx.process (lift, flush);
+            return notes;
+        };
+
+        check (notesFor (diatonicChain, 62) == std::vector<int> { 62, 65, 69 },
+               "D in C major plays D minor — the degree's own chord, not a shape");
+        check (notesFor (diatonicChain, 71) == std::vector<int> { 71, 74, 77 },
+               "and B plays B diminished, because that is what lives on that degree");
+
+        diatonicSettings.chord = MidiFxSettings::ChordType::diatonicSeventh;
+        diatonicChain.setSettings (diatonicSettings);
+        check (notesFor (diatonicChain, 60) == std::vector<int> { 60, 64, 67, 71 },
+               "the seventh flavour stacks one more scale third");
+
+        // --- and its learned half: per-key chords, exactly as captured ------------------
+        MidiFxChain learned;
+        MidiFxSettings learnedSettings;
+        learnedSettings.chord = MidiFxSettings::ChordType::keyChords;
+        MidiFxSettings::KeyChord captured;
+        captured.key = 60;
+        captured.offsets = { 0, 3, 7, 12 };
+        learnedSettings.keyChords.add (captured);
+        learned.setSettings (learnedSettings);
+
+        check (notesFor (learned, 60) == std::vector<int> { 60, 63, 67, 72 },
+               "a mapped key plays exactly the chord captured for it");
+        check (notesFor (learned, 61) == std::vector<int> { 61 },
+               "an unmapped key passes through plain — the map is the whole rule");
+
+        // Six voices release cleanly: press a wide mapped chord, lift, count the offs.
+        MidiFxSettings::KeyChord wide;
+        wide.key = 48;
+        wide.offsets = { 0, 4, 7, 12, 16, 19 };
+        learnedSettings.keyChords.add (wide);
+        learned.setSettings (learnedSettings);
+        juce::MidiBuffer press, sound, lift, silence;
+        press.addEvent (juce::MidiMessage::noteOn (1, 48, (juce::uint8) 100), 0);
+        learned.process (press, sound);
+        lift.addEvent (juce::MidiMessage::noteOff (1, 48), 0);
+        learned.process (lift, silence);
+        int ons = 0, offs = 0;
+        for (const auto metadata : sound) ons += metadata.getMessage().isNoteOn() ? 1 : 0;
+        for (const auto metadata : silence) offs += metadata.getMessage().isNoteOff() ? 1 : 0;
+        check (ons == 6 && offs == 6, "six captured voices sound and all six release");
+    }
 }
 
 void testScalesAndSerialization()
@@ -1151,6 +1217,12 @@ void testScalesAndSerialization()
     MidiFxSettings fx;
     fx.transpose = -7;
     fx.chord = MidiFxSettings::ChordType::seventh;
+    {
+        MidiFxSettings::KeyChord kc;
+        kc.key = 62;
+        kc.offsets = { -2, 2, 5 };
+        fx.keyChords.add (kc);
+    }
     fx.constrainToScale = true;
     fx.scaleType = "dorian";
     MidiFxSettings restoredFx;
@@ -1158,6 +1230,9 @@ void testScalesAndSerialization()
     check (restoredFx.transpose == -7 && restoredFx.chord == MidiFxSettings::ChordType::seventh
              && restoredFx.scaleType == "dorian",
            "and so do the MIDI FX");
+    check (restoredFx.keyChords.size() == 1 && restoredFx.keyChords[0].key == 62
+             && restoredFx.keyChords[0].offsets == juce::Array<int> { -2, 2, 5 },
+           "the learned key map survives the trip");
 }
 
 } // namespace

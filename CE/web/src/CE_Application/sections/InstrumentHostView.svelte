@@ -25,6 +25,7 @@
     addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
     hostArpStep,
+    hostChordLearn, learnKeyChord, cancelKeyChordLearn, clearKeyChord,
     hostNote,
     walkPartPreset,
     generateControlPages,
@@ -65,6 +66,9 @@
   let productOpen = $state(false);
   let reliabilityOpen = $state(false);
   let licenceOpen = $state(false);
+
+  const CHORD_NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const chordKeyName = (n) => `${CHORD_NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
 
   // --- the arp step grid -------------------------------------------------------------
   // Draft while dragging, committed on release: one setPartArp per gesture, not per pixel.
@@ -835,11 +839,40 @@
             <label>Chord
               <select value={focusedPart.midiFx.chord}
                       onchange={(e) => setPartMidiFx(focusedPart.partId, { chord: e.currentTarget.value })}>
-                {#each ['off', 'power fifth', 'triad', 'triad (1st inv)', 'seventh', 'octave'] as type (type)}
+                {#each ['off', 'power fifth', 'triad', 'triad (1st inv)', 'seventh', 'octave', 'diatonic', 'diatonic 7th', 'custom keys'] as type (type)}
                   <option value={type}>{type}</option>
                 {/each}
               </select>
             </label>
+            {#if focusedPart.midiFx.chord === 'diatonic' || focusedPart.midiFx.chord === 'diatonic 7th'}
+              <span class="chord-hint">plays the chord OF each scale degree — pick a scale above for real harmony</span>
+            {/if}
+            {#if focusedPart.midiFx.chord === 'custom keys'}
+              <div class="key-chords" data-testid="key-chords">
+                {#if $hostChordLearn.armed && $hostChordLearn.partId === focusedPart.partId}
+                  <button type="button" class="ghost midi-learn armed" data-testid="chord-learn-armed"
+                          onclick={() => cancelKeyChordLearn()}>
+                    {$hostChordLearn.stage === 'chord'
+                      ? `now play the chord for ${chordKeyName($hostChordLearn.key)}…`
+                      : 'tap the target key…'}</button>
+                {:else}
+                  <button type="button" class="ghost midi-learn" data-testid="chord-learn"
+                          title="Capture a chord onto a key: click, tap the target key, then play the chord"
+                          onclick={() => learnKeyChord(focusedPart.partId)}>+ learn chord</button>
+                {/if}
+                {#each focusedPart.midiFx.keyChords as keyChord (keyChord.key)}
+                  <span class="midi-cc" title={`${chordKeyName(keyChord.key)} plays ${keyChord.offsets.length} notes`}>
+                    {chordKeyName(keyChord.key)} · {keyChord.offsets.length}
+                    <button type="button" class="ghost danger" title="Remove this key's chord"
+                            onclick={() => clearKeyChord(focusedPart.partId, keyChord.key)}>×</button>
+                  </span>
+                {/each}
+                {#if focusedPart.midiFx.keyChords.length === 0
+                     && !($hostChordLearn.armed && $hostChordLearn.partId === focusedPart.partId)}
+                  <span class="arp-hint">no keys mapped — unmapped keys play plain</span>
+                {/if}
+              </div>
+            {/if}
             <label>Vel scale
               <input type="number" min="0.1" max="2" step="0.05" value={focusedPart.midiFx.velocityScale}
                      onchange={(e) => setPartMidiFx(focusedPart.partId, { velocityScale: Number(e.currentTarget.value) })} />
@@ -1869,6 +1902,8 @@
   .midi-learn { font-size: 10px; color: #9aa5b1; }
   .midi-learn.armed { color: #d9a13c; border-color: #d9a13c; animation: midi-learn-pulse 1s ease-in-out infinite; }
   @keyframes midi-learn-pulse { 50% { opacity: 0.45; } }
+  .key-chords { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; grid-column: 1 / -1; }
+  .chord-hint { color: #66707b; font-size: 10px; grid-column: 1 / -1; }
   .midi-cc { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: #7fb4e0;
              background: #22303c; border-radius: 3px; padding: 1px 4px; white-space: nowrap; }
 

@@ -93,13 +93,16 @@ const char* MidiFxSettings::chordTypeName (ChordType type) noexcept
         case ChordType::triadFirstInversion: return "triad (1st inv)";
         case ChordType::seventh:             return "seventh";
         case ChordType::octaveDouble:        return "octave";
+        case ChordType::diatonic:            return "diatonic";
+        case ChordType::diatonicSeventh:     return "diatonic 7th";
+        case ChordType::keyChords:           return "custom keys";
     }
     return "off";
 }
 
 MidiFxSettings::ChordType MidiFxSettings::chordTypeFromName (const juce::String& name) noexcept
 {
-    for (int i = 0; i <= (int) ChordType::octaveDouble; ++i)
+    for (int i = 0; i <= (int) ChordType::keyChords; ++i)
         if (name == chordTypeName ((ChordType) i))
             return (ChordType) i;
     return ChordType::off;
@@ -598,6 +601,20 @@ juce::var midiFxToVar (const MidiFxSettings& fx)
 {
     auto* f = new juce::DynamicObject();
     f->setProperty ("transpose",        fx.transpose);
+    {
+        juce::Array<juce::var> chords;
+        for (const auto& keyChord : fx.keyChords)
+        {
+            juce::Array<juce::var> offsets;
+            for (const auto offset : keyChord.offsets)
+                offsets.add (offset);
+            auto* kc = new juce::DynamicObject();
+            kc->setProperty ("key", keyChord.key);
+            kc->setProperty ("offsets", offsets);
+            chords.add (juce::var (kc));
+        }
+        f->setProperty ("keyChords", chords);
+    }
     f->setProperty ("constrainToScale", fx.constrainToScale);
     f->setProperty ("scaleRoot",        fx.scaleRoot);
     f->setProperty ("scaleType",        fx.scaleType);
@@ -620,6 +637,22 @@ void midiFxFromVar (const juce::var& stored, MidiFxSettings& out)
     out.chord            = MidiFxSettings::chordTypeFromName (stored.getProperty ("chord", {}).toString());
     out.velocityFixed    = intOf (stored, "velocityFixed", 0, 0, 127);
     out.velocityScale    = floatOf (stored, "velocityScale", 1.0f, 0.1f, 2.0f);
+
+    if (const auto* chords = stored.getProperty ("keyChords", {}).getArray())
+        for (const auto& entry : *chords)
+        {
+            MidiFxSettings::KeyChord keyChord;
+            keyChord.key = juce::jlimit (0, 127, (int) entry.getProperty ("key", 60));
+            if (const auto* offsets = entry.getProperty ("offsets", {}).getArray())
+                for (const auto& offset : *offsets)
+                {
+                    if (keyChord.offsets.size() >= 6)
+                        break;
+                    keyChord.offsets.add (juce::jlimit (-60, 60, (int) offset));
+                }
+            if (! keyChord.offsets.isEmpty())
+                out.keyChords.add (std::move (keyChord));
+        }
 }
 
 juce::var transportSettingsToVar (const TransportSettings& settings)

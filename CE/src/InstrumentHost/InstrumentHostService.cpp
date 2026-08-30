@@ -2365,6 +2365,57 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "learnKeyChord")
+    {
+        // The chorder's capture, one arm per chord: tap the key that should carry it,
+        // play the chord, done — grouped by "pressed together until released together",
+        // heard through the same observer the other learns use.
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        if (rack.getPerformance().findPart (partId) == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        chordLearn = {};
+        chordLearn.armed = true;
+        chordLearn.partId = partId;
+        {
+            const std::scoped_lock lock (midiActivityLock);
+            pendingChordNotes.clear();
+        }
+        chordLearnListening.store (true);
+        emitChordLearn (true, "key", -1, 0);
+        return;
+    }
+
+    if (cmd == "cancelKeyChordLearn")
+    {
+        chordLearn = {};
+        chordLearnListening.store (false);
+        emitChordLearn (false, "cancelled", -1, 0);
+        return;
+    }
+
+    if (cmd == "clearKeyChord")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        const auto key = (int) payload.getProperty ("key", -1);
+        auto fx = part->midiFx;
+        for (int i = fx.keyChords.size(); --i >= 0;)
+            if (fx.keyChords.getReference (i).key == key)
+                fx.keyChords.remove (i);
+        rack.setPartMidiFx (partId, fx);
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "walkPartPreset")
     {
         // Prev/next preset on a part, VIP's front-panel walk: every library preset for the
@@ -4188,6 +4239,14 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     midiActivityText = text;
     ++midiActivitySeq;
 
+    // While a chord capture is armed, raw note on/offs feed it — the drain groups them
+    // into "everything pressed until everything released", which is what a played chord is.
+    if (chordLearnListening.load() && (message.isNoteOnOrOff()))
+    {
+        if (pendingChordNotes.size() < 64)
+            pendingChordNotes.push_back ({ message.getNoteNumber(), message.isNoteOn() });
+    }
+
     // Controller changes additionally feed MIDI learn and the learned-slot writes, which
     // happen on the controlling thread — this only queues. Coalesced per (channel, cc):
     // a knob sweep between drains is one entry carrying its latest value, and the arrival
@@ -4288,6 +4347,101 @@ void InstrumentHostService::drainControllerEvents()
     }
 }
 
+void InstrumentHostService::emitChordLearn (bool armed, const juce::String& stage, int key,
+                                            int chordSize)
+{
+    if (options.emit == nullptr)
+        return;
+
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("armed",  armed);
+    obj->setProperty ("partId", chordLearn.partId);
+    obj->setProperty ("stage",  stage);
+    obj->setProperty ("key",    key);
+    obj->setProperty ("size",   chordSize);
+    options.emit ("instrumentHostChordLearn", juce::var (obj));
+}
+
+void InstrumentHostService::drainChordLearn()
+{
+    std::vector<PendingNoteEvent> events;
+    {
+        const std::scoped_lock lock (midiActivityLock);
+        events.swap (pendingChordNotes);
+    }
+    if (! chordLearn.armed || events.empty())
+        return;
+
+    // The part can leave mid-capture; disarm out loud instead of learning into a hole.
+    auto* part = rack.getPerformance().findPart (chordLearn.partId);
+    if (part == nullptr)
+    {
+        chordLearn = {};
+        chordLearnListening.store (false);
+        emitChordLearn (false, "cancelled", -1, 0);
+        return;
+    }
+
+    for (const auto& event : events)
+    {
+        if (event.on)
+        {
+            chordLearn.groupNotes.addIfNotAlreadyThere (event.note);
+            ++chordLearn.downCount;
+            continue;
+        }
+
+        if (! chordLearn.groupNotes.contains (event.note))
+            continue;   // a key held from before arming, released now — not this capture's
+        chordLearn.downCount = juce::jmax (0, chordLearn.downCount - 1);
+        if (chordLearn.downCount != 0 || chordLearn.groupNotes.isEmpty())
+            continue;
+
+        // A group completed: everything pressed since the last silence is now released.
+        if (chordLearn.key < 0)
+        {
+            if (chordLearn.groupNotes.size() != 1)
+            {
+                emitError ("Play the TARGET key alone first — then play the chord.");
+                chordLearn.groupNotes.clear();
+                continue;
+            }
+            chordLearn.key = chordLearn.groupNotes[0];
+            chordLearn.groupNotes.clear();
+            emitChordLearn (true, "chord", chordLearn.key, 0);
+            continue;
+        }
+
+        // The chord itself. Capture as offsets from the target key, sorted, six voices max.
+        auto notes = chordLearn.groupNotes;
+        notes.sort();
+        perf::MidiFxSettings::KeyChord captured;
+        captured.key = chordLearn.key;
+        for (const auto note : notes)
+        {
+            if (captured.offsets.size() >= perf::MidiFxChain::maxVoices)
+                break;
+            captured.offsets.add (juce::jlimit (-60, 60, note - chordLearn.key));
+        }
+
+        auto fx = part->midiFx;
+        for (int i = fx.keyChords.size(); --i >= 0;)
+            if (fx.keyChords.getReference (i).key == captured.key)
+                fx.keyChords.remove (i);
+        fx.keyChords.add (captured);
+        rack.setPartMidiFx (chordLearn.partId, fx);
+
+        const auto key = chordLearn.key;
+        const auto size = captured.offsets.size();
+        chordLearn = {};
+        chordLearnListening.store (false);
+        savePerformance();
+        emitState();
+        emitChordLearn (false, "done", key, size);
+        return;   // one capture per arm; leftover events belong to nobody
+    }
+}
+
 void InstrumentHostService::drainParameterEvents()
 {
     drainEngineEvents();
@@ -4317,6 +4471,7 @@ void InstrumentHostService::drainParameterEvents()
     }
 
     drainControllerEvents();
+    drainChordLearn();
 
     // The arp playhead: one tiny event whenever a part's live pattern step moved, nothing
     // while everything is idle. The UI only lights a column — timing stays the engine's,
