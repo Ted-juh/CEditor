@@ -13,6 +13,7 @@
     hostState, focusRackPart, setPartMixer, setSendLevel, setReturnLevel,
     setMasterLevel, setPartOutputPair,
     addBus, removeBus, setBusLevel, setBusDestination, setPartDestination,
+    busDestinationWouldLoop,
   } from '../stores/instrumentHost.js';
 
   let parts = $derived($hostState.rack.parts);
@@ -62,12 +63,14 @@
                ondblclick={() => setBusLevel(bus.busId, 1)}
                oninput={(e) => setBusLevel(bus.busId, Number(e.currentTarget.value))} />
         <span class="db">{db(bus.level)}</span>
-        <!-- A bus can feed another bus; the loop that would close is refused natively and
-             simply never offered here. -->
+        <!-- A bus can feed another bus; a routing that would close a loop is refused natively
+             and is not offered here either. Excluding only the bus ITSELF was not enough — an
+             indirect loop (A into B, then B into A) was still on the menu, and picking it got
+             you an error instead of a destination. -->
         <select class="out" title="Destination" value={bus.destinationBusId}
                 onchange={(e) => setBusDestination(bus.busId, e.currentTarget.value)}>
           <option value="">Master</option>
-          {#each buses.filter((other) => other.busId !== bus.busId) as other (other.busId)}
+          {#each buses.filter((other) => !busDestinationWouldLoop($hostState.rack, bus.busId, other.busId)) as other (other.busId)}
             <option value={other.busId}>{other.name}</option>
           {/each}
         </select>
@@ -134,12 +137,14 @@
                ondblclick={() => setBusLevel(bus.busId, 1)}
                oninput={(e) => setBusLevel(bus.busId, Number(e.currentTarget.value))} />
         <span class="db">{db(bus.level)}</span>
-        <!-- A bus can feed another bus; the loop that would close is refused natively and
-             simply never offered here. -->
+        <!-- A bus can feed another bus; a routing that would close a loop is refused natively
+             and is not offered here either. Excluding only the bus ITSELF was not enough — an
+             indirect loop (A into B, then B into A) was still on the menu, and picking it got
+             you an error instead of a destination. -->
         <select class="out" title="Destination" value={bus.destinationBusId}
                 onchange={(e) => setBusDestination(bus.busId, e.currentTarget.value)}>
           <option value="">Master</option>
-          {#each buses.filter((other) => other.busId !== bus.busId) as other (other.busId)}
+          {#each buses.filter((other) => !busDestinationWouldLoop($hostState.rack, bus.busId, other.busId)) as other (other.busId)}
             <option value={other.busId}>{other.name}</option>
           {/each}
         </select>

@@ -25,6 +25,7 @@
     addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
     hostArpStep,
+    hostCanvasDrag,
     hostChordLearn, learnKeyChord, cancelKeyChordLearn, clearKeyChord,
     hostNote,
     walkPartPreset,
@@ -722,13 +723,22 @@
 
       <div class="instrument-list">
         {#each instruments as instrument (instrument.ceId)}
-          <div class="instrument">
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="instrument" draggable="true"
+               ondragstart={(e) => {
+                 hostCanvasDrag.set({ kind: 'instrument', id: instrument.ceId, label: instrument.name });
+                 e.dataTransfer?.setData('text/plain', instrument.name);
+                 if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+               }}
+               ondragend={() => hostCanvasDrag.set({ kind: '', id: '', label: '' })}>
             <div class="instrument-id">
               <span class="instrument-name">{instrument.name}</span>
               <span class="instrument-vendor">{instrument.vendor} {instrument.version}</span>
             </div>
             <button type="button" disabled={!focusedPart}
-                    title={focusedPart ? `Load into ${partTitle(focusedPart)}` : 'Add and focus a rack part first'}
+                    title={focusedPart
+                             ? `Load into ${partTitle(focusedPart)} — or drag it onto a part in the rack canvas`
+                             : 'Focus a rack part first, or drag this onto one in the rack canvas'}
                     onclick={() => loadInstrument(focusedPart?.partId ?? '', instrument.ceId)}>
               Load
             </button>

@@ -1,35 +1,90 @@
 <script>
   /**
-   * HostRackCanvas.svelte — the signal path as a picture (rack-canvas plan, stage 2).
+   * HostRackCanvas.svelte — the signal path as a picture you can rewire (rack-canvas plan,
+   * stages 2 and 3).
    *
-   * Read-only on purpose. The rack column tells you what EXISTS; this tells you where the
-   * sound GOES, which no amount of headings ever did: instruments on the left, the buses they
-   * join in the middle, the master on the right, returns in a band of their own because they
-   * take a copy rather than carrying the signal.
+   * The rack column tells you what EXISTS; this tells you where the sound GOES, which no
+   * amount of headings ever did: instruments on the left, the buses they join in the middle,
+   * the master on the right, returns in a band of their own because they take a copy rather
+   * than carrying the signal.
    *
-   * Nothing here edits. Clicking a part focuses it, which is the same thing clicking its row
-   * does — the dock then shows it. Everything else is labelled with where it IS edited. That
-   * is deliberate for this stage: a picture has to earn dragging before it gets it, and a
-   * canvas that lets you draw connections the engine cannot build would be worse than a list.
+   * Routing is the one thing you can change here, by dragging a part or a bus onto its
+   * destination, and by dragging an instrument in from the browser. Everything else is
+   * labelled with where it IS edited. That restraint is the design, not a gap: a part's
+   * inserts are a serial chain with no splits and no parallel branches, so a canvas offering
+   * free cabling would promise a patchbay this engine does not have. Legal targets light up;
+   * everything else refuses the drop outright, which is why the picture can never be drawn
+   * into a routing the service would turn down.
    */
-  import { hostState, focusRackPart, rackCanvasLayout, CANVAS_NODE_W, CANVAS_NODE_H }
-    from '../stores/instrumentHost.js';
+  import {
+    hostState, focusRackPart, loadInstrument, setPartDestination, setBusDestination,
+    rackCanvasLayout, canvasDropTargets, hostCanvasDrag, CANVAS_NODE_W, CANVAS_NODE_H,
+  } from '../stores/instrumentHost.js';
 
   let layout = $derived(rackCanvasLayout($hostState.rack));
 
+  // Legal targets for whatever is in flight, recomputed as the drag starts rather than on
+  // every dragover: the answer only changes when the payload does.
+  let targets = $derived(new Set(canvasDropTargets($hostState.rack, $hostCanvasDrag)));
+  let hovered = $state('');
+
   const editedIn = {
-    part: 'Click to focus — edit it in the dock below',
-    bus: 'Group bus — its inserts and destination live in the Mixer',
+    part: 'Drag onto a bus or the master to route it · click to focus and edit below',
+    bus: 'Group bus — drag it onto another bus or the master · its inserts live in the Mixer',
     return: 'Send return — its chain lives in the dock’s Rack tab',
     master: 'Master chain — the dock’s Rack tab',
   };
+
+  function dragStart(event, node) {
+    if (node.kind !== 'part' && node.kind !== 'bus') return;
+    hostCanvasDrag.set({ kind: node.kind, id: node.id, label: node.title });
+    // A payload is still set for anything outside this component that may want it; the store
+    // above is what THIS component reads, for the dragover reason.
+    event.dataTransfer?.setData('text/plain', node.title);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  function dragEnd() {
+    hostCanvasDrag.set({ kind: '', id: '', label: '' });
+    hovered = '';
+  }
+
+  function dragOver(event, node) {
+    if (!targets.has(node.id)) return;      // no preventDefault = not a drop target at all
+    event.preventDefault();
+    // The effect has to MATCH what the source allowed or the browser cancels the drop
+    // outright, silently: an instrument is copied onto a part, a node is moved to a new
+    // destination, and saying "move" over a copy source loses the drop with no error.
+    if (event.dataTransfer)
+      event.dataTransfer.dropEffect = $hostCanvasDrag.kind === 'instrument' ? 'copy' : 'move';
+    hovered = node.id;
+  }
+
+  // No dragleave anywhere. It fires when the pointer crosses onto a CHILD of the node too,
+  // and relatedTarget is null during a drag in Chromium, so the event cannot tell "left the
+  // box" from "moved within it" — either way the highlight switched off while you were still
+  // over the box you were aiming at. dragover fires continuously on whatever is under the
+  // pointer, so it owns the highlight, and the end of the drag clears it.
+  $effect(() => { if (!$hostCanvasDrag.kind) hovered = ''; });
+
+  function drop(event, node) {
+    if (!targets.has(node.id)) return;
+    event.preventDefault();
+    const drag = $hostCanvasDrag;
+    // Every drop goes through a command that already exists. The canvas decides WHAT is legal
+    // and the service decides whether it happens, exactly as the dropdowns do.
+    if (drag.kind === 'part') setPartDestination(drag.id, node.id === '@master' ? '' : node.id);
+    else if (drag.kind === 'bus') setBusDestination(drag.id, node.id === '@master' ? '' : node.id);
+    else if (drag.kind === 'instrument' && node.kind === 'part') loadInstrument(node.id, drag.id);
+    dragEnd();
+  }
 </script>
 
 <div class="canvas-scroll" data-testid="host-rack-canvas">
   <div class="canvas" style={`width:${layout.width}px;height:${layout.height}px`}>
     <svg class="wires" width={layout.width} height={layout.height} aria-hidden="true">
       {#each layout.wires as wire (wire.kind + wire.from + wire.to)}
-        <path d={wire.d} class={wire.kind} />
+        <path d={wire.d} class={wire.kind} data-from={wire.from} data-to={wire.to} />
       {/each}
     </svg>
 
@@ -41,10 +96,18 @@
                       class:focused={node.focused}
                       class:muted={node.muted}
                       class:unresolved={node.unresolved}
+                      class:dragging={$hostCanvasDrag.id === node.id}
+                      class:target={targets.has(node.id)}
+                      class:hovered={hovered === node.id}
                       data-testid={`canvas-node-${node.id}`}
                       title={label}
                       aria-label={label}
+                      draggable={node.kind === 'part' || node.kind === 'bus'}
                       style={`left:${node.x}px;top:${node.y}px;width:${CANVAS_NODE_W}px;height:${CANVAS_NODE_H}px`}
+                      ondragstart={(e) => dragStart(e, node)}
+                      ondragend={dragEnd}
+                      ondragover={(e) => dragOver(e, node)}
+                      ondrop={(e) => drop(e, node)}
                       onclick={node.kind === 'part' ? () => focusRackPart(node.id) : undefined}>
         <span class="node-title">{node.title}</span>
         <span class="node-meta">
@@ -59,7 +122,13 @@
   <div class="canvas-key">
     <span><i class="swatch audio"></i>signal</span>
     <span><i class="swatch send"></i>send (a copy)</span>
-    <span class="canvas-note">Read-only for now — click a part to focus it.</span>
+    <span class="canvas-note">
+      {#if $hostCanvasDrag.kind}
+        Dropping <strong>{$hostCanvasDrag.label}</strong> — only the lit boxes will take it.
+      {:else}
+        Drag a part or bus onto its destination · drag an instrument here from the right.
+      {/if}
+    </span>
   </div>
 </div>
 
@@ -90,6 +159,12 @@
   button.node { cursor: pointer; font-family: inherit; }
   button.node:hover { border-color: #5b9bd5; }
   .node.focused { border-color: #5b9bd5; background: #24313d; }
+  .node[draggable='true'] { cursor: grab; }
+  .node.dragging { opacity: 0.4; }
+  /* Legal targets say so before you get there; everything else refuses the drop outright, so
+     the canvas cannot be drawn into a routing the engine would turn down. */
+  .node.target { border-color: #6f8a70; border-style: dashed; }
+  .node.hovered { border-color: #8fc4a8; border-style: solid; background: #223026; }
   .node.muted { opacity: 0.5; }
   .node.unresolved { border-color: #7a4a4a; }
   .node.bus { background: #232b21; }

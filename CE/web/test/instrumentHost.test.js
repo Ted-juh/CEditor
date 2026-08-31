@@ -37,6 +37,8 @@ import {
   saveUserPreset,
   saveChainToLibrary,
   rackCanvasLayout,
+  canvasDropTargets,
+  busDestinationWouldLoop,
   setLibraryUserMetadata,
   removeLibraryRecord,
   loadLibraryRecord,
@@ -527,6 +529,43 @@ test('rackCanvasLayout draws an empty rack without inventing anything', () => {
   assert.equal(layout.nodes.length, 1, 'the master is the only thing a rack always has');
   assert.equal(layout.nodes[0].kind, 'master');
   assert.equal(layout.wires.length, 0);
+});
+
+test('busDestinationWouldLoop catches the indirect loop, not just the obvious one', () => {
+  const rack = { buses: [{ busId: 'a', destinationBusId: 'b' }, { busId: 'b', destinationBusId: '' },
+                         { busId: 'c', destinationBusId: '' }] };
+  assert.equal(busDestinationWouldLoop(rack, 'a', 'a'), true, 'a bus into itself');
+  assert.equal(busDestinationWouldLoop(rack, 'b', 'a'), true, 'and A into B, then B into A');
+  assert.equal(busDestinationWouldLoop(rack, 'c', 'a'), false, 'an unrelated bus is fine');
+  assert.equal(busDestinationWouldLoop(rack, 'a', ''), false, 'the master ends every chain');
+
+  // A manifest that already loops must not hang the check that is asked about it.
+  const looped = { buses: [{ busId: 'x', destinationBusId: 'y' }, { busId: 'y', destinationBusId: 'x' }] };
+  assert.equal(busDestinationWouldLoop(looped, 'x', 'y'), true);
+});
+
+test('canvasDropTargets offers only what the engine would accept', () => {
+  const rack = {
+    parts: [{ partId: 'p1', destinationBusId: 'b1' }, { partId: 'p2', destinationBusId: '' }],
+    buses: [{ busId: 'b1', destinationBusId: 'b2' }, { busId: 'b2', destinationBusId: '' },
+            { busId: 'b3', destinationBusId: '' }],
+  };
+
+  const forPart = canvasDropTargets(rack, { kind: 'part', id: 'p1' });
+  assert.deepEqual(forPart, ['b2', 'b3', '@master'], 'every destination except the one it has');
+  assert.deepEqual(canvasDropTargets(rack, { kind: 'part', id: 'p2' }), ['b1', 'b2', 'b3'],
+    'a part already on the master is not offered the master again');
+
+  const forBus = canvasDropTargets(rack, { kind: 'bus', id: 'b2' });
+  assert.deepEqual(forBus, ['b3'],
+    'itself, its current destination, and anything that would loop are all off the table');
+
+  assert.deepEqual(canvasDropTargets(rack, { kind: 'instrument', id: 'VST3-x' }), ['p1', 'p2'],
+    'an instrument lands on a part, which is what loads it');
+
+  assert.deepEqual(canvasDropTargets(rack, {}), [], 'nothing in flight, nothing lit');
+  assert.deepEqual(canvasDropTargets(rack, { kind: 'part', id: 'gone' }), [],
+    'a stale payload lights nothing rather than everything');
 });
 
 // --- Stage 5: effect chains and macros -----------------------------------------------------------

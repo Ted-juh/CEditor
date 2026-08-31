@@ -63,6 +63,11 @@ export const hostArpStep = writable({});
 // part's midiFx via the state.
 export const hostChordLearn = writable({ armed: false, partId: '', stage: '', key: -1 });
 
+/** What is currently being dragged, so the canvas can light up the legal targets. It has to be
+    a store rather than the drag event's own payload: dataTransfer is deliberately unreadable
+    during dragover — the moment when the answer is needed. Cleared on dragend, always. */
+export const hostCanvasDrag = writable({ kind: '', id: '', label: '' });
+
 export function normalizeMidiLearn(payload) {
   return {
     armed: payload?.armed === true,
@@ -786,6 +791,56 @@ const CANVAS_GAP_Y = 14;
 const CANVAS_PAD = 12;
 const CANVAS_BAND_GAP = 26;
 const CANVAS_LANE_H = 7;
+
+// Which destinations a bus may actually take. The model refuses a routing that would close a
+// loop, and a UI that offers one anyway is just a refusal waiting to happen — so the same rule
+// lives here, in front of the drop targets AND the mixer's dropdowns.
+export function busDestinationWouldLoop(rack, busId, destinationBusId) {
+  if (!busId || !destinationBusId) return false;          // the master ends every chain
+  if (busId === destinationBusId) return true;
+  const buses = Array.isArray(rack?.buses) ? rack.buses : [];
+  const byId = new Map(buses.map((b) => [b.busId, b]));
+  const seen = new Set();
+  let at = destinationBusId;
+  while (at && !seen.has(at)) {
+    if (at === busId) return true;
+    seen.add(at);
+    at = byId.get(at)?.destinationBusId ?? '';
+  }
+  return false;
+}
+
+// What a thing being dragged may be dropped onto. Legal targets light up and illegal ones do
+// not accept the drop at all, so the canvas can never be drawn into a shape the engine would
+// refuse — the whole reason the picture is constrained rather than a free patchbay.
+export function canvasDropTargets(rack, drag) {
+  const buses = Array.isArray(rack?.buses) ? rack.buses : [];
+  const parts = Array.isArray(rack?.parts) ? rack.parts : [];
+  if (!drag?.kind) return [];
+
+  // An instrument from the browser lands on a part: that part loads it. Dropping it where you
+  // want it is the fix for a Load button that silently targeted whatever was focused.
+  if (drag.kind === 'instrument') return parts.map((part) => part.partId);
+
+  // A part goes to one destination: a bus, or the master. Its current one is not offered
+  // again — a drop that changes nothing reads as a drop that failed.
+  if (drag.kind === 'part') {
+    const part = parts.find((p) => p.partId === drag.id);
+    if (!part) return [];
+    return [...buses.map((b) => b.busId), '@master']
+      .filter((id) => id !== (part.destinationBusId || '@master'));
+  }
+
+  if (drag.kind === 'bus') {
+    const bus = buses.find((b) => b.busId === drag.id);
+    if (!bus) return [];
+    return [...buses.map((b) => b.busId), '@master']
+      .filter((id) => id !== (bus.destinationBusId || '@master'))
+      .filter((id) => id !== drag.id)
+      .filter((id) => id === '@master' || !busDestinationWouldLoop(rack, drag.id, id));
+  }
+  return [];
+}
 
 export function rackCanvasLayout(rack) {
   const parts = Array.isArray(rack?.parts) ? rack.parts : [];

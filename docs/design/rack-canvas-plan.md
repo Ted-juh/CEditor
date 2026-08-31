@@ -155,10 +155,40 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
 
    The List view stays and stays first. It is keyboard-navigable and carries the per-part mixer;
    the canvas is neither, and neither one gets to be the only way in.
-3. **Make it interactive.** Drag to reorder within a lane; drag a lane's output onto a bus; drag
-   from the browser onto a lane to load. Every drop goes through the commands that already exist
-   (`moveMidiSlot`, `setPartDestination`, `loadInstrument`, `addEffect`) — the canvas issues them,
-   it does not bypass them.
+3. ~~**Make it interactive.**~~ **BUILT (routing), 2026-08-31.** Drag a part or a bus onto its
+   destination; drag an instrument from the browser onto a part to load it there. Every drop
+   issues a command that already existed (`setPartDestination`, `setBusDestination`,
+   `loadInstrument`) — the canvas decides what is *legal*, the service decides what *happens*,
+   exactly as the dropdowns do.
+
+   Legality is a pure function (`canvasDropTargets`) and it is the whole reason the constrained
+   canvas is honest: legal targets light up, everything else refuses the drop outright, so the
+   picture cannot be drawn into a routing the engine would turn down. A node's current
+   destination is not offered again either — a drop that changes nothing reads as a drop that
+   failed.
+
+   Sharing that function with the mixer found a real gap. The mixer's destination dropdown
+   excluded only the bus *itself*, and its comment claimed loops were "never offered here": an
+   indirect loop (A into B, then B into A) was still on the menu, and picking it got you an error
+   instead of a destination. Both now ask `busDestinationWouldLoop`.
+
+   Two HTML5 drag-and-drop traps, recorded because neither reports anything when it goes wrong:
+   a `dropEffect` that does not match the source's `effectAllowed` cancels the drop **silently**
+   (an instrument is copied, a node is moved, and saying "move" over a copy source loses it); and
+   `dragleave` fires when the pointer crosses onto a *child* of the target, with `relatedTarget`
+   null during a drag in Chromium, so the event cannot tell "left the box" from "moved within
+   it" — the highlight switched off while you were still over the box you were aiming at.
+   `dragover` owns the highlight now and the end of the drag clears it.
+
+   **Not built:** dragging to reorder a chain (inserts and MIDI modules still reorder with ▲▼ in
+   the dock), dragging effects from the browser (the browser lists instruments only), and
+   dropping an instrument on empty canvas to make a new part — that last one needs a native
+   add-and-load transaction, since add and load are two commands and the new part's id only
+   arrives on the next state push.
+
+   Keyboard equivalents exist by construction rather than by addition: every drop has a control
+   that still does the same job — the mixer's destination dropdowns, and the browser's Load
+   button — which is why the List view stays first.
 4. **Thumbnails**, in the order above.
 5. **Persisted positions**, optional: `x`/`y` per node in the manifest, with auto-layout as the
    fallback when they are absent, so an older session and a hand-written manifest both still open.
