@@ -164,3 +164,42 @@ New ideas go here with a date, so nothing gets lost between sessions.
   their own bars, Reason-style start/end wires horizontal and vertical, effects reading as a
   timeline the signal follows, a bottom display panel that shows whatever node is selected
   (arpeggiator, step sequencer, mixer, panning), and thumbnails in the plug-in browser.
+
+- **2026-08-31** — **the controller itself as a picture in the dock.** Setting up hardware controls
+  should not be a list of eight text rows either. The dock shows a drawing of the connected
+  surface — its keys, its encoder row, its pads, its faders — laid out the way the hardware
+  actually is. Click a segment (the encoders, the pads, a key zone) and it zooms to that section at
+  a workable size; a back button returns to the whole instrument.
+
+  *Why it fits:* same dock, same selection idea as the rack canvas, pointed at hardware instead of
+  signal. Assignment is inherently spatial — "this knob" is a position, and today it is row 3 of a
+  list.
+
+  *What already exists:* `SurfaceProfile` (`CE/src/ControlSurface/SurfaceProfile.h`) is the right
+  home, and it is already built on the rule that a surface describes itself rather than being
+  assumed. It carries `SurfaceCapabilities` — `encoders`, `faders`, `pads`, `padBanks`, display
+  size, transport buttons — and the registry is keyed by a stable `profileId` ("akai-ctrl49"), so a
+  Performance already names the surface it was authored on. Control pages already bind by parameter
+  identity with MIDI learn behind them, so the drawing issues commands that exist rather than new
+  ones.
+
+  *What is missing, and the fork in the road:* capabilities are **counts, not a layout**. No
+  positions, no sizes, no groupings, no key count at all. Two ways to go:
+
+  - **Generic, from the counts we have.** A row of N encoders, a grid of N pads in banks, N faders,
+    a generic keybed. Works for every controller the moment its profile exists; looks like nobody's
+    hardware in particular.
+  - **A real layout per profile.** An optional layout block — normalised positions and sizes per
+    control, named regions — so a CTRL49 looks like a CTRL49. Better, and it is per-controller work
+    somebody has to do and keep correct.
+
+  The sane order is generic first, with the layout block optional and the generic drawing as the
+  fallback whenever a profile has none — the same pattern as auto-layout versus saved positions on
+  the rack canvas. **A drawing hardcoded to the CTRL49 is the one option to refuse:** the whole
+  point of `SurfaceProfile` is that support is claimed by conformance, not by special-casing one
+  device in the UI.
+
+  *Worth having once it is spatial:* live feedback on the picture — the encoder you are turning
+  lights up, an unassigned control is visibly empty, a pad shows what it fires — and dragging a
+  parameter from the list onto a knob to assign it. That is the version that beats a list rather
+  than merely replacing it.
